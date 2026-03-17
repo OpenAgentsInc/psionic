@@ -1,0 +1,205 @@
+{
+  "dataset_storage_key": "oa.tassadar.hungarian_v0.sequence@trace-family-v1",
+  "dataset_digest": "8b07909f21fe1eb2cb0f580f312435f33577414ac9f59e68fcda412748aa0142",
+  "tokenizer_digest": "f4134f46b2722a420ccb7f72a34e3b45e17a7a03b8a2c24084e1792f7e324bed",
+  "vocabulary_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e",
+  "trainable_surface": "output_head_only",
+  "structural_supervision_inventory": {
+    "train": {
+      "split": "train",
+      "example_count": 4,
+      "coverage": {
+        "total_target_token_count": 219844,
+        "instruction_pointer_token_count": 14680,
+        "branch_outcome_token_count": 1760,
+        "stack_delta_token_count": 17616,
+        "memory_diff_token_count": 780,
+        "workload_specific_state_token_count": 0
+      }
+    },
+    "validation": {
+      "split": "validation",
+      "example_count": 2,
+      "coverage": {
+        "total_target_token_count": 111077,
+        "instruction_pointer_token_count": 7420,
+        "branch_outcome_token_count": 870,
+        "stack_delta_token_count": 8904,
+        "memory_diff_token_count": 455,
+        "workload_specific_state_token_count": 0
+      }
+    },
+    "test": {
+      "split": "test",
+      "example_count": 2,
+      "coverage": {
+        "total_target_token_count": 109922,
+        "instruction_pointer_token_count": 7340,
+        "branch_outcome_token_count": 880,
+        "stack_delta_token_count": 8808,
+        "memory_diff_token_count": 390,
+        "workload_specific_state_token_count": 0
+      }
+    }
+  },
+  "packing_policy": {
+    "packing_mode": "batch_by_token_budget",
+    "max_row_tokens": 58719,
+    "max_batch_tokens": 234876,
+    "max_rows_per_batch": 4,
+    "overlong_sequence_posture": "refuse"
+  },
+  "train_plan": {
+    "policy_digest": "bc4def3d23eadb6b95bd7bebd44f8d7324bc4ec3d1d661a56d3573246e40a989",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "a3fc2a00293947027cdf972ae4a07fe8dd154aebbef2a80bb04e520e27d6d2f4",
+        "rows": [
+          {
+            "row_id": "6feb869ce0e48c1eb89a3abb2b292808437eb72aa32d0c43a5ec256976f94901",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_v0_train_a.sequential_cpu_reference",
+                "shard_key": "train-000",
+                "sequence_index": 0,
+                "token_count": 57564
+              }
+            ],
+            "token_count": 57564,
+            "padded_token_count": 57564
+          },
+          {
+            "row_id": "0de71f4c6ca5d7f69f7d84a2bab17f880c6fd40924cc8909c341e5818849505a",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_v0_train_b.sequential_cpu_reference",
+                "shard_key": "train-000",
+                "sequence_index": 1,
+                "token_count": 58719
+              }
+            ],
+            "token_count": 58719,
+            "padded_token_count": 58719
+          },
+          {
+            "row_id": "b549f9154402f6d3c5ced144e3ea54af3cca270410a4bef549c1c7f119898828",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_v0_train_c.sequential_cpu_reference",
+                "shard_key": "train-000",
+                "sequence_index": 2,
+                "token_count": 57564
+              }
+            ],
+            "token_count": 57564,
+            "padded_token_count": 57564
+          },
+          {
+            "row_id": "7f934cea387dd4a1832f9f8822a03a1edb5687a1a752efd6081adf2e7728ceb0",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_v0_train_d.sequential_cpu_reference",
+                "shard_key": "train-000",
+                "sequence_index": 3,
+                "token_count": 56409
+              }
+            ],
+            "token_count": 56409,
+            "padded_token_count": 56409
+          }
+        ],
+        "token_count": 230256,
+        "padded_token_count": 230256,
+        "fill_bps": 9803
+      }
+    ],
+    "total_source_sequences": 4,
+    "total_source_tokens": 230256
+  },
+  "validation_plan": {
+    "policy_digest": "bc4def3d23eadb6b95bd7bebd44f8d7324bc4ec3d1d661a56d3573246e40a989",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "39543d6ddc3a55cdc7738f98d2d1c5af34de401af91edf9cb9b0df57fa402d22",
+        "rows": [
+          {
+            "row_id": "cfbc37170c68540b020b846877051e57d28da756e85dfec5650ac28d31b392bf",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_v0_validation_a.sequential_cpu_reference",
+                "shard_key": "validation-000",
+                "sequence_index": 0,
+                "token_count": 58719
+              }
+            ],
+            "token_count": 58719,
+            "padded_token_count": 58719
+          },
+          {
+            "row_id": "6fa20bda54c54b096b2603ee7c423a28b0dc8e8f9d31be46169fc4d8ccb4dba5",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_v0_validation_b.sequential_cpu_reference",
+                "shard_key": "validation-000",
+                "sequence_index": 1,
+                "token_count": 57564
+              }
+            ],
+            "token_count": 57564,
+            "padded_token_count": 57564
+          }
+        ],
+        "token_count": 116283,
+        "padded_token_count": 116283,
+        "fill_bps": 4950
+      }
+    ],
+    "total_source_sequences": 2,
+    "total_source_tokens": 116283
+  },
+  "test_plan": {
+    "policy_digest": "bc4def3d23eadb6b95bd7bebd44f8d7324bc4ec3d1d661a56d3573246e40a989",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "8555c75a30af0d0d887c11a9ff833e1212a210b32ffdb2f355ac33867cdb5afc",
+        "rows": [
+          {
+            "row_id": "245b3b8c95e285fa8f46f8afa0aa5a5a5bba6fde02e3d3ee619787e83e53107a",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_v0_test_a.sequential_cpu_reference",
+                "shard_key": "test-000",
+                "sequence_index": 0,
+                "token_count": 58719
+              }
+            ],
+            "token_count": 58719,
+            "padded_token_count": 58719
+          },
+          {
+            "row_id": "da0ffcd534adc2960afc0c12f838c00979ef35a5b8b98fc3686411a78726eb64",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_v0_test_b.sequential_cpu_reference",
+                "shard_key": "test-000",
+                "sequence_index": 1,
+                "token_count": 56409
+              }
+            ],
+            "token_count": 56409,
+            "padded_token_count": 56409
+          }
+        ],
+        "token_count": 115128,
+        "padded_token_count": 115128,
+        "fill_bps": 4901
+      }
+    ],
+    "total_source_sequences": 2,
+    "total_source_tokens": 115128
+  },
+  "manifest_digest": "261dffe050f13f2c9594ddce6788b51e417bd98138470427b0818962ff9565f6"
+}

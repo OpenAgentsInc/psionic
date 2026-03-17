@@ -330,6 +330,16 @@ Current posture:
   target tokens, while making the long-trace contract difference explicit by
   dropping estimated live bytes from `109715076` on the flat-prefix family to
   `1459452` on the windowed family under the same corpus and checkpoint stage
+- the first same-corpus sequential-vs-wavefront trace-family comparison now
+  also exists at
+  `fixtures/tassadar/runs/tassadar_trace_family_comparison_v1`; it keeps the
+  claim boundary at `research_only` for the alternate families while proving
+  their exact final-output reconstruction on shared corpora: 9x9 Sudoku drops
+  from `5335309` max total tokens on the sequential CPU trace to `52969` on
+  the anti-diagonal wavefront family, and article-sized 10x10 Hungarian drops
+  from `11532454` to `22050`, with all alternate families staying at
+  `10000` bps final-output exactness and the sequential family remaining the
+  only full CPU-trace authority
 - the post-Phase-15 boundary-adapter follow-on now also exists in
   `psionic-models`, `psionic-eval`, `psionic-research`, `docs/audits/`, and
   nine preserved bounded artifact roots at

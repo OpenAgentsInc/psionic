@@ -1,0 +1,153 @@
+{
+  "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@trace-family-v1",
+  "dataset_digest": "9df38e72db67698de8df3bf12c63ff4d4e8644e1bf031747c58b48aeb7f585d6",
+  "tokenizer_digest": "f4134f46b2722a420ccb7f72a34e3b45e17a7a03b8a2c24084e1792f7e324bed",
+  "vocabulary_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e",
+  "trainable_surface": "output_head_only",
+  "structural_supervision_inventory": {
+    "train": {
+      "split": "train",
+      "example_count": 2,
+      "coverage": {
+        "total_target_token_count": 9741810,
+        "instruction_pointer_token_count": 137340,
+        "branch_outcome_token_count": 34080,
+        "stack_delta_token_count": 164808,
+        "memory_diff_token_count": 3835,
+        "workload_specific_state_token_count": 0
+      }
+    },
+    "validation": {
+      "split": "validation",
+      "example_count": 1,
+      "coverage": {
+        "total_target_token_count": 5283773,
+        "instruction_pointer_token_count": 74490,
+        "branch_outcome_token_count": 18560,
+        "stack_delta_token_count": 89388,
+        "memory_diff_token_count": 2106,
+        "workload_specific_state_token_count": 0
+      }
+    },
+    "test": {
+      "split": "test",
+      "example_count": 1,
+      "coverage": {
+        "total_target_token_count": 4839686,
+        "instruction_pointer_token_count": 68230,
+        "branch_outcome_token_count": 16970,
+        "stack_delta_token_count": 81876,
+        "memory_diff_token_count": 1898,
+        "workload_specific_state_token_count": 0
+      }
+    }
+  },
+  "packing_policy": {
+    "packing_mode": "batch_by_token_budget",
+    "max_row_tokens": 5335309,
+    "max_batch_tokens": 21341236,
+    "max_rows_per_batch": 4,
+    "overlong_sequence_posture": "refuse"
+  },
+  "train_plan": {
+    "policy_digest": "675939f7d74ec15e453b0f2b84ff44d2519cb6e6b2389a4688c3decb9e1940bd",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "a2d66affcec3646c5a8dd73b8befcf84f8d102c5e55a3e766d5d42b50b1fa7ea",
+        "rows": [
+          {
+            "row_id": "9472bf79e4149df769288094e8b7175ff6d570bcb6e6e9e741a71b7e8c9cfd1e",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.sudoku_9x9_train_a.sequential_cpu_reference",
+                "shard_key": "train-000",
+                "sequence_index": 0,
+                "token_count": 4918195
+              }
+            ],
+            "token_count": 4918195,
+            "padded_token_count": 4918195
+          },
+          {
+            "row_id": "9030a80797eb86c2978dac79f527e484add448cae06655bf94b92bd9fb40b02a",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.sudoku_9x9_train_b.sequential_cpu_reference",
+                "shard_key": "train-000",
+                "sequence_index": 1,
+                "token_count": 4926687
+              }
+            ],
+            "token_count": 4926687,
+            "padded_token_count": 4926687
+          }
+        ],
+        "token_count": 9844882,
+        "padded_token_count": 9844882,
+        "fill_bps": 4613
+      }
+    ],
+    "total_source_sequences": 2,
+    "total_source_tokens": 9844882
+  },
+  "validation_plan": {
+    "policy_digest": "675939f7d74ec15e453b0f2b84ff44d2519cb6e6b2389a4688c3decb9e1940bd",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "36c5f6b10b7008b261bd984d1cd31748b36de15d46362de4ce5b00ba40c7bf1b",
+        "rows": [
+          {
+            "row_id": "6af2aac15d0865b0d168de0f7b24692d368ad87c3da076798a17b07fc2daa139",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.sudoku_9x9_validation_a.sequential_cpu_reference",
+                "shard_key": "validation-000",
+                "sequence_index": 0,
+                "token_count": 5335309
+              }
+            ],
+            "token_count": 5335309,
+            "padded_token_count": 5335309
+          }
+        ],
+        "token_count": 5335309,
+        "padded_token_count": 5335309,
+        "fill_bps": 2500
+      }
+    ],
+    "total_source_sequences": 1,
+    "total_source_tokens": 5335309
+  },
+  "test_plan": {
+    "policy_digest": "675939f7d74ec15e453b0f2b84ff44d2519cb6e6b2389a4688c3decb9e1940bd",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "67fc3638b78f97a3ff4ac71db7b5658dc3bf12c9b89bf204cd2e4d1fd4933f5e",
+        "rows": [
+          {
+            "row_id": "7df78a76ea8da174dcfd6b15c5bd3ffb8b80da9157f9e4cd4b5924a6c41abd0a",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.sudoku_9x9_test_a.sequential_cpu_reference",
+                "shard_key": "test-000",
+                "sequence_index": 0,
+                "token_count": 4891222
+              }
+            ],
+            "token_count": 4891222,
+            "padded_token_count": 4891222
+          }
+        ],
+        "token_count": 4891222,
+        "padded_token_count": 4891222,
+        "fill_bps": 2291
+      }
+    ],
+    "total_source_sequences": 1,
+    "total_source_tokens": 4891222
+  },
+  "manifest_digest": "8e79360e78ab25c02c1622e25b9be0a4cabc5e8d2da5f901e196d3e207fd1918"
+}

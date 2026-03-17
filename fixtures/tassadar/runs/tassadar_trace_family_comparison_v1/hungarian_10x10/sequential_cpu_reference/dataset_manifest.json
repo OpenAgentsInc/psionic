@@ -1,0 +1,129 @@
+{
+  "abi_version": "psionic.data.v1",
+  "key": {
+    "dataset_ref": "oa.tassadar.hungarian_10x10.sequence",
+    "version": "trace-family-v1"
+  },
+  "display_name": "Tassadar Hungarian-10x10 Tokenized Executor Sequences",
+  "record_encoding": "token_ids_le_u32",
+  "tokenizer": {
+    "family": "custom",
+    "tokenizer_digest": "76b6aa78974c92fec80e515d58e60ebec7462c70a6028c0a9bb06a3fbe55059c",
+    "vocab_size": 303,
+    "special_tokens_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e"
+  },
+  "context_window_tokens": 11532454,
+  "splits": [
+    {
+      "split_name": "train",
+      "kind": "train",
+      "sequence_count": 2,
+      "token_count": 16470786,
+      "shards": [
+        {
+          "shard_key": "train-000",
+          "manifest": {
+            "stream_id": "dataset://oa.tassadar.hungarian_10x10.sequence@trace-family-v1/train",
+            "manifest_digest": "133c6cb6007a3cd22911cbb6e4b1e7c75666c24b74c7ddfc649b62b93d6a5e29",
+            "subject": "tokenized_corpus",
+            "object_digest": "307b3a165f74aea1eb4f831ed8aec0b5ac633a436a7447fef33d932ab4de1087",
+            "total_bytes": 65883152,
+            "chunk_count": 1,
+            "chunk_bytes": 65883152,
+            "encoding": "token_ids_le_u32",
+            "provenance_digest": "ea309ff743a83edfaf104a9badd61d826b10393ab7668fbe8ef66dc64a5f8945",
+            "dataset_binding": {
+              "dataset_id": "oa.tassadar.hungarian_10x10.sequence@trace-family-v1",
+              "split": "train",
+              "shard_key": "train-000"
+            }
+          },
+          "sequence_count": 2,
+          "token_count": 16470786,
+          "min_sequence_tokens": 7068764,
+          "max_sequence_tokens": 9402022
+        }
+      ]
+    },
+    {
+      "split_name": "validation",
+      "kind": "validation",
+      "sequence_count": 1,
+      "token_count": 9499283,
+      "shards": [
+        {
+          "shard_key": "validation-000",
+          "manifest": {
+            "stream_id": "dataset://oa.tassadar.hungarian_10x10.sequence@trace-family-v1/validation",
+            "manifest_digest": "290b34d7d94fc0013622594c39741b439169c1c469983fe47a9378d274cad404",
+            "subject": "tokenized_corpus",
+            "object_digest": "ba0c7b122ee25dc262d9e1d53873bdcdc7f8ba015e810e06ff8c727f8531dd55",
+            "total_bytes": 37997136,
+            "chunk_count": 1,
+            "chunk_bytes": 37997136,
+            "encoding": "token_ids_le_u32",
+            "provenance_digest": "bbc3504dea28412a28ea79203066abf3f465da7576f56977908f95c00407b5f5",
+            "dataset_binding": {
+              "dataset_id": "oa.tassadar.hungarian_10x10.sequence@trace-family-v1",
+              "split": "validation",
+              "shard_key": "validation-000"
+            }
+          },
+          "sequence_count": 1,
+          "token_count": 9499283,
+          "min_sequence_tokens": 9499283,
+          "max_sequence_tokens": 9499283
+        }
+      ]
+    },
+    {
+      "split_name": "test",
+      "kind": "test",
+      "sequence_count": 1,
+      "token_count": 11532454,
+      "shards": [
+        {
+          "shard_key": "test-000",
+          "manifest": {
+            "stream_id": "dataset://oa.tassadar.hungarian_10x10.sequence@trace-family-v1/test",
+            "manifest_digest": "3fb82f978ece5c26ec458296bf5cc6db0ab4eaa55d5112d38ac6e44281574e62",
+            "subject": "tokenized_corpus",
+            "object_digest": "23849a691fde339e8b0a4d5307b891e26cd5f2e9f110a8de32e244c30e50dbcc",
+            "total_bytes": 46129820,
+            "chunk_count": 1,
+            "chunk_bytes": 46129820,
+            "encoding": "token_ids_le_u32",
+            "provenance_digest": "5ad84ecd02ba30bb3d00a5f7a387f7c0d6da65c11c7ae0c71fd5bb9ea9a4586f",
+            "dataset_binding": {
+              "dataset_id": "oa.tassadar.hungarian_10x10.sequence@trace-family-v1",
+              "split": "test",
+              "shard_key": "test-000"
+            }
+          },
+          "sequence_count": 1,
+          "token_count": 11532454,
+          "min_sequence_tokens": 11532454,
+          "max_sequence_tokens": 11532454
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "tassadar.example_count": 4,
+    "tassadar.sequence_dataset_abi_version": "psionic.tassadar.sequence_dataset.v1",
+    "tassadar.test.sequence_ids": [
+      "tassadar.sequence.hungarian_10x10_test_a.sequential_cpu_reference"
+    ],
+    "tassadar.trace_family": "sequential_cpu_reference",
+    "tassadar.trace_family_reconstruction_scope": "full_cpu_trace",
+    "tassadar.train.sequence_ids": [
+      "tassadar.sequence.hungarian_10x10_train_a.sequential_cpu_reference",
+      "tassadar.sequence.hungarian_10x10_train_b.sequential_cpu_reference"
+    ],
+    "tassadar.validation.sequence_ids": [
+      "tassadar.sequence.hungarian_10x10_validation_a.sequential_cpu_reference"
+    ],
+    "tassadar.vocabulary_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e",
+    "tassadar.workload": "oa.tassadar.hungarian_10x10.sequence"
+  }
+}

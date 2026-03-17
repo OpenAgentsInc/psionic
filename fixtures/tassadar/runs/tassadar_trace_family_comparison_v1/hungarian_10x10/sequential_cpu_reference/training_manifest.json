@@ -1,0 +1,153 @@
+{
+  "dataset_storage_key": "oa.tassadar.hungarian_10x10.sequence@trace-family-v1",
+  "dataset_digest": "a5cea8fd7460f6da4d4996cabfc34d760b854e5f0af9e7fcda5c699f5e429e97",
+  "tokenizer_digest": "f4134f46b2722a420ccb7f72a34e3b45e17a7a03b8a2c24084e1792f7e324bed",
+  "vocabulary_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e",
+  "trainable_surface": "output_head_only",
+  "structural_supervision_inventory": {
+    "train": {
+      "split": "train",
+      "example_count": 2,
+      "coverage": {
+        "total_target_token_count": 16427024,
+        "instruction_pointer_token_count": 695420,
+        "branch_outcome_token_count": 168340,
+        "stack_delta_token_count": 834504,
+        "memory_diff_token_count": 23985,
+        "workload_specific_state_token_count": 0
+      }
+    },
+    "validation": {
+      "split": "validation",
+      "example_count": 1,
+      "coverage": {
+        "total_target_token_count": 9477402,
+        "instruction_pointer_token_count": 401270,
+        "branch_outcome_token_count": 96970,
+        "stack_delta_token_count": 481524,
+        "memory_diff_token_count": 14235,
+        "workload_specific_state_token_count": 0
+      }
+    },
+    "test": {
+      "split": "test",
+      "example_count": 1,
+      "coverage": {
+        "total_target_token_count": 11510573,
+        "instruction_pointer_token_count": 487270,
+        "branch_outcome_token_count": 117760,
+        "stack_delta_token_count": 584724,
+        "memory_diff_token_count": 17680,
+        "workload_specific_state_token_count": 0
+      }
+    }
+  },
+  "packing_policy": {
+    "packing_mode": "batch_by_token_budget",
+    "max_row_tokens": 11532454,
+    "max_batch_tokens": 46129816,
+    "max_rows_per_batch": 4,
+    "overlong_sequence_posture": "refuse"
+  },
+  "train_plan": {
+    "policy_digest": "4347fcc80476bae8c19c7b3e39c2797083fdf11e912effa162eb74b4f4f2f7fd",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "593c3c0b6a98fc5492bc85287434ceb8ede35a06b73397cc38155cb93344998a",
+        "rows": [
+          {
+            "row_id": "4fcf798efdb552e5577a1ae746fa2739733297f2ad29dd45a7de644bb36690df",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_10x10_train_a.sequential_cpu_reference",
+                "shard_key": "train-000",
+                "sequence_index": 0,
+                "token_count": 7068764
+              }
+            ],
+            "token_count": 7068764,
+            "padded_token_count": 7068764
+          },
+          {
+            "row_id": "13175f0e024ab561e4b2f713919f60ac7e4daa6728cf91c01e1da2359d1ef04f",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_10x10_train_b.sequential_cpu_reference",
+                "shard_key": "train-000",
+                "sequence_index": 1,
+                "token_count": 9402022
+              }
+            ],
+            "token_count": 9402022,
+            "padded_token_count": 9402022
+          }
+        ],
+        "token_count": 16470786,
+        "padded_token_count": 16470786,
+        "fill_bps": 3570
+      }
+    ],
+    "total_source_sequences": 2,
+    "total_source_tokens": 16470786
+  },
+  "validation_plan": {
+    "policy_digest": "4347fcc80476bae8c19c7b3e39c2797083fdf11e912effa162eb74b4f4f2f7fd",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "da9a7d93e1f6aa2111b8a9904737e7ecf7d35bd1ae0d2593c3d344f5cc1cf9a6",
+        "rows": [
+          {
+            "row_id": "4d26925c6c72418dc935feb4890c39ea8d7f7a4ebe07409151f21f67a907dc39",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_10x10_validation_a.sequential_cpu_reference",
+                "shard_key": "validation-000",
+                "sequence_index": 0,
+                "token_count": 9499283
+              }
+            ],
+            "token_count": 9499283,
+            "padded_token_count": 9499283
+          }
+        ],
+        "token_count": 9499283,
+        "padded_token_count": 9499283,
+        "fill_bps": 2059
+      }
+    ],
+    "total_source_sequences": 1,
+    "total_source_tokens": 9499283
+  },
+  "test_plan": {
+    "policy_digest": "4347fcc80476bae8c19c7b3e39c2797083fdf11e912effa162eb74b4f4f2f7fd",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "3119b2f488398f3ed589b5763ddb69fc33dbde5ec9031274b90bdb704f7a0995",
+        "rows": [
+          {
+            "row_id": "5cc6de94f979990feb1fafb8e2de3c0da5058d53ac562b47094313591b6d258b",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_10x10_test_a.sequential_cpu_reference",
+                "shard_key": "test-000",
+                "sequence_index": 0,
+                "token_count": 11532454
+              }
+            ],
+            "token_count": 11532454,
+            "padded_token_count": 11532454
+          }
+        ],
+        "token_count": 11532454,
+        "padded_token_count": 11532454,
+        "fill_bps": 2500
+      }
+    ],
+    "total_source_sequences": 1,
+    "total_source_tokens": 11532454
+  },
+  "manifest_digest": "abd37180cf02d6953741a4214f35bd3f09502571b5f23249bfe55b2aceb1a87a"
+}

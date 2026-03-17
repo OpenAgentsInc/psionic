@@ -1,0 +1,154 @@
+{
+  "dataset_storage_key": "oa.tassadar.hungarian_10x10.sequence.hungarian_assignment_frontier@trace-family-v1",
+  "dataset_digest": "7406b2368e765c6b25823924cb4ff674665651d91fcd5a5b2af986d36ed81bde",
+  "tokenizer_digest": "f4134f46b2722a420ccb7f72a34e3b45e17a7a03b8a2c24084e1792f7e324bed",
+  "vocabulary_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e",
+  "trainable_surface": "output_head_only",
+  "trace_family": "hungarian_assignment_frontier",
+  "structural_supervision_inventory": {
+    "train": {
+      "split": "train",
+      "example_count": 2,
+      "coverage": {
+        "total_target_token_count": 338,
+        "instruction_pointer_token_count": 20,
+        "branch_outcome_token_count": 0,
+        "stack_delta_token_count": 24,
+        "memory_diff_token_count": 0,
+        "workload_specific_state_token_count": 0
+      }
+    },
+    "validation": {
+      "split": "validation",
+      "example_count": 1,
+      "coverage": {
+        "total_target_token_count": 169,
+        "instruction_pointer_token_count": 10,
+        "branch_outcome_token_count": 0,
+        "stack_delta_token_count": 12,
+        "memory_diff_token_count": 0,
+        "workload_specific_state_token_count": 0
+      }
+    },
+    "test": {
+      "split": "test",
+      "example_count": 1,
+      "coverage": {
+        "total_target_token_count": 169,
+        "instruction_pointer_token_count": 10,
+        "branch_outcome_token_count": 0,
+        "stack_delta_token_count": 12,
+        "memory_diff_token_count": 0,
+        "workload_specific_state_token_count": 0
+      }
+    }
+  },
+  "packing_policy": {
+    "packing_mode": "batch_by_token_budget",
+    "max_row_tokens": 22050,
+    "max_batch_tokens": 88200,
+    "max_rows_per_batch": 4,
+    "overlong_sequence_posture": "refuse"
+  },
+  "train_plan": {
+    "policy_digest": "ab2912e89c4721a47b8f83f208e25aef4c18de50cf3a2c885081fc6849fe2ff6",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "59e3c1c2aae7a22711820ccc23defca14d6cd59ea2ceba16955c7c005425b8f5",
+        "rows": [
+          {
+            "row_id": "337b823a10a6609af0613641fb4f50b12e7f5024150b484154e409418864b973",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_10x10_train_a.hungarian_assignment_frontier",
+                "shard_key": "train-000",
+                "sequence_index": 0,
+                "token_count": 22050
+              }
+            ],
+            "token_count": 22050,
+            "padded_token_count": 22050
+          },
+          {
+            "row_id": "b662f31b6e53392c6d35c5af2594c70096f165c5a4ec8657f02f2c82b38aa257",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_10x10_train_b.hungarian_assignment_frontier",
+                "shard_key": "train-000",
+                "sequence_index": 1,
+                "token_count": 22050
+              }
+            ],
+            "token_count": 22050,
+            "padded_token_count": 22050
+          }
+        ],
+        "token_count": 44100,
+        "padded_token_count": 44100,
+        "fill_bps": 5000
+      }
+    ],
+    "total_source_sequences": 2,
+    "total_source_tokens": 44100
+  },
+  "validation_plan": {
+    "policy_digest": "ab2912e89c4721a47b8f83f208e25aef4c18de50cf3a2c885081fc6849fe2ff6",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "aa02ebebed4908c4ada80a20b0e9ec29345a12d884c7bbef46a95ad31a5bf452",
+        "rows": [
+          {
+            "row_id": "ea029cceb8c5a50520526f83d3b2a68accc2c568a2e68b6e3e4f145c8a1f3943",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_10x10_validation_a.hungarian_assignment_frontier",
+                "shard_key": "validation-000",
+                "sequence_index": 0,
+                "token_count": 22050
+              }
+            ],
+            "token_count": 22050,
+            "padded_token_count": 22050
+          }
+        ],
+        "token_count": 22050,
+        "padded_token_count": 22050,
+        "fill_bps": 2500
+      }
+    ],
+    "total_source_sequences": 1,
+    "total_source_tokens": 22050
+  },
+  "test_plan": {
+    "policy_digest": "ab2912e89c4721a47b8f83f208e25aef4c18de50cf3a2c885081fc6849fe2ff6",
+    "packing_mode": "batch_by_token_budget",
+    "batches": [
+      {
+        "batch_id": "445e67b8abf49d725dd4e4078da5359015ee89941361b4b6ad01650afbc7e300",
+        "rows": [
+          {
+            "row_id": "ee1b68affdcaf5fd91d86f5998c576792d94a0bbd2d41beb4239b736d0157758",
+            "source_sequences": [
+              {
+                "sequence_id": "tassadar.sequence.hungarian_10x10_test_a.hungarian_assignment_frontier",
+                "shard_key": "test-000",
+                "sequence_index": 0,
+                "token_count": 22050
+              }
+            ],
+            "token_count": 22050,
+            "padded_token_count": 22050
+          }
+        ],
+        "token_count": 22050,
+        "padded_token_count": 22050,
+        "fill_bps": 2500
+      }
+    ],
+    "total_source_sequences": 1,
+    "total_source_tokens": 22050
+  },
+  "manifest_digest": "1d6cff4033bb5cd1c460f9803e8fd64a9f0981b11445da7dc3cda3b2cc44b21c"
+}

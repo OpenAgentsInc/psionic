@@ -450,6 +450,18 @@ That now includes one intentionally narrow executor-training answer:
   over the first `512` target tokens, but the explicit contract live-bytes bar
   drops from `109715076` to `1459452`, which is the honest reason to keep the
   windowed family around even though it is not yet a green 9x9 learned lane
+- the first same-corpus sequential-vs-wavefront target-family comparison now
+  also exists under
+  `fixtures/tassadar/runs/tassadar_trace_family_comparison_v1`; those
+  artifacts freeze dataset manifests and training manifests for the sequential
+  CPU trace plus alternate research-only families on shared Sudoku and
+  Hungarian corpora, and they keep the claim boundary explicit by proving only
+  final-output exactness for the alternates: 9x9 Sudoku drops from `5335309`
+  max total tokens on the sequential trace to `52969` on the anti-diagonal
+  wavefront family, while article-sized 10x10 Hungarian drops from
+  `11532454` to `22050` on the parallel assignment frontier, and all of those
+  alternate families remain `research_only` even though they preserve
+  `10000` bps final-output exactness
 - the learned-structure supervision follow-on now also exists beside that same
   bounded lane: `psionic-models` now derives structural target families for
   instruction pointer, branch outcome, stack delta, memory diff, and

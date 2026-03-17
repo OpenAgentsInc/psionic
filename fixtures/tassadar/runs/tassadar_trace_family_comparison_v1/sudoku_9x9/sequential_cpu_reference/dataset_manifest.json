@@ -1,0 +1,129 @@
+{
+  "abi_version": "psionic.data.v1",
+  "key": {
+    "dataset_ref": "oa.tassadar.sudoku_9x9.sequence",
+    "version": "trace-family-v1"
+  },
+  "display_name": "Tassadar Sudoku 9x9 Tokenized Executor Sequences",
+  "record_encoding": "token_ids_le_u32",
+  "tokenizer": {
+    "family": "custom",
+    "tokenizer_digest": "76b6aa78974c92fec80e515d58e60ebec7462c70a6028c0a9bb06a3fbe55059c",
+    "vocab_size": 303,
+    "special_tokens_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e"
+  },
+  "context_window_tokens": 5335309,
+  "splits": [
+    {
+      "split_name": "train",
+      "kind": "train",
+      "sequence_count": 2,
+      "token_count": 9844882,
+      "shards": [
+        {
+          "shard_key": "train-000",
+          "manifest": {
+            "stream_id": "dataset://oa.tassadar.sudoku_9x9.sequence@trace-family-v1/train",
+            "manifest_digest": "d83da56d6c7433633d4348b7be46292ff2892156b312ac0fa0d911fcb2313c4a",
+            "subject": "tokenized_corpus",
+            "object_digest": "a99a7fd8c22b22ffccc5479bbbea3f5eee07a66c38fe9560a33b1dada8672864",
+            "total_bytes": 39379536,
+            "chunk_count": 1,
+            "chunk_bytes": 39379536,
+            "encoding": "token_ids_le_u32",
+            "provenance_digest": "35f156989ce3bfb3ee24a1bf8ccf56cbf5db8dc6e3edce187ba9ce1fa0bcd62b",
+            "dataset_binding": {
+              "dataset_id": "oa.tassadar.sudoku_9x9.sequence@trace-family-v1",
+              "split": "train",
+              "shard_key": "train-000"
+            }
+          },
+          "sequence_count": 2,
+          "token_count": 9844882,
+          "min_sequence_tokens": 4918195,
+          "max_sequence_tokens": 4926687
+        }
+      ]
+    },
+    {
+      "split_name": "validation",
+      "kind": "validation",
+      "sequence_count": 1,
+      "token_count": 5335309,
+      "shards": [
+        {
+          "shard_key": "validation-000",
+          "manifest": {
+            "stream_id": "dataset://oa.tassadar.sudoku_9x9.sequence@trace-family-v1/validation",
+            "manifest_digest": "5adfaf800c9213dcce5f8235bdc668a1c5c9a887c1a8e5f30db19cae8d383f84",
+            "subject": "tokenized_corpus",
+            "object_digest": "bc5ce981e69584c04bdb4d2061bf7dcba34fe8b7c636832d27448d8c07ff5afd",
+            "total_bytes": 21341240,
+            "chunk_count": 1,
+            "chunk_bytes": 21341240,
+            "encoding": "token_ids_le_u32",
+            "provenance_digest": "97d5f7f2210cfb440c4214623462e2ab626fad8fd5fc391230f11cdf77d97d37",
+            "dataset_binding": {
+              "dataset_id": "oa.tassadar.sudoku_9x9.sequence@trace-family-v1",
+              "split": "validation",
+              "shard_key": "validation-000"
+            }
+          },
+          "sequence_count": 1,
+          "token_count": 5335309,
+          "min_sequence_tokens": 5335309,
+          "max_sequence_tokens": 5335309
+        }
+      ]
+    },
+    {
+      "split_name": "test",
+      "kind": "test",
+      "sequence_count": 1,
+      "token_count": 4891222,
+      "shards": [
+        {
+          "shard_key": "test-000",
+          "manifest": {
+            "stream_id": "dataset://oa.tassadar.sudoku_9x9.sequence@trace-family-v1/test",
+            "manifest_digest": "0b73d36d55e6eec5b11ab612a9090eae2a42532a65bcd6681882ddf644a42cfa",
+            "subject": "tokenized_corpus",
+            "object_digest": "25eeb2ff233f5d15c5f7399333b7b1ed1ca54a41161aad6305d242bb4d98d3c5",
+            "total_bytes": 19564892,
+            "chunk_count": 1,
+            "chunk_bytes": 19564892,
+            "encoding": "token_ids_le_u32",
+            "provenance_digest": "fe9f2ba2c758753417290fbd8f018dab41a2a61d74d3f58ad2728337d9e26d0e",
+            "dataset_binding": {
+              "dataset_id": "oa.tassadar.sudoku_9x9.sequence@trace-family-v1",
+              "split": "test",
+              "shard_key": "test-000"
+            }
+          },
+          "sequence_count": 1,
+          "token_count": 4891222,
+          "min_sequence_tokens": 4891222,
+          "max_sequence_tokens": 4891222
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "tassadar.example_count": 4,
+    "tassadar.sequence_dataset_abi_version": "psionic.tassadar.sequence_dataset.v1",
+    "tassadar.test.sequence_ids": [
+      "tassadar.sequence.sudoku_9x9_test_a.sequential_cpu_reference"
+    ],
+    "tassadar.trace_family": "sequential_cpu_reference",
+    "tassadar.trace_family_reconstruction_scope": "full_cpu_trace",
+    "tassadar.train.sequence_ids": [
+      "tassadar.sequence.sudoku_9x9_train_a.sequential_cpu_reference",
+      "tassadar.sequence.sudoku_9x9_train_b.sequential_cpu_reference"
+    ],
+    "tassadar.validation.sequence_ids": [
+      "tassadar.sequence.sudoku_9x9_validation_a.sequential_cpu_reference"
+    ],
+    "tassadar.vocabulary_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e",
+    "tassadar.workload": "oa.tassadar.sudoku_9x9.sequence"
+  }
+}

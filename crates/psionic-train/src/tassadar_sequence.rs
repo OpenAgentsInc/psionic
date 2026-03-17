@@ -3,12 +3,13 @@ use psionic_data::{
     TassadarSequenceDatasetError, TassadarSequenceSplit,
 };
 use psionic_eval::{
-    TassadarSequenceEvalError, TassadarSequenceWorkload, build_tassadar_sequence_dataset,
+    TassadarSequenceDatasetBundle, TassadarSequenceEvalError, TassadarSequenceWorkload,
+    build_tassadar_sequence_dataset, build_tassadar_sequence_dataset_with_trace_family,
 };
 use psionic_models::{
     TassadarExecutorLongTraceContract, TassadarExecutorTrainableSurface,
-    TassadarStructuralSupervisionCoverage,
-    TassadarTraceTokenizer, TokenId,
+    TassadarSequenceTraceFamily, TassadarStructuralSupervisionCoverage, TassadarTraceTokenizer,
+    TokenId,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -24,6 +25,10 @@ fn default_structural_supervision_config() -> TassadarExecutorStructuralSupervis
 
 fn default_long_trace_contract() -> TassadarExecutorLongTraceContract {
     TassadarExecutorLongTraceContract::FlatPrefixFullForward
+}
+
+fn default_trace_family() -> TassadarSequenceTraceFamily {
+    TassadarSequenceTraceFamily::SequentialCpuReference
 }
 
 /// Frozen train/eval packing contract for the tokenized Sudoku-v0 executor corpus.
@@ -52,6 +57,12 @@ pub struct TassadarSequenceTrainingManifest {
         skip_serializing_if = "long_trace_contract_is_flat_prefix"
     )]
     pub long_trace_contract: TassadarExecutorLongTraceContract,
+    /// Explicit symbolic trace family bound to this manifest.
+    #[serde(
+        default = "default_trace_family",
+        skip_serializing_if = "trace_family_is_sequential_cpu_reference"
+    )]
+    pub trace_family: TassadarSequenceTraceFamily,
     /// Explicit structural-supervision weighting profile frozen into the run.
     #[serde(
         default = "default_structural_supervision_config",
@@ -80,6 +91,7 @@ impl TassadarSequenceTrainingManifest {
         trainable_surface: TassadarExecutorTrainableSurface,
         teacher_forced_training_strategy: TassadarExecutorTeacherForcedTrainingStrategy,
         long_trace_contract: TassadarExecutorLongTraceContract,
+        trace_family: TassadarSequenceTraceFamily,
         structural_supervision: TassadarExecutorStructuralSupervisionConfig,
         structural_supervision_inventory: TassadarSequenceStructuralSupervisionInventory,
         packing_policy: DatasetPackingPolicy,
@@ -95,6 +107,7 @@ impl TassadarSequenceTrainingManifest {
             trainable_surface,
             teacher_forced_training_strategy,
             long_trace_contract,
+            trace_family,
             structural_supervision,
             structural_supervision_inventory,
             packing_policy,
@@ -138,6 +151,10 @@ fn long_trace_contract_is_flat_prefix(contract: &TassadarExecutorLongTraceContra
     *contract == TassadarExecutorLongTraceContract::FlatPrefixFullForward
 }
 
+fn trace_family_is_sequential_cpu_reference(family: &TassadarSequenceTraceFamily) -> bool {
+    *family == TassadarSequenceTraceFamily::SequentialCpuReference
+}
+
 fn structural_supervision_config_is_next_token_only(
     config: &TassadarExecutorStructuralSupervisionConfig,
 ) -> bool {
@@ -176,7 +193,45 @@ pub fn build_tassadar_sequence_training_manifest(
     structural_supervision: TassadarExecutorStructuralSupervisionConfig,
 ) -> Result<TassadarSequenceTrainingManifest, TassadarSequenceTrainingError> {
     let bundle = build_tassadar_sequence_dataset(workload, version)?;
-    let dataset = bundle.dataset;
+    build_tassadar_sequence_training_manifest_from_bundle(
+        &bundle,
+        trainable_surface,
+        teacher_forced_training_strategy,
+        long_trace_contract,
+        structural_supervision,
+    )
+}
+
+/// Builds one frozen sequence dataset plus generic packing plans for a specific trace family.
+pub fn build_tassadar_sequence_training_manifest_with_trace_family(
+    workload: TassadarSequenceWorkload,
+    version: &str,
+    trace_family: TassadarSequenceTraceFamily,
+    trainable_surface: TassadarExecutorTrainableSurface,
+    teacher_forced_training_strategy: TassadarExecutorTeacherForcedTrainingStrategy,
+    long_trace_contract: TassadarExecutorLongTraceContract,
+    structural_supervision: TassadarExecutorStructuralSupervisionConfig,
+) -> Result<TassadarSequenceTrainingManifest, TassadarSequenceTrainingError> {
+    let bundle =
+        build_tassadar_sequence_dataset_with_trace_family(workload, version, trace_family)?;
+    build_tassadar_sequence_training_manifest_from_bundle(
+        &bundle,
+        trainable_surface,
+        teacher_forced_training_strategy,
+        long_trace_contract,
+        structural_supervision,
+    )
+}
+
+/// Builds one frozen sequence training manifest from a pre-built dataset bundle.
+pub fn build_tassadar_sequence_training_manifest_from_bundle(
+    bundle: &TassadarSequenceDatasetBundle,
+    trainable_surface: TassadarExecutorTrainableSurface,
+    teacher_forced_training_strategy: TassadarExecutorTeacherForcedTrainingStrategy,
+    long_trace_contract: TassadarExecutorLongTraceContract,
+    structural_supervision: TassadarExecutorStructuralSupervisionConfig,
+) -> Result<TassadarSequenceTrainingManifest, TassadarSequenceTrainingError> {
+    let dataset = &bundle.dataset;
     let tokenizer = TassadarTraceTokenizer::new();
     let max_tokens = dataset
         .examples
@@ -195,14 +250,15 @@ pub fn build_tassadar_sequence_training_manifest(
         dataset.packing_plan(TassadarSequenceSplit::Validation, &packing_policy)?;
     let test_plan = dataset.packing_plan(TassadarSequenceSplit::Test, &packing_policy)?;
     let structural_supervision_inventory =
-        build_structural_supervision_inventory(&tokenizer, &dataset);
+        build_structural_supervision_inventory(&tokenizer, dataset);
     Ok(TassadarSequenceTrainingManifest::new(
-        &dataset,
+        dataset,
         bundle.tokenizer_digest.stable_digest().as_str(),
         bundle.vocabulary_digest.as_str(),
         trainable_surface,
         teacher_forced_training_strategy,
         long_trace_contract,
+        bundle.trace_family,
         structural_supervision,
         structural_supervision_inventory,
         packing_policy,
@@ -270,7 +326,11 @@ fn build_split_structural_supervision_coverage(
 ) -> TassadarSequenceStructuralSupervisionSplitCoverage {
     let mut coverage = TassadarStructuralSupervisionCoverage::default();
     let mut example_count = 0_u32;
-    for example in dataset.examples.iter().filter(|example| example.metadata.split == split) {
+    for example in dataset
+        .examples
+        .iter()
+        .filter(|example| example.metadata.split == split)
+    {
         let tokens = example
             .token_ids
             .iter()
@@ -317,7 +377,12 @@ mod tests {
         assert_eq!(manifest.validation_plan.total_source_sequences, 2);
         assert_eq!(manifest.test_plan.total_source_sequences, 2);
         assert!(
-            manifest.structural_supervision_inventory.train.coverage.total_target_token_count > 0
+            manifest
+                .structural_supervision_inventory
+                .train
+                .coverage
+                .total_target_token_count
+                > 0
         );
         assert!(
             manifest

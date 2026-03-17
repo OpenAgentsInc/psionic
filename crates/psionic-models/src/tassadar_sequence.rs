@@ -63,6 +63,52 @@ const EVENT_RETURN: &str = "<event_return>";
 const HALT_RETURNED: &str = "<halt_returned>";
 const HALT_FELL_OFF_END: &str = "<halt_fell_off_end>";
 
+/// Explicit symbolic target family for one tokenized Tassadar sequence dataset.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarSequenceTraceFamily {
+    /// Canonical CPU-style append-only instruction trace.
+    #[default]
+    SequentialCpuReference,
+    /// Research-only anti-diagonal Sudoku assignment wavefront.
+    SudokuDiagonalWavefront,
+    /// Research-only parallel Hungarian assignment frontier.
+    HungarianAssignmentFrontier,
+}
+
+impl TassadarSequenceTraceFamily {
+    /// Returns the stable trace-family label.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::SequentialCpuReference => "sequential_cpu_reference",
+            Self::SudokuDiagonalWavefront => "sudoku_diagonal_wavefront",
+            Self::HungarianAssignmentFrontier => "hungarian_assignment_frontier",
+        }
+    }
+
+    /// Returns the stable dataset-suffix label for non-canonical families.
+    #[must_use]
+    pub const fn dataset_suffix(self) -> Option<&'static str> {
+        match self {
+            Self::SequentialCpuReference => None,
+            Self::SudokuDiagonalWavefront => Some("sudoku_diagonal_wavefront"),
+            Self::HungarianAssignmentFrontier => Some("hungarian_assignment_frontier"),
+        }
+    }
+
+    /// Returns the honest reconstruction scope for the trace family.
+    #[must_use]
+    pub const fn reconstruction_scope(self) -> &'static str {
+        match self {
+            Self::SequentialCpuReference => "full_cpu_trace",
+            Self::SudokuDiagonalWavefront | Self::HungarianAssignmentFrontier => {
+                "final_outputs_only"
+            }
+        }
+    }
+}
+
 /// Structural supervision family derived from the canonical Tassadar trace ABI.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -118,21 +164,17 @@ impl TassadarStructuralSupervisionCoverage {
                     self.instruction_pointer_token_count.saturating_add(1);
             }
             TassadarStructuralSupervisionFamily::BranchOutcome => {
-                self.branch_outcome_token_count =
-                    self.branch_outcome_token_count.saturating_add(1);
+                self.branch_outcome_token_count = self.branch_outcome_token_count.saturating_add(1);
             }
             TassadarStructuralSupervisionFamily::StackDelta => {
-                self.stack_delta_token_count =
-                    self.stack_delta_token_count.saturating_add(1);
+                self.stack_delta_token_count = self.stack_delta_token_count.saturating_add(1);
             }
             TassadarStructuralSupervisionFamily::MemoryDiff => {
-                self.memory_diff_token_count =
-                    self.memory_diff_token_count.saturating_add(1);
+                self.memory_diff_token_count = self.memory_diff_token_count.saturating_add(1);
             }
             TassadarStructuralSupervisionFamily::WorkloadSpecificState => {
-                self.workload_specific_state_token_count = self
-                    .workload_specific_state_token_count
-                    .saturating_add(1);
+                self.workload_specific_state_token_count =
+                    self.workload_specific_state_token_count.saturating_add(1);
             }
         }
     }
@@ -320,27 +362,92 @@ impl TassadarTraceTokenizer {
         execution: &TassadarExecution,
     ) -> TassadarTokenizedExecutionSequence {
         let mut tokens = Vec::new();
-        tokens.push(self.vocabulary.bos_id());
-        tokens.push(self.token_id(PROGRAM_TOKEN));
-        tokens.push(self.token_id(FIELD_LOCALS));
-        self.push_u32(&mut tokens, program.local_count as u32);
-        tokens.push(self.token_id(FIELD_MEMORY_SLOTS));
-        self.push_u32(&mut tokens, program.memory_slots as u32);
-        tokens.push(self.token_id(FIELD_INITIAL_MEMORY));
-        self.push_u32(&mut tokens, program.initial_memory.len() as u32);
-        for value in &program.initial_memory {
-            self.push_i32(&mut tokens, *value);
-        }
-        for instruction in &program.instructions {
-            self.push_instruction(&mut tokens, instruction);
-        }
-        tokens.push(self.token_id(TRACE_TOKEN));
-        let prompt_token_count = tokens.len();
+        let prompt_token_count = self.push_program_prompt(&mut tokens, program);
         for step in &execution.steps {
             self.push_step(&mut tokens, step);
         }
         tokens.push(self.token_id(HALT_TOKEN));
         self.push_halt_reason(&mut tokens, execution.halt_reason);
+        tokens.push(self.vocabulary.eos_id());
+        TassadarTokenizedExecutionSequence::new(TokenSequence::new(tokens), prompt_token_count)
+    }
+
+    /// Tokenizes one Sudoku solution as an anti-diagonal assignment wavefront.
+    #[must_use]
+    pub fn tokenize_program_and_sudoku_diagonal_wavefront(
+        &self,
+        program: &TassadarProgram,
+        solved_outputs: &[i32],
+        grid_width: usize,
+    ) -> TassadarTokenizedExecutionSequence {
+        let mut tokens = Vec::new();
+        let prompt_token_count = self.push_program_prompt(&mut tokens, program);
+        let mut emitted_count = 0_u32;
+        for wavefront_index in 0..grid_width.saturating_mul(2).saturating_sub(1) {
+            let mut payload = Vec::new();
+            for row in 0..grid_width {
+                let Some(col) = wavefront_index.checked_sub(row) else {
+                    continue;
+                };
+                if col >= grid_width {
+                    continue;
+                }
+                let cell_index = row.saturating_mul(grid_width).saturating_add(col);
+                let Some(value) = solved_outputs.get(cell_index) else {
+                    continue;
+                };
+                payload.push(cell_index as i32);
+                payload.push(*value);
+            }
+            emitted_count = emitted_count.saturating_add((payload.len() / 2) as u32);
+            self.push_wavefront_step(
+                &mut tokens,
+                wavefront_index as u32,
+                (payload.len() / 2) as u32,
+                emitted_count,
+                payload.as_slice(),
+                emitted_count as i32,
+            );
+        }
+        tokens.push(self.token_id(HALT_TOKEN));
+        self.push_halt_reason(&mut tokens, TassadarHaltReason::Returned);
+        tokens.push(self.vocabulary.eos_id());
+        TassadarTokenizedExecutionSequence::new(TokenSequence::new(tokens), prompt_token_count)
+    }
+
+    /// Tokenizes one Hungarian optimum as a parallel assignment frontier.
+    #[must_use]
+    pub fn tokenize_program_and_hungarian_assignment_frontier(
+        &self,
+        program: &TassadarProgram,
+        optimal_assignment: &[i32],
+        cost_matrix: &[i32],
+        optimal_cost: i32,
+    ) -> TassadarTokenizedExecutionSequence {
+        let mut tokens = Vec::new();
+        let prompt_token_count = self.push_program_prompt(&mut tokens, program);
+        let dimension = optimal_assignment.len();
+        let mut payload = Vec::with_capacity(dimension.saturating_mul(3));
+        for (row, column) in optimal_assignment.iter().enumerate() {
+            let column = *column as usize;
+            let row_cost = cost_matrix
+                .get(row.saturating_mul(dimension).saturating_add(column))
+                .copied()
+                .unwrap_or_default();
+            payload.push(row as i32);
+            payload.push(column as i32);
+            payload.push(row_cost);
+        }
+        self.push_wavefront_step(
+            &mut tokens,
+            0,
+            dimension as u32,
+            optimal_cost.max(0) as u32,
+            payload.as_slice(),
+            optimal_cost,
+        );
+        tokens.push(self.token_id(HALT_TOKEN));
+        self.push_halt_reason(&mut tokens, TassadarHaltReason::Returned);
         tokens.push(self.vocabulary.eos_id());
         TassadarTokenizedExecutionSequence::new(TokenSequence::new(tokens), prompt_token_count)
     }
@@ -399,6 +506,59 @@ impl TassadarTraceTokenizer {
             }
         }
         None
+    }
+
+    /// Reconstructs final Sudoku outputs from one anti-diagonal wavefront trace.
+    #[must_use]
+    pub fn extract_sudoku_diagonal_wavefront_outputs(
+        &self,
+        tokens: &[TokenId],
+        prompt_token_count: usize,
+        cell_count: usize,
+    ) -> Vec<i32> {
+        let mut outputs = vec![0; cell_count];
+        let mut index = prompt_token_count;
+        while let Some(step) = self.parse_wavefront_step(tokens, index) {
+            if step.stack_after.len() % 2 == 0 {
+                for pair in step.stack_after.chunks_exact(2) {
+                    let cell_index = pair[0].max(0) as usize;
+                    if cell_index < outputs.len() {
+                        outputs[cell_index] = pair[1];
+                    }
+                }
+            }
+            index = step.next_index;
+        }
+        outputs
+    }
+
+    /// Reconstructs final Hungarian outputs from one parallel assignment frontier trace.
+    #[must_use]
+    pub fn extract_hungarian_assignment_frontier_outputs(
+        &self,
+        tokens: &[TokenId],
+        prompt_token_count: usize,
+        dimension: usize,
+    ) -> Vec<i32> {
+        let mut assignments = vec![0; dimension];
+        let mut total_cost = 0_i32;
+        let mut index = prompt_token_count;
+        while let Some(step) = self.parse_wavefront_step(tokens, index) {
+            if let Some(summary_output) = step.summary_output {
+                total_cost = summary_output;
+            }
+            if step.stack_after.len() % 3 == 0 {
+                for triple in step.stack_after.chunks_exact(3) {
+                    let row = triple[0].max(0) as usize;
+                    if row < assignments.len() {
+                        assignments[row] = triple[1];
+                    }
+                }
+            }
+            index = step.next_index;
+        }
+        assignments.push(total_cost);
+        assignments
     }
 
     /// Classifies each target token into zero or more structural supervision families.
@@ -511,6 +671,50 @@ impl TassadarTraceTokenizer {
         self.push_i32_list(tokens, FIELD_STACK_AFTER, &step.stack_after);
         self.push_i32_list(tokens, FIELD_LOCALS_AFTER, &step.locals_after);
         self.push_i32_list(tokens, FIELD_MEMORY_AFTER, &step.memory_after);
+    }
+
+    fn push_program_prompt(&self, tokens: &mut Vec<TokenId>, program: &TassadarProgram) -> usize {
+        tokens.push(self.vocabulary.bos_id());
+        tokens.push(self.token_id(PROGRAM_TOKEN));
+        tokens.push(self.token_id(FIELD_LOCALS));
+        self.push_u32(tokens, program.local_count as u32);
+        tokens.push(self.token_id(FIELD_MEMORY_SLOTS));
+        self.push_u32(tokens, program.memory_slots as u32);
+        tokens.push(self.token_id(FIELD_INITIAL_MEMORY));
+        self.push_u32(tokens, program.initial_memory.len() as u32);
+        for value in &program.initial_memory {
+            self.push_i32(tokens, *value);
+        }
+        for instruction in &program.instructions {
+            self.push_instruction(tokens, instruction);
+        }
+        tokens.push(self.token_id(TRACE_TOKEN));
+        tokens.len()
+    }
+
+    fn push_wavefront_step(
+        &self,
+        tokens: &mut Vec<TokenId>,
+        step_index: u32,
+        payload_item_count: u32,
+        summary_index: u32,
+        payload: &[i32],
+        summary_output: i32,
+    ) {
+        tokens.push(self.token_id(STEP_TOKEN));
+        tokens.push(self.token_id(FIELD_STEP_INDEX));
+        self.push_u32(tokens, step_index);
+        tokens.push(self.token_id(FIELD_PC));
+        self.push_u32(tokens, payload_item_count);
+        tokens.push(self.token_id(FIELD_NEXT_PC));
+        self.push_u32(tokens, summary_index);
+        tokens.push(self.token_id(OP_OUTPUT));
+        tokens.push(self.token_id(EVENT_OUTPUT));
+        self.push_i32(tokens, summary_output);
+        self.push_i32_list(tokens, FIELD_STACK_BEFORE, &[]);
+        self.push_i32_list(tokens, FIELD_STACK_AFTER, payload);
+        self.push_i32_list(tokens, FIELD_LOCALS_AFTER, &[]);
+        self.push_i32_list(tokens, FIELD_MEMORY_AFTER, &[]);
     }
 
     fn push_instruction(&self, tokens: &mut Vec<TokenId>, instruction: &TassadarInstruction) {
@@ -687,13 +891,7 @@ impl TassadarTraceTokenizer {
             return index.saturating_add(1);
         }
         if let Some(family) = family {
-            self.mark_target_range(
-                prompt_token_count,
-                index,
-                5,
-                family,
-                families,
-            );
+            self.mark_target_range(prompt_token_count, index, 5, family, families);
         }
         index.saturating_add(5).min(tokens.len())
     }
@@ -756,7 +954,9 @@ impl TassadarTraceTokenizer {
                 TassadarStructuralSupervisionFamily::MemoryDiff,
                 families,
             );
-            let slot = self.parse_u32(tokens, index.saturating_add(1)).map(|value| value as usize);
+            let slot = self
+                .parse_u32(tokens, index.saturating_add(1))
+                .map(|value| value as usize);
             return (index.saturating_add(9).min(tokens.len()), slot);
         }
         if token == self.token_id(EVENT_BRANCH) {
@@ -858,6 +1058,74 @@ impl TassadarTraceTokenizer {
         Some(u32::from_le_bytes(bytes))
     }
 
+    fn parse_i32_list(
+        &self,
+        tokens: &[TokenId],
+        index: usize,
+        field_token: &str,
+    ) -> Option<Vec<i32>> {
+        if index.saturating_add(6) > tokens.len()
+            || tokens.get(index).copied()? != self.token_id(field_token)
+            || tokens.get(index + 1).copied()? != self.token_id(LIST_TOKEN)
+        {
+            return None;
+        }
+        let value_count = self.parse_u32(tokens, index + 2)? as usize;
+        let values_start = index + 6;
+        let mut values = Vec::with_capacity(value_count);
+        for value_index in 0..value_count {
+            values.push(self.parse_i32(tokens, values_start + value_index.saturating_mul(4))?);
+        }
+        Some(values)
+    }
+
+    fn parse_wavefront_step(
+        &self,
+        tokens: &[TokenId],
+        index: usize,
+    ) -> Option<ParsedWavefrontStep> {
+        if tokens.get(index).copied()? != self.token_id(STEP_TOKEN) {
+            return None;
+        }
+        if tokens.get(index + 1).copied()? != self.token_id(FIELD_STEP_INDEX) {
+            return None;
+        }
+        let step_index = self.parse_u32(tokens, index + 2)?;
+        if tokens.get(index + 6).copied()? != self.token_id(FIELD_PC) {
+            return None;
+        }
+        let payload_item_count = self.parse_u32(tokens, index + 7)?;
+        if tokens.get(index + 11).copied()? != self.token_id(FIELD_NEXT_PC) {
+            return None;
+        }
+        let summary_index = self.parse_u32(tokens, index + 12)?;
+        let op_index = index + 16;
+        if tokens.get(op_index).copied()? != self.token_id(OP_OUTPUT) {
+            return None;
+        }
+        if tokens.get(op_index + 1).copied()? != self.token_id(EVENT_OUTPUT) {
+            return None;
+        }
+        let summary_output = self.parse_i32(tokens, op_index + 2)?;
+        let stack_before_index = op_index + 6;
+        let stack_before = self.parse_i32_list(tokens, stack_before_index, FIELD_STACK_BEFORE)?;
+        let stack_after_index = stack_before_index + 6 + stack_before.len().saturating_mul(4);
+        let stack_after = self.parse_i32_list(tokens, stack_after_index, FIELD_STACK_AFTER)?;
+        let locals_after_index = stack_after_index + 6 + stack_after.len().saturating_mul(4);
+        let locals_after = self.parse_i32_list(tokens, locals_after_index, FIELD_LOCALS_AFTER)?;
+        let memory_after_index = locals_after_index + 6 + locals_after.len().saturating_mul(4);
+        let memory_after = self.parse_i32_list(tokens, memory_after_index, FIELD_MEMORY_AFTER)?;
+        let next_index = memory_after_index + 6 + memory_after.len().saturating_mul(4);
+        Some(ParsedWavefrontStep {
+            step_index,
+            payload_item_count,
+            summary_index,
+            summary_output: Some(summary_output),
+            stack_after,
+            next_index,
+        })
+    }
+
     fn mark_target_range(
         &self,
         prompt_token_count: usize,
@@ -920,12 +1188,27 @@ where
     hex::encode(hasher.finalize())
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ParsedWavefrontStep {
+    step_index: u32,
+    payload_item_count: u32,
+    summary_index: u32,
+    summary_output: Option<i32>,
+    stack_after: Vec<i32>,
+    next_index: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use crate::TokenizerBoundary;
-    use psionic_runtime::{TassadarCpuReferenceRunner, tassadar_sudoku_v0_corpus};
+    use psionic_runtime::{
+        TassadarCpuReferenceRunner, tassadar_hungarian_10x10_corpus, tassadar_sudoku_9x9_corpus,
+        tassadar_sudoku_v0_corpus,
+    };
 
-    use super::{TassadarStructuralSupervisionCoverage, TassadarTraceTokenizer};
+    use super::{
+        TassadarSequenceTraceFamily, TassadarStructuralSupervisionCoverage, TassadarTraceTokenizer,
+    };
 
     #[test]
     fn tokenizer_roundtrips_symbolic_tokens_for_sudoku_v0_reference_case()
@@ -984,6 +1267,63 @@ mod tests {
             coverage.workload_specific_state_token_count,
             TassadarStructuralSupervisionCoverage::default().workload_specific_state_token_count
         );
+        Ok(())
+    }
+
+    #[test]
+    fn tokenizer_roundtrips_sudoku_wavefront_outputs_exactly()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let tokenizer = TassadarTraceTokenizer::new();
+        let case = tassadar_sudoku_9x9_corpus()
+            .into_iter()
+            .next()
+            .expect("sudoku corpus should not be empty");
+        let execution = TassadarCpuReferenceRunner::for_program(&case.validation_case.program)?
+            .execute(&case.validation_case.program)?;
+        let tokenized = tokenizer.tokenize_program_and_sudoku_diagonal_wavefront(
+            &case.validation_case.program,
+            execution.outputs.as_slice(),
+            9,
+        );
+
+        let reconstructed = tokenizer.extract_sudoku_diagonal_wavefront_outputs(
+            tokenized.sequence.as_slice(),
+            tokenized.prompt_token_count,
+            execution.outputs.len(),
+        );
+
+        assert_eq!(reconstructed, execution.outputs);
+        assert_eq!(
+            TassadarSequenceTraceFamily::SudokuDiagonalWavefront.reconstruction_scope(),
+            "final_outputs_only"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn tokenizer_roundtrips_hungarian_assignment_frontier_outputs_exactly()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let tokenizer = TassadarTraceTokenizer::new();
+        let case = tassadar_hungarian_10x10_corpus()
+            .into_iter()
+            .next()
+            .expect("hungarian corpus should not be empty");
+        let execution = TassadarCpuReferenceRunner::for_program(&case.validation_case.program)?
+            .execute(&case.validation_case.program)?;
+        let tokenized = tokenizer.tokenize_program_and_hungarian_assignment_frontier(
+            &case.validation_case.program,
+            case.optimal_assignment.as_slice(),
+            case.cost_matrix.as_slice(),
+            case.optimal_cost,
+        );
+
+        let reconstructed = tokenizer.extract_hungarian_assignment_frontier_outputs(
+            tokenized.sequence.as_slice(),
+            tokenized.prompt_token_count,
+            case.optimal_assignment.len(),
+        );
+
+        assert_eq!(reconstructed, execution.outputs);
         Ok(())
     }
 }

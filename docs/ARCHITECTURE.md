@@ -398,6 +398,16 @@ The current scope is:
   target tokens, but the declared live-state contract drops from
   `109715076` bytes on the flat-prefix family to `1459452` bytes on the
   windowed family under the same corpus and fit facts
+- landed research-only sequential-vs-wavefront trace-family comparison:
+  `psionic-train` now also materializes
+  `fixtures/tassadar/runs/tassadar_trace_family_comparison_v1`, which keeps
+  the sequential CPU trace as the only full execution authority while proving
+  that alternate target families can preserve final outputs exactly on the
+  same corpora; the anti-diagonal Sudoku family drops max total tokens from
+  `5335309` to `52969` on 9x9 and the parallel Hungarian assignment frontier
+  drops max total tokens from `11532454` to `22050` on 10x10, with all
+  alternate families staying at `10000` bps final-output exactness under
+  explicit `research_only` claim boundaries
 - landed trained-executor Phase 15B follow-on bar: the same executor-attention
   family now also carries a bounded relative-target output-bias adapter in
   `psionic-models`, the preserved destructive boundary-first output-head

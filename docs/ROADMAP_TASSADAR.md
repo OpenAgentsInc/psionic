@@ -189,6 +189,12 @@ The current strongest committed artifacts are:
   - same-corpus flat-prefix-vs-windowed 9x9 comparison now proves the
     windowed family keeps bounded exactness parity while making the
     long-trace live-state contract explicit
+- `fixtures/tassadar/runs/tassadar_trace_family_comparison_v1`
+  - same-corpus sequential-vs-wavefront comparison now proves research-only
+    Sudoku and Hungarian alternate trace families preserve final outputs
+    exactly while shrinking max total tokens from `5335309` to `52969` on 9x9
+    Sudoku and from `11532454` to `22050` on article-sized Hungarian-10x10;
+    the sequential CPU trace remains the only full-trace authority
 - `fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0`
   - exact compiled/proof-backed 9x9 Sudoku lane now exists on the matched 9x9 corpus
 - `fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0`
@@ -219,6 +225,9 @@ The current technical reality is:
   a generic compiled kernel suite over arithmetic, memory, branch, and
   loop-heavy workloads, and a dedicated article-closure checker
 - the learned 4x4 lane is real
+- research-only parallel and wavefront target families now exist beside the
+  sequential trace for Sudoku and Hungarian workloads without widening learned
+  execution claims
 - the learned 9x9 lane still does not fit the full trace honestly under the
   current model contract
 
@@ -474,7 +483,7 @@ compiled-lane truth.
 | --- | --- | --- |
 | `PTAS-401` | implemented | Widen learned supervision beyond next token to instruction pointer, stack delta, memory diff, branch outcome, and workload-specific state such as Hungarian dual variables. |
 | `PTAS-402` | implemented | Add recurrent or windowed executor families that can carry long-horizon state without pretending a flat growing prefix is the only honest option. |
-| `PTAS-403` | planned | Add parallel or wavefront trace families for Sudoku and Hungarian-class workloads and compare them against sequential CPU-style traces. |
+| `PTAS-403` | implemented | Add parallel or wavefront trace families for Sudoku and Hungarian-class workloads and compare them against sequential CPU-style traces. |
 | `PTAS-404` | planned | Add later-window and suffix-focused eval artifacts so learned long-trace progress is visible after the first bounded prefix. |
 | `PTAS-405` | planned | Compare hull-specialized learned architectures against trainable sparse, hybrid, and recurrent baselines under the same artifact contract. |
 

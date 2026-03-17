@@ -2,24 +2,23 @@ use std::{collections::BTreeMap, env, time::Instant};
 
 use psionic_data::{TassadarSequenceExample, TassadarSequenceSplit};
 use psionic_eval::{
-    benchmark_tassadar_executor_linear_decode, build_tassadar_sequence_dataset,
-    evaluate_tassadar_executor_transformer_with_target_cap_and_progress, TassadarExecutorEvalError,
-    TassadarExecutorEvalReport, TassadarExecutorLinearBenchmarkError,
+    TassadarExecutorEvalError, TassadarExecutorEvalReport, TassadarExecutorLinearBenchmarkError,
     TassadarExecutorLinearBenchmarkReport, TassadarSequenceEvalError, TassadarSequenceWorkload,
+    benchmark_tassadar_executor_linear_decode, build_tassadar_sequence_dataset,
+    evaluate_tassadar_executor_transformer_with_target_cap_and_progress,
 };
 use psionic_models::{
     TassadarExecutorLongTraceContract, TassadarExecutorTrainableSurface,
-    TassadarExecutorTransformer,
-    TassadarExecutorTransformerError, TokenId, TokenSequence,
-    TassadarStructuralSupervisionFamily, TassadarTraceTokenizer,
+    TassadarExecutorTransformer, TassadarExecutorTransformerError,
+    TassadarStructuralSupervisionFamily, TassadarTraceTokenizer, TokenId, TokenSequence,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    build_tassadar_sequence_training_manifest, TassadarSequenceTrainingError,
-    TassadarSequenceTrainingManifest,
+    TassadarSequenceTrainingError, TassadarSequenceTrainingManifest,
+    build_tassadar_sequence_training_manifest,
 };
 
 fn default_tassadar_sequence_workload() -> TassadarSequenceWorkload {
@@ -598,6 +597,14 @@ pub enum TassadarExecutorTrainingError {
     /// Model forward/decode failed.
     #[error(transparent)]
     Model(#[from] TassadarExecutorTransformerError),
+    /// The requested workload has no honest landed learned model family yet.
+    #[error(
+        "tassadar executor training workload `{workload}` does not yet have a landed learned model family"
+    )]
+    UnsupportedWorkload {
+        /// Stable workload reference.
+        workload: String,
+    },
     /// The run did not emit any checkpoint candidates.
     #[error("tassadar executor training run `{run_id}` emitted no checkpoint candidates")]
     NoCheckpointCandidates {
@@ -639,6 +646,11 @@ pub fn train_tassadar_executor_transformer(
             TassadarExecutorLongTraceContract::IncrementalDecodeWindow,
         ) => {
             TassadarExecutorTransformer::sudoku_9x9_windowed_with_surface(config.trainable_surface)
+        }
+        (TassadarSequenceWorkload::HungarianV0 | TassadarSequenceWorkload::Hungarian10x10, _) => {
+            return Err(TassadarExecutorTrainingError::UnsupportedWorkload {
+                workload: config.workload.dataset_ref().to_string(),
+            });
         }
     };
     let examples_by_id = bundle
@@ -1629,8 +1641,7 @@ mod tests {
 
     use super::{
         TassadarExecutorStructuralSupervisionConfig, TassadarExecutorTeacherForcedTrainingStrategy,
-        TassadarExecutorTrainingConfig,
-        train_tassadar_executor_transformer,
+        TassadarExecutorTrainingConfig, train_tassadar_executor_transformer,
     };
 
     #[test]

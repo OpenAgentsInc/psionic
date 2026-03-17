@@ -1,0 +1,129 @@
+{
+  "abi_version": "psionic.data.v1",
+  "key": {
+    "dataset_ref": "oa.tassadar.hungarian_10x10.sequence.hungarian_assignment_frontier",
+    "version": "trace-family-v1"
+  },
+  "display_name": "Tassadar Hungarian-10x10 Tokenized Executor Sequences (Hungarian Assignment Frontier)",
+  "record_encoding": "token_ids_le_u32",
+  "tokenizer": {
+    "family": "custom",
+    "tokenizer_digest": "76b6aa78974c92fec80e515d58e60ebec7462c70a6028c0a9bb06a3fbe55059c",
+    "vocab_size": 303,
+    "special_tokens_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e"
+  },
+  "context_window_tokens": 22050,
+  "splits": [
+    {
+      "split_name": "train",
+      "kind": "train",
+      "sequence_count": 2,
+      "token_count": 44100,
+      "shards": [
+        {
+          "shard_key": "train-000",
+          "manifest": {
+            "stream_id": "dataset://oa.tassadar.hungarian_10x10.sequence.hungarian_assignment_frontier@trace-family-v1/train",
+            "manifest_digest": "0f46d741d80b02017c55c56cdfd567204fdd359ed52d841e683d03d36d8fa181",
+            "subject": "tokenized_corpus",
+            "object_digest": "19363f561d1bd1ccae129255d62a41a2dbab6b8e262688ad6b3ffa2a927c947c",
+            "total_bytes": 176408,
+            "chunk_count": 1,
+            "chunk_bytes": 176408,
+            "encoding": "token_ids_le_u32",
+            "provenance_digest": "dae7f4b463b1bd8bdd4d8f55ebb58f7243c6e27786c8af348831417d99ac4ede",
+            "dataset_binding": {
+              "dataset_id": "oa.tassadar.hungarian_10x10.sequence.hungarian_assignment_frontier@trace-family-v1",
+              "split": "train",
+              "shard_key": "train-000"
+            }
+          },
+          "sequence_count": 2,
+          "token_count": 44100,
+          "min_sequence_tokens": 22050,
+          "max_sequence_tokens": 22050
+        }
+      ]
+    },
+    {
+      "split_name": "validation",
+      "kind": "validation",
+      "sequence_count": 1,
+      "token_count": 22050,
+      "shards": [
+        {
+          "shard_key": "validation-000",
+          "manifest": {
+            "stream_id": "dataset://oa.tassadar.hungarian_10x10.sequence.hungarian_assignment_frontier@trace-family-v1/validation",
+            "manifest_digest": "f7c71c79fdee147094749959f6d9a3b5b1b4ecbc84080fa47e45ec71e27897cc",
+            "subject": "tokenized_corpus",
+            "object_digest": "87dc13e6e8fc0d2e6a5f36c593c51c5c7052dd87c70d81789c91aeea0b0f058f",
+            "total_bytes": 88204,
+            "chunk_count": 1,
+            "chunk_bytes": 88204,
+            "encoding": "token_ids_le_u32",
+            "provenance_digest": "a55ef5b96a6c0a18d42c5da7f23fdcbe7cfada3f98f0333bc1e36255e1b777a8",
+            "dataset_binding": {
+              "dataset_id": "oa.tassadar.hungarian_10x10.sequence.hungarian_assignment_frontier@trace-family-v1",
+              "split": "validation",
+              "shard_key": "validation-000"
+            }
+          },
+          "sequence_count": 1,
+          "token_count": 22050,
+          "min_sequence_tokens": 22050,
+          "max_sequence_tokens": 22050
+        }
+      ]
+    },
+    {
+      "split_name": "test",
+      "kind": "test",
+      "sequence_count": 1,
+      "token_count": 22050,
+      "shards": [
+        {
+          "shard_key": "test-000",
+          "manifest": {
+            "stream_id": "dataset://oa.tassadar.hungarian_10x10.sequence.hungarian_assignment_frontier@trace-family-v1/test",
+            "manifest_digest": "d8ed685ae7c18e85cf238cc7e05066aee2e2b1630b2a1b287739dad4377ecadc",
+            "subject": "tokenized_corpus",
+            "object_digest": "85337f134c6fec49a230135fc81b89894f71fdfde11b1d66f0ceac7b93e1016b",
+            "total_bytes": 88204,
+            "chunk_count": 1,
+            "chunk_bytes": 88204,
+            "encoding": "token_ids_le_u32",
+            "provenance_digest": "0cda8082ab19ab1eaff35c60b220819d2ac9d3235807ce9c13251aeec72af19a",
+            "dataset_binding": {
+              "dataset_id": "oa.tassadar.hungarian_10x10.sequence.hungarian_assignment_frontier@trace-family-v1",
+              "split": "test",
+              "shard_key": "test-000"
+            }
+          },
+          "sequence_count": 1,
+          "token_count": 22050,
+          "min_sequence_tokens": 22050,
+          "max_sequence_tokens": 22050
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "tassadar.example_count": 4,
+    "tassadar.sequence_dataset_abi_version": "psionic.tassadar.sequence_dataset.v1",
+    "tassadar.test.sequence_ids": [
+      "tassadar.sequence.hungarian_10x10_test_a.hungarian_assignment_frontier"
+    ],
+    "tassadar.trace_family": "hungarian_assignment_frontier",
+    "tassadar.trace_family_reconstruction_scope": "final_outputs_only",
+    "tassadar.train.sequence_ids": [
+      "tassadar.sequence.hungarian_10x10_train_a.hungarian_assignment_frontier",
+      "tassadar.sequence.hungarian_10x10_train_b.hungarian_assignment_frontier"
+    ],
+    "tassadar.validation.sequence_ids": [
+      "tassadar.sequence.hungarian_10x10_validation_a.hungarian_assignment_frontier"
+    ],
+    "tassadar.vocabulary_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e",
+    "tassadar.workload": "oa.tassadar.hungarian_10x10.sequence"
+  }
+}

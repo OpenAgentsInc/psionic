@@ -65,6 +65,7 @@ mod tassadar_executor_telemetry;
 mod tassadar_executor_training;
 mod tassadar_executor_windowed_family_comparison;
 mod tassadar_sequence;
+mod tassadar_trace_family_comparison;
 mod worker_protocol;
 
 pub use adapter_aggregation::*;
@@ -112,6 +113,7 @@ pub use tassadar_executor_telemetry::*;
 pub use tassadar_executor_training::*;
 pub use tassadar_executor_windowed_family_comparison::*;
 pub use tassadar_sequence::*;
+pub use tassadar_trace_family_comparison::*;
 pub use worker_protocol::*;
 
 /// Human-readable crate ownership summary.
