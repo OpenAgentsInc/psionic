@@ -295,6 +295,8 @@ pub enum TassadarWasmProfileId {
     SudokuV0SearchV1,
     /// Comparison-capable i32-only profile for bounded 4x4 matching programs.
     HungarianV0MatchingV1,
+    /// Comparison-capable search-oriented profile for exact 10x10 Hungarian-class programs.
+    Hungarian10x10MatchingV1,
     /// Larger i32-only profile for real 9x9 Sudoku-class search programs.
     Sudoku9x9SearchV1,
 }
@@ -309,6 +311,7 @@ impl TassadarWasmProfileId {
             Self::ArticleI32ComputeV1 => "tassadar.wasm.article_i32_compute.v1",
             Self::SudokuV0SearchV1 => "tassadar.wasm.sudoku_v0_search.v1",
             Self::HungarianV0MatchingV1 => "tassadar.wasm.hungarian_v0_matching.v1",
+            Self::Hungarian10x10MatchingV1 => "tassadar.wasm.hungarian_10x10_matching.v1",
             Self::Sudoku9x9SearchV1 => "tassadar.wasm.sudoku_9x9_search.v1",
         }
     }
@@ -631,6 +634,21 @@ impl TassadarWasmProfile {
         }
     }
 
+    /// Returns the larger comparison-capable profile for exact 10x10 Hungarian programs.
+    #[must_use]
+    pub fn hungarian_10x10_matching_v1() -> Self {
+        Self {
+            profile_id: String::from(TassadarWasmProfileId::Hungarian10x10MatchingV1.as_str()),
+            allowed_opcodes: TassadarOpcode::ARTICLE_I32_V1.to_vec(),
+            max_locals: 16,
+            max_memory_slots: 64,
+            max_program_len: 8_192,
+            max_steps: 262_144,
+            branch_mode: TassadarBranchMode::BrIfNonZero,
+            host_output_opcode: true,
+        }
+    }
+
     /// Returns the larger search-oriented profile used for honest 9x9 Sudoku programs.
     #[must_use]
     pub fn sudoku_9x9_search_v1() -> Self {
@@ -692,6 +710,9 @@ pub fn tassadar_wasm_profile_for_id(profile_id: &str) -> Option<TassadarWasmProf
         }
         value if value == TassadarWasmProfileId::HungarianV0MatchingV1.as_str() => {
             Some(TassadarWasmProfile::hungarian_v0_matching_v1())
+        }
+        value if value == TassadarWasmProfileId::Hungarian10x10MatchingV1.as_str() => {
+            Some(TassadarWasmProfile::hungarian_10x10_matching_v1())
         }
         value if value == TassadarWasmProfileId::Sudoku9x9SearchV1.as_str() => {
             Some(TassadarWasmProfile::sudoku_9x9_search_v1())
@@ -790,6 +811,20 @@ impl TassadarTraceAbi {
         }
     }
 
+    /// Returns the trace ABI for the exact 10x10 Hungarian matching profile.
+    #[must_use]
+    pub fn hungarian_10x10_matching_v1() -> Self {
+        Self {
+            abi_id: String::from("tassadar.trace.v1"),
+            schema_version: TASSADAR_TRACE_ABI_VERSION,
+            profile_id: String::from(TassadarWasmProfileId::Hungarian10x10MatchingV1.as_str()),
+            append_only: true,
+            includes_stack_snapshots: true,
+            includes_local_snapshots: true,
+            includes_memory_snapshots: true,
+        }
+    }
+
     /// Returns the search-oriented trace ABI for the honest 9x9 Sudoku profile.
     #[must_use]
     pub fn sudoku_9x9_search_v1() -> Self {
@@ -848,6 +883,9 @@ pub fn tassadar_trace_abi_for_profile_id(profile_id: &str) -> Option<TassadarTra
         }
         value if value == TassadarWasmProfileId::HungarianV0MatchingV1.as_str() => {
             Some(TassadarTraceAbi::hungarian_v0_matching_v1())
+        }
+        value if value == TassadarWasmProfileId::Hungarian10x10MatchingV1.as_str() => {
+            Some(TassadarTraceAbi::hungarian_10x10_matching_v1())
         }
         value if value == TassadarWasmProfileId::Sudoku9x9SearchV1.as_str() => {
             Some(TassadarTraceAbi::sudoku_9x9_search_v1())
@@ -1118,9 +1156,7 @@ impl TassadarTraceAbiDecisionReport {
             trace_abi_compatibility_digest: canonical_trace_abi.compatibility_digest(),
             canonical_trace_abi,
             authority_contract: TassadarTraceAbiAuthorityContract {
-                canonical_machine_truth_artifact_kind: String::from(
-                    "tassadar_trace_artifact.json",
-                ),
+                canonical_machine_truth_artifact_kind: String::from("tassadar_trace_artifact.json"),
                 canonical_machine_truth_fields: vec![
                     String::from("trace_abi_id"),
                     String::from("trace_abi_version"),
@@ -1140,15 +1176,23 @@ impl TassadarTraceAbiDecisionReport {
             },
             versioning_contract: TassadarTraceAbiVersioningContract {
                 compatible_without_abi_bump: vec![
-                    String::from("adding new derived reports that reference the same trace artifact"),
+                    String::from(
+                        "adding new derived reports that reference the same trace artifact",
+                    ),
                     String::from("changing readable-log formatting or truncation policy"),
-                    String::from("adding workload families that keep the same step/event semantics"),
+                    String::from(
+                        "adding workload families that keep the same step/event semantics",
+                    ),
                 ],
                 requires_abi_bump: vec![
                     String::from("changing step ordering or append-only semantics"),
                     String::from("changing the meaning or encoding of existing trace events"),
-                    String::from("changing whether stack, local, or memory snapshots are required per step"),
-                    String::from("changing digest inputs used by validators to establish trace identity"),
+                    String::from(
+                        "changing whether stack, local, or memory snapshots are required per step",
+                    ),
+                    String::from(
+                        "changing digest inputs used by validators to establish trace identity",
+                    ),
                 ],
             },
             validator_compatibility_notes,
@@ -1847,6 +1891,7 @@ pub fn tassadar_supported_wasm_profiles() -> Vec<TassadarWasmProfile> {
         TassadarWasmProfile::article_i32_compute_v1(),
         TassadarWasmProfile::sudoku_v0_search_v1(),
         TassadarWasmProfile::hungarian_v0_matching_v1(),
+        TassadarWasmProfile::hungarian_10x10_matching_v1(),
         TassadarWasmProfile::sudoku_9x9_search_v1(),
     ]
 }
@@ -3461,6 +3506,16 @@ impl TassadarFixtureWeights {
         }
     }
 
+    /// Returns the larger comparison-capable handcrafted fixture table.
+    #[must_use]
+    pub fn hungarian_10x10_matching_v1() -> Self {
+        Self {
+            profile_id: String::from(TassadarWasmProfileId::Hungarian10x10MatchingV1.as_str()),
+            trace_abi_id: String::from("tassadar.trace.v1"),
+            opcode_rules: Self::hungarian_v0_matching_v1().opcode_rules,
+        }
+    }
+
     /// Returns the larger 9x9 search-profile handcrafted fixture table.
     #[must_use]
     pub fn sudoku_9x9_search_v1() -> Self {
@@ -3502,6 +3557,9 @@ pub fn tassadar_fixture_weights_for_profile_id(profile_id: &str) -> Option<Tassa
         }
         value if value == TassadarWasmProfileId::HungarianV0MatchingV1.as_str() => {
             Some(TassadarFixtureWeights::hungarian_v0_matching_v1())
+        }
+        value if value == TassadarWasmProfileId::Hungarian10x10MatchingV1.as_str() => {
+            Some(TassadarFixtureWeights::hungarian_10x10_matching_v1())
         }
         value if value == TassadarWasmProfileId::Sudoku9x9SearchV1.as_str() => {
             Some(TassadarFixtureWeights::sudoku_9x9_search_v1())
@@ -5504,6 +5562,25 @@ pub struct TassadarHungarianV0CorpusCase {
     pub validation_case: TassadarValidationCase,
 }
 
+/// One article-sized 10x10 min-cost perfect-matching corpus case.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarHungarian10x10CorpusCase {
+    /// Stable case identifier.
+    pub case_id: String,
+    /// Stable split assignment.
+    pub split: TassadarSudokuV0CorpusSplit,
+    /// Flat 10x10 cost matrix in row-major order.
+    pub cost_matrix: Vec<i32>,
+    /// Stable search-row order used by the exact branch-and-bound program.
+    pub search_row_order: Vec<usize>,
+    /// Exact optimal assignment encoded as one chosen column per row.
+    pub optimal_assignment: Vec<i32>,
+    /// Exact optimal assignment cost.
+    pub optimal_cost: i32,
+    /// Exact CPU-reference-backed validation case.
+    pub validation_case: TassadarValidationCase,
+}
+
 const TASSADAR_SUDOKU_V0_CELL_COUNT: usize = 16;
 const TASSADAR_SUDOKU_V0_GRID_WIDTH: usize = 4;
 const TASSADAR_SUDOKU_V0_BOX_WIDTH: usize = 2;
@@ -5515,6 +5592,31 @@ const TASSADAR_HUNGARIAN_V0_MATRIX_CELL_COUNT: usize = 16;
 const TASSADAR_HUNGARIAN_V0_OUTPUT_SLOT_BASE: u8 = 16;
 const TASSADAR_HUNGARIAN_V0_BEST_COST_SLOT: u8 = 20;
 const TASSADAR_HUNGARIAN_V0_MEMORY_SLOTS: usize = 21;
+const TASSADAR_HUNGARIAN_10X10_DIM: usize = 10;
+const TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT: usize = 100;
+const TASSADAR_HUNGARIAN_10X10_BEST_COST_SLOT: u8 = 0;
+const TASSADAR_HUNGARIAN_10X10_BEST_ASSIGNMENT_SLOT_BASE: u8 = 1;
+const TASSADAR_HUNGARIAN_10X10_CURRENT_ASSIGNMENT_SLOT_BASE: u8 = 11;
+const TASSADAR_HUNGARIAN_10X10_NEXT_CANDIDATE_SLOT_BASE: u8 = 21;
+const TASSADAR_HUNGARIAN_10X10_USED_COLUMN_SLOT_BASE: u8 = 31;
+const TASSADAR_HUNGARIAN_10X10_MEMORY_SLOTS: usize = 41;
+const TASSADAR_HUNGARIAN_10X10_ROW_LOCAL: u8 = 0;
+const TASSADAR_HUNGARIAN_10X10_CURRENT_COST_LOCAL: u8 = 1;
+const TASSADAR_HUNGARIAN_10X10_CANDIDATE_COST_LOCAL: u8 = 2;
+const TASSADAR_HUNGARIAN_10X10_INITIAL_BEST_COST: i32 = 1_000_000;
+const TASSADAR_HUNGARIAN_10X10_ARTICLE_BASE_MATRIX: [i32;
+    TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT] = [
+    61, 58, 35, 86, 32, 39, 41, 27, 21, 42, //
+    59, 77, 97, 99, 78, 21, 89, 72, 35, 63, //
+    88, 85, 37, 57, 59, 97, 37, 29, 69, 94, //
+    32, 82, 53, 20, 77, 96, 21, 70, 50, 61, //
+    15, 44, 81, 10, 64, 36, 56, 78, 20, 69, //
+    76, 35, 87, 69, 16, 55, 26, 37, 30, 66, //
+    86, 32, 74, 94, 32, 14, 24, 12, 31, 70, //
+    97, 63, 20, 64, 90, 21, 28, 49, 89, 10, //
+    58, 52, 27, 76, 61, 35, 17, 91, 37, 66, //
+    42, 79, 61, 26, 55, 98, 70, 17, 26, 86,
+];
 const TASSADAR_SUDOKU_9X9_SOLVED_GRID: [i32; TASSADAR_SUDOKU_9X9_CELL_COUNT] = [
     5, 3, 4, 6, 7, 8, 9, 1, 2, //
     6, 7, 2, 1, 9, 5, 3, 4, 8, //
@@ -5797,6 +5899,48 @@ pub fn tassadar_hungarian_v0_corpus() -> Vec<TassadarHungarianV0CorpusCase> {
     ]
 }
 
+/// Returns the canonical article-sized 10x10 Hungarian-class corpus.
+#[must_use]
+pub fn tassadar_hungarian_10x10_corpus() -> Vec<TassadarHungarian10x10CorpusCase> {
+    vec![
+        computed_hungarian_10x10_corpus_case(
+            "hungarian_10x10_train_a",
+            TassadarSudokuV0CorpusSplit::Train,
+            TASSADAR_HUNGARIAN_10X10_ARTICLE_BASE_MATRIX,
+        ),
+        computed_hungarian_10x10_corpus_case(
+            "hungarian_10x10_train_b",
+            TassadarSudokuV0CorpusSplit::Train,
+            transformed_hungarian_10x10_cost_matrix(
+                [4, 1, 7, 0, 8, 2, 9, 3, 5, 6],
+                [8, 5, 2, 3, 0, 4, 1, 9, 6, 7],
+                [0, 2, 4, 1, 3, 5, 2, 4, 1, 3],
+                [1, 0, 2, 1, 3, 0, 2, 1, 0, 2],
+            ),
+        ),
+        computed_hungarian_10x10_corpus_case(
+            "hungarian_10x10_validation_a",
+            TassadarSudokuV0CorpusSplit::Validation,
+            transformed_hungarian_10x10_cost_matrix(
+                [6, 3, 9, 2, 5, 8, 1, 4, 0, 7],
+                [3, 0, 7, 2, 8, 5, 1, 9, 4, 6],
+                [0, 1, 2, 0, 1, 2, 0, 1, 2, 0],
+                [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+            ),
+        ),
+        computed_hungarian_10x10_corpus_case(
+            "hungarian_10x10_test_a",
+            TassadarSudokuV0CorpusSplit::Test,
+            transformed_hungarian_10x10_cost_matrix(
+                [2, 5, 8, 1, 4, 7, 0, 3, 6, 9],
+                [1, 4, 7, 0, 3, 6, 9, 2, 5, 8],
+                [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                [0, 2, 4, 6, 8, 10, 12, 14, 16, 18],
+            ),
+        ),
+    ]
+}
+
 fn computed_sudoku_v0_corpus_case(
     case_id: &str,
     split: TassadarSudokuV0CorpusSplit,
@@ -5939,6 +6083,55 @@ fn computed_hungarian_v0_corpus_case(
     }
 }
 
+fn computed_hungarian_10x10_corpus_case(
+    case_id: &str,
+    split: TassadarSudokuV0CorpusSplit,
+    cost_matrix: [i32; TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT],
+) -> TassadarHungarian10x10CorpusCase {
+    let (optimal_assignment, optimal_cost, unique_optimum) =
+        solve_hungarian_10x10_exact(&cost_matrix);
+    assert!(
+        unique_optimum,
+        "Hungarian-10x10 corpus case `{case_id}` should have a unique optimum"
+    );
+    let search_row_order = hungarian_10x10_search_row_order(&cost_matrix);
+    let program =
+        tassadar_hungarian_10x10_matching_program(format!("tassadar.{case_id}.v1"), cost_matrix);
+    let execution = TassadarCpuReferenceRunner::for_program(&program)
+        .expect("Hungarian-10x10 article profile should resolve on CPU")
+        .execute(&program)
+        .expect("Hungarian-10x10 corpus program should solve exactly");
+    let expected_outputs = {
+        let mut outputs = optimal_assignment.to_vec();
+        outputs.push(optimal_cost);
+        outputs
+    };
+    assert_eq!(
+        execution.outputs, expected_outputs,
+        "Hungarian-10x10 corpus case `{case_id}` should emit the exact assignment and cost"
+    );
+    let summary = format!(
+        "article-sized 10x10 min-cost perfect matching case on the {} split with unique optimum cost {}",
+        split.as_str(),
+        optimal_cost
+    );
+    TassadarHungarian10x10CorpusCase {
+        case_id: String::from(case_id),
+        split,
+        cost_matrix: cost_matrix.to_vec(),
+        search_row_order: search_row_order.to_vec(),
+        optimal_assignment: optimal_assignment.to_vec(),
+        optimal_cost,
+        validation_case: TassadarValidationCase {
+            case_id: String::from(case_id),
+            summary,
+            program,
+            expected_trace: execution.steps,
+            expected_outputs,
+        },
+    }
+}
+
 fn emit_hungarian_v0_candidate_cost(
     assembler: &mut TassadarLabelAssembler,
     permutation: &[usize; TASSADAR_HUNGARIAN_V0_DIM],
@@ -6044,6 +6237,439 @@ fn brute_force_hungarian_v0_solution(
         }
     }
     (best_assignment, best_cost, unique_optimum)
+}
+
+/// Builds an article-sized exact 10x10 min-cost perfect-matching program.
+#[must_use]
+pub fn tassadar_hungarian_10x10_matching_program(
+    program_id: impl Into<String>,
+    cost_matrix: [i32; TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT],
+) -> TassadarProgram {
+    let profile = TassadarWasmProfile::hungarian_10x10_matching_v1();
+    let row_order = hungarian_10x10_search_row_order(&cost_matrix);
+    let column_orders = hungarian_10x10_column_orders(&cost_matrix);
+    let remaining_min_bounds = hungarian_10x10_remaining_min_bounds(&cost_matrix, &row_order);
+    let mut assembler = TassadarLabelAssembler::default();
+
+    assembler.emit(TassadarInstruction::I32Const { value: 0 });
+    assembler.emit(TassadarInstruction::LocalSet {
+        local: TASSADAR_HUNGARIAN_10X10_ROW_LOCAL,
+    });
+    assembler.emit(TassadarInstruction::I32Const { value: 0 });
+    assembler.emit(TassadarInstruction::LocalSet {
+        local: TASSADAR_HUNGARIAN_10X10_CURRENT_COST_LOCAL,
+    });
+    assembler.branch_always("hungarian_10x10_main_loop");
+
+    assembler.label("hungarian_10x10_main_loop");
+    for depth in 0..=TASSADAR_HUNGARIAN_10X10_DIM {
+        let next_label = format!("hungarian_10x10_main_dispatch_next_{depth}");
+        emit_local_not_equal_branch(
+            &mut assembler,
+            TASSADAR_HUNGARIAN_10X10_ROW_LOCAL,
+            depth as i32,
+            next_label.as_str(),
+        );
+        if depth == TASSADAR_HUNGARIAN_10X10_DIM {
+            assembler.branch_always("hungarian_10x10_solution_found");
+        } else {
+            let target_label = format!("hungarian_10x10_row_dispatch_{depth}");
+            assembler.branch_always(target_label.as_str());
+        }
+        assembler.label(next_label.as_str());
+    }
+    assembler.branch_always("hungarian_10x10_search_done");
+
+    assembler.label("hungarian_10x10_solution_found");
+    assembler.emit(TassadarInstruction::LocalGet {
+        local: TASSADAR_HUNGARIAN_10X10_CURRENT_COST_LOCAL,
+    });
+    assembler.emit(TassadarInstruction::I32Load {
+        slot: TASSADAR_HUNGARIAN_10X10_BEST_COST_SLOT,
+    });
+    assembler.emit(TassadarInstruction::I32Lt);
+    assembler.branch_if("hungarian_10x10_update_best_solution");
+    assembler.branch_always("hungarian_10x10_post_solution_backtrack");
+
+    assembler.label("hungarian_10x10_update_best_solution");
+    assembler.emit(TassadarInstruction::LocalGet {
+        local: TASSADAR_HUNGARIAN_10X10_CURRENT_COST_LOCAL,
+    });
+    assembler.emit(TassadarInstruction::I32Store {
+        slot: TASSADAR_HUNGARIAN_10X10_BEST_COST_SLOT,
+    });
+    for actual_row in 0..TASSADAR_HUNGARIAN_10X10_DIM {
+        assembler.emit(TassadarInstruction::I32Load {
+            slot: hungarian_10x10_current_assignment_slot(actual_row),
+        });
+        assembler.emit(TassadarInstruction::I32Store {
+            slot: hungarian_10x10_best_assignment_slot(actual_row),
+        });
+    }
+
+    assembler.label("hungarian_10x10_post_solution_backtrack");
+    assembler.emit(TassadarInstruction::I32Const {
+        value: (TASSADAR_HUNGARIAN_10X10_DIM - 1) as i32,
+    });
+    assembler.emit(TassadarInstruction::LocalSet {
+        local: TASSADAR_HUNGARIAN_10X10_ROW_LOCAL,
+    });
+    assembler.branch_always("hungarian_10x10_release_depth_9");
+
+    for (depth, actual_row) in row_order.iter().copied().enumerate() {
+        let dispatch_label = format!("hungarian_10x10_row_dispatch_{depth}");
+        assembler.label(dispatch_label.as_str());
+        for start_position in 0..=TASSADAR_HUNGARIAN_10X10_DIM {
+            let next_label =
+                format!("hungarian_10x10_row_{depth}_start_dispatch_next_{start_position}");
+            emit_memory_not_equal_branch(
+                &mut assembler,
+                hungarian_10x10_next_candidate_slot(depth),
+                start_position as i32,
+                next_label.as_str(),
+            );
+            let target_label = format!("hungarian_10x10_row_{depth}_candidate_{start_position}");
+            assembler.branch_always(target_label.as_str());
+            assembler.label(next_label.as_str());
+        }
+        let exhausted_label = format!("hungarian_10x10_row_{depth}_candidate_10");
+        assembler.branch_always(exhausted_label.as_str());
+
+        let ordered_columns = &column_orders[actual_row];
+        for (candidate_position, column) in ordered_columns.iter().copied().enumerate() {
+            let candidate_label =
+                format!("hungarian_10x10_row_{depth}_candidate_{candidate_position}");
+            let next_candidate_label = format!(
+                "hungarian_10x10_row_{depth}_candidate_{}",
+                candidate_position + 1
+            );
+            let commit_label = format!("hungarian_10x10_row_{depth}_commit_{candidate_position}");
+            assembler.label(candidate_label.as_str());
+            assembler.emit(TassadarInstruction::I32Load {
+                slot: hungarian_10x10_used_column_slot(column),
+            });
+            assembler.branch_if(next_candidate_label.as_str());
+
+            assembler.emit(TassadarInstruction::LocalGet {
+                local: TASSADAR_HUNGARIAN_10X10_CURRENT_COST_LOCAL,
+            });
+            assembler.emit(TassadarInstruction::I32Const {
+                value: cost_matrix[actual_row * TASSADAR_HUNGARIAN_10X10_DIM + column],
+            });
+            assembler.emit(TassadarInstruction::I32Add);
+            assembler.emit(TassadarInstruction::LocalSet {
+                local: TASSADAR_HUNGARIAN_10X10_CANDIDATE_COST_LOCAL,
+            });
+
+            assembler.emit(TassadarInstruction::LocalGet {
+                local: TASSADAR_HUNGARIAN_10X10_CANDIDATE_COST_LOCAL,
+            });
+            assembler.emit(TassadarInstruction::I32Const {
+                value: remaining_min_bounds[depth + 1],
+            });
+            assembler.emit(TassadarInstruction::I32Add);
+            assembler.emit(TassadarInstruction::I32Load {
+                slot: TASSADAR_HUNGARIAN_10X10_BEST_COST_SLOT,
+            });
+            assembler.emit(TassadarInstruction::I32Lt);
+            assembler.branch_if(commit_label.as_str());
+            assembler.branch_always(next_candidate_label.as_str());
+
+            assembler.label(commit_label.as_str());
+            emit_memory_const_store(
+                &mut assembler,
+                hungarian_10x10_next_candidate_slot(depth),
+                (candidate_position + 1) as i32,
+            );
+            emit_memory_const_store(
+                &mut assembler,
+                hungarian_10x10_current_assignment_slot(actual_row),
+                column as i32,
+            );
+            emit_memory_const_store(&mut assembler, hungarian_10x10_used_column_slot(column), 1);
+            assembler.emit(TassadarInstruction::LocalGet {
+                local: TASSADAR_HUNGARIAN_10X10_CANDIDATE_COST_LOCAL,
+            });
+            assembler.emit(TassadarInstruction::LocalSet {
+                local: TASSADAR_HUNGARIAN_10X10_CURRENT_COST_LOCAL,
+            });
+            if depth + 1 < TASSADAR_HUNGARIAN_10X10_DIM {
+                emit_memory_const_store(
+                    &mut assembler,
+                    hungarian_10x10_next_candidate_slot(depth + 1),
+                    0,
+                );
+            }
+            assembler.emit(TassadarInstruction::I32Const {
+                value: (depth + 1) as i32,
+            });
+            assembler.emit(TassadarInstruction::LocalSet {
+                local: TASSADAR_HUNGARIAN_10X10_ROW_LOCAL,
+            });
+            assembler.branch_always("hungarian_10x10_main_loop");
+        }
+
+        let exhausted_label = format!("hungarian_10x10_row_{depth}_candidate_10");
+        assembler.label(exhausted_label.as_str());
+        if depth == 0 {
+            assembler.branch_always("hungarian_10x10_search_done");
+        } else {
+            assembler.emit(TassadarInstruction::I32Const {
+                value: (depth - 1) as i32,
+            });
+            assembler.emit(TassadarInstruction::LocalSet {
+                local: TASSADAR_HUNGARIAN_10X10_ROW_LOCAL,
+            });
+            let release_label = format!("hungarian_10x10_release_depth_{}", depth - 1);
+            assembler.branch_always(release_label.as_str());
+        }
+    }
+
+    for (depth, actual_row) in row_order.iter().copied().enumerate() {
+        let release_label = format!("hungarian_10x10_release_depth_{depth}");
+        assembler.label(release_label.as_str());
+        for column in 0..TASSADAR_HUNGARIAN_10X10_DIM {
+            let next_label = format!("hungarian_10x10_release_depth_{depth}_next_{column}");
+            emit_memory_not_equal_branch(
+                &mut assembler,
+                hungarian_10x10_current_assignment_slot(actual_row),
+                column as i32,
+                next_label.as_str(),
+            );
+            emit_memory_const_store(&mut assembler, hungarian_10x10_used_column_slot(column), 0);
+            assembler.emit(TassadarInstruction::LocalGet {
+                local: TASSADAR_HUNGARIAN_10X10_CURRENT_COST_LOCAL,
+            });
+            assembler.emit(TassadarInstruction::I32Const {
+                value: cost_matrix[actual_row * TASSADAR_HUNGARIAN_10X10_DIM + column],
+            });
+            assembler.emit(TassadarInstruction::I32Sub);
+            assembler.emit(TassadarInstruction::LocalSet {
+                local: TASSADAR_HUNGARIAN_10X10_CURRENT_COST_LOCAL,
+            });
+            assembler.branch_always("hungarian_10x10_main_loop");
+            assembler.label(next_label.as_str());
+        }
+        assembler.branch_always("hungarian_10x10_main_loop");
+    }
+
+    assembler.label("hungarian_10x10_search_done");
+    for actual_row in 0..TASSADAR_HUNGARIAN_10X10_DIM {
+        assembler.emit(TassadarInstruction::I32Load {
+            slot: hungarian_10x10_best_assignment_slot(actual_row),
+        });
+        assembler.emit(TassadarInstruction::Output);
+    }
+    assembler.emit(TassadarInstruction::I32Load {
+        slot: TASSADAR_HUNGARIAN_10X10_BEST_COST_SLOT,
+    });
+    assembler.emit(TassadarInstruction::Output);
+    assembler.emit(TassadarInstruction::Return);
+
+    let mut initial_memory = vec![0; TASSADAR_HUNGARIAN_10X10_MEMORY_SLOTS];
+    initial_memory[TASSADAR_HUNGARIAN_10X10_BEST_COST_SLOT as usize] =
+        TASSADAR_HUNGARIAN_10X10_INITIAL_BEST_COST;
+    for row in 0..TASSADAR_HUNGARIAN_10X10_DIM {
+        initial_memory[hungarian_10x10_best_assignment_slot(row) as usize] = -1;
+        initial_memory[hungarian_10x10_current_assignment_slot(row) as usize] = -1;
+    }
+    TassadarProgram::new(
+        program_id,
+        &profile,
+        3,
+        TASSADAR_HUNGARIAN_10X10_MEMORY_SLOTS,
+        assembler.finalize(),
+    )
+    .with_initial_memory(initial_memory)
+}
+
+fn transformed_hungarian_10x10_cost_matrix(
+    row_permutation: [usize; TASSADAR_HUNGARIAN_10X10_DIM],
+    column_permutation: [usize; TASSADAR_HUNGARIAN_10X10_DIM],
+    row_biases: [i32; TASSADAR_HUNGARIAN_10X10_DIM],
+    column_biases: [i32; TASSADAR_HUNGARIAN_10X10_DIM],
+) -> [i32; TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT] {
+    let mut matrix = [0; TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT];
+    for row in 0..TASSADAR_HUNGARIAN_10X10_DIM {
+        for column in 0..TASSADAR_HUNGARIAN_10X10_DIM {
+            let source_row = row_permutation[row];
+            let source_column = column_permutation[column];
+            matrix[row * TASSADAR_HUNGARIAN_10X10_DIM + column] =
+                TASSADAR_HUNGARIAN_10X10_ARTICLE_BASE_MATRIX
+                    [source_row * TASSADAR_HUNGARIAN_10X10_DIM + source_column]
+                    + row_biases[row]
+                    + column_biases[column];
+        }
+    }
+    matrix
+}
+
+fn solve_hungarian_10x10_exact(
+    cost_matrix: &[i32; TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT],
+) -> ([i32; TASSADAR_HUNGARIAN_10X10_DIM], i32, bool) {
+    let state_count = 1usize << TASSADAR_HUNGARIAN_10X10_DIM;
+    let full_mask = state_count - 1;
+    let mut best_costs = vec![i32::MAX; state_count];
+    let mut best_choices = vec![None; state_count];
+    let mut optimum_counts = vec![0u32; state_count];
+    best_costs[full_mask] = 0;
+    optimum_counts[full_mask] = 1;
+
+    for mask in (0..full_mask).rev() {
+        let row = mask.count_ones() as usize;
+        for column in 0..TASSADAR_HUNGARIAN_10X10_DIM {
+            if mask & (1usize << column) != 0 {
+                continue;
+            }
+            let next_mask = mask | (1usize << column);
+            let next_cost = best_costs[next_mask];
+            if next_cost == i32::MAX {
+                continue;
+            }
+            let candidate_cost =
+                cost_matrix[row * TASSADAR_HUNGARIAN_10X10_DIM + column] + next_cost;
+            if candidate_cost < best_costs[mask] {
+                best_costs[mask] = candidate_cost;
+                best_choices[mask] = Some(column);
+                optimum_counts[mask] = optimum_counts[next_mask];
+            } else if candidate_cost == best_costs[mask] {
+                optimum_counts[mask] =
+                    optimum_counts[mask].saturating_add(optimum_counts[next_mask]);
+            }
+        }
+    }
+
+    let mut assignment = [0; TASSADAR_HUNGARIAN_10X10_DIM];
+    let mut mask = 0usize;
+    for row in 0..TASSADAR_HUNGARIAN_10X10_DIM {
+        let choice = best_choices[mask]
+            .expect("Hungarian-10x10 exact solver should reconstruct one best assignment");
+        assignment[row] = choice as i32;
+        mask |= 1usize << choice;
+    }
+
+    (assignment, best_costs[0], optimum_counts[0] == 1)
+}
+
+fn hungarian_10x10_search_row_order(
+    cost_matrix: &[i32; TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT],
+) -> [usize; TASSADAR_HUNGARIAN_10X10_DIM] {
+    let mut indices = (0..TASSADAR_HUNGARIAN_10X10_DIM).collect::<Vec<_>>();
+    indices.sort_by(|left, right| {
+        let left_gap = hungarian_10x10_row_gap(cost_matrix, *left);
+        let right_gap = hungarian_10x10_row_gap(cost_matrix, *right);
+        right_gap
+            .cmp(&left_gap)
+            .then_with(|| {
+                hungarian_10x10_row_min(cost_matrix, *left)
+                    .cmp(&hungarian_10x10_row_min(cost_matrix, *right))
+            })
+            .then_with(|| left.cmp(right))
+    });
+    let mut row_order = [0; TASSADAR_HUNGARIAN_10X10_DIM];
+    row_order.copy_from_slice(indices.as_slice());
+    row_order
+}
+
+fn hungarian_10x10_column_orders(
+    cost_matrix: &[i32; TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT],
+) -> [[usize; TASSADAR_HUNGARIAN_10X10_DIM]; TASSADAR_HUNGARIAN_10X10_DIM] {
+    let mut orders = [[0; TASSADAR_HUNGARIAN_10X10_DIM]; TASSADAR_HUNGARIAN_10X10_DIM];
+    for row in 0..TASSADAR_HUNGARIAN_10X10_DIM {
+        let mut columns = (0..TASSADAR_HUNGARIAN_10X10_DIM).collect::<Vec<_>>();
+        columns.sort_by(|left, right| {
+            cost_matrix[row * TASSADAR_HUNGARIAN_10X10_DIM + *left]
+                .cmp(&cost_matrix[row * TASSADAR_HUNGARIAN_10X10_DIM + *right])
+                .then_with(|| left.cmp(right))
+        });
+        orders[row].copy_from_slice(columns.as_slice());
+    }
+    orders
+}
+
+fn hungarian_10x10_remaining_min_bounds(
+    cost_matrix: &[i32; TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT],
+    row_order: &[usize; TASSADAR_HUNGARIAN_10X10_DIM],
+) -> [i32; TASSADAR_HUNGARIAN_10X10_DIM + 1] {
+    let mut bounds = [0; TASSADAR_HUNGARIAN_10X10_DIM + 1];
+    for index in (0..TASSADAR_HUNGARIAN_10X10_DIM).rev() {
+        bounds[index] = bounds[index + 1] + hungarian_10x10_row_min(cost_matrix, row_order[index]);
+    }
+    bounds
+}
+
+fn hungarian_10x10_row_min(
+    cost_matrix: &[i32; TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT],
+    row: usize,
+) -> i32 {
+    (0..TASSADAR_HUNGARIAN_10X10_DIM)
+        .map(|column| cost_matrix[row * TASSADAR_HUNGARIAN_10X10_DIM + column])
+        .min()
+        .expect("Hungarian-10x10 row should have one minimum")
+}
+
+fn hungarian_10x10_row_gap(
+    cost_matrix: &[i32; TASSADAR_HUNGARIAN_10X10_MATRIX_CELL_COUNT],
+    row: usize,
+) -> i32 {
+    let mut values = (0..TASSADAR_HUNGARIAN_10X10_DIM)
+        .map(|column| cost_matrix[row * TASSADAR_HUNGARIAN_10X10_DIM + column])
+        .collect::<Vec<_>>();
+    values.sort_unstable();
+    values[1] - values[0]
+}
+
+fn hungarian_10x10_best_assignment_slot(actual_row: usize) -> u8 {
+    TASSADAR_HUNGARIAN_10X10_BEST_ASSIGNMENT_SLOT_BASE
+        + u8::try_from(actual_row).expect("Hungarian-10x10 row should fit in u8")
+}
+
+fn hungarian_10x10_current_assignment_slot(actual_row: usize) -> u8 {
+    TASSADAR_HUNGARIAN_10X10_CURRENT_ASSIGNMENT_SLOT_BASE
+        + u8::try_from(actual_row).expect("Hungarian-10x10 row should fit in u8")
+}
+
+fn hungarian_10x10_next_candidate_slot(search_depth: usize) -> u8 {
+    TASSADAR_HUNGARIAN_10X10_NEXT_CANDIDATE_SLOT_BASE
+        + u8::try_from(search_depth).expect("Hungarian-10x10 search depth should fit in u8")
+}
+
+fn hungarian_10x10_used_column_slot(column: usize) -> u8 {
+    TASSADAR_HUNGARIAN_10X10_USED_COLUMN_SLOT_BASE
+        + u8::try_from(column).expect("Hungarian-10x10 column should fit in u8")
+}
+
+fn emit_local_not_equal_branch(
+    assembler: &mut TassadarLabelAssembler,
+    local: u8,
+    expected_value: i32,
+    branch_label: &str,
+) {
+    assembler.emit(TassadarInstruction::LocalGet { local });
+    assembler.emit(TassadarInstruction::I32Const {
+        value: expected_value,
+    });
+    assembler.emit(TassadarInstruction::I32Sub);
+    assembler.branch_if(branch_label);
+}
+
+fn emit_memory_not_equal_branch(
+    assembler: &mut TassadarLabelAssembler,
+    slot: u8,
+    expected_value: i32,
+    branch_label: &str,
+) {
+    assembler.emit(TassadarInstruction::I32Load { slot });
+    assembler.emit(TassadarInstruction::I32Const {
+        value: expected_value,
+    });
+    assembler.emit(TassadarInstruction::I32Sub);
+    assembler.branch_if(branch_label);
+}
+
+fn emit_memory_const_store(assembler: &mut TassadarLabelAssembler, slot: u8, value: i32) {
+    assembler.emit(TassadarInstruction::I32Const { value });
+    assembler.emit(TassadarInstruction::I32Store { slot });
 }
 
 fn build_tassadar_sudoku_search_program(
@@ -6357,6 +6983,9 @@ fn claim_boundary_for_profile(profile_id: &str) -> String {
         value if value == TassadarWasmProfileId::HungarianV0MatchingV1.as_str() => {
             String::from("bounded 4x4 Hungarian matching profile")
         }
+        value if value == TassadarWasmProfileId::Hungarian10x10MatchingV1.as_str() => {
+            String::from("article-sized 10x10 Hungarian matching profile")
+        }
         value if value == TassadarWasmProfileId::Sudoku9x9SearchV1.as_str() => {
             String::from("bounded real 9x9 Sudoku search profile")
         }
@@ -6382,6 +7011,11 @@ fn profile_case_map() -> BTreeMap<String, Vec<String>> {
             .push(case.validation_case.case_id);
     }
     for case in tassadar_hungarian_v0_corpus() {
+        map.entry(case.validation_case.program.profile_id)
+            .or_insert_with(Vec::new)
+            .push(case.validation_case.case_id);
+    }
+    for case in tassadar_hungarian_10x10_corpus() {
         map.entry(case.validation_case.program.profile_id)
             .or_insert_with(Vec::new)
             .push(case.validation_case.case_id);
@@ -6412,6 +7046,9 @@ fn workload_targets_for_profile(profile_id: &str) -> Vec<String> {
         }
         value if value == TassadarWasmProfileId::HungarianV0MatchingV1.as_str() => {
             vec![String::from("hungarian_v0_matching")]
+        }
+        value if value == TassadarWasmProfileId::Hungarian10x10MatchingV1.as_str() => {
+            vec![String::from("hungarian_10x10_matching")]
         }
         value if value == TassadarWasmProfileId::Sudoku9x9SearchV1.as_str() => {
             vec![String::from("sudoku_9x9_search")]

@@ -1,0 +1,71 @@
+{
+  "workload_family_id": "tassadar.wasm.hungarian_10x10_matching.v1.compiled_executor",
+  "requested_decode_mode": "reference_linear",
+  "total_case_count": 4,
+  "average_cpu_reference_steps_per_second": 10470429.311347397,
+  "average_compiled_executor_steps_per_second": 1758.276204953549,
+  "average_compiled_over_cpu_ratio": 0.000167253739,
+  "case_receipts": [
+    {
+      "case_id": "hungarian_10x10_train_a",
+      "split": "train",
+      "optimal_cost": 206,
+      "program_artifact_digest": "1bf3d16d83b24585738385f2c6cd1d805c8419ec4ec9e546285118ef6f215e33",
+      "compiled_weight_artifact_digest": "9af8af5ca51277341fae3ca798e20d3603192f154e14eaf3488a6d5fb87d76b6",
+      "requested_decode_mode": "reference_linear",
+      "effective_decode_mode": "reference_linear",
+      "trace_step_count": 29831,
+      "cpu_reference_steps_per_second": 11468075.953561809,
+      "compiled_executor_steps_per_second": 2279.127095275998,
+      "compiled_over_cpu_ratio": 0.000198736659,
+      "runtime_trace_digest": "92bed0eb60230fb313a8c23cef0fac86da36fa951d505d36f50778b7791c6e5a",
+      "runtime_execution_proof_bundle_digest": "754de6ce26904fc036d1c339770a5526b3a9a7dbe4366d1c6d4b0a5f95961a36"
+    },
+    {
+      "case_id": "hungarian_10x10_train_b",
+      "split": "train",
+      "optimal_cost": 243,
+      "program_artifact_digest": "8ddcafb66a709e0c85129ee13410f4c0e0f88e0a3dbf1eecb24ac63d49e0c285",
+      "compiled_weight_artifact_digest": "0a9ef5bf6d38ec6b2a6cbd478d4820dc39dede5e133f12b33ac121f37d3c4961",
+      "requested_decode_mode": "reference_linear",
+      "effective_decode_mode": "reference_linear",
+      "trace_step_count": 39711,
+      "cpu_reference_steps_per_second": 11194973.41155052,
+      "compiled_executor_steps_per_second": 1688.130186669684,
+      "compiled_over_cpu_ratio": 0.000150793586,
+      "runtime_trace_digest": "4dc3beffb50ab17f35360f4d4a44911fb9f62fa3b1493c5ba5d19f7db879692f",
+      "runtime_execution_proof_bundle_digest": "3f7f8998a86e0894ddc26a5cd3b713b730b7c0fac435ab3bc5ec125e22c32fa4"
+    },
+    {
+      "case_id": "hungarian_10x10_validation_a",
+      "split": "validation",
+      "optimal_cost": 220,
+      "program_artifact_digest": "88af18bade92726761bd5718aeba1dac395ae67d8aa8aad86e8d2faf75029544",
+      "compiled_weight_artifact_digest": "0de52637e417fe2e1cb8a1e27cc03a834fc0161412bb608c6945d00c64d4b9f4",
+      "requested_decode_mode": "reference_linear",
+      "effective_decode_mode": "reference_linear",
+      "trace_step_count": 40127,
+      "cpu_reference_steps_per_second": 9488190.540325815,
+      "compiled_executor_steps_per_second": 1679.661026447513,
+      "compiled_over_cpu_ratio": 0.000177026486,
+      "runtime_trace_digest": "5442732b36ce7615320b224c212d07f5cb1c9588f7b650a8b61f7ecab2cb6e9c",
+      "runtime_execution_proof_bundle_digest": "2d571f4f5d9b8af5705c2ff4f6eff4e8b722a6eb7a5cc36d1795053bbdb37604"
+    },
+    {
+      "case_id": "hungarian_10x10_test_a",
+      "split": "test",
+      "optimal_cost": 341,
+      "program_artifact_digest": "b2f3489d393fe563e6b7cf8c21f17923b9e6273b81f59ea4182af17898eddcb3",
+      "compiled_weight_artifact_digest": "7b3f4b9c1034f67f624b408937e650e5cc6f8afabc2d4be4383d8dbc5dae61e3",
+      "requested_decode_mode": "reference_linear",
+      "effective_decode_mode": "reference_linear",
+      "trace_step_count": 48727,
+      "cpu_reference_steps_per_second": 9730477.33995145,
+      "compiled_executor_steps_per_second": 1386.186511421,
+      "compiled_over_cpu_ratio": 0.000142458223,
+      "runtime_trace_digest": "f4709afcb7b511df908f28c9e633ab3a3142c0a1ba43387e98c99ca3096365fa",
+      "runtime_execution_proof_bundle_digest": "d5def3f3806998089691a9e8875ef6508cfba6b2fd3c1269fc88e3982ba6693e"
+    }
+  ],
+  "report_digest": "69098c66a825a64c636fe1646ed888ba98cfec3455be79f526b15cc13863f66e"
+}

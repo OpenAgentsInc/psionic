@@ -1,0 +1,423 @@
+{
+  "eval_package": {
+    "abi_version": "psionic.environment.v1",
+    "key": {
+      "environment_ref": "env.openagents.tassadar.hungarian_10x10.eval",
+      "version": "v0"
+    },
+    "family": "evaluation",
+    "display_name": "Tassadar Hungarian-10x10 Corpus Eval",
+    "execution": {
+      "runtime_family": "evaluator",
+      "entrypoint": "tassadar_eval::run",
+      "args": [
+        "runtime://tassadar/hungarian_10x10/eval"
+      ],
+      "max_turns": 1,
+      "state_mode": "stateless",
+      "time_budget_ms": 30000
+    },
+    "supported_workloads": [
+      "online_eval",
+      "offline_eval"
+    ],
+    "datasets": [
+      {
+        "dataset": {
+          "dataset_ref": "dataset://openagents/tassadar/hungarian_10x10_corpus",
+          "version": "v0"
+        },
+        "split": "validation",
+        "mount_path": "/datasets/tassadar/hungarian_10x10/validation",
+        "required": true
+      }
+    ],
+    "rubric_hooks": [
+      {
+        "rubric_ref": "tassadar://rubric/exactness/final_output_exactness",
+        "hook_name": "score_final_output_exactness",
+        "score_kind": "binary",
+        "pass_threshold": 10000
+      },
+      {
+        "rubric_ref": "tassadar://rubric/exactness/step_exactness",
+        "hook_name": "score_step_exactness",
+        "score_kind": "binary",
+        "pass_threshold": 10000
+      },
+      {
+        "rubric_ref": "tassadar://rubric/exactness/halt_exactness",
+        "hook_name": "score_halt_exactness",
+        "score_kind": "binary",
+        "pass_threshold": 10000
+      }
+    ],
+    "expected_artifacts": [
+      {
+        "artifact_kind": "tassadar_program_artifact.json",
+        "required": true,
+        "verification_policy_ref": "policy://tassadar/program_artifact"
+      },
+      {
+        "artifact_kind": "tassadar_trace.json",
+        "required": true,
+        "verification_policy_ref": "policy://tassadar/trace"
+      },
+      {
+        "artifact_kind": "tassadar_eval_report.json",
+        "required": true,
+        "verification_policy_ref": "policy://tassadar/eval_report"
+      }
+    ],
+    "policy_references": [
+      {
+        "kind": "verification",
+        "policy_ref": "policy://tassadar/hungarian_10x10/eval/verification",
+        "required": true
+      }
+    ],
+    "metadata": {
+      "tassadar.abi_version": "psionic.tassadar_environment.v1",
+      "tassadar.current_workload_targets": [
+        "hungarian_matching"
+      ],
+      "tassadar.exactness_contract": {
+        "require_final_output_exactness": true,
+        "require_step_exactness": true,
+        "require_halt_exactness": true,
+        "timeout_budget_ms": 30000,
+        "trace_budget_steps": 131072,
+        "require_cpu_reference_baseline": true,
+        "require_reference_linear_baseline": true,
+        "future_throughput_metric_ids": [
+          "tassadar.hull_cache_steps_per_second"
+        ]
+      },
+      "tassadar.io_contract": {
+        "input_family": "no_external_input",
+        "output_family": "i32_sequence",
+        "output_element_type": "i32",
+        "deterministic_outputs": true
+      },
+      "tassadar.package_refs": {
+        "group_ref": "group.tassadar.hungarian_10x10",
+        "eval_pin_alias": "tassadar_hungarian_10x10_eval",
+        "benchmark_pin_alias": "tassadar_hungarian_10x10_benchmark",
+        "eval_member_ref": "tassadar_hungarian_10x10_eval_member",
+        "benchmark_member_ref": "tassadar_hungarian_10x10_benchmark_member",
+        "program_corpus_ref": "tassadar://corpus/hungarian_10x10.validation",
+        "io_contract_ref": "tassadar://io/exact_i32_sequence",
+        "rubric_binding_ref": "tassadar://rubric/exactness",
+        "eval_runtime_profile_ref": "runtime://tassadar/hungarian_10x10/eval",
+        "benchmark_profile_ref": "benchmark://tassadar/hungarian_10x10/reference_fixture",
+        "benchmark_runtime_profile_ref": "runtime://tassadar/hungarian_10x10/benchmark"
+      },
+      "tassadar.planned_workload_targets": [],
+      "tassadar.program_binding": {
+        "dataset": {
+          "dataset_ref": "dataset://openagents/tassadar/hungarian_10x10_corpus",
+          "version": "v0"
+        },
+        "program_corpus_ref": "tassadar://corpus/hungarian_10x10.validation",
+        "corpus_digest": "c9ca90a6b2269af6cfe9d74f9f77cf6b9a81e24efb387a31015f2bfea6d88952",
+        "wasm_profile_id": "tassadar.wasm.hungarian_10x10_matching.v1",
+        "trace_abi_id": "tassadar.trace.v1",
+        "trace_abi_version": 1,
+        "opcode_vocabulary_digest": "67420a6476d84ef43e3adb0027eb688a2364a0fe68b8258fb7a377f63e4fd78e",
+        "artifact_digests": [
+          "349a4e03048ca314673b390ec44b221750318f995135ed72a1fdb299ce7f27ab",
+          "acfc00533cb3fd0d9b8a28968d873af1d2bb2bce1edc5c9bf6fee6784c9f674f",
+          "a611cfbd4abf871f8e3ab9f889806a3d0f7287141b5c43856fb8e2c88da0f2c6",
+          "b1bfc07f002fb94548d633a1a70b3f0ea663114be20459dd3632ddc170232f03"
+        ]
+      },
+      "tassadar.surface": "eval"
+    }
+  },
+  "benchmark_package": {
+    "abi_version": "psionic.environment.v1",
+    "key": {
+      "environment_ref": "env.openagents.tassadar.hungarian_10x10.benchmark",
+      "version": "v0"
+    },
+    "family": "evaluation",
+    "display_name": "Tassadar Hungarian-10x10 Corpus Benchmark",
+    "execution": {
+      "runtime_family": "evaluator",
+      "entrypoint": "tassadar_benchmark::run",
+      "args": [
+        "runtime://tassadar/hungarian_10x10/benchmark"
+      ],
+      "max_turns": 1,
+      "state_mode": "turn_scoped",
+      "time_budget_ms": 30000
+    },
+    "supported_workloads": [
+      "offline_eval",
+      "validator_benchmark"
+    ],
+    "datasets": [
+      {
+        "dataset": {
+          "dataset_ref": "dataset://openagents/tassadar/hungarian_10x10_corpus",
+          "version": "v0"
+        },
+        "split": "benchmark",
+        "mount_path": "/datasets/tassadar/hungarian_10x10/benchmark",
+        "required": true
+      }
+    ],
+    "rubric_hooks": [
+      {
+        "rubric_ref": "tassadar://rubric/exactness/final_output_exactness",
+        "hook_name": "score_final_output_exactness",
+        "score_kind": "binary",
+        "pass_threshold": 10000
+      },
+      {
+        "rubric_ref": "tassadar://rubric/exactness/step_exactness",
+        "hook_name": "score_step_exactness",
+        "score_kind": "binary",
+        "pass_threshold": 10000
+      },
+      {
+        "rubric_ref": "tassadar://rubric/exactness/halt_exactness",
+        "hook_name": "score_halt_exactness",
+        "score_kind": "binary",
+        "pass_threshold": 10000
+      }
+    ],
+    "expected_artifacts": [
+      {
+        "artifact_kind": "tassadar_program_artifact.json",
+        "required": true,
+        "verification_policy_ref": "policy://tassadar/program_artifact"
+      },
+      {
+        "artifact_kind": "tassadar_trace.json",
+        "required": true,
+        "verification_policy_ref": "policy://tassadar/trace"
+      },
+      {
+        "artifact_kind": "tassadar_eval_report.json",
+        "required": true,
+        "verification_policy_ref": "policy://tassadar/eval_report"
+      }
+    ],
+    "policy_references": [
+      {
+        "kind": "benchmark",
+        "policy_ref": "policy://tassadar/hungarian_10x10/benchmark",
+        "required": true
+      },
+      {
+        "kind": "verification",
+        "policy_ref": "policy://tassadar/hungarian_10x10/benchmark/verification",
+        "required": true
+      }
+    ],
+    "benchmark_profiles": [
+      {
+        "benchmark_profile_ref": "benchmark://tassadar/hungarian_10x10/reference_fixture",
+        "runtime_profile_ref": "runtime://tassadar/hungarian_10x10/benchmark",
+        "verification_posture": "validator_required",
+        "expected_execution_strategy": "tassadar_reference_fixture"
+      }
+    ],
+    "metadata": {
+      "tassadar.abi_version": "psionic.tassadar_environment.v1",
+      "tassadar.current_workload_targets": [
+        "hungarian_matching"
+      ],
+      "tassadar.exactness_contract": {
+        "require_final_output_exactness": true,
+        "require_step_exactness": true,
+        "require_halt_exactness": true,
+        "timeout_budget_ms": 30000,
+        "trace_budget_steps": 131072,
+        "require_cpu_reference_baseline": true,
+        "require_reference_linear_baseline": true,
+        "future_throughput_metric_ids": [
+          "tassadar.hull_cache_steps_per_second"
+        ]
+      },
+      "tassadar.io_contract": {
+        "input_family": "no_external_input",
+        "output_family": "i32_sequence",
+        "output_element_type": "i32",
+        "deterministic_outputs": true
+      },
+      "tassadar.package_refs": {
+        "group_ref": "group.tassadar.hungarian_10x10",
+        "eval_pin_alias": "tassadar_hungarian_10x10_eval",
+        "benchmark_pin_alias": "tassadar_hungarian_10x10_benchmark",
+        "eval_member_ref": "tassadar_hungarian_10x10_eval_member",
+        "benchmark_member_ref": "tassadar_hungarian_10x10_benchmark_member",
+        "program_corpus_ref": "tassadar://corpus/hungarian_10x10.validation",
+        "io_contract_ref": "tassadar://io/exact_i32_sequence",
+        "rubric_binding_ref": "tassadar://rubric/exactness",
+        "eval_runtime_profile_ref": "runtime://tassadar/hungarian_10x10/eval",
+        "benchmark_profile_ref": "benchmark://tassadar/hungarian_10x10/reference_fixture",
+        "benchmark_runtime_profile_ref": "runtime://tassadar/hungarian_10x10/benchmark"
+      },
+      "tassadar.planned_workload_targets": [],
+      "tassadar.program_binding": {
+        "dataset": {
+          "dataset_ref": "dataset://openagents/tassadar/hungarian_10x10_corpus",
+          "version": "v0"
+        },
+        "program_corpus_ref": "tassadar://corpus/hungarian_10x10.validation",
+        "corpus_digest": "c9ca90a6b2269af6cfe9d74f9f77cf6b9a81e24efb387a31015f2bfea6d88952",
+        "wasm_profile_id": "tassadar.wasm.hungarian_10x10_matching.v1",
+        "trace_abi_id": "tassadar.trace.v1",
+        "trace_abi_version": 1,
+        "opcode_vocabulary_digest": "67420a6476d84ef43e3adb0027eb688a2364a0fe68b8258fb7a377f63e4fd78e",
+        "artifact_digests": [
+          "349a4e03048ca314673b390ec44b221750318f995135ed72a1fdb299ce7f27ab",
+          "acfc00533cb3fd0d9b8a28968d873af1d2bb2bce1edc5c9bf6fee6784c9f674f",
+          "a611cfbd4abf871f8e3ab9f889806a3d0f7287141b5c43856fb8e2c88da0f2c6",
+          "b1bfc07f002fb94548d633a1a70b3f0ea663114be20459dd3632ddc170232f03"
+        ]
+      },
+      "tassadar.surface": "benchmark"
+    }
+  },
+  "group": {
+    "group_ref": "group.tassadar.hungarian_10x10",
+    "display_name": "Tassadar Hungarian-10x10 Corpus",
+    "members": [
+      {
+        "member_ref": "tassadar_hungarian_10x10_eval_member",
+        "pin_alias": "tassadar_hungarian_10x10_eval",
+        "surfaces": [
+          "eval"
+        ],
+        "required_workloads": [
+          "online_eval",
+          "offline_eval"
+        ]
+      },
+      {
+        "member_ref": "tassadar_hungarian_10x10_benchmark_member",
+        "pin_alias": "tassadar_hungarian_10x10_benchmark",
+        "surfaces": [
+          "benchmark"
+        ],
+        "required_workloads": [
+          "validator_benchmark"
+        ],
+        "required_benchmark_profiles": [
+          "benchmark://tassadar/hungarian_10x10/reference_fixture"
+        ]
+      }
+    ]
+  },
+  "eval_resolution": {
+    "group_ref": "group.tassadar.hungarian_10x10",
+    "surface": "eval",
+    "members": [
+      {
+        "member_ref": "tassadar_hungarian_10x10_eval_member",
+        "surface": "eval",
+        "package": {
+          "alias": "tassadar_hungarian_10x10_eval",
+          "package_key": {
+            "environment_ref": "env.openagents.tassadar.hungarian_10x10.eval",
+            "version": "v0"
+          },
+          "package_digest": "05752cea9f5f09c9cc564866bc2b0b2804a23dcecdb455998a94f51a39f33a0a",
+          "supported_workloads": [
+            "online_eval",
+            "offline_eval"
+          ]
+        }
+      }
+    ],
+    "resolution_digest": "2652b3aa4e11a7ab73f95ce88fc93699b759d0f5917dcd003ea5d062bbb78c23"
+  },
+  "benchmark_resolution": {
+    "group_ref": "group.tassadar.hungarian_10x10",
+    "surface": "benchmark",
+    "members": [
+      {
+        "member_ref": "tassadar_hungarian_10x10_benchmark_member",
+        "surface": "benchmark",
+        "package": {
+          "alias": "tassadar_hungarian_10x10_benchmark",
+          "package_key": {
+            "environment_ref": "env.openagents.tassadar.hungarian_10x10.benchmark",
+            "version": "v0"
+          },
+          "package_digest": "d8ae8e39b731376e40f1f6e95b56821aa8344582eb76ce3ed84ec04a6fc7e45c",
+          "dependencies": [
+            {
+              "environment_ref": "env.openagents.tassadar.hungarian_10x10.eval",
+              "version": "v0"
+            }
+          ],
+          "supported_workloads": [
+            "offline_eval",
+            "validator_benchmark"
+          ]
+        },
+        "benchmark_profiles": [
+          "benchmark://tassadar/hungarian_10x10/reference_fixture"
+        ]
+      }
+    ],
+    "resolution_digest": "d58e0f743804fd8f5b00435caa59f83961a7f2f6c59c17bfbabe0e5746570158"
+  },
+  "package_refs": {
+    "group_ref": "group.tassadar.hungarian_10x10",
+    "eval_pin_alias": "tassadar_hungarian_10x10_eval",
+    "benchmark_pin_alias": "tassadar_hungarian_10x10_benchmark",
+    "eval_member_ref": "tassadar_hungarian_10x10_eval_member",
+    "benchmark_member_ref": "tassadar_hungarian_10x10_benchmark_member",
+    "program_corpus_ref": "tassadar://corpus/hungarian_10x10.validation",
+    "io_contract_ref": "tassadar://io/exact_i32_sequence",
+    "rubric_binding_ref": "tassadar://rubric/exactness",
+    "eval_runtime_profile_ref": "runtime://tassadar/hungarian_10x10/eval",
+    "benchmark_profile_ref": "benchmark://tassadar/hungarian_10x10/reference_fixture",
+    "benchmark_runtime_profile_ref": "runtime://tassadar/hungarian_10x10/benchmark"
+  },
+  "program_binding": {
+    "dataset": {
+      "dataset_ref": "dataset://openagents/tassadar/hungarian_10x10_corpus",
+      "version": "v0"
+    },
+    "program_corpus_ref": "tassadar://corpus/hungarian_10x10.validation",
+    "corpus_digest": "c9ca90a6b2269af6cfe9d74f9f77cf6b9a81e24efb387a31015f2bfea6d88952",
+    "wasm_profile_id": "tassadar.wasm.hungarian_10x10_matching.v1",
+    "trace_abi_id": "tassadar.trace.v1",
+    "trace_abi_version": 1,
+    "opcode_vocabulary_digest": "67420a6476d84ef43e3adb0027eb688a2364a0fe68b8258fb7a377f63e4fd78e",
+    "artifact_digests": [
+      "349a4e03048ca314673b390ec44b221750318f995135ed72a1fdb299ce7f27ab",
+      "acfc00533cb3fd0d9b8a28968d873af1d2bb2bce1edc5c9bf6fee6784c9f674f",
+      "a611cfbd4abf871f8e3ab9f889806a3d0f7287141b5c43856fb8e2c88da0f2c6",
+      "b1bfc07f002fb94548d633a1a70b3f0ea663114be20459dd3632ddc170232f03"
+    ]
+  },
+  "io_contract": {
+    "input_family": "no_external_input",
+    "output_family": "i32_sequence",
+    "output_element_type": "i32",
+    "deterministic_outputs": true
+  },
+  "exactness_contract": {
+    "require_final_output_exactness": true,
+    "require_step_exactness": true,
+    "require_halt_exactness": true,
+    "timeout_budget_ms": 30000,
+    "trace_budget_steps": 131072,
+    "require_cpu_reference_baseline": true,
+    "require_reference_linear_baseline": true,
+    "future_throughput_metric_ids": [
+      "tassadar.hull_cache_steps_per_second"
+    ]
+  },
+  "current_workload_targets": [
+    "hungarian_matching"
+  ],
+  "planned_workload_targets": []
+}

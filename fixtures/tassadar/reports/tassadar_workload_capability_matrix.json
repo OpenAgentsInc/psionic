@@ -5,6 +5,7 @@
     "fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0/run_bundle.json",
     "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/run_bundle.json",
     "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/run_bundle.json",
+    "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json",
     "fixtures/tassadar/runs/sudoku_v0_promotion_v3/promotion_bundle.json",
     "fixtures/tassadar/runs/sudoku_v0_promotion_v3/promotion_gate_report.json",
     "fixtures/tassadar/runs/sudoku_v0_promotion_v3/family_report.json",
@@ -196,8 +197,27 @@
           "note": "bounded compiled/proof-backed Hungarian-v0 lane exact on the matched 4x4 corpus and benchmark package; not a learned lane, not arbitrary-program closure, and not article parity; serve_posture=eval_only"
         }
       ]
+    },
+    {
+      "workload_family_id": "hungarian_matching_10x10",
+      "workload_target": "hungarian_matching",
+      "summary": "article-sized 10x10 Hungarian matching family with exact compiled/proof-backed closure and no learned long-horizon closure yet",
+      "capabilities": [
+        {
+          "surface_id": "compiled.proof_backed",
+          "posture": "exact",
+          "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json",
+          "note": "exact compiled/proof-backed article-sized 10x10 Hungarian lane on the committed corpus with benchmark, proof, throughput, and explicit learned-lane separation; this lands on the larger search-oriented Wasm profile rather than the tighter article_i32 profile, and it closes the compiled matching article workload, not full compiled article parity by itself; serve_posture=eval_only"
+        },
+        {
+          "surface_id": "learned.long_horizon",
+          "posture": "not_landed",
+          "artifact_ref": "fixtures/tassadar/reports/tassadar_acceptance_report.json",
+          "note": "no learned 10x10 Hungarian lane is landed; current article-sized matching closure is compiled/proof-backed only"
+        }
+      ]
     }
   ],
   "claim_boundary": "this matrix is a workload-family capability view over current committed artifacts only; exact runtime, fallback-only runtime, compiled exact, and bounded/partial learned results remain separated and this report does not imply article parity",
-  "report_digest": "872da8255dd61da3575e1ff6939cc7d5f62b5c20c7a246e97491b6dbe1737e56"
+  "report_digest": "004800e86c913aa387809c0695bbc94f34a323ddf4a77a4e4b5e87fd40dbc2ba"
 }

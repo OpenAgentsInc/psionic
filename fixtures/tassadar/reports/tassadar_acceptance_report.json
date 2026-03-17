@@ -123,7 +123,7 @@
   "compiled_article_class": {
     "verdict_id": "compiled_article_class",
     "passed": false,
-    "detail": "Compiled article-class closure is still red: the repo now has an exact compiled 9x9 Sudoku bundle, but it still lacks the article-sized Hungarian bundle, the generic compiled kernel suite, and the compiled article-closure checker.",
+    "detail": "Compiled article-class closure is still red: the repo now has exact compiled 9x9 Sudoku and 10x10 Hungarian bundles, but it still lacks the generic compiled kernel suite and the compiled article-closure checker.",
     "validation_commands": [
       "scripts/check-tassadar-acceptance.sh"
     ],
@@ -139,13 +139,24 @@
         "digest": "9a433a3ae5932df79c477b3dc49955996fa6825d39eec8f0e6366a2c471e4c66"
       },
       {
-        "label": "bounded compiled Hungarian run bundle",
-        "artifact_ref": "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/run_bundle.json",
-        "digest": "1d92730054062aaa6801f9e3d1b4b0ed60e5be0b988eda2fa6cf6e258604e59b"
+        "label": "article-sized compiled Hungarian-10x10 run bundle",
+        "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json",
+        "digest": "696786f891b36ee21779093b0ca5e325305b11d8d67ab834028242bd613172d6"
+      },
+      {
+        "label": "article-sized compiled Hungarian-10x10 exactness report",
+        "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_exactness_report.json"
+      },
+      {
+        "label": "article-sized compiled Hungarian-10x10 compatibility report",
+        "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_compatibility_report.json"
+      },
+      {
+        "label": "article-sized compiled Hungarian-10x10 claim-boundary report",
+        "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/claim_boundary_report.json"
       }
     ],
     "missing_evidence": [
-      "PTAS-303 exact compiled/proof-backed 10x10 Hungarian bundle",
       "PTAS-304 generic compiled arithmetic/memory/branch/loop kernel suite",
       "PTAS-305 compiled article-closure checker"
     ]
@@ -191,5 +202,5 @@
     ]
   },
   "current_truth_holds": true,
-  "report_digest": "db4b1d45f08d6a6450f6cebdb9d92aee28c9ea7f959cb0933e585921810599d8"
+  "report_digest": "9c964fe2bc3cf3bc0991301262faeb720cbcb1e7eaa7c698b87a221d4e068091"
 }

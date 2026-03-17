@@ -10,16 +10,17 @@ use psionic_environments::{
 use psionic_models::{TassadarExecutorContractError, TassadarExecutorFixture};
 use psionic_runtime::{
     build_tassadar_execution_evidence_bundle, diagnose_tassadar_executor_request,
-    run_tassadar_exact_equivalence, tassadar_article_class_corpus, tassadar_hungarian_v0_corpus,
-    tassadar_sudoku_9x9_corpus, tassadar_sudoku_v0_corpus,
+    run_tassadar_exact_equivalence, tassadar_article_class_corpus, tassadar_hungarian_10x10_corpus,
+    tassadar_hungarian_v0_corpus, tassadar_sudoku_9x9_corpus, tassadar_sudoku_v0_corpus,
     tassadar_trace_abi_for_profile_id, tassadar_validation_corpus, TassadarClaimClass,
     TassadarCpuReferenceRunner, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
     TassadarExecutorSelectionReason, TassadarExecutorSelectionState, TassadarFixtureRunner,
     TassadarHierarchicalHullCandidateRunner, TassadarHullCacheRunner,
-    TassadarHungarianV0CorpusCase, TassadarInstruction, TassadarProgram, TassadarProgramArtifact,
-    TassadarProgramArtifactError, TassadarSparseTopKRunner, TassadarSudoku9x9CorpusCase,
-    TassadarSudokuV0CorpusCase, TassadarSudokuV0CorpusSplit, TassadarTraceAbi,
-    TassadarTraceArtifact, TassadarWasmProfile, TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
+    TassadarHungarian10x10CorpusCase, TassadarHungarianV0CorpusCase, TassadarInstruction,
+    TassadarProgram, TassadarProgramArtifact, TassadarProgramArtifactError,
+    TassadarSparseTopKRunner, TassadarSudoku9x9CorpusCase, TassadarSudokuV0CorpusCase,
+    TassadarSudokuV0CorpusSplit, TassadarTraceAbi, TassadarTraceArtifact, TassadarWasmProfile,
+    TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -66,8 +67,7 @@ pub const TASSADAR_SUDOKU_9X9_BENCHMARK_ENVIRONMENT_REF: &str =
 pub const TASSADAR_SUDOKU_9X9_BENCHMARK_REF: &str =
     "benchmark://openagents/tassadar/sudoku_9x9/reference_fixture";
 /// Stable dataset ref for the compiled 9x9 Sudoku corpus.
-pub const TASSADAR_SUDOKU_9X9_DATASET_REF: &str =
-    "dataset://openagents/tassadar/sudoku_9x9_corpus";
+pub const TASSADAR_SUDOKU_9X9_DATASET_REF: &str = "dataset://openagents/tassadar/sudoku_9x9_corpus";
 /// Stable environment ref for the bounded Hungarian-v0 eval package.
 pub const TASSADAR_HUNGARIAN_V0_EVAL_ENVIRONMENT_REF: &str =
     "env.openagents.tassadar.hungarian_v0.eval";
@@ -80,6 +80,18 @@ pub const TASSADAR_HUNGARIAN_V0_BENCHMARK_REF: &str =
 /// Stable dataset ref for the bounded Hungarian-v0 corpus.
 pub const TASSADAR_HUNGARIAN_V0_DATASET_REF: &str =
     "dataset://openagents/tassadar/hungarian_v0_corpus";
+/// Stable environment ref for the article-sized Hungarian-10x10 eval package.
+pub const TASSADAR_HUNGARIAN_10X10_EVAL_ENVIRONMENT_REF: &str =
+    "env.openagents.tassadar.hungarian_10x10.eval";
+/// Stable environment ref for the article-sized Hungarian-10x10 benchmark package.
+pub const TASSADAR_HUNGARIAN_10X10_BENCHMARK_ENVIRONMENT_REF: &str =
+    "env.openagents.tassadar.hungarian_10x10.benchmark";
+/// Stable benchmark ref for the article-sized Hungarian-10x10 suite.
+pub const TASSADAR_HUNGARIAN_10X10_BENCHMARK_REF: &str =
+    "benchmark://openagents/tassadar/hungarian_10x10/reference_fixture";
+/// Stable dataset ref for the article-sized Hungarian-10x10 corpus.
+pub const TASSADAR_HUNGARIAN_10X10_DATASET_REF: &str =
+    "dataset://openagents/tassadar/hungarian_10x10_corpus";
 /// Stable metric id for the Phase 5 hull-cache lane.
 pub const TASSADAR_HULL_CACHE_METRIC_ID: &str = "tassadar.hull_cache_steps_per_second";
 /// Stable metric id for the Phase 8 sparse-top-k lane.
@@ -752,6 +764,24 @@ pub fn build_tassadar_hungarian_v0_suite(
         build_tassadar_hungarian_v0_environment_bundle(version, &artifacts, &corpus_digest)?;
     let benchmark_package =
         build_tassadar_hungarian_v0_benchmark_package(version, &environment_bundle, &artifacts)?;
+    Ok(TassadarReferenceFixtureSuite {
+        environment_bundle,
+        benchmark_package,
+        artifacts,
+        corpus_digest,
+    })
+}
+
+/// Builds the article-sized Hungarian-10x10 suite for the current exact matching corpus.
+pub fn build_tassadar_hungarian_10x10_suite(
+    version: &str,
+) -> Result<TassadarReferenceFixtureSuite, TassadarBenchmarkError> {
+    let artifacts = tassadar_hungarian_10x10_program_artifacts(version)?;
+    let corpus_digest = stable_corpus_digest(artifacts.as_slice());
+    let environment_bundle =
+        build_tassadar_hungarian_10x10_environment_bundle(version, &artifacts, &corpus_digest)?;
+    let benchmark_package =
+        build_tassadar_hungarian_10x10_benchmark_package(version, &environment_bundle, &artifacts)?;
     Ok(TassadarReferenceFixtureSuite {
         environment_bundle,
         benchmark_package,
@@ -1969,8 +1999,8 @@ fn build_tassadar_article_class_benchmark_package(
 pub fn tassadar_sudoku_9x9_program_artifacts(
     version: &str,
 ) -> Result<Vec<TassadarProgramArtifact>, TassadarBenchmarkError> {
-    let profile = TassadarWasmProfile::sudoku_9x9_search_v1();
-    let trace_abi = TassadarTraceAbi::sudoku_9x9_search_v1();
+    let profile = TassadarWasmProfile::hungarian_10x10_matching_v1();
+    let trace_abi = TassadarTraceAbi::hungarian_10x10_matching_v1();
     tassadar_sudoku_9x9_corpus()
         .into_iter()
         .map(|case| {
@@ -1990,8 +2020,8 @@ fn build_tassadar_sudoku_9x9_environment_bundle(
     artifacts: &[TassadarProgramArtifact],
     corpus_digest: &str,
 ) -> Result<TassadarEnvironmentBundle, TassadarBenchmarkError> {
-    let profile = TassadarWasmProfile::sudoku_9x9_search_v1();
-    let trace_abi = TassadarTraceAbi::sudoku_9x9_search_v1();
+    let profile = TassadarWasmProfile::hungarian_10x10_matching_v1();
+    let trace_abi = TassadarTraceAbi::hungarian_10x10_matching_v1();
     let dataset = DatasetKey::new(TASSADAR_SUDOKU_9X9_DATASET_REF, version);
     TassadarEnvironmentSpec {
         version: String::from(version),
@@ -2023,9 +2053,7 @@ fn build_tassadar_sudoku_9x9_environment_bundle(
             benchmark_profile_ref: String::from(
                 "benchmark://tassadar/sudoku_9x9/reference_fixture",
             ),
-            benchmark_runtime_profile_ref: String::from(
-                "runtime://tassadar/sudoku_9x9/benchmark",
-            ),
+            benchmark_runtime_profile_ref: String::from("runtime://tassadar/sudoku_9x9/benchmark"),
         },
         program_binding: TassadarProgramBinding {
             dataset,
@@ -2083,10 +2111,8 @@ fn build_tassadar_sudoku_9x9_benchmark_package(
     let corpus = tassadar_sudoku_9x9_corpus();
     let train_case_ids =
         sudoku_9x9_case_ids_for_split(corpus.as_slice(), TassadarSudokuV0CorpusSplit::Train);
-    let validation_case_ids = sudoku_9x9_case_ids_for_split(
-        corpus.as_slice(),
-        TassadarSudokuV0CorpusSplit::Validation,
-    );
+    let validation_case_ids =
+        sudoku_9x9_case_ids_for_split(corpus.as_slice(), TassadarSudokuV0CorpusSplit::Validation);
     let test_case_ids =
         sudoku_9x9_case_ids_for_split(corpus.as_slice(), TassadarSudokuV0CorpusSplit::Test);
     if artifacts.len() != corpus.len() {
@@ -2409,6 +2435,234 @@ fn build_tassadar_hungarian_v0_benchmark_package(
     Ok(package)
 }
 
+/// Builds digest-bound fixture artifacts for the article-sized Hungarian-10x10 corpus.
+pub fn tassadar_hungarian_10x10_program_artifacts(
+    version: &str,
+) -> Result<Vec<TassadarProgramArtifact>, TassadarBenchmarkError> {
+    let profile = TassadarWasmProfile::hungarian_10x10_matching_v1();
+    let trace_abi = TassadarTraceAbi::hungarian_10x10_matching_v1();
+    tassadar_hungarian_10x10_corpus()
+        .into_iter()
+        .map(|case| {
+            TassadarProgramArtifact::fixture_reference(
+                format!(
+                    "tassadar://artifact/{version}/hungarian_10x10/{}",
+                    case.case_id
+                ),
+                &profile,
+                &trace_abi,
+                case.validation_case.program,
+            )
+            .map_err(TassadarBenchmarkError::from)
+        })
+        .collect()
+}
+
+fn build_tassadar_hungarian_10x10_environment_bundle(
+    version: &str,
+    artifacts: &[TassadarProgramArtifact],
+    corpus_digest: &str,
+) -> Result<TassadarEnvironmentBundle, TassadarBenchmarkError> {
+    let profile = TassadarWasmProfile::hungarian_10x10_matching_v1();
+    let trace_abi = TassadarTraceAbi::hungarian_10x10_matching_v1();
+    let dataset = DatasetKey::new(TASSADAR_HUNGARIAN_10X10_DATASET_REF, version);
+    TassadarEnvironmentSpec {
+        version: String::from(version),
+        display_name: String::from("Tassadar Hungarian-10x10 Corpus"),
+        eval_environment_ref: String::from(TASSADAR_HUNGARIAN_10X10_EVAL_ENVIRONMENT_REF),
+        benchmark_environment_ref: String::from(TASSADAR_HUNGARIAN_10X10_BENCHMARK_ENVIRONMENT_REF),
+        eval_dataset: EnvironmentDatasetBinding {
+            dataset: dataset.clone(),
+            split: Some(String::from("validation")),
+            mount_path: String::from("/datasets/tassadar/hungarian_10x10/validation"),
+            required: true,
+        },
+        benchmark_dataset: EnvironmentDatasetBinding {
+            dataset: dataset.clone(),
+            split: Some(String::from("benchmark")),
+            mount_path: String::from("/datasets/tassadar/hungarian_10x10/benchmark"),
+            required: true,
+        },
+        package_refs: TassadarEnvironmentPackageRefs {
+            group_ref: String::from("group.tassadar.hungarian_10x10"),
+            eval_pin_alias: String::from("tassadar_hungarian_10x10_eval"),
+            benchmark_pin_alias: String::from("tassadar_hungarian_10x10_benchmark"),
+            eval_member_ref: String::from("tassadar_hungarian_10x10_eval_member"),
+            benchmark_member_ref: String::from("tassadar_hungarian_10x10_benchmark_member"),
+            program_corpus_ref: String::from("tassadar://corpus/hungarian_10x10.validation"),
+            io_contract_ref: String::from("tassadar://io/exact_i32_sequence"),
+            rubric_binding_ref: String::from("tassadar://rubric/exactness"),
+            eval_runtime_profile_ref: String::from("runtime://tassadar/hungarian_10x10/eval"),
+            benchmark_profile_ref: String::from(
+                "benchmark://tassadar/hungarian_10x10/reference_fixture",
+            ),
+            benchmark_runtime_profile_ref: String::from(
+                "runtime://tassadar/hungarian_10x10/benchmark",
+            ),
+        },
+        program_binding: TassadarProgramBinding {
+            dataset,
+            program_corpus_ref: String::from("tassadar://corpus/hungarian_10x10.validation"),
+            corpus_digest: String::from(corpus_digest),
+            wasm_profile_id: profile.profile_id.clone(),
+            trace_abi_id: trace_abi.abi_id.clone(),
+            trace_abi_version: trace_abi.schema_version,
+            opcode_vocabulary_digest: profile.opcode_vocabulary_digest(),
+            artifact_digests: artifacts
+                .iter()
+                .map(|artifact| artifact.artifact_digest.clone())
+                .collect(),
+        },
+        io_contract: TassadarIoContract::exact_i32_sequence(),
+        exactness_contract: TassadarExactnessContract {
+            require_final_output_exactness: true,
+            require_step_exactness: true,
+            require_halt_exactness: true,
+            timeout_budget_ms: 30_000,
+            trace_budget_steps: 131_072,
+            require_cpu_reference_baseline: true,
+            require_reference_linear_baseline: true,
+            future_throughput_metric_ids: vec![String::from(TASSADAR_HULL_CACHE_METRIC_ID)],
+        },
+        eval_policy_references: vec![EnvironmentPolicyReference {
+            kind: EnvironmentPolicyKind::Verification,
+            policy_ref: String::from("policy://tassadar/hungarian_10x10/eval/verification"),
+            required: true,
+        }],
+        benchmark_policy_references: vec![
+            EnvironmentPolicyReference {
+                kind: EnvironmentPolicyKind::Benchmark,
+                policy_ref: String::from("policy://tassadar/hungarian_10x10/benchmark"),
+                required: true,
+            },
+            EnvironmentPolicyReference {
+                kind: EnvironmentPolicyKind::Verification,
+                policy_ref: String::from(
+                    "policy://tassadar/hungarian_10x10/benchmark/verification",
+                ),
+                required: true,
+            },
+        ],
+        current_workload_targets: vec![TassadarWorkloadTarget::HungarianMatching],
+        planned_workload_targets: Vec::new(),
+    }
+    .build_bundle()
+    .map_err(TassadarBenchmarkError::from)
+}
+
+fn build_tassadar_hungarian_10x10_benchmark_package(
+    version: &str,
+    environment_bundle: &TassadarEnvironmentBundle,
+    artifacts: &[TassadarProgramArtifact],
+) -> Result<BenchmarkPackage, TassadarBenchmarkError> {
+    let corpus = tassadar_hungarian_10x10_corpus();
+    let train_case_ids =
+        hungarian_10x10_case_ids_for_split(corpus.as_slice(), TassadarSudokuV0CorpusSplit::Train);
+    let validation_case_ids = hungarian_10x10_case_ids_for_split(
+        corpus.as_slice(),
+        TassadarSudokuV0CorpusSplit::Validation,
+    );
+    let test_case_ids =
+        hungarian_10x10_case_ids_for_split(corpus.as_slice(), TassadarSudokuV0CorpusSplit::Test);
+    if artifacts.len() != corpus.len() {
+        return Err(TassadarBenchmarkError::ArtifactCountMismatch {
+            expected: corpus.len(),
+            actual: artifacts.len(),
+        });
+    }
+
+    let cases = corpus
+        .into_iter()
+        .zip(artifacts.iter())
+        .enumerate()
+        .map(|(ordinal, (case, artifact))| {
+            let mut benchmark_case = BenchmarkCase::new(case.case_id.clone());
+            benchmark_case.ordinal = Some(ordinal as u64);
+            benchmark_case.input_ref = Some(format!("tassadar://input/{}/none", case.case_id));
+            benchmark_case.expected_output_ref =
+                Some(format!("tassadar://expected_output/{}", case.case_id));
+            benchmark_case.metadata = json!({
+                "summary": case.validation_case.summary,
+                "workload_target": classify_case(&case.case_id),
+                "artifact_id": artifact.artifact_id,
+                "artifact_digest": artifact.artifact_digest,
+                "program_digest": artifact.validated_program_digest,
+                "expected_outputs": case.validation_case.expected_outputs,
+                "expected_trace_steps": case.validation_case.expected_trace.len(),
+                "trace_budget_steps": environment_bundle.exactness_contract.trace_budget_steps,
+                "timeout_budget_ms": environment_bundle.exactness_contract.timeout_budget_ms,
+                "hungarian_10x10_split": case.split.as_str(),
+                "hungarian_10x10_cost_matrix": case.cost_matrix.clone(),
+                "hungarian_10x10_search_row_order": case.search_row_order.clone(),
+                "hungarian_10x10_optimal_assignment": case.optimal_assignment.clone(),
+                "hungarian_10x10_optimal_cost": case.optimal_cost,
+            });
+            benchmark_case
+        })
+        .collect::<Vec<_>>();
+
+    let mut package = BenchmarkPackage::new(
+        BenchmarkPackageKey::new(TASSADAR_HUNGARIAN_10X10_BENCHMARK_REF, version),
+        "Tassadar Hungarian-10x10 Benchmark",
+        environment_bundle.benchmark_package.key.clone(),
+        1,
+        BenchmarkAggregationKind::MedianScore,
+    )
+    .with_dataset(
+        environment_bundle.program_binding.dataset.clone(),
+        Some(String::from("benchmark")),
+    )
+    .with_verification_policy(BenchmarkVerificationPolicy {
+        require_timer_integrity: true,
+        require_token_accounting: false,
+        require_final_state_capture: true,
+        require_execution_strategy: true,
+    })
+    .with_cases(cases);
+    package.metadata.insert(
+        String::from("tassadar.current_workload_targets"),
+        serde_json::to_value(&environment_bundle.current_workload_targets).unwrap_or(Value::Null),
+    );
+    package.metadata.insert(
+        String::from("tassadar.planned_workload_targets"),
+        serde_json::to_value(&environment_bundle.planned_workload_targets).unwrap_or(Value::Null),
+    );
+    package.metadata.insert(
+        String::from("tassadar.cpu_baseline_metric_id"),
+        Value::String(String::from(TASSADAR_CPU_BASELINE_METRIC_ID)),
+    );
+    package.metadata.insert(
+        String::from("tassadar.reference_linear_metric_id"),
+        Value::String(String::from(TASSADAR_REFERENCE_LINEAR_METRIC_ID)),
+    );
+    package.metadata.insert(
+        String::from("tassadar.hull_cache_metric_id"),
+        Value::String(String::from(TASSADAR_HULL_CACHE_METRIC_ID)),
+    );
+    package.metadata.insert(
+        String::from("tassadar.sparse_top_k_metric_id"),
+        Value::String(String::from(TASSADAR_SPARSE_TOP_K_METRIC_ID)),
+    );
+    package.metadata.insert(
+        String::from("tassadar.corpus_digest"),
+        Value::String(environment_bundle.program_binding.corpus_digest.clone()),
+    );
+    package.metadata.insert(
+        String::from("tassadar.hungarian_10x10_train_case_ids"),
+        serde_json::to_value(train_case_ids).unwrap_or(Value::Null),
+    );
+    package.metadata.insert(
+        String::from("tassadar.hungarian_10x10_validation_case_ids"),
+        serde_json::to_value(validation_case_ids).unwrap_or(Value::Null),
+    );
+    package.metadata.insert(
+        String::from("tassadar.hungarian_10x10_test_case_ids"),
+        serde_json::to_value(test_case_ids).unwrap_or(Value::Null),
+    );
+    package.validate()?;
+    Ok(package)
+}
+
 fn classify_case(case_id: &str) -> TassadarWorkloadTarget {
     match case_id {
         "locals_add" | "tassadar.locals_add.v1" => TassadarWorkloadTarget::ArithmeticMicroprogram,
@@ -2439,7 +2693,9 @@ fn classify_case(case_id: &str) -> TassadarWorkloadTarget {
         }
         value
             if value.starts_with("hungarian_v0_")
-                || value.starts_with("tassadar.hungarian_v0_") =>
+                || value.starts_with("hungarian_10x10_")
+                || value.starts_with("tassadar.hungarian_v0_")
+                || value.starts_with("tassadar.hungarian_10x10_") =>
         {
             TassadarWorkloadTarget::HungarianMatching
         }
@@ -2480,6 +2736,17 @@ fn sudoku_9x9_case_ids_for_split(
 
 fn hungarian_v0_case_ids_for_split(
     corpus: &[TassadarHungarianV0CorpusCase],
+    split: TassadarSudokuV0CorpusSplit,
+) -> Vec<String> {
+    corpus
+        .iter()
+        .filter(|case| case.split == split)
+        .map(|case| case.case_id.clone())
+        .collect()
+}
+
+fn hungarian_10x10_case_ids_for_split(
+    corpus: &[TassadarHungarian10x10CorpusCase],
     split: TassadarSudokuV0CorpusSplit,
 ) -> Vec<String> {
     corpus
@@ -2606,6 +2873,9 @@ pub fn build_tassadar_workload_capability_matrix_report(
     let hungarian_compiled_run_bundle = read_repo_json::<Value>(
         "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/run_bundle.json",
     )?;
+    let hungarian_10x10_compiled_run_bundle = read_repo_json::<Value>(
+        "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json",
+    )?;
     let sudoku_promotion_bundle = read_repo_json::<Value>(
         "fixtures/tassadar/runs/sudoku_v0_promotion_v3/promotion_bundle.json",
     )?;
@@ -2623,9 +2893,7 @@ pub fn build_tassadar_workload_capability_matrix_report(
         TassadarWorkloadCapabilityRow {
             workload_family_id: String::from("micro_wasm_kernel"),
             workload_target: Some(TassadarWorkloadTarget::MicroWasmKernel),
-            summary: String::from(
-                "unrolled article-class micro-kernel over memory-backed inputs",
-            ),
+            summary: String::from("unrolled article-class micro-kernel over memory-backed inputs"),
             capabilities: vec![
                 runtime_capability_cell(
                     &benchmark_report,
@@ -2871,6 +3139,41 @@ pub fn build_tassadar_workload_capability_matrix_report(
                 },
             ],
         },
+        TassadarWorkloadCapabilityRow {
+            workload_family_id: String::from("hungarian_matching_10x10"),
+            workload_target: Some(TassadarWorkloadTarget::HungarianMatching),
+            summary: String::from(
+                "article-sized 10x10 Hungarian matching family with exact compiled/proof-backed closure and no learned long-horizon closure yet",
+            ),
+            capabilities: vec![
+                TassadarWorkloadCapabilityCell {
+                    surface_id: String::from("compiled.proof_backed"),
+                    posture: TassadarCapabilityPosture::Exact,
+                    artifact_ref: String::from(
+                        "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json",
+                    ),
+                    note: format!(
+                        "{}; serve_posture={}",
+                        hungarian_10x10_compiled_run_bundle["claim_boundary"]
+                            .as_str()
+                            .unwrap_or("compiled Hungarian-10x10 boundary missing"),
+                        hungarian_10x10_compiled_run_bundle["serve_posture"]
+                            .as_str()
+                            .unwrap_or("unknown")
+                    ),
+                },
+                TassadarWorkloadCapabilityCell {
+                    surface_id: String::from("learned.long_horizon"),
+                    posture: TassadarCapabilityPosture::NotLanded,
+                    artifact_ref: String::from(
+                        "fixtures/tassadar/reports/tassadar_acceptance_report.json",
+                    ),
+                    note: String::from(
+                        "no learned 10x10 Hungarian lane is landed; current article-sized matching closure is compiled/proof-backed only",
+                    ),
+                },
+            ],
+        },
     ];
 
     let mut report = TassadarWorkloadCapabilityMatrixReport {
@@ -2881,9 +3184,16 @@ pub fn build_tassadar_workload_capability_matrix_report(
             String::from(
                 "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/run_bundle.json",
             ),
-            String::from("fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/run_bundle.json"),
+            String::from(
+                "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/run_bundle.json",
+            ),
+            String::from(
+                "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json",
+            ),
             String::from("fixtures/tassadar/runs/sudoku_v0_promotion_v3/promotion_bundle.json"),
-            String::from("fixtures/tassadar/runs/sudoku_v0_promotion_v3/promotion_gate_report.json"),
+            String::from(
+                "fixtures/tassadar/runs/sudoku_v0_promotion_v3/promotion_gate_report.json",
+            ),
             String::from("fixtures/tassadar/runs/sudoku_v0_promotion_v3/family_report.json"),
             String::from(
                 "fixtures/tassadar/runs/sudoku_9x9_v0_reference_run_v0/sequence_fit_report.json",
@@ -4627,6 +4937,17 @@ mod tests {
                 && row.capabilities.iter().any(|cell| {
                     cell.surface_id == "compiled.proof_backed"
                         && cell.posture == TassadarCapabilityPosture::Exact
+                })
+        }));
+        assert!(report.rows.iter().any(|row| {
+            row.workload_family_id == "hungarian_matching_10x10"
+                && row.capabilities.iter().any(|cell| {
+                    cell.surface_id == "compiled.proof_backed"
+                        && cell.posture == TassadarCapabilityPosture::Exact
+                })
+                && row.capabilities.iter().any(|cell| {
+                    cell.surface_id == "learned.long_horizon"
+                        && cell.posture == TassadarCapabilityPosture::NotLanded
                 })
         }));
         Ok(())

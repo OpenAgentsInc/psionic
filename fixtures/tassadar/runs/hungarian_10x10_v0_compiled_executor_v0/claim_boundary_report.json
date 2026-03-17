@@ -1,0 +1,9 @@
+{
+  "workload_family_id": "tassadar.wasm.hungarian_10x10_matching.v1.compiled_executor",
+  "claim_class": "compiled_article_class",
+  "compiled_lane_status": "exact",
+  "compiled_lane_detail": "exact compiled/proof-backed article-sized 10x10 Hungarian lane is landed on the committed corpus via the larger search-oriented Wasm profile",
+  "learned_lane_status": "not_done",
+  "learned_lane_detail": "no learned 10x10 Hungarian long-trace lane is landed; compiled exactness is the only promoted closure here",
+  "report_digest": "ff5ce7a8ae1e46961db3b720fd59e74592677a293e2190ec1fd54c43db4c8575"
+}

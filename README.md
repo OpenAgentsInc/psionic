@@ -396,6 +396,21 @@ Current posture:
   CPU reference, `16/16` exact refusal matches on the full corpus,
   `eval_only` posture), which is the article-sized Sudoku result but still not
   full compiled article parity by itself
+- the separate compiled article-sized matching bar now also exists in
+  `psionic-runtime`, `psionic-models`, `psionic-eval`, `psionic-research`,
+  and a canonical exact compiled 10x10 bundle at
+  `fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0`:
+  `psionic-runtime` now carries a dedicated
+  `tassadar.wasm.hungarian_10x10_matching.v1` profile and exact
+  branch-and-bound matching programs over the committed 10x10 corpus,
+  `psionic-eval` now emits benchmark/environment, exactness, refusal,
+  throughput, and claim-boundary artifacts for that lane, and
+  `psionic-research` now persists proof-bearing per-case deployments plus the
+  top-level article-class run bundle; the committed bundle proves exact
+  compiled/proof-backed 10x10 Hungarian closure on the matched corpus while
+  keeping the boundary explicit: this is article-sized matching closure on the
+  larger matching profile, not learned Hungarian execution and not full
+  compiled article parity by itself
 - the canonical coarse Tassadar claim vocabulary is now
   `compiled_exact`, `compiled_article_class`, `learned_bounded`,
   `learned_article_class`, and `research_only`; the canonical current

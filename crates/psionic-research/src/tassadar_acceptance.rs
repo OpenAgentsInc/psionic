@@ -14,7 +14,7 @@ use psionic_train::{
     TassadarExecutorPromotionGateReport, TassadarExecutorReferenceRunBundle,
     TassadarExecutorSequenceFitReport,
 };
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -49,6 +49,12 @@ const COMPILED_HUNGARIAN_EXACTNESS_REPORT_REF: &str = "fixtures/tassadar/runs/hu
 const COMPILED_HUNGARIAN_COMPATIBILITY_REPORT_REF: &str = "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/compiled_executor_compatibility_report.json";
 const COMPILED_HUNGARIAN_LANE_STATUS_REPORT_REF: &str =
     "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/hungarian_lane_status_report.json";
+const COMPILED_HUNGARIAN_10X10_RUN_BUNDLE_REF: &str =
+    "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json";
+const COMPILED_HUNGARIAN_10X10_EXACTNESS_REPORT_REF: &str = "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_exactness_report.json";
+const COMPILED_HUNGARIAN_10X10_COMPATIBILITY_REPORT_REF: &str = "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_compatibility_report.json";
+const COMPILED_HUNGARIAN_10X10_CLAIM_BOUNDARY_REPORT_REF: &str =
+    "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/claim_boundary_report.json";
 
 /// Canonical output directory for the Tassadar acceptance report.
 pub const TASSADAR_ACCEPTANCE_OUTPUT_DIR: &str = "fixtures/tassadar/reports";
@@ -231,8 +237,8 @@ pub fn tassadar_acceptance_report_path() -> PathBuf {
 
 /// Builds the live Tassadar acceptance report from the canonical committed
 /// fixture roots.
-pub fn build_tassadar_acceptance_report()
--> Result<TassadarAcceptanceReport, TassadarAcceptanceError> {
+pub fn build_tassadar_acceptance_report(
+) -> Result<TassadarAcceptanceReport, TassadarAcceptanceError> {
     let research_only = build_research_only_verdict()?;
     let compiled_exact = build_compiled_exact_verdict()?;
     let learned_bounded = build_learned_bounded_verdict()?;
@@ -562,8 +568,8 @@ fn build_fast_path_verdict() -> Result<TassadarAcceptanceVerdict, TassadarAccept
     ))
 }
 
-fn build_compiled_article_class_verdict()
--> Result<TassadarAcceptanceVerdict, TassadarAcceptanceError> {
+fn build_compiled_article_class_verdict(
+) -> Result<TassadarAcceptanceVerdict, TassadarAcceptanceError> {
     let sudoku_bundle: TassadarCompiledExecutorRunBundle = read_repo_json(
         COMPILED_SUDOKU_RUN_BUNDLE_REF,
         "tassadar_compiled_executor_run_bundle",
@@ -572,13 +578,13 @@ fn build_compiled_article_class_verdict()
         COMPILED_SUDOKU_9X9_RUN_BUNDLE_REF,
         "tassadar_sudoku_9x9_compiled_executor_run_bundle",
     )?;
-    let hungarian_bundle: TassadarHungarianCompiledExecutorRunBundle = read_repo_json(
-        COMPILED_HUNGARIAN_RUN_BUNDLE_REF,
-        "tassadar_hungarian_compiled_executor_run_bundle",
+    let hungarian_10x10_bundle: Value = read_repo_json(
+        COMPILED_HUNGARIAN_10X10_RUN_BUNDLE_REF,
+        "tassadar_hungarian_10x10_compiled_executor_run_bundle",
     )?;
     let passed = sudoku_bundle.claim_class == TassadarClaimClass::CompiledArticleClass
         && sudoku_9x9_bundle["claim_class"].as_str() == Some("compiled_article_class")
-        && hungarian_bundle.claim_class == TassadarClaimClass::CompiledArticleClass;
+        && hungarian_10x10_bundle["claim_class"].as_str() == Some("compiled_article_class");
 
     Ok(TassadarAcceptanceVerdict::new(
         "compiled_article_class",
@@ -586,7 +592,7 @@ fn build_compiled_article_class_verdict()
         if passed {
             "The compiled/proof-backed lane now advertises article-class closure from committed article workloads and acceptance artifacts."
         } else {
-            "Compiled article-class closure is still red: the repo now has an exact compiled 9x9 Sudoku bundle, but it still lacks the article-sized Hungarian bundle, the generic compiled kernel suite, and the compiled article-closure checker."
+            "Compiled article-class closure is still red: the repo now has exact compiled 9x9 Sudoku and 10x10 Hungarian bundles, but it still lacks the generic compiled kernel suite and the compiled article-closure checker."
         },
         vec![String::from(TASSADAR_ACCEPTANCE_CHECKER_COMMAND)],
         vec![
@@ -603,16 +609,32 @@ fn build_compiled_article_class_verdict()
                     .map(std::string::ToString::to_string),
             ),
             TassadarAcceptanceEvidenceRef::new(
-                "bounded compiled Hungarian run bundle",
-                COMPILED_HUNGARIAN_RUN_BUNDLE_REF,
-                Some(hungarian_bundle.bundle_digest),
+                "article-sized compiled Hungarian-10x10 run bundle",
+                COMPILED_HUNGARIAN_10X10_RUN_BUNDLE_REF,
+                hungarian_10x10_bundle["bundle_digest"]
+                    .as_str()
+                    .map(std::string::ToString::to_string),
+            ),
+            TassadarAcceptanceEvidenceRef::new(
+                "article-sized compiled Hungarian-10x10 exactness report",
+                COMPILED_HUNGARIAN_10X10_EXACTNESS_REPORT_REF,
+                None,
+            ),
+            TassadarAcceptanceEvidenceRef::new(
+                "article-sized compiled Hungarian-10x10 compatibility report",
+                COMPILED_HUNGARIAN_10X10_COMPATIBILITY_REPORT_REF,
+                None,
+            ),
+            TassadarAcceptanceEvidenceRef::new(
+                "article-sized compiled Hungarian-10x10 claim-boundary report",
+                COMPILED_HUNGARIAN_10X10_CLAIM_BOUNDARY_REPORT_REF,
+                None,
             ),
         ],
         if passed {
             Vec::new()
         } else {
             vec![
-                String::from("PTAS-303 exact compiled/proof-backed 10x10 Hungarian bundle"),
                 String::from(
                     "PTAS-304 generic compiled arithmetic/memory/branch/loop kernel suite",
                 ),
@@ -622,8 +644,8 @@ fn build_compiled_article_class_verdict()
     ))
 }
 
-fn build_learned_article_class_verdict()
--> Result<TassadarAcceptanceVerdict, TassadarAcceptanceError> {
+fn build_learned_article_class_verdict(
+) -> Result<TassadarAcceptanceVerdict, TassadarAcceptanceError> {
     let promotion_bundle: TassadarExecutorAttentionPromotionRunBundle = read_repo_json(
         LEARNED_BOUNDED_PROMOTION_BUNDLE_REF,
         "tassadar_executor_attention_promotion_bundle",
@@ -749,8 +771,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        TassadarAcceptanceReport, build_tassadar_acceptance_report, read_repo_json,
-        tassadar_acceptance_report_ref, write_tassadar_acceptance_report,
+        build_tassadar_acceptance_report, read_repo_json, tassadar_acceptance_report_ref,
+        write_tassadar_acceptance_report, TassadarAcceptanceReport,
     };
 
     #[test]
@@ -775,8 +797,8 @@ mod tests {
     }
 
     #[test]
-    fn write_tassadar_acceptance_report_persists_current_truth()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn write_tassadar_acceptance_report_persists_current_truth(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempdir()?;
         let report_path = temp_dir.path().join("tassadar_acceptance_report.json");
         let report = write_tassadar_acceptance_report(&report_path)?;

@@ -1,0 +1,112 @@
+{
+  "model": {
+    "model_id": "tassadar-executor-hungarian-10x10-matching-v0-compiled-tassadar.hungarian_10x10_train_b.v1",
+    "family": "tassadar_executor.compiled",
+    "revision": "hungarian_10x10_train_b.compiled_executor"
+  },
+  "compatibility": {
+    "executor_family": "wasm_trace_executor",
+    "trace_abi_id": "tassadar.trace.v1",
+    "trace_abi_version": 1,
+    "wasm_profile_id": "tassadar.wasm.hungarian_10x10_matching.v1",
+    "opcode_vocabulary_digest": "67420a6476d84ef43e3adb0027eb688a2364a0fe68b8258fb7a377f63e4fd78e",
+    "supported_decode_modes": [
+      "reference_linear",
+      "hull_cache",
+      "sparse_top_k"
+    ],
+    "attention_mode": "program_specialized_compiled",
+    "attention_geometry": {
+      "hull_cache_eligible": true
+    },
+    "exactness_posture": "exact_trace_and_output"
+  },
+  "profile": {
+    "profile_id": "tassadar.wasm.hungarian_10x10_matching.v1",
+    "allowed_opcodes": [
+      "i32_const",
+      "local_get",
+      "local_set",
+      "i32_add",
+      "i32_sub",
+      "i32_mul",
+      "i32_lt",
+      "i32_load",
+      "i32_store",
+      "br_if",
+      "output",
+      "return"
+    ],
+    "max_locals": 16,
+    "max_memory_slots": 64,
+    "max_program_len": 8192,
+    "max_steps": 262144,
+    "branch_mode": "br_if_non_zero",
+    "host_output_opcode": true
+  },
+  "trace_abi": {
+    "abi_id": "tassadar.trace.v1",
+    "schema_version": 1,
+    "profile_id": "tassadar.wasm.hungarian_10x10_matching.v1",
+    "append_only": true,
+    "includes_stack_snapshots": true,
+    "includes_local_snapshots": true,
+    "includes_memory_snapshots": true
+  },
+  "weights": {
+    "format": "ProgrammaticFixture",
+    "source": "ExternalArtifact",
+    "quantization": "none",
+    "digest": "4334a347aecfad24872228f943866fec38f67279d063ea18b629e5e5507ce178",
+    "tensors": [
+      {
+        "name": "compiled_decode_contract",
+        "shape": {
+          "dims": [
+            6
+          ]
+        },
+        "dtype": "F32",
+        "quantization": "none"
+      },
+      {
+        "name": "compiled_initial_memory",
+        "shape": {
+          "dims": [
+            64
+          ]
+        },
+        "dtype": "F32",
+        "quantization": "none"
+      },
+      {
+        "name": "compiled_instruction_stream",
+        "shape": {
+          "dims": [
+            8192,
+            4
+          ]
+        },
+        "dtype": "F32",
+        "quantization": "none"
+      },
+      {
+        "name": "compiled_program_header",
+        "shape": {
+          "dims": [
+            8
+          ]
+        },
+        "dtype": "F32",
+        "quantization": "none"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "hungarian_10x10_train_b.compiled_executor.compiled_weight.json",
+        "byte_length": 148176,
+        "sha256": "c7ba9f13b28f4ee3a527a33f3ac72fdc94d27a29c3c8e7f559588a65e66b6399"
+      }
+    ]
+  }
+}

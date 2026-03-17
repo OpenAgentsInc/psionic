@@ -1,0 +1,138 @@
+{
+  "workload_family_id": "tassadar.wasm.hungarian_10x10_matching.v1.compiled_executor",
+  "compiled_suite_artifact_digest": "1bd7f0a6308c485dfb8bab1756e10d6f4596832f0b98855b51ca097e4c0a3537",
+  "total_check_count": 16,
+  "matched_refusal_check_count": 16,
+  "matched_refusal_rate_bps": 10000,
+  "check_reports": [
+    {
+      "deployment_case_id": "hungarian_10x10_train_a",
+      "check_id": "wrong_program_artifact",
+      "expected_refusal_kind": "program_artifact_digest_mismatch",
+      "observed_refusal_kind": "program_artifact_digest_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program artifact mismatch: expected `1bf3d16d83b24585738385f2c6cd1d805c8419ec4ec9e546285118ef6f215e33`, got `8ddcafb66a709e0c85129ee13410f4c0e0f88e0a3dbf1eecb24ac63d49e0c285`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_train_a",
+      "check_id": "wrong_wasm_profile",
+      "expected_refusal_kind": "wasm_profile_mismatch",
+      "observed_refusal_kind": "wasm_profile_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: Wasm profile mismatch: expected `tassadar.wasm.hungarian_10x10_matching.v1`, got `tassadar.wasm.sudoku_v0_search.v1`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_train_a",
+      "check_id": "wrong_trace_abi_version",
+      "expected_refusal_kind": "trace_abi_version_mismatch",
+      "observed_refusal_kind": "trace_abi_version_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: trace ABI version mismatch: expected `1`, got `2`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_train_a",
+      "check_id": "artifact_inconsistent",
+      "expected_refusal_kind": "program_artifact_inconsistent",
+      "observed_refusal_kind": "program_artifact_inconsistent",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: program artifact is internally inconsistent: validated program digest mismatch: expected `b1c5eafc09143454df6045b461c27ffd1fd7fc5a048cb7e4ce2f27bd326fb0ab`, actual `bogus_program_digest`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_train_b",
+      "check_id": "wrong_program_artifact",
+      "expected_refusal_kind": "program_artifact_digest_mismatch",
+      "observed_refusal_kind": "program_artifact_digest_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program artifact mismatch: expected `8ddcafb66a709e0c85129ee13410f4c0e0f88e0a3dbf1eecb24ac63d49e0c285`, got `88af18bade92726761bd5718aeba1dac395ae67d8aa8aad86e8d2faf75029544`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_train_b",
+      "check_id": "wrong_wasm_profile",
+      "expected_refusal_kind": "wasm_profile_mismatch",
+      "observed_refusal_kind": "wasm_profile_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: Wasm profile mismatch: expected `tassadar.wasm.hungarian_10x10_matching.v1`, got `tassadar.wasm.sudoku_v0_search.v1`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_train_b",
+      "check_id": "wrong_trace_abi_version",
+      "expected_refusal_kind": "trace_abi_version_mismatch",
+      "observed_refusal_kind": "trace_abi_version_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: trace ABI version mismatch: expected `1`, got `2`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_train_b",
+      "check_id": "artifact_inconsistent",
+      "expected_refusal_kind": "program_artifact_inconsistent",
+      "observed_refusal_kind": "program_artifact_inconsistent",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: program artifact is internally inconsistent: validated program digest mismatch: expected `22f3cf0dda3e4da3285e47244de7eee745533ec8513e7803990ade7182cba6cd`, actual `bogus_program_digest`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_validation_a",
+      "check_id": "wrong_program_artifact",
+      "expected_refusal_kind": "program_artifact_digest_mismatch",
+      "observed_refusal_kind": "program_artifact_digest_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program artifact mismatch: expected `88af18bade92726761bd5718aeba1dac395ae67d8aa8aad86e8d2faf75029544`, got `b2f3489d393fe563e6b7cf8c21f17923b9e6273b81f59ea4182af17898eddcb3`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_validation_a",
+      "check_id": "wrong_wasm_profile",
+      "expected_refusal_kind": "wasm_profile_mismatch",
+      "observed_refusal_kind": "wasm_profile_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: Wasm profile mismatch: expected `tassadar.wasm.hungarian_10x10_matching.v1`, got `tassadar.wasm.sudoku_v0_search.v1`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_validation_a",
+      "check_id": "wrong_trace_abi_version",
+      "expected_refusal_kind": "trace_abi_version_mismatch",
+      "observed_refusal_kind": "trace_abi_version_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: trace ABI version mismatch: expected `1`, got `2`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_validation_a",
+      "check_id": "artifact_inconsistent",
+      "expected_refusal_kind": "program_artifact_inconsistent",
+      "observed_refusal_kind": "program_artifact_inconsistent",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: program artifact is internally inconsistent: validated program digest mismatch: expected `a8154237af5e982ff97ecf79829fded097b91280099088a5070d189c1652b38c`, actual `bogus_program_digest`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_test_a",
+      "check_id": "wrong_program_artifact",
+      "expected_refusal_kind": "program_artifact_digest_mismatch",
+      "observed_refusal_kind": "program_artifact_digest_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program artifact mismatch: expected `b2f3489d393fe563e6b7cf8c21f17923b9e6273b81f59ea4182af17898eddcb3`, got `1bf3d16d83b24585738385f2c6cd1d805c8419ec4ec9e546285118ef6f215e33`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_test_a",
+      "check_id": "wrong_wasm_profile",
+      "expected_refusal_kind": "wasm_profile_mismatch",
+      "observed_refusal_kind": "wasm_profile_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: Wasm profile mismatch: expected `tassadar.wasm.hungarian_10x10_matching.v1`, got `tassadar.wasm.sudoku_v0_search.v1`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_test_a",
+      "check_id": "wrong_trace_abi_version",
+      "expected_refusal_kind": "trace_abi_version_mismatch",
+      "observed_refusal_kind": "trace_abi_version_mismatch",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: trace ABI version mismatch: expected `1`, got `2`"
+    },
+    {
+      "deployment_case_id": "hungarian_10x10_test_a",
+      "check_id": "artifact_inconsistent",
+      "expected_refusal_kind": "program_artifact_inconsistent",
+      "observed_refusal_kind": "program_artifact_inconsistent",
+      "matched_expected_refusal": true,
+      "detail": "compiled program descriptor contract failed: program artifact is internally inconsistent: validated program digest mismatch: expected `539d84c161a8f0b0af38e16d843a049be85579b590e69a57cd746465a8d19586`, actual `bogus_program_digest`"
+    }
+  ],
+  "report_digest": "40c2c96b83e2776a9f10175468d747c5fa6706cba0af3c0a5942e30a69d31fb0"
+}
