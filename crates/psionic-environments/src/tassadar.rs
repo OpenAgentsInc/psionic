@@ -42,6 +42,12 @@ pub enum TassadarWorkloadTarget {
     BranchControlFlowMicroprogram,
     /// Richer WebAssembly kernels beyond the current microprogram corpus.
     MicroWasmKernel,
+    /// Branch-heavy kernel programs with repeated control-flow pivots.
+    BranchHeavyKernel,
+    /// Memory-heavy kernel programs with dense read/write traffic.
+    MemoryHeavyKernel,
+    /// Long-loop kernels that push the executor toward longer horizons.
+    LongLoopKernel,
     /// Sudoku-style exact search workloads.
     SudokuClass,
     /// Hungarian or min-cost-matching style workloads.
@@ -637,9 +643,10 @@ impl TassadarEnvironmentSpec {
                     pin_alias: self.package_refs.benchmark_pin_alias.clone(),
                     surfaces: vec![EnvironmentUsageSurface::Benchmark],
                     required_workloads: vec![EnvironmentWorkloadClass::ValidatorBenchmark],
-                    required_benchmark_profiles: vec![
-                        self.package_refs.benchmark_profile_ref.clone(),
-                    ],
+                    required_benchmark_profiles: vec![self
+                        .package_refs
+                        .benchmark_profile_ref
+                        .clone()],
                 },
             ],
         }

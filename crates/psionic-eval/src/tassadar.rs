@@ -1340,6 +1340,9 @@ fn build_tassadar_article_class_environment_bundle(
         ],
         current_workload_targets: vec![
             TassadarWorkloadTarget::MicroWasmKernel,
+            TassadarWorkloadTarget::BranchHeavyKernel,
+            TassadarWorkloadTarget::MemoryHeavyKernel,
+            TassadarWorkloadTarget::LongLoopKernel,
             TassadarWorkloadTarget::SudokuClass,
             TassadarWorkloadTarget::HungarianMatching,
         ],
@@ -1702,6 +1705,15 @@ fn classify_case(case_id: &str) -> TassadarWorkloadTarget {
         "micro_wasm_kernel" | "tassadar.micro_wasm_kernel.v2" => {
             TassadarWorkloadTarget::MicroWasmKernel
         }
+        "branch_heavy_kernel" | "tassadar.branch_heavy_kernel.v1" => {
+            TassadarWorkloadTarget::BranchHeavyKernel
+        }
+        "memory_heavy_kernel" | "tassadar.memory_heavy_kernel.v1" => {
+            TassadarWorkloadTarget::MemoryHeavyKernel
+        }
+        "long_loop_kernel" | "tassadar.long_loop_kernel.v1" => {
+            TassadarWorkloadTarget::LongLoopKernel
+        }
         "sudoku_class" | "tassadar.sudoku_class.v2" => TassadarWorkloadTarget::SudokuClass,
         value if value.starts_with("sudoku_v0_") || value.starts_with("tassadar.sudoku_v0_") => {
             TassadarWorkloadTarget::SudokuClass
@@ -1969,15 +1981,18 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let suite = build_tassadar_article_class_suite("2026.03.16")?;
         let sudoku_v0_corpus = tassadar_sudoku_v0_corpus();
-        assert_eq!(suite.artifacts.len(), sudoku_v0_corpus.len() + 2);
+        assert_eq!(suite.artifacts.len(), sudoku_v0_corpus.len() + 5);
         assert_eq!(
             suite.benchmark_package.cases.len(),
-            sudoku_v0_corpus.len() + 2
+            sudoku_v0_corpus.len() + 5
         );
         assert_eq!(
             suite.environment_bundle.current_workload_targets,
             vec![
                 TassadarWorkloadTarget::MicroWasmKernel,
+                TassadarWorkloadTarget::BranchHeavyKernel,
+                TassadarWorkloadTarget::MemoryHeavyKernel,
+                TassadarWorkloadTarget::LongLoopKernel,
                 TassadarWorkloadTarget::SudokuClass,
                 TassadarWorkloadTarget::HungarianMatching,
             ]
@@ -2043,6 +2058,30 @@ mod tests {
             report
                 .case_reports
                 .iter()
+                .filter(|case| case.workload_target == TassadarWorkloadTarget::BranchHeavyKernel)
+                .count(),
+            1
+        );
+        assert_eq!(
+            report
+                .case_reports
+                .iter()
+                .filter(|case| case.workload_target == TassadarWorkloadTarget::MemoryHeavyKernel)
+                .count(),
+            1
+        );
+        assert_eq!(
+            report
+                .case_reports
+                .iter()
+                .filter(|case| case.workload_target == TassadarWorkloadTarget::LongLoopKernel)
+                .count(),
+            1
+        );
+        assert_eq!(
+            report
+                .case_reports
+                .iter()
                 .filter(|case| case.workload_target == TassadarWorkloadTarget::HungarianMatching)
                 .count(),
             1
@@ -2077,7 +2116,50 @@ mod tests {
                     );
                     assert!(case.sparse_top_k_used_decode_fallback);
                 }
+                TassadarWorkloadTarget::LongLoopKernel => {
+                    assert_eq!(
+                        case.effective_decode_mode,
+                        TassadarExecutorDecodeMode::ReferenceLinear
+                    );
+                    assert_eq!(
+                        case.selection_state,
+                        TassadarExecutorSelectionState::Fallback
+                    );
+                    assert_eq!(
+                        case.selection_reason,
+                        Some(TassadarExecutorSelectionReason::HullCacheControlFlowUnsupported)
+                    );
+                    assert!(case.used_decode_fallback);
+                    assert_eq!(
+                        case.sparse_top_k_selection_state,
+                        TassadarExecutorSelectionState::Fallback
+                    );
+                    assert_eq!(
+                        case.sparse_top_k_selection_reason,
+                        Some(TassadarExecutorSelectionReason::SparseTopKValidationUnsupported)
+                    );
+                    assert!(case.sparse_top_k_used_decode_fallback);
+                }
+                TassadarWorkloadTarget::BranchHeavyKernel => {
+                    assert_eq!(
+                        case.effective_decode_mode,
+                        TassadarExecutorDecodeMode::HullCache
+                    );
+                    assert_eq!(case.selection_state, TassadarExecutorSelectionState::Direct);
+                    assert_eq!(case.selection_reason, None);
+                    assert!(!case.used_decode_fallback);
+                    assert_eq!(
+                        case.sparse_top_k_selection_state,
+                        TassadarExecutorSelectionState::Fallback
+                    );
+                    assert_eq!(
+                        case.sparse_top_k_selection_reason,
+                        Some(TassadarExecutorSelectionReason::SparseTopKValidationUnsupported)
+                    );
+                    assert!(case.sparse_top_k_used_decode_fallback);
+                }
                 TassadarWorkloadTarget::MicroWasmKernel
+                | TassadarWorkloadTarget::MemoryHeavyKernel
                 | TassadarWorkloadTarget::HungarianMatching => {
                     assert_eq!(
                         case.effective_decode_mode,

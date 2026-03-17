@@ -97,8 +97,11 @@ Current posture:
   `psionic-models`, and `psionic-eval`, with the widened `core_i32_v2`
   profile, the dedicated article-shaped `tassadar.wasm.article_i32_compute.v1`
   profile, profile-aware runner construction, and article-class exact
-  benchmark coverage for `MicroWasmKernel`, `SudokuClass`, and
-  `HungarianMatching`
+  benchmark coverage for `MicroWasmKernel`, `BranchHeavyKernel`,
+  `MemoryHeavyKernel`, `LongLoopKernel`, `SudokuClass`, and
+  `HungarianMatching`, plus the committed report at
+  `fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json`
+  that keeps direct-vs-fallback posture explicit per workload family
 - the first trained-executor follow-on bar now also exists in
   `psionic-runtime` and `psionic-models`: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile plus a real 4x4 backtracking

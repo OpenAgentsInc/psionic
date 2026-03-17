@@ -102,7 +102,10 @@
       "max_steps": 131072,
       "article_profile": true,
       "current_case_ids": [
+        "branch_heavy_kernel",
         "hungarian_matching",
+        "long_loop_kernel",
+        "memory_heavy_kernel",
         "micro_wasm_kernel",
         "sudoku_v0_test_a",
         "sudoku_v0_test_b",
@@ -115,6 +118,9 @@
       ],
       "current_workload_targets": [
         "micro_wasm_kernel",
+        "branch_heavy_kernel",
+        "memory_heavy_kernel",
+        "long_loop_kernel",
         "sudoku_class",
         "hungarian_matching"
       ],
@@ -267,5 +273,5 @@
     }
   ],
   "outcome_statement": "coverage is explicit over the current Tassadar i32 executor vocabulary only; unsupported opcodes still refuse by profile and this is not arbitrary Wasm closure",
-  "report_digest": "916b5f1e63fe9a5a3310399da645259eda1e82963821ad32cfff55b7ed38ffb6"
+  "report_digest": "df3d5fca67f067594e96ec2a18ec4af775dec45202e306cb53fda15ae97fa819"
 }

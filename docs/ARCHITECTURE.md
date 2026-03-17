@@ -167,9 +167,13 @@ The current scope is:
   proof, and runtime-manifest lineage
 - landed Phase 7B bar: widened `core_i32_v2` Wasm profile, profile-aware
   runner construction, and article-class benchmark coverage for
-  `MicroWasmKernel`, `SudokuClass`, and `HungarianMatching` with exact
+  `MicroWasmKernel`, `BranchHeavyKernel`, `MemoryHeavyKernel`,
+  `LongLoopKernel`, `SudokuClass`, and `HungarianMatching` with exact
   CPU/reference-linear/hull-cache parity plus published speedup and CPU-gap
-  metrics
+  metrics in
+  `fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json`;
+  the same report keeps branch-heavy sparse fallback and long-loop
+  hull/sparse fallback explicit instead of overstating fast-path closure
 - landed trained-executor Phase 1 follow-on bar: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile now exists with a real 4x4
   backtracking Sudoku program representation on the CPU reference lane, while

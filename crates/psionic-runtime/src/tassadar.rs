@@ -4972,7 +4972,12 @@ pub fn tassadar_validation_corpus() -> Vec<TassadarValidationCase> {
 /// Returns the widened article-class benchmark corpus.
 #[must_use]
 pub fn tassadar_article_class_corpus() -> Vec<TassadarValidationCase> {
-    let mut cases = vec![micro_wasm_kernel_case()];
+    let mut cases = vec![
+        micro_wasm_kernel_case(),
+        branch_heavy_kernel_case(),
+        memory_heavy_kernel_case(),
+        long_loop_kernel_case(),
+    ];
     cases.extend(tassadar_sudoku_v0_corpus().into_iter().map(|case| {
         rewrite_validation_case_profile(
             case.validation_case,
@@ -5086,6 +5091,9 @@ fn workload_targets_for_profile(profile_id: &str) -> Vec<String> {
         value if value == TassadarWasmProfileId::CoreI32V2.as_str() => Vec::new(),
         value if value == TassadarWasmProfileId::ArticleI32ComputeV1.as_str() => vec![
             String::from("micro_wasm_kernel"),
+            String::from("branch_heavy_kernel"),
+            String::from("memory_heavy_kernel"),
+            String::from("long_loop_kernel"),
             String::from("sudoku_class"),
             String::from("hungarian_matching"),
         ],
@@ -6518,6 +6526,180 @@ fn micro_wasm_kernel_case() -> TassadarValidationCase {
         )
         .with_initial_memory(vec![2, 3, 4, 5, 0, 0, 0, 0]),
         vec![40, 14],
+    )
+}
+
+fn branch_heavy_kernel_case() -> TassadarValidationCase {
+    let profile = TassadarWasmProfile::article_i32_compute_v1();
+    computed_validation_case(
+        "branch_heavy_kernel",
+        "acyclic branch ladder over memory-backed flags that exercises repeated forward control-flow pivots",
+        TassadarProgram::new(
+            "tassadar.branch_heavy_kernel.v1",
+            &profile,
+            1,
+            6,
+            vec![
+                TassadarInstruction::I32Const { value: 0 },
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Load { slot: 0 },
+                TassadarInstruction::BrIf { target_pc: 10 },
+                TassadarInstruction::I32Const { value: 11 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Const { value: 1 },
+                TassadarInstruction::BrIf { target_pc: 14 },
+                TassadarInstruction::I32Const { value: 7 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Load { slot: 1 },
+                TassadarInstruction::BrIf { target_pc: 22 },
+                TassadarInstruction::I32Const { value: 17 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Const { value: 1 },
+                TassadarInstruction::BrIf { target_pc: 26 },
+                TassadarInstruction::I32Const { value: 13 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Load { slot: 2 },
+                TassadarInstruction::BrIf { target_pc: 34 },
+                TassadarInstruction::I32Const { value: 23 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Const { value: 1 },
+                TassadarInstruction::BrIf { target_pc: 38 },
+                TassadarInstruction::I32Const { value: 19 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Load { slot: 3 },
+                TassadarInstruction::BrIf { target_pc: 46 },
+                TassadarInstruction::I32Const { value: 31 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Const { value: 1 },
+                TassadarInstruction::BrIf { target_pc: 50 },
+                TassadarInstruction::I32Const { value: 29 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Load { slot: 4 },
+                TassadarInstruction::BrIf { target_pc: 58 },
+                TassadarInstruction::I32Const { value: 41 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Const { value: 1 },
+                TassadarInstruction::BrIf { target_pc: 62 },
+                TassadarInstruction::I32Const { value: 37 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Load { slot: 5 },
+                TassadarInstruction::BrIf { target_pc: 70 },
+                TassadarInstruction::I32Const { value: 47 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Const { value: 1 },
+                TassadarInstruction::BrIf { target_pc: 74 },
+                TassadarInstruction::I32Const { value: 43 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::Output,
+                TassadarInstruction::Return,
+            ],
+        )
+        .with_initial_memory(vec![1, 0, 1, 1, 0, 1]),
+        vec![156],
+    )
+}
+
+fn memory_heavy_kernel_case() -> TassadarValidationCase {
+    let profile = TassadarWasmProfile::article_i32_compute_v1();
+    computed_validation_case(
+        "memory_heavy_kernel",
+        "dense memory-read and memory-write kernel that folds adjacent slots into staged accumulator buffers",
+        TassadarProgram::new(
+            "tassadar.memory_heavy_kernel.v1",
+            &profile,
+            1,
+            12,
+            vec![
+                TassadarInstruction::I32Load { slot: 0 },
+                TassadarInstruction::I32Load { slot: 1 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::I32Store { slot: 8 },
+                TassadarInstruction::I32Load { slot: 2 },
+                TassadarInstruction::I32Load { slot: 3 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::I32Store { slot: 9 },
+                TassadarInstruction::I32Load { slot: 4 },
+                TassadarInstruction::I32Load { slot: 5 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::I32Store { slot: 10 },
+                TassadarInstruction::I32Load { slot: 6 },
+                TassadarInstruction::I32Load { slot: 7 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::I32Store { slot: 11 },
+                TassadarInstruction::I32Load { slot: 8 },
+                TassadarInstruction::I32Load { slot: 9 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Load { slot: 10 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Load { slot: 11 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Add,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::Output,
+                TassadarInstruction::Return,
+            ],
+        )
+        .with_initial_memory(vec![2, 3, 5, 7, 11, 13, 17, 19, 0, 0, 0, 0]),
+        vec![77],
+    )
+}
+
+fn long_loop_kernel_case() -> TassadarValidationCase {
+    let profile = TassadarWasmProfile::article_i32_compute_v1();
+    computed_validation_case(
+        "long_loop_kernel",
+        "longer-horizon decrement loop that keeps exact backward-branch behavior explicit under the current article-shaped profile",
+        TassadarProgram::new(
+            "tassadar.long_loop_kernel.v1",
+            &profile,
+            1,
+            0,
+            vec![
+                TassadarInstruction::I32Const { value: 2_047 },
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::BrIf { target_pc: 7 },
+                TassadarInstruction::I32Const { value: 0 },
+                TassadarInstruction::Output,
+                TassadarInstruction::Return,
+                TassadarInstruction::LocalGet { local: 0 },
+                TassadarInstruction::I32Const { value: 1 },
+                TassadarInstruction::I32Sub,
+                TassadarInstruction::LocalSet { local: 0 },
+                TassadarInstruction::I32Const { value: 1 },
+                TassadarInstruction::BrIf { target_pc: 2 },
+            ],
+        ),
+        vec![0],
     )
 }
 
