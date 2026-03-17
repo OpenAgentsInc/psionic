@@ -1,6 +1,6 @@
 # Psionic MLX Roadmap
 
-> Status: updated 2026-03-16 after closing `PMLX-002` / `#3830`,
+> Status: updated 2026-03-17 after closing `PMLX-002` / `#3830`,
 > `PMLX-003` / `#3831`, `PMLX-004` / `#3832`, `PMLX-005` / `#3833`,
 > `PMLX-101` / `#3834`, `PMLX-102` / `#3835`, `PMLX-103` / `#3836`,
 > `PMLX-104` / `#3837`, `PMLX-105` / `#3838`, `PMLX-401` / `#3853`, and
@@ -8,8 +8,8 @@
 > `PMLX-502` / `#3860`, `PMLX-503` / `#3861`,
 > `PMLX-504` / `#3862`, `PMLX-505` / `#3863`, and
 > `PMLX-506` / `#3864`, `PMLX-507` / `#3865`,
-> `PMLX-601` / `#3866`, `PMLX-602` / `#3867`, and
-> `PMLX-603` / `#3868`,
+> `PMLX-601` / `#3866`, `PMLX-602` / `#3867`,
+> `PMLX-603` / `#3868`, and `PMLX-604` / `#3869`,
 > after reviewing `ROADMAP.md`, `ARCHITECTURE.md`,
 > `FRAMEWORK_CORE_ACCEPTANCE_MATRIX.md`, `TRAIN_SYSTEM.md`,
 > `MLX_COMPATIBILITY_SCOPE.md`, `MLX_ACCEPTANCE_MATRIX.md`,
@@ -553,7 +553,7 @@ MLX claims honest.
 | `PMLX-601` / [#3866](https://github.com/OpenAgentsInc/openagents/issues/3866) | done (2026-03-16) | `Psionic MLX: close CPU reference operator coverage against imported MLX parity categories` | `psionic-array` now exposes a bounded CPU-reference coverage contract over imported MLX `array_core`, `ops_numeric`, and `device_eval_memory` families via `MlxCpuReferenceCoverageReport`, `MLX_CPU_REFERENCE_COVERAGE.md`, `mlx_cpu_reference_coverage_report.schema.json`, and `scripts/release/check-psionic-mlx-cpu-reference-coverage.sh`, plus the public array surface now includes `flatten`, `expand_dims`, `squeeze`, and axis-aware `sum` to make that CPU oracle honest. |
 | `PMLX-602` / [#3867](https://github.com/OpenAgentsInc/openagents/issues/3867) | done (2026-03-16) | `Psionic MLX: close Metal backend coverage for the declared MLX-class surface` | `psionic-array` now exposes fallible `ArrayContext::metal()` / `metal_seeded()` constructors backed by the selected runtime Metal device, routes bounded dense `constant` / `add` / `matmul` graphs through `psionic-backend-metal` with real receipt device and stream identity, and refuses broader view/cast/reduction materialization explicitly instead of silently claiming Metal closure. |
 | `PMLX-603` / [#3868](https://github.com/OpenAgentsInc/openagents/issues/3868) | done (2026-03-16) | `Psionic MLX: close CUDA backend coverage for the declared MLX-class surface` | `psionic-array` now exposes fallible `ArrayContext::cuda()` / `cuda_seeded()` constructors backed by the selected runtime CUDA device, routes bounded dense `constant` / `add` / `matmul` graphs through `psionic-backend-cuda` with real receipt device and stream identity, keeps the public CUDA numerics contract explicitly bounded to dense `f32`, and leaves broader distributed/backend parity claims to the remaining backend-closure issues. |
-| `PMLX-604` | planned | `Psionic MLX: add advanced operator-family closure for linalg, fft, fast kernels, and attention helpers` | Land the operator families that MLX users expect beyond basic dense tensor math, keeping unsupported surfaces explicit until real coverage exists. |
+| `PMLX-604` | done (2026-03-17) | `Psionic MLX: add advanced operator-family closure for linalg, fft, fast kernels, and attention helpers` | `psionic-ir` now exposes a bounded advanced operator-family program layer with `GraphBuilder::linalg_gram_matrix(...)`, `signal_naive_dft(...)`, and `attention_rotary_residual_block(...)`, machine-readable `AdvancedOperatorProgramMatrixReport` evidence, and explicit refusal posture for distribution and special-function families that still lack the required primitives, so MLX-facing claims can point at reusable seeded coverage instead of hand-waving advanced math breadth. |
 | `PMLX-605` | planned | `Psionic MLX: port the upstream MLX C++ and Python test categories into the parity harness` | Build the real evidence base for bounded compatibility by porting or mirroring the highest-value upstream test families. |
 | `PMLX-606` | planned | `Psionic MLX: add an optional MLX naming facade and module-layout compatibility crate` | Only after native closure is real, add a thin compatibility shell that helps MLX users map concepts and API names without claiming full upstream closure. |
 | `PMLX-607` | planned | `Psionic MLX: add optional Python, C, or Swift binding layers above the Rust-native core` | Bindings are explicitly late-surface work and must depend on the native substrate rather than freezing a Python-first architecture into the core. |
@@ -661,7 +661,7 @@ track in parallel.
 - `PMLX-601` done 2026-03-16
 - `PMLX-602` done 2026-03-16
 - `PMLX-603` done 2026-03-16
-- `PMLX-604`
+- `PMLX-604` done 2026-03-17
 - `PMLX-605`
 
 ### Phase 8: close the package and service ecosystem above the native substrate
