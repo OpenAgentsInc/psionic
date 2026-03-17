@@ -102,6 +102,14 @@ Current posture:
   `HungarianMatching`, plus the committed report at
   `fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json`
   that keeps direct-vs-fallback posture explicit per workload family
+- its Phase 7C long-horizon trace ABI posture now also exists in
+  `psionic-runtime`, with the committed spec/report at
+  `fixtures/tassadar/reports/tassadar_trace_abi_decision_report.json` and the
+  committed long-loop evidence bundle at
+  `fixtures/tassadar/runs/long_loop_kernel_trace_abi_v0/execution_evidence_bundle.json`;
+  readable logs are now explicitly subordinate to the canonical trace
+  artifact, and validator-facing ABI pointers are frozen across benchmark,
+  compiled, and long-horizon fixture artifacts
 - the first trained-executor follow-on bar now also exists in
   `psionic-runtime` and `psionic-models`: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile plus a real 4x4 backtracking

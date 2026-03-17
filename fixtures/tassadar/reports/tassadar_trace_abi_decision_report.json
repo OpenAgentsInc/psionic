@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "canonical_trace_abi": {
+    "abi_id": "tassadar.trace.v1",
+    "schema_version": 1,
+    "profile_id": "tassadar.wasm.article_i32_compute.v1",
+    "append_only": true,
+    "includes_stack_snapshots": true,
+    "includes_local_snapshots": true,
+    "includes_memory_snapshots": true
+  },
+  "trace_abi_compatibility_digest": "421f5ab01c06ca29375fffa4216ea0e8da6a11f56124d7d0eb3704fe541d3f11",
+  "authority_contract": {
+    "canonical_machine_truth_artifact_kind": "tassadar_trace_artifact.json",
+    "canonical_machine_truth_fields": [
+      "trace_abi_id",
+      "trace_abi_version",
+      "trace_digest",
+      "behavior_digest",
+      "step_count",
+      "steps"
+    ],
+    "readable_log_posture": "readable logs are derived, non-authoritative views over the canonical append-only trace artifact and may be sampled, truncated, or reformatted without changing machine truth",
+    "readable_log_allowed_variations": [
+      "line wrapping or indentation",
+      "summary headers and progress annotations",
+      "bounded previews or truncation for very long traces"
+    ]
+  },
+  "versioning_contract": {
+    "compatible_without_abi_bump": [
+      "adding new derived reports that reference the same trace artifact",
+      "changing readable-log formatting or truncation policy",
+      "adding workload families that keep the same step/event semantics"
+    ],
+    "requires_abi_bump": [
+      "changing step ordering or append-only semantics",
+      "changing the meaning or encoding of existing trace events",
+      "changing whether stack, local, or memory snapshots are required per step",
+      "changing digest inputs used by validators to establish trace identity"
+    ]
+  },
+  "validator_compatibility_notes": [
+    {
+      "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+      "artifact_kind": "tassadar_article_class_benchmark_report.json",
+      "abi_id_pointer": "/suite/environment_bundle/program_binding/trace_abi_id",
+      "abi_version_pointer": "/suite/environment_bundle/program_binding/trace_abi_version",
+      "compatibility_expectation": "article-class benchmark validators read the ABI from the environment-bundle program binding and must keep that machine truth aligned with the runtime trace artifact"
+    },
+    {
+      "artifact_ref": "fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0/compiled_weight_suite_artifact.json",
+      "artifact_kind": "tassadar_compiled_weight_suite_artifact.json",
+      "abi_id_pointer": "/deployments/0/trace_abi_id",
+      "abi_version_pointer": "/deployments/0/trace_abi_version",
+      "compatibility_expectation": "compiled Sudoku validators keep runtime-contract and deployment ABI identity stable under the same trace ABI family"
+    },
+    {
+      "artifact_ref": "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/compiled_weight_suite_artifact.json",
+      "artifact_kind": "tassadar_compiled_weight_suite_artifact.json",
+      "abi_id_pointer": "/deployments/0/trace_abi_id",
+      "abi_version_pointer": "/deployments/0/trace_abi_version",
+      "compatibility_expectation": "compiled Hungarian validators keep deployment ABI identity stable under the same trace ABI family"
+    },
+    {
+      "artifact_ref": "fixtures/tassadar/runs/long_loop_kernel_trace_abi_v0/execution_evidence_bundle.json",
+      "artifact_kind": "tassadar_execution_evidence_bundle.json",
+      "abi_id_pointer": "/trace_artifact/trace_abi_id",
+      "abi_version_pointer": "/trace_artifact/trace_abi_version",
+      "compatibility_expectation": "the long-horizon exemplar records the same ABI identity directly on the emitted trace artifact while keeping readable-log concerns out of the authority layer"
+    }
+  ],
+  "long_horizon_fixture": {
+    "fixture_root_ref": "fixtures/tassadar/runs/long_loop_kernel_trace_abi_v0",
+    "evidence_bundle_ref": "fixtures/tassadar/runs/long_loop_kernel_trace_abi_v0/execution_evidence_bundle.json",
+    "case_id": "long_loop_kernel",
+    "program_id": "tassadar.long_loop_kernel.v1",
+    "workload_target": "long_loop_kernel",
+    "trace_abi_id": "tassadar.trace.v1",
+    "trace_abi_version": 1,
+    "trace_abi_compatibility_digest": "421f5ab01c06ca29375fffa4216ea0e8da6a11f56124d7d0eb3704fe541d3f11",
+    "step_count": 16383,
+    "trace_artifact_id": "tassadar://trace/tassadar-trace-abi-fixture-long_loop_kernel/672ffba42d6503747b741f3a48485aa2010b547b3d32a330c7e8a49389555a76",
+    "trace_artifact_digest": "907160ebc217c5fafc94f16fb1d73029bfabb8be5ea2daa5bd92acac32385aaf",
+    "trace_proof_id": "tassadar://trace_proof/tassadar-trace-abi-fixture-long_loop_kernel/672ffba42d6503747b741f3a48485aa2010b547b3d32a330c7e8a49389555a76",
+    "trace_proof_digest": "c60dffeb00dcf2167b364e90a04c0b7cd22520a3aa6547a9b8b7ec21ba9f6786"
+  },
+  "claim_boundary": "the current long-horizon ABI posture freezes `tassadar.trace.v1` as the canonical machine-truth trace for article-class execution; readable logs remain derived views and the separate million-step decode closure is still not implied by this report",
+  "report_digest": "42af44f80e35d08c307c5b6602c08d910d4656d29570c1907e28e74a94c90839"
+}

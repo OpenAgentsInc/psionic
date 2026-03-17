@@ -856,6 +856,21 @@ pub fn tassadar_trace_abi_for_profile_id(profile_id: &str) -> Option<TassadarTra
 /// Canonical machine-readable output path for the Wasm instruction-coverage report.
 pub const TASSADAR_WASM_INSTRUCTION_COVERAGE_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_wasm_instruction_coverage_report.json";
+/// Canonical machine-readable output path for the article-class benchmark report.
+pub const TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json";
+/// Canonical machine-readable output path for the trace-ABI decision report.
+pub const TASSADAR_TRACE_ABI_DECISION_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_trace_abi_decision_report.json";
+/// Canonical fixture root for the article-class long-horizon trace-ABI exemplar.
+pub const TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF: &str =
+    "fixtures/tassadar/runs/long_loop_kernel_trace_abi_v0";
+/// Canonical file name for the long-horizon execution evidence bundle.
+pub const TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE: &str = "execution_evidence_bundle.json";
+/// Current schema version for the trace-ABI decision report.
+pub const TASSADAR_TRACE_ABI_DECISION_SCHEMA_VERSION: u16 = 1;
+
+const TASSADAR_LONG_HORIZON_TRACE_CASE_ID: &str = "long_loop_kernel";
 
 /// One coverage row for one supported Tassadar Wasm profile.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -942,6 +957,229 @@ impl TassadarWasmInstructionCoverageReport {
     }
 }
 
+/// Machine-authority contract for one persisted Tassadar trace ABI.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarTraceAbiAuthorityContract {
+    /// Canonical machine-truth artifact kind.
+    pub canonical_machine_truth_artifact_kind: String,
+    /// Ordered machine-truth fields validators must treat as authoritative.
+    pub canonical_machine_truth_fields: Vec<String>,
+    /// Human-readable log posture relative to machine truth.
+    pub readable_log_posture: String,
+    /// Allowed readable-log differences that do not change machine truth.
+    pub readable_log_allowed_variations: Vec<String>,
+}
+
+/// Explicit versioning rules for one persisted Tassadar trace ABI.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarTraceAbiVersioningContract {
+    /// Changes that may happen without changing the trace ABI version.
+    pub compatible_without_abi_bump: Vec<String>,
+    /// Changes that require a new trace ABI version.
+    pub requires_abi_bump: Vec<String>,
+}
+
+/// One validator-facing note describing where trace ABI identity is recorded.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarTraceAbiValidatorCompatibilityNote {
+    /// Repo-owned artifact ref validators should inspect.
+    pub artifact_ref: String,
+    /// Artifact kind carrying the ABI identity.
+    pub artifact_kind: String,
+    /// JSON pointer to the ABI id field.
+    pub abi_id_pointer: String,
+    /// JSON pointer to the ABI version field.
+    pub abi_version_pointer: String,
+    /// Plain-language compatibility statement for validators.
+    pub compatibility_expectation: String,
+}
+
+/// Summary of one committed long-horizon trace fixture proving the ABI can
+/// carry article-class traces without changing identity semantics.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarLongHorizonTraceFixtureSummary {
+    /// Fixture root carrying the persisted exemplar.
+    pub fixture_root_ref: String,
+    /// Repo-owned evidence-bundle path for the exemplar.
+    pub evidence_bundle_ref: String,
+    /// Stable case identifier.
+    pub case_id: String,
+    /// Stable program identifier.
+    pub program_id: String,
+    /// Stable workload family.
+    pub workload_target: String,
+    /// Stable trace ABI identifier carried by the exemplar.
+    pub trace_abi_id: String,
+    /// Stable trace ABI version carried by the exemplar.
+    pub trace_abi_version: u16,
+    /// Stable compatibility digest for the ABI contract.
+    pub trace_abi_compatibility_digest: String,
+    /// Number of realized trace steps in the exemplar.
+    pub step_count: u64,
+    /// Stable trace-artifact identifier.
+    pub trace_artifact_id: String,
+    /// Stable trace-artifact digest.
+    pub trace_artifact_digest: String,
+    /// Stable trace-proof identifier.
+    pub trace_proof_id: String,
+    /// Stable trace-proof digest.
+    pub trace_proof_digest: String,
+}
+
+/// Machine-readable report capturing the deliberate long-horizon trace ABI
+/// posture for the current article-class executor lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarTraceAbiDecisionReport {
+    /// Stable schema version for the decision report itself.
+    pub schema_version: u16,
+    /// Canonical ABI the article-class long-horizon lane uses today.
+    pub canonical_trace_abi: TassadarTraceAbi,
+    /// Stable digest over the ABI compatibility surface.
+    pub trace_abi_compatibility_digest: String,
+    /// Contract separating machine truth from readable logs.
+    pub authority_contract: TassadarTraceAbiAuthorityContract,
+    /// Contract describing when ABI version changes are required.
+    pub versioning_contract: TassadarTraceAbiVersioningContract,
+    /// Validator-facing notes binding ABI identity into persisted artifacts.
+    pub validator_compatibility_notes: Vec<TassadarTraceAbiValidatorCompatibilityNote>,
+    /// Long-horizon article-class exemplar proving the ABI can carry a large trace.
+    pub long_horizon_fixture: TassadarLongHorizonTraceFixtureSummary,
+    /// Plain-language boundary statement for the current ABI posture.
+    pub claim_boundary: String,
+    /// Stable digest over the full decision report.
+    pub report_digest: String,
+}
+
+impl TassadarTraceAbiDecisionReport {
+    fn new(
+        canonical_trace_abi: TassadarTraceAbi,
+        long_horizon_fixture: TassadarLongHorizonTraceFixtureSummary,
+    ) -> Self {
+        let validator_compatibility_notes = vec![
+            TassadarTraceAbiValidatorCompatibilityNote {
+                artifact_ref: String::from(TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF),
+                artifact_kind: String::from("tassadar_article_class_benchmark_report.json"),
+                abi_id_pointer: String::from(
+                    "/suite/environment_bundle/program_binding/trace_abi_id",
+                ),
+                abi_version_pointer: String::from(
+                    "/suite/environment_bundle/program_binding/trace_abi_version",
+                ),
+                compatibility_expectation: String::from(
+                    "article-class benchmark validators read the ABI from the environment-bundle program binding and must keep that machine truth aligned with the runtime trace artifact",
+                ),
+            },
+            TassadarTraceAbiValidatorCompatibilityNote {
+                artifact_ref: String::from(
+                    "fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0/compiled_weight_suite_artifact.json",
+                ),
+                artifact_kind: String::from("tassadar_compiled_weight_suite_artifact.json"),
+                abi_id_pointer: String::from("/deployments/0/trace_abi_id"),
+                abi_version_pointer: String::from("/deployments/0/trace_abi_version"),
+                compatibility_expectation: String::from(
+                    "compiled Sudoku validators keep runtime-contract and deployment ABI identity stable under the same trace ABI family",
+                ),
+            },
+            TassadarTraceAbiValidatorCompatibilityNote {
+                artifact_ref: String::from(
+                    "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/compiled_weight_suite_artifact.json",
+                ),
+                artifact_kind: String::from("tassadar_compiled_weight_suite_artifact.json"),
+                abi_id_pointer: String::from("/deployments/0/trace_abi_id"),
+                abi_version_pointer: String::from("/deployments/0/trace_abi_version"),
+                compatibility_expectation: String::from(
+                    "compiled Hungarian validators keep deployment ABI identity stable under the same trace ABI family",
+                ),
+            },
+            TassadarTraceAbiValidatorCompatibilityNote {
+                artifact_ref: long_horizon_fixture.evidence_bundle_ref.clone(),
+                artifact_kind: String::from("tassadar_execution_evidence_bundle.json"),
+                abi_id_pointer: String::from("/trace_artifact/trace_abi_id"),
+                abi_version_pointer: String::from("/trace_artifact/trace_abi_version"),
+                compatibility_expectation: String::from(
+                    "the long-horizon exemplar records the same ABI identity directly on the emitted trace artifact while keeping readable-log concerns out of the authority layer",
+                ),
+            },
+        ];
+        let mut report = Self {
+            schema_version: TASSADAR_TRACE_ABI_DECISION_SCHEMA_VERSION,
+            trace_abi_compatibility_digest: canonical_trace_abi.compatibility_digest(),
+            canonical_trace_abi,
+            authority_contract: TassadarTraceAbiAuthorityContract {
+                canonical_machine_truth_artifact_kind: String::from(
+                    "tassadar_trace_artifact.json",
+                ),
+                canonical_machine_truth_fields: vec![
+                    String::from("trace_abi_id"),
+                    String::from("trace_abi_version"),
+                    String::from("trace_digest"),
+                    String::from("behavior_digest"),
+                    String::from("step_count"),
+                    String::from("steps"),
+                ],
+                readable_log_posture: String::from(
+                    "readable logs are derived, non-authoritative views over the canonical append-only trace artifact and may be sampled, truncated, or reformatted without changing machine truth",
+                ),
+                readable_log_allowed_variations: vec![
+                    String::from("line wrapping or indentation"),
+                    String::from("summary headers and progress annotations"),
+                    String::from("bounded previews or truncation for very long traces"),
+                ],
+            },
+            versioning_contract: TassadarTraceAbiVersioningContract {
+                compatible_without_abi_bump: vec![
+                    String::from("adding new derived reports that reference the same trace artifact"),
+                    String::from("changing readable-log formatting or truncation policy"),
+                    String::from("adding workload families that keep the same step/event semantics"),
+                ],
+                requires_abi_bump: vec![
+                    String::from("changing step ordering or append-only semantics"),
+                    String::from("changing the meaning or encoding of existing trace events"),
+                    String::from("changing whether stack, local, or memory snapshots are required per step"),
+                    String::from("changing digest inputs used by validators to establish trace identity"),
+                ],
+            },
+            validator_compatibility_notes,
+            long_horizon_fixture,
+            claim_boundary: String::from(
+                "the current long-horizon ABI posture freezes `tassadar.trace.v1` as the canonical machine-truth trace for article-class execution; readable logs remain derived views and the separate million-step decode closure is still not implied by this report",
+            ),
+            report_digest: String::new(),
+        };
+        report.report_digest =
+            stable_serialized_digest(b"tassadar_trace_abi_decision_report|", &report);
+        report
+    }
+}
+
+/// Errors while building or writing the long-horizon trace-ABI artifacts.
+#[derive(Debug, Error)]
+pub enum TassadarTraceAbiArtifactError {
+    /// The canonical long-horizon article-class case was missing.
+    #[error("missing canonical long-horizon article-class case `{case_id}`")]
+    MissingLongHorizonCase { case_id: String },
+    /// The canonical long-horizon case referenced an unsupported profile.
+    #[error("unsupported profile `{profile_id}` for canonical long-horizon trace ABI fixture")]
+    UnsupportedProfile { profile_id: String },
+    /// The realized CPU-reference execution diverged from the preserved case truth.
+    #[error(
+        "canonical long-horizon fixture `{case_id}` diverged from preserved CPU-reference truth"
+    )]
+    FixtureMismatch { case_id: String },
+    /// Program-artifact projection failed.
+    #[error(transparent)]
+    ProgramArtifact(#[from] TassadarProgramArtifactError),
+    /// Execution failed.
+    #[error(transparent)]
+    Execution(#[from] TassadarExecutionRefusal),
+    /// JSON serialization failed.
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    /// Artifact persistence failed.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+
 fn runtime_repo_root() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
@@ -966,6 +1204,174 @@ pub fn write_tassadar_wasm_instruction_coverage_report(
     let bytes = serde_json::to_vec_pretty(&report)
         .expect("Tassadar Wasm instruction coverage report should serialize");
     std::fs::write(output_path, bytes)?;
+    Ok(report)
+}
+
+/// Returns the canonical absolute path for the trace-ABI decision report.
+#[must_use]
+pub fn tassadar_trace_abi_decision_report_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_TRACE_ABI_DECISION_REPORT_REF)
+}
+
+/// Returns the canonical absolute path for the long-horizon trace fixture root.
+#[must_use]
+pub fn tassadar_long_horizon_trace_fixture_root_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF)
+}
+
+/// Returns the canonical absolute path for the long-horizon evidence bundle.
+#[must_use]
+pub fn tassadar_long_horizon_trace_evidence_bundle_path() -> std::path::PathBuf {
+    tassadar_long_horizon_trace_fixture_root_path()
+        .join(TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE)
+}
+
+fn canonical_long_horizon_trace_case(
+) -> Result<TassadarValidationCase, TassadarTraceAbiArtifactError> {
+    tassadar_article_class_corpus()
+        .into_iter()
+        .find(|case| case.case_id == TASSADAR_LONG_HORIZON_TRACE_CASE_ID)
+        .ok_or_else(|| TassadarTraceAbiArtifactError::MissingLongHorizonCase {
+            case_id: String::from(TASSADAR_LONG_HORIZON_TRACE_CASE_ID),
+        })
+}
+
+/// Builds the canonical long-horizon execution evidence bundle used to anchor
+/// the trace-ABI decision report.
+pub fn build_tassadar_long_horizon_trace_evidence_bundle(
+) -> Result<TassadarExecutionEvidenceBundle, TassadarTraceAbiArtifactError> {
+    let case = canonical_long_horizon_trace_case()?;
+    let profile =
+        tassadar_wasm_profile_for_id(case.program.profile_id.as_str()).ok_or_else(|| {
+            TassadarTraceAbiArtifactError::UnsupportedProfile {
+                profile_id: case.program.profile_id.clone(),
+            }
+        })?;
+    let trace_abi = tassadar_trace_abi_for_profile_id(case.program.profile_id.as_str())
+        .ok_or_else(|| TassadarTraceAbiArtifactError::UnsupportedProfile {
+            profile_id: case.program.profile_id.clone(),
+        })?;
+    let runner = TassadarCpuReferenceRunner::for_profile(profile.clone()).ok_or_else(|| {
+        TassadarTraceAbiArtifactError::UnsupportedProfile {
+            profile_id: case.program.profile_id.clone(),
+        }
+    })?;
+    let execution = runner.execute(&case.program)?;
+    if execution.steps != case.expected_trace || execution.outputs != case.expected_outputs {
+        return Err(TassadarTraceAbiArtifactError::FixtureMismatch {
+            case_id: case.case_id,
+        });
+    }
+    let program_artifact = TassadarProgramArtifact::fixture_reference(
+        format!("tassadar://artifact/trace_abi_fixture/{}", case.case_id),
+        &profile,
+        &trace_abi,
+        case.program,
+    )?;
+    let request_id = format!(
+        "tassadar-trace-abi-fixture-{}",
+        TASSADAR_LONG_HORIZON_TRACE_CASE_ID
+    );
+    let request_digest = stable_serialized_digest(
+        b"tassadar_trace_abi_fixture_request|",
+        &(
+            request_id.as_str(),
+            program_artifact.validated_program_digest.as_str(),
+        ),
+    );
+    let model_descriptor_digest = stable_serialized_digest(
+        b"tassadar_trace_abi_fixture_model|",
+        &(
+            TASSADAR_CPU_REFERENCE_RUNNER_ID,
+            trace_abi.abi_id.as_str(),
+            trace_abi.schema_version,
+            profile.profile_id.as_str(),
+        ),
+    );
+    Ok(build_tassadar_execution_evidence_bundle(
+        request_id,
+        request_digest,
+        "psionic.tassadar.trace_abi_fixture.v1",
+        format!(
+            "model://tassadar/{}/{}",
+            TASSADAR_CPU_REFERENCE_RUNNER_ID, profile.profile_id
+        ),
+        model_descriptor_digest,
+        vec![String::from(
+            "env.openagents.tassadar.article_class.benchmark",
+        )],
+        &program_artifact,
+        TassadarExecutorDecodeMode::ReferenceLinear,
+        &execution,
+    ))
+}
+
+fn build_tassadar_trace_abi_decision_report_for_refs(
+    fixture_root_ref: impl Into<String>,
+    evidence_bundle_ref: impl Into<String>,
+    evidence_bundle: &TassadarExecutionEvidenceBundle,
+) -> TassadarTraceAbiDecisionReport {
+    let trace_abi = TassadarTraceAbi::article_i32_compute_v1();
+    TassadarTraceAbiDecisionReport::new(
+        trace_abi.clone(),
+        TassadarLongHorizonTraceFixtureSummary {
+            fixture_root_ref: fixture_root_ref.into(),
+            evidence_bundle_ref: evidence_bundle_ref.into(),
+            case_id: String::from(TASSADAR_LONG_HORIZON_TRACE_CASE_ID),
+            program_id: evidence_bundle.trace_artifact.program_id.clone(),
+            workload_target: String::from("long_loop_kernel"),
+            trace_abi_id: evidence_bundle.trace_artifact.trace_abi_id.clone(),
+            trace_abi_version: evidence_bundle.trace_artifact.trace_abi_version,
+            trace_abi_compatibility_digest: trace_abi.compatibility_digest(),
+            step_count: evidence_bundle.trace_artifact.step_count,
+            trace_artifact_id: evidence_bundle.trace_artifact.artifact_id.clone(),
+            trace_artifact_digest: evidence_bundle.trace_artifact.artifact_digest.clone(),
+            trace_proof_id: evidence_bundle.trace_proof.proof_artifact_id.clone(),
+            trace_proof_digest: evidence_bundle.trace_proof.proof_digest.clone(),
+        },
+    )
+}
+
+/// Builds the canonical long-horizon trace-ABI decision report.
+pub fn build_tassadar_trace_abi_decision_report(
+) -> Result<TassadarTraceAbiDecisionReport, TassadarTraceAbiArtifactError> {
+    let evidence_bundle = build_tassadar_long_horizon_trace_evidence_bundle()?;
+    Ok(build_tassadar_trace_abi_decision_report_for_refs(
+        TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF,
+        format!(
+            "{}/{}",
+            TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF,
+            TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE
+        ),
+        &evidence_bundle,
+    ))
+}
+
+/// Writes the canonical trace-ABI decision report plus its long-horizon
+/// evidence-bundle fixture.
+pub fn write_tassadar_trace_abi_decision_artifacts(
+    report_path: impl AsRef<std::path::Path>,
+    fixture_root: impl AsRef<std::path::Path>,
+) -> Result<TassadarTraceAbiDecisionReport, TassadarTraceAbiArtifactError> {
+    let report_path = report_path.as_ref();
+    let fixture_root = fixture_root.as_ref();
+    if let Some(parent) = report_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::create_dir_all(fixture_root)?;
+
+    let evidence_bundle = build_tassadar_long_horizon_trace_evidence_bundle()?;
+    let evidence_bundle_path = fixture_root.join(TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE);
+    let evidence_bytes = serde_json::to_vec_pretty(&evidence_bundle)?;
+    std::fs::write(&evidence_bundle_path, evidence_bytes)?;
+
+    let report = build_tassadar_trace_abi_decision_report_for_refs(
+        canonical_repo_relative_path(fixture_root),
+        canonical_repo_relative_path(&evidence_bundle_path),
+        &evidence_bundle,
+    );
+    let report_bytes = serde_json::to_vec_pretty(&report)?;
+    std::fs::write(report_path, report_bytes)?;
     Ok(report)
 }
 
@@ -6937,7 +7343,9 @@ mod tests {
     use crate::TassadarClaimClass;
 
     use super::{
-        build_tassadar_execution_evidence_bundle, compile_tassadar_c_source_to_wasm_receipt,
+        build_tassadar_execution_evidence_bundle,
+        build_tassadar_long_horizon_trace_evidence_bundle,
+        build_tassadar_trace_abi_decision_report, compile_tassadar_c_source_to_wasm_receipt,
         diagnose_tassadar_executor_request, execute_tassadar_executor_request,
         replay_tassadar_execution, run_tassadar_exact_equivalence, run_tassadar_exact_parity,
         stable_bytes_digest, tassadar_article_class_corpus, tassadar_canonical_c_source_path,
@@ -6946,19 +7354,21 @@ mod tests {
         tassadar_sudoku_9x9_search_program, tassadar_sudoku_v0_corpus,
         tassadar_sudoku_v0_search_program, tassadar_supported_wasm_profiles,
         tassadar_validation_corpus, tassadar_wasm_instruction_coverage_report,
-        write_tassadar_c_to_wasm_compile_receipt, write_tassadar_wasm_instruction_coverage_report,
-        TassadarCToWasmCompileConfig, TassadarCToWasmCompileReceipt, TassadarCompileRefusal,
-        TassadarCompilerToolchainIdentity, TassadarCpuReferenceRunner, TassadarExecutionRefusal,
-        TassadarExecutorDecodeMode, TassadarExecutorSelectionReason,
-        TassadarExecutorSelectionState, TassadarFixtureRunner, TassadarHullCacheRunner,
-        TassadarInstruction, TassadarProgram, TassadarProgramArtifact,
+        write_tassadar_c_to_wasm_compile_receipt, write_tassadar_trace_abi_decision_artifacts,
+        write_tassadar_wasm_instruction_coverage_report, TassadarCToWasmCompileConfig,
+        TassadarCToWasmCompileReceipt, TassadarCompileRefusal, TassadarCompilerToolchainIdentity,
+        TassadarCpuReferenceRunner, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
+        TassadarExecutorSelectionReason, TassadarExecutorSelectionState, TassadarFixtureRunner,
+        TassadarHullCacheRunner, TassadarInstruction, TassadarProgram, TassadarProgramArtifact,
         TassadarProgramArtifactError, TassadarProgramSourceIdentity, TassadarProgramSourceKind,
         TassadarSparseTopKRunner, TassadarSudokuV0CorpusSplit, TassadarTraceAbi,
-        TassadarTraceEvent, TassadarWasmInstructionCoverageReport, TassadarWasmProfile,
-        TassadarWasmProfileId, TASSADAR_CANONICAL_C_PROGRAM_ARTIFACT_ID,
-        TASSADAR_CANONICAL_C_SOURCE_REF, TASSADAR_C_TO_WASM_COMPILE_RECEIPT_REF,
-        TASSADAR_FIXTURE_RUNNER_ID, TASSADAR_RUNTIME_BACKEND_ID,
-        TASSADAR_WASM_INSTRUCTION_COVERAGE_REPORT_REF,
+        TassadarTraceAbiDecisionReport, TassadarTraceEvent, TassadarWasmInstructionCoverageReport,
+        TassadarWasmProfile, TassadarWasmProfileId, TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
+        TASSADAR_CANONICAL_C_PROGRAM_ARTIFACT_ID, TASSADAR_CANONICAL_C_SOURCE_REF,
+        TASSADAR_C_TO_WASM_COMPILE_RECEIPT_REF, TASSADAR_FIXTURE_RUNNER_ID,
+        TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE,
+        TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF, TASSADAR_RUNTIME_BACKEND_ID,
+        TASSADAR_TRACE_ABI_DECISION_REPORT_REF, TASSADAR_WASM_INSTRUCTION_COVERAGE_REPORT_REF,
     };
 
     fn read_repo_json<T: serde::de::DeserializeOwned>(
@@ -7169,6 +7579,139 @@ mod tests {
         assert_eq!(persisted, report);
         std::fs::remove_file(&report_path).expect("temp report should be removable");
         std::fs::remove_dir(&temp_dir).expect("temp dir should be removable");
+    }
+
+    #[test]
+    fn tassadar_trace_abi_decision_report_matches_committed_truth() {
+        let report = build_tassadar_trace_abi_decision_report().expect("trace-ABI decision report");
+        assert_eq!(
+            report.canonical_trace_abi,
+            TassadarTraceAbi::article_i32_compute_v1()
+        );
+        assert_eq!(
+            report.long_horizon_fixture.trace_abi_id,
+            report.canonical_trace_abi.abi_id
+        );
+        assert_eq!(
+            report.long_horizon_fixture.trace_abi_version,
+            report.canonical_trace_abi.schema_version
+        );
+        assert!(report.long_horizon_fixture.step_count >= 16_000);
+        let persisted: TassadarTraceAbiDecisionReport =
+            read_repo_json::<TassadarTraceAbiDecisionReport>(
+                TASSADAR_TRACE_ABI_DECISION_REPORT_REF,
+                "tassadar_trace_abi_decision_report",
+            );
+        assert_eq!(persisted, report);
+    }
+
+    #[test]
+    fn long_horizon_trace_fixture_records_abi_identity() {
+        let evidence_bundle = build_tassadar_long_horizon_trace_evidence_bundle()
+            .expect("long-horizon trace evidence bundle");
+        assert_eq!(
+            evidence_bundle.trace_artifact.trace_abi_id,
+            TassadarTraceAbi::article_i32_compute_v1().abi_id
+        );
+        assert_eq!(
+            evidence_bundle.trace_artifact.trace_abi_version,
+            TassadarTraceAbi::article_i32_compute_v1().schema_version
+        );
+        assert_eq!(evidence_bundle.trace_artifact.step_count, 16_383);
+
+        let persisted: serde_json::Value = read_repo_json::<serde_json::Value>(
+            &format!(
+                "{}/{}",
+                TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF,
+                TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE
+            ),
+            "tassadar_long_horizon_trace_evidence_bundle",
+        );
+        assert_eq!(
+            persisted["trace_artifact"]["trace_abi_id"].as_str(),
+            Some(TassadarTraceAbi::article_i32_compute_v1().abi_id.as_str())
+        );
+        assert_eq!(
+            persisted["trace_artifact"]["trace_abi_version"].as_u64(),
+            Some(u64::from(
+                TassadarTraceAbi::article_i32_compute_v1().schema_version
+            ))
+        );
+    }
+
+    #[test]
+    fn write_tassadar_trace_abi_decision_artifacts_persist_current_truth() {
+        let temp_dir = temp_test_dir("trace-abi");
+        std::fs::create_dir_all(&temp_dir).expect("temp dir should create");
+        let report_path = temp_dir.join("tassadar_trace_abi_decision_report.json");
+        let fixture_root = temp_dir.join("long_horizon_fixture");
+        let report = write_tassadar_trace_abi_decision_artifacts(&report_path, &fixture_root)
+            .expect("trace-ABI decision artifacts should write");
+        let report_bytes = std::fs::read(&report_path).expect("persisted report");
+        let persisted_report: TassadarTraceAbiDecisionReport =
+            serde_json::from_slice(&report_bytes).expect("persisted report should deserialize");
+        assert_eq!(persisted_report, report);
+
+        let evidence_path = fixture_root.join(TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE);
+        let evidence_bytes = std::fs::read(&evidence_path).expect("persisted evidence bundle");
+        let persisted_evidence: serde_json::Value =
+            serde_json::from_slice(&evidence_bytes).expect("persisted evidence bundle json");
+        assert_eq!(
+            persisted_evidence["trace_artifact"]["trace_abi_id"].as_str(),
+            Some(TassadarTraceAbi::article_i32_compute_v1().abi_id.as_str())
+        );
+        assert_eq!(
+            persisted_evidence["trace_artifact"]["trace_abi_version"].as_u64(),
+            Some(u64::from(
+                TassadarTraceAbi::article_i32_compute_v1().schema_version
+            ))
+        );
+
+        std::fs::remove_file(&report_path).expect("temp report should be removable");
+        std::fs::remove_file(&evidence_path).expect("temp evidence bundle should be removable");
+        std::fs::remove_dir(&fixture_root).expect("fixture root should be removable");
+        std::fs::remove_dir(&temp_dir).expect("temp dir should be removable");
+    }
+
+    #[test]
+    fn validator_compatibility_artifacts_preserve_trace_abi_identity() {
+        let benchmark_report = read_repo_json::<serde_json::Value>(
+            TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
+            "tassadar_article_class_benchmark_report",
+        );
+        assert_eq!(
+            benchmark_report["suite"]["environment_bundle"]["program_binding"]["trace_abi_id"]
+                .as_str(),
+            Some(TassadarTraceAbi::article_i32_compute_v1().abi_id.as_str())
+        );
+        assert_eq!(
+            benchmark_report["suite"]["environment_bundle"]["program_binding"]["trace_abi_version"]
+                .as_u64(),
+            Some(u64::from(
+                TassadarTraceAbi::article_i32_compute_v1().schema_version
+            ))
+        );
+
+        let sudoku_compiled = read_repo_json::<serde_json::Value>(
+            "fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0/compiled_weight_suite_artifact.json",
+            "sudoku_compiled_weight_suite_artifact",
+        );
+        let hungarian_compiled = read_repo_json::<serde_json::Value>(
+            "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/compiled_weight_suite_artifact.json",
+            "hungarian_compiled_weight_suite_artifact",
+        );
+        for compiled in [&sudoku_compiled, &hungarian_compiled] {
+            assert_eq!(
+                compiled["deployments"][0]["trace_abi_id"].as_str(),
+                Some(TassadarTraceAbi::article_i32_compute_v1().abi_id.as_str())
+            );
+            assert_eq!(
+                compiled["deployments"][0]["trace_abi_version"].as_u64(),
+                Some(u64::from(
+                    TassadarTraceAbi::article_i32_compute_v1().schema_version
+                ))
+            );
+        }
     }
 
     #[test]

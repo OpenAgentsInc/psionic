@@ -174,6 +174,14 @@ The current scope is:
   `fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json`;
   the same report keeps branch-heavy sparse fallback and long-loop
   hull/sparse fallback explicit instead of overstating fast-path closure
+- landed Phase 7C bar: one explicit long-horizon trace ABI/versioning decision
+  now exists in `psionic-runtime`, with the canonical report
+  `fixtures/tassadar/reports/tassadar_trace_abi_decision_report.json` and the
+  committed long-loop evidence bundle
+  `fixtures/tassadar/runs/long_loop_kernel_trace_abi_v0/execution_evidence_bundle.json`;
+  machine validators now have frozen ABI pointers across benchmark, compiled,
+  and long-horizon artifacts, while readable logs remain explicitly
+  non-authoritative views over the append-only trace artifact
 - landed trained-executor Phase 1 follow-on bar: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile now exists with a real 4x4
   backtracking Sudoku program representation on the CPU reference lane, while
