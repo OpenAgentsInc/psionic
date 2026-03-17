@@ -1,0 +1,471 @@
+# Psionic Tassadar Roadmap
+
+> Status: written 2026-03-17 after reviewing `docs/ROADMAP.md`,
+> `docs/ARCHITECTURE.md`, `docs/TRAIN_SYSTEM.md`, `README.md`,
+> `docs/research/tassadar.md`,
+> `docs/audits/2026-03-16-tassadar-phase-12-boundary-audit.md`,
+> `docs/audits/2026-03-16-tassadar-phase-13-trainable-surface-audit.md`,
+> `docs/audits/2026-03-16-tassadar-phase-14-promotion-green-audit.md`,
+> and `docs/audits/2026-03-16-tassadar-phase-16-9x9-reference-run-audit.md`.
+>
+> This is the lane-specific roadmap for making the Psionic-owned `Tassadar`
+> executor lane honest against the full shape of the Percepta
+> "Can LLMs Be Computers?" article. It is intentionally narrower than
+> `docs/ROADMAP.md`: it is about WebAssembly-first in-model execution,
+> exact compiled/proof-backed executor lanes, learned executor lanes,
+> long-trace fast decode, and article-class workload closure inside
+> `crates/psionic-*`.
+
+Agent execution instruction: implement this roadmap in dependency order, not by
+whichever executor demo looks most exciting first. Keep compiled/proof-backed
+and learned lanes separate, keep article claims subordinate to artifacts, and
+do not let throughput numbers outrun exactness, compatibility, or refusal
+truth.
+
+Reference-first instruction: Tassadar work must not be implemented from memory.
+Choose the reference that owns the layer being changed:
+
+- start with `docs/ROADMAP.md` for the canonical full-program owner split and
+  dependency order
+- start with `docs/ARCHITECTURE.md` for the canonical current-state substrate
+  and status vocabulary
+- start with `docs/TRAIN_SYSTEM.md` for the learned-lane and train-substrate
+  contract
+- start with `README.md` for the current Tassadar inventory and crate map
+- start with `docs/research/tassadar.md` for the literature-grounded design
+  constraints, especially the separation between compiled/proof-backed and
+  learned lanes
+- start with committed artifact roots under `fixtures/tassadar/runs/` for the
+  actual exactness, throughput, fit, failure, and proof posture instead of
+  relying on remembered blog claims
+
+Psionic-only execution rule: the shipped Tassadar lane must remain
+Psionic-owned end to end. Do not close roadmap items by shelling out to a
+Python interpreter, an external Wasm runtime, or a tool-use loop and then
+pretending the transformer executed the program itself. If the computation did
+not run through the Psionic-owned executor substrate and produce Psionic-owned
+artifacts, it is not roadmap completion.
+
+## Decision
+
+`Tassadar` belongs in a separate `ROADMAP_TASSADAR.md`, not only as a long
+section inside `docs/ROADMAP.md`.
+
+That decision is deliberate for four reasons:
+
+1. `docs/ROADMAP.md` is the canonical full-library roadmap and should remain
+   the answer to "what is Psionic overall?"
+2. Tassadar now spans runtime, models, serving, eval, train, and research, so
+   the full article-shaped path is too detailed to keep only as one embedded
+   section in the main roadmap.
+3. The current repo already uses lane-specific deep dives such as
+   `docs/ROADMAP_CLUSTER.md`, `docs/ROADMAP_FM.md`, `docs/ROADMAP_METAL.md`,
+   and `docs/ROADMAP_MLX.md`.
+4. The article-shaped Tassadar program needs its own acceptance language,
+   separation between compiled/proof-backed and learned claims, and explicit
+   long-trace closure path without implying that Tassadar is the whole Psionic
+   program.
+
+So the structural rule is:
+
+- `docs/ROADMAP.md` remains canonical
+- `docs/ROADMAP_TASSADAR.md` is the Tassadar-specific dependency-ordered deep
+  dive
+
+## Objective
+
+Build Tassadar into an article-grade Psionic-owned executor lane with:
+
+- a WebAssembly-first in-model execution substrate that is exact against a CPU
+  reference lane
+- digest-bound program artifacts, trace artifacts, proof bundles, runtime
+  compatibility descriptors, and replay-stable lineage
+- a fast decode path that is honest about when it is exact, when it falls
+  back, and when it must refuse
+- article-class benchmark packages and artifact roots for branch-heavy,
+  memory-heavy, long-horizon computation workloads
+- a bounded compiled/proof-backed lane that can execute matched workloads
+  exactly inside the model-owned executor path
+- a learned lane that is kept separate from the compiled lane and only widens
+  claims when exactness artifacts justify it
+- a path from bounded research candidates to a truthful "the model executes
+  Wasm compute internally" claim for article-class workloads
+
+This is not a plan to:
+
+- outsource compute to tool use and describe it as in-model execution
+- blur compiled exactness into learned generalization
+- call bounded 4x4 proxy success "article parity"
+- treat benchmark speed alone as proof that the executor is correct
+- claim arbitrary-program or arbitrary-C closure before the instruction,
+  profile, workload, and compile pipeline artifacts prove it
+
+## Relationship To The Main Roadmap
+
+This roadmap is subordinate to `docs/ROADMAP.md`.
+
+It depends on and refines work already named there:
+
+- framework-core extensibility and cache identity
+- model/runtime-family truth
+- serving and routing truth
+- train/eval artifact truth
+- research-runner and experiment-manifest truth
+
+This roadmap does not widen product scope in `docs/MVP.md`, and it does not
+move ownership boundaries out of `docs/OWNERSHIP.md`.
+
+## Ownership Rules
+
+This roadmap must continue to respect `docs/OWNERSHIP.md`:
+
+- `crates/psionic-*` owns the reusable executor runtime, model, eval, train,
+  serving, artifact, benchmark, proof, and research surfaces
+- `apps/*` remain responsible for product UX and product control flows
+- kernel and Nexus remain authority owners, not executor-runtime owners
+
+More specifically:
+
+- `psionic-runtime` owns Wasm execution semantics, trace artifacts, runtime
+  compatibility, decode identity, and proof lineage
+- `psionic-models` owns executor model families, decode-state contracts,
+  compiled-weight artifacts, and truthful model descriptors
+- `psionic-eval` owns exactness, benchmark, compatibility, and refusal reports
+- `psionic-train` owns learned-lane manifests, training receipts, promotion
+  gates, and fit reports
+- `psionic-serve` owns explicit executor product and planner-routing surfaces
+- `psionic-research` owns bounded architecture, compile-to-weights, and
+  long-trace comparison families without widening product claims by itself
+
+## Why This Roadmap Exists
+
+The repo already has a real Tassadar lane, but it does not yet have a separate
+document that answers the larger question:
+
+> what is the full dependency-ordered path from today's bounded executor truth
+> to an honest implementation of the Wasm-compute vision described in the
+> article?
+
+That gap matters because the current state is easy to misread.
+
+The repo already has:
+
+- a real CPU-reference executor lane
+- proof-bearing trace artifacts
+- a bounded `HullCache` fast path
+- a bounded compiled/proof-backed exact Sudoku lane
+- a bounded compiled/proof-backed exact Hungarian lane
+- a bounded learned 4x4 lane with a green promotion gate
+- an honest but still partial learned 9x9 lane
+
+But it does not yet have:
+
+- article-grade exactness on the full long-trace workload envelope it would
+  take to justify "arbitrary C code executes inside the transformer"
+- article-grade long-trace closure on branch-heavy, memory-heavy workloads
+- a truthful learned long-horizon lane for 9x9 Sudoku or larger matching
+  problems
+- a generalized compile-to-weights or program-specialized deployment pipeline
+  that is honest beyond the currently matched bounded corpora
+
+So the right next move is not to widen the marketing language. The right next
+move is to make the closure path explicit.
+
+## Current Position
+
+Tassadar already has substantial shipped substrate on `main`.
+
+The current strongest committed artifacts are:
+
+- `fixtures/tassadar/runs/sudoku_v0_promotion_v3`
+  - learned 4x4 validation gate is green
+- `fixtures/tassadar/runs/sudoku_9x9_v0_reference_run_v0`
+  - learned 9x9 lane is honest but still partial
+- `fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0`
+  - bounded compiled/proof-backed Sudoku lane is exact on the matched corpus
+- `fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0`
+  - bounded compiled/proof-backed Hungarian lane is exact on the matched
+    corpus
+
+The current technical reality is:
+
+- exact CPU-reference and proof-bearing runtime substrate exists
+- the fast decode path exists, but its exact closure is still workload-shaped
+  rather than general
+- the compiled/proof-backed lane is stronger today than the learned long-trace
+  lane
+- the learned 4x4 lane is real
+- the learned 9x9 lane still does not fit the full trace honestly under the
+  current model contract
+
+That means the honest article-shaped path is:
+
+1. keep the compiled/proof-backed lane as the first exact long-trace answer
+2. widen runtime/profile/benchmark truth for real Wasm workloads
+3. make long-trace fast decode honest on the workload classes it claims
+4. only then widen the learned lane toward article-class long-horizon compute
+
+## Article Target
+
+For this roadmap, "fully implementing the article-shaped Wasm compute lane"
+means all of the following are true at once:
+
+- Psionic can take a stable Wasm artifact from a canonical compile pipeline and
+  execute it internally through the Tassadar executor path without an external
+  interpreter round-trip.
+- the same workload has exact CPU-reference parity, trace proof, runtime
+  lineage, compatibility/refusal reporting, and benchmark receipts
+- the fast decode path is exact on the long-trace workload class it claims,
+  with trace-length scaling reports instead of one throughput screenshot
+- compiled/proof-backed article workloads exist above today's 4x4 proxies,
+  including 9x9 Sudoku, 10x10 Hungarian-class matching, and branch-heavy or
+  memory-heavy kernel suites
+- learned-lane claims, if made, clear their own exactness and fit bars and are
+  never used to dilute compiled-lane truth
+- "arbitrary C code" claims only become honest after instruction coverage,
+  compile receipts, workload suites, and acceptance runners say so
+
+## Explicit Non-Goals
+
+These are not goals of this roadmap:
+
+- generic chat-product capability claims
+- replacing direct CPU execution as the authority lane
+- pretending article screenshots are equivalent to reproducible artifacts
+- claiming full softmax-attention parity before the executor-specific fast path
+  is closed honestly
+- claiming that bounded compiled/proof-backed success on a matched corpus means
+  arbitrary-program closure
+- claiming that a bounded learned 4x4 or 9x9 result proves a general learned
+  Wasm computer
+
+## Current Status Matrix
+
+| Subsystem | Status | Truth today |
+| --- | --- | --- |
+| Wasm executor runtime, trace ABI, proof, and serving surfaces | `implemented_early` | The core runtime, trace proof, compatibility, benchmark, and serving substrate exists and is usable today inside `crates/psionic-*`. |
+| Exact `HullCache` fast path | `partial` | Exact closure exists on bounded validated subsets, but the fast path is not yet honest as a general long-trace answer for all branch-heavy or memory-heavy workloads. |
+| Compiled/proof-backed exact executor lane | `implemented_early` | Exact bounded Sudoku-v0 and Hungarian-v0 lanes exist with proof-bearing deployment bundles, but they remain matched-corpus and `eval_only` rather than article-grade general closure. |
+| Learned 4x4 executor lane | `implemented_early` | The learned 4x4 promotion gate is green on the committed validation corpus. |
+| Learned 9x9 executor lane | `partial` | The first honest 9x9 run is preserved, but the full learned trace still does not fit the current model contract and remains blocked. |
+| Article-class long-trace benchmark closure | `partial` | Micro, Sudoku, and Hungarian families exist, but the repo does not yet have one acceptance bar that honestly closes the article-shaped long-trace claim. |
+| Generalized program-specialized weights and compile-to-weights | `partial` | Program-specialized compiled executor artifacts exist, but the repo does not yet have generalized compile-to-weights closure for broader Wasm families. |
+| Full article-parity Wasm compute claim | `planned` | Psionic is not yet at a truthful "arbitrary C/Wasm compute inside the transformer" claim boundary. |
+
+## Dependency Order
+
+This roadmap is organized into seven epics.
+
+| Epic | Title | Primary outcome |
+| --- | --- | --- |
+| Epic 0 | Governance and acceptance | explicit claim vocabulary and one acceptance bar for article-shaped Tassadar work |
+| Epic 1 | Wasm substrate closure | wider Wasm, compile, trace, and artifact truth for real article-class programs |
+| Epic 2 | Fast decode closure | honest long-trace fast-path exactness, scaling, and fallback truth |
+| Epic 3 | Compiled/proof-backed article closure | exact article-class workloads through the compiled lane first |
+| Epic 4 | Learned executor substrate redesign | richer supervision, recurrence/windowing, and architecture baselines |
+| Epic 5 | Learned long-trace closure | honest 9x9 and Hungarian-class learned-lane exactness or explicit bounded failure |
+| Epic 6 | Compile-to-weights and hybrid systems | broader program-specialized weights, deployment truth, and planner-integrated article workflows |
+
+## Epic 0: Governance And Acceptance
+
+### Goal
+
+Freeze the claim vocabulary and acceptance discipline so Tassadar work stops
+oscillating between bounded research wins and implied article parity.
+
+### Exit Criteria
+
+- one canonical Tassadar claim vocabulary exists
+- one repo-owned Tassadar acceptance runner exists
+- compiled/proof-backed, learned, and research-only lanes are machine-legible
+- article-parity language is tied to acceptance artifacts rather than audits or
+  issue comments alone
+
+### Issues
+
+| ID | Status | Work |
+| --- | --- | --- |
+| `PTAS-001` | implemented | Write the lane-specific Tassadar roadmap. This document closes that issue. |
+| `PTAS-002` | planned | Freeze the Tassadar claim vocabulary: `compiled_exact`, `compiled_article_class`, `learned_bounded`, `learned_article_class`, and `research_only`. |
+| `PTAS-003` | planned | Add a machine-readable Tassadar acceptance report and repo-owned checker that gates article-parity claims. |
+| `PTAS-004` | planned | Add one compact roadmap-to-artifact index tying each Tassadar phase to canonical fixture roots, audits, and validation commands. |
+
+## Epic 1: Wasm Substrate Closure
+
+### Goal
+
+Close the runtime, profile, compile, and artifact gaps between today's bounded
+executor substrate and the article-shaped "compile low-level programs and run
+them internally" target.
+
+### Exit Criteria
+
+- a canonical compile pipeline from source program to Wasm artifact exists
+- the active Wasm profiles cover the article-class instruction and memory
+  surface honestly
+- long-trace workloads have benchmark packages and fixture suites that do not
+  rely only on 4x4 proxies
+- program compatibility and refusal reports stay explicit as coverage widens
+
+### Issues
+
+| ID | Status | Work |
+| --- | --- | --- |
+| `PTAS-101` | partial | Widen the Wasm profile set from today's bounded Sudoku and Hungarian profiles to an article-shaped executor profile with explicit instruction-coverage reporting. |
+| `PTAS-102` | planned | Add a canonical C/C++ to Wasm compile receipt path, including toolchain identity, source digest, output digest, and compile refusal reasons. |
+| `PTAS-103` | partial | Extend benchmark and fixture coverage to branch-heavy, memory-heavy, and million-step kernel families rather than only the current bounded corpora. |
+| `PTAS-104` | planned | Add a trace ABI/versioning decision for long-horizon execution that keeps readable logs, token traces, and proof-bearing machine truth aligned. |
+| `PTAS-105` | planned | Add one article-class workload matrix that records which workload families are exact, fallback-only, or refused under each executor/runtime mode. |
+
+## Epic 2: Fast Decode Closure
+
+### Goal
+
+Make the fast path honest on the workload classes it claims, with scaling
+artifacts that justify the "log-time retrieval beats full prefix scans" story.
+
+### Exit Criteria
+
+- exact fast-path parity is demonstrated on the workload class claimed
+- fallback and refusal boundaries are explicit on workloads outside that class
+- throughput, CPU-gap, and trace-length scaling are published together
+- hull-based, sparse, and any successor decode paths are compared under the
+  same artifact contract
+
+### Issues
+
+| ID | Status | Work |
+| --- | --- | --- |
+| `PTAS-201` | partial | Widen exact `HullCache` closure beyond today's bounded subset without silently erasing backward-branch or memory-shaped refusal truth. |
+| `PTAS-202` | partial | Turn current sparse-top-k support into a full article-path comparison family with exactness, speedup, and fallback reporting over the same long-trace workloads. |
+| `PTAS-203` | planned | Add trace-length scaling reports that show linear-scan, hull, sparse, and any successor runtime on identical long-trace workloads. |
+| `PTAS-204` | planned | Add a million-step decode benchmark bundle with exactness, proof, throughput, memory-growth, and CPU-gap receipts. |
+| `PTAS-205` | planned | Evaluate whether slightly richer geometric fast paths, such as 3D or hierarchical hull variants, materially widen the exact workload class without abandoning truthful refusal posture. |
+
+## Epic 3: Compiled/Proof-Backed Article Closure
+
+### Goal
+
+Reach article-class exact in-model compute through the compiled/proof-backed
+lane first, because that is the strongest current path in this repo.
+
+### Exit Criteria
+
+- exact compiled/proof-backed 9x9 Sudoku lane exists
+- exact compiled/proof-backed 10x10 Hungarian-class lane exists
+- generic branch-heavy and memory-heavy kernel suites exist with proof-bearing
+  exactness and refusal reports
+- compiled article-class workloads are benchmarked through the same executor
+  runtime and artifact surfaces as the bounded lanes
+
+### Issues
+
+| ID | Status | Work |
+| --- | --- | --- |
+| `PTAS-301` | partial | Widen the compiled/proof-backed lane from today's matched 4x4 corpora to article-class Sudoku and matching workloads. |
+| `PTAS-302` | planned | Land an exact compiled/proof-backed 9x9 Sudoku bundle with readable-log, token-trace, proof, and throughput artifacts. |
+| `PTAS-303` | planned | Land an exact compiled/proof-backed 10x10 Hungarian-class bundle with benchmark-package, proof, and throughput artifacts. |
+| `PTAS-304` | planned | Add a generic compiled kernel suite covering arithmetic, memory, branch, and loop-heavy programs with exactness-vs-trace-length reporting. |
+| `PTAS-305` | planned | Add one compiled article-closure checker that only turns green when the bounded 4x4 proxies are no longer the strongest exact compiled result in-tree. |
+
+## Epic 4: Learned Executor Substrate Redesign
+
+### Goal
+
+Redesign the learned lane around what the research memo actually recommends:
+more structure, better long-trace architectures, and clearer separation from
+compiled-lane truth.
+
+### Exit Criteria
+
+- learned targets include more than next token
+- recurrent/windowed and parallel-trace candidates exist beside flat-prefix
+  next-token models
+- architecture families are compared under the same dataset and artifact
+  contract
+- later-window evaluation exists so long-trace claims do not over-read early
+  prefix wins
+
+### Issues
+
+| ID | Status | Work |
+| --- | --- | --- |
+| `PTAS-401` | partial | Widen learned supervision beyond next token to instruction pointer, stack delta, memory diff, branch outcome, and workload-specific state such as Hungarian dual variables. |
+| `PTAS-402` | planned | Add recurrent or windowed executor families that can carry long-horizon state without pretending a flat growing prefix is the only honest option. |
+| `PTAS-403` | planned | Add parallel or wavefront trace families for Sudoku and Hungarian-class workloads and compare them against sequential CPU-style traces. |
+| `PTAS-404` | planned | Add later-window and suffix-focused eval artifacts so learned long-trace progress is visible after the first bounded prefix. |
+| `PTAS-405` | planned | Compare hull-specialized learned architectures against trainable sparse, hybrid, and recurrent baselines under the same artifact contract. |
+
+## Epic 5: Learned Long-Trace Closure
+
+### Goal
+
+Either make the learned lane honestly article-class on long-horizon workloads
+or produce explicit artifact-backed evidence that it remains a bounded or
+research-only lane.
+
+### Exit Criteria
+
+- the current 9x9 learned fit blocker is removed honestly or replaced with a
+  better long-trace contract
+- learned 9x9 and Hungarian-class workloads have exactness-vs-length and fit
+  reports
+- million-step learned traces are either exact on a defined workload class or
+  explicitly refused as unsupported
+- article-grade learned claims only appear after acceptance artifacts exist
+
+### Issues
+
+| ID | Status | Work |
+| --- | --- | --- |
+| `PTAS-501` | partial | Remove the current learned 9x9 full-trace fit cliff without hiding it behind a bounded first-window metric. |
+| `PTAS-502` | planned | Land a truthful learned 9x9 promotion gate with later-window and full-trace exactness criteria, not only first-prefix scores. |
+| `PTAS-503` | planned | Land a learned Hungarian-class lane with explicit dual-state supervision and exactness-vs-trace-length reporting. |
+| `PTAS-504` | planned | Add a million-step learned trace benchmark family or an explicit learned refusal policy for workloads beyond the supported horizon. |
+| `PTAS-505` | planned | Add one learned article-closure audit that says either "exact article-class learned executor exists" or "the learned lane remains bounded" with no middle-ground marketing language. |
+
+## Epic 6: Compile-To-Weights And Hybrid Systems
+
+### Goal
+
+Widen today's bounded program-specialized compiled executor artifacts into a
+broader program-to-weights and hybrid execution system without collapsing the
+compiled, learned, and planner-owned layers into one vague claim.
+
+### Exit Criteria
+
+- program-specialized weight deployments extend beyond the current matched
+  corpora
+- compile-to-weights truth stays bound to source program, compile evidence, and
+  runtime contract
+- planner and serving routes can invoke the executor lane for article-class
+  compute while preserving evidence and refusal truth
+- any hybrid article demos are reproducible from repo-owned artifacts
+
+### Issues
+
+| ID | Status | Work |
+| --- | --- | --- |
+| `PTAS-601` | partial | Widen the current program-specialized compiled-weight lane beyond today's bounded Sudoku and Hungarian corpora. |
+| `PTAS-602` | planned | Add a generalized program-to-weights benchmark suite that compares direct tokenized execution against compiled-weight deployment on the same Wasm workloads. |
+| `PTAS-603` | planned | Add a served article-workload executor session surface that emits readable-log, token-trace, proof, and benchmark identities without pretending to be ordinary tool use. |
+| `PTAS-604` | planned | Add planner-owned hybrid workflows where larger reasoning systems route exact compute spans into Tassadar while preserving routing, proof, and refusal truth. |
+| `PTAS-605` | planned | Add one final article-parity closeout audit that only turns green when the repo can reproduce article-class Wasm compute claims from local artifacts and commands. |
+
+## Closing Rule
+
+This roadmap only closes honestly when the repo can say all three of the
+following with artifacts:
+
+- compiled/proof-backed article-class Wasm compute exists inside the Psionic
+  executor lane
+- the fast decode path is honest about its exact workload class and scaling
+- learned-lane claims, if any, are separately justified rather than borrowed
+  from the compiled lane
+
+Before that point, the repo should keep using narrower language:
+
+- bounded compiled/proof-backed lane
+- bounded learned lane
+- research-only long-trace candidate
+- partial article-shape substrate
