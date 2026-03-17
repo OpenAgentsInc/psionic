@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "bundle_root_ref": "fixtures/tassadar/runs/million_step_loop_benchmark_v0",
+  "workload_family_id": "million_step_backward_branch_loop",
+  "wasm_profile_id": "tassadar.wasm.sudoku_9x9_search.v1",
+  "trace_abi_id": "tassadar.trace.v1",
+  "trace_abi_version": 1,
+  "iteration_count": 131071,
+  "expected_step_count": 1048575,
+  "cpu_reference_summary": {
+    "program_id": "tassadar.million_step_backward_branch_loop.v1",
+    "profile_id": "tassadar.wasm.sudoku_9x9_search.v1",
+    "runner_id": "tassadar.cpu_reference.v1",
+    "trace_abi_id": "tassadar.trace.v1",
+    "trace_abi_version": 1,
+    "trace_digest": "aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+    "behavior_digest": "47f933a41857826c67b0b5651cc1cdfe6d2d833e30ab2b29423ceb0b02785805",
+    "step_count": 1048575,
+    "serialized_trace_bytes": 236174842,
+    "outputs": [
+      0
+    ],
+    "final_locals": [
+      0
+    ],
+    "final_memory": [],
+    "final_stack": [],
+    "halt_reason": "returned"
+  },
+  "cpu_reference_steps_per_second": 1038460.2517633894,
+  "exactness_bps": 10000,
+  "memory_growth_metric": "serialized_trace_step_stream_bytes",
+  "memory_growth_bytes": 236174842,
+  "runtime_manifest_identity_digest": "bf26dc6f39e0bac486b588487860fca27918f639f4e054b2acc6fd3f6a75d27d",
+  "reference_linear": {
+    "requested_decode_mode": "reference_linear",
+    "selection_state": "direct",
+    "effective_decode_mode": "reference_linear",
+    "measurement_posture": "measured",
+    "steps_per_second": 1038460.2517633894,
+    "remaining_gap_vs_cpu_reference": 0.0,
+    "note": "reference-linear is the measured CPU-reference mode for this million-step bundle, so its throughput and zero remaining CPU gap are recorded directly"
+  },
+  "hull_cache": {
+    "requested_decode_mode": "hull_cache",
+    "selection_state": "fallback",
+    "selection_reason": "hull_cache_control_flow_unsupported",
+    "effective_decode_mode": "reference_linear",
+    "measurement_posture": "selection_only",
+    "note": "HullCache remains outside the validated backward-branch subset at the million-step horizon, so this bundle records explicit fallback truth rather than pretending direct fast-path closure"
+  },
+  "sparse_top_k": {
+    "requested_decode_mode": "sparse_top_k",
+    "selection_state": "fallback",
+    "selection_reason": "sparse_top_k_validation_unsupported",
+    "effective_decode_mode": "reference_linear",
+    "measurement_posture": "selection_only",
+    "note": "SparseTopK remains outside the validated backward-branch subset at the million-step horizon, so this bundle records explicit fallback truth rather than claiming direct support"
+  },
+  "runtime_capability": {
+    "runtime_backend": "cpu",
+    "supports_executor_trace": true,
+    "supports_hull_decode": true,
+    "supports_sparse_top_k_decode": true,
+    "supported_wasm_profiles": [
+      "tassadar.wasm.core_i32.v1",
+      "tassadar.wasm.core_i32.v2",
+      "tassadar.wasm.article_i32_compute.v1",
+      "tassadar.wasm.sudoku_v0_search.v1",
+      "tassadar.wasm.hungarian_v0_matching.v1",
+      "tassadar.wasm.sudoku_9x9_search.v1"
+    ],
+    "supported_attention_modes": [
+      "reference_linear",
+      "hard_max_hull",
+      "sparse_top_k_validated"
+    ],
+    "validated_trace_abi_versions": [
+      1
+    ],
+    "supported_decode_modes": [
+      "reference_linear",
+      "hull_cache",
+      "sparse_top_k"
+    ],
+    "default_decode_mode": "reference_linear",
+    "exact_fallback_decode_mode": "reference_linear"
+  },
+  "evidence_bundle": {
+    "runtime_manifest": {
+      "schema_version": 1,
+      "manifest_id": "tassadar-runtime-summary-manifest-tassadar-million-step-decode-benchmark-v0",
+      "runtime_identity": {
+        "runtime_backend": "cpu",
+        "backend_toolchain": {
+          "effective_backend": "cpu",
+          "toolchain_version": "tassadar.cpu_reference.v1",
+          "compiled_backend_features": [
+            "tassadar_executor_summary",
+            "tassadar.wasm.sudoku_9x9_search.v1"
+          ],
+          "probe_state": "compiled_only"
+        }
+      },
+      "validation": {
+        "matrix_id": "psionic.minimum_hardware_validation.v1",
+        "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+        "claim_id": "tassadar.executor_trace.phase4",
+        "coverage": "not_yet_validated"
+      },
+      "environment_refs": [
+        "env.openagents.tassadar.million_step_decode_benchmark"
+      ],
+      "artifact_bindings": [
+        {
+          "kind": "model_descriptor",
+          "reference": "model://tassadar/tassadar.cpu_reference.v1/tassadar.wasm.sudoku_9x9_search.v1",
+          "digest": "bd8d152eca9b625ba8b782e931d18c54dabb2663f720489b8ac9b60ea46bc61c"
+        },
+        {
+          "kind": "program_artifact",
+          "reference": "tassadar://artifact/million_step_loop_benchmark/program",
+          "digest": "92d60d068f6b1d370ba4b90ef2411d10a41d4311397c7bb2ea000baa1522910f"
+        },
+        {
+          "kind": "execution_trace",
+          "reference": "tassadar://trace_summary/tassadar-million-step-decode-benchmark-v0/aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+          "digest": "8a3f44759ef81c5de85f9e01dc49e7d66c1d610921d93470aa3f8f25405b0614"
+        }
+      ],
+      "static_config_bindings": [
+        {
+          "key": "tassadar.compile_toolchain_digest",
+          "value_digest": "ff62b5a698c05ed87dceeb0f3d6dcf78f7a6d5779e4c7da56246a71a9e10a61d"
+        },
+        {
+          "key": "tassadar.program_digest",
+          "value_digest": "eaeb008db9b49af1e32e36f84db58fe5acdf20b866bba633c94be29f8c33f21e"
+        },
+        {
+          "key": "tassadar.reference_runner",
+          "value_digest": "d4caeaa3e034d32fd31c0a7864e5fd208d8758a3c3747057d9e4c91717bb922c"
+        },
+        {
+          "key": "tassadar.source_program_digest",
+          "value_digest": "4d9d82cbc842cbb76937076243d37cf4bfd39b10c908b170a1d6fc910ad3326e"
+        }
+      ],
+      "claims_profile_id": "tassadar.executor_trace.proof.v1",
+      "identity_digest": "bf26dc6f39e0bac486b588487860fca27918f639f4e054b2acc6fd3f6a75d27d",
+      "manifest_digest": "b9e14d9e0031c92a9e2ff4ac281ab0791fec3f680eeea686cd96e0ae64312003"
+    },
+    "trace_summary_artifact": {
+      "schema_version": 1,
+      "artifact_id": "tassadar://trace_summary/tassadar-million-step-decode-benchmark-v0/aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+      "artifact_digest": "8a3f44759ef81c5de85f9e01dc49e7d66c1d610921d93470aa3f8f25405b0614",
+      "program_id": "tassadar.million_step_backward_branch_loop.v1",
+      "runner_id": "tassadar.cpu_reference.v1",
+      "trace_abi_id": "tassadar.trace.v1",
+      "trace_abi_version": 1,
+      "trace_digest": "aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+      "behavior_digest": "47f933a41857826c67b0b5651cc1cdfe6d2d833e30ab2b29423ceb0b02785805",
+      "step_count": 1048575,
+      "serialized_trace_bytes": 236174842,
+      "outputs": [
+        0
+      ],
+      "final_locals": [
+        0
+      ],
+      "final_memory": [],
+      "final_stack": [],
+      "halt_reason": "returned"
+    },
+    "trace_summary_proof": {
+      "proof_receipt_id": "tassadar://trace_summary_proof/tassadar-million-step-decode-benchmark-v0/aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+      "proof_receipt_digest": "89e2943d007321d7c6cf0a1a57a6b3ecd0577dc6ff74e15b4e654a0cf836621c",
+      "trace_artifact_ref": "tassadar://trace_summary/tassadar-million-step-decode-benchmark-v0/aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+      "trace_artifact_digest": "8a3f44759ef81c5de85f9e01dc49e7d66c1d610921d93470aa3f8f25405b0614",
+      "trace_digest": "aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+      "program_digest": "eaeb008db9b49af1e32e36f84db58fe5acdf20b866bba633c94be29f8c33f21e",
+      "program_artifact_digest": "92d60d068f6b1d370ba4b90ef2411d10a41d4311397c7bb2ea000baa1522910f",
+      "wasm_profile_id": "tassadar.wasm.sudoku_9x9_search.v1",
+      "runtime_backend": "cpu",
+      "runner_id": "tassadar.cpu_reference.v1",
+      "validation": {
+        "matrix_id": "psionic.minimum_hardware_validation.v1",
+        "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+        "claim_id": "tassadar.executor_trace.phase4",
+        "coverage": "not_yet_validated"
+      },
+      "runtime_manifest_identity_digest": "bf26dc6f39e0bac486b588487860fca27918f639f4e054b2acc6fd3f6a75d27d",
+      "runtime_manifest_digest": "b9e14d9e0031c92a9e2ff4ac281ab0791fec3f680eeea686cd96e0ae64312003"
+    },
+    "proof_bundle": {
+      "schema_version": 1,
+      "bundle_kind": "local",
+      "status": "succeeded",
+      "request_id": "tassadar-million-step-decode-benchmark-v0",
+      "request_digest": "48b0b3f1a9cdc04fff6f1165e7cb2d4e6692174457f0fee62f414103cfc8ac14",
+      "product_id": "psionic.tassadar.million_step_decode_benchmark.v1",
+      "model_id": "model://tassadar/tassadar.cpu_reference.v1/tassadar.wasm.sudoku_9x9_search.v1",
+      "runtime_identity": {
+        "runtime_backend": "cpu",
+        "backend_toolchain": {
+          "effective_backend": "cpu",
+          "toolchain_version": "tassadar.cpu_reference.v1",
+          "compiled_backend_features": [
+            "tassadar_executor_summary",
+            "tassadar.wasm.sudoku_9x9_search.v1"
+          ],
+          "probe_state": "compiled_only"
+        }
+      },
+      "validation": {
+        "matrix_id": "psionic.minimum_hardware_validation.v1",
+        "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+        "claim_id": "tassadar.executor_trace.phase4",
+        "coverage": "not_yet_validated"
+      },
+      "artifact_residency": {
+        "weight_bundle_digest": "bd8d152eca9b625ba8b782e931d18c54dabb2663f720489b8ac9b60ea46bc61c",
+        "input_artifact_digests": [
+          "92d60d068f6b1d370ba4b90ef2411d10a41d4311397c7bb2ea000baa1522910f"
+        ],
+        "output_artifact_digests": [
+          "8a3f44759ef81c5de85f9e01dc49e7d66c1d610921d93470aa3f8f25405b0614",
+          "89e2943d007321d7c6cf0a1a57a6b3ecd0577dc6ff74e15b4e654a0cf836621c"
+        ]
+      },
+      "activation_fingerprint_posture": "unavailable"
+    }
+  },
+  "claim_boundary": "this bundle proves one Psionic-owned million-step reference-linear CPU execution with compact trace/proof lineage, explicit memory-growth and runtime-identity receipts, and explicit decode-selection truth for the other request paths; it does not claim direct HullCache or SparseTopK million-step closure",
+  "bundle_digest": "87cf729bf58aae766926f217d28394867d1bcc35db07eeef45d8137bd0c99408"
+}

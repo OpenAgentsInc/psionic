@@ -208,6 +208,13 @@ The current scope is:
   shared synthetic trace-length families while recording trace-artifact growth
   and direct-vs-fallback posture so the fast-path scaling story is tied to
   exactness and compatibility truth instead of a single throughput screenshot
+- landed Phase 8D bar: one million-step decode benchmark bundle now exists in
+  `psionic-runtime` at
+  `fixtures/tassadar/runs/million_step_loop_benchmark_v0/benchmark_bundle.json`,
+  proving one reproducible 1,048,575-step reference-linear CPU execution with
+  compact trace-summary proof lineage, runtime-manifest identity, and explicit
+  serialized trace-byte growth receipts, while keeping HullCache and
+  SparseTopK explicit as fallback-only at that horizon
 - landed trained-executor Phase 1 follow-on bar: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile now exists with a real 4x4
   backtracking Sudoku program representation on the CPU reference lane, while

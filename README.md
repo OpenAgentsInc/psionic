@@ -134,6 +134,13 @@ Current posture:
   trace-artifact growth, throughput, CPU-gap, and direct-vs-fallback posture
   across shared linear, branch-heavy, and long-loop synthetic families instead
   of relying on one headline fast-path number
+- its Phase 8D million-step decode benchmark bundle now also exists in
+  `psionic-runtime`, with the committed bundle at
+  `fixtures/tassadar/runs/million_step_loop_benchmark_v0/benchmark_bundle.json`
+  that proves one reproducible 1,048,575-step reference-linear execution under
+  the Psionic-owned executor path, including exactness, proof lineage,
+  runtime-manifest identity, and serialized trace-byte growth receipts while
+  keeping HullCache and SparseTopK explicit as fallback-only at that horizon
 - the first trained-executor follow-on bar now also exists in
   `psionic-runtime` and `psionic-models`: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile plus a real 4x4 backtracking

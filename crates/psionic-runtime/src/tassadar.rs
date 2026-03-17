@@ -867,10 +867,19 @@ pub const TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF: &str =
     "fixtures/tassadar/runs/long_loop_kernel_trace_abi_v0";
 /// Canonical file name for the long-horizon execution evidence bundle.
 pub const TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE: &str = "execution_evidence_bundle.json";
+/// Canonical fixture root for the million-step decode benchmark bundle.
+pub const TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF: &str =
+    "fixtures/tassadar/runs/million_step_loop_benchmark_v0";
+/// Canonical file name for the million-step decode benchmark bundle.
+pub const TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE: &str = "benchmark_bundle.json";
 /// Current schema version for the trace-ABI decision report.
 pub const TASSADAR_TRACE_ABI_DECISION_SCHEMA_VERSION: u16 = 1;
+/// Current schema version for the million-step decode benchmark bundle.
+pub const TASSADAR_MILLION_STEP_BENCHMARK_SCHEMA_VERSION: u16 = 1;
 
 const TASSADAR_LONG_HORIZON_TRACE_CASE_ID: &str = "long_loop_kernel";
+const TASSADAR_MILLION_STEP_LOOP_ITERATION_COUNT: i32 = 131_071;
+const TASSADAR_MILLION_STEP_LOOP_EXPECTED_STEPS: u64 = 1_048_575;
 
 /// One coverage row for one supported Tassadar Wasm profile.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1152,6 +1161,203 @@ impl TassadarTraceAbiDecisionReport {
     }
 }
 
+/// Measured vs selection-only posture for one million-step decode-mode receipt.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarMillionStepMeasurementPosture {
+    /// Throughput was measured directly at the declared million-step horizon.
+    Measured,
+    /// Only compatibility and selection truth were recorded at this horizon.
+    SelectionOnly,
+}
+
+/// Compact execution summary for very long-horizon Tassadar runs.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutionSummary {
+    /// Stable program identifier.
+    pub program_id: String,
+    /// Stable profile identifier.
+    pub profile_id: String,
+    /// Stable runner identifier.
+    pub runner_id: String,
+    /// Stable trace ABI identifier.
+    pub trace_abi_id: String,
+    /// Stable trace ABI version.
+    pub trace_abi_version: u16,
+    /// Stable trace digest over the append-only step stream.
+    pub trace_digest: String,
+    /// Stable digest over trace plus terminal state.
+    pub behavior_digest: String,
+    /// Number of executed steps.
+    pub step_count: u64,
+    /// Exact serialized byte count for the append-only step stream.
+    pub serialized_trace_bytes: u64,
+    /// Final emitted outputs.
+    pub outputs: Vec<i32>,
+    /// Final locals snapshot.
+    pub final_locals: Vec<i32>,
+    /// Final memory snapshot.
+    pub final_memory: Vec<i32>,
+    /// Final stack snapshot.
+    pub final_stack: Vec<i32>,
+    /// Terminal halt reason.
+    pub halt_reason: TassadarHaltReason,
+}
+
+/// Compact trace artifact for very long-horizon runs where persisting every
+/// step would be impractical.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarTraceSummaryArtifact {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable artifact identifier.
+    pub artifact_id: String,
+    /// Stable digest over the summary artifact.
+    pub artifact_digest: String,
+    /// Stable program identifier.
+    pub program_id: String,
+    /// Stable runner identifier.
+    pub runner_id: String,
+    /// Stable trace ABI identifier.
+    pub trace_abi_id: String,
+    /// Stable trace ABI version.
+    pub trace_abi_version: u16,
+    /// Stable trace digest over the append-only step stream.
+    pub trace_digest: String,
+    /// Stable behavior digest.
+    pub behavior_digest: String,
+    /// Number of executed steps.
+    pub step_count: u64,
+    /// Exact serialized byte count for the append-only step stream.
+    pub serialized_trace_bytes: u64,
+    /// Final outputs carried by the summary artifact.
+    pub outputs: Vec<i32>,
+    /// Final locals snapshot.
+    pub final_locals: Vec<i32>,
+    /// Final memory snapshot.
+    pub final_memory: Vec<i32>,
+    /// Final stack snapshot.
+    pub final_stack: Vec<i32>,
+    /// Terminal halt reason.
+    pub halt_reason: TassadarHaltReason,
+}
+
+/// Summary-form evidence bundle for very long-horizon executions.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutionSummaryEvidenceBundle {
+    /// Digest-bound runtime manifest for the execution lane.
+    pub runtime_manifest: RuntimeManifest,
+    /// Compact trace summary artifact.
+    pub trace_summary_artifact: TassadarTraceSummaryArtifact,
+    /// Proof-bearing trace summary receipt.
+    pub trace_summary_proof: TassadarTraceSummaryProofReceipt,
+    /// Canonical Psionic proof bundle carrying the execution identity.
+    pub proof_bundle: ExecutionProofBundle,
+}
+
+/// Proof-bearing receipt for a compact trace summary artifact.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarTraceSummaryProofReceipt {
+    /// Stable proof receipt identifier.
+    pub proof_receipt_id: String,
+    /// Stable digest over the proof receipt.
+    pub proof_receipt_digest: String,
+    /// Stable trace-summary-artifact reference.
+    pub trace_artifact_ref: String,
+    /// Stable trace-summary-artifact digest.
+    pub trace_artifact_digest: String,
+    /// Stable trace digest.
+    pub trace_digest: String,
+    /// Stable validated-program digest.
+    pub program_digest: String,
+    /// Stable program-artifact digest.
+    pub program_artifact_digest: String,
+    /// Stable Wasm profile identifier.
+    pub wasm_profile_id: String,
+    /// Runtime backend that realized the trace.
+    pub runtime_backend: String,
+    /// Stable runner identifier.
+    pub runner_id: String,
+    /// Validation reference carried with the receipt.
+    pub validation: ValidationMatrixReference,
+    /// Stable runtime-manifest identity digest.
+    pub runtime_manifest_identity_digest: String,
+    /// Stable runtime-manifest digest.
+    pub runtime_manifest_digest: String,
+}
+
+/// One requested decode-mode receipt in the million-step benchmark bundle.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TassadarMillionStepDecodeModeReceipt {
+    /// Requested decode mode.
+    pub requested_decode_mode: TassadarExecutorDecodeMode,
+    /// Direct/fallback/refused selection state at the million-step horizon.
+    pub selection_state: TassadarExecutorSelectionState,
+    /// Stable reason for fallback or refusal when one existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_reason: Option<TassadarExecutorSelectionReason>,
+    /// Effective decode mode after selection when execution remains allowed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective_decode_mode: Option<TassadarExecutorDecodeMode>,
+    /// Whether throughput was directly measured or only selection truth was recorded.
+    pub measurement_posture: TassadarMillionStepMeasurementPosture,
+    /// Direct throughput receipt when measurement occurred.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steps_per_second: Option<f64>,
+    /// Remaining CPU gap ratio when measurement occurred.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remaining_gap_vs_cpu_reference: Option<f64>,
+    /// Plain-language note for the receipt.
+    pub note: String,
+}
+
+/// Machine-readable million-step decode benchmark bundle.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TassadarMillionStepDecodeBenchmarkBundle {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Canonical bundle root.
+    pub bundle_root_ref: String,
+    /// Stable workload-family identifier.
+    pub workload_family_id: String,
+    /// Stable profile identifier used for the benchmark family.
+    pub wasm_profile_id: String,
+    /// Stable trace ABI identifier.
+    pub trace_abi_id: String,
+    /// Stable trace ABI version.
+    pub trace_abi_version: u16,
+    /// Loop iteration count used to cross one million steps.
+    pub iteration_count: u64,
+    /// Expected exact step count for the benchmark family.
+    pub expected_step_count: u64,
+    /// Exact summary from the measured CPU-reference execution.
+    pub cpu_reference_summary: TassadarExecutionSummary,
+    /// Direct CPU-reference throughput at the million-step horizon.
+    pub cpu_reference_steps_per_second: f64,
+    /// Whether the CPU-reference summary cleared the declared exactness bar.
+    pub exactness_bps: u32,
+    /// Stable memory-growth metric identifier carried by the bundle.
+    pub memory_growth_metric: String,
+    /// Exact summary-form byte growth for the realized append-only trace.
+    pub memory_growth_bytes: u64,
+    /// Stable runtime-manifest identity digest for the measured execution mode.
+    pub runtime_manifest_identity_digest: String,
+    /// Requested reference-linear receipt.
+    pub reference_linear: TassadarMillionStepDecodeModeReceipt,
+    /// Requested HullCache receipt.
+    pub hull_cache: TassadarMillionStepDecodeModeReceipt,
+    /// Requested SparseTopK receipt.
+    pub sparse_top_k: TassadarMillionStepDecodeModeReceipt,
+    /// Runtime capability report anchoring the benchmark bundle.
+    pub runtime_capability: TassadarRuntimeCapabilityReport,
+    /// Proof-bearing execution lineage for the measured CPU-reference run.
+    pub evidence_bundle: TassadarExecutionSummaryEvidenceBundle,
+    /// Plain-language boundary statement for the current bundle.
+    pub claim_boundary: String,
+    /// Stable digest over the full bundle.
+    pub bundle_digest: String,
+}
+
 /// Errors while building or writing the long-horizon trace-ABI artifacts.
 #[derive(Debug, Error)]
 pub enum TassadarTraceAbiArtifactError {
@@ -1166,6 +1372,23 @@ pub enum TassadarTraceAbiArtifactError {
         "canonical long-horizon fixture `{case_id}` diverged from preserved CPU-reference truth"
     )]
     FixtureMismatch { case_id: String },
+    /// Program-artifact projection failed.
+    #[error(transparent)]
+    ProgramArtifact(#[from] TassadarProgramArtifactError),
+    /// Execution failed.
+    #[error(transparent)]
+    Execution(#[from] TassadarExecutionRefusal),
+    /// JSON serialization failed.
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    /// Artifact persistence failed.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+
+/// Errors while building or writing the million-step decode benchmark bundle.
+#[derive(Debug, Error)]
+pub enum TassadarMillionStepBenchmarkError {
     /// Program-artifact projection failed.
     #[error(transparent)]
     ProgramArtifact(#[from] TassadarProgramArtifactError),
@@ -1224,6 +1447,243 @@ pub fn tassadar_long_horizon_trace_fixture_root_path() -> std::path::PathBuf {
 pub fn tassadar_long_horizon_trace_evidence_bundle_path() -> std::path::PathBuf {
     tassadar_long_horizon_trace_fixture_root_path()
         .join(TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE)
+}
+
+/// Returns the canonical absolute path for the million-step benchmark root.
+#[must_use]
+pub fn tassadar_million_step_benchmark_root_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF)
+}
+
+/// Returns the canonical absolute path for the million-step benchmark bundle.
+#[must_use]
+pub fn tassadar_million_step_benchmark_bundle_path() -> std::path::PathBuf {
+    tassadar_million_step_benchmark_root_path().join(TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE)
+}
+
+fn tassadar_million_step_loop_program() -> TassadarProgram {
+    let profile = TassadarWasmProfile::sudoku_9x9_search_v1();
+    TassadarProgram::new(
+        "tassadar.million_step_backward_branch_loop.v1",
+        &profile,
+        1,
+        0,
+        vec![
+            TassadarInstruction::I32Const {
+                value: TASSADAR_MILLION_STEP_LOOP_ITERATION_COUNT,
+            },
+            TassadarInstruction::LocalSet { local: 0 },
+            TassadarInstruction::LocalGet { local: 0 },
+            TassadarInstruction::BrIf { target_pc: 7 },
+            TassadarInstruction::I32Const { value: 0 },
+            TassadarInstruction::Output,
+            TassadarInstruction::Return,
+            TassadarInstruction::LocalGet { local: 0 },
+            TassadarInstruction::I32Const { value: 1 },
+            TassadarInstruction::I32Sub,
+            TassadarInstruction::LocalSet { local: 0 },
+            TassadarInstruction::I32Const { value: 1 },
+            TassadarInstruction::BrIf { target_pc: 2 },
+        ],
+    )
+}
+
+fn benchmark_summary_steps_per_second<F>(
+    steps_per_run: u64,
+    mut runner: F,
+) -> Result<f64, TassadarMillionStepBenchmarkError>
+where
+    F: FnMut() -> Result<TassadarExecutionSummary, TassadarExecutionRefusal>,
+{
+    let normalized_steps = steps_per_run.max(1);
+    let target_steps = normalized_steps.saturating_mul(2);
+    let started = std::time::Instant::now();
+    let mut total_steps = 0u64;
+
+    loop {
+        runner()?;
+        total_steps = total_steps.saturating_add(normalized_steps);
+        let elapsed = started.elapsed().as_secs_f64();
+        if total_steps >= target_steps || elapsed >= 0.020 {
+            return Ok(total_steps as f64 / elapsed.max(1e-9));
+        }
+    }
+}
+
+/// Builds the canonical million-step decode benchmark bundle.
+pub fn build_tassadar_million_step_decode_benchmark_bundle(
+) -> Result<TassadarMillionStepDecodeBenchmarkBundle, TassadarMillionStepBenchmarkError> {
+    let profile = TassadarWasmProfile::sudoku_9x9_search_v1();
+    let trace_abi = TassadarTraceAbi::sudoku_9x9_search_v1();
+    let program = tassadar_million_step_loop_program();
+    let program_artifact = TassadarProgramArtifact::fixture_reference(
+        "tassadar://artifact/million_step_loop_benchmark/program",
+        &profile,
+        &trace_abi,
+        program.clone(),
+    )?;
+    let cpu_reference_summary = execute_program_direct_summary(
+        &program,
+        &profile,
+        &trace_abi,
+        TASSADAR_CPU_REFERENCE_RUNNER_ID,
+    )?;
+    let cpu_reference_steps_per_second =
+        benchmark_summary_steps_per_second(cpu_reference_summary.step_count, || {
+            execute_program_direct_summary(
+                &program,
+                &profile,
+                &trace_abi,
+                TASSADAR_CPU_REFERENCE_RUNNER_ID,
+            )
+        })?;
+    let exactness_bps = u32::from(
+        cpu_reference_summary.step_count == TASSADAR_MILLION_STEP_LOOP_EXPECTED_STEPS
+            && cpu_reference_summary.outputs == vec![0]
+            && cpu_reference_summary.halt_reason == TassadarHaltReason::Returned,
+    ) * 10_000;
+    let memory_growth_bytes = cpu_reference_summary.serialized_trace_bytes;
+
+    let reference_linear_selection = diagnose_tassadar_executor_request(
+        &program,
+        TassadarExecutorDecodeMode::ReferenceLinear,
+        trace_abi.schema_version,
+        Some(&[
+            TassadarExecutorDecodeMode::ReferenceLinear,
+            TassadarExecutorDecodeMode::HullCache,
+            TassadarExecutorDecodeMode::SparseTopK,
+        ]),
+    );
+    let hull_cache_selection = diagnose_tassadar_executor_request(
+        &program,
+        TassadarExecutorDecodeMode::HullCache,
+        trace_abi.schema_version,
+        Some(&[
+            TassadarExecutorDecodeMode::ReferenceLinear,
+            TassadarExecutorDecodeMode::HullCache,
+            TassadarExecutorDecodeMode::SparseTopK,
+        ]),
+    );
+    let sparse_top_k_selection = diagnose_tassadar_executor_request(
+        &program,
+        TassadarExecutorDecodeMode::SparseTopK,
+        trace_abi.schema_version,
+        Some(&[
+            TassadarExecutorDecodeMode::ReferenceLinear,
+            TassadarExecutorDecodeMode::HullCache,
+            TassadarExecutorDecodeMode::SparseTopK,
+        ]),
+    );
+
+    let request_id = String::from("tassadar-million-step-decode-benchmark-v0");
+    let request_digest = stable_serialized_digest(
+        b"tassadar_million_step_benchmark_request|",
+        &(
+            program_artifact.validated_program_digest.as_str(),
+            cpu_reference_summary.trace_digest.as_str(),
+        ),
+    );
+    let model_descriptor_digest = stable_serialized_digest(
+        b"tassadar_million_step_benchmark_model|",
+        &(
+            TASSADAR_CPU_REFERENCE_RUNNER_ID,
+            profile.profile_id.as_str(),
+            trace_abi.abi_id.as_str(),
+            trace_abi.schema_version,
+        ),
+    );
+    let evidence_bundle = build_tassadar_execution_summary_evidence_bundle(
+        request_id.clone(),
+        request_digest,
+        "psionic.tassadar.million_step_decode_benchmark.v1",
+        format!(
+            "model://tassadar/{}/{}",
+            TASSADAR_CPU_REFERENCE_RUNNER_ID, profile.profile_id
+        ),
+        model_descriptor_digest,
+        vec![String::from(
+            "env.openagents.tassadar.million_step_decode_benchmark",
+        )],
+        &program_artifact,
+        &cpu_reference_summary,
+    );
+
+    let mut bundle = TassadarMillionStepDecodeBenchmarkBundle {
+        schema_version: TASSADAR_MILLION_STEP_BENCHMARK_SCHEMA_VERSION,
+        bundle_root_ref: String::from(TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF),
+        workload_family_id: String::from("million_step_backward_branch_loop"),
+        wasm_profile_id: profile.profile_id.clone(),
+        trace_abi_id: trace_abi.abi_id.clone(),
+        trace_abi_version: trace_abi.schema_version,
+        iteration_count: TASSADAR_MILLION_STEP_LOOP_ITERATION_COUNT as u64,
+        expected_step_count: TASSADAR_MILLION_STEP_LOOP_EXPECTED_STEPS,
+        cpu_reference_summary,
+        cpu_reference_steps_per_second,
+        exactness_bps,
+        memory_growth_metric: String::from("serialized_trace_step_stream_bytes"),
+        memory_growth_bytes,
+        runtime_manifest_identity_digest: evidence_bundle.runtime_manifest.identity_digest.clone(),
+        reference_linear: TassadarMillionStepDecodeModeReceipt {
+            requested_decode_mode: TassadarExecutorDecodeMode::ReferenceLinear,
+            selection_state: reference_linear_selection.selection_state,
+            selection_reason: reference_linear_selection.selection_reason,
+            effective_decode_mode: reference_linear_selection.effective_decode_mode,
+            measurement_posture: TassadarMillionStepMeasurementPosture::Measured,
+            steps_per_second: Some(cpu_reference_steps_per_second),
+            remaining_gap_vs_cpu_reference: Some(0.0),
+            note: String::from(
+                "reference-linear is the measured CPU-reference mode for this million-step bundle, so its throughput and zero remaining CPU gap are recorded directly",
+            ),
+        },
+        hull_cache: TassadarMillionStepDecodeModeReceipt {
+            requested_decode_mode: TassadarExecutorDecodeMode::HullCache,
+            selection_state: hull_cache_selection.selection_state,
+            selection_reason: hull_cache_selection.selection_reason,
+            effective_decode_mode: hull_cache_selection.effective_decode_mode,
+            measurement_posture: TassadarMillionStepMeasurementPosture::SelectionOnly,
+            steps_per_second: None,
+            remaining_gap_vs_cpu_reference: None,
+            note: String::from(
+                "HullCache remains outside the validated backward-branch subset at the million-step horizon, so this bundle records explicit fallback truth rather than pretending direct fast-path closure",
+            ),
+        },
+        sparse_top_k: TassadarMillionStepDecodeModeReceipt {
+            requested_decode_mode: TassadarExecutorDecodeMode::SparseTopK,
+            selection_state: sparse_top_k_selection.selection_state,
+            selection_reason: sparse_top_k_selection.selection_reason,
+            effective_decode_mode: sparse_top_k_selection.effective_decode_mode,
+            measurement_posture: TassadarMillionStepMeasurementPosture::SelectionOnly,
+            steps_per_second: None,
+            remaining_gap_vs_cpu_reference: None,
+            note: String::from(
+                "SparseTopK remains outside the validated backward-branch subset at the million-step horizon, so this bundle records explicit fallback truth rather than claiming direct support",
+            ),
+        },
+        runtime_capability: tassadar_runtime_capability_report(),
+        evidence_bundle,
+        claim_boundary: String::from(
+            "this bundle proves one Psionic-owned million-step reference-linear CPU execution with compact trace/proof lineage, explicit memory-growth and runtime-identity receipts, and explicit decode-selection truth for the other request paths; it does not claim direct HullCache or SparseTopK million-step closure",
+        ),
+        bundle_digest: String::new(),
+    };
+    bundle.bundle_digest =
+        stable_serialized_digest(b"tassadar_million_step_decode_benchmark|", &bundle);
+    Ok(bundle)
+}
+
+/// Writes the canonical million-step decode benchmark bundle.
+pub fn write_tassadar_million_step_decode_benchmark_bundle(
+    root: impl AsRef<std::path::Path>,
+) -> Result<TassadarMillionStepDecodeBenchmarkBundle, TassadarMillionStepBenchmarkError> {
+    let root = root.as_ref();
+    std::fs::create_dir_all(root)?;
+    let bundle = build_tassadar_million_step_decode_benchmark_bundle()?;
+    let bundle_bytes = serde_json::to_vec_pretty(&bundle)?;
+    std::fs::write(
+        root.join(TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE),
+        bundle_bytes,
+    )?;
+    Ok(bundle)
 }
 
 fn canonical_long_horizon_trace_case(
@@ -3202,6 +3662,82 @@ impl TassadarExecution {
     }
 }
 
+fn stable_behavior_digest_from_parts(
+    program_id: &str,
+    profile_id: &str,
+    trace_digest: &str,
+    outputs: &[i32],
+    final_locals: &[i32],
+    final_memory: &[i32],
+    final_stack: &[i32],
+    halt_reason: TassadarHaltReason,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(program_id.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(profile_id.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(trace_digest.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(serde_json::to_vec(outputs).unwrap_or_default());
+    hasher.update(b"\n");
+    hasher.update(serde_json::to_vec(final_locals).unwrap_or_default());
+    hasher.update(b"\n");
+    hasher.update(serde_json::to_vec(final_memory).unwrap_or_default());
+    hasher.update(b"\n");
+    hasher.update(serde_json::to_vec(final_stack).unwrap_or_default());
+    hasher.update(b"\n");
+    hasher.update(format!("{:?}", halt_reason).as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+impl TassadarExecutionSummary {
+    fn new(
+        program_id: impl Into<String>,
+        profile_id: impl Into<String>,
+        runner_id: impl Into<String>,
+        trace_abi: &TassadarTraceAbi,
+        trace_digest: impl Into<String>,
+        step_count: u64,
+        serialized_trace_bytes: u64,
+        outputs: Vec<i32>,
+        final_locals: Vec<i32>,
+        final_memory: Vec<i32>,
+        final_stack: Vec<i32>,
+        halt_reason: TassadarHaltReason,
+    ) -> Self {
+        let program_id = program_id.into();
+        let profile_id = profile_id.into();
+        let trace_digest = trace_digest.into();
+        let behavior_digest = stable_behavior_digest_from_parts(
+            &program_id,
+            &profile_id,
+            &trace_digest,
+            outputs.as_slice(),
+            final_locals.as_slice(),
+            final_memory.as_slice(),
+            final_stack.as_slice(),
+            halt_reason,
+        );
+        Self {
+            program_id,
+            profile_id,
+            runner_id: runner_id.into(),
+            trace_abi_id: trace_abi.abi_id.clone(),
+            trace_abi_version: trace_abi.schema_version,
+            trace_digest,
+            behavior_digest,
+            step_count,
+            serialized_trace_bytes,
+            outputs,
+            final_locals,
+            final_memory,
+            final_stack,
+            halt_reason,
+        }
+    }
+}
+
 /// Emitted trace artifact for one realized Tassadar execution.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TassadarTraceArtifact {
@@ -3276,6 +3812,74 @@ impl TassadarTraceArtifact {
         hasher.update(self.step_count.to_be_bytes());
         hasher.update(b"\n");
         hasher.update(serde_json::to_vec(&self.steps).unwrap_or_default());
+        hex::encode(hasher.finalize())
+    }
+}
+
+impl TassadarTraceSummaryArtifact {
+    #[must_use]
+    pub fn from_execution_summary(
+        artifact_id: impl Into<String>,
+        execution: &TassadarExecutionSummary,
+    ) -> Self {
+        let mut artifact = Self {
+            schema_version: TASSADAR_TRACE_ARTIFACT_SCHEMA_VERSION,
+            artifact_id: artifact_id.into(),
+            artifact_digest: String::new(),
+            program_id: execution.program_id.clone(),
+            runner_id: execution.runner_id.clone(),
+            trace_abi_id: execution.trace_abi_id.clone(),
+            trace_abi_version: execution.trace_abi_version,
+            trace_digest: execution.trace_digest.clone(),
+            behavior_digest: execution.behavior_digest.clone(),
+            step_count: execution.step_count,
+            serialized_trace_bytes: execution.serialized_trace_bytes,
+            outputs: execution.outputs.clone(),
+            final_locals: execution.final_locals.clone(),
+            final_memory: execution.final_memory.clone(),
+            final_stack: execution.final_stack.clone(),
+            halt_reason: execution.halt_reason,
+        };
+        artifact.refresh_digest();
+        artifact
+    }
+
+    fn refresh_digest(&mut self) {
+        self.artifact_digest = self.compute_digest();
+    }
+
+    fn compute_digest(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"tassadar_trace_summary_artifact|");
+        hasher.update(self.schema_version.to_be_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.artifact_id.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.program_id.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.runner_id.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.trace_abi_id.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.trace_abi_version.to_be_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.trace_digest.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.behavior_digest.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.step_count.to_be_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.serialized_trace_bytes.to_be_bytes());
+        hasher.update(b"\n");
+        hasher.update(serde_json::to_vec(&self.outputs).unwrap_or_default());
+        hasher.update(b"\n");
+        hasher.update(serde_json::to_vec(&self.final_locals).unwrap_or_default());
+        hasher.update(b"\n");
+        hasher.update(serde_json::to_vec(&self.final_memory).unwrap_or_default());
+        hasher.update(b"\n");
+        hasher.update(serde_json::to_vec(&self.final_stack).unwrap_or_default());
+        hasher.update(b"\n");
+        hasher.update(format!("{:?}", self.halt_reason).as_bytes());
         hex::encode(hasher.finalize())
     }
 }
@@ -3356,6 +3960,42 @@ impl TassadarTraceProofArtifact {
         artifact
     }
 
+    /// Builds a trace-proof artifact from a compact summary artifact.
+    #[must_use]
+    pub fn new_from_summary(
+        proof_artifact_id: impl Into<String>,
+        trace_artifact: &TassadarTraceSummaryArtifact,
+        program_artifact: &TassadarProgramArtifact,
+        model_descriptor_digest: impl Into<String>,
+        decode_mode: TassadarExecutorDecodeMode,
+        runtime_backend: impl Into<String>,
+        reference_runner_id: impl Into<String>,
+        validation: ValidationMatrixReference,
+        runtime_manifest: &RuntimeManifest,
+    ) -> Self {
+        let mut artifact = Self {
+            schema_version: TASSADAR_TRACE_PROOF_SCHEMA_VERSION,
+            proof_artifact_id: proof_artifact_id.into(),
+            proof_digest: String::new(),
+            trace_artifact_ref: trace_artifact.artifact_id.clone(),
+            trace_artifact_digest: trace_artifact.artifact_digest.clone(),
+            trace_digest: trace_artifact.trace_digest.clone(),
+            program_digest: program_artifact.validated_program_digest.clone(),
+            program_artifact_digest: program_artifact.artifact_digest.clone(),
+            wasm_profile_id: program_artifact.wasm_profile_id.clone(),
+            model_descriptor_digest: model_descriptor_digest.into(),
+            decode_mode,
+            cache_algorithm_id: String::from(decode_mode.cache_algorithm().as_str()),
+            runtime_backend: runtime_backend.into(),
+            reference_runner_id: reference_runner_id.into(),
+            validation,
+            runtime_manifest_identity_digest: runtime_manifest.identity_digest.clone(),
+            runtime_manifest_digest: runtime_manifest.manifest_digest.clone(),
+        };
+        artifact.refresh_digest();
+        artifact
+    }
+
     fn refresh_digest(&mut self) {
         self.proof_digest = self.compute_digest();
     }
@@ -3388,6 +4028,70 @@ impl TassadarTraceProofArtifact {
         hasher.update(self.runtime_backend.as_bytes());
         hasher.update(b"\n");
         hasher.update(self.reference_runner_id.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(serde_json::to_vec(&self.validation).unwrap_or_default());
+        hasher.update(b"\n");
+        hasher.update(self.runtime_manifest_identity_digest.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.runtime_manifest_digest.as_bytes());
+        hex::encode(hasher.finalize())
+    }
+}
+
+impl TassadarTraceSummaryProofReceipt {
+    #[must_use]
+    pub fn new(
+        proof_receipt_id: impl Into<String>,
+        trace_artifact: &TassadarTraceSummaryArtifact,
+        program_artifact: &TassadarProgramArtifact,
+        runtime_backend: impl Into<String>,
+        runner_id: impl Into<String>,
+        validation: ValidationMatrixReference,
+        runtime_manifest: &RuntimeManifest,
+    ) -> Self {
+        let mut receipt = Self {
+            proof_receipt_id: proof_receipt_id.into(),
+            proof_receipt_digest: String::new(),
+            trace_artifact_ref: trace_artifact.artifact_id.clone(),
+            trace_artifact_digest: trace_artifact.artifact_digest.clone(),
+            trace_digest: trace_artifact.trace_digest.clone(),
+            program_digest: program_artifact.validated_program_digest.clone(),
+            program_artifact_digest: program_artifact.artifact_digest.clone(),
+            wasm_profile_id: program_artifact.wasm_profile_id.clone(),
+            runtime_backend: runtime_backend.into(),
+            runner_id: runner_id.into(),
+            validation,
+            runtime_manifest_identity_digest: runtime_manifest.identity_digest.clone(),
+            runtime_manifest_digest: runtime_manifest.manifest_digest.clone(),
+        };
+        receipt.refresh_digest();
+        receipt
+    }
+
+    fn refresh_digest(&mut self) {
+        self.proof_receipt_digest = self.compute_digest();
+    }
+
+    fn compute_digest(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"tassadar_trace_summary_proof_receipt|");
+        hasher.update(self.proof_receipt_id.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.trace_artifact_ref.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.trace_artifact_digest.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.trace_digest.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.program_digest.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.program_artifact_digest.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.wasm_profile_id.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.runtime_backend.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(self.runner_id.as_bytes());
         hasher.update(b"\n");
         hasher.update(serde_json::to_vec(&self.validation).unwrap_or_default());
         hasher.update(b"\n");
@@ -3554,6 +4258,139 @@ pub fn build_tassadar_execution_evidence_bundle(
         runtime_manifest,
         trace_artifact,
         trace_proof,
+        proof_bundle,
+    }
+}
+
+/// Builds runtime-manifest and proof-bundle evidence for one compact
+/// long-horizon execution summary.
+#[must_use]
+pub fn build_tassadar_execution_summary_evidence_bundle(
+    request_id: impl Into<String>,
+    request_digest: impl Into<String>,
+    product_id: impl Into<String>,
+    model_id: impl Into<String>,
+    model_descriptor_digest: impl Into<String>,
+    environment_refs: Vec<String>,
+    program_artifact: &TassadarProgramArtifact,
+    execution: &TassadarExecutionSummary,
+) -> TassadarExecutionSummaryEvidenceBundle {
+    let request_id = request_id.into();
+    let request_digest = request_digest.into();
+    let product_id = product_id.into();
+    let model_id = model_id.into();
+    let model_descriptor_digest = model_descriptor_digest.into();
+    let validation = tassadar_validation_reference();
+    let trace_summary_artifact = TassadarTraceSummaryArtifact::from_execution_summary(
+        format!(
+            "tassadar://trace_summary/{request_id}/{}",
+            execution.trace_digest
+        ),
+        execution,
+    );
+    let runtime_identity = ExecutionProofRuntimeIdentity::new(
+        "cpu",
+        BackendToolchainIdentity::new(
+            "cpu",
+            execution.runner_id.clone(),
+            vec![
+                String::from("tassadar_executor_summary"),
+                execution.profile_id.clone(),
+            ],
+        )
+        .with_probe(BackendProbeState::CompiledOnly, Vec::new()),
+    );
+    let mut runtime_manifest = RuntimeManifest::new(
+        format!("tassadar-runtime-summary-manifest-{request_id}"),
+        runtime_identity.clone(),
+    )
+    .with_validation(validation.clone())
+    .with_claims_profile_id(TASSADAR_PROOF_CLAIMS_PROFILE_ID)
+    .with_artifact_binding(RuntimeManifestArtifactBinding::new(
+        RuntimeManifestArtifactKind::ProgramArtifact,
+        program_artifact.artifact_id.clone(),
+        program_artifact.artifact_digest.clone(),
+    ))
+    .with_artifact_binding(RuntimeManifestArtifactBinding::new(
+        RuntimeManifestArtifactKind::ModelDescriptor,
+        model_id.clone(),
+        model_descriptor_digest.clone(),
+    ))
+    .with_artifact_binding(RuntimeManifestArtifactBinding::new(
+        RuntimeManifestArtifactKind::ExecutionTrace,
+        trace_summary_artifact.artifact_id.clone(),
+        trace_summary_artifact.artifact_digest.clone(),
+    ))
+    .with_static_config_binding(RuntimeManifestStaticConfigBinding::new(
+        "tassadar.source_program_digest",
+        program_artifact.source_identity.stable_digest(),
+    ))
+    .with_static_config_binding(RuntimeManifestStaticConfigBinding::new(
+        "tassadar.compile_toolchain_digest",
+        program_artifact.toolchain_identity.stable_digest(),
+    ))
+    .with_static_config_binding(RuntimeManifestStaticConfigBinding::new(
+        "tassadar.program_digest",
+        program_artifact.validated_program_digest.clone(),
+    ))
+    .with_static_config_binding(RuntimeManifestStaticConfigBinding::new(
+        "tassadar.reference_runner",
+        stable_bytes_digest(execution.runner_id.as_bytes()),
+    ));
+    for environment_ref in environment_refs {
+        runtime_manifest = runtime_manifest.with_environment_ref(environment_ref);
+    }
+
+    let trace_summary_proof = TassadarTraceSummaryProofReceipt::new(
+        format!(
+            "tassadar://trace_summary_proof/{request_id}/{}",
+            trace_summary_artifact.trace_digest
+        ),
+        &trace_summary_artifact,
+        program_artifact,
+        runtime_identity.runtime_backend.clone(),
+        execution.runner_id.clone(),
+        validation.clone(),
+        &runtime_manifest,
+    );
+
+    let mut proof_bundle = ExecutionProofBundle::new(
+        ExecutionProofBundleKind::Local,
+        if execution.halt_reason == TassadarHaltReason::Returned {
+            ExecutionProofBundleStatus::Succeeded
+        } else {
+            ExecutionProofBundleStatus::Failed
+        },
+        request_id,
+        request_digest,
+        product_id,
+        runtime_identity,
+    )
+    .with_model_id(model_id)
+    .with_validation(validation)
+    .with_activation_fingerprint_posture(ExecutionProofAugmentationPosture::Unavailable);
+    proof_bundle.artifact_residency = Some(ExecutionProofArtifactResidency {
+        served_artifact_digest: None,
+        weight_bundle_digest: Some(model_descriptor_digest),
+        cluster_artifact_residency_digest: None,
+        sharded_model_manifest_digest: None,
+        input_artifact_digests: vec![program_artifact.artifact_digest.clone()],
+        output_artifact_digests: vec![
+            trace_summary_artifact.artifact_digest.clone(),
+            trace_summary_proof.proof_receipt_digest.clone(),
+        ],
+        stdout_sha256: None,
+        stderr_sha256: None,
+    });
+    if execution.halt_reason != TassadarHaltReason::Returned {
+        proof_bundle =
+            proof_bundle.with_failure_reason(format!("tassadar_halt={:?}", execution.halt_reason));
+    }
+
+    TassadarExecutionSummaryEvidenceBundle {
+        runtime_manifest,
+        trace_summary_artifact,
+        trace_summary_proof,
         proof_bundle,
     }
 }
@@ -5732,6 +6569,131 @@ fn execute_program_direct(
     })
 }
 
+fn record_trace_summary_step(
+    step: &TassadarTraceStep,
+    trace_bytes: &mut u64,
+    trace_hasher: &mut Sha256,
+) {
+    let bytes = serde_json::to_vec(step).unwrap_or_default();
+    *trace_bytes = trace_bytes.saturating_add(bytes.len() as u64);
+    trace_hasher.update(bytes);
+}
+
+fn finish_execution_summary(
+    program: &TassadarProgram,
+    trace_abi: &TassadarTraceAbi,
+    runner_id: &str,
+    trace_hasher: Sha256,
+    trace_bytes: u64,
+    step_count: u64,
+    outputs: Vec<i32>,
+    final_locals: Vec<i32>,
+    final_memory: Vec<i32>,
+    final_stack: Vec<i32>,
+    halt_reason: TassadarHaltReason,
+) -> TassadarExecutionSummary {
+    TassadarExecutionSummary::new(
+        program.program_id.clone(),
+        program.profile_id.clone(),
+        String::from(runner_id),
+        trace_abi,
+        hex::encode(trace_hasher.finalize()),
+        step_count,
+        trace_bytes,
+        outputs,
+        final_locals,
+        final_memory,
+        final_stack,
+        halt_reason,
+    )
+}
+
+fn execute_program_direct_summary(
+    program: &TassadarProgram,
+    profile: &TassadarWasmProfile,
+    trace_abi: &TassadarTraceAbi,
+    runner_id: &str,
+) -> Result<TassadarExecutionSummary, TassadarExecutionRefusal> {
+    program.validate_against(profile)?;
+
+    let mut pc = 0usize;
+    let mut outputs = Vec::new();
+    let mut stack = Vec::new();
+    let mut locals = vec![0; program.local_count];
+    let mut memory = program.initial_memory.clone();
+    let mut step_index = 0usize;
+    let mut halt_reason = TassadarHaltReason::FellOffEnd;
+    let mut trace_bytes = 0u64;
+    let mut trace_hasher = Sha256::new();
+
+    while pc < program.instructions.len() {
+        if step_index >= profile.max_steps {
+            return Err(TassadarExecutionRefusal::StepLimitExceeded {
+                max_steps: profile.max_steps,
+            });
+        }
+
+        let instruction = program.instructions[pc].clone();
+        let stack_before = stack.clone();
+        let mut next_pc = pc + 1;
+        let event = execute_instruction(
+            &instruction,
+            pc,
+            &mut next_pc,
+            &mut stack,
+            &mut locals,
+            &mut memory,
+            &mut outputs,
+            &mut halt_reason,
+        )?;
+        let step = TassadarTraceStep {
+            step_index,
+            pc,
+            next_pc,
+            instruction: instruction.clone(),
+            event,
+            stack_before,
+            stack_after: stack.clone(),
+            locals_after: locals.clone(),
+            memory_after: memory.clone(),
+        };
+        record_trace_summary_step(&step, &mut trace_bytes, &mut trace_hasher);
+
+        step_index += 1;
+        if matches!(instruction, TassadarInstruction::Return) {
+            return Ok(finish_execution_summary(
+                program,
+                trace_abi,
+                runner_id,
+                trace_hasher,
+                trace_bytes,
+                step_index as u64,
+                outputs,
+                locals,
+                memory,
+                stack,
+                halt_reason,
+            ));
+        }
+
+        pc = next_pc;
+    }
+
+    Ok(finish_execution_summary(
+        program,
+        trace_abi,
+        runner_id,
+        trace_hasher,
+        trace_bytes,
+        step_index as u64,
+        outputs,
+        locals,
+        memory,
+        stack,
+        halt_reason,
+    ))
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct TassadarDecodedState {
     stack: Vec<i32>,
@@ -7340,11 +8302,14 @@ fn stable_bytes_digest(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::OnceLock;
+
     use crate::TassadarClaimClass;
 
     use super::{
         build_tassadar_execution_evidence_bundle,
         build_tassadar_long_horizon_trace_evidence_bundle,
+        build_tassadar_million_step_decode_benchmark_bundle,
         build_tassadar_trace_abi_decision_report, compile_tassadar_c_source_to_wasm_receipt,
         diagnose_tassadar_executor_request, execute_tassadar_executor_request,
         replay_tassadar_execution, run_tassadar_exact_equivalence, run_tassadar_exact_parity,
@@ -7354,12 +8319,15 @@ mod tests {
         tassadar_sudoku_9x9_search_program, tassadar_sudoku_v0_corpus,
         tassadar_sudoku_v0_search_program, tassadar_supported_wasm_profiles,
         tassadar_validation_corpus, tassadar_wasm_instruction_coverage_report,
-        write_tassadar_c_to_wasm_compile_receipt, write_tassadar_trace_abi_decision_artifacts,
+        write_tassadar_c_to_wasm_compile_receipt,
+        write_tassadar_million_step_decode_benchmark_bundle,
+        write_tassadar_trace_abi_decision_artifacts,
         write_tassadar_wasm_instruction_coverage_report, TassadarCToWasmCompileConfig,
         TassadarCToWasmCompileReceipt, TassadarCompileRefusal, TassadarCompilerToolchainIdentity,
         TassadarCpuReferenceRunner, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
         TassadarExecutorSelectionReason, TassadarExecutorSelectionState, TassadarFixtureRunner,
-        TassadarHullCacheRunner, TassadarInstruction, TassadarProgram, TassadarProgramArtifact,
+        TassadarHullCacheRunner, TassadarInstruction, TassadarMillionStepDecodeBenchmarkBundle,
+        TassadarMillionStepMeasurementPosture, TassadarProgram, TassadarProgramArtifact,
         TassadarProgramArtifactError, TassadarProgramSourceIdentity, TassadarProgramSourceKind,
         TassadarSparseTopKRunner, TassadarSudokuV0CorpusSplit, TassadarTraceAbi,
         TassadarTraceAbiDecisionReport, TassadarTraceEvent, TassadarWasmInstructionCoverageReport,
@@ -7367,7 +8335,8 @@ mod tests {
         TASSADAR_CANONICAL_C_PROGRAM_ARTIFACT_ID, TASSADAR_CANONICAL_C_SOURCE_REF,
         TASSADAR_C_TO_WASM_COMPILE_RECEIPT_REF, TASSADAR_FIXTURE_RUNNER_ID,
         TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE,
-        TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF, TASSADAR_RUNTIME_BACKEND_ID,
+        TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF, TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE,
+        TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF, TASSADAR_RUNTIME_BACKEND_ID,
         TASSADAR_TRACE_ABI_DECISION_REPORT_REF, TASSADAR_WASM_INSTRUCTION_COVERAGE_REPORT_REF,
     };
 
@@ -7398,6 +8367,25 @@ mod tests {
             "psionic-tassadar-runtime-test-{suffix}-{}",
             std::process::id()
         ))
+    }
+
+    fn million_step_benchmark_bundle() -> &'static TassadarMillionStepDecodeBenchmarkBundle {
+        static BUNDLE: OnceLock<TassadarMillionStepDecodeBenchmarkBundle> = OnceLock::new();
+        BUNDLE.get_or_init(|| {
+            build_tassadar_million_step_decode_benchmark_bundle()
+                .expect("million-step benchmark bundle should build")
+        })
+    }
+
+    fn normalized_million_step_bundle_value(
+        bundle: &TassadarMillionStepDecodeBenchmarkBundle,
+    ) -> serde_json::Value {
+        let mut value = serde_json::to_value(bundle).expect("bundle should serialize");
+        value["bundle_digest"] = serde_json::Value::Null;
+        value["cpu_reference_steps_per_second"] = serde_json::Value::Null;
+        value["reference_linear"]["steps_per_second"] = serde_json::Value::Null;
+        value["reference_linear"]["remaining_gap_vs_cpu_reference"] = serde_json::Value::Null;
+        value
     }
 
     #[test]
@@ -7670,6 +8658,146 @@ mod tests {
         std::fs::remove_file(&report_path).expect("temp report should be removable");
         std::fs::remove_file(&evidence_path).expect("temp evidence bundle should be removable");
         std::fs::remove_dir(&fixture_root).expect("fixture root should be removable");
+        std::fs::remove_dir(&temp_dir).expect("temp dir should be removable");
+    }
+
+    #[test]
+    fn million_step_decode_benchmark_bundle_records_expected_truth() {
+        let bundle = million_step_benchmark_bundle();
+        assert_eq!(bundle.schema_version, 1);
+        assert_eq!(
+            bundle.bundle_root_ref,
+            TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF
+        );
+        assert_eq!(bundle.iteration_count, 131_071);
+        assert_eq!(bundle.expected_step_count, 1_048_575);
+        assert_eq!(bundle.cpu_reference_summary.step_count, 1_048_575);
+        assert_eq!(bundle.cpu_reference_summary.outputs, vec![0]);
+        assert_eq!(bundle.cpu_reference_summary.final_locals, vec![0]);
+        assert_eq!(bundle.cpu_reference_summary.final_memory, Vec::<i32>::new());
+        assert_eq!(bundle.cpu_reference_summary.final_stack, Vec::<i32>::new());
+        assert_eq!(bundle.exactness_bps, 10_000);
+        assert_eq!(
+            bundle.memory_growth_metric,
+            "serialized_trace_step_stream_bytes"
+        );
+        assert_eq!(
+            bundle.memory_growth_bytes,
+            bundle.cpu_reference_summary.serialized_trace_bytes
+        );
+        assert!(!bundle.runtime_manifest_identity_digest.is_empty());
+        assert!(bundle.cpu_reference_steps_per_second > 0.0);
+
+        assert_eq!(
+            bundle.reference_linear.selection_state,
+            TassadarExecutorSelectionState::Direct
+        );
+        assert_eq!(
+            bundle.reference_linear.measurement_posture,
+            TassadarMillionStepMeasurementPosture::Measured
+        );
+        assert_eq!(
+            bundle.reference_linear.effective_decode_mode,
+            Some(TassadarExecutorDecodeMode::ReferenceLinear)
+        );
+        assert!(
+            bundle
+                .reference_linear
+                .steps_per_second
+                .expect("reference-linear throughput should exist")
+                > 0.0
+        );
+        assert_eq!(
+            bundle.reference_linear.remaining_gap_vs_cpu_reference,
+            Some(0.0)
+        );
+
+        assert_eq!(
+            bundle.hull_cache.selection_state,
+            TassadarExecutorSelectionState::Fallback
+        );
+        assert_eq!(
+            bundle.hull_cache.selection_reason,
+            Some(TassadarExecutorSelectionReason::HullCacheControlFlowUnsupported)
+        );
+        assert_eq!(
+            bundle.hull_cache.effective_decode_mode,
+            Some(TassadarExecutorDecodeMode::ReferenceLinear)
+        );
+
+        assert_eq!(
+            bundle.sparse_top_k.selection_state,
+            TassadarExecutorSelectionState::Fallback
+        );
+        assert_eq!(
+            bundle.sparse_top_k.selection_reason,
+            Some(TassadarExecutorSelectionReason::SparseTopKValidationUnsupported)
+        );
+        assert_eq!(
+            bundle.sparse_top_k.effective_decode_mode,
+            Some(TassadarExecutorDecodeMode::ReferenceLinear)
+        );
+
+        assert_eq!(
+            bundle.evidence_bundle.runtime_manifest.identity_digest,
+            bundle.runtime_manifest_identity_digest
+        );
+        assert_eq!(
+            bundle.evidence_bundle.trace_summary_artifact.step_count,
+            bundle.cpu_reference_summary.step_count
+        );
+    }
+
+    #[test]
+    fn million_step_decode_benchmark_bundle_matches_committed_truth() {
+        let persisted: TassadarMillionStepDecodeBenchmarkBundle =
+            read_repo_json::<TassadarMillionStepDecodeBenchmarkBundle>(
+                &format!(
+                    "{}/{}",
+                    TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF,
+                    TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE
+                ),
+                "tassadar_million_step_decode_benchmark_bundle",
+            );
+        assert!(persisted.cpu_reference_steps_per_second > 0.0);
+        assert!(
+            persisted
+                .reference_linear
+                .steps_per_second
+                .expect("persisted reference-linear throughput")
+                > 0.0
+        );
+        assert_eq!(
+            normalized_million_step_bundle_value(&persisted),
+            normalized_million_step_bundle_value(million_step_benchmark_bundle())
+        );
+    }
+
+    #[test]
+    fn write_tassadar_million_step_decode_benchmark_bundle_persists_current_truth() {
+        let temp_dir = temp_test_dir("million-step");
+        std::fs::create_dir_all(&temp_dir).expect("temp dir should create");
+        let bundle = write_tassadar_million_step_decode_benchmark_bundle(&temp_dir)
+            .expect("million-step benchmark bundle should write");
+        let bundle_path = temp_dir.join(TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE);
+        let bundle_bytes = std::fs::read(&bundle_path).expect("persisted million-step bundle");
+        let persisted: TassadarMillionStepDecodeBenchmarkBundle =
+            serde_json::from_slice(&bundle_bytes)
+                .expect("persisted million-step bundle should deserialize");
+        assert!(persisted.cpu_reference_steps_per_second > 0.0);
+        assert!(
+            persisted
+                .reference_linear
+                .steps_per_second
+                .expect("persisted reference-linear throughput")
+                > 0.0
+        );
+        assert_eq!(
+            normalized_million_step_bundle_value(&persisted),
+            normalized_million_step_bundle_value(&bundle)
+        );
+
+        std::fs::remove_file(&bundle_path).expect("temp bundle should be removable");
         std::fs::remove_dir(&temp_dir).expect("temp dir should be removable");
     }
 
