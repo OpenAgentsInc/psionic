@@ -943,6 +943,9 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
 - **[docs/MLX_TO_PSIONIC_MIGRATION_GUIDE.md](docs/MLX_TO_PSIONIC_MIGRATION_GUIDE.md)** —
   bounded MLX adoption guide covering runnable examples, native drop-down
   points, and current supported versus convertible versus unsupported posture.
+- **[docs/MLX_LM_PACKAGE.md](docs/MLX_LM_PACKAGE.md)** —
+  canonical first-package spec for the bounded local `psionic-mlx-lm` text
+  package, CLI, and prompt-cache artifact contract.
 - **[docs/INFERENCE_ENGINE.md](docs/INFERENCE_ENGINE.md)** — canonical
   inference-engine completion criteria and current boundaries.
 - **[docs/TRAIN_SYSTEM.md](docs/TRAIN_SYSTEM.md)** — canonical training

@@ -1,0 +1,26 @@
+[package]
+name = "psionic-mlx-lm"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Bounded local MLX-lm-style text package and CLI above Psionic-native GGUF serving"
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+psionic-catalog = { path = "../psionic-catalog" }
+psionic-models = { path = "../psionic-models" }
+psionic-runtime = { path = "../psionic-runtime" }
+psionic-serve = { path = "../psionic-serve" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

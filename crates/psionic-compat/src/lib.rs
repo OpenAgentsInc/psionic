@@ -1873,15 +1873,16 @@ pub fn builtin_mlx_compatibility_matrix_report() -> MlxCompatibilityMatrixReport
         },
         MlxCompatibilityMatrixEntry {
             surface_id: String::from("mlx_package_ecosystem"),
-            matrix_status: MlxCompatibilityMatrixStatus::Unsupported,
+            matrix_status: MlxCompatibilityMatrixStatus::Convertible,
             summary: String::from(
-                "There is no supported MLX-lm, multimodal, audio, serving, recipe, or benchmark ecosystem layer in Psionic today.",
+                "A first bounded local MLX-lm text package now exists in `psionic-mlx-lm`, but remote catalogs, served text APIs, multimodal/audio packages, recipe layers, and benchmark packages remain later ecosystem work.",
             ),
-            evidence_refs: vec![String::from(
-                "ROADMAP_MLX Epic 7 remains entirely future work",
-            )],
+            evidence_refs: vec![
+                String::from("crates/psionic-mlx-lm"),
+                String::from("docs/MLX_LM_PACKAGE.md"),
+                String::from("cargo test -p psionic-mlx-lm --lib --tests"),
+            ],
             blocking_issue_refs: vec![
-                String::from("PMLX-701 (#3874)"),
                 String::from("PMLX-702 (#3875)"),
                 String::from("PMLX-703 (#3876)"),
                 String::from("PMLX-704 (#3877)"),
@@ -1892,7 +1893,7 @@ pub fn builtin_mlx_compatibility_matrix_report() -> MlxCompatibilityMatrixReport
                 String::from("PMLX-709 (#3882)"),
             ],
             boundary_note: String::from(
-                "Ecosystem workflows are intentionally later and must not be implied by the current governance slice.",
+                "The first local text package is real, but it does not imply remote registry support, OpenAI-compatible serving, multimodal/audio closure, training recipes, synthetic/publish workflows, or benchmark-package completion.",
             ),
         },
     ])
@@ -2585,6 +2586,23 @@ mod tests {
             MlxCompatibilityMatrixStatus::Supported
         );
         assert!(distributed.blocking_issue_refs.is_empty());
+
+        let ecosystem = report
+            .surfaces
+            .iter()
+            .find(|surface| surface.surface_id == "mlx_package_ecosystem")
+            .expect("missing MLX package ecosystem row");
+        assert_eq!(
+            ecosystem.matrix_status,
+            MlxCompatibilityMatrixStatus::Convertible
+        );
+        assert!(ecosystem.summary.contains("psionic-mlx-lm"));
+        assert!(
+            ecosystem
+                .blocking_issue_refs
+                .iter()
+                .all(|issue| !issue.contains("PMLX-701"))
+        );
 
         let filtered = report.filter_to_surfaces(&[
             String::from("governance_contracts"),

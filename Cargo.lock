@@ -3607,6 +3607,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "psionic-mlx-lm"
+version = "0.1.1"
+dependencies = [
+ "psionic-catalog",
+ "psionic-models",
+ "psionic-runtime",
+ "psionic-serve",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "psionic-models"
 version = "0.1.1"
 dependencies = [
