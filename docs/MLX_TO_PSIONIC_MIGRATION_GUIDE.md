@@ -53,7 +53,7 @@ entrypoint.
 | Surface | Current truth | Primary entrypoint |
 | --- | --- | --- |
 | `portable_model_io_bridge` | safetensors manifests and GGUF import can carry bounded migration paths, but this is not native MLX artifact parity | `psionic-array-io`, `psionic-function-io`, `psionic-models` |
-| `mlx_package_ecosystem` | `psionic-mlx-lm`, `psionic-mlx-catalog`, `psionic-mlx-serve`, and `psionic-mlx-vlm` now provide bounded local text-runtime, catalog, OpenAI-compatible text-serving, and multimodal request-planning workflows for GGUF paths, Ollama model ids, local Hugging Face cache snapshots, and image/audio/video inputs, but audio packages, recipe layers, synthetic/publish workflows, and benchmark packages remain later work | `psionic-mlx-lm`, `psionic-mlx-catalog`, `psionic-mlx-serve`, `psionic-mlx-vlm`, `docs/MLX_LM_PACKAGE.md`, `docs/MLX_MODEL_CATALOG.md`, `docs/MLX_TEXT_SERVE.md`, `docs/MLX_VLM_PACKAGE.md` |
+| `mlx_package_ecosystem` | `psionic-mlx-lm`, `psionic-mlx-catalog`, `psionic-mlx-serve`, `psionic-mlx-vlm`, and `psionic-mlx-audio` now provide bounded local text-runtime, catalog, OpenAI-compatible text-serving, multimodal request-planning, and audio synthesis/codec workflows for GGUF paths, Ollama model ids, local Hugging Face cache snapshots, image/audio/video inputs, and CPU-reference speech requests, but recipe layers, synthetic/publish workflows, and benchmark packages remain later work | `psionic-mlx-lm`, `psionic-mlx-catalog`, `psionic-mlx-serve`, `psionic-mlx-vlm`, `psionic-mlx-audio`, `docs/MLX_LM_PACKAGE.md`, `docs/MLX_MODEL_CATALOG.md`, `docs/MLX_TEXT_SERVE.md`, `docs/MLX_VLM_PACKAGE.md`, `docs/MLX_AUDIO_PACKAGE.md` |
 
 ## Common Translation Map
 
@@ -113,5 +113,5 @@ cargo run -p psionic-compat --example mlx_compatibility_matrix_report
 - Do not call the facade or C ABI MLX-identical.
 - Do not imply Python package parity from the current C ABI.
 - Do not treat portable weight IO as proof of native MLX module compatibility.
-- Do not imply the package ecosystem is done because `PMLX-701` through `PMLX-704` landed; `PMLX-705` through `PMLX-709` still bound the remaining ecosystem work.
+- Do not imply the package ecosystem is done because `PMLX-701` through `PMLX-705` landed; `PMLX-706` through `PMLX-709` still bound the remaining ecosystem work.
 - Do not hide typed refusal or bounded backend support behind optimistic fallback prose.

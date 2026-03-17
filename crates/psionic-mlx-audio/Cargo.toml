@@ -1,0 +1,23 @@
+[package]
+name = "psionic-mlx-audio"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Bounded MLX-style audio package with CPU-reference synthesis, WAV IO, codec helpers, and server-facing request contracts"
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

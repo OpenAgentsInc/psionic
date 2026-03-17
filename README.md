@@ -539,6 +539,9 @@ Current posture:
 - `psionic-mlx-vlm`: bounded MLX-style multimodal package with processor
   registries, image/audio/video request shapes, and served-request planning
   over the shared text-serving lane.
+- `psionic-mlx-audio`: bounded MLX-style audio package with CPU-reference
+  synthesis, WAV IO, codec helpers, streaming chunk contracts, and
+  server-facing speech request surfaces.
 
 ### Backend And Platform Lanes
 
@@ -706,6 +709,10 @@ Implemented now:
   processor registries for `llava`, `qwen2_vl`, and `omni`-class families,
   OpenAI-compatible image/audio/video request shapes, digest-bound attachment
   receipts, and text-serving request plans over the shared server.
+- `psionic-mlx-audio` bounded MLX-style audio package with builtin
+  `kokoro`, `xtts`, and `encodec`-class family metadata, quantized-checkpoint
+  descriptors, WAV IO, text-to-speech and speech-to-speech request contracts,
+  stream-chunk outputs, and a CPU-reference audio server contract.
 - CPU baseline plus a first Metal-backed `psionic.embeddings` lane.
 - generic CPU GGUF decoder execution for GPT-OSS plus representative Llama,
   Qwen, and Mistral families through one Psionic-owned runtime surface.
@@ -984,6 +991,10 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
   canonical bounded multimodal package spec for `psionic-mlx-vlm`, including
   builtin processor registries, prompt projection, attachment receipts, and
   served-request planning for image/audio/video inputs.
+- **[docs/MLX_AUDIO_PACKAGE.md](docs/MLX_AUDIO_PACKAGE.md)** —
+  canonical bounded audio package spec for `psionic-mlx-audio`, including
+  family/quantization metadata, WAV IO, text-to-speech and speech-to-speech
+  requests, stream chunks, and the server-facing speech contract.
 - **[docs/INFERENCE_ENGINE.md](docs/INFERENCE_ENGINE.md)** — canonical
   inference-engine completion criteria and current boundaries.
 - **[docs/TRAIN_SYSTEM.md](docs/TRAIN_SYSTEM.md)** — canonical training

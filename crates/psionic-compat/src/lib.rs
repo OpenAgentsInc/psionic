@@ -1875,31 +1875,33 @@ pub fn builtin_mlx_compatibility_matrix_report() -> MlxCompatibilityMatrixReport
             surface_id: String::from("mlx_package_ecosystem"),
             matrix_status: MlxCompatibilityMatrixStatus::Convertible,
             summary: String::from(
-                "Bounded local MLX-style text, catalog, text-serving, and multimodal packages now exist in `psionic-mlx-lm`, `psionic-mlx-catalog`, `psionic-mlx-serve`, and `psionic-mlx-vlm`, but audio packages, recipe layers, synthetic/publish workflows, and benchmark packages remain later ecosystem work.",
+                "Bounded local MLX-style text, catalog, text-serving, multimodal, and audio packages now exist in `psionic-mlx-lm`, `psionic-mlx-catalog`, `psionic-mlx-serve`, `psionic-mlx-vlm`, and `psionic-mlx-audio`, but recipe layers, synthetic/publish workflows, and benchmark packages remain later ecosystem work.",
             ),
             evidence_refs: vec![
                 String::from("crates/psionic-mlx-lm"),
                 String::from("crates/psionic-mlx-catalog"),
                 String::from("crates/psionic-mlx-serve"),
                 String::from("crates/psionic-mlx-vlm"),
+                String::from("crates/psionic-mlx-audio"),
                 String::from("docs/MLX_LM_PACKAGE.md"),
                 String::from("docs/MLX_MODEL_CATALOG.md"),
                 String::from("docs/MLX_TEXT_SERVE.md"),
                 String::from("docs/MLX_VLM_PACKAGE.md"),
+                String::from("docs/MLX_AUDIO_PACKAGE.md"),
                 String::from("cargo test -p psionic-mlx-lm --lib --tests"),
                 String::from("cargo test -p psionic-mlx-catalog --lib --tests"),
                 String::from("cargo test -p psionic-mlx-serve --lib --tests"),
                 String::from("cargo test -p psionic-mlx-vlm --lib --tests"),
+                String::from("cargo test -p psionic-mlx-audio --lib --tests"),
             ],
             blocking_issue_refs: vec![
-                String::from("PMLX-705 (#3878)"),
                 String::from("PMLX-706 (#3879)"),
                 String::from("PMLX-707 (#3880)"),
                 String::from("PMLX-708 (#3881)"),
                 String::from("PMLX-709 (#3882)"),
             ],
             boundary_note: String::from(
-                "The first local text, catalog, text-serving, and multimodal packages are real, but they do not imply audio closure, training recipes, synthetic/publish workflows, or benchmark-package completion.",
+                "The first local text, catalog, text-serving, multimodal, and audio packages are real, but they do not imply training-recipe closure, synthetic/publish workflows, or benchmark-package completion.",
             ),
         },
     ])
@@ -2621,6 +2623,12 @@ mod tests {
                 .blocking_issue_refs
                 .iter()
                 .all(|issue| !issue.contains("PMLX-704"))
+        );
+        assert!(
+            ecosystem
+                .blocking_issue_refs
+                .iter()
+                .all(|issue| !issue.contains("PMLX-705"))
         );
         assert!(
             ecosystem

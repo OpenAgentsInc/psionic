@@ -3583,6 +3583,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "psionic-mlx-audio"
+version = "0.1.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "psionic-mlx-capi"
 version = "0.1.1"
 dependencies = [

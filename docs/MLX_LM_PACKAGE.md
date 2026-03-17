@@ -31,7 +31,7 @@ CLI boundary.
 - OpenAI-compatible HTTP serving now lives in `psionic-mlx-serve`
 - no notebook/UI shell
 
-Those later surfaces belong to `PMLX-705` through `PMLX-709`.
+Those later surfaces belong to `PMLX-706` through `PMLX-709`.
 
 ## Library Surface
 
