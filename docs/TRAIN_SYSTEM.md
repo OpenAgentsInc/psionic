@@ -191,6 +191,10 @@ It already has real substrate for:
 - environment package ABI and deterministic runtime sessions
 - held-out eval runtime, benchmark packages, repeat-run aggregation, and local
   validator simulation
+- bounded `AttnRes` tiny next-token training over a repo-owned fixture corpus,
+  with stable parameter-group identity, fixed-budget step receipts, held-out
+  loss plus routing-delta evaluation, and Psionic-native safetensors checkpoint
+  lineage over the trained routing and LM-head parameter subset
 - bounded `Tassadar` small-executor training over the validation benchmark
   package, using the fixed-budget training core plus proof-aware exactness
   comparison against the handcrafted reference lane
@@ -201,7 +205,8 @@ It does not yet implement the full distributed trainer-orchestrator-RL runtime.
 ## What Psionic Train Is Not
 
 - It is not a promise that full general model training already works in the
-  repo today beyond the current narrow Apple adapter lane.
+  repo today beyond the current narrow Apple adapter and AttnRes reference
+  lanes.
 - It is not a Python trainer hidden behind Rust wrappers.
 - It is not an app-owned workflow inside `apps/*`.
 - It is not just "cluster execution, but for training."
@@ -212,6 +217,27 @@ The honest description today is:
 > Psionic already owns real training-class truth surfaces plus a bounded
 > training-core reference loop, but it does not yet own the full distributed
 > train system.
+
+That now includes one intentionally narrow AttnRes reference-training answer:
+
+- `psionic-train::train_attnres_tiny_next_token(...)` can train the bounded
+  CPU-reference AttnRes family over a repo-owned tiny next-token corpus without
+  Burn, using stable named parameter groups for the routing pseudo-query and
+  LM-head tensors rather than positional optimizer state
+- checkpoint export is Psionic-native and explicit: the lane persists
+  safetensors parameter payloads plus a JSON manifest carrying config, base
+  descriptor digest, dataset digests, checkpoint refs, and parent-checkpoint
+  lineage instead of adopting Burn `.mpk` as a native storage contract
+- restore is equally explicit: the lane reseeds the canonical Psionic AttnRes
+  model family and reapplies the persisted named parameter subset, so
+  checkpoint identity stays tied to the same descriptor/config surface the
+  runtime and eval lanes already consume
+- `psionic-eval::evaluate_attnres_training_shift(...)` now gives the same lane
+  a held-out machine-readable loss and routing-delta report, making it visible
+  whether training changed the routing story in addition to the token loss
+- the claim remains intentionally narrow: this is a tiny CPU-reference
+  next-token lane for the first AttnRes consumer, not a claim that generic
+  AttnRes training, backend acceleration, or product-facing training UX is done
 
 That now includes one intentionally narrow executor-training answer:
 

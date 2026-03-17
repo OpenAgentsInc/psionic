@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use psionic_core::{DType, QuantizationMode, Shape};
 pub use psionic_runtime::{
     AttnResDiagnosticsSnapshot, AttnResSublayerKind, AttnResSublayerSnapshot,
@@ -7,12 +9,39 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    ModelDescriptor, TokenSequence, WeightBundleMetadata, WeightFormat, WeightSource,
+    ModelDescriptor, TokenId, TokenSequence, WeightBundleMetadata, WeightFormat, WeightSource,
     WeightTensorMetadata,
 };
 
 /// Stable family label for Attention Residual models.
 pub const ATTN_RES_MODEL_FAMILY: &str = "attnres";
+
+/// One next-token supervision sample for bounded AttnRes train/eval flows.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttnResNextTokenSample {
+    /// Stable sample identifier.
+    pub sample_id: String,
+    /// Ordered input token prefix.
+    pub input_tokens: TokenSequence,
+    /// Target token the model should predict at the last position.
+    pub target_token: TokenId,
+}
+
+impl AttnResNextTokenSample {
+    /// Creates one next-token supervision sample.
+    #[must_use]
+    pub fn new(
+        sample_id: impl Into<String>,
+        input_tokens: TokenSequence,
+        target_token: TokenId,
+    ) -> Self {
+        Self {
+            sample_id: sample_id.into(),
+            input_tokens,
+            target_token,
+        }
+    }
+}
 
 /// Configuration for one Attention Residual model family instance.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -563,6 +592,12 @@ pub enum AttnResModelError {
         /// Expected element count.
         expected: usize,
     },
+    /// A named parameter override targeted an unknown parameter.
+    #[error("unknown attnres parameter `{parameter_id}`")]
+    UnknownParameter {
+        /// Stable parameter identifier.
+        parameter_id: String,
+    },
 }
 
 /// CPU-reference execution failure.
@@ -794,6 +829,17 @@ pub struct AttnResWeightBundle {
     lm_head: AttnResLinearWeights,
 }
 
+/// Stable named parameter vector exported from one AttnRes weight bundle.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AttnResParameterVector {
+    /// Stable parameter identifier.
+    pub parameter_id: String,
+    /// Logical tensor shape for the parameter.
+    pub shape: Shape,
+    /// Dense `f32` values in row-major order.
+    pub values: Vec<f32>,
+}
+
 impl AttnResWeightBundle {
     /// Builds a deterministic reference bundle for the supplied config.
     pub fn seeded_reference(config: &AttnResConfig) -> Result<Self, AttnResModelError> {
@@ -835,6 +881,157 @@ impl AttnResWeightBundle {
     #[must_use]
     pub fn token_embeddings(&self) -> &[f32] {
         &self.token_embeddings
+    }
+
+    /// Returns one stable flat parameter-map view over the bundle.
+    #[must_use]
+    pub fn parameter_vectors(&self) -> Vec<AttnResParameterVector> {
+        let d_model = self.final_norm_gamma.len();
+        let mut vectors = vec![AttnResParameterVector {
+            parameter_id: String::from("token_embeddings"),
+            shape: Shape::new(vec![self.token_embeddings.len() / d_model, d_model]),
+            values: self.token_embeddings.clone(),
+        }];
+        for (layer_idx, layer) in self.layers.iter().enumerate() {
+            vectors.extend([
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.attn_res.pseudo_query"),
+                    shape: Shape::new(vec![layer.attn_res.pseudo_query.len()]),
+                    values: layer.attn_res.pseudo_query.clone(),
+                },
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.attn_res.norm_gamma"),
+                    shape: Shape::new(vec![layer.attn_res.norm_gamma.len()]),
+                    values: layer.attn_res.norm_gamma.clone(),
+                },
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.mlp_res.pseudo_query"),
+                    shape: Shape::new(vec![layer.mlp_res.pseudo_query.len()]),
+                    values: layer.mlp_res.pseudo_query.clone(),
+                },
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.mlp_res.norm_gamma"),
+                    shape: Shape::new(vec![layer.mlp_res.norm_gamma.len()]),
+                    values: layer.mlp_res.norm_gamma.clone(),
+                },
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.attn_norm_gamma"),
+                    shape: Shape::new(vec![layer.attn_norm_gamma.len()]),
+                    values: layer.attn_norm_gamma.clone(),
+                },
+                linear_parameter_vector(
+                    format!("layers.{layer_idx}.attention.q_proj.weight"),
+                    layer.attention.q_proj.input_dim,
+                    layer.attention.q_proj.output_dim,
+                    layer.attention.q_proj.weight.as_slice(),
+                ),
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.attention.q_proj.bias"),
+                    shape: Shape::new(vec![layer.attention.q_proj.output_dim]),
+                    values: layer.attention.q_proj.bias.clone(),
+                },
+                linear_parameter_vector(
+                    format!("layers.{layer_idx}.attention.k_proj.weight"),
+                    layer.attention.k_proj.input_dim,
+                    layer.attention.k_proj.output_dim,
+                    layer.attention.k_proj.weight.as_slice(),
+                ),
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.attention.k_proj.bias"),
+                    shape: Shape::new(vec![layer.attention.k_proj.output_dim]),
+                    values: layer.attention.k_proj.bias.clone(),
+                },
+                linear_parameter_vector(
+                    format!("layers.{layer_idx}.attention.v_proj.weight"),
+                    layer.attention.v_proj.input_dim,
+                    layer.attention.v_proj.output_dim,
+                    layer.attention.v_proj.weight.as_slice(),
+                ),
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.attention.v_proj.bias"),
+                    shape: Shape::new(vec![layer.attention.v_proj.output_dim]),
+                    values: layer.attention.v_proj.bias.clone(),
+                },
+                linear_parameter_vector(
+                    format!("layers.{layer_idx}.attention.o_proj.weight"),
+                    layer.attention.o_proj.input_dim,
+                    layer.attention.o_proj.output_dim,
+                    layer.attention.o_proj.weight.as_slice(),
+                ),
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.attention.o_proj.bias"),
+                    shape: Shape::new(vec![layer.attention.o_proj.output_dim]),
+                    values: layer.attention.o_proj.bias.clone(),
+                },
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.mlp_norm_gamma"),
+                    shape: Shape::new(vec![layer.mlp_norm_gamma.len()]),
+                    values: layer.mlp_norm_gamma.clone(),
+                },
+                linear_parameter_vector(
+                    format!("layers.{layer_idx}.feed_forward.linear1.weight"),
+                    layer.feed_forward.linear1.input_dim,
+                    layer.feed_forward.linear1.output_dim,
+                    layer.feed_forward.linear1.weight.as_slice(),
+                ),
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.feed_forward.linear1.bias"),
+                    shape: Shape::new(vec![layer.feed_forward.linear1.output_dim]),
+                    values: layer.feed_forward.linear1.bias.clone(),
+                },
+                linear_parameter_vector(
+                    format!("layers.{layer_idx}.feed_forward.linear2.weight"),
+                    layer.feed_forward.linear2.input_dim,
+                    layer.feed_forward.linear2.output_dim,
+                    layer.feed_forward.linear2.weight.as_slice(),
+                ),
+                AttnResParameterVector {
+                    parameter_id: format!("layers.{layer_idx}.feed_forward.linear2.bias"),
+                    shape: Shape::new(vec![layer.feed_forward.linear2.output_dim]),
+                    values: layer.feed_forward.linear2.bias.clone(),
+                },
+            ]);
+        }
+        vectors.extend([
+            AttnResParameterVector {
+                parameter_id: String::from("final_norm_gamma"),
+                shape: Shape::new(vec![self.final_norm_gamma.len()]),
+                values: self.final_norm_gamma.clone(),
+            },
+            linear_parameter_vector(
+                String::from("lm_head.weight"),
+                self.lm_head.input_dim,
+                self.lm_head.output_dim,
+                self.lm_head.weight.as_slice(),
+            ),
+            AttnResParameterVector {
+                parameter_id: String::from("lm_head.bias"),
+                shape: Shape::new(vec![self.lm_head.output_dim]),
+                values: self.lm_head.bias.clone(),
+            },
+        ]);
+        vectors
+    }
+
+    /// Returns one named parameter vector when it exists.
+    #[must_use]
+    pub fn parameter_vector(&self, parameter_id: &str) -> Option<AttnResParameterVector> {
+        self.parameter_vectors()
+            .into_iter()
+            .find(|parameter| parameter.parameter_id == parameter_id)
+    }
+
+    /// Returns a rebuilt bundle with the supplied named parameter overrides.
+    pub fn with_parameter_overrides(
+        &self,
+        config: &AttnResConfig,
+        overrides: &BTreeMap<String, Vec<f32>>,
+    ) -> Result<Self, AttnResModelError> {
+        let mut updated = self.clone();
+        for (parameter_id, values) in overrides {
+            apply_parameter_override(&mut updated, parameter_id.as_str(), values.as_slice())?;
+        }
+        updated.rebuild_metadata(config)
     }
 
     fn validate(&self, config: &AttnResConfig) -> Result<(), AttnResModelError> {
@@ -1878,6 +2075,146 @@ fn seeded_values(label: &str, len: usize, scale: f32) -> Vec<f32> {
         .collect()
 }
 
+fn linear_parameter_vector(
+    parameter_id: String,
+    input_dim: usize,
+    output_dim: usize,
+    values: &[f32],
+) -> AttnResParameterVector {
+    AttnResParameterVector {
+        parameter_id,
+        shape: Shape::new(vec![input_dim, output_dim]),
+        values: values.to_vec(),
+    }
+}
+
+fn apply_parameter_override(
+    bundle: &mut AttnResWeightBundle,
+    parameter_id: &str,
+    values: &[f32],
+) -> Result<(), AttnResModelError> {
+    if parameter_id == "token_embeddings" {
+        assign_parameter_values(&mut bundle.token_embeddings, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == "final_norm_gamma" {
+        assign_parameter_values(&mut bundle.final_norm_gamma, parameter_id, values)?;
+        return Ok(());
+    }
+    if let Some(tail) = parameter_id.strip_prefix("lm_head.") {
+        apply_linear_override(&mut bundle.lm_head, parameter_id, tail, values)?;
+        return Ok(());
+    }
+    if let Some(rest) = parameter_id.strip_prefix("layers.") {
+        let Some((layer_str, tail)) = rest.split_once('.') else {
+            return Err(AttnResModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        let Ok(layer_idx) = layer_str.parse::<usize>() else {
+            return Err(AttnResModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        let Some(layer) = bundle.layers.get_mut(layer_idx) else {
+            return Err(AttnResModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        match tail {
+            "attn_res.pseudo_query" => {
+                assign_parameter_values(&mut layer.attn_res.pseudo_query, parameter_id, values)?
+            }
+            "attn_res.norm_gamma" => {
+                assign_parameter_values(&mut layer.attn_res.norm_gamma, parameter_id, values)?
+            }
+            "mlp_res.pseudo_query" => {
+                assign_parameter_values(&mut layer.mlp_res.pseudo_query, parameter_id, values)?
+            }
+            "mlp_res.norm_gamma" => {
+                assign_parameter_values(&mut layer.mlp_res.norm_gamma, parameter_id, values)?
+            }
+            "attn_norm_gamma" => {
+                assign_parameter_values(&mut layer.attn_norm_gamma, parameter_id, values)?
+            }
+            "mlp_norm_gamma" => {
+                assign_parameter_values(&mut layer.mlp_norm_gamma, parameter_id, values)?
+            }
+            tail if tail.starts_with("attention.q_proj.") => apply_linear_override(
+                &mut layer.attention.q_proj,
+                parameter_id,
+                tail.trim_start_matches("attention.q_proj."),
+                values,
+            )?,
+            tail if tail.starts_with("attention.k_proj.") => apply_linear_override(
+                &mut layer.attention.k_proj,
+                parameter_id,
+                tail.trim_start_matches("attention.k_proj."),
+                values,
+            )?,
+            tail if tail.starts_with("attention.v_proj.") => apply_linear_override(
+                &mut layer.attention.v_proj,
+                parameter_id,
+                tail.trim_start_matches("attention.v_proj."),
+                values,
+            )?,
+            tail if tail.starts_with("attention.o_proj.") => apply_linear_override(
+                &mut layer.attention.o_proj,
+                parameter_id,
+                tail.trim_start_matches("attention.o_proj."),
+                values,
+            )?,
+            tail if tail.starts_with("feed_forward.linear1.") => apply_linear_override(
+                &mut layer.feed_forward.linear1,
+                parameter_id,
+                tail.trim_start_matches("feed_forward.linear1."),
+                values,
+            )?,
+            tail if tail.starts_with("feed_forward.linear2.") => apply_linear_override(
+                &mut layer.feed_forward.linear2,
+                parameter_id,
+                tail.trim_start_matches("feed_forward.linear2."),
+                values,
+            )?,
+            _ => {
+                return Err(AttnResModelError::UnknownParameter {
+                    parameter_id: String::from(parameter_id),
+                });
+            }
+        }
+        return Ok(());
+    }
+    Err(AttnResModelError::UnknownParameter {
+        parameter_id: String::from(parameter_id),
+    })
+}
+
+fn apply_linear_override(
+    linear: &mut AttnResLinearWeights,
+    parameter_id: &str,
+    tail: &str,
+    values: &[f32],
+) -> Result<(), AttnResModelError> {
+    match tail {
+        "weight" => assign_parameter_values(&mut linear.weight, parameter_id, values),
+        "bias" => assign_parameter_values(&mut linear.bias, parameter_id, values),
+        _ => Err(AttnResModelError::UnknownParameter {
+            parameter_id: String::from(parameter_id),
+        }),
+    }
+}
+
+fn assign_parameter_values(
+    target: &mut Vec<f32>,
+    parameter_id: &str,
+    values: &[f32],
+) -> Result<(), AttnResModelError> {
+    validate_vector_length(parameter_id, values, target.len())?;
+    target.clear();
+    target.extend_from_slice(values);
+    Ok(())
+}
+
 fn validate_vector_length(
     name: impl Into<String>,
     values: &[f32],
@@ -1948,6 +2285,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::error::Error;
 
     use psionic_runtime::{
@@ -1960,7 +2298,7 @@ mod tests {
 
     use super::{
         ATTN_RES_MODEL_FAMILY, AttnResConfig, AttnResCpuReferenceModel, AttnResExecutionError,
-        AttnResOpWeights, AttnResSublayerKind, AttnResTensor3, attn_res_forward,
+        AttnResModelError, AttnResOpWeights, AttnResSublayerKind, AttnResTensor3, attn_res_forward,
     };
 
     #[derive(Debug, Deserialize)]
@@ -2003,6 +2341,95 @@ mod tests {
             model.weights().metadata().format,
             crate::WeightFormat::ProgrammaticFixture
         );
+        Ok(())
+    }
+
+    #[test]
+    fn weight_bundle_parameter_vectors_match_metadata_inventory() -> Result<(), Box<dyn Error>> {
+        let model = AttnResCpuReferenceModel::seeded(
+            "attnres-parameter-map",
+            "v0",
+            AttnResConfig::new(8, 4, 2)
+                .with_num_heads(2)
+                .with_vocab_size(16),
+        )?;
+        let parameters = model.weights().parameter_vectors();
+        assert_eq!(parameters.len(), model.weights().metadata().tensors.len());
+        assert!(
+            parameters
+                .iter()
+                .any(|parameter| parameter.parameter_id == "lm_head.bias")
+        );
+        assert!(
+            parameters
+                .iter()
+                .any(|parameter| { parameter.parameter_id == "layers.0.attn_res.pseudo_query" })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn weight_bundle_parameter_overrides_rebuild_metadata() -> Result<(), Box<dyn Error>> {
+        let model = AttnResCpuReferenceModel::seeded(
+            "attnres-overrides",
+            "v0",
+            AttnResConfig::new(8, 4, 2)
+                .with_num_heads(2)
+                .with_vocab_size(16),
+        )?;
+        let baseline_digest = model.weights().metadata().digest.clone();
+        let baseline_bias = model
+            .weights()
+            .parameter_vector("lm_head.bias")
+            .expect("lm_head.bias");
+        let overridden = model.weights().with_parameter_overrides(
+            model.config(),
+            &BTreeMap::from([
+                (
+                    String::from("layers.0.attn_res.pseudo_query"),
+                    vec![0.25; model.config().d_model],
+                ),
+                (
+                    String::from("lm_head.bias"),
+                    baseline_bias
+                        .values
+                        .iter()
+                        .map(|value| value + 0.5)
+                        .collect::<Vec<_>>(),
+                ),
+            ]),
+        )?;
+        assert_ne!(overridden.metadata().digest, baseline_digest);
+        assert_eq!(
+            overridden
+                .parameter_vector("layers.0.attn_res.pseudo_query")
+                .expect("routing override")
+                .values,
+            vec![0.25; model.config().d_model]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn weight_bundle_unknown_override_is_rejected() -> Result<(), Box<dyn Error>> {
+        let model = AttnResCpuReferenceModel::seeded(
+            "attnres-bad-override",
+            "v0",
+            AttnResConfig::new(8, 4, 2)
+                .with_num_heads(2)
+                .with_vocab_size(16),
+        )?;
+        let error = model
+            .weights()
+            .with_parameter_overrides(
+                model.config(),
+                &BTreeMap::from([(
+                    String::from("layers.99.attn_res.pseudo_query"),
+                    vec![0.0; model.config().d_model],
+                )]),
+            )
+            .expect_err("unknown parameter");
+        assert!(matches!(error, AttnResModelError::UnknownParameter { .. }));
         Ok(())
     }
 
