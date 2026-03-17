@@ -430,6 +430,12 @@ Current posture:
   `final_outputs=0`, `workload_specific_state=7568`, full sequences fit the
   current model window), so this is a bounded research-only learned lane and
   does not change the compiled Hungarian closure claim
+- the repo now also carries the explicit learned long-horizon refusal policy at
+  `fixtures/tassadar/reports/tassadar_learned_horizon_policy_report.json`,
+  which freezes `unsupported_horizon` for million-step/article-class learned
+  traces until an exact learned long-horizon benchmark bundle exists; this
+  keeps the acceptance language honest instead of leaving the learned horizon
+  limit implicit
 - the separate post-audit Phase 19 bar now also exists in `psionic-runtime`,
   `psionic-models`, `psionic-eval`, `psionic-research`, and a canonical
   exact compiled 9x9 bundle at

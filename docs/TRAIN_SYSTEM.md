@@ -574,6 +574,12 @@ That now includes one intentionally narrow executor-training answer:
   `workload_specific_state=7568`), so the honest posture is `research_only`
   even though the full Hungarian-v0 traces fit the current learned model
   window
+- the learned long-horizon boundary is now explicit rather than implicit:
+  `psionic-research` persists
+  `fixtures/tassadar/reports/tassadar_learned_horizon_policy_report.json`,
+  which freezes a typed `unsupported_horizon` refusal for million-step and
+  article-class learned traces until an exact learned long-horizon benchmark
+  bundle replaces the current refusal posture
 - `psionic-research` can now use that bounded trained-small receipt as an
   explicit comparator inside the learned-plus-compiled and learned-circuit
   Tassadar research family, but that does not expand the train-side claim

@@ -494,6 +494,11 @@ The current scope is:
   than promoted (`aggregate=6839`, `first_target=0`, `first_32=6875`,
   `exact_traces=0`, `final_outputs=0`, `workload_specific_state=7568`) even
   though full traces fit the current learned model window
+- landed learned long-horizon refusal bar: `psionic-research` now emits
+  `fixtures/tassadar/reports/tassadar_learned_horizon_policy_report.json`,
+  which makes the learned long-horizon boundary machine-readable instead of
+  implicit by freezing `unsupported_horizon` for million-step/article-class
+  learned traces until an exact learned long-horizon benchmark bundle exists
 - landed trained-executor Phase 19 follow-on bar: `psionic-runtime` and
   `psionic-models` now carry an exact compiled 9x9 Sudoku search deployment
   lane, `psionic-eval` now emits benchmark/environment, exactness, refusal,

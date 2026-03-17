@@ -31,7 +31,7 @@
   "compiled_exact": {
     "verdict_id": "compiled_exact",
     "passed": true,
-    "detail": "The bounded compiled/proof-backed Sudoku-v0 and Hungarian-v0 lanes are exact on their matched corpora and preserve exact refusal truth; this remains bounded compiled exactness, not article-class closure.",
+    "detail": "The bounded compiled/proof-backed Sudoku-v0 and Hungarian-v0 lanes are exact on their matched corpora and preserve exact refusal truth; any learned Hungarian posture remains a separate lane-status fact rather than part of this compiled exactness claim.",
     "validation_commands": [
       "cargo test -p psionic-research compiled_executor_bundle_writes_reports_and_deployments",
       "cargo test -p psionic-research compiled_hungarian_executor_bundle_writes_reports_and_deployments"
@@ -55,22 +55,22 @@
       {
         "label": "bounded compiled Hungarian run bundle",
         "artifact_ref": "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/run_bundle.json",
-        "digest": "1d92730054062aaa6801f9e3d1b4b0ed60e5be0b988eda2fa6cf6e258604e59b"
+        "digest": "e4b358536ad81a0bc8008fdccdcc49a83d54a8c89752ce84ef200489b83acabe"
       },
       {
         "label": "bounded compiled Hungarian exactness report",
         "artifact_ref": "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/compiled_executor_exactness_report.json",
-        "digest": "f072f2f74c6856dd076be4ce301f36a48e2e7d6a3b799864fc577f52731a1584"
+        "digest": "ab64ffa656dc4f161eb3b248e28603ffa6f6274cc68b56218d3a033fd1b8c9da"
       },
       {
         "label": "bounded compiled Hungarian compatibility report",
         "artifact_ref": "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/compiled_executor_compatibility_report.json",
-        "digest": "fd49bf4dd82362798eab9c86696d37f16cf4cdf7b2e0f848681a6b4c29a7829a"
+        "digest": "f176234c85645c5bcd1b5d5fda22ab84c14af2ffb61d609297a99d8c3523f8aa"
       },
       {
         "label": "compiled-vs-learned Hungarian lane status",
         "artifact_ref": "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/hungarian_lane_status_report.json",
-        "digest": "55e7ca9f4d1ca9c26095f3988410f111c72b1a9084779781311bbbdb7011bd8a"
+        "digest": "570d13d576bbeca75cd84386d6b68cebff47b40ab2e068894de433f0e34f0eb1"
       }
     ]
   },
@@ -181,7 +181,7 @@
   "learned_article_class": {
     "verdict_id": "learned_article_class",
     "passed": false,
-    "detail": "Learned article-class closure is still red: the committed 9x9 fit report now records an explicit bounded-scope replacement for the canonical incremental-window lane, but full one-pass sequence fit is still not available and the learned lane remains bounded.",
+    "detail": "Learned article-class closure is still red: the committed learned long-horizon policy now freezes an explicit `unsupported_horizon` refusal for million-step/article-class learned traces, the 9x9 learned lane remains bounded to explicit incremental windows, and the learned Hungarian lane remains research-only.",
     "validation_commands": [
       "scripts/check-tassadar-acceptance.sh"
     ],
@@ -195,12 +195,17 @@
         "label": "learned 9x9 fit report",
         "artifact_ref": "fixtures/tassadar/runs/sudoku_9x9_v0_reference_run_v0/sequence_fit_report.json",
         "digest": "46941cb172330e8d10f7e7560756a1beb3d5e68759c50396b56116faa8390ac6"
+      },
+      {
+        "label": "learned long-horizon policy report",
+        "artifact_ref": "fixtures/tassadar/reports/tassadar_learned_horizon_policy_report.json",
+        "digest": "9b8bece6a6677b4016ec5a457b645ddd46f89dd5e152f0d48aa64537fa897f59"
       }
     ],
     "missing_evidence": [
-      "PTAS-502 truthful learned 9x9 promotion gate with later-window criteria",
-      "PTAS-503 learned Hungarian-class lane with explicit dual-state supervision",
-      "PTAS-504 million-step learned benchmark or explicit refusal policy",
+      "replace bounded learned 9x9 windowed evidence with one exact article-class learned workload",
+      "promote a learned Hungarian-class workload beyond research-only exactness",
+      "replace the explicit learned long-horizon refusal policy with one exact learned benchmark bundle",
       "PTAS-505 learned article-closure audit"
     ]
   },
@@ -217,5 +222,5 @@
     ]
   },
   "current_truth_holds": true,
-  "report_digest": "f671b1c5a9b3cf16f6e02f3d28c2f26208de79db336323f6abd64587e6374ffe"
+  "report_digest": "91a305db9c252c1ceb36691fab1e2a288e72f87fa55a8dc656beeabf7d11a1fa"
 }

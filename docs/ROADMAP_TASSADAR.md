@@ -527,7 +527,7 @@ research-only lane.
 | `PTAS-501` | implemented | Remove the current learned 9x9 full-trace fit cliff without hiding it behind a bounded first-window metric. |
 | `PTAS-502` | implemented | Land a truthful learned 9x9 promotion gate with later-window and full-trace exactness criteria, not only first-prefix scores. |
 | `PTAS-503` | implemented | Landed `fixtures/tassadar/runs/hungarian_v0_learned_executor_v0` as the first bounded learned Hungarian-class lane with explicit dual-state supervision and separate token/state/final-result receipts. The selected checkpoint remains research-only rather than promoted (`aggregate=6839`, `first_target=0`, `first_32=6875`, `exact_traces=0`, `final_outputs=0`, `workload_specific_state=7568`), which keeps the learned-vs-compiled boundary explicit. |
-| `PTAS-504` | planned | Add a million-step learned trace benchmark family or an explicit learned refusal policy for workloads beyond the supported horizon. |
+| `PTAS-504` | implemented | Added the machine-readable learned long-horizon refusal policy at `fixtures/tassadar/reports/tassadar_learned_horizon_policy_report.json`. It freezes `unsupported_horizon` for million-step/article-class learned traces until an exact learned long-horizon benchmark bundle exists and threads that guard into the acceptance logic so `learned_article_class` cannot bypass the long-horizon bar. |
 | `PTAS-505` | planned | Add one learned article-closure audit that says either "exact article-class learned executor exists" or "the learned lane remains bounded" with no middle-ground marketing language. |
 
 ## Epic 6: Compile-To-Weights And Hybrid Systems

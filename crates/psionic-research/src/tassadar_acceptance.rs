@@ -12,7 +12,8 @@ use psionic_eval::{
 use psionic_runtime::{TassadarClaimClass, TassadarExecutorDecodeMode};
 use psionic_train::{
     TassadarExecutorPromotionGateReport, TassadarExecutorReferenceRunBundle,
-    TassadarExecutorSequenceFitReport,
+    TassadarExecutorSequenceFitReport, TassadarHungarianLearnedFitReport,
+    TassadarHungarianLearnedLaneReport,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
@@ -36,6 +37,12 @@ const FAST_PATH_HULL_BENCHMARK_REPORT_REF: &str =
     "fixtures/tassadar/runs/sudoku_v0_reference_run_v0/neural_hull_benchmark_report.json";
 const LEARNED_9X9_SEQUENCE_FIT_REPORT_REF: &str =
     "fixtures/tassadar/runs/sudoku_9x9_v0_reference_run_v0/sequence_fit_report.json";
+const LEARNED_HUNGARIAN_SEQUENCE_FIT_REPORT_REF: &str =
+    "fixtures/tassadar/runs/hungarian_v0_learned_executor_v0/sequence_fit_report.json";
+const LEARNED_HUNGARIAN_LANE_REPORT_REF: &str =
+    "fixtures/tassadar/runs/hungarian_v0_learned_executor_v0/learned_lane_report.json";
+const COMPILED_MILLION_STEP_BENCHMARK_BUNDLE_REF: &str =
+    "fixtures/tassadar/runs/million_step_loop_benchmark_v0/benchmark_bundle.json";
 const COMPILED_SUDOKU_RUN_BUNDLE_REF: &str =
     "fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0/run_bundle.json";
 const COMPILED_SUDOKU_9X9_RUN_BUNDLE_REF: &str =
@@ -73,6 +80,124 @@ pub const TASSADAR_ACCEPTANCE_REPORT_FILE: &str = "tassadar_acceptance_report.js
 pub const TASSADAR_ACCEPTANCE_REPORT_SCHEMA_VERSION: u16 = 1;
 /// Canonical checker command for the live acceptance report.
 pub const TASSADAR_ACCEPTANCE_CHECKER_COMMAND: &str = "scripts/check-tassadar-acceptance.sh";
+/// Canonical machine-readable learned long-horizon policy report file.
+pub const TASSADAR_LEARNED_HORIZON_POLICY_REPORT_FILE: &str =
+    "tassadar_learned_horizon_policy_report.json";
+/// Stable schema version for the learned long-horizon policy report.
+pub const TASSADAR_LEARNED_HORIZON_POLICY_REPORT_SCHEMA_VERSION: u16 = 1;
+
+/// Whether the learned long-horizon article guard is satisfied by an exact
+/// benchmark or by an explicit refusal policy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarLearnedLongHorizonGuardStatus {
+    /// An exact learned long-horizon benchmark bundle exists.
+    ExactBenchmarkLanded,
+    /// The repo explicitly refuses learned long-horizon article claims.
+    ExplicitRefusalPolicy,
+}
+
+/// Current benchmark posture for the learned long-horizon lane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarLearnedLongHorizonBenchmarkStatus {
+    /// An exact learned long-horizon benchmark exists.
+    Exact,
+    /// A benchmark exists but remains partial.
+    Partial,
+    /// No learned long-horizon benchmark exists yet.
+    NotLanded,
+}
+
+/// Typed learned refusal kind for unsupported long-horizon requests.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarLearnedLongHorizonRefusalKind {
+    /// The requested learned horizon is outside the current supported bar.
+    UnsupportedHorizon,
+}
+
+/// Typed reasons backing the current learned long-horizon refusal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarLearnedLongHorizonRefusalReason {
+    /// No committed learned million-step benchmark exists.
+    NoLearnedMillionStepBenchmark,
+    /// No validated learned article-class long-trace contract exists yet.
+    NoValidatedLearnedArticleClassLongTraceContract,
+    /// The 9x9 learned lane still operates under bounded incremental windows.
+    Sudoku9x9StillBoundedToWindowedScope,
+    /// The learned Hungarian lane remains research-only rather than promoted.
+    HungarianV0StillResearchOnly,
+}
+
+/// Machine-readable guardrail for learned million-step and article-class
+/// long-horizon claims.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarLearnedLongHorizonPolicyReport {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable policy identifier.
+    pub policy_id: String,
+    /// Claim class guarded by this policy.
+    pub enforced_claim_class: TassadarClaimClass,
+    /// Minimum trace-step bar for the long-horizon article story.
+    pub article_class_trace_step_floor: u32,
+    /// Whether the guard is currently satisfied by a benchmark or refusal.
+    pub guard_status: TassadarLearnedLongHorizonGuardStatus,
+    /// Current learned benchmark posture for that long-horizon bar.
+    pub benchmark_status: TassadarLearnedLongHorizonBenchmarkStatus,
+    /// Learned benchmark artifact when one exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub benchmark_artifact_ref: Option<String>,
+    /// Compiled/runtime comparator artifact proving the million-step story is
+    /// currently outside the learned lane.
+    pub reference_million_step_artifact_ref: String,
+    /// Typed refusal kind currently enforced by the repo.
+    pub refusal_kind: TassadarLearnedLongHorizonRefusalKind,
+    /// Typed refusal reasons currently backing the policy.
+    pub refusal_reasons: Vec<TassadarLearnedLongHorizonRefusalReason>,
+    /// Human-readable refusal detail.
+    pub refusal_detail: String,
+    /// Whether learned article-class claims may bypass this guard.
+    pub learned_article_class_bypass_allowed: bool,
+    /// Green bounded learned artifact that stays below the article horizon.
+    pub bounded_green_artifact_ref: String,
+    /// 9x9 learned fit artifact currently bounding the long-horizon story.
+    pub sudoku_9x9_fit_artifact_ref: String,
+    /// 9x9 learned model identifier.
+    pub sudoku_9x9_model_id: String,
+    /// 9x9 learned context ceiling.
+    pub sudoku_9x9_model_max_sequence_tokens: u32,
+    /// 9x9 maximum full-sequence token count.
+    pub sudoku_9x9_total_token_count_max: u32,
+    /// Whether full 9x9 sequences fit model context.
+    pub sudoku_9x9_full_sequence_fits_model_context: bool,
+    /// Honest 9x9 scope statement.
+    pub sudoku_9x9_scope_statement: String,
+    /// Learned Hungarian fit artifact.
+    pub hungarian_v0_fit_artifact_ref: String,
+    /// Learned Hungarian lane artifact.
+    pub hungarian_v0_lane_artifact_ref: String,
+    /// Learned Hungarian model identifier.
+    pub hungarian_v0_model_id: String,
+    /// Learned Hungarian context ceiling.
+    pub hungarian_v0_model_max_sequence_tokens: u32,
+    /// Learned Hungarian maximum full-sequence token count.
+    pub hungarian_v0_total_token_count_max: u32,
+    /// Whether learned Hungarian full sequences fit model context.
+    pub hungarian_v0_full_sequence_fits_model_context: bool,
+    /// Learned Hungarian exact-trace case count.
+    pub hungarian_v0_exact_trace_case_count: u32,
+    /// Learned Hungarian exact final-output case count.
+    pub hungarian_v0_final_output_exact_case_count: u32,
+    /// Honest learned Hungarian verdict.
+    pub hungarian_v0_verdict: String,
+    /// Explicit follow-on requirement for replacing the refusal policy.
+    pub replacement_requirement: String,
+    /// Stable report digest.
+    pub report_digest: String,
+}
 
 /// One artifact or report used as evidence for a Tassadar acceptance verdict.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -242,6 +367,113 @@ pub fn tassadar_acceptance_report_ref() -> &'static str {
 #[must_use]
 pub fn tassadar_acceptance_report_path() -> PathBuf {
     repo_root().join(tassadar_acceptance_report_ref())
+}
+
+/// Returns the canonical repo-relative learned long-horizon policy report path.
+#[must_use]
+pub fn tassadar_learned_horizon_policy_report_ref() -> &'static str {
+    "fixtures/tassadar/reports/tassadar_learned_horizon_policy_report.json"
+}
+
+/// Returns the canonical absolute learned long-horizon policy report path.
+#[must_use]
+pub fn tassadar_learned_horizon_policy_report_path() -> PathBuf {
+    repo_root().join(tassadar_learned_horizon_policy_report_ref())
+}
+
+/// Builds the live learned long-horizon policy report from the committed fit
+/// and lane artifacts.
+pub fn build_tassadar_learned_horizon_policy_report()
+-> Result<TassadarLearnedLongHorizonPolicyReport, TassadarAcceptanceError> {
+    let sudoku_9x9_fit_report: TassadarExecutorSequenceFitReport = read_repo_json(
+        LEARNED_9X9_SEQUENCE_FIT_REPORT_REF,
+        "tassadar_executor_sequence_fit_report",
+    )?;
+    let hungarian_fit_report: TassadarHungarianLearnedFitReport = read_repo_json(
+        LEARNED_HUNGARIAN_SEQUENCE_FIT_REPORT_REF,
+        "tassadar_hungarian_learned_fit_report",
+    )?;
+    let hungarian_lane_report: TassadarHungarianLearnedLaneReport = read_repo_json(
+        LEARNED_HUNGARIAN_LANE_REPORT_REF,
+        "tassadar_hungarian_learned_lane_report",
+    )?;
+
+    let mut report = TassadarLearnedLongHorizonPolicyReport {
+        schema_version: TASSADAR_LEARNED_HORIZON_POLICY_REPORT_SCHEMA_VERSION,
+        policy_id: String::from("tassadar.learned_long_horizon_policy.v0"),
+        enforced_claim_class: TassadarClaimClass::LearnedArticleClass,
+        article_class_trace_step_floor: 1_048_575,
+        guard_status: TassadarLearnedLongHorizonGuardStatus::ExplicitRefusalPolicy,
+        benchmark_status: TassadarLearnedLongHorizonBenchmarkStatus::NotLanded,
+        benchmark_artifact_ref: None,
+        reference_million_step_artifact_ref: String::from(COMPILED_MILLION_STEP_BENCHMARK_BUNDLE_REF),
+        refusal_kind: TassadarLearnedLongHorizonRefusalKind::UnsupportedHorizon,
+        refusal_reasons: vec![
+            TassadarLearnedLongHorizonRefusalReason::NoLearnedMillionStepBenchmark,
+            TassadarLearnedLongHorizonRefusalReason::NoValidatedLearnedArticleClassLongTraceContract,
+            TassadarLearnedLongHorizonRefusalReason::Sudoku9x9StillBoundedToWindowedScope,
+            TassadarLearnedLongHorizonRefusalReason::HungarianV0StillResearchOnly,
+        ],
+        refusal_detail: format!(
+            "learned million-step and article-class long-horizon traces are explicitly refused until an exact learned long-horizon benchmark bundle exists; 9x9 remains bounded to `{:?}` with full-sequence overflow up to {} tokens, and learned Hungarian-v0 remains research-only with `exact_traces={}` and `final_outputs={}`",
+            sudoku_9x9_fit_report.long_trace_contract,
+            sudoku_9x9_fit_report.full_sequence_context_overflow_max,
+            hungarian_lane_report.exact_trace_case_count,
+            hungarian_lane_report.final_output_exact_case_count
+        ),
+        learned_article_class_bypass_allowed: false,
+        bounded_green_artifact_ref: String::from(LEARNED_BOUNDED_PROMOTION_BUNDLE_REF),
+        sudoku_9x9_fit_artifact_ref: String::from(LEARNED_9X9_SEQUENCE_FIT_REPORT_REF),
+        sudoku_9x9_model_id: sudoku_9x9_fit_report.model_id.clone(),
+        sudoku_9x9_model_max_sequence_tokens: sudoku_9x9_fit_report.model_max_sequence_tokens,
+        sudoku_9x9_total_token_count_max: sudoku_9x9_fit_report.total_token_count_max,
+        sudoku_9x9_full_sequence_fits_model_context: sudoku_9x9_fit_report
+            .full_sequence_fits_model_context,
+        sudoku_9x9_scope_statement: sudoku_9x9_fit_report.scope_statement.clone(),
+        hungarian_v0_fit_artifact_ref: String::from(LEARNED_HUNGARIAN_SEQUENCE_FIT_REPORT_REF),
+        hungarian_v0_lane_artifact_ref: String::from(LEARNED_HUNGARIAN_LANE_REPORT_REF),
+        hungarian_v0_model_id: hungarian_fit_report.model_id.clone(),
+        hungarian_v0_model_max_sequence_tokens: hungarian_fit_report.model_max_sequence_tokens,
+        hungarian_v0_total_token_count_max: hungarian_fit_report.total_token_count_max,
+        hungarian_v0_full_sequence_fits_model_context: hungarian_fit_report
+            .full_sequence_fits_model_context,
+        hungarian_v0_exact_trace_case_count: hungarian_lane_report.exact_trace_case_count,
+        hungarian_v0_final_output_exact_case_count: hungarian_lane_report
+            .final_output_exact_case_count,
+        hungarian_v0_verdict: hungarian_lane_report.verdict.clone(),
+        replacement_requirement: String::from(
+            "replace this refusal policy with one exact learned long-horizon benchmark bundle before allowing `learned_article_class`",
+        ),
+        report_digest: String::new(),
+    };
+    report.report_digest = stable_digest(
+        b"psionic_tassadar_learned_horizon_policy_report|",
+        &report,
+    );
+    Ok(report)
+}
+
+/// Writes the canonical learned long-horizon policy report.
+pub fn write_tassadar_learned_horizon_policy_report(
+    path: &Path,
+) -> Result<TassadarLearnedLongHorizonPolicyReport, TassadarAcceptanceError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| TassadarAcceptanceError::CreateDir {
+            path: parent.display().to_string(),
+            error,
+        })?;
+    }
+    let report = build_tassadar_learned_horizon_policy_report()?;
+    let bytes =
+        serde_json::to_vec_pretty(&report).map_err(|error| TassadarAcceptanceError::Serialize {
+            artifact_kind: String::from("tassadar_learned_horizon_policy_report"),
+            error,
+        })?;
+    fs::write(path, bytes).map_err(|error| TassadarAcceptanceError::Write {
+        path: path.display().to_string(),
+        error,
+    })?;
+    Ok(report)
 }
 
 /// Builds the live Tassadar acceptance report from the canonical committed
@@ -679,9 +911,12 @@ fn build_learned_article_class_verdict()
         LEARNED_9X9_SEQUENCE_FIT_REPORT_REF,
         "tassadar_executor_sequence_fit_report",
     )?;
+    let horizon_policy = build_tassadar_learned_horizon_policy_report()?;
     let passed = promotion_bundle.claim_class == TassadarClaimClass::LearnedArticleClass
         && fit_report.full_sequence_fits_model_context
-        && fit_report.blocking_reasons.is_empty();
+        && fit_report.blocking_reasons.is_empty()
+        && horizon_policy.guard_status == TassadarLearnedLongHorizonGuardStatus::ExactBenchmarkLanded
+        && !horizon_policy.learned_article_class_bypass_allowed;
 
     Ok(TassadarAcceptanceVerdict::new(
         "learned_article_class",
@@ -689,7 +924,7 @@ fn build_learned_article_class_verdict()
         if passed {
             "The learned lane now clears the article-class fit and exactness bars."
         } else {
-            "Learned article-class closure is still red: the committed 9x9 fit report now records an explicit bounded-scope replacement for the canonical incremental-window lane, but full one-pass sequence fit is still not available and the learned lane remains bounded."
+            "Learned article-class closure is still red: the committed learned long-horizon policy now freezes an explicit `unsupported_horizon` refusal for million-step/article-class learned traces, the 9x9 learned lane remains bounded to explicit incremental windows, and the learned Hungarian lane remains research-only."
         },
         vec![String::from(TASSADAR_ACCEPTANCE_CHECKER_COMMAND)],
         vec![
@@ -703,18 +938,25 @@ fn build_learned_article_class_verdict()
                 LEARNED_9X9_SEQUENCE_FIT_REPORT_REF,
                 Some(fit_report.report_digest),
             ),
+            TassadarAcceptanceEvidenceRef::new(
+                "learned long-horizon policy report",
+                tassadar_learned_horizon_policy_report_ref(),
+                Some(horizon_policy.report_digest),
+            ),
         ],
         if passed {
             Vec::new()
         } else {
             vec![
                 String::from(
-                    "PTAS-502 truthful learned 9x9 promotion gate with later-window criteria",
+                    "replace bounded learned 9x9 windowed evidence with one exact article-class learned workload",
                 ),
                 String::from(
-                    "PTAS-503 learned Hungarian-class lane with explicit dual-state supervision",
+                    "promote a learned Hungarian-class workload beyond research-only exactness",
                 ),
-                String::from("PTAS-504 million-step learned benchmark or explicit refusal policy"),
+                String::from(
+                    "replace the explicit learned long-horizon refusal policy with one exact learned benchmark bundle",
+                ),
                 String::from("PTAS-505 learned article-closure audit"),
             ]
         },
@@ -801,8 +1043,11 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        TassadarAcceptanceReport, build_tassadar_acceptance_report, read_repo_json,
-        tassadar_acceptance_report_ref, write_tassadar_acceptance_report,
+        TassadarAcceptanceReport, TassadarLearnedLongHorizonBenchmarkStatus,
+        TassadarLearnedLongHorizonGuardStatus, TassadarLearnedLongHorizonPolicyReport,
+        build_tassadar_acceptance_report, build_tassadar_learned_horizon_policy_report,
+        read_repo_json, tassadar_acceptance_report_ref, tassadar_learned_horizon_policy_report_ref,
+        write_tassadar_acceptance_report, write_tassadar_learned_horizon_policy_report,
     };
 
     #[test]
@@ -836,6 +1081,43 @@ mod tests {
         let persisted: TassadarAcceptanceReport = serde_json::from_slice(&bytes)?;
         assert_eq!(persisted, report);
         assert!(persisted.current_truth_holds());
+        Ok(())
+    }
+
+    #[test]
+    fn learned_horizon_policy_report_matches_committed_truth()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let report = build_tassadar_learned_horizon_policy_report()?;
+        assert_eq!(
+            report.guard_status,
+            TassadarLearnedLongHorizonGuardStatus::ExplicitRefusalPolicy
+        );
+        assert_eq!(
+            report.benchmark_status,
+            TassadarLearnedLongHorizonBenchmarkStatus::NotLanded
+        );
+        assert!(!report.learned_article_class_bypass_allowed);
+
+        let persisted: TassadarLearnedLongHorizonPolicyReport = read_repo_json(
+            tassadar_learned_horizon_policy_report_ref(),
+            "tassadar_learned_horizon_policy_report",
+        )?;
+        assert_eq!(persisted, report);
+        Ok(())
+    }
+
+    #[test]
+    fn write_learned_horizon_policy_report_persists_current_truth()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = tempdir()?;
+        let report_path = temp_dir
+            .path()
+            .join("tassadar_learned_horizon_policy_report.json");
+        let report = write_tassadar_learned_horizon_policy_report(&report_path)?;
+        let bytes = std::fs::read(&report_path)?;
+        let persisted: TassadarLearnedLongHorizonPolicyReport = serde_json::from_slice(&bytes)?;
+        assert_eq!(persisted, report);
+        assert!(!persisted.learned_article_class_bypass_allowed);
         Ok(())
     }
 }
