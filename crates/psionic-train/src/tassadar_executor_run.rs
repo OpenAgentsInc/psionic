@@ -12,10 +12,13 @@ use psionic_datastream::{
 use psionic_eval::{
     EvalArtifact, TassadarExecutorBoundaryExactnessReport,
     TassadarExecutorDivergenceHistogramReport, TassadarExecutorFirstTokenConfusionReport,
-    TassadarExecutorLinearBenchmarkReport, benchmark_tassadar_executor_linear_decode,
+    TassadarExecutorEvalError, TassadarExecutorLinearBenchmarkReport,
+    TassadarExecutorStructuralSupervisionReport,
+    benchmark_tassadar_executor_linear_decode,
     build_tassadar_executor_boundary_exactness_report,
     build_tassadar_executor_divergence_histogram_report,
-    build_tassadar_executor_first_token_confusion_report, build_tassadar_sequence_dataset,
+    build_tassadar_executor_first_token_confusion_report,
+    build_tassadar_executor_structural_supervision_report, build_tassadar_sequence_dataset,
 };
 use psionic_models::{
     TassadarExecutorTrainableSurface, TassadarExecutorTransformer,
@@ -67,6 +70,8 @@ const LINEAR_BENCHMARK_REPORT_FILE: &str = "linear_benchmark_report.json";
 pub const TASSADAR_EXECUTOR_BOUNDARY_EXACTNESS_REPORT_FILE: &str = "boundary_exactness_report.json";
 pub const TASSADAR_EXECUTOR_DIVERGENCE_HISTOGRAM_FILE: &str = "divergence_histogram.json";
 pub const TASSADAR_EXECUTOR_FIRST_TOKEN_CONFUSION_FILE: &str = "first_token_confusion_report.json";
+pub const TASSADAR_EXECUTOR_STRUCTURAL_SUPERVISION_REPORT_FILE: &str =
+    "structural_supervision_report.json";
 pub const TASSADAR_EXECUTOR_CHECKPOINT_LEADERBOARD_FILE: &str = "checkpoint_leaderboard.json";
 pub const TASSADAR_EXECUTOR_NEURAL_HULL_BENCHMARK_REPORT_FILE: &str =
     "neural_hull_benchmark_report.json";
@@ -489,6 +494,9 @@ pub struct TassadarExecutorReferenceRunBundle {
     /// Persisted first-token confusion report digest when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub first_token_confusion_report_digest: Option<String>,
+    /// Persisted structural-supervision report digest when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structural_supervision_report_digest: Option<String>,
     /// Persisted checkpoint leaderboard digest when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub checkpoint_leaderboard_report_digest: Option<String>,
@@ -532,6 +540,7 @@ impl TassadarExecutorReferenceRunBundle {
         boundary_exactness_report: Option<&TassadarExecutorBoundaryExactnessReport>,
         divergence_histogram_report: Option<&TassadarExecutorDivergenceHistogramReport>,
         first_token_confusion_report: Option<&TassadarExecutorFirstTokenConfusionReport>,
+        structural_supervision_report: Option<&TassadarExecutorStructuralSupervisionReport>,
         checkpoint_artifact: &TassadarExecutorCheckpointArtifact,
         model_artifact: &TassadarExecutorModelArtifact,
         artifacts: Vec<EvalArtifact>,
@@ -565,6 +574,8 @@ impl TassadarExecutorReferenceRunBundle {
                 .map(|report| report.report_digest.clone()),
             first_token_confusion_report_digest: first_token_confusion_report
                 .map(|report| report.report_digest.clone()),
+            structural_supervision_report_digest: structural_supervision_report
+                .map(|report| report.report_digest.clone()),
             checkpoint_leaderboard_report_digest: Some(stable_digest(
                 b"psionic_tassadar_executor_checkpoint_leaderboard|",
                 &training_report.checkpoint_leaderboard,
@@ -596,6 +607,9 @@ pub enum TassadarExecutorRunError {
     /// Training failed.
     #[error(transparent)]
     Training(#[from] TassadarExecutorTrainingError),
+    /// Eval artifact generation failed.
+    #[error(transparent)]
+    Eval(#[from] TassadarExecutorEvalError),
     /// Model checkpoint application failed.
     #[error(transparent)]
     Model(#[from] TassadarExecutorTransformerError),
@@ -688,6 +702,7 @@ pub fn tassadar_executor_promotion_run_config() -> TassadarExecutorTrainingConfi
             TassadarExecutorTrainableSurface::OutputHeadEmbeddingsAndSmallLearnedMixer,
         teacher_forced_training_strategy:
             crate::TassadarExecutorTeacherForcedTrainingStrategy::FullForwardWindow,
+        structural_supervision: crate::TassadarExecutorStructuralSupervisionConfig::next_token_only(),
         curriculum_stages: vec![
             crate::TassadarExecutorCurriculumStage::new("prompt_to_first_token", Some(1), 1),
             crate::TassadarExecutorCurriculumStage::new("prompt_to_first_2_tokens", Some(2), 1),
@@ -727,6 +742,7 @@ pub fn tassadar_executor_promotion_v2_run_config() -> TassadarExecutorTrainingCo
             TassadarExecutorTrainableSurface::OutputHeadEmbeddingsAndSmallLearnedMixer,
         teacher_forced_training_strategy:
             crate::TassadarExecutorTeacherForcedTrainingStrategy::FullForwardWindow,
+        structural_supervision: crate::TassadarExecutorStructuralSupervisionConfig::next_token_only(),
         curriculum_stages: vec![
             crate::TassadarExecutorCurriculumStage::new("prompt_to_first_token", Some(1), 1),
             crate::TassadarExecutorCurriculumStage::new("prompt_to_first_2_tokens", Some(2), 1),
@@ -812,6 +828,7 @@ fn execute_tassadar_training_run_with_options(
         config.dataset_version.as_str(),
         config.trainable_surface,
         config.teacher_forced_training_strategy,
+        config.structural_supervision.clone(),
     )?;
     emit_tassadar_progress(format!(
         "tassadar_progress phase=manifest_ready run={} manifest_digest={} dataset_storage_key={} train_batches={} elapsed_ms={}",
@@ -878,6 +895,12 @@ fn execute_tassadar_training_run_with_options(
         build_tassadar_executor_divergence_histogram_report(&outcome.report.evaluation);
     let first_token_confusion_report =
         build_tassadar_executor_first_token_confusion_report(&outcome.report.evaluation);
+    let structural_supervision_report = build_tassadar_executor_structural_supervision_report(
+        &outcome.model,
+        &dataset_bundle.dataset,
+        TassadarSequenceSplit::Validation,
+        config.max_eval_target_tokens_per_example,
+    )?;
     let checkpoint_state = TassadarExecutorCheckpointState::new(
         outcome.report.best_checkpoint_id.as_str(),
         config.run_id.as_str(),
@@ -966,6 +989,12 @@ fn execute_tassadar_training_run_with_options(
     )?);
     artifacts.push(write_json_artifact(
         output_dir,
+        TASSADAR_EXECUTOR_STRUCTURAL_SUPERVISION_REPORT_FILE,
+        "tassadar_structural_supervision_report",
+        &structural_supervision_report,
+    )?);
+    artifacts.push(write_json_artifact(
+        output_dir,
         TASSADAR_EXECUTOR_CHECKPOINT_LEADERBOARD_FILE,
         "tassadar_checkpoint_leaderboard",
         &outcome.report.checkpoint_leaderboard,
@@ -1006,6 +1035,7 @@ fn execute_tassadar_training_run_with_options(
         Some(&boundary_exactness_report),
         Some(&divergence_histogram_report),
         Some(&first_token_confusion_report),
+        Some(&structural_supervision_report),
         &checkpoint_artifact,
         &model_artifact,
         artifacts,
@@ -1112,7 +1142,8 @@ mod tests {
         CHECKPOINT_STATE_FILE, MODEL_ARTIFACT_FILE, RUN_BUNDLE_FILE,
         TASSADAR_EXECUTOR_BOUNDARY_EXACTNESS_REPORT_FILE,
         TASSADAR_EXECUTOR_CHECKPOINT_LEADERBOARD_FILE, TASSADAR_EXECUTOR_DIVERGENCE_HISTOGRAM_FILE,
-        TASSADAR_EXECUTOR_FIRST_TOKEN_CONFUSION_FILE, TRAINING_REPORT_FILE,
+        TASSADAR_EXECUTOR_FIRST_TOKEN_CONFUSION_FILE,
+        TASSADAR_EXECUTOR_STRUCTURAL_SUPERVISION_REPORT_FILE, TRAINING_REPORT_FILE,
         TassadarExecutorCheckpointState, execute_tassadar_boundary_training_run,
         execute_tassadar_training_run, tassadar_executor_boundary_run_config,
         tassadar_executor_reference_run_config,
@@ -1146,6 +1177,11 @@ mod tests {
         assert!(
             temp.path()
                 .join(TASSADAR_EXECUTOR_FIRST_TOKEN_CONFUSION_FILE)
+                .exists()
+        );
+        assert!(
+            temp.path()
+                .join(TASSADAR_EXECUTOR_STRUCTURAL_SUPERVISION_REPORT_FILE)
                 .exists()
         );
         assert!(
@@ -1184,6 +1220,7 @@ mod tests {
         assert!(bundle.boundary_exactness_report_digest.is_some());
         assert!(bundle.divergence_histogram_report_digest.is_some());
         assert!(bundle.first_token_confusion_report_digest.is_some());
+        assert!(bundle.structural_supervision_report_digest.is_some());
         assert!(bundle.checkpoint_leaderboard_report_digest.is_some());
         Ok(())
     }

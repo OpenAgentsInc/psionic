@@ -142,6 +142,8 @@ impl TassadarExecutorSudoku9x9ScalePlan {
                 trainable_surface: TassadarExecutorTrainableSurface::OutputHeadOnly,
                 teacher_forced_training_strategy:
                     crate::TassadarExecutorTeacherForcedTrainingStrategy::FullForwardWindow,
+                structural_supervision:
+                    crate::TassadarExecutorStructuralSupervisionConfig::next_token_only(),
                 curriculum_stages: Vec::new(),
                 validate_every_epoch: true,
                 select_best_checkpoint_by_boundary: true,
@@ -501,6 +503,7 @@ mod tests {
             boundary_exactness_report_digest: None,
             divergence_histogram_report_digest: None,
             first_token_confusion_report_digest: None,
+            structural_supervision_report_digest: None,
             checkpoint_leaderboard_report_digest: None,
             exactness_curve_report_digest: None,
             failure_samples_report_digest: None,

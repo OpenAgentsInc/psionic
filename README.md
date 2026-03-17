@@ -463,6 +463,18 @@ Current posture:
   with a small-model Tassadar trainer over package-backed supervision, a
   fixed-budget train receipt, proof-aware exactness comparison against the
   handcrafted reference lane, and explicit validation-corpus-only scope claims
+- its learned structural-supervision follow-on now also exists across
+  `psionic-models`, `psionic-train`, `psionic-eval`, and `psionic-research`:
+  the tokenizer now classifies instruction-pointer, branch-outcome,
+  stack-delta, memory-diff, and workload-specific target families, the
+  training manifest persists profile weights plus split-level coverage
+  inventory, the run bundle persists a validation
+  `structural_supervision_report.json`, and the bounded comparison root at
+  `fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1` proves the richer
+  targets changed the learned lane without widening the claim boundary
+  (`4570` to `7812` aggregate target-token exactness, `4375` to `6875`
+  first-32 exactness, `+2000` instruction-pointer bps, and `+3333`
+  stack-delta bps versus the matched next-token-only baseline)
 - its Phase 9C compiled-weight and larger-2D exploration now exists in
   `psionic-models` and `psionic-research`, with program-specialized compiled
   executor artifacts carrying exact program binding, runtime-contract truth,

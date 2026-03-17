@@ -63,6 +63,103 @@ const EVENT_RETURN: &str = "<event_return>";
 const HALT_RETURNED: &str = "<halt_returned>";
 const HALT_FELL_OFF_END: &str = "<halt_fell_off_end>";
 
+/// Structural supervision family derived from the canonical Tassadar trace ABI.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarStructuralSupervisionFamily {
+    /// Instruction-pointer state such as `pc` and `next_pc`.
+    InstructionPointer,
+    /// Conditional-branch state such as taken/not-taken outcomes.
+    BranchOutcome,
+    /// Stack-shape state that exposes stack-size deltas across steps.
+    StackDelta,
+    /// Memory-write state that exposes sparse memory diffs.
+    MemoryDiff,
+    /// Workload-specific structured state such as Hungarian dual variables.
+    WorkloadSpecificState,
+}
+
+impl TassadarStructuralSupervisionFamily {
+    /// Returns the stable family label.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::InstructionPointer => "instruction_pointer",
+            Self::BranchOutcome => "branch_outcome",
+            Self::StackDelta => "stack_delta",
+            Self::MemoryDiff => "memory_diff",
+            Self::WorkloadSpecificState => "workload_specific_state",
+        }
+    }
+}
+
+/// Aggregate target-token coverage for one structural supervision family set.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarStructuralSupervisionCoverage {
+    /// Total target tokens observed in the covered slice.
+    pub total_target_token_count: u32,
+    /// Target tokens tagged as instruction-pointer state.
+    pub instruction_pointer_token_count: u32,
+    /// Target tokens tagged as branch-outcome state.
+    pub branch_outcome_token_count: u32,
+    /// Target tokens tagged as stack-delta state.
+    pub stack_delta_token_count: u32,
+    /// Target tokens tagged as memory-diff state.
+    pub memory_diff_token_count: u32,
+    /// Target tokens tagged as workload-specific state.
+    pub workload_specific_state_token_count: u32,
+}
+
+impl TassadarStructuralSupervisionCoverage {
+    fn increment(&mut self, family: TassadarStructuralSupervisionFamily) {
+        match family {
+            TassadarStructuralSupervisionFamily::InstructionPointer => {
+                self.instruction_pointer_token_count =
+                    self.instruction_pointer_token_count.saturating_add(1);
+            }
+            TassadarStructuralSupervisionFamily::BranchOutcome => {
+                self.branch_outcome_token_count =
+                    self.branch_outcome_token_count.saturating_add(1);
+            }
+            TassadarStructuralSupervisionFamily::StackDelta => {
+                self.stack_delta_token_count =
+                    self.stack_delta_token_count.saturating_add(1);
+            }
+            TassadarStructuralSupervisionFamily::MemoryDiff => {
+                self.memory_diff_token_count =
+                    self.memory_diff_token_count.saturating_add(1);
+            }
+            TassadarStructuralSupervisionFamily::WorkloadSpecificState => {
+                self.workload_specific_state_token_count = self
+                    .workload_specific_state_token_count
+                    .saturating_add(1);
+            }
+        }
+    }
+
+    /// Adds another coverage summary into `self`.
+    pub fn accumulate(&mut self, other: &Self) {
+        self.total_target_token_count = self
+            .total_target_token_count
+            .saturating_add(other.total_target_token_count);
+        self.instruction_pointer_token_count = self
+            .instruction_pointer_token_count
+            .saturating_add(other.instruction_pointer_token_count);
+        self.branch_outcome_token_count = self
+            .branch_outcome_token_count
+            .saturating_add(other.branch_outcome_token_count);
+        self.stack_delta_token_count = self
+            .stack_delta_token_count
+            .saturating_add(other.stack_delta_token_count);
+        self.memory_diff_token_count = self
+            .memory_diff_token_count
+            .saturating_add(other.memory_diff_token_count);
+        self.workload_specific_state_token_count = self
+            .workload_specific_state_token_count
+            .saturating_add(other.workload_specific_state_token_count);
+    }
+}
+
 /// Tokenized executor example with explicit prompt/target boundaries.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TassadarTokenizedExecutionSequence {
@@ -304,6 +401,102 @@ impl TassadarTraceTokenizer {
         None
     }
 
+    /// Classifies each target token into zero or more structural supervision families.
+    #[must_use]
+    pub fn classify_target_structural_supervision(
+        &self,
+        tokens: &[TokenId],
+        prompt_token_count: usize,
+    ) -> Vec<Vec<TassadarStructuralSupervisionFamily>> {
+        let mut families = vec![Vec::new(); tokens.len().saturating_sub(prompt_token_count)];
+        let mut index = prompt_token_count;
+        let halt_token = self.token_id(HALT_TOKEN);
+        let eos_token = self.vocabulary.eos_id();
+        let step_token = self.token_id(STEP_TOKEN);
+        while index < tokens.len() {
+            let token = tokens[index];
+            if token == halt_token || token == eos_token {
+                break;
+            }
+            if token != step_token {
+                index = index.saturating_add(1);
+                continue;
+            }
+            index = index.saturating_add(1);
+            index = self.consume_field_u32(
+                tokens,
+                prompt_token_count,
+                index,
+                FIELD_STEP_INDEX,
+                None,
+                &mut families,
+            );
+            index = self.consume_field_u32(
+                tokens,
+                prompt_token_count,
+                index,
+                FIELD_PC,
+                Some(TassadarStructuralSupervisionFamily::InstructionPointer),
+                &mut families,
+            );
+            index = self.consume_field_u32(
+                tokens,
+                prompt_token_count,
+                index,
+                FIELD_NEXT_PC,
+                Some(TassadarStructuralSupervisionFamily::InstructionPointer),
+                &mut families,
+            );
+            index = self.consume_instruction(tokens, index);
+            let memory_write_slot =
+                self.consume_event(tokens, prompt_token_count, index, &mut families);
+            index = memory_write_slot.0;
+            index = self.consume_stack_list(
+                tokens,
+                prompt_token_count,
+                index,
+                FIELD_STACK_BEFORE,
+                &mut families,
+            );
+            index = self.consume_stack_list(
+                tokens,
+                prompt_token_count,
+                index,
+                FIELD_STACK_AFTER,
+                &mut families,
+            );
+            index = self.consume_i32_list(tokens, index, FIELD_LOCALS_AFTER);
+            index = self.consume_memory_after_list(
+                tokens,
+                prompt_token_count,
+                index,
+                memory_write_slot.1,
+                &mut families,
+            );
+        }
+        families
+    }
+
+    /// Summarizes structural-supervision coverage for one token sequence.
+    #[must_use]
+    pub fn summarize_target_structural_supervision(
+        &self,
+        tokens: &[TokenId],
+        prompt_token_count: usize,
+    ) -> TassadarStructuralSupervisionCoverage {
+        let families = self.classify_target_structural_supervision(tokens, prompt_token_count);
+        let mut coverage = TassadarStructuralSupervisionCoverage {
+            total_target_token_count: families.len() as u32,
+            ..TassadarStructuralSupervisionCoverage::default()
+        };
+        for token_families in families {
+            for family in token_families {
+                coverage.increment(family);
+            }
+        }
+        coverage
+    }
+
     fn push_step(&self, tokens: &mut Vec<TokenId>, step: &TassadarTraceStep) {
         tokens.push(self.token_id(STEP_TOKEN));
         tokens.push(self.token_id(FIELD_STEP_INDEX));
@@ -480,6 +673,213 @@ impl TassadarTraceTokenizer {
         }
         Some((raw - self.byte_token_start) as u8)
     }
+
+    fn consume_field_u32(
+        &self,
+        tokens: &[TokenId],
+        prompt_token_count: usize,
+        index: usize,
+        field_token: &str,
+        family: Option<TassadarStructuralSupervisionFamily>,
+        families: &mut [Vec<TassadarStructuralSupervisionFamily>],
+    ) -> usize {
+        if index >= tokens.len() || tokens[index] != self.token_id(field_token) {
+            return index.saturating_add(1);
+        }
+        if let Some(family) = family {
+            self.mark_target_range(
+                prompt_token_count,
+                index,
+                5,
+                family,
+                families,
+            );
+        }
+        index.saturating_add(5).min(tokens.len())
+    }
+
+    fn consume_instruction(&self, tokens: &[TokenId], index: usize) -> usize {
+        if index >= tokens.len() {
+            return index;
+        }
+        let token = tokens[index];
+        let with_immediate = [
+            self.token_id(OP_I32_CONST),
+            self.token_id(OP_LOCAL_GET),
+            self.token_id(OP_LOCAL_SET),
+            self.token_id(OP_I32_LOAD),
+            self.token_id(OP_I32_STORE),
+            self.token_id(OP_BR_IF),
+        ];
+        if with_immediate.contains(&token) {
+            index.saturating_add(5).min(tokens.len())
+        } else {
+            index.saturating_add(1).min(tokens.len())
+        }
+    }
+
+    fn consume_event(
+        &self,
+        tokens: &[TokenId],
+        prompt_token_count: usize,
+        index: usize,
+        families: &mut [Vec<TassadarStructuralSupervisionFamily>],
+    ) -> (usize, Option<usize>) {
+        if index >= tokens.len() {
+            return (index, None);
+        }
+        let token = tokens[index];
+        if token == self.token_id(EVENT_CONST_PUSH) {
+            return (index.saturating_add(5).min(tokens.len()), None);
+        }
+        if token == self.token_id(EVENT_LOCAL_GET) || token == self.token_id(EVENT_LOCAL_SET) {
+            return (index.saturating_add(9).min(tokens.len()), None);
+        }
+        if [
+            self.token_id(EVENT_BINARY_ADD),
+            self.token_id(EVENT_BINARY_SUB),
+            self.token_id(EVENT_BINARY_MUL),
+            self.token_id(EVENT_BINARY_LT),
+        ]
+        .contains(&token)
+        {
+            return (index.saturating_add(13).min(tokens.len()), None);
+        }
+        if token == self.token_id(EVENT_LOAD) {
+            return (index.saturating_add(9).min(tokens.len()), None);
+        }
+        if token == self.token_id(EVENT_STORE) {
+            self.mark_target_range(
+                prompt_token_count,
+                index,
+                9,
+                TassadarStructuralSupervisionFamily::MemoryDiff,
+                families,
+            );
+            let slot = self.parse_u32(tokens, index.saturating_add(1)).map(|value| value as usize);
+            return (index.saturating_add(9).min(tokens.len()), slot);
+        }
+        if token == self.token_id(EVENT_BRANCH) {
+            self.mark_target_range(
+                prompt_token_count,
+                index,
+                10,
+                TassadarStructuralSupervisionFamily::BranchOutcome,
+                families,
+            );
+            return (index.saturating_add(10).min(tokens.len()), None);
+        }
+        if token == self.token_id(EVENT_OUTPUT) {
+            return (index.saturating_add(5).min(tokens.len()), None);
+        }
+        if token == self.token_id(EVENT_RETURN) {
+            return (index.saturating_add(1).min(tokens.len()), None);
+        }
+        (index.saturating_add(1).min(tokens.len()), None)
+    }
+
+    fn consume_stack_list(
+        &self,
+        tokens: &[TokenId],
+        prompt_token_count: usize,
+        index: usize,
+        field_token: &str,
+        families: &mut [Vec<TassadarStructuralSupervisionFamily>],
+    ) -> usize {
+        if index.saturating_add(6) > tokens.len() || tokens[index] != self.token_id(field_token) {
+            return index.saturating_add(1);
+        }
+        self.mark_target_range(
+            prompt_token_count,
+            index,
+            6,
+            TassadarStructuralSupervisionFamily::StackDelta,
+            families,
+        );
+        self.consume_i32_list(tokens, index, field_token)
+    }
+
+    fn consume_i32_list(&self, tokens: &[TokenId], index: usize, field_token: &str) -> usize {
+        if index.saturating_add(6) > tokens.len() || tokens[index] != self.token_id(field_token) {
+            return index.saturating_add(1);
+        }
+        if tokens[index + 1] != self.token_id(LIST_TOKEN) {
+            return index.saturating_add(1);
+        }
+        let value_count = self.parse_u32(tokens, index + 2).unwrap_or(0) as usize;
+        index
+            .saturating_add(6)
+            .saturating_add(value_count.saturating_mul(4))
+            .min(tokens.len())
+    }
+
+    fn consume_memory_after_list(
+        &self,
+        tokens: &[TokenId],
+        prompt_token_count: usize,
+        index: usize,
+        memory_write_slot: Option<usize>,
+        families: &mut [Vec<TassadarStructuralSupervisionFamily>],
+    ) -> usize {
+        if index.saturating_add(6) > tokens.len()
+            || tokens[index] != self.token_id(FIELD_MEMORY_AFTER)
+            || tokens[index + 1] != self.token_id(LIST_TOKEN)
+        {
+            return index.saturating_add(1);
+        }
+        let value_count = self.parse_u32(tokens, index + 2).unwrap_or(0) as usize;
+        if let Some(slot) = memory_write_slot {
+            if slot < value_count {
+                let value_start = index
+                    .saturating_add(6)
+                    .saturating_add(slot.saturating_mul(4));
+                self.mark_target_range(
+                    prompt_token_count,
+                    value_start,
+                    4,
+                    TassadarStructuralSupervisionFamily::MemoryDiff,
+                    families,
+                );
+            }
+        }
+        index
+            .saturating_add(6)
+            .saturating_add(value_count.saturating_mul(4))
+            .min(tokens.len())
+    }
+
+    fn parse_u32(&self, tokens: &[TokenId], start: usize) -> Option<u32> {
+        let bytes = [
+            self.byte_value(*tokens.get(start)?)?,
+            self.byte_value(*tokens.get(start + 1)?)?,
+            self.byte_value(*tokens.get(start + 2)?)?,
+            self.byte_value(*tokens.get(start + 3)?)?,
+        ];
+        Some(u32::from_le_bytes(bytes))
+    }
+
+    fn mark_target_range(
+        &self,
+        prompt_token_count: usize,
+        start: usize,
+        len: usize,
+        family: TassadarStructuralSupervisionFamily,
+        families: &mut [Vec<TassadarStructuralSupervisionFamily>],
+    ) {
+        let end = start.saturating_add(len);
+        for absolute_index in start..end {
+            if absolute_index < prompt_token_count {
+                continue;
+            }
+            let target_index = absolute_index - prompt_token_count;
+            let Some(entry) = families.get_mut(target_index) else {
+                continue;
+            };
+            if !entry.contains(&family) {
+                entry.push(family);
+            }
+        }
+    }
 }
 
 impl TokenizerBoundary for TassadarTraceTokenizer {
@@ -525,7 +925,7 @@ mod tests {
     use crate::TokenizerBoundary;
     use psionic_runtime::{TassadarCpuReferenceRunner, tassadar_sudoku_v0_corpus};
 
-    use super::TassadarTraceTokenizer;
+    use super::{TassadarStructuralSupervisionCoverage, TassadarTraceTokenizer};
 
     #[test]
     fn tokenizer_roundtrips_symbolic_tokens_for_sudoku_v0_reference_case()
@@ -555,5 +955,35 @@ mod tests {
 
         assert_eq!(tokenizer.stable_digest(), tokenizer.stable_digest());
         assert!(tokenizer.vocabulary().len() > 256);
+    }
+
+    #[test]
+    fn tokenizer_derives_structural_supervision_coverage_for_reference_trace()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let tokenizer = TassadarTraceTokenizer::new();
+        let case = tassadar_sudoku_v0_corpus()
+            .into_iter()
+            .next()
+            .expect("sudoku corpus should not be empty");
+        let execution = TassadarCpuReferenceRunner::for_program(&case.validation_case.program)?
+            .execute(&case.validation_case.program)?;
+        let tokenized =
+            tokenizer.tokenize_program_and_execution(&case.validation_case.program, &execution);
+        let coverage = tokenizer.summarize_target_structural_supervision(
+            tokenized.sequence.as_slice(),
+            tokenized.prompt_token_count,
+        );
+
+        assert_eq!(
+            coverage.total_target_token_count,
+            tokenized.target_token_count as u32
+        );
+        assert!(coverage.instruction_pointer_token_count > 0);
+        assert!(coverage.stack_delta_token_count > 0);
+        assert_eq!(
+            coverage.workload_specific_state_token_count,
+            TassadarStructuralSupervisionCoverage::default().workload_specific_state_token_count
+        );
+        Ok(())
     }
 }

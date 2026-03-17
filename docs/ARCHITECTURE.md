@@ -501,6 +501,20 @@ The current scope is:
   `psionic-train`, with package-backed Tassadar supervision, fixed-budget
   training receipts, proof-aware exactness comparison against the handcrafted
   reference lane, and explicit validation-corpus-only scope claims
+- landed learned structural-supervision follow-on: `psionic-models` now
+  classifies instruction-pointer, branch-outcome, stack-delta, memory-diff,
+  and workload-specific target families from the executor trace ABI,
+  `psionic-train` now persists structural-supervision profiles and split-level
+  coverage inventory in the sequence training manifest and emits
+  `structural_supervision_report.json` in learned run bundles, `psionic-eval`
+  now scores family-level exactness on bounded validation decodes, and
+  `psionic-research` now materializes the bounded comparison root at
+  `fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1`; the committed
+  artifacts prove richer learned targets moved the bounded lane materially
+  without widening the claim boundary (`4570` to `7812` aggregate target-token
+  exactness, `4375` to `6875` first-32 exactness, instruction-pointer `5000`
+  to `7000` bps, stack-delta `2500` to `5833` bps, still `10000` bps
+  first-target, and still bounded early-curriculum validation only)
 - landed Phase 9C bar: program-specialized compiled-weight deployments in
   `psionic-models` plus larger-2D-head family research outputs in
   `psionic-research`, with exact program-artifact binding, explicit

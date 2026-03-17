@@ -5,15 +5,24 @@ use psionic_data::{
 use psionic_eval::{
     TassadarSequenceEvalError, TassadarSequenceWorkload, build_tassadar_sequence_dataset,
 };
-use psionic_models::TassadarExecutorTrainableSurface;
+use psionic_models::{
+    TassadarExecutorTrainableSurface, TassadarStructuralSupervisionCoverage,
+    TassadarTraceTokenizer, TokenId,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::TassadarExecutorTeacherForcedTrainingStrategy;
+use crate::{
+    TassadarExecutorStructuralSupervisionConfig, TassadarExecutorTeacherForcedTrainingStrategy,
+};
+
+fn default_structural_supervision_config() -> TassadarExecutorStructuralSupervisionConfig {
+    TassadarExecutorStructuralSupervisionConfig::next_token_only()
+}
 
 /// Frozen train/eval packing contract for the tokenized Sudoku-v0 executor corpus.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TassadarSequenceTrainingManifest {
     /// Stable dataset storage key.
     pub dataset_storage_key: String,
@@ -32,6 +41,14 @@ pub struct TassadarSequenceTrainingManifest {
         skip_serializing_if = "teacher_forced_training_strategy_is_full_forward_window"
     )]
     pub teacher_forced_training_strategy: TassadarExecutorTeacherForcedTrainingStrategy,
+    /// Explicit structural-supervision weighting profile frozen into the run.
+    #[serde(
+        default = "default_structural_supervision_config",
+        skip_serializing_if = "structural_supervision_config_is_next_token_only"
+    )]
+    pub structural_supervision: TassadarExecutorStructuralSupervisionConfig,
+    /// Aggregate structural-supervision coverage across dataset splits.
+    pub structural_supervision_inventory: TassadarSequenceStructuralSupervisionInventory,
     /// Shared packing policy used for the first training run.
     pub packing_policy: DatasetPackingPolicy,
     /// Packed train split.
@@ -51,6 +68,8 @@ impl TassadarSequenceTrainingManifest {
         vocabulary_digest: &str,
         trainable_surface: TassadarExecutorTrainableSurface,
         teacher_forced_training_strategy: TassadarExecutorTeacherForcedTrainingStrategy,
+        structural_supervision: TassadarExecutorStructuralSupervisionConfig,
+        structural_supervision_inventory: TassadarSequenceStructuralSupervisionInventory,
         packing_policy: DatasetPackingPolicy,
         train_plan: DatasetPackingPlan,
         validation_plan: DatasetPackingPlan,
@@ -63,6 +82,8 @@ impl TassadarSequenceTrainingManifest {
             vocabulary_digest: vocabulary_digest.to_string(),
             trainable_surface,
             teacher_forced_training_strategy,
+            structural_supervision,
+            structural_supervision_inventory,
             packing_policy,
             train_plan,
             validation_plan,
@@ -100,15 +121,45 @@ fn teacher_forced_training_strategy_is_full_forward_window(
     *strategy == TassadarExecutorTeacherForcedTrainingStrategy::FullForwardWindow
 }
 
+fn structural_supervision_config_is_next_token_only(
+    config: &TassadarExecutorStructuralSupervisionConfig,
+) -> bool {
+    *config == TassadarExecutorStructuralSupervisionConfig::next_token_only()
+}
+
+/// Aggregate structural-supervision coverage for one split.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarSequenceStructuralSupervisionSplitCoverage {
+    /// Split represented by the summary.
+    pub split: TassadarSequenceSplit,
+    /// Number of examples inside the split.
+    pub example_count: u32,
+    /// Aggregate coverage across all target tokens in the split.
+    pub coverage: TassadarStructuralSupervisionCoverage,
+}
+
+/// Aggregate structural-supervision coverage across the frozen dataset splits.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarSequenceStructuralSupervisionInventory {
+    /// Training split coverage.
+    pub train: TassadarSequenceStructuralSupervisionSplitCoverage,
+    /// Validation split coverage.
+    pub validation: TassadarSequenceStructuralSupervisionSplitCoverage,
+    /// Test split coverage.
+    pub test: TassadarSequenceStructuralSupervisionSplitCoverage,
+}
+
 /// Builds the frozen sequence dataset plus generic packing plans for one Tassadar workload.
 pub fn build_tassadar_sequence_training_manifest(
     workload: TassadarSequenceWorkload,
     version: &str,
     trainable_surface: TassadarExecutorTrainableSurface,
     teacher_forced_training_strategy: TassadarExecutorTeacherForcedTrainingStrategy,
+    structural_supervision: TassadarExecutorStructuralSupervisionConfig,
 ) -> Result<TassadarSequenceTrainingManifest, TassadarSequenceTrainingError> {
     let bundle = build_tassadar_sequence_dataset(workload, version)?;
     let dataset = bundle.dataset;
+    let tokenizer = TassadarTraceTokenizer::new();
     let max_tokens = dataset
         .examples
         .iter()
@@ -125,12 +176,16 @@ pub fn build_tassadar_sequence_training_manifest(
     let validation_plan =
         dataset.packing_plan(TassadarSequenceSplit::Validation, &packing_policy)?;
     let test_plan = dataset.packing_plan(TassadarSequenceSplit::Test, &packing_policy)?;
+    let structural_supervision_inventory =
+        build_structural_supervision_inventory(&tokenizer, &dataset);
     Ok(TassadarSequenceTrainingManifest::new(
         &dataset,
         bundle.tokenizer_digest.stable_digest().as_str(),
         bundle.vocabulary_digest.as_str(),
         trainable_surface,
         teacher_forced_training_strategy,
+        structural_supervision,
+        structural_supervision_inventory,
         packing_policy,
         train_plan,
         validation_plan,
@@ -147,6 +202,7 @@ pub fn build_tassadar_sudoku_v0_sequence_training_manifest(
         version,
         TassadarExecutorTrainableSurface::OutputHeadOnly,
         TassadarExecutorTeacherForcedTrainingStrategy::FullForwardWindow,
+        TassadarExecutorStructuralSupervisionConfig::next_token_only(),
     )
 }
 
@@ -159,7 +215,57 @@ pub fn build_tassadar_sudoku_9x9_sequence_training_manifest(
         version,
         TassadarExecutorTrainableSurface::OutputHeadOnly,
         TassadarExecutorTeacherForcedTrainingStrategy::FullForwardWindow,
+        TassadarExecutorStructuralSupervisionConfig::next_token_only(),
     )
+}
+
+fn build_structural_supervision_inventory(
+    tokenizer: &TassadarTraceTokenizer,
+    dataset: &TassadarSequenceDatasetContract,
+) -> TassadarSequenceStructuralSupervisionInventory {
+    TassadarSequenceStructuralSupervisionInventory {
+        train: build_split_structural_supervision_coverage(
+            tokenizer,
+            dataset,
+            TassadarSequenceSplit::Train,
+        ),
+        validation: build_split_structural_supervision_coverage(
+            tokenizer,
+            dataset,
+            TassadarSequenceSplit::Validation,
+        ),
+        test: build_split_structural_supervision_coverage(
+            tokenizer,
+            dataset,
+            TassadarSequenceSplit::Test,
+        ),
+    }
+}
+
+fn build_split_structural_supervision_coverage(
+    tokenizer: &TassadarTraceTokenizer,
+    dataset: &TassadarSequenceDatasetContract,
+    split: TassadarSequenceSplit,
+) -> TassadarSequenceStructuralSupervisionSplitCoverage {
+    let mut coverage = TassadarStructuralSupervisionCoverage::default();
+    let mut example_count = 0_u32;
+    for example in dataset.examples.iter().filter(|example| example.metadata.split == split) {
+        let tokens = example
+            .token_ids
+            .iter()
+            .map(|token| TokenId(*token))
+            .collect::<Vec<_>>();
+        coverage.accumulate(&tokenizer.summarize_target_structural_supervision(
+            tokens.as_slice(),
+            example.metadata.prompt_token_count as usize,
+        ));
+        example_count = example_count.saturating_add(1);
+    }
+    TassadarSequenceStructuralSupervisionSplitCoverage {
+        split,
+        example_count,
+        coverage,
+    }
 }
 
 fn stable_digest<T>(prefix: &[u8], value: &T) -> String
@@ -189,6 +295,17 @@ mod tests {
         assert_eq!(manifest.train_plan.total_source_sequences, 4);
         assert_eq!(manifest.validation_plan.total_source_sequences, 2);
         assert_eq!(manifest.test_plan.total_source_sequences, 2);
+        assert!(
+            manifest.structural_supervision_inventory.train.coverage.total_target_token_count > 0
+        );
+        assert!(
+            manifest
+                .structural_supervision_inventory
+                .train
+                .coverage
+                .instruction_pointer_token_count
+                > 0
+        );
         assert!(!manifest.tokenizer_digest.is_empty());
         assert!(!manifest.vocabulary_digest.is_empty());
         assert!(!manifest.manifest_digest.is_empty());
@@ -203,6 +320,14 @@ mod tests {
         assert_eq!(manifest.train_plan.total_source_sequences, 2);
         assert_eq!(manifest.validation_plan.total_source_sequences, 1);
         assert_eq!(manifest.test_plan.total_source_sequences, 1);
+        assert!(
+            manifest
+                .structural_supervision_inventory
+                .validation
+                .coverage
+                .total_target_token_count
+                > 0
+        );
         assert!(!manifest.manifest_digest.is_empty());
         Ok(())
     }

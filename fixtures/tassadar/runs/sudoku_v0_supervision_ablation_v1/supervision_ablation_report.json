@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "comparison_ref": "research://openagents/psionic/tassadar/supervision_ablation/v1",
+  "workload": "sudoku_v0",
+  "variants": [
+    {
+      "variant_id": "next_token_only",
+      "description": "Bounded early-curriculum baseline with next-token-only loss weighting",
+      "structural_supervision_profile_id": "next_token_only_v1",
+      "run_bundle_ref": "fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1/next_token_only/run_bundle.json",
+      "training_manifest_ref": "fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1/next_token_only/training_manifest.json",
+      "training_report_ref": "fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1/next_token_only/training_report.json",
+      "structural_supervision_report_ref": "fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1/next_token_only/structural_supervision_report.json",
+      "training_manifest_digest": "2784297bcddd05dc1290487fbdd2b8be08c5074bcd18fe61fcdf52a7e6ff5229",
+      "training_report_digest": "50143844e96d57bfd8cada860d94cfa6f9b957dd0e9c7310ab13c036fd6e744c",
+      "structural_supervision_report_digest": "6778775a97647d626d9aa1fed048162e9e813148095dc40a94b3c83772cdadc1",
+      "aggregate_target_token_exactness_bps": 4570,
+      "first_target_exactness_bps": 10000,
+      "first_32_token_exactness_bps": 4375,
+      "structural_metrics": [
+        {
+          "family": "instruction_pointer",
+          "target_token_count": 20,
+          "matched_token_count": 10,
+          "exactness_bps": 5000
+        },
+        {
+          "family": "branch_outcome",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        },
+        {
+          "family": "stack_delta",
+          "target_token_count": 24,
+          "matched_token_count": 6,
+          "exactness_bps": 2500
+        },
+        {
+          "family": "memory_diff",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        },
+        {
+          "family": "workload_specific_state",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        }
+      ]
+    },
+    {
+      "variant_id": "structural_state_weighted",
+      "description": "Matched bounded early-curriculum run with extra instruction-pointer, branch, stack, and memory weighting",
+      "structural_supervision_profile_id": "structural_state_reference_v1",
+      "run_bundle_ref": "fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1/structural_state_weighted/run_bundle.json",
+      "training_manifest_ref": "fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1/structural_state_weighted/training_manifest.json",
+      "training_report_ref": "fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1/structural_state_weighted/training_report.json",
+      "structural_supervision_report_ref": "fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1/structural_state_weighted/structural_supervision_report.json",
+      "training_manifest_digest": "c61bda552fc814a9929ad2f1ead5b41f177803da3682d2c9a310590ff2673742",
+      "training_report_digest": "3f577ed2e0c7cd593739a3d2d4efbf6edcf359ef1f1aa47a5cf7ca2f089d6bde",
+      "structural_supervision_report_digest": "2ca3ec9acbef6beef233753f70694c4ee00ddb0ea73e3bff362163c041e6f204",
+      "aggregate_target_token_exactness_bps": 7812,
+      "first_target_exactness_bps": 10000,
+      "first_32_token_exactness_bps": 6875,
+      "structural_metrics": [
+        {
+          "family": "instruction_pointer",
+          "target_token_count": 20,
+          "matched_token_count": 14,
+          "exactness_bps": 7000
+        },
+        {
+          "family": "branch_outcome",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        },
+        {
+          "family": "stack_delta",
+          "target_token_count": 24,
+          "matched_token_count": 14,
+          "exactness_bps": 5833
+        },
+        {
+          "family": "memory_diff",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        },
+        {
+          "family": "workload_specific_state",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        }
+      ]
+    }
+  ],
+  "family_deltas_vs_baseline": [
+    {
+      "family": "branch_outcome",
+      "baseline_exactness_bps": 0,
+      "candidate_exactness_bps": 0,
+      "delta_bps": 0
+    },
+    {
+      "family": "instruction_pointer",
+      "baseline_exactness_bps": 5000,
+      "candidate_exactness_bps": 7000,
+      "delta_bps": 2000
+    },
+    {
+      "family": "memory_diff",
+      "baseline_exactness_bps": 0,
+      "candidate_exactness_bps": 0,
+      "delta_bps": 0
+    },
+    {
+      "family": "stack_delta",
+      "baseline_exactness_bps": 2500,
+      "candidate_exactness_bps": 5833,
+      "delta_bps": 3333
+    },
+    {
+      "family": "workload_specific_state",
+      "baseline_exactness_bps": 0,
+      "candidate_exactness_bps": 0,
+      "delta_bps": 0
+    }
+  ],
+  "summary": "Structured supervision changed the bounded learned lane while keeping claims bounded: aggregate_bps=7812, first_target_bps=10000, first_32_bps=6875, family_improvements=instruction_pointer:+2000,stack_delta:+3333.",
+  "report_digest": "04073b4beb340def96283897dbf9bfd10731fa84eb609a6bde6fe85c1970acf1"
+}

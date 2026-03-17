@@ -495,6 +495,7 @@ pub fn tassadar_executor_sudoku_9x9_reference_run_config() -> TassadarExecutorTr
         trainable_surface: TassadarExecutorTrainableSurface::OutputHeadOnly,
         teacher_forced_training_strategy:
             TassadarExecutorTeacherForcedTrainingStrategy::IncrementalDecodeWindow,
+        structural_supervision: crate::TassadarExecutorStructuralSupervisionConfig::next_token_only(),
         curriculum_stages: vec![
             crate::TassadarExecutorCurriculumStage::new("prompt_to_first_token", Some(1), 1),
             crate::TassadarExecutorCurriculumStage::new("prompt_to_first_8_tokens", Some(8), 1),

@@ -1,0 +1,518 @@
+{
+  "config": {
+    "run_id": "tassadar-executor-sudoku-v0-supervision-baseline-v1",
+    "workload": "sudoku_v0",
+    "dataset_version": "train-v0",
+    "epochs": 1,
+    "learning_rate": 0.05,
+    "max_train_target_tokens_per_example": 128,
+    "max_eval_target_tokens_per_example": 128,
+    "trainable_surface": "output_head_embeddings_and_small_learned_mixer",
+    "curriculum_stages": [
+      {
+        "stage_id": "prompt_to_first_token",
+        "max_train_target_tokens_per_example": 1,
+        "epochs": 1
+      },
+      {
+        "stage_id": "prompt_to_first_8_tokens",
+        "max_train_target_tokens_per_example": 8,
+        "epochs": 1
+      },
+      {
+        "stage_id": "prompt_to_first_32_tokens",
+        "max_train_target_tokens_per_example": 32,
+        "epochs": 1
+      }
+    ],
+    "validate_every_epoch": true,
+    "select_best_checkpoint_by_boundary": true
+  },
+  "training_manifest_digest": "2784297bcddd05dc1290487fbdd2b8be08c5074bcd18fe61fcdf52a7e6ff5229",
+  "trained_model_descriptor_digest": "02d2d3e3ec65dc8dfcbde3df9967af07433a5c5c7deb583a91b44a4a20d0423d",
+  "trained_weight_digest": "5fc1f2a39e66bbe90b055f143201a4d3952276f561675eaad263d1cc2808e233",
+  "best_checkpoint_id": "tassadar-executor-sudoku-v0-supervision-baseline-v1.checkpoint.epoch_0003",
+  "checkpoint_selection_basis": "boundary_metrics_lexicographic_v1",
+  "batch_reports": [
+    {
+      "global_epoch_index": 0,
+      "stage_id": "prompt_to_first_token",
+      "stage_epoch_index": 0,
+      "stage_max_train_target_tokens_per_example": 1,
+      "stage_learning_rate": 0.05,
+      "stage_prefix_mode": "teacher_forced",
+      "batch_id": "03e41bb9c7b4129495d84049cbf005a7181b7e8bc97ac42c1ad63b7d0204ad02",
+      "sequence_ids": [
+        "tassadar.sequence.sudoku_v0_train_a",
+        "tassadar.sequence.sudoku_v0_train_b",
+        "tassadar.sequence.sudoku_v0_train_c",
+        "tassadar.sequence.sudoku_v0_train_d"
+      ],
+      "mean_loss": 5.6762214,
+      "target_token_count": 4
+    },
+    {
+      "global_epoch_index": 1,
+      "stage_id": "prompt_to_first_8_tokens",
+      "stage_epoch_index": 0,
+      "stage_max_train_target_tokens_per_example": 8,
+      "stage_learning_rate": 0.05,
+      "stage_prefix_mode": "teacher_forced",
+      "batch_id": "03e41bb9c7b4129495d84049cbf005a7181b7e8bc97ac42c1ad63b7d0204ad02",
+      "sequence_ids": [
+        "tassadar.sequence.sudoku_v0_train_a",
+        "tassadar.sequence.sudoku_v0_train_b",
+        "tassadar.sequence.sudoku_v0_train_c",
+        "tassadar.sequence.sudoku_v0_train_d"
+      ],
+      "mean_loss": 5.6784434,
+      "target_token_count": 32
+    },
+    {
+      "global_epoch_index": 2,
+      "stage_id": "prompt_to_first_32_tokens",
+      "stage_epoch_index": 0,
+      "stage_max_train_target_tokens_per_example": 32,
+      "stage_learning_rate": 0.05,
+      "stage_prefix_mode": "teacher_forced",
+      "batch_id": "03e41bb9c7b4129495d84049cbf005a7181b7e8bc97ac42c1ad63b7d0204ad02",
+      "sequence_ids": [
+        "tassadar.sequence.sudoku_v0_train_a",
+        "tassadar.sequence.sudoku_v0_train_b",
+        "tassadar.sequence.sudoku_v0_train_c",
+        "tassadar.sequence.sudoku_v0_train_d"
+      ],
+      "mean_loss": 5.6684003,
+      "target_token_count": 128
+    },
+    {
+      "global_epoch_index": 3,
+      "stage_id": "full_trace_supervision",
+      "stage_epoch_index": 0,
+      "stage_max_train_target_tokens_per_example": 128,
+      "stage_learning_rate": 0.05,
+      "stage_prefix_mode": "teacher_forced",
+      "batch_id": "03e41bb9c7b4129495d84049cbf005a7181b7e8bc97ac42c1ad63b7d0204ad02",
+      "sequence_ids": [
+        "tassadar.sequence.sudoku_v0_train_a",
+        "tassadar.sequence.sudoku_v0_train_b",
+        "tassadar.sequence.sudoku_v0_train_c",
+        "tassadar.sequence.sudoku_v0_train_d"
+      ],
+      "mean_loss": 5.6187906,
+      "target_token_count": 512
+    }
+  ],
+  "epoch_reports": [
+    {
+      "checkpoint_id": "tassadar-executor-sudoku-v0-supervision-baseline-v1.checkpoint.epoch_0000",
+      "global_epoch_index": 0,
+      "stage_id": "prompt_to_first_token",
+      "stage_epoch_index": 0,
+      "stage_max_train_target_tokens_per_example": 1,
+      "stage_learning_rate": 0.05,
+      "stage_prefix_mode": "teacher_forced",
+      "mean_loss": 5.6762214,
+      "target_token_count": 4,
+      "evaluation": {
+        "dataset_storage_key": "oa.tassadar.sudoku_v0.sequence@train-v0",
+        "dataset_digest": "e71f1538d567d65656a2ca4a5ea6db6cdb444e9bfd80244347e691bba894a2af",
+        "split": "validation",
+        "claim_boundary": "greedy_decode_unvalidated",
+        "aggregate_target_token_exactness_bps": 78,
+        "first_target_exactness_bps": 10000,
+        "first_8_token_exactness_bps": 1250,
+        "first_32_token_exactness_bps": 313,
+        "exact_trace_case_count": 0,
+        "final_output_exact_case_count": 0,
+        "halt_exact_case_count": 0,
+        "case_reports": [
+          {
+            "sequence_id": "tassadar.sequence.sudoku_v0_validation_a",
+            "case_id": "sudoku_v0_validation_a",
+            "target_token_exactness_bps": 78,
+            "boundary": {
+              "first_target_exactness_bps": 10000,
+              "first_8_token_exactness_bps": 1250,
+              "first_32_token_exactness_bps": 313
+            },
+            "matched_target_token_count": 1,
+            "first_divergence_index": 1,
+            "reference_divergence_token": "<step_index>",
+            "predicted_divergence_token": "<byte_79>",
+            "exact_trace_match": false,
+            "final_output_match": false,
+            "halt_match": false,
+            "reference_target_digest": "edb14d14fd36dd461a7a4729b5f583f205d75baf18db1a90f5bf18d00428bfa1",
+            "predicted_target_digest": "84a1f2f8930897f537015e1c9491de030aa5ffcbf103d239bcec8575b33614cc",
+            "failures": [
+              "exact_trace_mismatch",
+              "final_output_mismatch",
+              "halt_mismatch"
+            ]
+          },
+          {
+            "sequence_id": "tassadar.sequence.sudoku_v0_validation_b",
+            "case_id": "sudoku_v0_validation_b",
+            "target_token_exactness_bps": 78,
+            "boundary": {
+              "first_target_exactness_bps": 10000,
+              "first_8_token_exactness_bps": 1250,
+              "first_32_token_exactness_bps": 313
+            },
+            "matched_target_token_count": 1,
+            "first_divergence_index": 1,
+            "reference_divergence_token": "<step_index>",
+            "predicted_divergence_token": "<byte_79>",
+            "exact_trace_match": false,
+            "final_output_match": false,
+            "halt_match": false,
+            "reference_target_digest": "ef2b34758a0fdc0e8364e919638e5b8134358d36e80030422e7e7680ec5bf7d8",
+            "predicted_target_digest": "84a1f2f8930897f537015e1c9491de030aa5ffcbf103d239bcec8575b33614cc",
+            "failures": [
+              "exact_trace_mismatch",
+              "final_output_mismatch",
+              "halt_mismatch"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "checkpoint_id": "tassadar-executor-sudoku-v0-supervision-baseline-v1.checkpoint.epoch_0001",
+      "global_epoch_index": 1,
+      "stage_id": "prompt_to_first_8_tokens",
+      "stage_epoch_index": 0,
+      "stage_max_train_target_tokens_per_example": 8,
+      "stage_learning_rate": 0.05,
+      "stage_prefix_mode": "teacher_forced",
+      "mean_loss": 5.6784434,
+      "target_token_count": 32,
+      "evaluation": {
+        "dataset_storage_key": "oa.tassadar.sudoku_v0.sequence@train-v0",
+        "dataset_digest": "e71f1538d567d65656a2ca4a5ea6db6cdb444e9bfd80244347e691bba894a2af",
+        "split": "validation",
+        "claim_boundary": "greedy_decode_unvalidated",
+        "aggregate_target_token_exactness_bps": 78,
+        "first_target_exactness_bps": 10000,
+        "first_8_token_exactness_bps": 1250,
+        "first_32_token_exactness_bps": 313,
+        "exact_trace_case_count": 0,
+        "final_output_exact_case_count": 0,
+        "halt_exact_case_count": 0,
+        "case_reports": [
+          {
+            "sequence_id": "tassadar.sequence.sudoku_v0_validation_a",
+            "case_id": "sudoku_v0_validation_a",
+            "target_token_exactness_bps": 78,
+            "boundary": {
+              "first_target_exactness_bps": 10000,
+              "first_8_token_exactness_bps": 1250,
+              "first_32_token_exactness_bps": 313
+            },
+            "matched_target_token_count": 1,
+            "first_divergence_index": 1,
+            "reference_divergence_token": "<step_index>",
+            "predicted_divergence_token": "<byte_79>",
+            "exact_trace_match": false,
+            "final_output_match": false,
+            "halt_match": false,
+            "reference_target_digest": "edb14d14fd36dd461a7a4729b5f583f205d75baf18db1a90f5bf18d00428bfa1",
+            "predicted_target_digest": "84a1f2f8930897f537015e1c9491de030aa5ffcbf103d239bcec8575b33614cc",
+            "failures": [
+              "exact_trace_mismatch",
+              "final_output_mismatch",
+              "halt_mismatch"
+            ]
+          },
+          {
+            "sequence_id": "tassadar.sequence.sudoku_v0_validation_b",
+            "case_id": "sudoku_v0_validation_b",
+            "target_token_exactness_bps": 78,
+            "boundary": {
+              "first_target_exactness_bps": 10000,
+              "first_8_token_exactness_bps": 1250,
+              "first_32_token_exactness_bps": 313
+            },
+            "matched_target_token_count": 1,
+            "first_divergence_index": 1,
+            "reference_divergence_token": "<step_index>",
+            "predicted_divergence_token": "<byte_79>",
+            "exact_trace_match": false,
+            "final_output_match": false,
+            "halt_match": false,
+            "reference_target_digest": "ef2b34758a0fdc0e8364e919638e5b8134358d36e80030422e7e7680ec5bf7d8",
+            "predicted_target_digest": "84a1f2f8930897f537015e1c9491de030aa5ffcbf103d239bcec8575b33614cc",
+            "failures": [
+              "exact_trace_mismatch",
+              "final_output_mismatch",
+              "halt_mismatch"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "checkpoint_id": "tassadar-executor-sudoku-v0-supervision-baseline-v1.checkpoint.epoch_0002",
+      "global_epoch_index": 2,
+      "stage_id": "prompt_to_first_32_tokens",
+      "stage_epoch_index": 0,
+      "stage_max_train_target_tokens_per_example": 32,
+      "stage_learning_rate": 0.05,
+      "stage_prefix_mode": "teacher_forced",
+      "mean_loss": 5.6684003,
+      "target_token_count": 128,
+      "evaluation": {
+        "dataset_storage_key": "oa.tassadar.sudoku_v0.sequence@train-v0",
+        "dataset_digest": "e71f1538d567d65656a2ca4a5ea6db6cdb444e9bfd80244347e691bba894a2af",
+        "split": "validation",
+        "claim_boundary": "greedy_decode_unvalidated",
+        "aggregate_target_token_exactness_bps": 547,
+        "first_target_exactness_bps": 10000,
+        "first_8_token_exactness_bps": 7500,
+        "first_32_token_exactness_bps": 2188,
+        "exact_trace_case_count": 0,
+        "final_output_exact_case_count": 0,
+        "halt_exact_case_count": 0,
+        "case_reports": [
+          {
+            "sequence_id": "tassadar.sequence.sudoku_v0_validation_a",
+            "case_id": "sudoku_v0_validation_a",
+            "target_token_exactness_bps": 547,
+            "boundary": {
+              "first_target_exactness_bps": 10000,
+              "first_8_token_exactness_bps": 7500,
+              "first_32_token_exactness_bps": 2188
+            },
+            "matched_target_token_count": 1,
+            "first_divergence_index": 1,
+            "reference_divergence_token": "<step_index>",
+            "predicted_divergence_token": "<byte_00>",
+            "exact_trace_match": false,
+            "final_output_match": false,
+            "halt_match": false,
+            "reference_target_digest": "edb14d14fd36dd461a7a4729b5f583f205d75baf18db1a90f5bf18d00428bfa1",
+            "predicted_target_digest": "06177c963c0c65a2690b59a90ba3eb3b302a6acfc29e78b992ad3e6e02b36b30",
+            "failures": [
+              "exact_trace_mismatch",
+              "final_output_mismatch",
+              "halt_mismatch"
+            ]
+          },
+          {
+            "sequence_id": "tassadar.sequence.sudoku_v0_validation_b",
+            "case_id": "sudoku_v0_validation_b",
+            "target_token_exactness_bps": 547,
+            "boundary": {
+              "first_target_exactness_bps": 10000,
+              "first_8_token_exactness_bps": 7500,
+              "first_32_token_exactness_bps": 2188
+            },
+            "matched_target_token_count": 1,
+            "first_divergence_index": 1,
+            "reference_divergence_token": "<step_index>",
+            "predicted_divergence_token": "<byte_00>",
+            "exact_trace_match": false,
+            "final_output_match": false,
+            "halt_match": false,
+            "reference_target_digest": "ef2b34758a0fdc0e8364e919638e5b8134358d36e80030422e7e7680ec5bf7d8",
+            "predicted_target_digest": "06177c963c0c65a2690b59a90ba3eb3b302a6acfc29e78b992ad3e6e02b36b30",
+            "failures": [
+              "exact_trace_mismatch",
+              "final_output_mismatch",
+              "halt_mismatch"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "checkpoint_id": "tassadar-executor-sudoku-v0-supervision-baseline-v1.checkpoint.epoch_0003",
+      "global_epoch_index": 3,
+      "stage_id": "full_trace_supervision",
+      "stage_epoch_index": 0,
+      "stage_max_train_target_tokens_per_example": 128,
+      "stage_learning_rate": 0.05,
+      "stage_prefix_mode": "teacher_forced",
+      "mean_loss": 5.6187906,
+      "target_token_count": 512,
+      "evaluation": {
+        "dataset_storage_key": "oa.tassadar.sudoku_v0.sequence@train-v0",
+        "dataset_digest": "e71f1538d567d65656a2ca4a5ea6db6cdb444e9bfd80244347e691bba894a2af",
+        "split": "validation",
+        "claim_boundary": "greedy_decode_unvalidated",
+        "aggregate_target_token_exactness_bps": 4570,
+        "first_target_exactness_bps": 10000,
+        "first_8_token_exactness_bps": 7500,
+        "first_32_token_exactness_bps": 4375,
+        "exact_trace_case_count": 0,
+        "final_output_exact_case_count": 0,
+        "halt_exact_case_count": 0,
+        "case_reports": [
+          {
+            "sequence_id": "tassadar.sequence.sudoku_v0_validation_a",
+            "case_id": "sudoku_v0_validation_a",
+            "target_token_exactness_bps": 4531,
+            "boundary": {
+              "first_target_exactness_bps": 10000,
+              "first_8_token_exactness_bps": 7500,
+              "first_32_token_exactness_bps": 4375
+            },
+            "matched_target_token_count": 1,
+            "first_divergence_index": 1,
+            "reference_divergence_token": "<step_index>",
+            "predicted_divergence_token": "<byte_00>",
+            "exact_trace_match": false,
+            "final_output_match": false,
+            "halt_match": false,
+            "reference_target_digest": "edb14d14fd36dd461a7a4729b5f583f205d75baf18db1a90f5bf18d00428bfa1",
+            "predicted_target_digest": "3d9630ef961276037b8e9c56aeb82f08fa93c22c20c18536c7ae648d544e21b9",
+            "failures": [
+              "exact_trace_mismatch",
+              "final_output_mismatch",
+              "halt_mismatch"
+            ]
+          },
+          {
+            "sequence_id": "tassadar.sequence.sudoku_v0_validation_b",
+            "case_id": "sudoku_v0_validation_b",
+            "target_token_exactness_bps": 4609,
+            "boundary": {
+              "first_target_exactness_bps": 10000,
+              "first_8_token_exactness_bps": 7500,
+              "first_32_token_exactness_bps": 4375
+            },
+            "matched_target_token_count": 1,
+            "first_divergence_index": 1,
+            "reference_divergence_token": "<step_index>",
+            "predicted_divergence_token": "<byte_00>",
+            "exact_trace_match": false,
+            "final_output_match": false,
+            "halt_match": false,
+            "reference_target_digest": "ef2b34758a0fdc0e8364e919638e5b8134358d36e80030422e7e7680ec5bf7d8",
+            "predicted_target_digest": "3d9630ef961276037b8e9c56aeb82f08fa93c22c20c18536c7ae648d544e21b9",
+            "failures": [
+              "exact_trace_mismatch",
+              "final_output_mismatch",
+              "halt_mismatch"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "checkpoint_leaderboard": [
+    {
+      "checkpoint_id": "tassadar-executor-sudoku-v0-supervision-baseline-v1.checkpoint.epoch_0003",
+      "global_epoch_index": 3,
+      "stage_id": "full_trace_supervision",
+      "stage_epoch_index": 0,
+      "first_target_exactness_bps": 10000,
+      "first_8_token_exactness_bps": 7500,
+      "first_32_token_exactness_bps": 4375,
+      "exact_trace_case_count": 0,
+      "aggregate_target_token_exactness_bps": 4570,
+      "selected_for_export": true
+    },
+    {
+      "checkpoint_id": "tassadar-executor-sudoku-v0-supervision-baseline-v1.checkpoint.epoch_0002",
+      "global_epoch_index": 2,
+      "stage_id": "prompt_to_first_32_tokens",
+      "stage_epoch_index": 0,
+      "first_target_exactness_bps": 10000,
+      "first_8_token_exactness_bps": 7500,
+      "first_32_token_exactness_bps": 2188,
+      "exact_trace_case_count": 0,
+      "aggregate_target_token_exactness_bps": 547,
+      "selected_for_export": false
+    },
+    {
+      "checkpoint_id": "tassadar-executor-sudoku-v0-supervision-baseline-v1.checkpoint.epoch_0000",
+      "global_epoch_index": 0,
+      "stage_id": "prompt_to_first_token",
+      "stage_epoch_index": 0,
+      "first_target_exactness_bps": 10000,
+      "first_8_token_exactness_bps": 1250,
+      "first_32_token_exactness_bps": 313,
+      "exact_trace_case_count": 0,
+      "aggregate_target_token_exactness_bps": 78,
+      "selected_for_export": false
+    },
+    {
+      "checkpoint_id": "tassadar-executor-sudoku-v0-supervision-baseline-v1.checkpoint.epoch_0001",
+      "global_epoch_index": 1,
+      "stage_id": "prompt_to_first_8_tokens",
+      "stage_epoch_index": 0,
+      "first_target_exactness_bps": 10000,
+      "first_8_token_exactness_bps": 1250,
+      "first_32_token_exactness_bps": 313,
+      "exact_trace_case_count": 0,
+      "aggregate_target_token_exactness_bps": 78,
+      "selected_for_export": false
+    }
+  ],
+  "evaluation": {
+    "dataset_storage_key": "oa.tassadar.sudoku_v0.sequence@train-v0",
+    "dataset_digest": "e71f1538d567d65656a2ca4a5ea6db6cdb444e9bfd80244347e691bba894a2af",
+    "split": "validation",
+    "claim_boundary": "greedy_decode_unvalidated",
+    "aggregate_target_token_exactness_bps": 4570,
+    "first_target_exactness_bps": 10000,
+    "first_8_token_exactness_bps": 7500,
+    "first_32_token_exactness_bps": 4375,
+    "exact_trace_case_count": 0,
+    "final_output_exact_case_count": 0,
+    "halt_exact_case_count": 0,
+    "case_reports": [
+      {
+        "sequence_id": "tassadar.sequence.sudoku_v0_validation_a",
+        "case_id": "sudoku_v0_validation_a",
+        "target_token_exactness_bps": 4531,
+        "boundary": {
+          "first_target_exactness_bps": 10000,
+          "first_8_token_exactness_bps": 7500,
+          "first_32_token_exactness_bps": 4375
+        },
+        "matched_target_token_count": 1,
+        "first_divergence_index": 1,
+        "reference_divergence_token": "<step_index>",
+        "predicted_divergence_token": "<byte_00>",
+        "exact_trace_match": false,
+        "final_output_match": false,
+        "halt_match": false,
+        "reference_target_digest": "edb14d14fd36dd461a7a4729b5f583f205d75baf18db1a90f5bf18d00428bfa1",
+        "predicted_target_digest": "3d9630ef961276037b8e9c56aeb82f08fa93c22c20c18536c7ae648d544e21b9",
+        "failures": [
+          "exact_trace_mismatch",
+          "final_output_mismatch",
+          "halt_mismatch"
+        ]
+      },
+      {
+        "sequence_id": "tassadar.sequence.sudoku_v0_validation_b",
+        "case_id": "sudoku_v0_validation_b",
+        "target_token_exactness_bps": 4609,
+        "boundary": {
+          "first_target_exactness_bps": 10000,
+          "first_8_token_exactness_bps": 7500,
+          "first_32_token_exactness_bps": 4375
+        },
+        "matched_target_token_count": 1,
+        "first_divergence_index": 1,
+        "reference_divergence_token": "<step_index>",
+        "predicted_divergence_token": "<byte_00>",
+        "exact_trace_match": false,
+        "final_output_match": false,
+        "halt_match": false,
+        "reference_target_digest": "ef2b34758a0fdc0e8364e919638e5b8134358d36e80030422e7e7680ec5bf7d8",
+        "predicted_target_digest": "3d9630ef961276037b8e9c56aeb82f08fa93c22c20c18536c7ae648d544e21b9",
+        "failures": [
+          "exact_trace_mismatch",
+          "final_output_mismatch",
+          "halt_mismatch"
+        ]
+      }
+    ]
+  },
+  "report_digest": "50143844e96d57bfd8cada860d94cfa6f9b957dd0e9c7310ab13c036fd6e744c"
+}

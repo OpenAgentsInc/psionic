@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "run_id": "tassadar-executor-sudoku-v0-supervision-baseline-v1",
+  "claim_class": "learned_bounded",
+  "trainable_surface": "output_head_embeddings_and_small_learned_mixer",
+  "dataset_version": "train-v0",
+  "dataset_storage_key": "oa.tassadar.sudoku_v0.sequence@train-v0",
+  "dataset_digest": "e71f1538d567d65656a2ca4a5ea6db6cdb444e9bfd80244347e691bba894a2af",
+  "tokenizer_digest": "f4134f46b2722a420ccb7f72a34e3b45e17a7a03b8a2c24084e1792f7e324bed",
+  "vocabulary_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e",
+  "training_manifest_digest": "2784297bcddd05dc1290487fbdd2b8be08c5074bcd18fe61fcdf52a7e6ff5229",
+  "trained_model_descriptor_digest": "02d2d3e3ec65dc8dfcbde3df9967af07433a5c5c7deb583a91b44a4a20d0423d",
+  "trained_weight_digest": "5fc1f2a39e66bbe90b055f143201a4d3952276f561675eaad263d1cc2808e233",
+  "training_report_digest": "50143844e96d57bfd8cada860d94cfa6f9b957dd0e9c7310ab13c036fd6e744c",
+  "boundary_exactness_report_digest": "1e00cf0971eca3bfa2988e3e3366e43509da0a885685d96404d8852df691aedf",
+  "divergence_histogram_report_digest": "1348f21559a01c96a072cca5fea60a221372b25eda351f48b1822010cf26f3de",
+  "first_token_confusion_report_digest": "f13987531a2ee7d6ad79b155870ffc76d86959aa2f40bafc6019746c47f31452",
+  "structural_supervision_report_digest": "6778775a97647d626d9aa1fed048162e9e813148095dc40a94b3c83772cdadc1",
+  "checkpoint_leaderboard_report_digest": "7ecf9bf8892ca844f1a879d9c86b76a1acbd6e2389c013993264bfd339c85edd",
+  "checkpoint_artifact_digest": "865da5b36348b4f5d033a2dd07e5bb8e0245f97e23a3611a94e7c6e0314c7b67",
+  "model_artifact_digest": "863778d92070dcdbbe4f16cf41ae268eba6e80e73dce0bf555c83618f52a2890",
+  "artifacts": [
+    {
+      "artifact_kind": "tassadar_training_manifest",
+      "artifact_ref": "training_manifest.json",
+      "artifact_digest": "8d2fd9761facac149d2b5cf448fa37dc13512ad7b588badeeee507609211ddd8"
+    },
+    {
+      "artifact_kind": "tassadar_training_report",
+      "artifact_ref": "training_report.json",
+      "artifact_digest": "a267091ff99fbf2cd036e973057e83441624108f9088e0b6ffdd18cc4ebbe667"
+    },
+    {
+      "artifact_kind": "tassadar_boundary_exactness_report",
+      "artifact_ref": "boundary_exactness_report.json",
+      "artifact_digest": "b4718666467eb4fd5989d5f66b79c9ec1197e541f2f20058f008dbe553958668"
+    },
+    {
+      "artifact_kind": "tassadar_divergence_histogram_report",
+      "artifact_ref": "divergence_histogram.json",
+      "artifact_digest": "9f6ee04001a9f38d2f219d12fd01f3184f2e1af918f6f714299a0d30465106d4"
+    },
+    {
+      "artifact_kind": "tassadar_first_token_confusion_report",
+      "artifact_ref": "first_token_confusion_report.json",
+      "artifact_digest": "58e3736b63dc6411a3e8c4551c8aede848aace58d4af083140677e9da3256e38"
+    },
+    {
+      "artifact_kind": "tassadar_structural_supervision_report",
+      "artifact_ref": "structural_supervision_report.json",
+      "artifact_digest": "205b5663ebdb0f98bb8b6e5c4014cae8c1b78a12cfc08dcac8fd8ccee32064a4"
+    },
+    {
+      "artifact_kind": "tassadar_checkpoint_leaderboard",
+      "artifact_ref": "checkpoint_leaderboard.json",
+      "artifact_digest": "0e80bc7bff93c655cdb6753e42ca20ffda04acf47f5cc0c54bc5e56faf9f7038"
+    },
+    {
+      "artifact_kind": "tassadar_checkpoint_artifact",
+      "artifact_ref": "checkpoint_artifact.json",
+      "artifact_digest": "45a9d7cdd90c691a0d5288d0b755cb922742abff7b94f5b8859b8932bfad78c4"
+    },
+    {
+      "artifact_kind": "tassadar_checkpoint_state",
+      "artifact_ref": "checkpoint_state.json",
+      "artifact_digest": "fe209b68e5d36cef31461a12277cb775a1b3fb0ef8d5e50bcdd677fc8f11775c"
+    },
+    {
+      "artifact_kind": "tassadar_checkpoint_manifest",
+      "artifact_ref": "checkpoint_manifest.json",
+      "artifact_digest": "da6fa77744ca8f0ac48a8f1c7ed51fb2002e8010ff0b004baab748d1a7967c00"
+    },
+    {
+      "artifact_kind": "tassadar_model_artifact",
+      "artifact_ref": "model_artifact.json",
+      "artifact_digest": "5abba8ee3e88f8c77607bbdb6c7395f05bd16e939575a73aedf6c1573ffeb312"
+    }
+  ],
+  "bundle_digest": "d9d35b36564c57ee1a9d157ec8a60aeb9f232cac98f3f9eee3fed2ceb13c6bf7"
+}

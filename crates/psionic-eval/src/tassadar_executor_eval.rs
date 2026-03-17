@@ -5,7 +5,8 @@ use psionic_data::{
 };
 use psionic_models::{
     TassadarExecutorTransformer, TassadarExecutorTransformerClaimBoundary,
-    TassadarExecutorTransformerError, TokenId, TokenSequence, TokenizerBoundary,
+    TassadarExecutorTransformerError, TassadarStructuralSupervisionFamily, TokenId,
+    TokenSequence, TokenizerBoundary,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -222,6 +223,49 @@ pub struct TassadarExecutorFirstTokenConfusionReport {
     pub token_zero_divergence_case_count: u32,
     /// Confusion entries sorted from most frequent to least.
     pub entries: Vec<TassadarExecutorFirstTokenConfusionEntry>,
+    /// Stable report digest.
+    pub report_digest: String,
+}
+
+/// Exactness summary for one structural supervision family.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutorStructuralSupervisionMetric {
+    /// Structural supervision family represented by the metric.
+    pub family: TassadarStructuralSupervisionFamily,
+    /// Number of target tokens tagged with the family.
+    pub target_token_count: u32,
+    /// Number of tagged target tokens that matched exactly.
+    pub matched_token_count: u32,
+    /// Exactness over the tagged family tokens.
+    pub exactness_bps: u32,
+}
+
+/// Per-case structural supervision summary.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutorStructuralSupervisionCaseReport {
+    /// Stable sequence identifier.
+    pub sequence_id: String,
+    /// Stable corpus case identifier.
+    pub case_id: String,
+    /// Family-level exactness metrics for the case.
+    pub metrics: Vec<TassadarExecutorStructuralSupervisionMetric>,
+}
+
+/// Machine-readable structural-supervision report for one eval split.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutorStructuralSupervisionReport {
+    /// Stable dataset storage key used for evaluation.
+    pub dataset_storage_key: String,
+    /// Stable dataset digest.
+    pub dataset_digest: String,
+    /// Split that was evaluated.
+    pub split: TassadarSequenceSplit,
+    /// Explicit model claim boundary.
+    pub claim_boundary: TassadarExecutorTransformerClaimBoundary,
+    /// Aggregate family metrics across the evaluated split.
+    pub aggregate_metrics: Vec<TassadarExecutorStructuralSupervisionMetric>,
+    /// Per-case family metrics.
+    pub case_reports: Vec<TassadarExecutorStructuralSupervisionCaseReport>,
     /// Stable report digest.
     pub report_digest: String,
 }
@@ -566,6 +610,107 @@ pub fn build_tassadar_executor_first_token_confusion_report(
     first_token
 }
 
+/// Evaluates one model on one split and emits family-level structural exactness.
+pub fn build_tassadar_executor_structural_supervision_report(
+    model: &TassadarExecutorTransformer,
+    dataset: &TassadarSequenceDatasetContract,
+    split: TassadarSequenceSplit,
+    target_token_cap: Option<usize>,
+) -> Result<TassadarExecutorStructuralSupervisionReport, TassadarExecutorEvalError> {
+    dataset.validate()?;
+    let tokenizer = model.tokenizer();
+    let mut case_reports = Vec::new();
+    let mut aggregate_counts =
+        BTreeMap::<TassadarStructuralSupervisionFamily, (u32, u32)>::new();
+    for family in structural_supervision_families() {
+        aggregate_counts.insert(family, (0, 0));
+    }
+
+    for example in dataset.split_examples(split) {
+        let prompt_len = example.metadata.prompt_token_count as usize;
+        let prompt = TokenSequence::new(
+            example.token_ids[..prompt_len]
+                .iter()
+                .map(|token| TokenId(*token))
+                .collect::<Vec<_>>(),
+        );
+        let full_reference_target = example.token_ids[prompt_len..]
+            .iter()
+            .map(|token| TokenId(*token))
+            .collect::<Vec<_>>();
+        let evaluated_target_len = target_token_cap
+            .unwrap_or(full_reference_target.len())
+            .min(full_reference_target.len());
+        let reference_target = full_reference_target[..evaluated_target_len].to_vec();
+        let predicted_target = greedy_decode_target(model, prompt, reference_target.len())?;
+        let all_target_families = tokenizer.classify_target_structural_supervision(
+            &example
+                .token_ids
+                .iter()
+                .map(|token| TokenId(*token))
+                .collect::<Vec<_>>(),
+            prompt_len,
+        );
+        let target_families = all_target_families
+            .into_iter()
+            .take(evaluated_target_len)
+            .collect::<Vec<_>>();
+        let mut metrics = Vec::new();
+        for family in structural_supervision_families() {
+            let (target_token_count, matched_token_count) = family_match_counts(
+                family,
+                reference_target.as_slice(),
+                predicted_target.as_slice(),
+                target_families.as_slice(),
+            );
+            let exactness_bps = exactness_bps(matched_token_count, target_token_count);
+            metrics.push(TassadarExecutorStructuralSupervisionMetric {
+                family,
+                target_token_count,
+                matched_token_count,
+                exactness_bps,
+            });
+            let aggregate = aggregate_counts
+                .get_mut(&family)
+                .expect("aggregate family bucket should exist");
+            aggregate.0 = aggregate.0.saturating_add(target_token_count);
+            aggregate.1 = aggregate.1.saturating_add(matched_token_count);
+        }
+        case_reports.push(TassadarExecutorStructuralSupervisionCaseReport {
+            sequence_id: example.sequence_id.clone(),
+            case_id: example.metadata.case_id.clone(),
+            metrics,
+        });
+    }
+
+    let mut report = TassadarExecutorStructuralSupervisionReport {
+        dataset_storage_key: dataset.storage_key(),
+        dataset_digest: dataset.stable_digest(),
+        split,
+        claim_boundary: model.descriptor().claim_boundary,
+        aggregate_metrics: structural_supervision_families()
+            .iter()
+            .map(|family| {
+                let (target_token_count, matched_token_count) =
+                    aggregate_counts.get(family).copied().unwrap_or((0, 0));
+                TassadarExecutorStructuralSupervisionMetric {
+                    family: *family,
+                    target_token_count,
+                    matched_token_count,
+                    exactness_bps: exactness_bps(matched_token_count, target_token_count),
+                }
+            })
+            .collect(),
+        case_reports,
+        report_digest: String::new(),
+    };
+    report.report_digest = stable_digest(
+        b"psionic_tassadar_executor_structural_supervision_report|",
+        &report,
+    );
+    Ok(report)
+}
+
 fn greedy_decode_target(
     model: &TassadarExecutorTransformer,
     prompt: TokenSequence,
@@ -617,6 +762,43 @@ fn matched_target_token_count(reference: &[TokenId], predicted: &[TokenId]) -> u
         .zip(predicted.iter())
         .take_while(|(left, right)| left == right)
         .count() as u32
+}
+
+fn family_match_counts(
+    family: TassadarStructuralSupervisionFamily,
+    reference: &[TokenId],
+    predicted: &[TokenId],
+    target_families: &[Vec<TassadarStructuralSupervisionFamily>],
+) -> (u32, u32) {
+    let mut target_token_count = 0_u32;
+    let mut matched_token_count = 0_u32;
+    for (index, families) in target_families.iter().enumerate() {
+        if !families.contains(&family) {
+            continue;
+        }
+        target_token_count = target_token_count.saturating_add(1);
+        if reference.get(index) == predicted.get(index) {
+            matched_token_count = matched_token_count.saturating_add(1);
+        }
+    }
+    (target_token_count, matched_token_count)
+}
+
+fn exactness_bps(matched_token_count: u32, target_token_count: u32) -> u32 {
+    if target_token_count == 0 {
+        return 0;
+    }
+    ((matched_token_count as f64 / target_token_count as f64) * 10_000.0).round() as u32
+}
+
+fn structural_supervision_families() -> [TassadarStructuralSupervisionFamily; 5] {
+    [
+        TassadarStructuralSupervisionFamily::InstructionPointer,
+        TassadarStructuralSupervisionFamily::BranchOutcome,
+        TassadarStructuralSupervisionFamily::StackDelta,
+        TassadarStructuralSupervisionFamily::MemoryDiff,
+        TassadarStructuralSupervisionFamily::WorkloadSpecificState,
+    ]
 }
 
 fn first_divergence_index(reference: &[TokenId], predicted: &[TokenId]) -> Option<u32> {

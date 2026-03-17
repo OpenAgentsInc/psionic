@@ -10,6 +10,7 @@ use psionic_eval::{
 use psionic_models::{
     TassadarExecutorTrainableSurface, TassadarExecutorTransformer,
     TassadarExecutorTransformerError, TokenId, TokenSequence,
+    TassadarStructuralSupervisionFamily, TassadarTraceTokenizer,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -40,6 +41,10 @@ fn default_teacher_forced_training_strategy() -> TassadarExecutorTeacherForcedTr
     TassadarExecutorTeacherForcedTrainingStrategy::FullForwardWindow
 }
 
+fn default_structural_supervision_config() -> TassadarExecutorStructuralSupervisionConfig {
+    TassadarExecutorStructuralSupervisionConfig::next_token_only()
+}
+
 fn tassadar_progress_updates_enabled() -> bool {
     match env::var("OPENAGENTS_TASSADAR_PROGRESS") {
         Ok(value) => {
@@ -64,6 +69,12 @@ fn teacher_forced_training_strategy_is_full_forward_window(
     strategy: &TassadarExecutorTeacherForcedTrainingStrategy,
 ) -> bool {
     *strategy == TassadarExecutorTeacherForcedTrainingStrategy::FullForwardWindow
+}
+
+fn structural_supervision_config_is_next_token_only(
+    config: &TassadarExecutorStructuralSupervisionConfig,
+) -> bool {
+    *config == TassadarExecutorStructuralSupervisionConfig::next_token_only()
 }
 
 /// Prefix construction mode for one curriculum stage.
@@ -117,6 +128,81 @@ impl TassadarExecutorTeacherForcedTrainingStrategy {
 impl Default for TassadarExecutorTeacherForcedTrainingStrategy {
     fn default() -> Self {
         Self::FullForwardWindow
+    }
+}
+
+/// Explicit structural-supervision weighting profile for the learned Tassadar lane.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TassadarExecutorStructuralSupervisionConfig {
+    /// Stable profile identifier.
+    pub profile_id: String,
+    /// Baseline next-token loss weight applied to every supervised token.
+    pub base_next_token_weight: f32,
+    /// Extra loss weight for instruction-pointer tokens.
+    pub instruction_pointer_weight: f32,
+    /// Extra loss weight for branch-outcome tokens.
+    pub branch_outcome_weight: f32,
+    /// Extra loss weight for stack-delta tokens.
+    pub stack_delta_weight: f32,
+    /// Extra loss weight for memory-diff tokens.
+    pub memory_diff_weight: f32,
+    /// Extra loss weight for workload-specific structured-state tokens.
+    pub workload_specific_state_weight: f32,
+}
+
+impl TassadarExecutorStructuralSupervisionConfig {
+    /// Returns the preserved next-token-only baseline profile.
+    #[must_use]
+    pub fn next_token_only() -> Self {
+        Self {
+            profile_id: String::from("next_token_only_v1"),
+            base_next_token_weight: 1.0,
+            instruction_pointer_weight: 0.0,
+            branch_outcome_weight: 0.0,
+            stack_delta_weight: 0.0,
+            memory_diff_weight: 0.0,
+            workload_specific_state_weight: 0.0,
+        }
+    }
+
+    /// Returns the bounded structured-state weighting profile used for PTAS-401.
+    #[must_use]
+    pub fn structural_state_reference() -> Self {
+        Self {
+            profile_id: String::from("structural_state_reference_v1"),
+            base_next_token_weight: 1.0,
+            instruction_pointer_weight: 1.0,
+            branch_outcome_weight: 1.0,
+            stack_delta_weight: 0.75,
+            memory_diff_weight: 0.75,
+            workload_specific_state_weight: 0.5,
+        }
+    }
+
+    /// Returns the total loss weight for one target token family set.
+    #[must_use]
+    pub fn effective_weight(&self, families: &[TassadarStructuralSupervisionFamily]) -> f32 {
+        let mut weight = self.base_next_token_weight;
+        for family in families {
+            weight += match family {
+                TassadarStructuralSupervisionFamily::InstructionPointer => {
+                    self.instruction_pointer_weight
+                }
+                TassadarStructuralSupervisionFamily::BranchOutcome => self.branch_outcome_weight,
+                TassadarStructuralSupervisionFamily::StackDelta => self.stack_delta_weight,
+                TassadarStructuralSupervisionFamily::MemoryDiff => self.memory_diff_weight,
+                TassadarStructuralSupervisionFamily::WorkloadSpecificState => {
+                    self.workload_specific_state_weight
+                }
+            };
+        }
+        weight.max(0.0)
+    }
+}
+
+impl Default for TassadarExecutorStructuralSupervisionConfig {
+    fn default() -> Self {
+        Self::next_token_only()
     }
 }
 
@@ -202,6 +288,12 @@ pub struct TassadarExecutorTrainingConfig {
         skip_serializing_if = "teacher_forced_training_strategy_is_full_forward_window"
     )]
     pub teacher_forced_training_strategy: TassadarExecutorTeacherForcedTrainingStrategy,
+    /// Explicit structural-supervision weighting profile for the run.
+    #[serde(
+        default = "default_structural_supervision_config",
+        skip_serializing_if = "structural_supervision_config_is_next_token_only"
+    )]
+    pub structural_supervision: TassadarExecutorStructuralSupervisionConfig,
     /// Optional boundary curriculum preceding the terminal full-trace stage.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub curriculum_stages: Vec<TassadarExecutorCurriculumStage>,
@@ -229,6 +321,7 @@ impl TassadarExecutorTrainingConfig {
             trainable_surface: TassadarExecutorTrainableSurface::OutputHeadOnly,
             teacher_forced_training_strategy:
                 TassadarExecutorTeacherForcedTrainingStrategy::FullForwardWindow,
+            structural_supervision: TassadarExecutorStructuralSupervisionConfig::next_token_only(),
             curriculum_stages: Vec::new(),
             validate_every_epoch: true,
             select_best_checkpoint_by_boundary: true,
@@ -250,6 +343,7 @@ impl TassadarExecutorTrainingConfig {
             trainable_surface: TassadarExecutorTrainableSurface::OutputHeadOnly,
             teacher_forced_training_strategy:
                 TassadarExecutorTeacherForcedTrainingStrategy::FullForwardWindow,
+            structural_supervision: TassadarExecutorStructuralSupervisionConfig::next_token_only(),
             curriculum_stages: vec![
                 TassadarExecutorCurriculumStage::new("prompt_to_first_token", Some(1), 1),
                 TassadarExecutorCurriculumStage::new("prompt_to_first_2_tokens", Some(2), 1),
@@ -278,6 +372,7 @@ impl TassadarExecutorTrainingConfig {
             trainable_surface: TassadarExecutorTrainableSurface::OutputHeadOnly,
             teacher_forced_training_strategy:
                 TassadarExecutorTeacherForcedTrainingStrategy::FullForwardWindow,
+            structural_supervision: TassadarExecutorStructuralSupervisionConfig::next_token_only(),
             curriculum_stages: Vec::new(),
             validate_every_epoch: true,
             select_best_checkpoint_by_boundary: true,
@@ -494,7 +589,9 @@ pub fn train_tassadar_executor_transformer(
         config.dataset_version.as_str(),
         config.trainable_surface,
         config.teacher_forced_training_strategy,
+        config.structural_supervision.clone(),
     )?;
+    let tokenizer = TassadarTraceTokenizer::new();
     let mut current_model = match config.workload {
         TassadarSequenceWorkload::SudokuV0 => {
             TassadarExecutorTransformer::sudoku_v0_with_surface(config.trainable_surface)
@@ -508,6 +605,25 @@ pub fn train_tassadar_executor_transformer(
         .examples
         .iter()
         .map(|example| (example.sequence_id.clone(), example))
+        .collect::<BTreeMap<_, _>>();
+    let supervision_families_by_id = bundle
+        .dataset
+        .examples
+        .iter()
+        .map(|example| {
+            let tokens = example
+                .token_ids
+                .iter()
+                .map(|token| TokenId(*token))
+                .collect::<Vec<_>>();
+            (
+                example.sequence_id.clone(),
+                tokenizer.classify_target_structural_supervision(
+                    tokens.as_slice(),
+                    example.metadata.prompt_token_count as usize,
+                ),
+            )
+        })
         .collect::<BTreeMap<_, _>>();
     let mut batch_reports = Vec::new();
     let mut epoch_reports = Vec::new();
@@ -671,8 +787,12 @@ pub fn train_tassadar_executor_transformer(
                         accumulate_sequence_gradients(
                             &current_model,
                             example,
+                            supervision_families_by_id
+                                .get(sequence_id.as_str())
+                                .expect("supervision families should exist for frozen examples"),
                             &stage,
                             config.teacher_forced_training_strategy,
+                            &config.structural_supervision,
                             projection_grad.as_mut_slice(),
                             bias_grad.as_mut_slice(),
                             token_embedding_grad.as_deref_mut(),
@@ -1053,8 +1173,10 @@ pub fn benchmark_trained_tassadar_executor_transformer(
 fn accumulate_sequence_gradients(
     current_model: &TassadarExecutorTransformer,
     example: &TassadarSequenceExample,
+    supervision_families: &[Vec<TassadarStructuralSupervisionFamily>],
     stage: &TassadarExecutorCurriculumStage,
     teacher_forced_training_strategy: TassadarExecutorTeacherForcedTrainingStrategy,
+    structural_supervision: &TassadarExecutorStructuralSupervisionConfig,
     projection_grad: &mut [f32],
     bias_grad: &mut [f32],
     token_embedding_grad: Option<&mut [f32]>,
@@ -1067,8 +1189,10 @@ fn accumulate_sequence_gradients(
             accumulate_teacher_forced_sequence_gradients(
                 current_model,
                 example,
+                supervision_families,
                 stage,
                 teacher_forced_training_strategy,
+                structural_supervision,
                 projection_grad,
                 bias_grad,
                 token_embedding_grad,
@@ -1081,7 +1205,9 @@ fn accumulate_sequence_gradients(
             accumulate_greedy_rollout_sequence_gradients(
                 current_model,
                 example,
+                supervision_families,
                 stage,
+                structural_supervision,
                 projection_grad,
                 bias_grad,
                 token_embedding_grad,
@@ -1096,8 +1222,10 @@ fn accumulate_sequence_gradients(
 fn accumulate_teacher_forced_sequence_gradients(
     current_model: &TassadarExecutorTransformer,
     example: &TassadarSequenceExample,
+    supervision_families: &[Vec<TassadarStructuralSupervisionFamily>],
     stage: &TassadarExecutorCurriculumStage,
     teacher_forced_training_strategy: TassadarExecutorTeacherForcedTrainingStrategy,
+    structural_supervision: &TassadarExecutorStructuralSupervisionConfig,
     projection_grad: &mut [f32],
     bias_grad: &mut [f32],
     mut token_embedding_grad: Option<&mut [f32]>,
@@ -1111,7 +1239,9 @@ fn accumulate_teacher_forced_sequence_gradients(
         return accumulate_teacher_forced_incremental_sequence_gradients(
             current_model,
             example,
+            supervision_families,
             stage,
+            structural_supervision,
             projection_grad,
             bias_grad,
             token_embedding_grad,
@@ -1137,6 +1267,7 @@ fn accumulate_teacher_forced_sequence_gradients(
     let mut total_loss = 0.0_f32;
     let mut target_token_count = 0_u32;
     for logit_index in start_logit_index..end_logit_index {
+        let target_index = logit_index.saturating_sub(start_logit_index);
         total_loss += accumulate_step_gradients(
             current_model,
             &forward.hidden_states[logit_index],
@@ -1144,6 +1275,12 @@ fn accumulate_teacher_forced_sequence_gradients(
             &forward.step_contexts[logit_index],
             &forward.logits[logit_index],
             sequence.as_slice()[logit_index + 1],
+            structural_supervision.effective_weight(
+                supervision_families
+                    .get(target_index)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]),
+            ),
             projection_grad,
             bias_grad,
             token_embedding_grad.as_deref_mut(),
@@ -1159,7 +1296,9 @@ fn accumulate_teacher_forced_sequence_gradients(
 fn accumulate_teacher_forced_incremental_sequence_gradients(
     current_model: &TassadarExecutorTransformer,
     example: &TassadarSequenceExample,
+    supervision_families: &[Vec<TassadarStructuralSupervisionFamily>],
     stage: &TassadarExecutorCurriculumStage,
+    structural_supervision: &TassadarExecutorStructuralSupervisionConfig,
     projection_grad: &mut [f32],
     bias_grad: &mut [f32],
     mut token_embedding_grad: Option<&mut [f32]>,
@@ -1185,7 +1324,7 @@ fn accumulate_teacher_forced_incremental_sequence_gradients(
     let mut state = current_model.start_decode(prompt)?;
     let mut total_loss = 0.0_f32;
     let mut target_token_count = 0_u32;
-    for target_token in reference_target {
+    for (target_index, target_token) in reference_target.into_iter().enumerate() {
         let step = current_model.decode_step(&state)?;
         total_loss += accumulate_step_gradients(
             current_model,
@@ -1194,6 +1333,12 @@ fn accumulate_teacher_forced_incremental_sequence_gradients(
             &step.step_context,
             step.logits.as_slice(),
             target_token,
+            structural_supervision.effective_weight(
+                supervision_families
+                    .get(target_index)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]),
+            ),
             projection_grad,
             bias_grad,
             token_embedding_grad.as_deref_mut(),
@@ -1210,7 +1355,9 @@ fn accumulate_teacher_forced_incremental_sequence_gradients(
 fn accumulate_greedy_rollout_sequence_gradients(
     current_model: &TassadarExecutorTransformer,
     example: &TassadarSequenceExample,
+    supervision_families: &[Vec<TassadarStructuralSupervisionFamily>],
     stage: &TassadarExecutorCurriculumStage,
+    structural_supervision: &TassadarExecutorStructuralSupervisionConfig,
     projection_grad: &mut [f32],
     bias_grad: &mut [f32],
     mut token_embedding_grad: Option<&mut [f32]>,
@@ -1236,7 +1383,7 @@ fn accumulate_greedy_rollout_sequence_gradients(
     let mut state = current_model.start_decode(prompt)?;
     let mut total_loss = 0.0_f32;
     let mut target_token_count = 0_u32;
-    for target_token in reference_target {
+    for (target_index, target_token) in reference_target.into_iter().enumerate() {
         let step = current_model.decode_step(&state)?;
         total_loss += accumulate_step_gradients(
             current_model,
@@ -1245,6 +1392,12 @@ fn accumulate_greedy_rollout_sequence_gradients(
             &step.step_context,
             step.logits.as_slice(),
             target_token,
+            structural_supervision.effective_weight(
+                supervision_families
+                    .get(target_index)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]),
+            ),
             projection_grad,
             bias_grad,
             token_embedding_grad.as_deref_mut(),
@@ -1267,6 +1420,7 @@ fn accumulate_step_gradients(
     step_context: &psionic_models::TassadarExecutorTransformerStepContext,
     logits: &[f32],
     target_token: TokenId,
+    loss_weight: f32,
     projection_grad: &mut [f32],
     bias_grad: &mut [f32],
     token_embedding_grad: Option<&mut [f32]>,
@@ -1274,6 +1428,9 @@ fn accumulate_step_gradients(
     mixer_projection_grad: Option<&mut [f32]>,
     mixer_bias_grad: Option<&mut [f32]>,
 ) -> f32 {
+    if loss_weight <= 0.0 {
+        return 0.0;
+    }
     let hidden_width = current_model.descriptor().config.hidden_width();
     let embedding_dim = current_model.descriptor().config.embedding_dim;
     let probabilities = softmax(logits);
@@ -1282,7 +1439,7 @@ fn accumulate_step_gradients(
     let mut hidden_grad = vec![0.0; hidden_width];
 
     for (token_index, probability) in probabilities.iter().enumerate() {
-        let delta = probability - f32::from(token_index == target_token_index);
+        let delta = (probability - f32::from(token_index == target_token_index)) * loss_weight;
         bias_grad[token_index] += delta;
         for (hidden_index, hidden_value) in hidden.iter().enumerate() {
             let projection_index = hidden_index * probabilities.len() + token_index;
@@ -1336,7 +1493,7 @@ fn accumulate_step_gradients(
         }
     }
 
-    -probability.ln()
+    -probability.ln() * loss_weight
 }
 
 fn greedy_token_from_logits(logits: &[f32]) -> TokenId {
@@ -1430,7 +1587,8 @@ mod tests {
     use psionic_eval::TassadarSequenceWorkload;
 
     use super::{
-        TassadarExecutorTeacherForcedTrainingStrategy, TassadarExecutorTrainingConfig,
+        TassadarExecutorStructuralSupervisionConfig, TassadarExecutorTeacherForcedTrainingStrategy,
+        TassadarExecutorTrainingConfig,
         train_tassadar_executor_transformer,
     };
 
@@ -1494,6 +1652,22 @@ mod tests {
         assert_eq!(
             outcome.report.config.workload,
             TassadarSequenceWorkload::Sudoku9x9
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn structural_supervision_profile_persists_in_training_report()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut config = TassadarExecutorTrainingConfig::reference();
+        config.structural_supervision =
+            TassadarExecutorStructuralSupervisionConfig::structural_state_reference();
+
+        let outcome = train_tassadar_executor_transformer(&config)?;
+
+        assert_eq!(
+            outcome.report.config.structural_supervision.profile_id,
+            "structural_state_reference_v1"
         );
         Ok(())
     }

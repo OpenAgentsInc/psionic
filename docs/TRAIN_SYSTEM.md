@@ -441,6 +441,21 @@ That now includes one intentionally narrow executor-training answer:
   statement remains “9x9 only partially fit and remains blocked”; the
   companion note is
   `docs/audits/2026-03-16-tassadar-phase-16-9x9-reference-run-audit.md`
+- the learned-structure supervision follow-on now also exists beside that same
+  bounded lane: `psionic-models` now derives structural target families for
+  instruction pointer, branch outcome, stack delta, memory diff, and
+  workload-specific state from the frozen trace ABI, `psionic-train` now
+  persists structural-supervision weights and split-level coverage inventory in
+  `TassadarSequenceTrainingManifest`, `psionic-eval` now emits
+  `structural_supervision_report.json` for bounded validation decodes, and
+  `psionic-research` now materializes the comparison root at
+  `fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1`; those committed
+  artifacts keep the claim bounded but prove richer supervision moves the
+  learned lane on the same early-curriculum setup (`4570` to `7812` aggregate
+  target-token exactness, `4375` to `6875` first-32 exactness,
+  instruction-pointer `5000` to `7000` bps, stack-delta `2500` to `5833` bps,
+  and no claim that branch/memory/workload-specific families are already green
+  on the short validation window)
 - the post-Phase-15 trained-attention follow-on now also exists beside that
   seeded comparison: `psionic-research` now runs a bounded attention-family
   output-head training loop and persists its artifacts under

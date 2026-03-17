@@ -1,0 +1,113 @@
+{
+  "dataset_storage_key": "oa.tassadar.sudoku_v0.sequence@train-v0",
+  "dataset_digest": "e71f1538d567d65656a2ca4a5ea6db6cdb444e9bfd80244347e691bba894a2af",
+  "split": "validation",
+  "claim_boundary": "greedy_decode_unvalidated",
+  "aggregate_metrics": [
+    {
+      "family": "instruction_pointer",
+      "target_token_count": 20,
+      "matched_token_count": 10,
+      "exactness_bps": 5000
+    },
+    {
+      "family": "branch_outcome",
+      "target_token_count": 0,
+      "matched_token_count": 0,
+      "exactness_bps": 0
+    },
+    {
+      "family": "stack_delta",
+      "target_token_count": 24,
+      "matched_token_count": 6,
+      "exactness_bps": 2500
+    },
+    {
+      "family": "memory_diff",
+      "target_token_count": 0,
+      "matched_token_count": 0,
+      "exactness_bps": 0
+    },
+    {
+      "family": "workload_specific_state",
+      "target_token_count": 0,
+      "matched_token_count": 0,
+      "exactness_bps": 0
+    }
+  ],
+  "case_reports": [
+    {
+      "sequence_id": "tassadar.sequence.sudoku_v0_validation_a",
+      "case_id": "sudoku_v0_validation_a",
+      "metrics": [
+        {
+          "family": "instruction_pointer",
+          "target_token_count": 10,
+          "matched_token_count": 5,
+          "exactness_bps": 5000
+        },
+        {
+          "family": "branch_outcome",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        },
+        {
+          "family": "stack_delta",
+          "target_token_count": 12,
+          "matched_token_count": 3,
+          "exactness_bps": 2500
+        },
+        {
+          "family": "memory_diff",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        },
+        {
+          "family": "workload_specific_state",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        }
+      ]
+    },
+    {
+      "sequence_id": "tassadar.sequence.sudoku_v0_validation_b",
+      "case_id": "sudoku_v0_validation_b",
+      "metrics": [
+        {
+          "family": "instruction_pointer",
+          "target_token_count": 10,
+          "matched_token_count": 5,
+          "exactness_bps": 5000
+        },
+        {
+          "family": "branch_outcome",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        },
+        {
+          "family": "stack_delta",
+          "target_token_count": 12,
+          "matched_token_count": 3,
+          "exactness_bps": 2500
+        },
+        {
+          "family": "memory_diff",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        },
+        {
+          "family": "workload_specific_state",
+          "target_token_count": 0,
+          "matched_token_count": 0,
+          "exactness_bps": 0
+        }
+      ]
+    }
+  ],
+  "report_digest": "6778775a97647d626d9aa1fed048162e9e813148095dc40a94b3c83772cdadc1"
+}

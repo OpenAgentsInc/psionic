@@ -181,6 +181,10 @@ The current strongest committed artifacts are:
   - learned 4x4 validation gate is green
 - `fixtures/tassadar/runs/sudoku_9x9_v0_reference_run_v0`
   - learned 9x9 lane is honest but still partial
+- `fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1`
+  - bounded learned structural-supervision comparison proves richer targets
+    improve instruction-pointer and stack-delta exactness without widening the
+    learned claim boundary
 - `fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0`
   - exact compiled/proof-backed 9x9 Sudoku lane now exists on the matched 9x9 corpus
 - `fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0`
@@ -464,7 +468,7 @@ compiled-lane truth.
 
 | ID | Status | Work |
 | --- | --- | --- |
-| `PTAS-401` | partial | Widen learned supervision beyond next token to instruction pointer, stack delta, memory diff, branch outcome, and workload-specific state such as Hungarian dual variables. |
+| `PTAS-401` | implemented | Widen learned supervision beyond next token to instruction pointer, stack delta, memory diff, branch outcome, and workload-specific state such as Hungarian dual variables. |
 | `PTAS-402` | planned | Add recurrent or windowed executor families that can carry long-horizon state without pretending a flat growing prefix is the only honest option. |
 | `PTAS-403` | planned | Add parallel or wavefront trace families for Sudoku and Hungarian-class workloads and compare them against sequential CPU-style traces. |
 | `PTAS-404` | planned | Add later-window and suffix-focused eval artifacts so learned long-trace progress is visible after the first bounded prefix. |
