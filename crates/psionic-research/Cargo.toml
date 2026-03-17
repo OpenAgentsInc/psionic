@@ -13,17 +13,36 @@ workspace = true
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = []
+burn-import = [
+    "dep:burn-core",
+    "dep:burn-ndarray",
+    "dep:burn-nn",
+    "dep:burn-store",
+]
+
 [dependencies]
+burn-core = { version = "0.20.1", default-features = false, features = ["std"], optional = true }
+burn-ndarray = { version = "0.20.1", default-features = false, features = ["std"], optional = true }
+burn-nn = { version = "0.20.1", default-features = false, features = ["std"], optional = true }
+burn-store = { version = "0.20.1", default-features = false, features = ["std"], optional = true }
 hex = { workspace = true }
 psionic-data = { path = "../psionic-data" }
 psionic-eval = { path = "../psionic-eval" }
 psionic-models = { path = "../psionic-models" }
 psionic-runtime = { path = "../psionic-runtime" }
 psionic-train = { path = "../psionic-train" }
+safetensors = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
+
+[[bin]]
+name = "psionic-attnres-burn-import"
+path = "src/bin/psionic-attnres-burn-import.rs"
+required-features = ["burn-import"]
 
 [dev-dependencies]
 tempfile = "3"

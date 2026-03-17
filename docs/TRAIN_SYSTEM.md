@@ -232,6 +232,13 @@ That now includes one intentionally narrow AttnRes reference-training answer:
   model family and reapplies the persisted named parameter subset, so
   checkpoint identity stays tied to the same descriptor/config surface the
   runtime and eval lanes already consume
+- `psionic-research` now also owns an optional feature-gated Burn migration
+  boundary for legacy `attnres` `.mpk` and `.bin` artifacts: it loads the old
+  Burn model only inside that research/import surface, maps legacy tensor paths
+  into canonical Psionic parameter ids once, and emits Psionic-native
+  `safetensors` plus a machine-readable import manifest; path remaps and
+  partial-load posture live only at that import boundary rather than leaking
+  Burn semantics into the runtime or training contract
 - `psionic-eval::evaluate_attnres_training_shift(...)` now gives the same lane
   a held-out machine-readable loss and routing-delta report, making it visible
   whether training changed the routing story in addition to the token loss

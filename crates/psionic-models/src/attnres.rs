@@ -9,8 +9,8 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    ModelDescriptor, TokenId, TokenSequence, WeightBundleMetadata, WeightFormat, WeightSource,
-    WeightTensorMetadata,
+    ModelDescriptor, TokenId, TokenSequence, WeightArtifactMetadata, WeightBundleMetadata,
+    WeightFormat, WeightSource, WeightTensorMetadata,
 };
 
 /// Stable family label for Attention Residual models.
@@ -1032,6 +1032,21 @@ impl AttnResWeightBundle {
             apply_parameter_override(&mut updated, parameter_id.as_str(), values.as_slice())?;
         }
         updated.rebuild_metadata(config)
+    }
+
+    /// Returns a copy tagged with explicit artifact-backed provenance.
+    #[must_use]
+    pub fn with_artifact_metadata(
+        &self,
+        format: WeightFormat,
+        source: WeightSource,
+        artifacts: Vec<WeightArtifactMetadata>,
+    ) -> Self {
+        let mut updated = self.clone();
+        updated.metadata.format = format;
+        updated.metadata.source = source;
+        updated.metadata.artifacts = artifacts;
+        updated
     }
 
     fn validate(&self, config: &AttnResConfig) -> Result<(), AttnResModelError> {
@@ -2430,6 +2445,34 @@ mod tests {
             )
             .expect_err("unknown parameter");
         assert!(matches!(error, AttnResModelError::UnknownParameter { .. }));
+        Ok(())
+    }
+
+    #[test]
+    fn weight_bundle_artifact_metadata_can_be_retagged() -> Result<(), Box<dyn Error>> {
+        let model = AttnResCpuReferenceModel::seeded(
+            "attnres-artifact",
+            "v0",
+            AttnResConfig::new(8, 4, 2)
+                .with_num_heads(2)
+                .with_vocab_size(16),
+        )?;
+        let retagged = model.weights().with_artifact_metadata(
+            crate::WeightFormat::SafeTensors,
+            crate::WeightSource::ExternalArtifact,
+            vec![crate::WeightArtifactMetadata::new(
+                "weights.safetensors",
+                128,
+                "deadbeef",
+            )],
+        );
+        assert_eq!(retagged.metadata().format, crate::WeightFormat::SafeTensors);
+        assert_eq!(
+            retagged.metadata().source,
+            crate::WeightSource::ExternalArtifact
+        );
+        assert_eq!(retagged.metadata().artifacts.len(), 1);
+        assert_eq!(retagged.metadata().digest, model.weights().metadata().digest);
         Ok(())
     }
 
