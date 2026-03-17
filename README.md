@@ -352,6 +352,13 @@ Current posture:
   it inventories the supported `tassadar.wasm.*` profiles, the current
   article-shaped opcode universe, explicit workload/case coverage, and typed
   refusal examples for unsupported opcodes
+- the repo now also carries one canonical Tassadar C-to-Wasm compile receipt at
+  `fixtures/tassadar/reports/tassadar_c_to_wasm_compile_receipt.json`, emitted
+  by `cargo run -p psionic-runtime --example tassadar_c_to_wasm_compile_receipt`;
+  it binds one committed C source fixture plus the emitted Wasm binary to
+  source/toolchain/config/output digests, projects that success into one
+  canonical `TassadarProgramArtifact` lineage contract, and surfaces typed
+  compile refusals instead of hiding toolchain failure behind ad hoc scripts
 - its Phase 8A research family now exists in `psionic-research`, with a typed
   executor-variant family, benchmark/proof/lineage-backed bounded runs, and
   machine-readable sweep records for reproducible same-contract comparisons
@@ -1046,4 +1053,9 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
 - `fixtures/tassadar/reports/tassadar_wasm_instruction_coverage_report.json`
   is the canonical machine-readable Tassadar Wasm profile/instruction coverage
   artifact.
+- `fixtures/tassadar/reports/tassadar_c_to_wasm_compile_receipt.json`,
+  `fixtures/tassadar/sources/tassadar_micro_wasm_kernel.c`, and
+  `fixtures/tassadar/wasm/tassadar_micro_wasm_kernel.wasm` are the canonical
+  Tassadar source/toolchain/output lineage artifacts for the repo-owned
+  C-to-Wasm compile path.
 - Other planning and reference docs live under `docs/`.

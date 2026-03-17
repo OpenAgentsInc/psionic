@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "source_identity": {
+    "source_kind": "c_source",
+    "source_name": "fixtures/tassadar/sources/tassadar_micro_wasm_kernel.c",
+    "source_digest": "d2456975673ef639803ff773bcf4aa4d269a2683c5af7517b5d3084793bad058"
+  },
+  "toolchain_identity": {
+    "compiler_family": "clang",
+    "compiler_version": "21.1.6",
+    "target": "wasm32-unknown-unknown",
+    "pipeline_features": [
+      "compiler_binary:clang",
+      "export:micro_wasm_kernel",
+      "language_standard:c11",
+      "no_entry",
+      "nostdlib",
+      "optimization:O3"
+    ]
+  },
+  "compile_config": {
+    "compiler_binary": "clang",
+    "target": "wasm32-unknown-unknown",
+    "language_standard": "c11",
+    "optimization_level": "O3",
+    "export_symbols": [
+      "micro_wasm_kernel"
+    ],
+    "no_standard_library": true,
+    "no_entry": true,
+    "allow_undefined": false
+  },
+  "outcome": {
+    "status": "succeeded",
+    "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_micro_wasm_kernel.wasm",
+    "wasm_binary_digest": "db3f7b2a8a9cc0e0a9603e6a2206a4c90edf7592704acfb8595c3f5d27f4d35a",
+    "wasm_binary_summary": {
+      "byte_len": 244,
+      "exported_functions": [
+        "micro_wasm_kernel"
+      ],
+      "function_count": 1,
+      "imported_function_count": 0,
+      "memory_count": 1,
+      "custom_sections": [
+        "producers",
+        "target_features"
+      ]
+    },
+    "lineage_contract": {
+      "program_id": "tassadar.micro_wasm_kernel.v2",
+      "validated_program_digest": "82f502db9486b704d1f3e34dfe08fb6a757561a27b2893526e137c97fde85eb9",
+      "artifact_id": "tassadar.micro_wasm_kernel.c_compile.artifact.v1",
+      "artifact_digest": "9cf9132ed76ae9ad303c7fbf9f35583dd6f893a3e943cafa39eb8160ebc7cb5a",
+      "wasm_profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "trace_abi_id": "tassadar.trace.v1",
+      "trace_abi_version": 1
+    }
+  },
+  "claim_boundary": "canonical micro_wasm_kernel C-to-Wasm receipt only; proves one explicit source/toolchain/output/artifact lineage and one typed refusal path, not general C/C++ frontend closure or arbitrary Wasm lowering",
+  "receipt_digest": "7bfd8be7d26b3840484f7c517aae15dd5bd9c39f4e5bf72ee569c931a2d5ea91"
+}
