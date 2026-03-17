@@ -194,7 +194,12 @@ The current scope is:
   `fixtures/tassadar/reports/tassadar_workload_capability_matrix.json`,
   keeping runtime exact, runtime fallback-only, compiled exact, bounded
   learned, and partial learned-long-horizon posture separate per workload
-  family instead of collapsing them into one green summary
+  family instead of collapsing them into one green summary; `psionic-models`
+  now also publishes the served-lane workload matrix schema plus typed refusal
+  reasons, `psionic-serve` now exposes a benchmark-gated
+  `TassadarExecutorCapabilityPublication` above that schema, and
+  `psionic-provider` now wraps the same publication into a provider-facing
+  `TassadarCapabilityEnvelope` instead of inventing a second capability story
 - landed Phase 8A bar: one widened HullCache closure report now exists in
   `psionic-eval` at
   `fixtures/tassadar/reports/tassadar_hull_cache_closure_report.json`,

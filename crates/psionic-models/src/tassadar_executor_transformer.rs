@@ -2,15 +2,17 @@ use psionic_core::{DType, QuantizationMode, Shape};
 use psionic_runtime::{TassadarExecutorDecodeMode, TassadarTraceAbi, TassadarWasmProfile};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use thiserror::Error;
 use std::cmp::Reverse;
+use thiserror::Error;
 
 use crate::{
+    tassadar::{
+        research_only_workload_capability_matrix, workload_class_for_tassadar_model_id,
+        TassadarAttentionGeometryContract, TassadarExecutorAttentionMode, TassadarExecutorFamily,
+        TassadarWorkloadCapabilityMatrix, TassadarWorkloadClass,
+    },
     ModelDescriptor, TassadarTraceTokenizer, TokenId, TokenSequence, TokenizerBoundary,
     WeightBundleMetadata, WeightFormat, WeightSource, WeightTensorMetadata,
-    tassadar::{
-        TassadarAttentionGeometryContract, TassadarExecutorAttentionMode, TassadarExecutorFamily,
-    },
 };
 
 /// Stable claim boundary for the first neural executor family.
@@ -129,10 +131,7 @@ pub struct TassadarExecutorTransformerConfig {
     /// Constrained lookup head dimension carried as a geometry claim.
     pub constrained_lookup_head_dim: usize,
     /// Optional prompt-summary embedding buckets for prompt-conditioned learned adapters.
-    #[serde(
-        default,
-        skip_serializing_if = "prompt_summary_bucket_count_is_zero"
-    )]
+    #[serde(default, skip_serializing_if = "prompt_summary_bucket_count_is_zero")]
     pub prompt_summary_bucket_count: usize,
 }
 
@@ -373,12 +372,11 @@ impl TassadarExecutorTransformerWeightBundle {
             .iter()
             .map(|offset| *offset as f32)
             .collect::<Vec<_>>();
-        let prompt_summary_target_output_bias_tensors =
-            (!prompt_summary_target_output_bias_rows.is_empty()).then(|| {
-                flatten_prompt_summary_target_output_bias_rows(
-                    &prompt_summary_target_output_bias_rows,
-                )
-            });
+        let prompt_summary_target_output_bias_tensors = (!prompt_summary_target_output_bias_rows
+            .is_empty())
+        .then(|| {
+            flatten_prompt_summary_target_output_bias_rows(&prompt_summary_target_output_bias_rows)
+        });
 
         let mut entries = vec![
             (
@@ -426,7 +424,10 @@ impl TassadarExecutorTransformerWeightBundle {
             entries.push((
                 WeightTensorMetadata::new(
                     "prompt_summary_embeddings",
-                    Shape::new(vec![config.prompt_summary_bucket_count, config.embedding_dim]),
+                    Shape::new(vec![
+                        config.prompt_summary_bucket_count,
+                        config.embedding_dim,
+                    ]),
                     DType::F32,
                 ),
                 prompt_summary_embeddings.as_slice(),
@@ -459,7 +460,10 @@ impl TassadarExecutorTransformerWeightBundle {
             entries.push((
                 WeightTensorMetadata::new(
                     "relative_target_trace_schema_output_bias",
-                    Shape::new(vec![TassadarEarlyTraceSchemaPhase::COUNT, config.vocab_size]),
+                    Shape::new(vec![
+                        TassadarEarlyTraceSchemaPhase::COUNT,
+                        config.vocab_size,
+                    ]),
                     DType::F32,
                 ),
                 relative_target_trace_schema_output_bias.as_slice(),
@@ -571,7 +575,9 @@ impl TassadarExecutorTransformerWeightBundle {
 
     /// Returns the prompt-conditioned target-position output-bias rows.
     #[must_use]
-    pub fn prompt_summary_target_output_bias_rows(&self) -> &[TassadarPromptSummaryTargetOutputBiasRow] {
+    pub fn prompt_summary_target_output_bias_rows(
+        &self,
+    ) -> &[TassadarPromptSummaryTargetOutputBiasRow] {
         &self.prompt_summary_target_output_bias_rows
     }
 
@@ -659,7 +665,10 @@ impl TassadarExecutorTransformerWeightBundle {
             entries.push((
                 WeightTensorMetadata::new(
                     "prompt_summary_embeddings",
-                    Shape::new(vec![config.prompt_summary_bucket_count, config.embedding_dim]),
+                    Shape::new(vec![
+                        config.prompt_summary_bucket_count,
+                        config.embedding_dim,
+                    ]),
                     DType::F32,
                 ),
                 self.prompt_summary_embeddings.as_slice(),
@@ -698,7 +707,10 @@ impl TassadarExecutorTransformerWeightBundle {
             entries.push((
                 WeightTensorMetadata::new(
                     "relative_target_trace_schema_output_bias",
-                    Shape::new(vec![TassadarEarlyTraceSchemaPhase::COUNT, config.vocab_size]),
+                    Shape::new(vec![
+                        TassadarEarlyTraceSchemaPhase::COUNT,
+                        config.vocab_size,
+                    ]),
                     DType::F32,
                 ),
                 self.relative_target_trace_schema_output_bias.as_slice(),
@@ -838,8 +850,7 @@ impl TassadarExecutorTransformer {
     /// Stable model identifier for the first Hungarian-v0 executor family.
     pub const HUNGARIAN_V0_MODEL_ID: &str = "tassadar-executor-transformer-hungarian-v0-v0";
     /// Stable model identifier for the first Hungarian-10x10 executor family.
-    pub const HUNGARIAN_10X10_MODEL_ID: &str =
-        "tassadar-executor-transformer-hungarian-10x10-v0";
+    pub const HUNGARIAN_10X10_MODEL_ID: &str = "tassadar-executor-transformer-hungarian-10x10-v0";
     /// Stable model identifier for the first windowed Sudoku-v0 executor family.
     pub const WINDOWED_MODEL_ID: &str = "tassadar-executor-transformer-sudoku-v0-windowed-v0";
     /// Stable model identifier for the first windowed 9x9 executor family.
@@ -1044,9 +1055,7 @@ impl TassadarExecutorTransformer {
 
     /// Creates the first bounded Hungarian-v0 executor transformer for one surface.
     #[must_use]
-    pub fn hungarian_v0_with_surface(
-        trainable_surface: TassadarExecutorTrainableSurface,
-    ) -> Self {
+    pub fn hungarian_v0_with_surface(trainable_surface: TassadarExecutorTrainableSurface) -> Self {
         Self::hungarian_v0_with_surface_and_contract(
             trainable_surface,
             TassadarExecutorLongTraceContract::FlatPrefixFullForward,
@@ -1205,7 +1214,11 @@ impl TassadarExecutorTransformer {
 
     /// Enables the bounded early trace-schema output-bias adapter when absent.
     pub fn ensure_relative_target_trace_schema_output_bias(&mut self) {
-        if !self.weights.relative_target_trace_schema_output_bias.is_empty() {
+        if !self
+            .weights
+            .relative_target_trace_schema_output_bias
+            .is_empty()
+        {
             return;
         }
         self.weights.relative_target_trace_schema_output_bias =
@@ -1244,7 +1257,10 @@ impl TassadarExecutorTransformer {
         relative_target_position: usize,
     ) {
         if self
-            .prompt_summary_target_output_bias_row_index(prompt_summary_bucket, relative_target_position)
+            .prompt_summary_target_output_bias_row_index(
+                prompt_summary_bucket,
+                relative_target_position,
+            )
             .is_some()
         {
             return;
@@ -1295,6 +1311,36 @@ impl TassadarExecutorTransformer {
         self.descriptor
             .supported_decode_modes
             .contains(&decode_mode)
+    }
+
+    /// Returns the workload capability matrix for this learned executor family.
+    #[must_use]
+    pub fn workload_capability_matrix(&self) -> TassadarWorkloadCapabilityMatrix {
+        let workload_class =
+            workload_class_for_tassadar_model_id(self.descriptor.model.model_id.as_str())
+                .unwrap_or(TassadarWorkloadClass::SudokuClass);
+        let claim_boundary = format!(
+            "learned executor family remains {} under the {} contract; served capability publication stays closed until exact executor promotion lands",
+            match self.descriptor.claim_boundary {
+                TassadarExecutorTransformerClaimBoundary::NextTokenOnly => "next-token-only",
+                TassadarExecutorTransformerClaimBoundary::GreedyDecodeUnvalidated => {
+                    "greedy-decode-unvalidated"
+                }
+            },
+            self.descriptor.long_trace_contract.label(),
+        );
+        let detail = format!(
+            "learned {} lane stays research-only on `{}` until exact executor promotion and benchmark-backed served publication land",
+            workload_class.as_str(),
+            self.descriptor.model.model_id,
+        );
+        research_only_workload_capability_matrix(
+            &self.descriptor.model,
+            self.descriptor.supported_decode_modes.as_slice(),
+            workload_class,
+            claim_boundary,
+            detail,
+        )
     }
 
     /// Resolves one requested decode mode into an effective path or refusal.
@@ -1383,9 +1429,11 @@ impl TassadarExecutorTransformer {
         let mut source_hidden_states = Vec::new();
         let mut logits = Vec::new();
         let mut step_contexts = Vec::new();
-        let prompt_summary_bucket = self
-            .infer_initial_prompt_len(sequence.as_slice())
-            .and_then(|prompt_len| self.prompt_summary_bucket_for_prompt(&sequence.as_slice()[..prompt_len]));
+        let prompt_summary_bucket =
+            self.infer_initial_prompt_len(sequence.as_slice())
+                .and_then(|prompt_len| {
+                    self.prompt_summary_bucket_for_prompt(&sequence.as_slice()[..prompt_len])
+                });
         for position in 1..sequence.len() {
             let prefix = &sequence.as_slice()[..position];
             let step_context = self.step_context(prefix, position, prompt_summary_bucket)?;
@@ -1713,7 +1761,9 @@ impl TassadarExecutorTransformer {
         let mut ranked = kv_points.iter().collect::<Vec<_>>();
         ranked.sort_by_key(|point| Reverse(Self::lookup_score(point, target_position)));
         ranked.truncate(sparse_top_k.min(ranked.len()));
-        ranked.into_iter().max_by_key(|point| Self::lookup_score(point, target_position))
+        ranked
+            .into_iter()
+            .max_by_key(|point| Self::lookup_score(point, target_position))
     }
 
     fn lookup_score(point: &TassadarExecutorTransformerKvPoint, target_position: usize) -> i128 {
@@ -1815,7 +1865,10 @@ impl TassadarExecutorTransformer {
         let vocab_size = self.descriptor.config.vocab_size;
         if logits.len() != vocab_size
             || trace_schema_phase >= TassadarEarlyTraceSchemaPhase::COUNT
-            || self.weights.relative_target_trace_schema_output_bias.is_empty()
+            || self
+                .weights
+                .relative_target_trace_schema_output_bias
+                .is_empty()
         {
             return;
         }
@@ -1892,7 +1945,9 @@ impl TassadarExecutorTransformer {
         let all_bytes = |tokens: &[TokenId]| tokens.iter().copied().all(is_byte);
 
         match target_prefix.len() {
-            1 if target_prefix[0] == step_token => Some(TassadarEarlyTraceSchemaPhase::ExpectStepIndex),
+            1 if target_prefix[0] == step_token => {
+                Some(TassadarEarlyTraceSchemaPhase::ExpectStepIndex)
+            }
             2 if target_prefix[0] == step_token && target_prefix[1] == step_index_token => {
                 Some(TassadarEarlyTraceSchemaPhase::ExpectStepIndexByte0)
             }
@@ -2152,8 +2207,8 @@ where
 #[cfg(test)]
 mod tests {
     use psionic_runtime::{
-        TassadarCpuReferenceRunner, TassadarExecutorDecodeMode, tassadar_sudoku_9x9_corpus,
-        tassadar_sudoku_v0_corpus,
+        tassadar_sudoku_9x9_corpus, tassadar_sudoku_v0_corpus, TassadarCpuReferenceRunner,
+        TassadarExecutorDecodeMode,
     };
 
     use crate::{TassadarTraceTokenizer, TokenSequence, TokenizerBoundary};
@@ -2163,6 +2218,10 @@ mod tests {
         TassadarExecutorTrainableSurface, TassadarExecutorTransformer,
         TassadarExecutorTransformerClaimBoundary, TassadarExecutorTransformerConfig,
         TassadarExecutorTransformerDecodeRefusal,
+    };
+    use crate::tassadar::{
+        TassadarWorkloadCapabilityRefusalReason, TassadarWorkloadClass,
+        TassadarWorkloadSupportPosture,
     };
 
     #[test]
@@ -2221,6 +2280,25 @@ mod tests {
     }
 
     #[test]
+    fn learned_executor_transformer_workload_matrix_stays_research_only() {
+        let model = TassadarExecutorTransformer::sudoku_v0();
+        let matrix = model.workload_capability_matrix();
+        let row = matrix
+            .row(TassadarWorkloadClass::SudokuClass)
+            .expect("sudoku workload row");
+
+        assert_eq!(
+            row.support_posture,
+            TassadarWorkloadSupportPosture::ResearchOnly
+        );
+        assert_eq!(
+            row.refusal_reasons,
+            vec![TassadarWorkloadCapabilityRefusalReason::ClaimBoundaryUnvalidated]
+        );
+        assert!(matrix.validate_publication().is_err());
+    }
+
+    #[test]
     fn sudoku_9x9_windowed_executor_transformer_descriptor_is_explicit_about_long_trace_contract() {
         let model = TassadarExecutorTransformer::sudoku_9x9_windowed_with_surface(
             crate::TassadarExecutorTrainableSurface::OutputHeadOnly,
@@ -2243,8 +2321,8 @@ mod tests {
     }
 
     #[test]
-    fn sudoku_v0_executor_transformer_emits_logits_over_tokenized_sequences()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn sudoku_v0_executor_transformer_emits_logits_over_tokenized_sequences(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let model = TassadarExecutorTransformer::sudoku_v0();
         let case = tassadar_sudoku_v0_corpus()
@@ -2259,18 +2337,16 @@ mod tests {
 
         assert_eq!(forward.logits.len(), sequence.sequence.len() - 1);
         assert_eq!(forward.hidden_states.len(), sequence.sequence.len() - 1);
-        assert!(
-            forward
-                .logits
-                .iter()
-                .all(|step| step.len() == model.descriptor().config.vocab_size)
-        );
+        assert!(forward
+            .logits
+            .iter()
+            .all(|step| step.len() == model.descriptor().config.vocab_size));
         Ok(())
     }
 
     #[test]
-    fn sudoku_9x9_executor_transformer_emits_logits_over_tokenized_sequences()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn sudoku_9x9_executor_transformer_emits_logits_over_tokenized_sequences(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let model = TassadarExecutorTransformer::sudoku_9x9();
         let case = tassadar_sudoku_9x9_corpus()
@@ -2288,18 +2364,16 @@ mod tests {
 
         assert_eq!(forward.logits.len(), truncated.len() - 1);
         assert_eq!(forward.hidden_states.len(), truncated.len() - 1);
-        assert!(
-            forward
-                .logits
-                .iter()
-                .all(|step| step.len() == model.descriptor().config.vocab_size)
-        );
+        assert!(forward
+            .logits
+            .iter()
+            .all(|step| step.len() == model.descriptor().config.vocab_size));
         Ok(())
     }
 
     #[test]
-    fn sudoku_v0_executor_transformer_can_start_linear_decode()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn sudoku_v0_executor_transformer_can_start_linear_decode(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let model = TassadarExecutorTransformer::sudoku_v0();
         let config = TassadarExecutorTransformerConfig::sudoku_v0(&tokenizer);
@@ -2369,8 +2443,8 @@ mod tests {
     }
 
     #[test]
-    fn hull_decode_matches_linear_decode_over_real_model_kv_points()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn hull_decode_matches_linear_decode_over_real_model_kv_points(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let model = TassadarExecutorTransformer::sudoku_v0();
         let encoded = tokenizer.encode("<program> <locals> <memory> <trace>");
@@ -2401,8 +2475,8 @@ mod tests {
     }
 
     #[test]
-    fn sparse_decode_matches_linear_decode_over_real_model_kv_points()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn sparse_decode_matches_linear_decode_over_real_model_kv_points(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let model = TassadarExecutorTransformer::sudoku_v0_sparse_with_surface(
             TassadarExecutorTrainableSurface::OutputHeadEmbeddingsAndSmallLearnedMixer,
@@ -2420,10 +2494,8 @@ mod tests {
             &linear_state,
             TassadarExecutorDecodeMode::ReferenceLinear,
         )?;
-        let sparse_logits = model.next_token_logits_for_mode(
-            &sparse_state,
-            TassadarExecutorDecodeMode::SparseTopK,
-        )?;
+        let sparse_logits = model
+            .next_token_logits_for_mode(&sparse_state, TassadarExecutorDecodeMode::SparseTopK)?;
 
         assert_eq!(linear_logits, sparse_logits);
         assert_eq!(
@@ -2440,8 +2512,8 @@ mod tests {
     }
 
     #[test]
-    fn applying_a_trained_output_head_reconstructs_the_same_descriptor_digest()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn applying_a_trained_output_head_reconstructs_the_same_descriptor_digest(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut trained = TassadarExecutorTransformer::sudoku_v0();
         trained.refresh_after_training();
         let mut restored = TassadarExecutorTransformer::sudoku_v0();
@@ -2470,7 +2542,8 @@ mod tests {
             "<bos> <program> <locals> <byte_00> <byte_00> <byte_00> <byte_00> <memory_slots> <byte_00> <byte_00> <byte_00> <byte_00> <initial_memory> <byte_00> <byte_00> <byte_00> <byte_00> <trace> <step> <step_index> <byte_00> <byte_00> <byte_00> <byte_00>",
         );
         let initial_prompt_len = prefix.len() - 6;
-        let phase = model.relative_target_trace_schema_phase_index(prefix.as_slice(), initial_prompt_len);
+        let phase =
+            model.relative_target_trace_schema_phase_index(prefix.as_slice(), initial_prompt_len);
 
         assert_eq!(phase, Some(TassadarEarlyTraceSchemaPhase::ExpectPc.index()));
     }

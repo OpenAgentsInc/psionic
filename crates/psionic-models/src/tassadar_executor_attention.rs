@@ -5,11 +5,13 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    tassadar::{
+        research_only_workload_capability_matrix, workload_class_for_tassadar_model_id,
+        TassadarAttentionGeometryContract, TassadarExecutorAttentionMode, TassadarExecutorFamily,
+        TassadarWorkloadCapabilityMatrix, TassadarWorkloadClass,
+    },
     ModelDescriptor, TassadarTraceTokenizer, TokenId, TokenSequence, TokenizerBoundary,
     WeightBundleMetadata, WeightFormat, WeightSource, WeightTensorMetadata,
-    tassadar::{
-        TassadarAttentionGeometryContract, TassadarExecutorAttentionMode, TassadarExecutorFamily,
-    },
 };
 
 /// Stable claim boundary for the bounded executor-attention research lane.
@@ -860,6 +862,37 @@ impl TassadarExecutorAttentionTransformer {
             .contains(&decode_mode)
     }
 
+    /// Returns the workload capability matrix for this bounded research lane.
+    #[must_use]
+    pub fn workload_capability_matrix(&self) -> TassadarWorkloadCapabilityMatrix {
+        let workload_class =
+            workload_class_for_tassadar_model_id(self.descriptor.model.model_id.as_str())
+                .unwrap_or(TassadarWorkloadClass::SudokuClass);
+        let claim_boundary = format!(
+            "executor-attention remains {} and research-only until exact executor promotion lands",
+            match self.descriptor.claim_boundary {
+                TassadarExecutorAttentionClaimBoundary::ResearchWindowedDecodeOnly => {
+                    "windowed-decode-only"
+                }
+                TassadarExecutorAttentionClaimBoundary::GreedyDecodeUnvalidated => {
+                    "greedy-decode-unvalidated"
+                }
+            },
+        );
+        let detail = format!(
+            "attention candidate for `{}` stays research-only on `{}` until a benchmark-backed exact executor claim exists",
+            workload_class.as_str(),
+            self.descriptor.model.model_id,
+        );
+        research_only_workload_capability_matrix(
+            &self.descriptor.model,
+            self.descriptor.supported_decode_modes.as_slice(),
+            workload_class,
+            claim_boundary,
+            detail,
+        )
+    }
+
     /// Resolves one requested decode mode into an effective path or fallback.
     #[must_use]
     pub fn select_decode_mode(
@@ -1457,7 +1490,9 @@ impl TassadarExecutorAttentionTransformer {
         let all_bytes = |tokens: &[TokenId]| tokens.iter().copied().all(is_byte);
 
         match target_prefix.len() {
-            1 if target_prefix[0] == step_token => Some(TassadarEarlyTraceSchemaPhase::ExpectStepIndex),
+            1 if target_prefix[0] == step_token => {
+                Some(TassadarEarlyTraceSchemaPhase::ExpectStepIndex)
+            }
             2 if target_prefix[0] == step_token && target_prefix[1] == step_index_token => {
                 Some(TassadarEarlyTraceSchemaPhase::ExpectStepIndexByte0)
             }
@@ -1747,8 +1782,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use psionic_runtime::{TassadarExecutorDecodeMode, tassadar_sudoku_v0_corpus};
+    use psionic_runtime::{tassadar_sudoku_v0_corpus, TassadarExecutorDecodeMode};
 
+    use crate::tassadar::{
+        TassadarWorkloadCapabilityRefusalReason, TassadarWorkloadClass,
+        TassadarWorkloadSupportPosture,
+    };
     use crate::{TassadarTraceTokenizer, TokenSequence, TokenizerBoundary};
 
     use super::{
@@ -1776,18 +1815,35 @@ mod tests {
             descriptor.layer_semantics.len(),
             descriptor.config.layer_count
         );
-        assert!(
-            descriptor
-                .layer_semantics
-                .iter()
-                .all(|layer| layer.hull_cache_posture
-                    == TassadarExecutorAttentionHullPosture::FallbackToReferenceLinear)
-        );
+        assert!(descriptor
+            .layer_semantics
+            .iter()
+            .all(|layer| layer.hull_cache_posture
+                == TassadarExecutorAttentionHullPosture::FallbackToReferenceLinear));
     }
 
     #[test]
-    fn executor_attention_forward_logits_run_on_bounded_sequences()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn executor_attention_workload_matrix_stays_research_only() {
+        let model = TassadarExecutorAttentionTransformer::sudoku_v0();
+        let matrix = model.workload_capability_matrix();
+        let row = matrix
+            .row(TassadarWorkloadClass::SudokuClass)
+            .expect("sudoku workload row");
+
+        assert_eq!(
+            row.support_posture,
+            TassadarWorkloadSupportPosture::ResearchOnly
+        );
+        assert_eq!(
+            row.refusal_reasons,
+            vec![TassadarWorkloadCapabilityRefusalReason::ClaimBoundaryUnvalidated]
+        );
+        assert!(matrix.validate_publication().is_err());
+    }
+
+    #[test]
+    fn executor_attention_forward_logits_run_on_bounded_sequences(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let model = TassadarExecutorAttentionTransformer::sudoku_v0();
         let case = tassadar_sudoku_v0_corpus()
@@ -1805,18 +1861,16 @@ mod tests {
 
         assert_eq!(forward.logits.len(), truncated.len() - 1);
         assert_eq!(forward.layer_contexts.len(), truncated.len() - 1);
-        assert!(
-            forward
-                .logits
-                .iter()
-                .all(|step| step.len() == model.descriptor().config.vocab_size)
-        );
+        assert!(forward
+            .logits
+            .iter()
+            .all(|step| step.len() == model.descriptor().config.vocab_size));
         Ok(())
     }
 
     #[test]
-    fn executor_attention_decode_falls_back_from_hull_to_reference_linear()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn executor_attention_decode_falls_back_from_hull_to_reference_linear(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let model = TassadarExecutorAttentionTransformer::sudoku_v0();
         let prompt = TokenSequence::new(tokenizer.encode("<program> <locals>").as_slice().to_vec());
@@ -1871,7 +1925,8 @@ mod tests {
             "<bos> <program> <locals> <byte_00> <byte_00> <byte_00> <byte_00> <memory_slots> <byte_00> <byte_00> <byte_00> <byte_00> <initial_memory> <byte_00> <byte_00> <byte_00> <byte_00> <trace> <step> <step_index> <byte_00> <byte_00> <byte_00> <byte_00>",
         );
         let initial_prompt_len = prefix.len() - 6;
-        let phase = model.relative_target_trace_schema_phase_index(prefix.as_slice(), initial_prompt_len);
+        let phase =
+            model.relative_target_trace_schema_phase_index(prefix.as_slice(), initial_prompt_len);
 
         assert_eq!(phase, Some(TassadarEarlyTraceSchemaPhase::ExpectPc.index()));
     }

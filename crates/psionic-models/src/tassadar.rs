@@ -5,7 +5,8 @@ use psionic_runtime::{
     TassadarExecutionEvidenceBundle, TassadarExecutorDecodeMode, TassadarExecutorExecutionReport,
     TassadarExecutorSelectionDiagnostic, TassadarFixtureWeights as RuntimeTassadarFixtureWeights,
     TassadarProgram, TassadarProgramArtifact, TassadarRuntimeCapabilityReport, TassadarTraceAbi,
-    TassadarWasmProfile,
+    TassadarWasmProfile, TASSADAR_ARTICLE_CLASS_BENCHMARK_REF,
+    TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -16,6 +17,14 @@ use crate::{
     ModelRuntimeSurface, ModelServingSurface, WeightArtifactMetadata, WeightBundleMetadata,
     WeightFormat, WeightSource, WeightTensorMetadata,
 };
+
+const TASSADAR_WORKLOAD_CAPABILITY_MATRIX_SCHEMA_VERSION: u16 = 1;
+const TASSADAR_PUBLIC_BENCHMARK_PACKAGE_SET_REF: &str =
+    "benchmark-set://openagents/tassadar/public";
+const TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json";
+const TASSADAR_REFERENCE_FIXTURE_BENCHMARK_REF: &str =
+    "benchmark://openagents/tassadar/reference_fixture/validation_corpus";
 
 /// Stable executor-family identity distinct from ordinary decoder families.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,6 +130,345 @@ impl TassadarExecutorCompatibility {
     pub fn supports_decode_mode(&self, decode_mode: TassadarExecutorDecodeMode) -> bool {
         self.supported_decode_modes.contains(&decode_mode)
     }
+}
+
+/// Explicit workload-class taxonomy for public Tassadar capability publication.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarWorkloadClass {
+    /// Arithmetic-only microprograms.
+    ArithmeticMicroprogram,
+    /// CLRS-adjacent shortest-path witness workloads.
+    ClrsShortestPath,
+    /// Memory or local read-write microprograms.
+    MemoryLookupMicroprogram,
+    /// Branch and control-flow microprograms.
+    BranchControlFlowMicroprogram,
+    /// Richer WebAssembly kernels beyond the current microprogram corpus.
+    MicroWasmKernel,
+    /// Branch-heavy kernel programs with repeated control-flow pivots.
+    BranchHeavyKernel,
+    /// Memory-heavy kernel programs with dense read/write traffic.
+    MemoryHeavyKernel,
+    /// Long-loop kernels that push the executor toward longer horizons.
+    LongLoopKernel,
+    /// Sudoku-style exact search workloads.
+    SudokuClass,
+    /// Hungarian or min-cost-matching style workloads.
+    HungarianMatching,
+}
+
+impl TassadarWorkloadClass {
+    /// Returns all workload classes in stable publication order.
+    #[must_use]
+    pub const fn all() -> [Self; 10] {
+        [
+            Self::ArithmeticMicroprogram,
+            Self::ClrsShortestPath,
+            Self::MemoryLookupMicroprogram,
+            Self::BranchControlFlowMicroprogram,
+            Self::MicroWasmKernel,
+            Self::BranchHeavyKernel,
+            Self::MemoryHeavyKernel,
+            Self::LongLoopKernel,
+            Self::SudokuClass,
+            Self::HungarianMatching,
+        ]
+    }
+
+    /// Returns the stable workload label.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ArithmeticMicroprogram => "arithmetic_microprogram",
+            Self::ClrsShortestPath => "clrs_shortest_path",
+            Self::MemoryLookupMicroprogram => "memory_lookup_microprogram",
+            Self::BranchControlFlowMicroprogram => "branch_control_flow_microprogram",
+            Self::MicroWasmKernel => "micro_wasm_kernel",
+            Self::BranchHeavyKernel => "branch_heavy_kernel",
+            Self::MemoryHeavyKernel => "memory_heavy_kernel",
+            Self::LongLoopKernel => "long_loop_kernel",
+            Self::SudokuClass => "sudoku_class",
+            Self::HungarianMatching => "hungarian_matching",
+        }
+    }
+}
+
+/// Served-support posture for one workload class on one Tassadar lane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarWorkloadSupportPosture {
+    /// The workload class is published as exact on this lane.
+    Exact,
+    /// The workload class remains exact only by falling back to a slower direct path.
+    ExactFallbackOnly,
+    /// The workload class is bounded and partially supported on this lane.
+    Partial,
+    /// The workload class exists only as a research signal and is not a served claim.
+    ResearchOnly,
+    /// The workload class is outside the published support boundary.
+    Unsupported,
+}
+
+/// Typed refusal reason for workload classes that are not published directly.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarWorkloadCapabilityRefusalReason {
+    /// The workload sits outside the published lane boundary.
+    WorkloadClassOutOfScope,
+    /// The workload has no benchmark gate for served publication yet.
+    BenchmarkGateMissing,
+    /// The lane still stops at a research or next-token claim boundary.
+    ClaimBoundaryUnvalidated,
+}
+
+/// Benchmark-backed gate required before a workload row is published as support.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarWorkloadBenchmarkGate {
+    /// Stable benchmark or benchmark-set ref that gates publication.
+    pub benchmark_gate_ref: String,
+    /// Repo-owned evidence anchor proving the gate is public and reviewable.
+    pub evidence_ref: String,
+}
+
+impl TassadarWorkloadBenchmarkGate {
+    fn validate(
+        &self,
+        workload_class: TassadarWorkloadClass,
+    ) -> Result<(), TassadarWorkloadCapabilityMatrixError> {
+        if self.benchmark_gate_ref.trim().is_empty() {
+            return Err(
+                TassadarWorkloadCapabilityMatrixError::MissingBenchmarkGateRef { workload_class },
+            );
+        }
+        if self.evidence_ref.trim().is_empty() {
+            return Err(
+                TassadarWorkloadCapabilityMatrixError::MissingBenchmarkEvidenceRef {
+                    workload_class,
+                },
+            );
+        }
+        Ok(())
+    }
+}
+
+/// One workload row in the public Tassadar capability matrix.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarWorkloadCapabilityRow {
+    /// Stable workload-class identifier.
+    pub workload_class: TassadarWorkloadClass,
+    /// Current published support posture.
+    pub support_posture: TassadarWorkloadSupportPosture,
+    /// Decode modes the lane can speak about honestly for this class.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub supported_decode_modes: Vec<TassadarExecutorDecodeMode>,
+    /// Exact fallback mode when the posture is fallback-only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exact_fallback_decode_mode: Option<TassadarExecutorDecodeMode>,
+    /// Typed refusal reasons for unsupported or unpublishable rows.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refusal_reasons: Vec<TassadarWorkloadCapabilityRefusalReason>,
+    /// Benchmark gate required before the row is published as support.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub benchmark_gate: Option<TassadarWorkloadBenchmarkGate>,
+    /// Plain-language boundary note for the row.
+    pub detail: String,
+}
+
+impl TassadarWorkloadCapabilityRow {
+    fn publishable(&self) -> bool {
+        matches!(
+            self.support_posture,
+            TassadarWorkloadSupportPosture::Exact
+                | TassadarWorkloadSupportPosture::ExactFallbackOnly
+                | TassadarWorkloadSupportPosture::Partial
+        )
+    }
+}
+
+/// Machine-readable workload capability matrix for one Tassadar model lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarWorkloadCapabilityMatrix {
+    /// Stable schema version for the matrix.
+    pub schema_version: u16,
+    /// Stable model identifier that owns the matrix.
+    pub model_id: String,
+    /// Stable model family.
+    pub model_family: String,
+    /// Ordered workload rows.
+    pub rows: Vec<TassadarWorkloadCapabilityRow>,
+    /// Plain-language claim boundary for the full matrix.
+    pub claim_boundary: String,
+    /// Stable digest over the full matrix.
+    pub matrix_digest: String,
+}
+
+impl TassadarWorkloadCapabilityMatrix {
+    /// Creates a workload capability matrix in stable row order.
+    #[must_use]
+    pub fn new(
+        model_id: impl Into<String>,
+        model_family: impl Into<String>,
+        mut rows: Vec<TassadarWorkloadCapabilityRow>,
+        claim_boundary: impl Into<String>,
+    ) -> Self {
+        rows.sort_by_key(|row| row.workload_class.as_str());
+        let mut matrix = Self {
+            schema_version: TASSADAR_WORKLOAD_CAPABILITY_MATRIX_SCHEMA_VERSION,
+            model_id: model_id.into(),
+            model_family: model_family.into(),
+            rows,
+            claim_boundary: claim_boundary.into(),
+            matrix_digest: String::new(),
+        };
+        matrix.refresh_digest();
+        matrix
+    }
+
+    /// Returns one row by workload class.
+    #[must_use]
+    pub fn row(
+        &self,
+        workload_class: TassadarWorkloadClass,
+    ) -> Option<&TassadarWorkloadCapabilityRow> {
+        self.rows
+            .iter()
+            .find(|row| row.workload_class == workload_class)
+    }
+
+    /// Validates that the matrix is explicit enough for served publication.
+    pub fn validate_publication(&self) -> Result<(), TassadarWorkloadCapabilityMatrixError> {
+        if self.rows.is_empty() {
+            return Err(TassadarWorkloadCapabilityMatrixError::EmptyMatrix);
+        }
+        let mut seen = Vec::with_capacity(self.rows.len());
+        let mut publishable_rows = 0usize;
+        for row in &self.rows {
+            if seen.contains(&row.workload_class) {
+                return Err(
+                    TassadarWorkloadCapabilityMatrixError::DuplicateWorkloadClass {
+                        workload_class: row.workload_class,
+                    },
+                );
+            }
+            seen.push(row.workload_class);
+            if row.publishable() {
+                publishable_rows += 1;
+                if row.supported_decode_modes.is_empty() {
+                    return Err(
+                        TassadarWorkloadCapabilityMatrixError::PublishableWorkloadMissingDecodeModes {
+                            workload_class: row.workload_class,
+                        },
+                    );
+                }
+                if matches!(
+                    row.support_posture,
+                    TassadarWorkloadSupportPosture::ExactFallbackOnly
+                ) && row.exact_fallback_decode_mode.is_none()
+                {
+                    return Err(
+                        TassadarWorkloadCapabilityMatrixError::FallbackWorkloadMissingExactFallback {
+                            workload_class: row.workload_class,
+                        },
+                    );
+                }
+                row.benchmark_gate
+                    .as_ref()
+                    .ok_or(
+                        TassadarWorkloadCapabilityMatrixError::PublishableWorkloadMissingBenchmarkGate {
+                            workload_class: row.workload_class,
+                        },
+                    )?
+                    .validate(row.workload_class)?;
+            } else if row.refusal_reasons.is_empty() {
+                return Err(
+                    TassadarWorkloadCapabilityMatrixError::UnpublishedWorkloadMissingRefusalReasons {
+                        workload_class: row.workload_class,
+                    },
+                );
+            }
+        }
+        if publishable_rows == 0 {
+            return Err(TassadarWorkloadCapabilityMatrixError::NoPublishableWorkloads);
+        }
+        Ok(())
+    }
+
+    fn refresh_digest(&mut self) {
+        #[derive(Serialize)]
+        struct MatrixDigestEncoding<'a> {
+            schema_version: u16,
+            model_id: &'a str,
+            model_family: &'a str,
+            rows: &'a [TassadarWorkloadCapabilityRow],
+            claim_boundary: &'a str,
+        }
+
+        self.matrix_digest = stable_serialized_digest(
+            b"tassadar_workload_capability_matrix|",
+            &MatrixDigestEncoding {
+                schema_version: self.schema_version,
+                model_id: self.model_id.as_str(),
+                model_family: self.model_family.as_str(),
+                rows: self.rows.as_slice(),
+                claim_boundary: self.claim_boundary.as_str(),
+            },
+        );
+    }
+}
+
+/// Workload capability matrix generation or publication failure.
+#[derive(Clone, Debug, Error, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum TassadarWorkloadCapabilityMatrixError {
+    /// No workload rows were present.
+    #[error("Tassadar workload capability matrix must contain at least one row")]
+    EmptyMatrix,
+    /// The matrix duplicated a workload class.
+    #[error("duplicate Tassadar workload class `{workload_class:?}` in capability matrix")]
+    DuplicateWorkloadClass {
+        /// Repeated workload class.
+        workload_class: TassadarWorkloadClass,
+    },
+    /// One supported row did not advertise any decode modes.
+    #[error("publishable workload `{workload_class:?}` is missing supported decode modes")]
+    PublishableWorkloadMissingDecodeModes {
+        /// Workload class missing decode modes.
+        workload_class: TassadarWorkloadClass,
+    },
+    /// One fallback-only row omitted the exact fallback mode.
+    #[error("fallback-only workload `{workload_class:?}` is missing an exact fallback mode")]
+    FallbackWorkloadMissingExactFallback {
+        /// Workload class missing the fallback mode.
+        workload_class: TassadarWorkloadClass,
+    },
+    /// One publishable row omitted its benchmark gate.
+    #[error("publishable workload `{workload_class:?}` is missing its benchmark gate")]
+    PublishableWorkloadMissingBenchmarkGate {
+        /// Workload class missing the gate.
+        workload_class: TassadarWorkloadClass,
+    },
+    /// One benchmark gate omitted its benchmark or package-set ref.
+    #[error("workload `{workload_class:?}` is missing its benchmark gate ref")]
+    MissingBenchmarkGateRef {
+        /// Workload class missing the gate ref.
+        workload_class: TassadarWorkloadClass,
+    },
+    /// One benchmark gate omitted its evidence anchor.
+    #[error("workload `{workload_class:?}` is missing its benchmark evidence ref")]
+    MissingBenchmarkEvidenceRef {
+        /// Workload class missing the evidence ref.
+        workload_class: TassadarWorkloadClass,
+    },
+    /// One unpublished row omitted its typed refusal reasons.
+    #[error("unpublished workload `{workload_class:?}` is missing refusal reasons")]
+    UnpublishedWorkloadMissingRefusalReasons {
+        /// Workload class missing refusal reasons.
+        workload_class: TassadarWorkloadClass,
+    },
+    /// The matrix had no publishable workloads after benchmark gating.
+    #[error("Tassadar workload capability matrix has no benchmark-gated publishable workloads")]
+    NoPublishableWorkloads,
 }
 
 /// Typed compatibility failures when pairing a program artifact with an executor model descriptor.
@@ -582,6 +930,12 @@ impl TassadarExecutorFixture {
                     .as_slice(),
             ),
         )
+    }
+
+    /// Returns the public workload capability matrix for this executor lane.
+    #[must_use]
+    pub fn workload_capability_matrix(&self) -> TassadarWorkloadCapabilityMatrix {
+        workload_capability_matrix_for_fixture(self)
     }
 
     /// Compiles one digest-bound program artifact into a program-specialized
@@ -1142,6 +1496,350 @@ pub enum TassadarCompiledProgramError {
     },
 }
 
+fn workload_capability_matrix_for_fixture(
+    fixture: &TassadarExecutorFixture,
+) -> TassadarWorkloadCapabilityMatrix {
+    let descriptor = fixture.descriptor();
+    let supported_decode_modes = descriptor.compatibility.supported_decode_modes.as_slice();
+    let rows = match descriptor.model.model_id.as_str() {
+        value if value == TassadarExecutorFixture::MODEL_ID => {
+            let gate = validation_benchmark_gate();
+            TassadarWorkloadClass::all()
+                .into_iter()
+                .map(|workload_class| match workload_class {
+                    TassadarWorkloadClass::ArithmeticMicroprogram => exact_workload_row(
+                        workload_class,
+                        supported_decode_modes,
+                        Some(gate.clone()),
+                        "published exact on the validation-corpus arithmetic microprogram lane",
+                    ),
+                    TassadarWorkloadClass::ClrsShortestPath => exact_workload_row(
+                        workload_class,
+                        supported_decode_modes,
+                        Some(gate.clone()),
+                        "published exact on the bounded shortest-path witness in the validation corpus",
+                    ),
+                    TassadarWorkloadClass::MemoryLookupMicroprogram => exact_workload_row(
+                        workload_class,
+                        supported_decode_modes,
+                        Some(gate.clone()),
+                        "published exact on the validation-corpus memory lookup microprogram lane",
+                    ),
+                    TassadarWorkloadClass::BranchControlFlowMicroprogram => exact_workload_row(
+                        workload_class,
+                        supported_decode_modes,
+                        Some(gate.clone()),
+                        "published exact on the validation-corpus branch/control-flow microprogram lane",
+                    ),
+                    _ => unsupported_workload_row(
+                        workload_class,
+                        vec![TassadarWorkloadCapabilityRefusalReason::WorkloadClassOutOfScope],
+                        "reference_fixture publication stops at the validation microprogram workload classes",
+                    ),
+                })
+                .collect()
+        }
+        value if value == TassadarExecutorFixture::CORE_I32_V2_MODEL_ID => TassadarWorkloadClass::all()
+            .into_iter()
+            .map(|workload_class| {
+                unsupported_workload_row(
+                    workload_class,
+                    vec![TassadarWorkloadCapabilityRefusalReason::BenchmarkGateMissing],
+                    "core_i32_v2 is widened runtime substrate, but it stays unpublished until a public benchmark gate lands",
+                )
+            })
+            .collect(),
+        value if value == TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID => {
+            let gate = article_benchmark_gate();
+            TassadarWorkloadClass::all()
+                .into_iter()
+                .map(|workload_class| match workload_class {
+                    TassadarWorkloadClass::MicroWasmKernel => exact_workload_row(
+                        workload_class,
+                        supported_decode_modes,
+                        Some(gate.clone()),
+                        "published exact on the article micro-kernel benchmark family",
+                    ),
+                    TassadarWorkloadClass::BranchHeavyKernel => fallback_workload_row(
+                        workload_class,
+                        supported_decode_modes,
+                        TassadarExecutorDecodeMode::ReferenceLinear,
+                        Some(gate.clone()),
+                        "published exact only with explicit fallback to reference_linear when the requested fast path exceeds the validated branch-heavy envelope",
+                    ),
+                    TassadarWorkloadClass::MemoryHeavyKernel => exact_workload_row(
+                        workload_class,
+                        supported_decode_modes,
+                        Some(gate.clone()),
+                        "published exact on the current memory-heavy article kernel family",
+                    ),
+                    TassadarWorkloadClass::LongLoopKernel => fallback_workload_row(
+                        workload_class,
+                        supported_decode_modes,
+                        TassadarExecutorDecodeMode::ReferenceLinear,
+                        Some(gate.clone()),
+                        "published exact only with explicit fallback to reference_linear on the current long-loop horizon family",
+                    ),
+                    TassadarWorkloadClass::SudokuClass => fallback_workload_row(
+                        workload_class,
+                        supported_decode_modes,
+                        TassadarExecutorDecodeMode::ReferenceLinear,
+                        Some(gate.clone()),
+                        "published exact only with explicit fallback to reference_linear while Sudoku search fast paths remain outside the current direct closure",
+                    ),
+                    TassadarWorkloadClass::HungarianMatching => exact_workload_row(
+                        workload_class,
+                        supported_decode_modes,
+                        Some(gate.clone()),
+                        "published exact on the current Hungarian matching article family",
+                    ),
+                    _ => unsupported_workload_row(
+                        workload_class,
+                        vec![TassadarWorkloadCapabilityRefusalReason::BenchmarkGateMissing],
+                        "article_i32_compute publication is benchmark-gated only for the article workload families",
+                    ),
+                })
+                .collect()
+        }
+        value
+            if value == TassadarExecutorFixture::SUDOKU_V0_SEARCH_MODEL_ID
+                || value == TassadarExecutorFixture::SUDOKU_9X9_SEARCH_MODEL_ID =>
+        {
+            exact_single_workload_matrix_rows(
+                TassadarWorkloadClass::SudokuClass,
+                supported_decode_modes,
+                public_package_set_benchmark_gate(),
+                "published exact only for the exact Sudoku search workload family under the public benchmark-package-set gate",
+            )
+        }
+        value
+            if value == TassadarExecutorFixture::HUNGARIAN_V0_MATCHING_MODEL_ID
+                || value == TassadarExecutorFixture::HUNGARIAN_10X10_MATCHING_MODEL_ID =>
+        {
+            exact_single_workload_matrix_rows(
+                TassadarWorkloadClass::HungarianMatching,
+                supported_decode_modes,
+                public_package_set_benchmark_gate(),
+                "published exact only for the exact Hungarian matching workload family under the public benchmark-package-set gate",
+            )
+        }
+        _ => TassadarWorkloadClass::all()
+            .into_iter()
+            .map(|workload_class| {
+                unsupported_workload_row(
+                    workload_class,
+                    vec![TassadarWorkloadCapabilityRefusalReason::WorkloadClassOutOfScope],
+                    "this executor fixture does not publish workload capability outside its declared fixture lane",
+                )
+            })
+            .collect(),
+    };
+    let claim_boundary = match descriptor.model.model_id.as_str() {
+        value if value == TassadarExecutorFixture::MODEL_ID => {
+            "reference_fixture publishes only the validation-corpus microprogram workload classes; article, Sudoku, and matching claims remain out of scope"
+        }
+        value if value == TassadarExecutorFixture::CORE_I32_V2_MODEL_ID => {
+            "core_i32_v2 remains runtime substrate only; served capability publication stays closed until a benchmark gate lands"
+        }
+        value if value == TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID => {
+            "article_i32_compute publishes only the article benchmark families; validation microprogram publication remains owned by reference_fixture"
+        }
+        value
+            if value == TassadarExecutorFixture::SUDOKU_V0_SEARCH_MODEL_ID
+                || value == TassadarExecutorFixture::SUDOKU_9X9_SEARCH_MODEL_ID =>
+        {
+            "Sudoku fixture publication is exact only for Sudoku-class search workloads"
+        }
+        value
+            if value == TassadarExecutorFixture::HUNGARIAN_V0_MATCHING_MODEL_ID
+                || value == TassadarExecutorFixture::HUNGARIAN_10X10_MATCHING_MODEL_ID =>
+        {
+            "Hungarian fixture publication is exact only for Hungarian matching workloads"
+        }
+        _ => "fixture publication remains closed outside explicit workload rows",
+    };
+    TassadarWorkloadCapabilityMatrix::new(
+        descriptor.model.model_id.clone(),
+        descriptor.model.family.clone(),
+        rows,
+        claim_boundary,
+    )
+}
+
+pub(crate) fn research_only_workload_capability_matrix(
+    model: &ModelDescriptor,
+    supported_decode_modes: &[TassadarExecutorDecodeMode],
+    primary_workload_class: TassadarWorkloadClass,
+    claim_boundary: impl Into<String>,
+    primary_detail: impl Into<String>,
+) -> TassadarWorkloadCapabilityMatrix {
+    let primary_detail = primary_detail.into();
+    let rows = TassadarWorkloadClass::all()
+        .into_iter()
+        .map(|workload_class| {
+            if workload_class == primary_workload_class {
+                research_only_workload_row(
+                    workload_class,
+                    supported_decode_modes,
+                    primary_detail.clone(),
+                )
+            } else {
+                unsupported_workload_row(
+                    workload_class,
+                    vec![TassadarWorkloadCapabilityRefusalReason::WorkloadClassOutOfScope],
+                    "this research lane does not publish served capability outside its primary workload class",
+                )
+            }
+        })
+        .collect();
+    TassadarWorkloadCapabilityMatrix::new(
+        model.model_id.clone(),
+        model.family.clone(),
+        rows,
+        claim_boundary,
+    )
+}
+
+pub(crate) fn workload_class_for_tassadar_model_id(
+    model_id: &str,
+) -> Option<TassadarWorkloadClass> {
+    if model_id.contains("sudoku") {
+        Some(TassadarWorkloadClass::SudokuClass)
+    } else if model_id.contains("hungarian") {
+        Some(TassadarWorkloadClass::HungarianMatching)
+    } else if model_id.contains("article-i32-compute") {
+        Some(TassadarWorkloadClass::MicroWasmKernel)
+    } else if model_id.contains("core-i32") || model_id.contains("fixture") {
+        Some(TassadarWorkloadClass::ArithmeticMicroprogram)
+    } else {
+        None
+    }
+}
+
+fn exact_single_workload_matrix_rows(
+    primary_workload_class: TassadarWorkloadClass,
+    supported_decode_modes: &[TassadarExecutorDecodeMode],
+    benchmark_gate: TassadarWorkloadBenchmarkGate,
+    supported_detail: &str,
+) -> Vec<TassadarWorkloadCapabilityRow> {
+    TassadarWorkloadClass::all()
+        .into_iter()
+        .map(|workload_class| {
+            if workload_class == primary_workload_class {
+                exact_workload_row(
+                    workload_class,
+                    supported_decode_modes,
+                    Some(benchmark_gate.clone()),
+                    supported_detail,
+                )
+            } else {
+                unsupported_workload_row(
+                    workload_class,
+                    vec![TassadarWorkloadCapabilityRefusalReason::WorkloadClassOutOfScope],
+                    "this exact fixture publishes only its dedicated workload family",
+                )
+            }
+        })
+        .collect()
+}
+
+fn exact_workload_row(
+    workload_class: TassadarWorkloadClass,
+    supported_decode_modes: &[TassadarExecutorDecodeMode],
+    benchmark_gate: Option<TassadarWorkloadBenchmarkGate>,
+    detail: impl Into<String>,
+) -> TassadarWorkloadCapabilityRow {
+    TassadarWorkloadCapabilityRow {
+        workload_class,
+        support_posture: TassadarWorkloadSupportPosture::Exact,
+        supported_decode_modes: sorted_supported_decode_modes(supported_decode_modes),
+        exact_fallback_decode_mode: None,
+        refusal_reasons: Vec::new(),
+        benchmark_gate,
+        detail: detail.into(),
+    }
+}
+
+fn fallback_workload_row(
+    workload_class: TassadarWorkloadClass,
+    supported_decode_modes: &[TassadarExecutorDecodeMode],
+    exact_fallback_decode_mode: TassadarExecutorDecodeMode,
+    benchmark_gate: Option<TassadarWorkloadBenchmarkGate>,
+    detail: impl Into<String>,
+) -> TassadarWorkloadCapabilityRow {
+    TassadarWorkloadCapabilityRow {
+        workload_class,
+        support_posture: TassadarWorkloadSupportPosture::ExactFallbackOnly,
+        supported_decode_modes: sorted_supported_decode_modes(supported_decode_modes),
+        exact_fallback_decode_mode: Some(exact_fallback_decode_mode),
+        refusal_reasons: Vec::new(),
+        benchmark_gate,
+        detail: detail.into(),
+    }
+}
+
+fn research_only_workload_row(
+    workload_class: TassadarWorkloadClass,
+    supported_decode_modes: &[TassadarExecutorDecodeMode],
+    detail: impl Into<String>,
+) -> TassadarWorkloadCapabilityRow {
+    TassadarWorkloadCapabilityRow {
+        workload_class,
+        support_posture: TassadarWorkloadSupportPosture::ResearchOnly,
+        supported_decode_modes: sorted_supported_decode_modes(supported_decode_modes),
+        exact_fallback_decode_mode: None,
+        refusal_reasons: vec![TassadarWorkloadCapabilityRefusalReason::ClaimBoundaryUnvalidated],
+        benchmark_gate: None,
+        detail: detail.into(),
+    }
+}
+
+fn unsupported_workload_row(
+    workload_class: TassadarWorkloadClass,
+    refusal_reasons: Vec<TassadarWorkloadCapabilityRefusalReason>,
+    detail: impl Into<String>,
+) -> TassadarWorkloadCapabilityRow {
+    TassadarWorkloadCapabilityRow {
+        workload_class,
+        support_posture: TassadarWorkloadSupportPosture::Unsupported,
+        supported_decode_modes: Vec::new(),
+        exact_fallback_decode_mode: None,
+        refusal_reasons,
+        benchmark_gate: None,
+        detail: detail.into(),
+    }
+}
+
+fn sorted_supported_decode_modes(
+    supported_decode_modes: &[TassadarExecutorDecodeMode],
+) -> Vec<TassadarExecutorDecodeMode> {
+    let mut supported_decode_modes = supported_decode_modes.to_vec();
+    supported_decode_modes.sort_by_key(|mode| mode.as_str());
+    supported_decode_modes.dedup();
+    supported_decode_modes
+}
+
+fn validation_benchmark_gate() -> TassadarWorkloadBenchmarkGate {
+    TassadarWorkloadBenchmarkGate {
+        benchmark_gate_ref: String::from(TASSADAR_REFERENCE_FIXTURE_BENCHMARK_REF),
+        evidence_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
+    }
+}
+
+fn article_benchmark_gate() -> TassadarWorkloadBenchmarkGate {
+    TassadarWorkloadBenchmarkGate {
+        benchmark_gate_ref: String::from(TASSADAR_ARTICLE_CLASS_BENCHMARK_REF),
+        evidence_ref: String::from(TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF),
+    }
+}
+
+fn public_package_set_benchmark_gate() -> TassadarWorkloadBenchmarkGate {
+    TassadarWorkloadBenchmarkGate {
+        benchmark_gate_ref: String::from(TASSADAR_PUBLIC_BENCHMARK_PACKAGE_SET_REF),
+        evidence_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
+    }
+}
+
 fn build_weight_bundle(
     runtime_weights: &RuntimeTassadarFixtureWeights,
     profile: &TassadarWasmProfile,
@@ -1531,6 +2229,8 @@ mod tests {
     use super::{
         TassadarCompiledProgramError, TassadarCompiledProgramSuiteArtifact,
         TassadarExecutorContractError, TassadarExecutorFixture,
+        TassadarWorkloadCapabilityMatrixError, TassadarWorkloadCapabilityRefusalReason,
+        TassadarWorkloadClass, TassadarWorkloadSupportPosture,
     };
     use crate::{
         ModelIngressSurface, ModelRuntimeSurface, ModelServingSurface, WeightFormat, WeightSource,
@@ -1649,6 +2349,80 @@ mod tests {
             );
             run_tassadar_exact_parity(&case.program).expect("exact parity should hold");
         }
+    }
+
+    #[test]
+    fn article_fixture_workload_capability_matrix_is_machine_legible() {
+        let fixture = TassadarExecutorFixture::article_i32_compute_v1();
+        let matrix = fixture.workload_capability_matrix();
+
+        matrix
+            .validate_publication()
+            .expect("article fixture matrix should be publishable");
+        assert_eq!(
+            matrix
+                .row(TassadarWorkloadClass::MicroWasmKernel)
+                .expect("micro row")
+                .support_posture,
+            TassadarWorkloadSupportPosture::Exact
+        );
+        assert_eq!(
+            matrix
+                .row(TassadarWorkloadClass::LongLoopKernel)
+                .expect("long-loop row")
+                .support_posture,
+            TassadarWorkloadSupportPosture::ExactFallbackOnly
+        );
+        assert_eq!(
+            matrix
+                .row(TassadarWorkloadClass::ArithmeticMicroprogram)
+                .expect("arithmetic row")
+                .refusal_reasons,
+            vec![TassadarWorkloadCapabilityRefusalReason::BenchmarkGateMissing]
+        );
+        let encoded = serde_json::to_value(&matrix).expect("matrix should serialize");
+        let workload_classes = encoded["rows"]
+            .as_array()
+            .expect("rows should encode as an array")
+            .iter()
+            .map(|row| row["workload_class"].clone())
+            .collect::<Vec<_>>();
+        assert!(workload_classes.contains(&serde_json::json!("arithmetic_microprogram")));
+        assert!(workload_classes.contains(&serde_json::json!("micro_wasm_kernel")));
+    }
+
+    #[test]
+    fn workload_capability_matrix_requires_benchmark_gate_for_published_rows() {
+        let fixture = TassadarExecutorFixture::article_i32_compute_v1();
+        let mut matrix = fixture.workload_capability_matrix();
+        let row = matrix
+            .rows
+            .iter_mut()
+            .find(|row| row.workload_class == TassadarWorkloadClass::MicroWasmKernel)
+            .expect("micro row");
+        row.benchmark_gate = None;
+        let err = matrix
+            .validate_publication()
+            .expect_err("published rows should require a benchmark gate");
+        assert_eq!(
+            err,
+            TassadarWorkloadCapabilityMatrixError::PublishableWorkloadMissingBenchmarkGate {
+                workload_class: TassadarWorkloadClass::MicroWasmKernel,
+            }
+        );
+    }
+
+    #[test]
+    fn core_i32_v2_workload_capability_matrix_stays_unpublishable_without_benchmark_gate() {
+        let fixture = TassadarExecutorFixture::core_i32_v2();
+        let err = fixture
+            .workload_capability_matrix()
+            .validate_publication()
+            .expect_err("core_i32_v2 should remain unpublished");
+        assert_eq!(
+            err,
+            TassadarWorkloadCapabilityMatrixError::NoPublishableWorkloads
+        );
     }
 
     #[test]

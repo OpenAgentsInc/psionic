@@ -16,6 +16,7 @@ path = "src/lib.rs"
 [dependencies]
 ed25519-dalek = { workspace = true }
 hex = { workspace = true }
+psionic-models = { path = "../psionic-models" }
 psionic-runtime = { path = "../psionic-runtime" }
 psionic-serve = { path = "../psionic-serve" }
 serde = { workspace = true }

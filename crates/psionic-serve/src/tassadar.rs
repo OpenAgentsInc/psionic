@@ -6,7 +6,8 @@ use std::{
 
 use psionic_models::{
     TassadarExecutorContractError, TassadarExecutorFixture, TassadarExecutorModelDescriptor,
-    TassadarTraceTokenizer,
+    TassadarTraceTokenizer, TassadarWorkloadCapabilityMatrix,
+    TassadarWorkloadCapabilityMatrixError,
 };
 use psionic_research::{
     TassadarAcceptanceReport, TassadarCompiledArticleClosureReport,
@@ -49,6 +50,36 @@ pub const TASSADAR_LAB_SURFACE_ARTIFACT_REF: &str =
 const ARTICLE_EXECUTOR_READABLE_LOG_MAX_LINES: usize = 96;
 const ARTICLE_EXECUTOR_TOKEN_TRACE_MAX_TOKENS: usize = 256;
 const ARTICLE_EXECUTOR_TOKEN_TRACE_CHUNK_SIZE: usize = 32;
+
+/// Benchmark-gated served capability publication for the explicit executor-trace lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutorCapabilityPublication {
+    /// Served product identifier.
+    pub product_id: String,
+    /// Served executor model descriptor.
+    pub model_descriptor: TassadarExecutorModelDescriptor,
+    /// Runtime capability visible to the caller.
+    pub runtime_capability: TassadarRuntimeCapabilityReport,
+    /// Machine-readable workload capability matrix for the served lane.
+    pub workload_capability_matrix: TassadarWorkloadCapabilityMatrix,
+}
+
+/// Capability-publication failure for the explicit executor-trace lane.
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum TassadarExecutorCapabilityPublicationError {
+    /// The requested executor model is not registered.
+    #[error("unknown Tassadar executor model `{model_id}`")]
+    UnknownModel {
+        /// Requested model identifier.
+        model_id: String,
+    },
+    /// The workload capability matrix is not publishable yet.
+    #[error("invalid Tassadar workload capability publication: {error}")]
+    InvalidWorkloadCapabilityMatrix {
+        /// Validation failure from the shared model contract.
+        error: TassadarWorkloadCapabilityMatrixError,
+    },
+}
 
 /// Explicit request contract for the served Tassadar executor lane.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -341,6 +372,33 @@ impl LocalTassadarExecutorService {
         self
     }
 
+    /// Returns the benchmark-gated served capability publication for one fixture.
+    pub fn capability_publication(
+        &self,
+        requested_model_id: Option<&str>,
+    ) -> Result<TassadarExecutorCapabilityPublication, TassadarExecutorCapabilityPublicationError>
+    {
+        let fixture = self
+            .resolve_fixture_by_model_id(requested_model_id)
+            .map_err(
+                |model_id| TassadarExecutorCapabilityPublicationError::UnknownModel { model_id },
+            )?;
+        let workload_capability_matrix = fixture.workload_capability_matrix();
+        workload_capability_matrix
+            .validate_publication()
+            .map_err(|error| {
+                TassadarExecutorCapabilityPublicationError::InvalidWorkloadCapabilityMatrix {
+                    error,
+                }
+            })?;
+        Ok(TassadarExecutorCapabilityPublication {
+            product_id: String::from(EXECUTOR_TRACE_PRODUCT_ID),
+            model_descriptor: fixture.descriptor().clone(),
+            runtime_capability: fixture.runtime_capability_report(),
+            workload_capability_matrix,
+        })
+    }
+
     /// Executes one request through the explicit executor-trace surface.
     pub fn execute(
         &self,
@@ -415,11 +473,18 @@ impl LocalTassadarExecutorService {
             .requested_model_id
             .as_deref()
             .unwrap_or(self.default_model_id.as_str());
-        self.fixtures.get(requested_model_id).ok_or_else(|| {
-            TassadarExecutorServiceError::UnknownModel {
-                model_id: requested_model_id.to_string(),
-            }
-        })
+        self.resolve_fixture_by_model_id(Some(requested_model_id))
+            .map_err(|model_id| TassadarExecutorServiceError::UnknownModel { model_id })
+    }
+
+    fn resolve_fixture_by_model_id(
+        &self,
+        requested_model_id: Option<&str>,
+    ) -> Result<&TassadarExecutorFixture, String> {
+        let requested_model_id = requested_model_id.unwrap_or(self.default_model_id.as_str());
+        self.fixtures
+            .get(requested_model_id)
+            .ok_or_else(|| requested_model_id.to_string())
     }
 
     fn execute_with_fixture(
@@ -4709,10 +4774,11 @@ mod tests {
         TassadarArticleExecutorSessionOutcome, TassadarArticleExecutorSessionRequest,
         TassadarArticleExecutorSessionServiceError, TassadarArticleExecutorSessionStreamEvent,
         TassadarArticleHybridWorkflowOutcome, TassadarArticleHybridWorkflowRequest,
-        TassadarArticleHybridWorkflowServiceError, TassadarExecutorOutcome,
-        TassadarExecutorRequest, TassadarExecutorServiceError, TassadarExecutorStreamEvent,
-        TassadarLabPreparedView, TassadarLabReplayId, TassadarLabRequest, TassadarLabSourceKind,
-        TassadarLabUpdate, TassadarPlannerExecutorSubproblem, TassadarPlannerFallbackPolicy,
+        TassadarArticleHybridWorkflowServiceError, TassadarExecutorCapabilityPublicationError,
+        TassadarExecutorOutcome, TassadarExecutorRequest, TassadarExecutorServiceError,
+        TassadarExecutorStreamEvent, TassadarLabPreparedView, TassadarLabReplayId,
+        TassadarLabRequest, TassadarLabSourceKind, TassadarLabUpdate,
+        TassadarPlannerExecutorSubproblem, TassadarPlannerFallbackPolicy,
         TassadarPlannerRouteReason, TassadarPlannerRouterError, TassadarPlannerRoutingBudget,
         TassadarPlannerRoutingOutcome, TassadarPlannerRoutingPolicy, TassadarPlannerRoutingRequest,
         ARTICLE_EXECUTOR_SESSION_PRODUCT_ID, ARTICLE_HYBRID_WORKFLOW_PRODUCT_ID,
@@ -4771,6 +4837,47 @@ mod tests {
             case_id,
             requested_decode_mode,
         )
+    }
+
+    #[test]
+    fn executor_service_capability_publication_serializes_benchmark_gated_matrix() {
+        let service = LocalTassadarExecutorService::new()
+            .with_fixture(TassadarExecutorFixture::article_i32_compute_v1());
+        let publication = service
+            .capability_publication(Some(TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID))
+            .expect("article fixture should publish capability");
+
+        assert_eq!(publication.product_id, EXECUTOR_TRACE_PRODUCT_ID);
+        assert_eq!(publication.runtime_capability.runtime_backend, "cpu");
+        let encoded = serde_json::to_value(&publication).expect("publication should serialize");
+        assert_eq!(
+            encoded["model_descriptor"]["model"]["model_id"],
+            serde_json::json!(TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID)
+        );
+        let workload_classes = encoded["workload_capability_matrix"]["rows"]
+            .as_array()
+            .expect("rows should encode as an array")
+            .iter()
+            .map(|row| row["workload_class"].clone())
+            .collect::<Vec<_>>();
+        assert!(workload_classes.contains(&serde_json::json!("micro_wasm_kernel")));
+    }
+
+    #[test]
+    fn executor_service_capability_publication_rejects_unbenchmarked_fixture() {
+        let service = LocalTassadarExecutorService::new()
+            .with_fixture(TassadarExecutorFixture::core_i32_v2());
+        let err = service
+            .capability_publication(Some(TassadarExecutorFixture::CORE_I32_V2_MODEL_ID))
+            .expect_err("core_i32_v2 should stay unpublished");
+
+        assert_eq!(
+            err,
+            TassadarExecutorCapabilityPublicationError::InvalidWorkloadCapabilityMatrix {
+                error:
+                    psionic_models::TassadarWorkloadCapabilityMatrixError::NoPublishableWorkloads,
+            }
+        );
     }
 
     #[test]
