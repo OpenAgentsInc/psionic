@@ -9,7 +9,12 @@ for issue `#3616`.
   first reviewed real-run corpus splits under
   `datasets/psionic_architecture_explainer/`
 - `experiments/`: frozen experiment manifests and trend ledgers for the
-  first reviewed `Psionic architecture explainer` run iterations
+  first reviewed `Psionic architecture explainer` run iterations, including the
+  standalone repo-local reference-overfit contract at
+  `experiments/psionic_architecture_explainer_reference_overfit_v1.json`
+- `runs/`: committed machine-readable run reports, including the standalone
+  repo-local Apple overfit proof at
+  `runs/psionic_architecture_explainer_reference_overfit_report.json`
 - `packages/`: positive and negative `.fmadapter` inventory fixtures
 - `lineage/`: positive and negative OpenAgents lineage payloads
 
@@ -34,3 +39,19 @@ tests a stable corpus to validate against.
 - `docs/APPLE_ADAPTER_DATASET_SPEC.md`
 - `docs/APPLE_FMADAPTER_PACKAGE_SPEC.md`
 - `docs/APPLE_ADAPTER_LINEAGE_SPEC.md`
+- `docs/TRAIN_SYSTEM.md`
+
+## Repo-Local Overfit Evidence
+
+The standalone `psionic` repo now keeps one canonical bounded Apple
+benchmark-effectiveness proof entirely in-repo:
+
+- frozen contract:
+  `experiments/psionic_architecture_explainer_reference_overfit_v1.json`
+- generator:
+  `crates/psionic-train/examples/apple_architecture_explainer_reference_overfit.rs`
+- machine-readable report:
+  `runs/psionic_architecture_explainer_reference_overfit_report.json`
+
+That report is intentionally repo-local reference evidence, not a live
+bridge-backed or authority-backed operator receipt.

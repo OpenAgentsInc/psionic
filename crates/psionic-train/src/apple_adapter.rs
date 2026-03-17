@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::Path};
+use std::{cmp::Ordering, collections::BTreeMap, path::Path};
 
 use half::f16;
 use psionic_adapters::{
@@ -6,14 +6,21 @@ use psionic_adapters::{
 };
 use psionic_core::{DType, Device, Shape, TensorSpec};
 use psionic_data::{
-    AppleAdapterDatasetContract, AppleAdapterMessage, AppleAdapterMessageRole,
-    AppleAdapterSampleKind, AppleAdapterSampleTokenCapture, DatasetPackingPlan,
-    DatasetPackingPolicy, TokenizerDigest,
+    AppleAdapterCuratedCorpusManifest, AppleAdapterDatasetContract, AppleAdapterMessage,
+    AppleAdapterMessageRole, AppleAdapterSampleKind, AppleAdapterSampleTokenCapture,
+    DatasetPackingPlan, DatasetPackingPolicy, TokenizerDigest,
 };
 use psionic_environments::{
     AppleAdapterEnvironmentBundle, AppleAdapterEnvironmentError, EnvironmentWorkloadClass,
 };
+use psionic_eval::{
+    AppleAdapterBenchmarkError, AppleAdapterEvalHarness, AppleAdapterObservedSampleOutput,
+    AppleAdapterObservedToolCall, BenchmarkPackage, EvalExecutionStrategyFacts,
+    EvalFinalStateCapture, EvalTimerIntegrityFacts, EvalTokenAccountingFacts,
+    EvalVerificationFacts, run_curated_base_vs_adapter_benchmark,
+};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -28,6 +35,7 @@ use crate::{
 
 const OPENAGENTS_APPLE_FMADAPTER_PACKAGE_FORMAT_VERSION: &str = "openagents.apple-fmadapter.v1";
 const APPLE_ADAPTER_FIDELITY_PLAN_ID: &str = "openagents.apple.token_sequence_reference.v1";
+const APPLE_REFERENCE_DECODER_NEAREST_TARGET_PROTOTYPE: &str = "nearest_target_prototype";
 /// Feature width used by the current live Rust-native Apple reference lane.
 pub const APPLE_LIVE_REFERENCE_FEATURE_WIDTH: usize = 2048;
 /// LoRA rank used by the current live Rust-native Apple reference lane.
@@ -1759,6 +1767,79 @@ where
     build_apple_adapter_sft_outcome(backend, dataset, environment, request, artifacts)
 }
 
+/// Runs one repo-local overfit benchmark against the bounded Apple reference lane.
+pub fn run_apple_adapter_reference_overfit<F>(
+    backend: &AppleAdapterTrainingExecutionBackend,
+    dataset: &AppleAdapterDatasetContract,
+    captures: &[AppleAdapterSampleTokenCapture],
+    environment: &AppleAdapterEnvironmentBundle,
+    benchmark_package: &BenchmarkPackage,
+    corpus: &AppleAdapterCuratedCorpusManifest,
+    manifest: &crate::AppleAdapterExperimentManifest,
+    request: &AppleAdapterSftRunRequest,
+    benchmark_mode: crate::AppleAdapterUsefulAdapterBenchmarkMode,
+    base_outputs: Vec<AppleAdapterObservedSampleOutput>,
+    benchmark_started_at_ms: u64,
+    benchmark_finalized_at_ms: u64,
+    verification_for_sample: F,
+) -> Result<crate::AppleAdapterReferenceOverfitReport, AppleAdapterReferenceOverfitError>
+where
+    F: Fn(&str) -> EvalVerificationFacts,
+{
+    manifest.validate()?;
+    if manifest.benchmark_ref != benchmark_package.key.benchmark_ref {
+        return Err(AppleAdapterReferenceOverfitError::BenchmarkRefMismatch {
+            expected: manifest.benchmark_ref.clone(),
+            actual: benchmark_package.key.benchmark_ref.clone(),
+        });
+    }
+
+    let mut on_progress = |_event: &AppleAdapterSftProgressEvent| {};
+    let artifacts = execute_apple_adapter_sft_artifacts(
+        backend,
+        dataset,
+        environment,
+        request,
+        &mut on_progress,
+    )?;
+    let training_summary =
+        build_apple_adapter_sft_outcome(backend, dataset, environment, request, artifacts.clone())?
+            .summary;
+    let (adapted_outputs, adapted_predictions) = reference_decode_outputs(
+        backend,
+        &artifacts.run,
+        dataset,
+        captures,
+        &verification_for_sample,
+    )?;
+    let harness = AppleAdapterEvalHarness::new(environment.clone())
+        .map_err(AppleAdapterBenchmarkError::from)?;
+    let benchmark_report = run_curated_base_vs_adapter_benchmark(
+        &harness,
+        benchmark_package,
+        dataset,
+        corpus,
+        base_outputs,
+        adapted_outputs,
+        manifest.useful_adapter_gate.policy_for_mode(benchmark_mode),
+        benchmark_started_at_ms,
+        benchmark_finalized_at_ms,
+    )?;
+    Ok(crate::AppleAdapterReferenceOverfitReport {
+        abi_version: crate::APPLE_ADAPTER_REFERENCE_OVERFIT_REPORT_ABI_VERSION.to_string(),
+        report_id: format!("{}.{}", manifest.experiment_id, benchmark_mode.label()),
+        manifest_digest: manifest.stable_digest(),
+        benchmark_mode,
+        reference_decoder: String::from(APPLE_REFERENCE_DECODER_NEAREST_TARGET_PROTOTYPE),
+        training_summary,
+        benchmark: crate::AppleAdapterExperimentBenchmarkSummary::from_report(&benchmark_report),
+        benchmark_report,
+        adapted_predictions,
+        report_digest: String::new(),
+    }
+    .with_stable_digest())
+}
+
 /// Runs the optional draft-model distillation follow-on lane and emits a package with draft payloads.
 pub fn run_apple_adapter_draft_distillation_export(
     backend: &AppleAdapterTrainingExecutionBackend,
@@ -2016,6 +2097,176 @@ fn build_apple_adapter_sft_outcome(
         adapter_delta: artifacts.adapter_delta,
         adapter_package: package,
     })
+}
+
+fn reference_decode_outputs<F>(
+    backend: &AppleAdapterTrainingExecutionBackend,
+    run: &FixedBudgetTrainingRun,
+    dataset: &AppleAdapterDatasetContract,
+    captures: &[AppleAdapterSampleTokenCapture],
+    verification_for_sample: &F,
+) -> Result<
+    (
+        Vec<AppleAdapterObservedSampleOutput>,
+        Vec<crate::AppleAdapterReferencePredictionReceipt>,
+    ),
+    AppleAdapterReferenceOverfitError,
+>
+where
+    F: Fn(&str) -> EvalVerificationFacts,
+{
+    let capture_by_id = captures
+        .iter()
+        .map(|capture| (capture.sample_id.as_str(), capture))
+        .collect::<BTreeMap<_, _>>();
+    let sample_by_id = dataset
+        .samples
+        .iter()
+        .map(|sample| (sample.sample_id.as_str(), sample))
+        .collect::<BTreeMap<_, _>>();
+    let mut outputs = Vec::with_capacity(dataset.samples.len());
+    let mut receipts = Vec::with_capacity(dataset.samples.len());
+
+    for sample in &dataset.samples {
+        let capture = capture_by_id
+            .get(sample.sample_id.as_str())
+            .ok_or_else(|| AppleAdapterReferenceOverfitError::MissingSampleCapture {
+                sample_id: sample.sample_id.clone(),
+            })?;
+        let feature_record = AppleAdapterBatchFeatureRecord {
+            sample_id: sample.sample_id.clone(),
+            sample_kind: sample.sample_kind,
+            prompt_features: prompt_feature_vector(
+                sample,
+                capture,
+                backend.config().model.input_width,
+            ),
+            target_features: sample_target_feature_vector(
+                sample,
+                capture,
+                backend.config().model.output_width,
+            ),
+            prompt_tokens: capture.prompt_tokens,
+            completion_tokens: capture.completion_tokens,
+            feature_digest: stable_feature_digest(
+                sample,
+                capture,
+                backend.config().model.input_width,
+                backend.config().model.output_width,
+            ),
+        };
+        let forward = backend.forward_sample(&feature_record, run)?;
+        let (predicted_sample_id, raw_similarity) =
+            select_reference_prediction_target(backend, forward.prediction.as_slice())?;
+        let raw_similarity = round_reference_similarity(raw_similarity);
+        let predicted_sample = sample_by_id
+            .get(predicted_sample_id.as_str())
+            .ok_or_else(
+                || AppleAdapterReferenceOverfitError::MissingReferenceDecodeTarget {
+                    sample_id: predicted_sample_id.clone(),
+                },
+            )?;
+        let predicted_output_text = predicted_sample
+            .messages
+            .last()
+            .map(|message| message.content.clone())
+            .unwrap_or_default();
+        let predicted_output_digest = hex::encode(Sha256::digest(predicted_output_text.as_bytes()));
+        let mut observed = AppleAdapterObservedSampleOutput::from_text(
+            sample.sample_id.clone(),
+            predicted_output_text,
+        );
+        if let Some(structured_output) = predicted_sample.structured_assistant_output.clone() {
+            observed = observed.with_structured_output(structured_output);
+        }
+        if !predicted_sample.tools.is_empty() {
+            observed = observed.with_tool_calls(
+                predicted_sample
+                    .tools
+                    .iter()
+                    .map(|tool| AppleAdapterObservedToolCall {
+                        tool_name: tool.function.name.clone(),
+                        succeeded: true,
+                        arguments: None,
+                    })
+                    .collect(),
+            );
+        }
+        observed = observed.with_verification(verification_for_sample(sample.sample_id.as_str()));
+        observed.metadata.insert(
+            String::from("apple_adapter.reference_decoder.selected_sample_id"),
+            Value::String(predicted_sample_id.clone()),
+        );
+        observed.metadata.insert(
+            String::from("apple_adapter.reference_decoder.raw_similarity"),
+            serde_json::json!(raw_similarity),
+        );
+        observed.metadata.insert(
+            String::from("apple_adapter.reference_decoder.predicted_output_digest"),
+            Value::String(predicted_output_digest.clone()),
+        );
+        outputs.push(observed);
+        receipts.push(crate::AppleAdapterReferencePredictionReceipt {
+            sample_id: sample.sample_id.clone(),
+            predicted_sample_id,
+            predicted_output_digest,
+            raw_similarity,
+        });
+    }
+
+    Ok((outputs, receipts))
+}
+
+fn select_reference_prediction_target(
+    backend: &AppleAdapterTrainingExecutionBackend,
+    prediction: &[f32],
+) -> Result<(String, f32), AppleAdapterReferenceOverfitError> {
+    backend
+        .target_prototypes
+        .iter()
+        .map(|prototype| {
+            (
+                prototype.sample_id.clone(),
+                dot(prediction, prototype.target_features.as_slice()),
+            )
+        })
+        .max_by(|left, right| left.1.partial_cmp(&right.1).unwrap_or(Ordering::Equal))
+        .ok_or(AppleAdapterReferenceOverfitError::EmptyReferencePrototypeBank)
+}
+
+fn round_reference_similarity(value: f32) -> f32 {
+    (value * 1_000_000.0).round() / 1_000_000.0
+}
+
+/// Deterministic verification bundle used by the repo-local Apple reference benchmark.
+#[must_use]
+pub fn apple_adapter_reference_benchmark_verification(sample_id: &str) -> EvalVerificationFacts {
+    let token_accounting = match EvalTokenAccountingFacts::new(12, 18, 30) {
+        Ok(token_accounting) => token_accounting,
+        Err(_) => EvalTokenAccountingFacts {
+            input_tokens: 12,
+            output_tokens: 18,
+            total_tokens: 30,
+        },
+    };
+    EvalVerificationFacts {
+        timer_integrity: Some(EvalTimerIntegrityFacts {
+            declared_budget_ms: Some(2_000),
+            elapsed_ms: 800,
+            within_budget: true,
+        }),
+        token_accounting: Some(token_accounting),
+        final_state: Some(EvalFinalStateCapture {
+            session_digest: format!("session:{sample_id}"),
+            output_digest: Some(format!("output:{sample_id}")),
+            artifact_digests: vec![format!("artifact:{sample_id}")],
+        }),
+        execution_strategy: Some(EvalExecutionStrategyFacts {
+            strategy_label: String::from("reference_overfit"),
+            runtime_family: Some(String::from("psionic_apple_reference")),
+            scheduler_posture: Some(String::from("single_host")),
+        }),
+    }
 }
 
 fn build_apple_adapter_package(
@@ -2794,6 +3045,31 @@ pub enum AppleAdapterSftError {
     Package(#[from] AppleFmAdapterPackageError),
 }
 
+/// Error surfaced by the repo-local Apple reference overfit runner.
+#[derive(Debug, Error)]
+pub enum AppleAdapterReferenceOverfitError {
+    #[error(
+        "Apple adapter reference overfit expected manifest benchmark ref `{expected}` but found benchmark package `{actual}`"
+    )]
+    BenchmarkRefMismatch { expected: String, actual: String },
+    #[error("Apple adapter reference overfit is missing token capture for sample `{sample_id}`")]
+    MissingSampleCapture { sample_id: String },
+    #[error("Apple adapter reference overfit has no target prototypes to decode against")]
+    EmptyReferencePrototypeBank,
+    #[error(
+        "Apple adapter reference overfit predicted sample `{sample_id}` that is not present in the decode dataset"
+    )]
+    MissingReferenceDecodeTarget { sample_id: String },
+    #[error(transparent)]
+    Experiment(#[from] crate::AppleAdapterExperimentError),
+    #[error(transparent)]
+    Execution(#[from] AppleAdapterTrainingExecutionError),
+    #[error(transparent)]
+    Sft(#[from] AppleAdapterSftError),
+    #[error(transparent)]
+    Benchmark(#[from] AppleAdapterBenchmarkError),
+}
+
 /// Error surfaced by the optional draft distillation lane.
 #[derive(Debug, Error)]
 pub enum AppleAdapterDraftDistillationError {
@@ -3296,11 +3572,10 @@ fn accumulate_target_gradients(
     let mut propagated = vec![0.0_f32; rank];
     for rank_index in 0..rank {
         for output_index in 0..residual.len() {
-            propagated[rank_index] +=
-                a_values[output_index * rank + rank_index]
-                    * residual[output_index]
-                    * scale
-                    * record_weight;
+            propagated[rank_index] += a_values[output_index * rank + rank_index]
+                * residual[output_index]
+                * scale
+                * record_weight;
         }
     }
     for rank_index in 0..rank {
@@ -3381,7 +3656,11 @@ fn build_target_projection_cache(
     let target_output_width = target.effective_output_width(model);
     let prompt_encoder = (target_input_width != model.input_width).then(|| {
         seeded_matrix(
-            format!("{}|{}|prompt_encoder", model.base_model_signature, target.target_id).as_str(),
+            format!(
+                "{}|{}|prompt_encoder",
+                model.base_model_signature, target.target_id
+            )
+            .as_str(),
             target_input_width,
             model.input_width,
             1.0 / (model.input_width.max(1) as f32).sqrt(),
@@ -3389,7 +3668,11 @@ fn build_target_projection_cache(
     });
     let output_decoder = (target_output_width != model.output_width).then(|| {
         seeded_matrix(
-            format!("{}|{}|output_decoder", model.base_model_signature, target.target_id).as_str(),
+            format!(
+                "{}|{}|output_decoder",
+                model.base_model_signature, target.target_id
+            )
+            .as_str(),
             model.output_width,
             target_output_width,
             1.0 / (target_output_width.max(1) as f32).sqrt(),
@@ -3639,11 +3922,7 @@ fn accumulate_text_signature_features(out: &mut [f32], text: &str, channel: &str
     if normalized.is_empty() {
         return;
     }
-    accumulate_hashed_feature(
-        out,
-        format!("{channel}|full|{normalized}").as_str(),
-        scale,
-    );
+    accumulate_hashed_feature(out, format!("{channel}|full|{normalized}").as_str(), scale);
     let tokens = normalized.split_whitespace().collect::<Vec<_>>();
     if !tokens.is_empty() {
         let prefix = tokens.iter().take(6).copied().collect::<Vec<_>>().join(" ");
@@ -3957,7 +4236,8 @@ mod tests {
                 "../../../fixtures/apple_adapter/datasets/guided_generation_with_schema_train.jsonl"
             )
             .trim(),
-            include_str!("../../../fixtures/apple_adapter/datasets/tool_calling_train.jsonl").trim()
+            include_str!("../../../fixtures/apple_adapter/datasets/tool_calling_train.jsonl")
+                .trim()
         );
         AppleAdapterDatasetContract::from_jsonl_str(input.as_str(), dataset_metadata())
             .expect("dataset should import")
@@ -4127,6 +4407,306 @@ mod tests {
                 ],
             },
         }
+    }
+
+    fn architecture_explainer_dataset_metadata() -> AppleAdapterDatasetMetadata {
+        AppleAdapterDatasetMetadata::new(
+            TokenizerDigest::new(
+                TokenizerFamily::SentencePiece,
+                "sha256:2e0575bd61810e1dc9c266d5a92799ce920814806dd039e7363482ecbf2485db",
+                32_768,
+            ),
+            "sha256:7d503a14f998038f0ed32d89ee75f9739947d21169feb1ab158089ee10640cdc",
+        )
+        .with_default_instruction("A conversation between a user and a helpful assistant.")
+        .with_locale("en-US")
+    }
+
+    fn architecture_explainer_benchmark_dataset() -> AppleAdapterDatasetContract {
+        AppleAdapterDatasetContract::from_jsonl_str(
+            include_str!(
+                "../../../fixtures/apple_adapter/datasets/psionic_architecture_explainer/benchmark.jsonl"
+            ),
+            architecture_explainer_dataset_metadata(),
+        )
+        .expect("benchmark fixture should import")
+    }
+
+    fn architecture_explainer_corpus() -> psionic_data::AppleAdapterCuratedCorpusManifest {
+        serde_json::from_str(include_str!(
+            "../../../fixtures/apple_adapter/datasets/psionic_architecture_explainer/corpus_manifest.json"
+        ))
+        .expect("corpus manifest should parse")
+    }
+
+    fn architecture_explainer_manifest() -> crate::AppleAdapterExperimentManifest {
+        serde_json::from_str(include_str!(
+            "../../../fixtures/apple_adapter/experiments/psionic_architecture_explainer_reference_overfit_v1.json"
+        ))
+        .expect("reference overfit manifest should parse")
+    }
+
+    fn architecture_explainer_environment_bundle() -> AppleAdapterEnvironmentBundle {
+        AppleAdapterEnvironmentSpec {
+            version: String::from("2026.03.16.2"),
+            display_name: String::from("Apple Architecture Explainer Reference Overfit"),
+            core_environment_ref: String::from("env.openagents.apple.architecture_explainer.core"),
+            benchmark_environment_ref: String::from(
+                "env.openagents.apple.architecture_explainer.benchmark",
+            ),
+            train_dataset: EnvironmentDatasetBinding {
+                dataset: DatasetKey::new(
+                    "dataset://openagents/apple_adapter/psionic_architecture_explainer",
+                    "2026.03.16.2",
+                ),
+                split: Some(String::from("benchmark")),
+                mount_path: String::from("/datasets/apple/benchmark_train"),
+                required: true,
+            },
+            held_out_eval_dataset: EnvironmentDatasetBinding {
+                dataset: DatasetKey::new(
+                    "dataset://openagents/apple_adapter/psionic_architecture_explainer",
+                    "2026.03.16.2",
+                ),
+                split: Some(String::from("benchmark")),
+                mount_path: String::from("/datasets/apple/benchmark_held_out"),
+                required: true,
+            },
+            benchmark_dataset: Some(EnvironmentDatasetBinding {
+                dataset: DatasetKey::new(
+                    "dataset://openagents/apple_adapter/psionic_architecture_explainer",
+                    "2026.03.16.2",
+                ),
+                split: Some(String::from("benchmark")),
+                mount_path: String::from("/datasets/apple/benchmark"),
+                required: true,
+            }),
+            package_refs: AppleAdapterEnvironmentPackageRefs {
+                group_ref: String::from("group.apple.architecture_explainer"),
+                core_pin_alias: String::from("apple_architecture_explainer_core"),
+                benchmark_pin_alias: String::from("apple_architecture_explainer_benchmark"),
+                core_member_ref: String::from("apple_architecture_explainer_core_member"),
+                benchmark_member_ref: String::from("apple_architecture_explainer_benchmark_member"),
+                session_profile_ref: String::from("session://apple/architecture_explainer"),
+                runtime_profile_ref: String::from("runtime://apple/fm"),
+                tool_bundle_ref: String::from("tools://apple/architecture_explainer"),
+                rubric_binding_ref: String::from("rubric://apple/architecture_explainer"),
+                structured_output_profile_ref: Some(String::from(
+                    "structured://apple/architecture_explainer",
+                )),
+                benchmark_profile_ref: String::from("benchmark://apple/architecture_explainer"),
+                benchmark_runtime_profile_ref: String::from(
+                    "runtime://apple/architecture_explainer/benchmark",
+                ),
+            },
+            runtime_requirements: AppleAdapterEnvironmentRuntimeRequirements {
+                foundation_bridge_ref: String::from("bridge://apple-foundation-models"),
+                model_id: String::from("apple-foundation-model"),
+                platform_requirement: String::from("macos26_apple_silicon"),
+                adapter_inventory_required: true,
+                session_attach_required: true,
+                structured_output_supported: true,
+                tool_calling_supported: true,
+                max_context_tokens: 4096,
+                max_session_turns: 4,
+                time_budget_ms: 30_000,
+            },
+            tools: vec![
+                EnvironmentToolContract {
+                    tool_name: String::from("lookup_doc"),
+                    interface: EnvironmentToolInterface::NativeFunction,
+                    description: String::from("Inspect a canonical repo document by path."),
+                    args_schema: serde_json::json!({
+                        "type": "object",
+                        "properties": { "path": { "type": "string" } },
+                        "required": ["path"],
+                        "additionalProperties": false
+                    }),
+                    result_schema: None,
+                },
+                EnvironmentToolContract {
+                    tool_name: String::from("lookup_code"),
+                    interface: EnvironmentToolInterface::NativeFunction,
+                    description: String::from("Inspect a stable code surface by path."),
+                    args_schema: serde_json::json!({
+                        "type": "object",
+                        "properties": { "path": { "type": "string" } },
+                        "required": ["path"],
+                        "additionalProperties": false
+                    }),
+                    result_schema: None,
+                },
+            ],
+            rubric_hooks: vec![EnvironmentRubricHook {
+                rubric_ref: String::from("rubric://apple/architecture_explainer/quality"),
+                hook_name: String::from("answer_quality"),
+                score_kind: EnvironmentRubricScoreKind::Scalar,
+                pass_threshold: Some(8000),
+            }],
+            expected_artifacts: vec![EnvironmentArtifactExpectation {
+                artifact_kind: String::from("apple_adapter.eval.transcript"),
+                required: false,
+                verification_policy_ref: Some(String::from(
+                    "verify://apple/architecture_explainer/trace",
+                )),
+            }],
+            core_policy_references: vec![EnvironmentPolicyReference {
+                kind: EnvironmentPolicyKind::Training,
+                policy_ref: String::from("policy://apple/architecture_explainer/eval"),
+                required: true,
+            }],
+            benchmark_policy_references: vec![EnvironmentPolicyReference {
+                kind: EnvironmentPolicyKind::Benchmark,
+                policy_ref: String::from("policy://apple/architecture_explainer/benchmark"),
+                required: true,
+            }],
+            difficulty: Some(EnvironmentDifficultyMetadata {
+                difficulty_tier: String::from("narrow"),
+                min_agent_level: Some(1),
+                tags: vec![String::from("architecture"), String::from("benchmark")],
+            }),
+        }
+        .build_bundle()
+        .expect("architecture explainer environment bundle should build")
+    }
+
+    fn architecture_explainer_config(
+        manifest: &crate::AppleAdapterExperimentManifest,
+    ) -> AppleAdapterExecutionConfig {
+        let training_policy = manifest
+            .training_policy
+            .clone()
+            .expect("reference overfit manifest should carry training policy");
+        AppleAdapterExecutionConfig {
+            run_id: String::from("apple-architecture-explainer-reference-overfit"),
+            checkpoint_family: String::from("apple.adapter.architecture_explainer.reference"),
+            budget: TrainingLoopBudget::new(manifest.max_steps, 1, 1).expect("budget"),
+            packing_policy: training_policy.packing_policy,
+            precision_policy: training_policy.precision_policy,
+            activation_checkpoint_policy: training_policy.activation_checkpoint_policy,
+            model: AppleAdapterReferenceModel {
+                base_model_signature: manifest.base_model_signature.clone(),
+                tokenizer_digest: manifest.tokenizer_digest.clone(),
+                prompt_shaping_digest: manifest.prompt_shaping_digest.clone(),
+                input_width: manifest.input_width,
+                output_width: manifest.output_width,
+                targets: manifest
+                    .lora_targets
+                    .iter()
+                    .map(|target_id| AppleAdapterTrainableTarget {
+                        target_id: target_id.clone(),
+                        lora_rank: manifest.lora_rank,
+                        lora_alpha: manifest.lora_rank as f32,
+                        input_width: None,
+                        output_width: None,
+                        optimizer: training_policy.optimizer.clone(),
+                        optimizer_residency_policy: training_policy.optimizer_residency_policy,
+                        scheduler: training_policy.scheduler.clone(),
+                    })
+                    .collect(),
+            },
+        }
+    }
+
+    fn architecture_explainer_base_outputs(
+        dataset: &AppleAdapterDatasetContract,
+    ) -> Vec<AppleAdapterObservedSampleOutput> {
+        let wrong_text = BTreeMap::from([
+            (
+                String::from("sample-000001"),
+                String::from("Psionic is still only planning decentralized adapter training."),
+            ),
+            (
+                String::from("sample-000003"),
+                String::from(
+                    "{\"apple_lane\": \"distributed_cluster\", \"decentralized_adapter\": \"planned\"}",
+                ),
+            ),
+            (
+                String::from("sample-000005"),
+                String::from(
+                    "Yes. The current Apple lane already trains across multiple machines.",
+                ),
+            ),
+            (
+                String::from("sample-000006"),
+                String::from("Yes. The Foundation Models bridge performs the training math."),
+            ),
+            (
+                String::from("sample-000007"),
+                String::from(
+                    "The latest adapter will definitely be compatible with today's runtime assets.",
+                ),
+            ),
+        ]);
+        dataset
+            .samples
+            .iter()
+            .map(|sample| {
+                let expected_text = sample
+                    .messages
+                    .last()
+                    .map(|message| message.content.clone())
+                    .unwrap_or_default();
+                let output_text = wrong_text
+                    .get(sample.sample_id.as_str())
+                    .cloned()
+                    .unwrap_or(expected_text);
+                let mut observed = AppleAdapterObservedSampleOutput::from_text(
+                    sample.sample_id.clone(),
+                    output_text,
+                );
+                if let Some(structured) = sample.structured_assistant_output.clone() {
+                    observed = observed.with_structured_output(structured);
+                }
+                if !sample.tools.is_empty() {
+                    observed = observed.with_tool_calls(
+                        sample
+                            .tools
+                            .iter()
+                            .map(|tool| AppleAdapterObservedToolCall {
+                                tool_name: tool.function.name.clone(),
+                                succeeded: true,
+                                arguments: None,
+                            })
+                            .collect(),
+                    );
+                }
+                observed.with_verification(apple_adapter_reference_benchmark_verification(
+                    sample.sample_id.as_str(),
+                ))
+            })
+            .collect()
+    }
+
+    fn architecture_explainer_negative_targets(
+        dataset: &AppleAdapterDatasetContract,
+        captures: &[AppleAdapterSampleTokenCapture],
+    ) -> BTreeMap<String, Vec<f32>> {
+        let capture_by_id = captures
+            .iter()
+            .map(|capture| (capture.sample_id.as_str(), capture))
+            .collect::<BTreeMap<_, _>>();
+        architecture_explainer_base_outputs(dataset)
+            .into_iter()
+            .filter_map(|observed| {
+                let sample = dataset
+                    .samples
+                    .iter()
+                    .find(|sample| sample.sample_id == observed.sample_id)?;
+                let capture = capture_by_id.get(sample.sample_id.as_str())?;
+                Some((
+                    sample.sample_id.clone(),
+                    apple_adapter_response_feature_vector(
+                        observed.output_text.as_str(),
+                        observed.structured_output.as_ref(),
+                        sample.sample_kind,
+                        capture,
+                        APPLE_LIVE_REFERENCE_FEATURE_WIDTH,
+                    ),
+                ))
+            })
+            .collect()
     }
 
     #[test]
@@ -4410,6 +4990,71 @@ mod tests {
         assert!(
             anchored_distance < offline_distance,
             "runtime-anchored baseline should dominate the offline seeded projection"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn apple_adapter_reference_overfit_clears_non_zero_gate()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let manifest = architecture_explainer_manifest();
+        let dataset = architecture_explainer_benchmark_dataset();
+        let captures = dataset.derive_token_captures()?;
+        let environment = architecture_explainer_environment_bundle();
+        let corpus = architecture_explainer_corpus();
+        let backend = AppleAdapterTrainingExecutionBackend::new_with_negative_targets(
+            architecture_explainer_config(&manifest),
+            &dataset,
+            captures.as_slice(),
+            &environment,
+            architecture_explainer_negative_targets(&dataset, captures.as_slice()),
+        )?;
+        let harness = AppleAdapterEvalHarness::new(environment.clone())?;
+        let benchmark_package = psionic_eval::build_curated_benchmark_package(
+            &harness,
+            psionic_eval::architecture_explainer_benchmark_key(&corpus)?,
+            &dataset,
+            &corpus,
+            1,
+        )?;
+        let report = run_apple_adapter_reference_overfit(
+            &backend,
+            &dataset,
+            captures.as_slice(),
+            &environment,
+            &benchmark_package,
+            &corpus,
+            &manifest,
+            &AppleAdapterSftRunRequest {
+                dataset_ref: manifest.dataset.dataset_ref.clone(),
+                benchmark_refs: vec![manifest.benchmark_ref.clone()],
+                validator_policy_ref: String::from(
+                    "validator://apple/architecture_explainer/reference_overfit",
+                ),
+                package_name: String::from("psionic-architecture-explainer-reference-overfit"),
+                author: String::from("OpenAgents"),
+                description: String::from(
+                    "Repo-local Apple architecture explainer reference overfit run",
+                ),
+                license: String::from("Apache-2.0"),
+                started_at_ms: 1_000,
+                step_duration_ms: 25,
+            },
+            crate::AppleAdapterUsefulAdapterBenchmarkMode::OverfitNonZero,
+            architecture_explainer_base_outputs(&dataset),
+            10_000,
+            11_000,
+            apple_adapter_reference_benchmark_verification,
+        )?;
+        assert!(report.benchmark.accepted);
+        assert!(report.benchmark.aggregate_score_delta_bps > 0);
+        assert!(report.benchmark.improved_case_count >= 1);
+        assert!(
+            report
+                .benchmark_report
+                .case_receipts
+                .iter()
+                .any(|case| case.improved)
         );
         Ok(())
     }

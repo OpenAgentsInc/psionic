@@ -2293,7 +2293,10 @@ acceptance gate for the `Psionic architecture explainer` target:
 
 The canonical gate for that layer is now:
 
-- `scripts/release/check-psionic-apple-architecture-explainer-benchmark.sh`
+- historical operator gate in `openagents`:
+  `scripts/release/check-psionic-apple-architecture-explainer-benchmark.sh`
+- standalone `psionic` repo evidence:
+  `fixtures/apple_adapter/runs/psionic_architecture_explainer_reference_overfit_report.json`
 
 On 2026-03-15, GitHub issue `#3656` added the experiment-management layer for
 that same first real-run target:
@@ -2313,7 +2316,43 @@ that same first real-run target:
 
 The canonical experiment-program gate for that layer is now:
 
-- `scripts/release/check-psionic-apple-experiment-program.sh`
+- historical operator gate in `openagents`:
+  `scripts/release/check-psionic-apple-experiment-program.sh`
+- standalone `psionic` repo contract:
+  `fixtures/apple_adapter/experiments/psionic_architecture_explainer_reference_overfit_v1.json`
+
+On 2026-03-17, GitHub issue `psionic#2` closed the standalone repo-local
+benchmark-effectiveness gap for the bounded Apple reference lane:
+
+- `psionic-train` now exposes one repo-local overfit runner:
+  `run_apple_adapter_reference_overfit(...)`
+- the runner keeps the machine-legible truth in-repo:
+  - the frozen contract lives at
+    `fixtures/apple_adapter/experiments/psionic_architecture_explainer_reference_overfit_v1.json`
+  - the canonical generator lives at
+    `crates/psionic-train/examples/apple_architecture_explainer_reference_overfit.rs`
+  - the canonical report lives at
+    `fixtures/apple_adapter/runs/psionic_architecture_explainer_reference_overfit_report.json`
+- the current report uses the bounded Rust-only Apple backend, the reviewed
+  benchmark corpus reused as train plus held-out, manifest-pinned live target
+  ids, repo-local negative anchors derived from the reviewed base-output oracle,
+  and an explicit `nearest_target_prototype` reference decoder over the learned
+  feature space
+- the current truthful repo-local result is:
+  - benchmark mode `overfit_non_zero`
+  - base score `4997` bps
+  - adapted score `10000` bps
+  - aggregate score delta `5003` bps
+  - base pass rate `4285` bps
+  - adapted pass rate `10000` bps
+  - aggregate pass-rate delta `5715` bps
+  - improved case count `4`
+- that report now gives this standalone repo one committed, replayable proof
+  that the bounded Rust-owned Apple lane can move the benchmark materially off
+  the zero floor while still exporting a valid `.fmadapter`
+- it does not prove the stronger standard usefulness bar or replace the
+  cross-repo live bridge or authority harness; those older `openagents`
+  references remain historical context only
 
 On 2026-03-16, GitHub issue `#3900` added the full-path acceptance harness for
 that same Rust-only Apple reference lane:

@@ -726,6 +726,8 @@ What ships here today:
 - `psionic-train` owns a bounded adapter-only Apple training/export lane
 - `psionic-eval` and `fixtures/apple_adapter/` own benchmark/eval fixtures and
   reference reports for that lane
+- the standalone repo now includes a committed repo-local Apple overfit proof
+  at `fixtures/apple_adapter/runs/psionic_architecture_explainer_reference_overfit_report.json`
 
 What does not ship here:
 
@@ -746,6 +748,9 @@ The honest current scope is:
 - graph-level checkpoint transforms exist in `psionic-ir`, but activation
   checkpointing remains disabled in the shipped Apple reference lane
 - held-out eval and package/runtime contract validation are repo-owned here
+- the weak Apple `overfit_non_zero` benchmark gate is proven in-repo by the
+  reference overfit report, but the stronger standard usefulness bar is still
+  a separate claim
 - benchmark-useful quality remains a separate claim from package validity or
   export success
 

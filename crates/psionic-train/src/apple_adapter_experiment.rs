@@ -17,6 +17,9 @@ pub const APPLE_ADAPTER_EXPERIMENT_MANIFEST_ABI_VERSION: &str =
 /// Stable ABI version for first-run Apple adapter trend ledgers.
 pub const APPLE_ADAPTER_EXPERIMENT_TREND_LEDGER_ABI_VERSION: &str =
     "psionic.apple_adapter_experiment_trend_ledger.v1";
+/// Stable ABI version for repo-local Apple reference overfit reports.
+pub const APPLE_ADAPTER_REFERENCE_OVERFIT_REPORT_ABI_VERSION: &str =
+    "psionic.apple_adapter_reference_overfit_report.v1";
 /// Canonical experiment id for the first real architecture-explainer run.
 pub const APPLE_ARCHITECTURE_EXPLAINER_EXPERIMENT_ID: &str =
     "apple_adapter.psionic_architecture_explainer.first_real_run";
@@ -585,6 +588,92 @@ pub struct AppleAdapterExperimentRegressionReport {
     pub reason_codes: Vec<AppleAdapterExperimentRegressionReasonCode>,
 }
 
+/// One reference-decoder prediction surfaced by the repo-local overfit runner.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AppleAdapterReferencePredictionReceipt {
+    /// Benchmark sample id the decoder answered.
+    pub sample_id: String,
+    /// Training-sample id selected by the nearest-prototype decoder.
+    pub predicted_sample_id: String,
+    /// Stable digest of the emitted output text.
+    pub predicted_output_digest: String,
+    /// Raw target-prototype similarity used for selection.
+    pub raw_similarity: f32,
+}
+
+/// Machine-legible report for one repo-local Apple reference overfit run.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AppleAdapterReferenceOverfitReport {
+    /// Stable report ABI version.
+    pub abi_version: String,
+    /// Stable report identifier.
+    pub report_id: String,
+    /// Stable digest of the frozen experiment manifest used for the run.
+    pub manifest_digest: String,
+    /// Benchmark gate mode used by this report.
+    pub benchmark_mode: AppleAdapterUsefulAdapterBenchmarkMode,
+    /// Explicit reference-decoder label.
+    pub reference_decoder: String,
+    /// Training/export summary for the adapted package.
+    pub training_summary: crate::AppleAdapterSftTrainingSummary,
+    /// Reduced benchmark summary for quick inspection.
+    pub benchmark: AppleAdapterExperimentBenchmarkSummary,
+    /// Full benchmark receipt including per-case failures.
+    pub benchmark_report: AppleAdapterBaseVsAdapterBenchmarkReport,
+    /// Reference-decoder selections used to produce the adapted benchmark outputs.
+    pub adapted_predictions: Vec<AppleAdapterReferencePredictionReceipt>,
+    /// Stable digest over the report body.
+    pub report_digest: String,
+}
+
+impl AppleAdapterReferenceOverfitReport {
+    /// Returns the stable digest for the report body.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"psionic_apple_adapter_reference_overfit_report|");
+        hasher.update(self.report_id.as_bytes());
+        hasher.update(b"|");
+        hasher.update(self.manifest_digest.as_bytes());
+        hasher.update(b"|");
+        hasher.update(self.benchmark_mode.label().as_bytes());
+        hasher.update(b"|");
+        hasher.update(self.reference_decoder.as_bytes());
+        hasher.update(b"|training_summary|");
+        hasher.update(
+            serde_json::to_vec(&self.training_summary)
+                .unwrap_or_default()
+                .as_slice(),
+        );
+        hasher.update(b"|benchmark|");
+        hasher.update(
+            serde_json::to_vec(&self.benchmark)
+                .unwrap_or_default()
+                .as_slice(),
+        );
+        hasher.update(b"|benchmark_report|");
+        hasher.update(
+            serde_json::to_vec(&self.benchmark_report)
+                .unwrap_or_default()
+                .as_slice(),
+        );
+        hasher.update(b"|adapted_predictions|");
+        hasher.update(
+            serde_json::to_vec(&self.adapted_predictions)
+                .unwrap_or_default()
+                .as_slice(),
+        );
+        hex::encode(hasher.finalize())
+    }
+
+    /// Finalizes the report digest after the body has been assembled.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.report_digest = self.stable_digest();
+        self
+    }
+}
+
 /// Experiment selection, ledger, or manifest failure.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum AppleAdapterExperimentError {
@@ -1061,5 +1150,26 @@ mod tests {
             detect_experiment_regression(&ledger).is_some(),
             "ledger fixture should carry one explicit regression example"
         );
+    }
+
+    #[test]
+    fn reference_overfit_report_fixture_roundtrip() {
+        let report = serde_json::from_str::<AppleAdapterReferenceOverfitReport>(include_str!(
+            "../../../fixtures/apple_adapter/runs/psionic_architecture_explainer_reference_overfit_report.json"
+        ))
+        .expect("reference overfit report fixture should decode");
+        assert_eq!(
+            report.abi_version,
+            APPLE_ADAPTER_REFERENCE_OVERFIT_REPORT_ABI_VERSION
+        );
+        assert_eq!(report.report_digest, report.stable_digest());
+        assert_eq!(
+            report.benchmark_mode,
+            AppleAdapterUsefulAdapterBenchmarkMode::OverfitNonZero
+        );
+        assert!(report.benchmark.accepted);
+        assert!(report.benchmark.aggregate_score_delta_bps > 0);
+        assert!(report.benchmark.improved_case_count >= 1);
+        assert!(!report.adapted_predictions.is_empty());
     }
 }
