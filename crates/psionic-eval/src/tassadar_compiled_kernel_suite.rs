@@ -1,10 +1,10 @@
 use std::{collections::BTreeMap, time::Instant};
 
-use psionic_data::DatasetKey;
+use psionic_data::{DatasetKey, TassadarBenchmarkAxis, TassadarBenchmarkFamily};
 use psionic_environments::{
     EnvironmentDatasetBinding, EnvironmentPolicyKind, EnvironmentPolicyReference,
-    TassadarEnvironmentBundle, TassadarEnvironmentSpec, TassadarExactnessContract,
-    TassadarIoContract, TassadarProgramBinding, TassadarWorkloadTarget,
+    TassadarBenchmarkPackageSetBinding, TassadarEnvironmentBundle, TassadarEnvironmentSpec,
+    TassadarExactnessContract, TassadarIoContract, TassadarProgramBinding, TassadarWorkloadTarget,
 };
 use psionic_models::{
     TassadarCompiledProgramError, TassadarCompiledProgramExecution,
@@ -24,6 +24,7 @@ use thiserror::Error;
 use crate::{
     BenchmarkAggregationKind, BenchmarkCase, BenchmarkPackage, BenchmarkPackageKey,
     BenchmarkVerificationPolicy, TassadarBenchmarkError, TassadarReferenceFixtureSuite,
+    TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF,
 };
 
 /// Stable environment ref for the compiled kernel-suite eval package.
@@ -219,10 +220,8 @@ impl TassadarCompiledKernelSuiteExactnessReport {
             .iter()
             .filter(|case| case.final_output_match)
             .count() as u32;
-        let halt_match_case_count = case_reports
-            .iter()
-            .filter(|case| case.halt_match)
-            .count() as u32;
+        let halt_match_case_count =
+            case_reports.iter().filter(|case| case.halt_match).count() as u32;
         let family_reports = build_family_exactness_reports(&case_reports);
         let mut report = Self {
             workload_family_id: String::from(TASSADAR_COMPILED_KERNEL_SUITE_WORKLOAD_FAMILY_ID),
@@ -375,8 +374,10 @@ impl TassadarCompiledKernelSuiteScalingReport {
             family_reports,
             report_digest: String::new(),
         };
-        report.report_digest =
-            stable_digest(b"psionic_tassadar_compiled_kernel_suite_scaling_report|", &report);
+        report.report_digest = stable_digest(
+            b"psionic_tassadar_compiled_kernel_suite_scaling_report|",
+            &report,
+        );
         report
     }
 }
@@ -436,54 +437,60 @@ pub enum TassadarCompiledKernelSuiteEvalError {
 
 #[must_use]
 fn build_tassadar_compiled_kernel_suite_case_specs() -> Vec<TassadarCompiledKernelSuiteCaseSpec> {
-    let arithmetic = [8usize, 32, 96].into_iter().map(|operation_count| {
-        TassadarCompiledKernelSuiteCaseSpec {
-            case_id: format!("arithmetic_kernel_ops_{operation_count}"),
-            family_id: TassadarCompiledKernelFamilyId::ArithmeticKernel,
-            regime_id: format!("operation_count_{operation_count}"),
-            summary: format!("execute {operation_count} alternating arithmetic updates in locals"),
-            length_parameter_name: String::from("operation_count"),
-            length_parameter_value: operation_count as u64,
-            program: build_arithmetic_kernel_program(operation_count),
-        }
-    });
-    let memory = [4usize, 16, 32].into_iter().map(|slot_count| {
-        TassadarCompiledKernelSuiteCaseSpec {
-            case_id: format!("memory_update_kernel_slots_{slot_count}"),
-            family_id: TassadarCompiledKernelFamilyId::MemoryUpdateKernel,
-            regime_id: format!("slot_count_{slot_count}"),
-            summary: format!("update and accumulate the first {slot_count} memory slots"),
-            length_parameter_name: String::from("slot_count"),
-            length_parameter_value: slot_count as u64,
-            program: build_memory_update_kernel_program(slot_count),
-        }
-    });
-    let branches = [2usize, 8, 16].into_iter().map(|branch_count| {
-        TassadarCompiledKernelSuiteCaseSpec {
-            case_id: format!("forward_branch_kernel_branches_{branch_count}"),
-            family_id: TassadarCompiledKernelFamilyId::ForwardBranchKernel,
-            regime_id: format!("branch_count_{branch_count}"),
-            summary: format!(
-                "evaluate {branch_count} forward-branch pivots with alternating lanes"
-            ),
-            length_parameter_name: String::from("branch_count"),
-            length_parameter_value: branch_count as u64,
-            program: build_forward_branch_kernel_program(branch_count),
-        }
-    });
-    let loops = [63i32, 255, 1023].into_iter().map(|iteration_count| {
-        TassadarCompiledKernelSuiteCaseSpec {
-            case_id: format!("backward_loop_kernel_iters_{iteration_count}"),
-            family_id: TassadarCompiledKernelFamilyId::BackwardLoopKernel,
-            regime_id: format!("iteration_count_{iteration_count}"),
-            summary: format!(
-                "count down from {iteration_count} through one backward-branch loop"
-            ),
-            length_parameter_name: String::from("iteration_count"),
-            length_parameter_value: iteration_count as u64,
-            program: build_backward_loop_kernel_program(iteration_count),
-        }
-    });
+    let arithmetic =
+        [8usize, 32, 96]
+            .into_iter()
+            .map(|operation_count| TassadarCompiledKernelSuiteCaseSpec {
+                case_id: format!("arithmetic_kernel_ops_{operation_count}"),
+                family_id: TassadarCompiledKernelFamilyId::ArithmeticKernel,
+                regime_id: format!("operation_count_{operation_count}"),
+                summary: format!(
+                    "execute {operation_count} alternating arithmetic updates in locals"
+                ),
+                length_parameter_name: String::from("operation_count"),
+                length_parameter_value: operation_count as u64,
+                program: build_arithmetic_kernel_program(operation_count),
+            });
+    let memory =
+        [4usize, 16, 32]
+            .into_iter()
+            .map(|slot_count| TassadarCompiledKernelSuiteCaseSpec {
+                case_id: format!("memory_update_kernel_slots_{slot_count}"),
+                family_id: TassadarCompiledKernelFamilyId::MemoryUpdateKernel,
+                regime_id: format!("slot_count_{slot_count}"),
+                summary: format!("update and accumulate the first {slot_count} memory slots"),
+                length_parameter_name: String::from("slot_count"),
+                length_parameter_value: slot_count as u64,
+                program: build_memory_update_kernel_program(slot_count),
+            });
+    let branches =
+        [2usize, 8, 16]
+            .into_iter()
+            .map(|branch_count| TassadarCompiledKernelSuiteCaseSpec {
+                case_id: format!("forward_branch_kernel_branches_{branch_count}"),
+                family_id: TassadarCompiledKernelFamilyId::ForwardBranchKernel,
+                regime_id: format!("branch_count_{branch_count}"),
+                summary: format!(
+                    "evaluate {branch_count} forward-branch pivots with alternating lanes"
+                ),
+                length_parameter_name: String::from("branch_count"),
+                length_parameter_value: branch_count as u64,
+                program: build_forward_branch_kernel_program(branch_count),
+            });
+    let loops =
+        [63i32, 255, 1023]
+            .into_iter()
+            .map(|iteration_count| TassadarCompiledKernelSuiteCaseSpec {
+                case_id: format!("backward_loop_kernel_iters_{iteration_count}"),
+                family_id: TassadarCompiledKernelFamilyId::BackwardLoopKernel,
+                regime_id: format!("iteration_count_{iteration_count}"),
+                summary: format!(
+                    "count down from {iteration_count} through one backward-branch loop"
+                ),
+                length_parameter_name: String::from("iteration_count"),
+                length_parameter_value: iteration_count as u64,
+                program: build_backward_loop_kernel_program(iteration_count),
+            });
 
     arithmetic
         .chain(memory)
@@ -509,10 +516,16 @@ pub fn build_tassadar_compiled_kernel_suite(
             })
             .collect::<Vec<_>>(),
     );
-    let environment_bundle =
-        build_tassadar_compiled_kernel_suite_environment_bundle(version, &artifacts, &corpus_digest)?;
-    let benchmark_package =
-        build_tassadar_compiled_kernel_suite_benchmark_package(version, &environment_bundle, &artifacts)?;
+    let environment_bundle = build_tassadar_compiled_kernel_suite_environment_bundle(
+        version,
+        &artifacts,
+        &corpus_digest,
+    )?;
+    let benchmark_package = build_tassadar_compiled_kernel_suite_benchmark_package(
+        version,
+        &environment_bundle,
+        &artifacts,
+    )?;
     Ok(TassadarReferenceFixtureSuite {
         environment_bundle,
         benchmark_package,
@@ -588,9 +601,10 @@ pub fn build_tassadar_compiled_kernel_suite_exactness_report(
 ) -> Result<TassadarCompiledKernelSuiteExactnessReport, TassadarCompiledKernelSuiteEvalError> {
     let mut case_reports = Vec::with_capacity(corpus.cases.len());
     for corpus_case in &corpus.cases {
-        let cpu_execution =
-            TassadarCpuReferenceRunner::for_program(&corpus_case.program_artifact.validated_program)?
-                .execute(&corpus_case.program_artifact.validated_program)?;
+        let cpu_execution = TassadarCpuReferenceRunner::for_program(
+            &corpus_case.program_artifact.validated_program,
+        )?
+        .execute(&corpus_case.program_artifact.validated_program)?;
         let compiled_execution = corpus_case
             .compiled_executor
             .execute(&corpus_case.program_artifact, requested_decode_mode)?;
@@ -639,7 +653,11 @@ pub fn build_tassadar_compiled_kernel_suite_exactness_report(
                 .effective_decode_mode
                 .unwrap_or(TassadarExecutorDecodeMode::ReferenceLinear),
             trace_step_count: runtime_execution.steps.len() as u64,
-            instruction_count: corpus_case.program_artifact.validated_program.instructions.len() as u32,
+            instruction_count: corpus_case
+                .program_artifact
+                .validated_program
+                .instructions
+                .len() as u32,
             cpu_trace_digest: cpu_execution.trace_digest(),
             compiled_trace_digest: runtime_execution.trace_digest(),
             cpu_behavior_digest: cpu_execution.behavior_digest(),
@@ -674,7 +692,8 @@ pub fn build_tassadar_compiled_kernel_suite_compatibility_report(
         ));
 
         let mut wrong_profile_artifact = corpus_case.program_artifact.clone();
-        wrong_profile_artifact.wasm_profile_id = TassadarWasmProfile::sudoku_v0_search_v1().profile_id;
+        wrong_profile_artifact.wasm_profile_id =
+            TassadarWasmProfile::sudoku_v0_search_v1().profile_id;
         check_reports.push(run_refusal_check(
             &corpus_case.case_id,
             corpus_case.family_id,
@@ -687,8 +706,9 @@ pub fn build_tassadar_compiled_kernel_suite_compatibility_report(
         ));
 
         let mut wrong_trace_abi_artifact = corpus_case.program_artifact.clone();
-        wrong_trace_abi_artifact.trace_abi_version =
-            TassadarTraceAbi::article_i32_compute_v1().schema_version.saturating_add(1);
+        wrong_trace_abi_artifact.trace_abi_version = TassadarTraceAbi::article_i32_compute_v1()
+            .schema_version
+            .saturating_add(1);
         check_reports.push(run_refusal_check(
             &corpus_case.case_id,
             corpus_case.family_id,
@@ -723,15 +743,21 @@ pub fn build_tassadar_compiled_kernel_suite_scaling_report(
     corpus: &TassadarCompiledKernelSuiteCorpus,
     requested_decode_mode: TassadarExecutorDecodeMode,
 ) -> Result<TassadarCompiledKernelSuiteScalingReport, TassadarCompiledKernelSuiteEvalError> {
-    let mut grouped = BTreeMap::<TassadarCompiledKernelFamilyId, Vec<TassadarCompiledKernelSuiteScalingRegimeReport>>::new();
+    let mut grouped = BTreeMap::<
+        TassadarCompiledKernelFamilyId,
+        Vec<TassadarCompiledKernelSuiteScalingRegimeReport>,
+    >::new();
     for corpus_case in &corpus.cases {
-        let cpu_execution =
-            TassadarCpuReferenceRunner::for_program(&corpus_case.program_artifact.validated_program)?
-                .execute(&corpus_case.program_artifact.validated_program)?;
+        let cpu_execution = TassadarCpuReferenceRunner::for_program(
+            &corpus_case.program_artifact.validated_program,
+        )?
+        .execute(&corpus_case.program_artifact.validated_program)?;
         let trace_step_count = cpu_execution.steps.len() as u64;
         let cpu_reference_steps_per_second = single_run_steps_per_second(trace_step_count, || {
-            TassadarCpuReferenceRunner::for_program(&corpus_case.program_artifact.validated_program)?
-                .execute(&corpus_case.program_artifact.validated_program)
+            TassadarCpuReferenceRunner::for_program(
+                &corpus_case.program_artifact.validated_program,
+            )?
+            .execute(&corpus_case.program_artifact.validated_program)
         })?;
         let compiled_sample = corpus_case
             .compiled_executor
@@ -746,19 +772,21 @@ pub fn build_tassadar_compiled_kernel_suite_scaling_report(
         let exact_trace_match = runtime_execution.steps == cpu_execution.steps;
         let final_output_match = runtime_execution.outputs == cpu_execution.outputs;
         let halt_match = runtime_execution.halt_reason == cpu_execution.halt_reason;
-        grouped
-            .entry(corpus_case.family_id)
-            .or_default()
-            .push(TassadarCompiledKernelSuiteScalingRegimeReport {
+        grouped.entry(corpus_case.family_id).or_default().push(
+            TassadarCompiledKernelSuiteScalingRegimeReport {
                 case_id: corpus_case.case_id.clone(),
                 family_id: corpus_case.family_id,
                 regime_id: corpus_case.regime_id.clone(),
                 summary: corpus_case.summary.clone(),
                 length_parameter_name: corpus_case.length_parameter_name.clone(),
                 length_parameter_value: corpus_case.length_parameter_value,
-                instruction_count: corpus_case.program_artifact.validated_program.instructions.len()
+                instruction_count: corpus_case
+                    .program_artifact
+                    .validated_program
+                    .instructions
+                    .len() as u32,
+                memory_slot_count: corpus_case.program_artifact.validated_program.memory_slots
                     as u32,
-                memory_slot_count: corpus_case.program_artifact.validated_program.memory_slots as u32,
                 trace_step_count,
                 exactness_bps: ((u32::from(exact_trace_match)
                     + u32::from(final_output_match)
@@ -772,7 +800,9 @@ pub fn build_tassadar_compiled_kernel_suite_scaling_report(
                     .effective_decode_mode
                     .unwrap_or(TassadarExecutorDecodeMode::ReferenceLinear),
                 cpu_reference_steps_per_second: round_metric(cpu_reference_steps_per_second),
-                compiled_executor_steps_per_second: round_metric(compiled_executor_steps_per_second),
+                compiled_executor_steps_per_second: round_metric(
+                    compiled_executor_steps_per_second,
+                ),
                 compiled_over_cpu_ratio: round_metric(
                     compiled_executor_steps_per_second / cpu_reference_steps_per_second.max(1e-9),
                 ),
@@ -787,7 +817,8 @@ pub fn build_tassadar_compiled_kernel_suite_scaling_report(
                     .proof_bundle
                     .stable_digest(),
                 runtime_trace_digest: runtime_execution.trace_digest(),
-            });
+            },
+        );
     }
 
     let family_reports = grouped
@@ -886,11 +917,23 @@ fn build_tassadar_compiled_kernel_suite_environment_bundle(
                 TASSADAR_COMPILED_KERNEL_SUITE_METRIC_ID,
             )],
         },
+        benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding {
+            package_set_ref: String::from("benchmark-set://openagents/tassadar/public"),
+            package_set_version: String::from(version),
+            supported_families: vec![
+                TassadarBenchmarkFamily::Arithmetic,
+                TassadarBenchmarkFamily::TraceLengthStress,
+            ],
+            axis_coverage: vec![
+                TassadarBenchmarkAxis::Exactness,
+                TassadarBenchmarkAxis::LengthGeneralization,
+                TassadarBenchmarkAxis::PlannerUsefulness,
+            ],
+            summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
+        },
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
-            policy_ref: String::from(
-                "policy://tassadar/compiled_kernel_suite/eval/verification",
-            ),
+            policy_ref: String::from("policy://tassadar/compiled_kernel_suite/eval/verification"),
             required: true,
         }],
         benchmark_policy_references: vec![
@@ -990,9 +1033,7 @@ fn build_tassadar_compiled_kernel_suite_benchmark_package(
     );
     package.metadata.insert(
         String::from("tassadar.compiled_executor_metric_id"),
-        serde_json::Value::String(String::from(
-            TASSADAR_COMPILED_KERNEL_SUITE_METRIC_ID,
-        )),
+        serde_json::Value::String(String::from(TASSADAR_COMPILED_KERNEL_SUITE_METRIC_ID)),
     );
     package.metadata.insert(
         String::from("tassadar.corpus_digest"),
@@ -1143,16 +1184,24 @@ fn build_backward_loop_kernel_program(iteration_count: i32) -> TassadarProgram {
 fn build_family_exactness_reports(
     case_reports: &[TassadarCompiledKernelSuiteCaseExactnessReport],
 ) -> Vec<TassadarCompiledKernelSuiteFamilyExactnessReport> {
-    let mut grouped = BTreeMap::<TassadarCompiledKernelFamilyId, Vec<&TassadarCompiledKernelSuiteCaseExactnessReport>>::new();
+    let mut grouped = BTreeMap::<
+        TassadarCompiledKernelFamilyId,
+        Vec<&TassadarCompiledKernelSuiteCaseExactnessReport>,
+    >::new();
     for case_report in case_reports {
-        grouped.entry(case_report.family_id).or_default().push(case_report);
+        grouped
+            .entry(case_report.family_id)
+            .or_default()
+            .push(case_report);
     }
     grouped
         .into_iter()
         .map(|(family_id, reports)| {
             let total_case_count = reports.len() as u32;
-            let exact_trace_case_count =
-                reports.iter().filter(|report| report.exact_trace_match).count() as u32;
+            let exact_trace_case_count = reports
+                .iter()
+                .filter(|report| report.exact_trace_match)
+                .count() as u32;
             let max_trace_step_count = reports
                 .iter()
                 .map(|report| report.trace_step_count)
@@ -1172,7 +1221,10 @@ fn build_family_exactness_reports(
 fn build_family_compatibility_reports(
     check_reports: &[TassadarCompiledKernelSuiteRefusalCheckReport],
 ) -> Vec<TassadarCompiledKernelSuiteFamilyCompatibilityReport> {
-    let mut grouped = BTreeMap::<TassadarCompiledKernelFamilyId, Vec<&TassadarCompiledKernelSuiteRefusalCheckReport>>::new();
+    let mut grouped = BTreeMap::<
+        TassadarCompiledKernelFamilyId,
+        Vec<&TassadarCompiledKernelSuiteRefusalCheckReport>,
+    >::new();
     for check_report in check_reports {
         grouped
             .entry(check_report.family_id)
@@ -1191,10 +1243,7 @@ fn build_family_compatibility_reports(
                 family_id,
                 total_check_count,
                 matched_refusal_check_count,
-                matched_refusal_rate_bps: ratio_bps(
-                    matched_refusal_check_count,
-                    total_check_count,
-                ),
+                matched_refusal_rate_bps: ratio_bps(matched_refusal_check_count, total_check_count),
             }
         })
         .collect()
@@ -1294,8 +1343,8 @@ fn stable_digest<T>(prefix: &[u8], value: &T) -> String
 where
     T: Serialize,
 {
-    let encoded =
-        serde_json::to_vec(value).expect("Tassadar compiled kernel suite artifact should serialize");
+    let encoded = serde_json::to_vec(value)
+        .expect("Tassadar compiled kernel suite artifact should serialize");
     let mut hasher = Sha256::new();
     hasher.update(prefix);
     hasher.update(encoded);
@@ -1305,12 +1354,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        build_tassadar_compiled_kernel_suite, build_tassadar_compiled_kernel_suite_claim_boundary_report,
+        build_tassadar_compiled_kernel_suite,
+        build_tassadar_compiled_kernel_suite_claim_boundary_report,
         build_tassadar_compiled_kernel_suite_compatibility_report,
         build_tassadar_compiled_kernel_suite_corpus,
         build_tassadar_compiled_kernel_suite_exactness_report,
-        build_tassadar_compiled_kernel_suite_scaling_report,
-        TassadarCompiledKernelFamilyId, TassadarCompiledKernelSuiteLaneClaimStatus,
+        build_tassadar_compiled_kernel_suite_scaling_report, TassadarCompiledKernelFamilyId,
+        TassadarCompiledKernelSuiteLaneClaimStatus,
     };
     use psionic_runtime::{TassadarClaimClass, TassadarExecutorDecodeMode};
 

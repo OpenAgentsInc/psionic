@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use psionic_data::DatasetKey;
+use psionic_data::{DatasetKey, TassadarBenchmarkAxis, TassadarBenchmarkFamily};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Digest;
@@ -23,6 +23,7 @@ const TASSADAR_METADATA_IO_CONTRACT_KEY: &str = "tassadar.io_contract";
 const TASSADAR_METADATA_EXACTNESS_CONTRACT_KEY: &str = "tassadar.exactness_contract";
 const TASSADAR_METADATA_CURRENT_TARGETS_KEY: &str = "tassadar.current_workload_targets";
 const TASSADAR_METADATA_PLANNED_TARGETS_KEY: &str = "tassadar.planned_workload_targets";
+const TASSADAR_METADATA_BENCHMARK_PACKAGE_SET_KEY: &str = "tassadar.benchmark_package_set";
 const TASSADAR_METADATA_ABI_VERSION_KEY: &str = "tassadar.abi_version";
 const TASSADAR_EVAL_METADATA_SURFACE: &str = "eval";
 const TASSADAR_BENCHMARK_METADATA_SURFACE: &str = "benchmark";
@@ -36,6 +37,8 @@ pub const TASSADAR_ENVIRONMENT_ABI_VERSION: &str = "psionic.tassadar_environment
 pub enum TassadarWorkloadTarget {
     /// Arithmetic-only microprograms.
     ArithmeticMicroprogram,
+    /// CLRS-adjacent shortest-path witness workloads.
+    ClrsShortestPath,
     /// Memory or local read-write microprograms.
     MemoryLookupMicroprogram,
     /// Branch and control-flow microprograms.
@@ -79,6 +82,52 @@ pub struct TassadarEnvironmentPackageRefs {
     pub benchmark_profile_ref: String,
     /// Stable runtime-profile ref for benchmark execution.
     pub benchmark_runtime_profile_ref: String,
+}
+
+/// Public benchmark-package-set binding reused by Tassadar environment bundles.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarBenchmarkPackageSetBinding {
+    /// Stable benchmark-package-set reference.
+    pub package_set_ref: String,
+    /// Immutable package-set version.
+    pub package_set_version: String,
+    /// Benchmark families surfaced by this environment bundle.
+    pub supported_families: Vec<TassadarBenchmarkFamily>,
+    /// Reporting axes surfaced by this environment bundle.
+    pub axis_coverage: Vec<TassadarBenchmarkAxis>,
+    /// Canonical machine-readable summary artifact ref for the package set.
+    pub summary_report_ref: String,
+}
+
+impl TassadarBenchmarkPackageSetBinding {
+    /// Returns a stable digest over the binding.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let encoded = serde_json::to_vec(self)
+            .expect("Tassadar benchmark package-set binding should serialize");
+        let digest = sha2::Sha256::digest(encoded.as_slice());
+        hex::encode(digest)
+    }
+
+    /// Validates that the binding is explicit.
+    pub fn validate(&self) -> Result<(), TassadarEnvironmentError> {
+        if self.package_set_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingBenchmarkPackageSetRef);
+        }
+        if self.package_set_version.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingBenchmarkPackageSetVersion);
+        }
+        if self.supported_families.is_empty() {
+            return Err(TassadarEnvironmentError::MissingBenchmarkFamilies);
+        }
+        if self.axis_coverage.is_empty() {
+            return Err(TassadarEnvironmentError::MissingBenchmarkAxisCoverage);
+        }
+        if self.summary_report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingBenchmarkSummaryReportRef);
+        }
+        Ok(())
+    }
 }
 
 impl TassadarEnvironmentPackageRefs {
@@ -329,6 +378,8 @@ pub struct TassadarEnvironmentSpec {
     pub io_contract: TassadarIoContract,
     /// Exactness and budget contract.
     pub exactness_contract: TassadarExactnessContract,
+    /// Public benchmark-package-set binding.
+    pub benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding,
     /// Policy refs for the eval package.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub eval_policy_references: Vec<EnvironmentPolicyReference>,
@@ -413,6 +464,7 @@ impl TassadarEnvironmentSpec {
             program_binding: self.program_binding.clone(),
             io_contract: self.io_contract.clone(),
             exactness_contract: self.exactness_contract.clone(),
+            benchmark_package_set_binding: self.benchmark_package_set_binding.clone(),
             current_workload_targets: self.current_workload_targets.clone(),
             planned_workload_targets: self.planned_workload_targets.clone(),
         })
@@ -444,6 +496,7 @@ impl TassadarEnvironmentSpec {
         self.program_binding.validate()?;
         self.io_contract.validate()?;
         self.exactness_contract.validate()?;
+        self.benchmark_package_set_binding.validate()?;
         if self.current_workload_targets.is_empty() {
             return Err(TassadarEnvironmentError::MissingCurrentWorkloadTargets);
         }
@@ -613,6 +666,10 @@ impl TassadarEnvironmentSpec {
             serde_json::to_value(&self.exactness_contract).unwrap_or(Value::Null),
         );
         metadata.insert(
+            String::from(TASSADAR_METADATA_BENCHMARK_PACKAGE_SET_KEY),
+            serde_json::to_value(&self.benchmark_package_set_binding).unwrap_or(Value::Null),
+        );
+        metadata.insert(
             String::from(TASSADAR_METADATA_CURRENT_TARGETS_KEY),
             serde_json::to_value(&self.current_workload_targets).unwrap_or(Value::Null),
         );
@@ -674,6 +731,8 @@ pub struct TassadarEnvironmentBundle {
     pub io_contract: TassadarIoContract,
     /// Exactness contract.
     pub exactness_contract: TassadarExactnessContract,
+    /// Benchmark-package-set binding.
+    pub benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding,
     /// Current workload targets implemented now.
     pub current_workload_targets: Vec<TassadarWorkloadTarget>,
     /// Planned workload targets still to widen later.
@@ -704,6 +763,27 @@ pub enum TassadarEnvironmentError {
     /// Missing benchmark dataset.
     #[error("Tassadar environment spec is missing the benchmark dataset binding")]
     MissingBenchmarkDataset,
+    /// Missing benchmark package-set ref.
+    #[error(
+        "Tassadar environment spec is missing `benchmark_package_set_binding.package_set_ref`"
+    )]
+    MissingBenchmarkPackageSetRef,
+    /// Missing benchmark package-set version.
+    #[error(
+        "Tassadar environment spec is missing `benchmark_package_set_binding.package_set_version`"
+    )]
+    MissingBenchmarkPackageSetVersion,
+    /// Missing benchmark families.
+    #[error("Tassadar environment spec must declare at least one benchmark package-set family")]
+    MissingBenchmarkFamilies,
+    /// Missing benchmark axis coverage.
+    #[error("Tassadar environment spec must declare benchmark axis coverage")]
+    MissingBenchmarkAxisCoverage,
+    /// Missing benchmark summary report ref.
+    #[error(
+        "Tassadar environment spec is missing `benchmark_package_set_binding.summary_report_ref`"
+    )]
+    MissingBenchmarkSummaryReportRef,
     /// Missing group ref.
     #[error("Tassadar environment refs are missing `group_ref`")]
     MissingGroupRef,
@@ -885,6 +965,22 @@ mod tests {
                     "tassadar.hull_cache_steps_per_second",
                 )],
             },
+            benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding {
+                package_set_ref: String::from("benchmark-set://openagents/tassadar/public"),
+                package_set_version: String::from("2026.03.17"),
+                supported_families: vec![
+                    TassadarBenchmarkFamily::Arithmetic,
+                    TassadarBenchmarkFamily::ClrsSubset,
+                ],
+                axis_coverage: vec![
+                    TassadarBenchmarkAxis::Exactness,
+                    TassadarBenchmarkAxis::LengthGeneralization,
+                    TassadarBenchmarkAxis::PlannerUsefulness,
+                ],
+                summary_report_ref: String::from(
+                    "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json",
+                ),
+            },
             eval_policy_references: vec![EnvironmentPolicyReference {
                 kind: EnvironmentPolicyKind::Verification,
                 policy_ref: String::from("policy://tassadar/eval/verification"),
@@ -904,6 +1000,7 @@ mod tests {
             ],
             current_workload_targets: vec![
                 TassadarWorkloadTarget::ArithmeticMicroprogram,
+                TassadarWorkloadTarget::ClrsShortestPath,
                 TassadarWorkloadTarget::MemoryLookupMicroprogram,
                 TassadarWorkloadTarget::BranchControlFlowMicroprogram,
             ],
@@ -943,12 +1040,22 @@ mod tests {
                 .get(TASSADAR_METADATA_CURRENT_TARGETS_KEY)
                 .and_then(|value| value.as_array())
                 .map(Vec::len),
-            Some(3)
+            Some(4)
+        );
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
+                .get(TASSADAR_METADATA_BENCHMARK_PACKAGE_SET_KEY)
+                .and_then(|value| value.get("summary_report_ref"))
+                .and_then(Value::as_str),
+            Some("fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json")
         );
         assert_eq!(
             bundle.current_workload_targets,
             vec![
                 TassadarWorkloadTarget::ArithmeticMicroprogram,
+                TassadarWorkloadTarget::ClrsShortestPath,
                 TassadarWorkloadTarget::MemoryLookupMicroprogram,
                 TassadarWorkloadTarget::BranchControlFlowMicroprogram,
             ]

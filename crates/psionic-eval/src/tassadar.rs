@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, time::Instant};
 
-use psionic_data::DatasetKey;
+use psionic_data::{DatasetKey, TassadarBenchmarkAxis, TassadarBenchmarkFamily};
 use psionic_environments::{
     EnvironmentDatasetBinding, EnvironmentPolicyKind, EnvironmentPolicyReference,
-    TassadarEnvironmentBundle, TassadarEnvironmentError, TassadarEnvironmentPackageRefs,
-    TassadarEnvironmentSpec, TassadarExactnessContract, TassadarIoContract, TassadarProgramBinding,
-    TassadarWorkloadTarget,
+    TassadarBenchmarkPackageSetBinding, TassadarEnvironmentBundle, TassadarEnvironmentError,
+    TassadarEnvironmentPackageRefs, TassadarEnvironmentSpec, TassadarExactnessContract,
+    TassadarIoContract, TassadarProgramBinding, TassadarWorkloadTarget,
 };
 use psionic_models::{TassadarExecutorContractError, TassadarExecutorFixture};
 use psionic_runtime::{
@@ -111,6 +111,9 @@ pub const TASSADAR_DECODE_SCALING_REPORT_REF: &str =
 /// Canonical machine-readable output path for the geometric-variant comparison report.
 pub const TASSADAR_GEOMETRIC_VARIANT_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_geometric_variant_report.json";
+/// Canonical machine-readable output path for the benchmark-package-set summary report.
+pub const TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json";
 
 const TASSADAR_OUTPUT_EXACTNESS_METRIC_ID: &str = "tassadar.final_output_exactness_bps";
 const TASSADAR_STEP_EXACTNESS_METRIC_ID: &str = "tassadar.step_exactness_bps";
@@ -1637,6 +1640,20 @@ fn build_tassadar_environment_bundle(
             require_reference_linear_baseline: true,
             future_throughput_metric_ids: vec![String::from(TASSADAR_HULL_CACHE_METRIC_ID)],
         },
+        benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding {
+            package_set_ref: String::from("benchmark-set://openagents/tassadar/public"),
+            package_set_version: String::from(version),
+            supported_families: vec![
+                TassadarBenchmarkFamily::Arithmetic,
+                TassadarBenchmarkFamily::ClrsSubset,
+            ],
+            axis_coverage: vec![
+                TassadarBenchmarkAxis::Exactness,
+                TassadarBenchmarkAxis::LengthGeneralization,
+                TassadarBenchmarkAxis::PlannerUsefulness,
+            ],
+            summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
+        },
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/eval/verification"),
@@ -1656,6 +1673,7 @@ fn build_tassadar_environment_bundle(
         ],
         current_workload_targets: vec![
             TassadarWorkloadTarget::ArithmeticMicroprogram,
+            TassadarWorkloadTarget::ClrsShortestPath,
             TassadarWorkloadTarget::MemoryLookupMicroprogram,
             TassadarWorkloadTarget::BranchControlFlowMicroprogram,
         ],
@@ -1845,6 +1863,21 @@ fn build_tassadar_article_class_environment_bundle(
             require_cpu_reference_baseline: true,
             require_reference_linear_baseline: true,
             future_throughput_metric_ids: vec![String::from(TASSADAR_HULL_CACHE_METRIC_ID)],
+        },
+        benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding {
+            package_set_ref: String::from("benchmark-set://openagents/tassadar/public"),
+            package_set_version: String::from(version),
+            supported_families: vec![
+                TassadarBenchmarkFamily::Sudoku,
+                TassadarBenchmarkFamily::Hungarian,
+                TassadarBenchmarkFamily::TraceLengthStress,
+            ],
+            axis_coverage: vec![
+                TassadarBenchmarkAxis::Exactness,
+                TassadarBenchmarkAxis::LengthGeneralization,
+                TassadarBenchmarkAxis::PlannerUsefulness,
+            ],
+            summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
         },
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
@@ -2079,6 +2112,17 @@ fn build_tassadar_sudoku_9x9_environment_bundle(
             require_reference_linear_baseline: true,
             future_throughput_metric_ids: vec![String::from(TASSADAR_HULL_CACHE_METRIC_ID)],
         },
+        benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding {
+            package_set_ref: String::from("benchmark-set://openagents/tassadar/public"),
+            package_set_version: String::from(version),
+            supported_families: vec![TassadarBenchmarkFamily::Sudoku],
+            axis_coverage: vec![
+                TassadarBenchmarkAxis::Exactness,
+                TassadarBenchmarkAxis::LengthGeneralization,
+                TassadarBenchmarkAxis::PlannerUsefulness,
+            ],
+            summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
+        },
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/sudoku_9x9/eval/verification"),
@@ -2300,6 +2344,17 @@ fn build_tassadar_hungarian_v0_environment_bundle(
             require_cpu_reference_baseline: true,
             require_reference_linear_baseline: true,
             future_throughput_metric_ids: vec![String::from(TASSADAR_HULL_CACHE_METRIC_ID)],
+        },
+        benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding {
+            package_set_ref: String::from("benchmark-set://openagents/tassadar/public"),
+            package_set_version: String::from(version),
+            supported_families: vec![TassadarBenchmarkFamily::Hungarian],
+            axis_coverage: vec![
+                TassadarBenchmarkAxis::Exactness,
+                TassadarBenchmarkAxis::LengthGeneralization,
+                TassadarBenchmarkAxis::PlannerUsefulness,
+            ],
+            summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
         },
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
@@ -2524,6 +2579,17 @@ fn build_tassadar_hungarian_10x10_environment_bundle(
             require_reference_linear_baseline: true,
             future_throughput_metric_ids: vec![String::from(TASSADAR_HULL_CACHE_METRIC_ID)],
         },
+        benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding {
+            package_set_ref: String::from("benchmark-set://openagents/tassadar/public"),
+            package_set_version: String::from(version),
+            supported_families: vec![TassadarBenchmarkFamily::Hungarian],
+            axis_coverage: vec![
+                TassadarBenchmarkAxis::Exactness,
+                TassadarBenchmarkAxis::LengthGeneralization,
+                TassadarBenchmarkAxis::PlannerUsefulness,
+            ],
+            summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
+        },
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/hungarian_10x10/eval/verification"),
@@ -2666,6 +2732,9 @@ fn build_tassadar_hungarian_10x10_benchmark_package(
 fn classify_case(case_id: &str) -> TassadarWorkloadTarget {
     match case_id {
         "locals_add" | "tassadar.locals_add.v1" => TassadarWorkloadTarget::ArithmeticMicroprogram,
+        "shortest_path_two_route" | "tassadar.shortest_path_two_route.v1" => {
+            TassadarWorkloadTarget::ClrsShortestPath
+        }
         "memory_roundtrip" | "tassadar.memory_roundtrip.v1" => {
             TassadarWorkloadTarget::MemoryLookupMicroprogram
         }
@@ -2765,6 +2834,7 @@ fn eval_repo_root() -> std::path::PathBuf {
 fn workload_target_id(workload_target: TassadarWorkloadTarget) -> &'static str {
     match workload_target {
         TassadarWorkloadTarget::ArithmeticMicroprogram => "arithmetic_microprogram",
+        TassadarWorkloadTarget::ClrsShortestPath => "clrs_shortest_path",
         TassadarWorkloadTarget::MemoryLookupMicroprogram => "memory_lookup_microprogram",
         TassadarWorkloadTarget::BranchControlFlowMicroprogram => "branch_control_flow_microprogram",
         TassadarWorkloadTarget::MicroWasmKernel => "micro_wasm_kernel",
@@ -2862,9 +2932,9 @@ fn compiled_kernel_family_max_trace_step_count(report: &Value, family_id: &str) 
     report["family_reports"]
         .as_array()
         .and_then(|families| {
-            families.iter().find(|family| {
-                family["family_id"].as_str() == Some(family_id)
-            })
+            families
+                .iter()
+                .find(|family| family["family_id"].as_str() == Some(family_id))
         })
         .and_then(|family| family["regimes"].as_array())
         .map(|regimes| {
@@ -2895,9 +2965,8 @@ pub fn build_tassadar_workload_capability_matrix_report(
     let hungarian_10x10_compiled_run_bundle = read_repo_json::<Value>(
         "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json",
     )?;
-    let compiled_kernel_suite_run_bundle = read_repo_json::<Value>(
-        "fixtures/tassadar/runs/compiled_kernel_suite_v0/run_bundle.json",
-    )?;
+    let compiled_kernel_suite_run_bundle =
+        read_repo_json::<Value>("fixtures/tassadar/runs/compiled_kernel_suite_v0/run_bundle.json")?;
     let compiled_kernel_suite_scaling_report = read_repo_json::<Value>(
         "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_scaling_report.json",
     )?;
@@ -4667,8 +4736,8 @@ mod tests {
     fn tassadar_reference_fixture_suite_builds_package_and_environment_contracts(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let suite = build_tassadar_reference_fixture_suite("2026.03.15")?;
-        assert_eq!(suite.artifacts.len(), 3);
-        assert_eq!(suite.benchmark_package.cases.len(), 3);
+        assert_eq!(suite.artifacts.len(), 4);
+        assert_eq!(suite.benchmark_package.cases.len(), 4);
         assert_eq!(
             suite
                 .benchmark_package
@@ -4689,8 +4758,19 @@ mod tests {
             suite.environment_bundle.current_workload_targets,
             vec![
                 TassadarWorkloadTarget::ArithmeticMicroprogram,
+                TassadarWorkloadTarget::ClrsShortestPath,
                 TassadarWorkloadTarget::MemoryLookupMicroprogram,
                 TassadarWorkloadTarget::BranchControlFlowMicroprogram,
+            ]
+        );
+        assert_eq!(
+            suite
+                .environment_bundle
+                .benchmark_package_set_binding
+                .supported_families,
+            vec![
+                TassadarBenchmarkFamily::Arithmetic,
+                TassadarBenchmarkFamily::ClrsSubset,
             ]
         );
         Ok(())

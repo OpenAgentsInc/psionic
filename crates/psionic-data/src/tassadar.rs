@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use psionic_datastream::{DatastreamEncoding, DatastreamManifest, DatastreamSubjectKind};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -14,6 +14,328 @@ use crate::{
 
 /// Stable ABI version for Tassadar token-sequence dataset contracts.
 pub const TASSADAR_SEQUENCE_DATASET_ABI_VERSION: &str = "psionic.tassadar.sequence_dataset.v1";
+/// Stable ABI version for Tassadar benchmark-package-set contracts.
+pub const TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION: &str =
+    "psionic.tassadar.benchmark_package_set.v1";
+
+/// Benchmark-family taxonomy for the public Tassadar package set.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarBenchmarkFamily {
+    /// Exact arithmetic kernels and microprograms.
+    Arithmetic,
+    /// CLRS-adjacent benchmark subset currently seeded by shortest-path witnesses.
+    ClrsSubset,
+    /// Sudoku-class exact-search workloads.
+    Sudoku,
+    /// Hungarian or matching-class workloads.
+    Hungarian,
+    /// Explicit trace-length and horizon-stress workloads.
+    TraceLengthStress,
+}
+
+/// Canonical benchmark-summary axes for Tassadar benchmark packages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarBenchmarkAxis {
+    /// Exactness or equivalence facts.
+    Exactness,
+    /// Length-generalization or horizon-scaling posture.
+    LengthGeneralization,
+    /// Whether the family is useful for planner or route selection rather than only systems work.
+    PlannerUsefulness,
+}
+
+/// One benchmark package that participates in the public Tassadar package set.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarBenchmarkPackageBinding {
+    /// Stable benchmark reference.
+    pub benchmark_ref: String,
+    /// Immutable benchmark package version.
+    pub version: String,
+    /// Environment package that owns benchmark execution.
+    pub environment_ref: String,
+    /// Bound dataset identity.
+    pub dataset: DatasetKey,
+    /// Optional dataset split.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub split: Option<String>,
+}
+
+impl TassadarBenchmarkPackageBinding {
+    fn validate(&self) -> Result<(), TassadarBenchmarkPackageSetError> {
+        if self.benchmark_ref.trim().is_empty() {
+            return Err(TassadarBenchmarkPackageSetError::MissingBenchmarkRef);
+        }
+        if self.version.trim().is_empty() {
+            return Err(TassadarBenchmarkPackageSetError::MissingBenchmarkVersion {
+                benchmark_ref: self.benchmark_ref.clone(),
+            });
+        }
+        if self.environment_ref.trim().is_empty() {
+            return Err(TassadarBenchmarkPackageSetError::MissingEnvironmentRef {
+                benchmark_ref: self.benchmark_ref.clone(),
+            });
+        }
+        if self.dataset.dataset_ref.trim().is_empty() || self.dataset.version.trim().is_empty() {
+            return Err(TassadarBenchmarkPackageSetError::MissingDatasetBinding {
+                benchmark_ref: self.benchmark_ref.clone(),
+            });
+        }
+        Ok(())
+    }
+}
+
+/// Family-level benchmark-package-set contract.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarBenchmarkFamilyContract {
+    /// Stable benchmark family.
+    pub family: TassadarBenchmarkFamily,
+    /// Human-readable family summary.
+    pub summary: String,
+    /// Benchmark packages that currently cover the family.
+    pub benchmark_packages: Vec<TassadarBenchmarkPackageBinding>,
+    /// Canonical reporting axes that the family supports.
+    pub axis_coverage: Vec<TassadarBenchmarkAxis>,
+    /// Stable benchmark case identifiers that seed the family today.
+    pub case_ids: Vec<String>,
+}
+
+impl TassadarBenchmarkFamilyContract {
+    fn validate(&self) -> Result<(), TassadarBenchmarkPackageSetError> {
+        if self.summary.trim().is_empty() {
+            return Err(TassadarBenchmarkPackageSetError::MissingFamilySummary {
+                family: self.family,
+            });
+        }
+        if self.benchmark_packages.is_empty() {
+            return Err(TassadarBenchmarkPackageSetError::MissingBenchmarkPackages {
+                family: self.family,
+            });
+        }
+        if self.axis_coverage.is_empty() {
+            return Err(TassadarBenchmarkPackageSetError::MissingAxisCoverage {
+                family: self.family,
+            });
+        }
+        if self.case_ids.is_empty() {
+            return Err(TassadarBenchmarkPackageSetError::MissingCaseIds {
+                family: self.family,
+            });
+        }
+
+        let mut seen_axes = BTreeSet::new();
+        for axis in &self.axis_coverage {
+            if !seen_axes.insert(*axis) {
+                return Err(TassadarBenchmarkPackageSetError::DuplicateAxis {
+                    family: self.family,
+                    axis: *axis,
+                });
+            }
+        }
+
+        let mut seen_packages = BTreeSet::new();
+        for package in &self.benchmark_packages {
+            package.validate()?;
+            let package_key = format!("{}@{}", package.benchmark_ref, package.version);
+            if !seen_packages.insert(package_key.clone()) {
+                return Err(
+                    TassadarBenchmarkPackageSetError::DuplicateBenchmarkPackage {
+                        family: self.family,
+                        package_key,
+                    },
+                );
+            }
+        }
+
+        let mut seen_case_ids = BTreeSet::new();
+        for case_id in &self.case_ids {
+            if case_id.trim().is_empty() {
+                return Err(TassadarBenchmarkPackageSetError::MissingCaseId {
+                    family: self.family,
+                });
+            }
+            if !seen_case_ids.insert(case_id.clone()) {
+                return Err(TassadarBenchmarkPackageSetError::DuplicateCaseId {
+                    family: self.family,
+                    case_id: case_id.clone(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Public package-set contract for the current Tassadar benchmark families.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarBenchmarkPackageSetContract {
+    /// Stable ABI version.
+    pub abi_version: String,
+    /// Stable package-set reference.
+    pub package_set_ref: String,
+    /// Immutable package-set version.
+    pub version: String,
+    /// Family contracts covered by the package set.
+    pub families: Vec<TassadarBenchmarkFamilyContract>,
+}
+
+impl TassadarBenchmarkPackageSetContract {
+    /// Creates and validates a package-set contract.
+    pub fn new(
+        package_set_ref: impl Into<String>,
+        version: impl Into<String>,
+        families: Vec<TassadarBenchmarkFamilyContract>,
+    ) -> Result<Self, TassadarBenchmarkPackageSetError> {
+        let contract = Self {
+            abi_version: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION),
+            package_set_ref: package_set_ref.into(),
+            version: version.into(),
+            families,
+        };
+        contract.validate()?;
+        Ok(contract)
+    }
+
+    /// Validates the contract.
+    pub fn validate(&self) -> Result<(), TassadarBenchmarkPackageSetError> {
+        if self.abi_version != TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION {
+            return Err(TassadarBenchmarkPackageSetError::UnsupportedAbiVersion {
+                abi_version: self.abi_version.clone(),
+            });
+        }
+        if self.package_set_ref.trim().is_empty() {
+            return Err(TassadarBenchmarkPackageSetError::MissingPackageSetRef);
+        }
+        if self.version.trim().is_empty() {
+            return Err(TassadarBenchmarkPackageSetError::MissingPackageSetVersion);
+        }
+        if self.families.is_empty() {
+            return Err(TassadarBenchmarkPackageSetError::MissingFamilies);
+        }
+
+        let mut seen_families = BTreeSet::new();
+        for family in &self.families {
+            family.validate()?;
+            if !seen_families.insert(family.family) {
+                return Err(TassadarBenchmarkPackageSetError::DuplicateFamily {
+                    family: family.family,
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Returns a stable digest over the contract.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        stable_digest(b"psionic_tassadar_benchmark_package_set_contract|", self)
+    }
+}
+
+/// Benchmark-package-set validation failure.
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum TassadarBenchmarkPackageSetError {
+    /// Unsupported ABI version.
+    #[error("unsupported Tassadar benchmark package set ABI version `{abi_version}`")]
+    UnsupportedAbiVersion {
+        /// Observed ABI version.
+        abi_version: String,
+    },
+    /// Missing package-set ref.
+    #[error("Tassadar benchmark package set is missing `package_set_ref`")]
+    MissingPackageSetRef,
+    /// Missing package-set version.
+    #[error("Tassadar benchmark package set is missing `version`")]
+    MissingPackageSetVersion,
+    /// No family contracts.
+    #[error("Tassadar benchmark package set must contain at least one family contract")]
+    MissingFamilies,
+    /// Family repeated.
+    #[error("Tassadar benchmark package set repeated family `{family:?}`")]
+    DuplicateFamily {
+        /// Repeated family.
+        family: TassadarBenchmarkFamily,
+    },
+    /// Benchmark ref missing.
+    #[error("Tassadar benchmark package binding is missing `benchmark_ref`")]
+    MissingBenchmarkRef,
+    /// Package version missing.
+    #[error("Tassadar benchmark package `{benchmark_ref}` is missing `version`")]
+    MissingBenchmarkVersion {
+        /// Benchmark reference.
+        benchmark_ref: String,
+    },
+    /// Environment ref missing.
+    #[error("Tassadar benchmark package `{benchmark_ref}` is missing `environment_ref`")]
+    MissingEnvironmentRef {
+        /// Benchmark reference.
+        benchmark_ref: String,
+    },
+    /// Dataset binding missing.
+    #[error("Tassadar benchmark package `{benchmark_ref}` is missing a stable dataset binding")]
+    MissingDatasetBinding {
+        /// Benchmark reference.
+        benchmark_ref: String,
+    },
+    /// Family summary missing.
+    #[error("Tassadar benchmark family `{family:?}` is missing `summary`")]
+    MissingFamilySummary {
+        /// Benchmark family.
+        family: TassadarBenchmarkFamily,
+    },
+    /// Family has no packages.
+    #[error(
+        "Tassadar benchmark family `{family:?}` must reference at least one benchmark package"
+    )]
+    MissingBenchmarkPackages {
+        /// Benchmark family.
+        family: TassadarBenchmarkFamily,
+    },
+    /// Family has no axes.
+    #[error("Tassadar benchmark family `{family:?}` must declare axis coverage")]
+    MissingAxisCoverage {
+        /// Benchmark family.
+        family: TassadarBenchmarkFamily,
+    },
+    /// Family has no cases.
+    #[error("Tassadar benchmark family `{family:?}` must declare at least one case id")]
+    MissingCaseIds {
+        /// Benchmark family.
+        family: TassadarBenchmarkFamily,
+    },
+    /// Empty case id.
+    #[error("Tassadar benchmark family `{family:?}` contains an empty case id")]
+    MissingCaseId {
+        /// Benchmark family.
+        family: TassadarBenchmarkFamily,
+    },
+    /// Repeated axis.
+    #[error("Tassadar benchmark family `{family:?}` repeated axis `{axis:?}`")]
+    DuplicateAxis {
+        /// Benchmark family.
+        family: TassadarBenchmarkFamily,
+        /// Repeated axis.
+        axis: TassadarBenchmarkAxis,
+    },
+    /// Repeated package.
+    #[error("Tassadar benchmark family `{family:?}` repeated benchmark package `{package_key}`")]
+    DuplicateBenchmarkPackage {
+        /// Benchmark family.
+        family: TassadarBenchmarkFamily,
+        /// Repeated package key.
+        package_key: String,
+    },
+    /// Repeated case id.
+    #[error("Tassadar benchmark family `{family:?}` repeated case id `{case_id}`")]
+    DuplicateCaseId {
+        /// Benchmark family.
+        family: TassadarBenchmarkFamily,
+        /// Repeated case id.
+        case_id: String,
+    },
+}
 
 /// Split identity used by the canonical Sudoku-v0 token-sequence dataset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -248,12 +570,10 @@ impl TassadarSequenceDatasetContract {
 
             manifest.metadata.insert(
                 format!("tassadar.{}.sequence_ids", split_name),
-                json!(
-                    split_examples
-                        .iter()
-                        .map(|example| example.sequence_id.clone())
-                        .collect::<Vec<_>>()
-                ),
+                json!(split_examples
+                    .iter()
+                    .map(|example| example.sequence_id.clone())
+                    .collect::<Vec<_>>()),
             );
         }
 
@@ -530,8 +850,11 @@ mod tests {
     use serde_json::Value;
 
     use super::{
-        TASSADAR_SEQUENCE_DATASET_ABI_VERSION, TassadarSequenceDatasetContract,
-        TassadarSequenceExample, TassadarSequenceExampleMetadata, TassadarSequenceSplit,
+        TassadarBenchmarkAxis, TassadarBenchmarkFamily, TassadarBenchmarkFamilyContract,
+        TassadarBenchmarkPackageBinding, TassadarBenchmarkPackageSetContract,
+        TassadarSequenceDatasetContract, TassadarSequenceExample, TassadarSequenceExampleMetadata,
+        TassadarSequenceSplit, TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION,
+        TASSADAR_SEQUENCE_DATASET_ABI_VERSION,
     };
     use crate::{DatasetKey, TokenizerDigest, TokenizerFamily};
 
@@ -593,5 +916,83 @@ mod tests {
             &Value::String(String::from("vocab-digest"))
         );
         assert!(!dataset.stable_digest().is_empty());
+    }
+
+    #[test]
+    fn benchmark_package_set_contract_is_machine_legible() {
+        let contract = TassadarBenchmarkPackageSetContract::new(
+            "benchmark-set://openagents/tassadar/public",
+            "2026.03.17",
+            vec![
+                TassadarBenchmarkFamilyContract {
+                    family: TassadarBenchmarkFamily::Arithmetic,
+                    summary: String::from("exact arithmetic kernels and validation microprograms"),
+                    benchmark_packages: vec![
+                        TassadarBenchmarkPackageBinding {
+                            benchmark_ref: String::from(
+                                "benchmark://openagents/tassadar/reference_fixture/validation_corpus",
+                            ),
+                            version: String::from("2026.03.17"),
+                            environment_ref: String::from("env.openagents.tassadar.benchmark"),
+                            dataset: DatasetKey::new(
+                                "dataset://openagents/tassadar/validation_corpus",
+                                "2026.03.17",
+                            ),
+                            split: Some(String::from("benchmark")),
+                        },
+                        TassadarBenchmarkPackageBinding {
+                            benchmark_ref: String::from(
+                                "benchmark://openagents/tassadar/compiled_kernel_suite/reference_fixture",
+                            ),
+                            version: String::from("v0"),
+                            environment_ref: String::from(
+                                "env.openagents.tassadar.compiled_kernel_suite.benchmark",
+                            ),
+                            dataset: DatasetKey::new(
+                                "dataset://openagents/tassadar/compiled_kernel_suite",
+                                "v0",
+                            ),
+                            split: Some(String::from("benchmark")),
+                        },
+                    ],
+                    axis_coverage: vec![
+                        TassadarBenchmarkAxis::Exactness,
+                        TassadarBenchmarkAxis::LengthGeneralization,
+                        TassadarBenchmarkAxis::PlannerUsefulness,
+                    ],
+                    case_ids: vec![String::from("locals_add")],
+                },
+                TassadarBenchmarkFamilyContract {
+                    family: TassadarBenchmarkFamily::ClrsSubset,
+                    summary: String::from("bounded CLRS-adjacent shortest-path witness"),
+                    benchmark_packages: vec![TassadarBenchmarkPackageBinding {
+                        benchmark_ref: String::from(
+                            "benchmark://openagents/tassadar/reference_fixture/validation_corpus",
+                        ),
+                        version: String::from("2026.03.17"),
+                        environment_ref: String::from("env.openagents.tassadar.benchmark"),
+                        dataset: DatasetKey::new(
+                            "dataset://openagents/tassadar/validation_corpus",
+                            "2026.03.17",
+                        ),
+                        split: Some(String::from("benchmark")),
+                    }],
+                    axis_coverage: vec![
+                        TassadarBenchmarkAxis::Exactness,
+                        TassadarBenchmarkAxis::LengthGeneralization,
+                        TassadarBenchmarkAxis::PlannerUsefulness,
+                    ],
+                    case_ids: vec![String::from("shortest_path_two_route")],
+                },
+            ],
+        )
+        .expect("package set contract should build");
+
+        assert_eq!(
+            contract.abi_version,
+            TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION
+        );
+        assert_eq!(contract.families.len(), 2);
+        assert!(!contract.stable_digest().is_empty());
     }
 }

@@ -1,0 +1,391 @@
+{
+  "schema_version": 1,
+  "package_set": {
+    "abi_version": "psionic.tassadar.benchmark_package_set.v1",
+    "package_set_ref": "benchmark-set://openagents/tassadar/public",
+    "version": "2026.03.17",
+    "families": [
+      {
+        "family": "arithmetic",
+        "summary": "exact arithmetic kernels spanning the validation microprogram corpus and the compiled kernel suite",
+        "benchmark_packages": [
+          {
+            "benchmark_ref": "benchmark://openagents/tassadar/reference_fixture/validation_corpus",
+            "version": "2026.03.17",
+            "environment_ref": "env.openagents.tassadar.benchmark",
+            "dataset": {
+              "dataset_ref": "dataset://openagents/tassadar/validation_corpus",
+              "version": "2026.03.17"
+            },
+            "split": "benchmark"
+          },
+          {
+            "benchmark_ref": "benchmark://openagents/tassadar/compiled_kernel_suite/reference_fixture",
+            "version": "v0",
+            "environment_ref": "env.openagents.tassadar.compiled_kernel_suite.benchmark",
+            "dataset": {
+              "dataset_ref": "dataset://openagents/tassadar/compiled_kernel_suite",
+              "version": "v0"
+            },
+            "split": "benchmark"
+          }
+        ],
+        "axis_coverage": [
+          "exactness",
+          "length_generalization",
+          "planner_usefulness"
+        ],
+        "case_ids": [
+          "locals_add",
+          "arithmetic_kernel_ops_32",
+          "arithmetic_kernel_ops_8",
+          "arithmetic_kernel_ops_96"
+        ]
+      },
+      {
+        "family": "clrs_subset",
+        "summary": "bounded CLRS-adjacent shortest-path witness seeded in the reference validation corpus",
+        "benchmark_packages": [
+          {
+            "benchmark_ref": "benchmark://openagents/tassadar/reference_fixture/validation_corpus",
+            "version": "2026.03.17",
+            "environment_ref": "env.openagents.tassadar.benchmark",
+            "dataset": {
+              "dataset_ref": "dataset://openagents/tassadar/validation_corpus",
+              "version": "2026.03.17"
+            },
+            "split": "benchmark"
+          }
+        ],
+        "axis_coverage": [
+          "exactness",
+          "length_generalization",
+          "planner_usefulness"
+        ],
+        "case_ids": [
+          "shortest_path_two_route"
+        ]
+      },
+      {
+        "family": "sudoku",
+        "summary": "Sudoku-class exact-search workloads across the article-class package and the exact 9x9 suite",
+        "benchmark_packages": [
+          {
+            "benchmark_ref": "benchmark://openagents/tassadar/article_class/reference_fixture",
+            "version": "2026.03.17",
+            "environment_ref": "env.openagents.tassadar.article_class.benchmark",
+            "dataset": {
+              "dataset_ref": "dataset://openagents/tassadar/article_class_corpus",
+              "version": "2026.03.17"
+            },
+            "split": "benchmark"
+          },
+          {
+            "benchmark_ref": "benchmark://openagents/tassadar/sudoku_9x9/reference_fixture",
+            "version": "2026.03.17",
+            "environment_ref": "env.openagents.tassadar.sudoku_9x9.benchmark",
+            "dataset": {
+              "dataset_ref": "dataset://openagents/tassadar/sudoku_9x9_corpus",
+              "version": "2026.03.17"
+            },
+            "split": "benchmark"
+          }
+        ],
+        "axis_coverage": [
+          "exactness",
+          "length_generalization",
+          "planner_usefulness"
+        ],
+        "case_ids": [
+          "sudoku_v0_test_a",
+          "sudoku_v0_test_b",
+          "sudoku_v0_train_a",
+          "sudoku_v0_train_b",
+          "sudoku_v0_train_c",
+          "sudoku_v0_train_d",
+          "sudoku_v0_validation_a",
+          "sudoku_v0_validation_b",
+          "sudoku_9x9_train_a",
+          "sudoku_9x9_train_b",
+          "sudoku_9x9_validation_a",
+          "sudoku_9x9_test_a"
+        ]
+      },
+      {
+        "family": "hungarian",
+        "summary": "matching-class workloads across the article-class, bounded 4x4, and article-sized 10x10 suites",
+        "benchmark_packages": [
+          {
+            "benchmark_ref": "benchmark://openagents/tassadar/article_class/reference_fixture",
+            "version": "2026.03.17",
+            "environment_ref": "env.openagents.tassadar.article_class.benchmark",
+            "dataset": {
+              "dataset_ref": "dataset://openagents/tassadar/article_class_corpus",
+              "version": "2026.03.17"
+            },
+            "split": "benchmark"
+          },
+          {
+            "benchmark_ref": "benchmark://openagents/tassadar/hungarian_v0/reference_fixture",
+            "version": "2026.03.17",
+            "environment_ref": "env.openagents.tassadar.hungarian_v0.benchmark",
+            "dataset": {
+              "dataset_ref": "dataset://openagents/tassadar/hungarian_v0_corpus",
+              "version": "2026.03.17"
+            },
+            "split": "benchmark"
+          },
+          {
+            "benchmark_ref": "benchmark://openagents/tassadar/hungarian_10x10/reference_fixture",
+            "version": "2026.03.17",
+            "environment_ref": "env.openagents.tassadar.hungarian_10x10.benchmark",
+            "dataset": {
+              "dataset_ref": "dataset://openagents/tassadar/hungarian_10x10_corpus",
+              "version": "2026.03.17"
+            },
+            "split": "benchmark"
+          }
+        ],
+        "axis_coverage": [
+          "exactness",
+          "length_generalization",
+          "planner_usefulness"
+        ],
+        "case_ids": [
+          "hungarian_matching",
+          "hungarian_v0_train_a",
+          "hungarian_v0_train_b",
+          "hungarian_v0_train_c",
+          "hungarian_v0_train_d",
+          "hungarian_v0_validation_a",
+          "hungarian_v0_validation_b",
+          "hungarian_v0_test_a",
+          "hungarian_v0_test_b",
+          "hungarian_10x10_train_a",
+          "hungarian_10x10_train_b",
+          "hungarian_10x10_validation_a",
+          "hungarian_10x10_test_a"
+        ]
+      },
+      {
+        "family": "trace_length_stress",
+        "summary": "explicit horizon and trace-growth workloads across long-loop article cases and compiled backward-loop kernels",
+        "benchmark_packages": [
+          {
+            "benchmark_ref": "benchmark://openagents/tassadar/article_class/reference_fixture",
+            "version": "2026.03.17",
+            "environment_ref": "env.openagents.tassadar.article_class.benchmark",
+            "dataset": {
+              "dataset_ref": "dataset://openagents/tassadar/article_class_corpus",
+              "version": "2026.03.17"
+            },
+            "split": "benchmark"
+          },
+          {
+            "benchmark_ref": "benchmark://openagents/tassadar/compiled_kernel_suite/reference_fixture",
+            "version": "v0",
+            "environment_ref": "env.openagents.tassadar.compiled_kernel_suite.benchmark",
+            "dataset": {
+              "dataset_ref": "dataset://openagents/tassadar/compiled_kernel_suite",
+              "version": "v0"
+            },
+            "split": "benchmark"
+          }
+        ],
+        "axis_coverage": [
+          "exactness",
+          "length_generalization",
+          "planner_usefulness"
+        ],
+        "case_ids": [
+          "long_loop_kernel",
+          "backward_loop_kernel_iters_1023",
+          "backward_loop_kernel_iters_255",
+          "backward_loop_kernel_iters_63"
+        ]
+      }
+    ]
+  },
+  "generated_from_refs": [
+    "benchmark://openagents/tassadar/article_class/reference_fixture@2026.03.17",
+    "benchmark://openagents/tassadar/compiled_kernel_suite/reference_fixture@v0",
+    "benchmark://openagents/tassadar/hungarian_10x10/reference_fixture@2026.03.17",
+    "benchmark://openagents/tassadar/hungarian_v0/reference_fixture@2026.03.17",
+    "benchmark://openagents/tassadar/reference_fixture/validation_corpus@2026.03.17",
+    "benchmark://openagents/tassadar/sudoku_9x9/reference_fixture@2026.03.17",
+    "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+    "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_scaling_report.json",
+    "fixtures/tassadar/runs/compiled_kernel_suite_v0/run_bundle.json",
+    "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json",
+    "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/run_bundle.json",
+    "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/run_bundle.json"
+  ],
+  "family_summaries": [
+    {
+      "family": "arithmetic",
+      "summary": "exact arithmetic kernels spanning the reference validation corpus and compiled kernel suite",
+      "benchmark_package_refs": [
+        "benchmark://openagents/tassadar/reference_fixture/validation_corpus@2026.03.17",
+        "benchmark://openagents/tassadar/compiled_kernel_suite/reference_fixture@v0"
+      ],
+      "case_ids": [
+        "locals_add",
+        "arithmetic_kernel_ops_32",
+        "arithmetic_kernel_ops_8",
+        "arithmetic_kernel_ops_96"
+      ],
+      "exactness_score_bps": 10000,
+      "exactness_support_refs": [
+        "benchmark://openagents/tassadar/reference_fixture/validation_corpus",
+        "fixtures/tassadar/runs/compiled_kernel_suite_v0/run_bundle.json"
+      ],
+      "exactness_summary": "reference arithmetic microprograms and compiled arithmetic kernels are exact on the current committed package set",
+      "length_generalization_posture": "bounded_holdout",
+      "length_generalization_support_refs": [
+        "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_scaling_report.json"
+      ],
+      "length_generalization_summary": "arithmetic coverage is benchmarked across bounded held-out and compiled scaling regimes rather than promoted as arbitrary-program closure",
+      "planner_usefulness_posture": "route_candidate",
+      "planner_usefulness_support_refs": [
+        "benchmark://openagents/tassadar/reference_fixture/validation_corpus"
+      ],
+      "planner_usefulness_summary": "arithmetic workloads remain useful route-selection probes for exact-compute invocation, not just systems-only smoke tests"
+    },
+    {
+      "family": "clrs_subset",
+      "summary": "bounded CLRS-adjacent shortest-path witness in the validation benchmark package",
+      "benchmark_package_refs": [
+        "benchmark://openagents/tassadar/reference_fixture/validation_corpus@2026.03.17"
+      ],
+      "case_ids": [
+        "shortest_path_two_route"
+      ],
+      "exactness_score_bps": 10000,
+      "exactness_support_refs": [
+        "benchmark://openagents/tassadar/reference_fixture/validation_corpus"
+      ],
+      "exactness_summary": "the current public CLRS subset is seeded by an exact shortest-path witness rather than a broad benchmark claim",
+      "length_generalization_posture": "bounded_holdout",
+      "length_generalization_support_refs": [
+        "benchmark://openagents/tassadar/reference_fixture/validation_corpus"
+      ],
+      "length_generalization_summary": "the CLRS subset remains intentionally narrow and benchmark-bound until a wider literature-legible family lands",
+      "planner_usefulness_posture": "route_candidate",
+      "planner_usefulness_support_refs": [
+        "benchmark://openagents/tassadar/reference_fixture/validation_corpus"
+      ],
+      "planner_usefulness_summary": "shortest-path style exact reasoning remains a planner-relevant route candidate because language-only heuristics should not silently replace exact compute on structured graph tasks"
+    },
+    {
+      "family": "sudoku",
+      "summary": "Sudoku-class exact-search coverage across article-class and exact 9x9 benchmark packages",
+      "benchmark_package_refs": [
+        "benchmark://openagents/tassadar/article_class/reference_fixture@2026.03.17",
+        "benchmark://openagents/tassadar/sudoku_9x9/reference_fixture@2026.03.17"
+      ],
+      "case_ids": [
+        "sudoku_v0_test_a",
+        "sudoku_v0_test_b",
+        "sudoku_v0_train_a",
+        "sudoku_v0_train_b",
+        "sudoku_v0_train_c",
+        "sudoku_v0_train_d",
+        "sudoku_v0_validation_a",
+        "sudoku_v0_validation_b",
+        "sudoku_9x9_train_a",
+        "sudoku_9x9_train_b",
+        "sudoku_9x9_validation_a",
+        "sudoku_9x9_test_a"
+      ],
+      "exactness_score_bps": 10000,
+      "exactness_support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/run_bundle.json"
+      ],
+      "exactness_summary": "the current package set carries exact runtime evidence on 4x4 Sudoku article cases and exact compiled/proof-backed evidence on the committed 9x9 suite",
+      "length_generalization_posture": "article_scale",
+      "length_generalization_support_refs": [
+        "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/run_bundle.json"
+      ],
+      "length_generalization_summary": "Sudoku benchmark coverage now includes article-sized 9x9 exact compiled closure instead of stopping at the bounded 4x4 package alone",
+      "planner_usefulness_posture": "route_candidate",
+      "planner_usefulness_support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+      ],
+      "planner_usefulness_summary": "Sudoku remains a direct planner/executor routing probe because the benchmark family measures exact search, fallback posture, and long-horizon executor usefulness together"
+    },
+    {
+      "family": "hungarian",
+      "summary": "matching-class coverage across article-class, bounded 4x4, and article-sized 10x10 benchmark packages",
+      "benchmark_package_refs": [
+        "benchmark://openagents/tassadar/article_class/reference_fixture@2026.03.17",
+        "benchmark://openagents/tassadar/hungarian_v0/reference_fixture@2026.03.17",
+        "benchmark://openagents/tassadar/hungarian_10x10/reference_fixture@2026.03.17"
+      ],
+      "case_ids": [
+        "hungarian_matching",
+        "hungarian_v0_train_a",
+        "hungarian_v0_train_b",
+        "hungarian_v0_train_c",
+        "hungarian_v0_train_d",
+        "hungarian_v0_validation_a",
+        "hungarian_v0_validation_b",
+        "hungarian_v0_test_a",
+        "hungarian_v0_test_b",
+        "hungarian_10x10_train_a",
+        "hungarian_10x10_train_b",
+        "hungarian_10x10_validation_a",
+        "hungarian_10x10_test_a"
+      ],
+      "exactness_score_bps": 10000,
+      "exactness_support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/run_bundle.json",
+        "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json"
+      ],
+      "exactness_summary": "matching-class packages are exact on the current public benchmark set, with compiled/proof-backed closure widening from bounded 4x4 to article-sized 10x10",
+      "length_generalization_posture": "article_scale",
+      "length_generalization_support_refs": [
+        "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json"
+      ],
+      "length_generalization_summary": "Hungarian coverage now reaches article-sized 10x10 workloads rather than stopping at the bounded 4x4 benchmark family",
+      "planner_usefulness_posture": "route_candidate",
+      "planner_usefulness_support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+      ],
+      "planner_usefulness_summary": "matching workloads remain planner-relevant because they are structured exact-compute tasks where route choice and fallback posture materially change outcome quality"
+    },
+    {
+      "family": "trace_length_stress",
+      "summary": "explicit horizon and trace-growth workloads across long-loop article cases and compiled backward-loop kernels",
+      "benchmark_package_refs": [
+        "benchmark://openagents/tassadar/article_class/reference_fixture@2026.03.17",
+        "benchmark://openagents/tassadar/compiled_kernel_suite/reference_fixture@v0"
+      ],
+      "case_ids": [
+        "long_loop_kernel",
+        "backward_loop_kernel_iters_1023",
+        "backward_loop_kernel_iters_255",
+        "backward_loop_kernel_iters_63"
+      ],
+      "exactness_score_bps": 10000,
+      "exactness_support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "fixtures/tassadar/runs/compiled_kernel_suite_v0/run_bundle.json"
+      ],
+      "exactness_summary": "trace-stress workloads stay exact on the current package set, but they are kept separate because they primarily measure horizon and fallback posture rather than task breadth",
+      "length_generalization_posture": "explicit_trace_stress",
+      "length_generalization_support_refs": [
+        "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_scaling_report.json"
+      ],
+      "length_generalization_summary": "trace-length stress is reported explicitly through long-loop and backward-loop families instead of being hidden inside one aggregate score",
+      "planner_usefulness_posture": "systems_only",
+      "planner_usefulness_support_refs": [
+        "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_scaling_report.json"
+      ],
+      "planner_usefulness_summary": "trace-stress workloads are primarily systems and closure diagnostics, not direct planner task wedges on their own"
+    }
+  ],
+  "claim_boundary": "this report summarizes the public Tassadar benchmark package set only; it separates exactness, length-generalization, and planner-usefulness, and it does not widen compiled, learned, or served capability claims beyond the cited package and artifact refs",
+  "report_digest": "b7d33e32c18a2d84a84e1b03105efa380d2061e7bcd5e8b11e89ea717c11b509"
+}

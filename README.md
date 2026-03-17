@@ -74,7 +74,11 @@ Current posture:
 - its Phase 2 artifact/compatibility contract now exists as digest-bound
   program artifacts plus explicit executor compatibility descriptors
 - its Phase 3 benchmark/environment package layer now exists in
-  `psionic-environments` and `psionic-eval`
+  `psionic-data`, `psionic-environments`, and `psionic-eval`, including a
+  public benchmark-package-set summary that separates exactness,
+  length-generalization, and planner-usefulness across arithmetic,
+  CLRS-seeded shortest path, Sudoku, Hungarian, and trace-length-stress
+  families
 - its Phase 4 proof/lineage layer now exists in `psionic-runtime`, with
   emitted trace artifacts, runtime-manifest lineage, and canonical proof-bundle
   integration
