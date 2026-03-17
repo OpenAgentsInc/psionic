@@ -141,6 +141,13 @@ Current posture:
   the Psionic-owned executor path, including exactness, proof lineage,
   runtime-manifest identity, and serialized trace-byte growth receipts while
   keeping HullCache and SparseTopK explicit as fallback-only at that horizon
+- its Phase 8E geometric-variant comparison report now also exists in
+  `psionic-eval`, with the committed report at
+  `fixtures/tassadar/reports/tassadar_geometric_variant_report.json` that keeps
+  the promoted runtime HullCache lane separate from a research-only
+  hierarchical-hull candidate; the candidate stays direct and exact on
+  long-loop and 4x4 Sudoku article workloads, but that widened class remains
+  explicitly unpromoted until runtime closure bars are landed
 - the first trained-executor follow-on bar now also exists in
   `psionic-runtime` and `psionic-models`: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile plus a real 4x4 backtracking

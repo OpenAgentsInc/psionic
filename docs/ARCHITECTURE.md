@@ -215,6 +215,14 @@ The current scope is:
   compact trace-summary proof lineage, runtime-manifest identity, and explicit
   serialized trace-byte growth receipts, while keeping HullCache and
   SparseTopK explicit as fallback-only at that horizon
+- landed Phase 8E bar: one geometric-variant comparison report now exists in
+  `psionic-eval` at
+  `fixtures/tassadar/reports/tassadar_geometric_variant_report.json`, keeping
+  the promoted runtime HullCache surface separate from a research-only
+  hierarchical-hull candidate; the candidate stays direct and exact on the
+  long-loop and 4x4 Sudoku article workloads, but the widened class remains
+  research-only until decode-mode identity and runtime closure bars are
+  promoted explicitly
 - landed trained-executor Phase 1 follow-on bar: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile now exists with a real 4x4
   backtracking Sudoku program representation on the CPU reference lane, while

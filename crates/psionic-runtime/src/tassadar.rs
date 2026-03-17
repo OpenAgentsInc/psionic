@@ -19,6 +19,9 @@ pub const TASSADAR_CPU_REFERENCE_RUNNER_ID: &str = "tassadar.cpu_reference.v1";
 pub const TASSADAR_FIXTURE_RUNNER_ID: &str = "tassadar.fixture_runner.v1";
 /// Stable hull-cache runner identifier for the Phase 5 lane.
 pub const TASSADAR_HULL_CACHE_RUNNER_ID: &str = "tassadar.hull_cache_runner.v1";
+/// Stable research-only hierarchical-hull runner identifier.
+pub const TASSADAR_HIERARCHICAL_HULL_CANDIDATE_RUNNER_ID: &str =
+    "tassadar.hierarchical_hull_candidate.v0";
 /// Stable sparse-top-k runner identifier for the Phase 8 lane.
 pub const TASSADAR_SPARSE_TOP_K_RUNNER_ID: &str = "tassadar.sparse_top_k_runner.v1";
 /// Stable runtime backend identifier for the current Tassadar reference lane.
@@ -4814,6 +4817,70 @@ impl TassadarHullCacheRunner {
     }
 }
 
+/// Research-only hierarchical-hull runner that keeps full write histories so
+/// loop-heavy workloads can be benchmarked without relaxing runtime claim
+/// boundaries.
+#[derive(Clone, Debug, Default)]
+pub struct TassadarHierarchicalHullCandidateRunner {
+    profile: TassadarWasmProfile,
+    trace_abi: TassadarTraceAbi,
+    weights: TassadarFixtureWeights,
+}
+
+impl TassadarHierarchicalHullCandidateRunner {
+    /// Creates the canonical research-only hierarchical-hull runner.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            profile: TassadarWasmProfile::core_i32_v1(),
+            trace_abi: TassadarTraceAbi::core_i32_v1(),
+            weights: TassadarFixtureWeights::core_i32_v1(),
+        }
+    }
+
+    /// Creates a research-only hierarchical-hull runner for one supported profile.
+    #[must_use]
+    pub fn for_profile(profile: TassadarWasmProfile) -> Option<Self> {
+        let trace_abi = tassadar_trace_abi_for_profile_id(profile.profile_id.as_str())?;
+        let weights = tassadar_fixture_weights_for_profile_id(profile.profile_id.as_str())?;
+        Some(Self {
+            profile,
+            trace_abi,
+            weights,
+        })
+    }
+
+    /// Creates a research-only hierarchical-hull runner that matches one
+    /// validated program profile.
+    pub fn for_program(program: &TassadarProgram) -> Result<Self, TassadarExecutionRefusal> {
+        let Some(profile) = tassadar_wasm_profile_for_id(program.profile_id.as_str()) else {
+            return Err(TassadarExecutionRefusal::ProfileMismatch {
+                expected: supported_wasm_profile_ids_csv(),
+                actual: program.profile_id.clone(),
+            });
+        };
+        Self::for_profile(profile).ok_or(TassadarExecutionRefusal::ProfileMismatch {
+            expected: supported_wasm_profile_ids_csv(),
+            actual: program.profile_id.clone(),
+        })
+    }
+
+    /// Executes one validated Tassadar program against the research-only
+    /// hierarchical-hull candidate.
+    pub fn execute(
+        &self,
+        program: &TassadarProgram,
+    ) -> Result<TassadarExecution, TassadarExecutionRefusal> {
+        execute_program_hierarchical_hull_candidate(
+            program,
+            &self.profile,
+            &self.trace_abi,
+            TASSADAR_HIERARCHICAL_HULL_CANDIDATE_RUNNER_ID,
+            Some(&self.weights),
+        )
+    }
+}
+
 /// Sparse-top-k runner for the validated Phase 8 subset.
 #[derive(Clone, Debug)]
 pub struct TassadarSparseTopKRunner {
@@ -6965,6 +7032,147 @@ fn execute_program_hull_cache(
     ))
 }
 
+fn execute_program_hierarchical_hull_candidate(
+    program: &TassadarProgram,
+    profile: &TassadarWasmProfile,
+    trace_abi: &TassadarTraceAbi,
+    runner_id: &str,
+    fixture_weights: Option<&TassadarFixtureWeights>,
+) -> Result<TassadarExecution, TassadarExecutionRefusal> {
+    program.validate_against(profile)?;
+
+    let mut pc = 0usize;
+    let mut steps = Vec::new();
+    let mut state = TassadarHierarchicalHullCandidateState {
+        stack: Vec::new(),
+        locals: vec![0; program.local_count],
+        memory: program.initial_memory.clone(),
+        outputs: Vec::new(),
+        local_write_history: vec![Vec::new(); program.local_count],
+        memory_write_history: vec![Vec::new(); program.initial_memory.len()],
+    };
+    let mut step_index = 0usize;
+    let mut halt_reason = TassadarHaltReason::FellOffEnd;
+
+    while pc < program.instructions.len() {
+        if step_index >= profile.max_steps {
+            return Err(TassadarExecutionRefusal::StepLimitExceeded {
+                max_steps: profile.max_steps,
+            });
+        }
+
+        let instruction = program.instructions[pc].clone();
+        let stack_before = state.stack.clone();
+        let opcode = instruction.opcode();
+        let rule = match fixture_weights {
+            Some(weights) => Some(
+                weights
+                    .rule_for(opcode)
+                    .ok_or(TassadarExecutionRefusal::FixtureRuleMissing { opcode })?,
+            ),
+            None => None,
+        };
+        let mut next_pc = pc + 1;
+        let event = match instruction.clone() {
+            TassadarInstruction::LocalGet { local } => {
+                let value = hierarchical_hull_local_value(
+                    usize::from(local),
+                    steps.as_slice(),
+                    &state.local_write_history,
+                    &state.locals,
+                );
+                state.stack.push(value);
+                TassadarTraceEvent::LocalGet { local, value }
+            }
+            TassadarInstruction::I32Load { slot } => {
+                let value = hierarchical_hull_memory_value(
+                    usize::from(slot),
+                    program.initial_memory.as_slice(),
+                    steps.as_slice(),
+                    &state.memory_write_history,
+                    &state.memory,
+                );
+                state.stack.push(value);
+                TassadarTraceEvent::Load { slot, value }
+            }
+            _ => execute_instruction(
+                &instruction,
+                pc,
+                &mut next_pc,
+                &mut state.stack,
+                &mut state.locals,
+                &mut state.memory,
+                &mut state.outputs,
+                &mut halt_reason,
+            )?,
+        };
+
+        if let Some(rule) = rule {
+            let observed = observed_rule_signature(&instruction, &event);
+            if rule.pops != observed.pops || rule.pushes != observed.pushes {
+                return Err(TassadarExecutionRefusal::FixtureRuleMismatch {
+                    opcode,
+                    expected_pops: rule.pops,
+                    expected_pushes: rule.pushes,
+                    actual_pops: observed.pops,
+                    actual_pushes: observed.pushes,
+                });
+            }
+        }
+
+        match event {
+            TassadarTraceEvent::LocalSet { local, .. } => {
+                state.local_write_history[usize::from(local)].push(step_index);
+            }
+            TassadarTraceEvent::Store { slot, .. } => {
+                state.memory_write_history[usize::from(slot)].push(step_index);
+            }
+            _ => {}
+        }
+
+        steps.push(TassadarTraceStep {
+            step_index,
+            pc,
+            next_pc,
+            instruction: instruction.clone(),
+            event,
+            stack_before,
+            stack_after: state.stack.clone(),
+            locals_after: state.locals.clone(),
+            memory_after: state.memory.clone(),
+        });
+
+        step_index += 1;
+        if matches!(instruction, TassadarInstruction::Return) {
+            return Ok(build_tassadar_execution(
+                program,
+                trace_abi,
+                runner_id,
+                steps,
+                state.outputs,
+                state.locals,
+                state.memory,
+                state.stack,
+                halt_reason,
+            ));
+        }
+
+        pc = next_pc;
+    }
+
+    Ok(build_tassadar_execution(
+        program,
+        trace_abi,
+        runner_id,
+        steps,
+        state.outputs,
+        state.locals,
+        state.memory,
+        state.stack,
+        halt_reason,
+    ))
+}
+
 fn execute_program_sparse_top_k(
     program: &TassadarProgram,
     profile: &TassadarWasmProfile,
@@ -7166,11 +7374,58 @@ struct TassadarSparseTopKState {
     memory_recent_write_steps: Vec<Vec<usize>>,
 }
 
+#[derive(Clone, Debug, Default)]
+struct TassadarHierarchicalHullCandidateState {
+    stack: Vec<i32>,
+    locals: Vec<i32>,
+    memory: Vec<i32>,
+    outputs: Vec<i32>,
+    local_write_history: Vec<Vec<usize>>,
+    memory_write_history: Vec<Vec<usize>>,
+}
+
 fn record_sparse_top_k_write(history: &mut Vec<usize>, step_index: usize, top_k: usize) {
     history.insert(0, step_index);
     if history.len() > top_k {
         history.truncate(top_k);
     }
+}
+
+fn hierarchical_hull_local_value(
+    local: usize,
+    steps: &[TassadarTraceStep],
+    write_history: &[Vec<usize>],
+    locals: &[i32],
+) -> i32 {
+    write_history[local]
+        .iter()
+        .rev()
+        .find_map(
+            |index| match steps.get(*index).map(|step| step.event.clone()) {
+                Some(TassadarTraceEvent::LocalSet { value, .. }) => Some(value),
+                _ => None,
+            },
+        )
+        .unwrap_or(locals[local])
+}
+
+fn hierarchical_hull_memory_value(
+    slot: usize,
+    initial_memory: &[i32],
+    steps: &[TassadarTraceStep],
+    write_history: &[Vec<usize>],
+    memory: &[i32],
+) -> i32 {
+    write_history[slot]
+        .iter()
+        .rev()
+        .find_map(
+            |index| match steps.get(*index).map(|step| step.event.clone()) {
+                Some(TassadarTraceEvent::Store { value, .. }) => Some(value),
+                _ => None,
+            },
+        )
+        .unwrap_or(memory.get(slot).copied().unwrap_or(initial_memory[slot]))
 }
 
 fn sparse_top_k_local_value(

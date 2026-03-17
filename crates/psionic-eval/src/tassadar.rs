@@ -12,12 +12,13 @@ use psionic_runtime::{
     build_tassadar_execution_evidence_bundle, diagnose_tassadar_executor_request,
     run_tassadar_exact_equivalence, tassadar_article_class_corpus, tassadar_hungarian_v0_corpus,
     tassadar_sudoku_v0_corpus, tassadar_trace_abi_for_profile_id, tassadar_validation_corpus,
-    TassadarCpuReferenceRunner, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
-    TassadarExecutorSelectionReason, TassadarExecutorSelectionState, TassadarFixtureRunner,
-    TassadarHullCacheRunner, TassadarHungarianV0CorpusCase, TassadarInstruction, TassadarProgram,
-    TassadarProgramArtifact, TassadarProgramArtifactError, TassadarSparseTopKRunner,
-    TassadarSudokuV0CorpusCase, TassadarSudokuV0CorpusSplit, TassadarTraceAbi,
-    TassadarTraceArtifact, TassadarWasmProfile, TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
+    TassadarClaimClass, TassadarCpuReferenceRunner, TassadarExecutionRefusal,
+    TassadarExecutorDecodeMode, TassadarExecutorSelectionReason, TassadarExecutorSelectionState,
+    TassadarFixtureRunner, TassadarHierarchicalHullCandidateRunner, TassadarHullCacheRunner,
+    TassadarHungarianV0CorpusCase, TassadarInstruction, TassadarProgram, TassadarProgramArtifact,
+    TassadarProgramArtifactError, TassadarSparseTopKRunner, TassadarSudokuV0CorpusCase,
+    TassadarSudokuV0CorpusSplit, TassadarTraceAbi, TassadarTraceArtifact, TassadarWasmProfile,
+    TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -82,6 +83,9 @@ pub const TASSADAR_SPARSE_TOP_K_COMPARISON_REPORT_REF: &str =
 /// Canonical machine-readable output path for the decode-scaling report.
 pub const TASSADAR_DECODE_SCALING_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_decode_scaling_report.json";
+/// Canonical machine-readable output path for the geometric-variant comparison report.
+pub const TASSADAR_GEOMETRIC_VARIANT_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_geometric_variant_report.json";
 
 const TASSADAR_OUTPUT_EXACTNESS_METRIC_ID: &str = "tassadar.final_output_exactness_bps";
 const TASSADAR_STEP_EXACTNESS_METRIC_ID: &str = "tassadar.step_exactness_bps";
@@ -102,6 +106,11 @@ const TASSADAR_WORKLOAD_CAPABILITY_MATRIX_SCHEMA_VERSION: u16 = 1;
 const TASSADAR_HULL_CACHE_CLOSURE_SCHEMA_VERSION: u16 = 1;
 const TASSADAR_SPARSE_TOP_K_COMPARISON_SCHEMA_VERSION: u16 = 1;
 const TASSADAR_DECODE_SCALING_SCHEMA_VERSION: u16 = 1;
+const TASSADAR_GEOMETRIC_VARIANT_REPORT_SCHEMA_VERSION: u16 = 1;
+const TASSADAR_RUNTIME_HULL_GEOMETRIC_VARIANT_ID: &str =
+    "tassadar.geometric_variant.hull_cache_runtime.v1";
+const TASSADAR_HIERARCHICAL_HULL_GEOMETRIC_VARIANT_ID: &str =
+    "tassadar.geometric_variant.hierarchical_hull_candidate.v0";
 
 /// One packaged Tassadar Phase 3 suite.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -437,6 +446,115 @@ pub struct TassadarDecodeScalingReport {
     pub report_digest: String,
 }
 
+/// Runtime-ready versus research-only claim boundary for one geometric variant.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarGeometricVariantClaimBoundary {
+    /// Variant is a promoted runtime surface with explicit selection truth.
+    RuntimeReady,
+    /// Variant remains research-only and is not a promoted runtime surface.
+    ResearchOnly,
+}
+
+/// Per-case comparison artifact for one geometric fast-path variant.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TassadarGeometricVariantCaseReport {
+    /// Stable benchmark case identifier.
+    pub case_id: String,
+    /// Workload target for the case.
+    pub workload_target: TassadarWorkloadTarget,
+    /// Stable variant identifier.
+    pub variant_id: String,
+    /// Runtime-ready or research-only claim boundary for the variant.
+    pub claim_boundary: TassadarGeometricVariantClaimBoundary,
+    /// Current top-level Tassadar claim class for the variant.
+    pub claim_class: TassadarClaimClass,
+    /// Direct/fallback/refused state surfaced for the variant on this case.
+    pub selection_state: TassadarExecutorSelectionState,
+    /// Stable reason for fallback or refusal when one existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_reason: Option<TassadarExecutorSelectionReason>,
+    /// Whether the variant preserved exact trace equality against CPU reference.
+    pub trace_digest_equal: bool,
+    /// Whether the variant preserved final outputs against CPU reference.
+    pub outputs_equal: bool,
+    /// Whether the variant preserved halt reason against CPU reference.
+    pub halt_equal: bool,
+    /// Aggregate exactness score in basis points.
+    pub exactness_bps: u32,
+    /// Exact trace-step count.
+    pub trace_steps: u64,
+    /// Reference-linear throughput reused for comparison.
+    pub reference_linear_steps_per_second: f64,
+    /// CPU-reference throughput reused for comparison.
+    pub cpu_reference_steps_per_second: f64,
+    /// Variant throughput on the case.
+    pub variant_steps_per_second: f64,
+    /// Variant speedup over reference-linear execution.
+    pub speedup_over_reference_linear: f64,
+    /// Remaining CPU-reference gap ratio for the variant.
+    pub remaining_gap_vs_cpu_reference: f64,
+    /// CPU-reference behavior digest.
+    pub cpu_behavior_digest: String,
+    /// Variant behavior digest.
+    pub variant_behavior_digest: String,
+    /// Artifact anchor for the underlying evidence.
+    pub artifact_ref: String,
+    /// Plain-language note for the case.
+    pub note: String,
+}
+
+/// Workload-family summary for one geometric fast-path variant.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TassadarGeometricVariantWorkloadSummary {
+    /// Stable variant identifier.
+    pub variant_id: String,
+    /// Runtime-ready or research-only claim boundary for the variant.
+    pub claim_boundary: TassadarGeometricVariantClaimBoundary,
+    /// Current top-level Tassadar claim class for the variant.
+    pub claim_class: TassadarClaimClass,
+    /// Workload target summarized by this row.
+    pub workload_target: TassadarWorkloadTarget,
+    /// Number of cases that stayed direct on the variant.
+    pub direct_case_count: usize,
+    /// Number of cases that fell back away from the variant.
+    pub fallback_case_count: usize,
+    /// Number of cases that were refused by the variant.
+    pub refused_case_count: usize,
+    /// Number of cases that preserved exact behavior against CPU reference.
+    pub exact_case_count: usize,
+    /// Average variant throughput across the workload family.
+    pub average_steps_per_second: f64,
+    /// Average speedup over reference-linear execution.
+    pub average_speedup_over_reference_linear: f64,
+    /// Average remaining CPU-reference gap ratio.
+    pub average_remaining_gap_vs_cpu_reference: f64,
+    /// Stable counts for fallback or refusal reasons.
+    pub selection_reason_counts: BTreeMap<String, usize>,
+    /// Artifact anchor for the summary.
+    pub artifact_ref: String,
+    /// Plain-language note for the workload summary.
+    pub note: String,
+}
+
+/// Machine-readable comparison report across the current runtime HullCache and
+/// richer geometric research variants.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TassadarGeometricVariantReport {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Ordered artifact anchors used to build the report.
+    pub generated_from_artifacts: Vec<String>,
+    /// Ordered per-case comparison artifacts.
+    pub case_reports: Vec<TassadarGeometricVariantCaseReport>,
+    /// Ordered workload-family summaries.
+    pub workload_summaries: Vec<TassadarGeometricVariantWorkloadSummary>,
+    /// Plain-language boundary for the full report.
+    pub claim_boundary: String,
+    /// Stable digest over the full report.
+    pub report_digest: String,
+}
+
 /// Tassadar benchmark build or execution failure.
 #[derive(Debug, Error)]
 pub enum TassadarBenchmarkError {
@@ -531,6 +649,29 @@ pub enum TassadarDecodeScalingReportError {
         program_id: String,
         /// Requested decode mode.
         requested_decode_mode: TassadarExecutorDecodeMode,
+    },
+}
+
+/// Geometric-variant comparison report build or persistence failure.
+#[derive(Debug, Error)]
+pub enum TassadarGeometricVariantReportError {
+    /// Underlying filesystem read/write failed.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    /// JSON parsing or serialization failed.
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    /// Runtime execution refused one program directly.
+    #[error(transparent)]
+    ExecutionRefusal(#[from] TassadarExecutionRefusal),
+    /// Benchmark helper or runtime execution failed.
+    #[error(transparent)]
+    Benchmark(#[from] TassadarBenchmarkError),
+    /// One required benchmark case was missing from the article corpus.
+    #[error("missing article benchmark case `{case_id}` in the article corpus")]
+    MissingCase {
+        /// Missing case identifier.
+        case_id: String,
     },
 }
 
@@ -3222,6 +3363,295 @@ pub fn write_tassadar_decode_scaling_report(
     Ok(report)
 }
 
+fn geometric_variant_reason_key(reason: Option<TassadarExecutorSelectionReason>) -> Option<String> {
+    reason.map(|reason| {
+        serde_json::to_string(&reason)
+            .unwrap_or_else(|_| String::from("\"unknown_selection_reason\""))
+            .trim_matches('"')
+            .to_string()
+    })
+}
+
+fn build_runtime_hull_cache_variant_case_report(
+    benchmark_case: &TassadarBenchmarkCaseReport,
+) -> TassadarGeometricVariantCaseReport {
+    let exactness_bps =
+        u32::from(benchmark_case.hull_cache_behavior_digest == benchmark_case.cpu_behavior_digest)
+            * 10_000;
+    let note = if benchmark_case.selection_state == TassadarExecutorSelectionState::Direct {
+        String::from(
+            "current promoted HullCache runtime path stayed direct and exact on this workload case",
+        )
+    } else {
+        String::from(
+            "current promoted HullCache runtime path remained exact here only by explicitly falling back to the runtime's exact reference-linear mode",
+        )
+    };
+    TassadarGeometricVariantCaseReport {
+        case_id: benchmark_case.case_id.clone(),
+        workload_target: benchmark_case.workload_target,
+        variant_id: String::from(TASSADAR_RUNTIME_HULL_GEOMETRIC_VARIANT_ID),
+        claim_boundary: TassadarGeometricVariantClaimBoundary::RuntimeReady,
+        claim_class: TassadarClaimClass::CompiledExact,
+        selection_state: benchmark_case.selection_state,
+        selection_reason: benchmark_case.selection_reason,
+        trace_digest_equal: benchmark_case.trace_digest_equal,
+        outputs_equal: benchmark_case.outputs_equal,
+        halt_equal: benchmark_case.halt_equal,
+        exactness_bps,
+        trace_steps: benchmark_case.trace_steps,
+        reference_linear_steps_per_second: benchmark_case.reference_linear_steps_per_second,
+        cpu_reference_steps_per_second: benchmark_case.cpu_reference_steps_per_second,
+        variant_steps_per_second: benchmark_case.hull_cache_steps_per_second,
+        speedup_over_reference_linear: benchmark_case.hull_cache_speedup_over_reference_linear,
+        remaining_gap_vs_cpu_reference: benchmark_case.hull_cache_remaining_gap_vs_cpu_reference,
+        cpu_behavior_digest: benchmark_case.cpu_behavior_digest.clone(),
+        variant_behavior_digest: benchmark_case.hull_cache_behavior_digest.clone(),
+        artifact_ref: String::from(TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF),
+        note,
+    }
+}
+
+fn build_hierarchical_hull_variant_case_report(
+    benchmark_case: &TassadarBenchmarkCaseReport,
+    program: &TassadarProgram,
+) -> Result<TassadarGeometricVariantCaseReport, TassadarGeometricVariantReportError> {
+    let cpu_runner = TassadarCpuReferenceRunner::for_program(program)?;
+    let cpu_execution = cpu_runner.execute(program)?;
+    let candidate_runner = TassadarHierarchicalHullCandidateRunner::for_program(program)?;
+    let candidate_execution = candidate_runner.execute(program)?;
+    let trace_steps = candidate_execution.steps.len() as u64;
+    let variant_steps_per_second =
+        benchmark_runner_steps_per_second(trace_steps, || candidate_runner.execute(program))?;
+    let trace_digest_equal = candidate_execution.trace_digest() == cpu_execution.trace_digest();
+    let outputs_equal = candidate_execution.outputs == cpu_execution.outputs;
+    let halt_equal = candidate_execution.halt_reason == cpu_execution.halt_reason;
+    let exactness_bps = u32::from(
+        trace_digest_equal
+            && outputs_equal
+            && halt_equal
+            && candidate_execution.behavior_digest() == cpu_execution.behavior_digest(),
+    ) * 10_000;
+    let note = if benchmark_case.selection_state == TassadarExecutorSelectionState::Direct {
+        String::from(
+            "research-only hierarchical hull candidate matches the promoted HullCache lane on this already-direct workload case",
+        )
+    } else {
+        String::from(
+            "research-only hierarchical hull candidate stays direct on this case while the promoted HullCache runtime path still falls back, so the widened exact class remains explicit but unpromoted",
+        )
+    };
+    Ok(TassadarGeometricVariantCaseReport {
+        case_id: benchmark_case.case_id.clone(),
+        workload_target: benchmark_case.workload_target,
+        variant_id: String::from(TASSADAR_HIERARCHICAL_HULL_GEOMETRIC_VARIANT_ID),
+        claim_boundary: TassadarGeometricVariantClaimBoundary::ResearchOnly,
+        claim_class: TassadarClaimClass::ResearchOnly,
+        selection_state: TassadarExecutorSelectionState::Direct,
+        selection_reason: None,
+        trace_digest_equal,
+        outputs_equal,
+        halt_equal,
+        exactness_bps,
+        trace_steps,
+        reference_linear_steps_per_second: benchmark_case.reference_linear_steps_per_second,
+        cpu_reference_steps_per_second: benchmark_case.cpu_reference_steps_per_second,
+        variant_steps_per_second: round_metric(variant_steps_per_second),
+        speedup_over_reference_linear: round_metric(
+            variant_steps_per_second / benchmark_case.reference_linear_steps_per_second.max(1e-9),
+        ),
+        remaining_gap_vs_cpu_reference: round_metric(
+            benchmark_case.cpu_reference_steps_per_second / variant_steps_per_second.max(1e-9),
+        ),
+        cpu_behavior_digest: cpu_execution.behavior_digest(),
+        variant_behavior_digest: candidate_execution.behavior_digest(),
+        artifact_ref: String::from(TASSADAR_GEOMETRIC_VARIANT_REPORT_REF),
+        note,
+    })
+}
+
+fn build_geometric_variant_workload_summary(
+    case_reports: &[TassadarGeometricVariantCaseReport],
+    variant_id: &str,
+    workload_target: TassadarWorkloadTarget,
+) -> Option<TassadarGeometricVariantWorkloadSummary> {
+    let cases = case_reports
+        .iter()
+        .filter(|case| case.variant_id == variant_id && case.workload_target == workload_target)
+        .collect::<Vec<_>>();
+    if cases.is_empty() {
+        return None;
+    }
+    let direct_case_count = cases
+        .iter()
+        .filter(|case| case.selection_state == TassadarExecutorSelectionState::Direct)
+        .count();
+    let fallback_case_count = cases
+        .iter()
+        .filter(|case| case.selection_state == TassadarExecutorSelectionState::Fallback)
+        .count();
+    let refused_case_count = cases
+        .iter()
+        .filter(|case| case.selection_state == TassadarExecutorSelectionState::Refused)
+        .count();
+    let exact_case_count = cases
+        .iter()
+        .filter(|case| case.exactness_bps == 10_000)
+        .count();
+    let mut selection_reason_counts = BTreeMap::new();
+    for key in cases
+        .iter()
+        .filter_map(|case| geometric_variant_reason_key(case.selection_reason))
+    {
+        *selection_reason_counts.entry(key).or_insert(0) += 1;
+    }
+    let average_steps_per_second = round_metric(
+        cases
+            .iter()
+            .map(|case| case.variant_steps_per_second)
+            .sum::<f64>()
+            / cases.len() as f64,
+    );
+    let average_speedup_over_reference_linear = round_metric(
+        cases
+            .iter()
+            .map(|case| case.speedup_over_reference_linear)
+            .sum::<f64>()
+            / cases.len() as f64,
+    );
+    let average_remaining_gap_vs_cpu_reference = round_metric(
+        cases
+            .iter()
+            .map(|case| case.remaining_gap_vs_cpu_reference)
+            .sum::<f64>()
+            / cases.len() as f64,
+    );
+    let claim_boundary = cases[0].claim_boundary;
+    let claim_class = cases[0].claim_class;
+    let artifact_ref = cases[0].artifact_ref.clone();
+    let note = if variant_id == TASSADAR_RUNTIME_HULL_GEOMETRIC_VARIANT_ID {
+        String::from(
+            "current promoted HullCache runtime posture, including explicit fallback truth where the validated subset still ends",
+        )
+    } else {
+        String::from(
+            "research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim",
+        )
+    };
+    Some(TassadarGeometricVariantWorkloadSummary {
+        variant_id: String::from(variant_id),
+        claim_boundary,
+        claim_class,
+        workload_target,
+        direct_case_count,
+        fallback_case_count,
+        refused_case_count,
+        exact_case_count,
+        average_steps_per_second,
+        average_speedup_over_reference_linear,
+        average_remaining_gap_vs_cpu_reference,
+        selection_reason_counts,
+        artifact_ref,
+        note,
+    })
+}
+
+/// Builds the machine-readable geometric-variant comparison report.
+pub fn build_tassadar_geometric_variant_report(
+) -> Result<TassadarGeometricVariantReport, TassadarGeometricVariantReportError> {
+    let benchmark_report: TassadarBenchmarkReport = read_repo_json(
+        TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
+    )
+    .map_err(|error| match error {
+        TassadarWorkloadCapabilityMatrixError::Io(error) => {
+            TassadarGeometricVariantReportError::Io(error)
+        }
+        TassadarWorkloadCapabilityMatrixError::Json(error) => {
+            TassadarGeometricVariantReportError::Json(error)
+        }
+        TassadarWorkloadCapabilityMatrixError::MissingWorkloadTarget { .. } => {
+            unreachable!("repo JSON reads do not synthesize workload-target errors")
+        }
+    })?;
+    let article_cases = tassadar_article_class_corpus()
+        .into_iter()
+        .map(|case| (case.case_id.clone(), case))
+        .collect::<BTreeMap<_, _>>();
+
+    let mut case_reports = benchmark_report
+        .case_reports
+        .iter()
+        .map(build_runtime_hull_cache_variant_case_report)
+        .collect::<Vec<_>>();
+    for benchmark_case in &benchmark_report.case_reports {
+        let Some(article_case) = article_cases.get(benchmark_case.case_id.as_str()) else {
+            return Err(TassadarGeometricVariantReportError::MissingCase {
+                case_id: benchmark_case.case_id.clone(),
+            });
+        };
+        case_reports.push(build_hierarchical_hull_variant_case_report(
+            benchmark_case,
+            &article_case.program,
+        )?);
+    }
+
+    let workload_targets = [
+        TassadarWorkloadTarget::MicroWasmKernel,
+        TassadarWorkloadTarget::BranchHeavyKernel,
+        TassadarWorkloadTarget::MemoryHeavyKernel,
+        TassadarWorkloadTarget::LongLoopKernel,
+        TassadarWorkloadTarget::SudokuClass,
+        TassadarWorkloadTarget::HungarianMatching,
+    ];
+    let variant_ids = [
+        TASSADAR_RUNTIME_HULL_GEOMETRIC_VARIANT_ID,
+        TASSADAR_HIERARCHICAL_HULL_GEOMETRIC_VARIANT_ID,
+    ];
+    let mut workload_summaries = Vec::new();
+    for variant_id in variant_ids {
+        for workload_target in workload_targets {
+            if let Some(summary) =
+                build_geometric_variant_workload_summary(&case_reports, variant_id, workload_target)
+            {
+                workload_summaries.push(summary);
+            }
+        }
+    }
+
+    let mut report = TassadarGeometricVariantReport {
+        schema_version: TASSADAR_GEOMETRIC_VARIANT_REPORT_SCHEMA_VERSION,
+        generated_from_artifacts: vec![String::from(TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF)],
+        case_reports,
+        workload_summaries,
+        claim_boundary: String::from(
+            "this report keeps the promoted runtime HullCache surface separate from a research-only hierarchical hull candidate. The candidate materially widens exact direct coverage on loop-heavy article workloads under the same artifact contract, but it remains research_only until decode-mode identity, refusal policy, and runtime closure bars are promoted explicitly",
+        ),
+        report_digest: String::new(),
+    };
+    report.report_digest = stable_serialized_digest(b"tassadar_geometric_variant_report|", &report);
+    Ok(report)
+}
+
+/// Returns the canonical absolute path for the geometric-variant comparison report.
+#[must_use]
+pub fn tassadar_geometric_variant_report_path() -> std::path::PathBuf {
+    eval_repo_root().join(TASSADAR_GEOMETRIC_VARIANT_REPORT_REF)
+}
+
+/// Writes the canonical geometric-variant comparison report.
+pub fn write_tassadar_geometric_variant_report(
+    output_path: impl AsRef<std::path::Path>,
+) -> Result<TassadarGeometricVariantReport, TassadarGeometricVariantReportError> {
+    let output_path = output_path.as_ref();
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let report = build_tassadar_geometric_variant_report()?;
+    let bytes = serde_json::to_vec_pretty(&report)?;
+    std::fs::write(output_path, bytes)?;
+    Ok(report)
+}
+
 fn stable_corpus_digest(artifacts: &[TassadarProgramArtifact]) -> String {
     let mut hasher = sha2::Sha256::new();
     hasher.update(b"tassadar_corpus|");
@@ -3362,6 +3792,36 @@ mod tests {
         REPORT.get_or_init(|| {
             build_tassadar_decode_scaling_report().expect("decode-scaling report should build")
         })
+    }
+
+    fn cached_geometric_variant_report() -> &'static TassadarGeometricVariantReport {
+        static REPORT: OnceLock<TassadarGeometricVariantReport> = OnceLock::new();
+        REPORT.get_or_init(|| {
+            build_tassadar_geometric_variant_report()
+                .expect("geometric-variant report should build")
+        })
+    }
+
+    fn normalized_geometric_variant_report_value(
+        report: &TassadarGeometricVariantReport,
+    ) -> serde_json::Value {
+        let mut value = serde_json::to_value(report).expect("report should serialize");
+        value["report_digest"] = Value::Null;
+        if let Some(case_reports) = value["case_reports"].as_array_mut() {
+            for case in case_reports {
+                case["variant_steps_per_second"] = Value::Null;
+                case["speedup_over_reference_linear"] = Value::Null;
+                case["remaining_gap_vs_cpu_reference"] = Value::Null;
+            }
+        }
+        if let Some(workload_summaries) = value["workload_summaries"].as_array_mut() {
+            for summary in workload_summaries {
+                summary["average_steps_per_second"] = Value::Null;
+                summary["average_speedup_over_reference_linear"] = Value::Null;
+                summary["average_remaining_gap_vs_cpu_reference"] = Value::Null;
+            }
+        }
+        value
     }
 
     fn assert_decode_scaling_report_matches_stable_shape(
@@ -4044,6 +4504,97 @@ mod tests {
         let bytes = std::fs::read(&report_path)?;
         let persisted: Value = serde_json::from_slice(&bytes)?;
         assert_eq!(persisted, serde_json::to_value(&report)?);
+        std::fs::remove_file(&report_path)?;
+        std::fs::remove_dir(&temp_dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn tassadar_geometric_variant_report_tracks_runtime_and_research_boundaries(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let report = cached_geometric_variant_report();
+        assert_eq!(
+            report.schema_version,
+            TASSADAR_GEOMETRIC_VARIANT_REPORT_SCHEMA_VERSION
+        );
+        assert!(report.case_reports.iter().any(|case| {
+            case.variant_id == TASSADAR_RUNTIME_HULL_GEOMETRIC_VARIANT_ID
+                && case.workload_target == TassadarWorkloadTarget::LongLoopKernel
+                && case.claim_boundary == TassadarGeometricVariantClaimBoundary::RuntimeReady
+                && case.selection_state == TassadarExecutorSelectionState::Fallback
+                && case.selection_reason
+                    == Some(TassadarExecutorSelectionReason::HullCacheControlFlowUnsupported)
+                && case.exactness_bps == 10_000
+        }));
+        assert!(report.case_reports.iter().any(|case| {
+            case.variant_id == TASSADAR_HIERARCHICAL_HULL_GEOMETRIC_VARIANT_ID
+                && case.workload_target == TassadarWorkloadTarget::LongLoopKernel
+                && case.claim_boundary == TassadarGeometricVariantClaimBoundary::ResearchOnly
+                && case.selection_state == TassadarExecutorSelectionState::Direct
+                && case.exactness_bps == 10_000
+                && case.trace_digest_equal
+        }));
+        assert!(report.workload_summaries.iter().any(|summary| {
+            summary.variant_id == TASSADAR_RUNTIME_HULL_GEOMETRIC_VARIANT_ID
+                && summary.workload_target == TassadarWorkloadTarget::SudokuClass
+                && summary.fallback_case_count == 8
+                && summary.direct_case_count == 0
+        }));
+        assert!(report.workload_summaries.iter().any(|summary| {
+            summary.variant_id == TASSADAR_HIERARCHICAL_HULL_GEOMETRIC_VARIANT_ID
+                && summary.workload_target == TassadarWorkloadTarget::SudokuClass
+                && summary.direct_case_count == 8
+                && summary.fallback_case_count == 0
+                && summary.exact_case_count == 8
+        }));
+        assert!(report
+            .case_reports
+            .iter()
+            .all(|case| case.variant_steps_per_second > 0.0));
+        Ok(())
+    }
+
+    #[test]
+    fn tassadar_geometric_variant_report_matches_committed_truth(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let bytes = std::fs::read(
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join(TASSADAR_GEOMETRIC_VARIANT_REPORT_REF),
+        )?;
+        let persisted: TassadarGeometricVariantReport = serde_json::from_slice(&bytes)?;
+        assert!(persisted
+            .case_reports
+            .iter()
+            .all(|case| case.variant_steps_per_second > 0.0));
+        assert_eq!(
+            normalized_geometric_variant_report_value(cached_geometric_variant_report()),
+            normalized_geometric_variant_report_value(&persisted)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn write_tassadar_geometric_variant_report_persists_current_truth(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "psionic-tassadar-eval-geometric-variants-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&temp_dir)?;
+        let report_path = temp_dir.join("tassadar_geometric_variant_report.json");
+        let report = write_tassadar_geometric_variant_report(&report_path)?;
+        let bytes = std::fs::read(&report_path)?;
+        let persisted: TassadarGeometricVariantReport = serde_json::from_slice(&bytes)?;
+        assert!(persisted
+            .case_reports
+            .iter()
+            .all(|case| case.variant_steps_per_second > 0.0));
+        assert_eq!(
+            normalized_geometric_variant_report_value(&report),
+            normalized_geometric_variant_report_value(&persisted)
+        );
         std::fs::remove_file(&report_path)?;
         std::fs::remove_dir(&temp_dir)?;
         Ok(())
