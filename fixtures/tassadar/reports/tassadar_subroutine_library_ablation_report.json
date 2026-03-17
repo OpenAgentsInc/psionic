@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "comparison_id": "tassadar.subroutine_library_ablation.v0",
+  "report_ref": "fixtures/tassadar/reports/tassadar_subroutine_library_ablation_report.json",
+  "regeneration_commands": [
+    "cargo run -p psionic-research --example tassadar_subroutine_library_ablation",
+    "cargo test -p psionic-research subroutine_library_ablation_report_matches_committed_truth -- --nocapture"
+  ],
+  "full_trace_manifest_digest": "17f46545c1ecc48caf49855e553fcf48a0cb70d077df83aae445ca77f8ca35f2",
+  "subroutine_manifest_digest": "5f744f068c599c45f7ac8d63cc06b138019048fe3566b9fe200c650e9f50e909",
+  "mode_reports": [
+    {
+      "supervision_mode": "full_trace",
+      "held_out_workload_family": "sort",
+      "train_workload_families": [
+        "clrs_shortest_path",
+        "sudoku_style"
+      ],
+      "train_target_vocab_size": 16,
+      "held_out_target_count": 8,
+      "reusable_held_out_target_count": 0,
+      "held_out_reuse_bps": 0,
+      "detail": "held_out_workload=sort, supervision_mode=full_trace, reusable_held_out_target_count=0/8, train_target_vocab_size=16"
+    },
+    {
+      "supervision_mode": "full_trace",
+      "held_out_workload_family": "clrs_shortest_path",
+      "train_workload_families": [
+        "sort",
+        "sudoku_style"
+      ],
+      "train_target_vocab_size": 16,
+      "held_out_target_count": 8,
+      "reusable_held_out_target_count": 0,
+      "held_out_reuse_bps": 0,
+      "detail": "held_out_workload=clrs_shortest_path, supervision_mode=full_trace, reusable_held_out_target_count=0/8, train_target_vocab_size=16"
+    },
+    {
+      "supervision_mode": "full_trace",
+      "held_out_workload_family": "sudoku_style",
+      "train_workload_families": [
+        "sort",
+        "clrs_shortest_path"
+      ],
+      "train_target_vocab_size": 16,
+      "held_out_target_count": 8,
+      "reusable_held_out_target_count": 0,
+      "held_out_reuse_bps": 0,
+      "detail": "held_out_workload=sudoku_style, supervision_mode=full_trace, reusable_held_out_target_count=0/8, train_target_vocab_size=16"
+    },
+    {
+      "supervision_mode": "subroutine_library",
+      "held_out_workload_family": "sort",
+      "train_workload_families": [
+        "clrs_shortest_path",
+        "sudoku_style"
+      ],
+      "train_target_vocab_size": 4,
+      "held_out_target_count": 6,
+      "reusable_held_out_target_count": 6,
+      "held_out_reuse_bps": 10000,
+      "detail": "held_out_workload=sort, supervision_mode=subroutine_library, reusable_held_out_target_count=6/6, train_target_vocab_size=4"
+    },
+    {
+      "supervision_mode": "subroutine_library",
+      "held_out_workload_family": "clrs_shortest_path",
+      "train_workload_families": [
+        "sort",
+        "sudoku_style"
+      ],
+      "train_target_vocab_size": 4,
+      "held_out_target_count": 8,
+      "reusable_held_out_target_count": 8,
+      "held_out_reuse_bps": 10000,
+      "detail": "held_out_workload=clrs_shortest_path, supervision_mode=subroutine_library, reusable_held_out_target_count=8/8, train_target_vocab_size=4"
+    },
+    {
+      "supervision_mode": "subroutine_library",
+      "held_out_workload_family": "sudoku_style",
+      "train_workload_families": [
+        "sort",
+        "clrs_shortest_path"
+      ],
+      "train_target_vocab_size": 4,
+      "held_out_target_count": 6,
+      "reusable_held_out_target_count": 6,
+      "held_out_reuse_bps": 10000,
+      "detail": "held_out_workload=sudoku_style, supervision_mode=subroutine_library, reusable_held_out_target_count=6/6, train_target_vocab_size=4"
+    }
+  ],
+  "workload_deltas": [
+    {
+      "held_out_workload_family": "sort",
+      "full_trace_reuse_bps": 0,
+      "subroutine_library_reuse_bps": 10000,
+      "delta_bps": 10000
+    },
+    {
+      "held_out_workload_family": "clrs_shortest_path",
+      "full_trace_reuse_bps": 0,
+      "subroutine_library_reuse_bps": 10000,
+      "delta_bps": 10000
+    },
+    {
+      "held_out_workload_family": "sudoku_style",
+      "full_trace_reuse_bps": 0,
+      "subroutine_library_reuse_bps": 10000,
+      "delta_bps": 10000
+    }
+  ],
+  "claim_class": "learned_bounded_success",
+  "claim_boundary": "this report compares held-out target-label reuse under full-trace versus reusable-subroutine supervision on the seeded sort, shortest-path, and sudoku-style corpus only; it is an OOD supervision proxy for research planning, not a trained-model exactness claim",
+  "summary": "Bounded subroutine-library ablation now publishes held-out label-reuse deltas across 3 workload families; reusable subroutine targets improve OOD reuse on 3 of 3 held-out families while remaining explicitly a research-only supervision proxy rather than a trained exactness result.",
+  "report_digest": "0de374c5308dc789f5a983883af829807cd548b139dc549f76f52c86b49b9172"
+}

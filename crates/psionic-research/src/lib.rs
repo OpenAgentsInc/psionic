@@ -30,6 +30,7 @@ mod tassadar_program_to_weights_benchmark;
 mod tassadar_symbolic_program_artifact_suite;
 mod tassadar_sudoku_9x9_compiled_executor_bundle;
 mod tassadar_supervision_ablation;
+mod tassadar_subroutine_library_ablation;
 mod tassadar_surface_ablation;
 
 #[cfg(feature = "burn-import")]
@@ -50,6 +51,7 @@ pub use tassadar_program_to_weights_benchmark::*;
 pub use tassadar_symbolic_program_artifact_suite::*;
 pub use tassadar_sudoku_9x9_compiled_executor_bundle::*;
 pub use tassadar_supervision_ablation::*;
+pub use tassadar_subroutine_library_ablation::*;
 pub use tassadar_surface_ablation::*;
 
 /// Human-readable crate ownership summary.

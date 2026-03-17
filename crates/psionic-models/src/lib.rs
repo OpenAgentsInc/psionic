@@ -9,6 +9,7 @@ mod tassadar;
 mod tassadar_executor_attention;
 mod tassadar_executor_transformer;
 mod tassadar_sequence;
+mod tassadar_subroutine;
 mod tassadar_symbolic;
 
 use std::{
@@ -39,6 +40,7 @@ pub use tassadar::*;
 pub use tassadar_executor_attention::*;
 pub use tassadar_executor_transformer::*;
 pub use tassadar_sequence::*;
+pub use tassadar_subroutine::*;
 pub use tassadar_symbolic::*;
 
 /// Human-readable crate ownership summary.

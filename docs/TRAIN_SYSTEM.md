@@ -508,6 +508,16 @@ That now includes one intentionally narrow executor-training answer:
   instruction-pointer `5000` to `7000` bps, stack-delta `2500` to `5833` bps,
   and no claim that branch/memory/workload-specific families are already green
   on the short validation window)
+- the learned subroutine-library follow-on now also exists beside that bounded
+  lane: `psionic-models` now exposes a public reusable subroutine library for
+  sort, CLRS shortest-path, and sudoku-style workloads, `psionic-train` now
+  materializes the same seeded corpus under explicit `full_trace` versus
+  `subroutine_library` supervision modes and computes deterministic
+  held-out-workload OOD target-reuse comparisons, and `psionic-research` now
+  freezes the bounded comparison artifact at
+  `fixtures/tassadar/reports/tassadar_subroutine_library_ablation_report.json`;
+  those committed artifacts keep the claim bounded by proving only supervision
+  target reuse deltas, not trained-model exactness
 - the post-Phase-15 trained-attention follow-on now also exists beside that
   seeded comparison: `psionic-research` now runs a bounded attention-family
   output-head training loop and persists its artifacts under
