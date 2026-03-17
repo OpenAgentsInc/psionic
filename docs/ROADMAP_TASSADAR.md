@@ -394,7 +394,7 @@ artifacts that justify the "log-time retrieval beats full prefix scans" story.
 
 | ID | Status | Work |
 | --- | --- | --- |
-| `PTAS-201` | partial | Widen exact `HullCache` closure beyond today's bounded subset without silently erasing backward-branch or memory-shaped refusal truth. |
+| `PTAS-201` | implemented | The repo now has the widened HullCache closure report at `fixtures/tassadar/reports/tassadar_hull_cache_closure_report.json`, proving direct exact HullCache closure on `MicroWasmKernel`, `BranchHeavyKernel`, `MemoryHeavyKernel`, and bounded `HungarianMatching` from the committed article benchmark artifact. The same report keeps `LongLoopKernel` and `SudokuClass` explicit as fallback-only families, so the widened closure stays honest about control-flow limits rather than muting refusal truth. |
 | `PTAS-202` | partial | Turn current sparse-top-k support into a full article-path comparison family with exactness, speedup, and fallback reporting over the same long-trace workloads. |
 | `PTAS-203` | planned | Add trace-length scaling reports that show linear-scan, hull, sparse, and any successor runtime on identical long-trace workloads. |
 | `PTAS-204` | planned | Add a million-step decode benchmark bundle with exactness, proof, throughput, memory-growth, and CPU-gap receipts. |

@@ -115,6 +115,13 @@ Current posture:
   `fixtures/tassadar/reports/tassadar_workload_capability_matrix.json` that
   records runtime exact vs fallback-only posture per workload family and keeps
   compiled exact, bounded learned, and partial 9x9 learned evidence separate
+- its Phase 8A widened `HullCache` closure report now also exists in
+  `psionic-eval`, with the committed report at
+  `fixtures/tassadar/reports/tassadar_hull_cache_closure_report.json` that
+  freezes the current direct-exact HullCache class on
+  `MicroWasmKernel`, `BranchHeavyKernel`, `MemoryHeavyKernel`, and bounded
+  `HungarianMatching`, while keeping `LongLoopKernel` and `SudokuClass`
+  explicitly fallback-only
 - the first trained-executor follow-on bar now also exists in
   `psionic-runtime` and `psionic-models`: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile plus a real 4x4 backtracking

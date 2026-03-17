@@ -188,6 +188,13 @@ The current scope is:
   keeping runtime exact, runtime fallback-only, compiled exact, bounded
   learned, and partial learned-long-horizon posture separate per workload
   family instead of collapsing them into one green summary
+- landed Phase 8A bar: one widened HullCache closure report now exists in
+  `psionic-eval` at
+  `fixtures/tassadar/reports/tassadar_hull_cache_closure_report.json`,
+  proving direct exact HullCache closure on the current micro, branch-heavy,
+  memory-heavy, and bounded Hungarian families while keeping long-loop and
+  Sudoku search workloads explicit as fallback-only under the current
+  control-flow contract
 - landed trained-executor Phase 1 follow-on bar: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile now exists with a real 4x4
   backtracking Sudoku program representation on the CPU reference lane, while

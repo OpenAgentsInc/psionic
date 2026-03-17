@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{collections::BTreeMap, time::Instant};
 
 use psionic_data::DatasetKey;
 use psionic_environments::{
@@ -72,6 +72,9 @@ pub const TASSADAR_SPARSE_TOP_K_METRIC_ID: &str = "tassadar.sparse_top_k_steps_p
 /// Canonical machine-readable output path for the workload capability matrix report.
 pub const TASSADAR_WORKLOAD_CAPABILITY_MATRIX_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_workload_capability_matrix.json";
+/// Canonical machine-readable output path for the widened HullCache closure report.
+pub const TASSADAR_HULL_CACHE_CLOSURE_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_hull_cache_closure_report.json";
 
 const TASSADAR_OUTPUT_EXACTNESS_METRIC_ID: &str = "tassadar.final_output_exactness_bps";
 const TASSADAR_STEP_EXACTNESS_METRIC_ID: &str = "tassadar.step_exactness_bps";
@@ -89,6 +92,7 @@ const TASSADAR_SPARSE_TOP_K_CPU_GAP_METRIC_ID: &str =
     "tassadar.sparse_top_k_remaining_gap_vs_cpu_reference";
 const TASSADAR_TRACE_STEP_COUNT_METRIC_ID: &str = "tassadar.trace_step_count";
 const TASSADAR_WORKLOAD_CAPABILITY_MATRIX_SCHEMA_VERSION: u16 = 1;
+const TASSADAR_HULL_CACHE_CLOSURE_SCHEMA_VERSION: u16 = 1;
 
 /// One packaged Tassadar Phase 3 suite.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -243,6 +247,42 @@ pub struct TassadarWorkloadCapabilityMatrixReport {
     pub report_digest: String,
 }
 
+/// One workload-family summary in the widened HullCache closure report.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TassadarHullCacheWorkloadSummary {
+    /// Stable workload target for the summary.
+    pub workload_target: TassadarWorkloadTarget,
+    /// Current HullCache posture on the workload family.
+    pub posture: TassadarCapabilityPosture,
+    /// Number of cases that stayed direct on HullCache.
+    pub direct_case_count: usize,
+    /// Number of cases that fell back away from HullCache.
+    pub fallback_case_count: usize,
+    /// Average HullCache speedup over reference-linear execution.
+    pub average_speedup_over_reference_linear: f64,
+    /// Average remaining CPU gap ratio.
+    pub average_remaining_gap_vs_cpu_reference: f64,
+    /// Aggregated typed fallback reasons for the workload family.
+    pub fallback_reason_counts: BTreeMap<String, u64>,
+    /// Stable artifact ref anchoring the summary.
+    pub artifact_ref: String,
+}
+
+/// Machine-readable widened HullCache closure report.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TassadarHullCacheClosureReport {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Direct exact workload families currently inside the widened closure.
+    pub exact_workloads: Vec<TassadarHullCacheWorkloadSummary>,
+    /// Workload families that remain fallback-only outside the direct closure.
+    pub fallback_only_workloads: Vec<TassadarHullCacheWorkloadSummary>,
+    /// Plain-language boundary statement for the current HullCache closure.
+    pub claim_boundary: String,
+    /// Stable digest over the report.
+    pub report_digest: String,
+}
+
 /// Tassadar benchmark build or execution failure.
 #[derive(Debug, Error)]
 pub enum TassadarBenchmarkError {
@@ -289,6 +329,17 @@ pub enum TassadarWorkloadCapabilityMatrixError {
         /// Missing workload target.
         workload_target: TassadarWorkloadTarget,
     },
+}
+
+/// HullCache closure report build or persistence failure.
+#[derive(Debug, Error)]
+pub enum TassadarHullCacheClosureError {
+    /// Underlying filesystem read/write failed.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    /// JSON parsing or serialization failed.
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
 }
 
 /// Builds the packaged Phase 3 suite for the current Tassadar validation corpus.
@@ -2249,6 +2300,128 @@ pub fn write_tassadar_workload_capability_matrix_report(
     Ok(report)
 }
 
+fn build_hull_cache_workload_summary(
+    benchmark_report: &TassadarBenchmarkReport,
+    workload_target: TassadarWorkloadTarget,
+) -> Option<TassadarHullCacheWorkloadSummary> {
+    let cases = benchmark_report
+        .case_reports
+        .iter()
+        .filter(|case| case.workload_target == workload_target)
+        .collect::<Vec<_>>();
+    if cases.is_empty() {
+        return None;
+    }
+    let direct_case_count = cases
+        .iter()
+        .filter(|case| case.selection_state == TassadarExecutorSelectionState::Direct)
+        .count();
+    let fallback_case_count = cases.len().saturating_sub(direct_case_count);
+    let posture = if fallback_case_count == 0 {
+        TassadarCapabilityPosture::Exact
+    } else {
+        TassadarCapabilityPosture::FallbackOnly
+    };
+    let average_speedup_over_reference_linear = round_metric(
+        cases
+            .iter()
+            .map(|case| case.hull_cache_speedup_over_reference_linear)
+            .sum::<f64>()
+            / cases.len() as f64,
+    );
+    let average_remaining_gap_vs_cpu_reference = round_metric(
+        cases
+            .iter()
+            .map(|case| case.hull_cache_remaining_gap_vs_cpu_reference)
+            .sum::<f64>()
+            / cases.len() as f64,
+    );
+    let mut fallback_reason_counts = BTreeMap::new();
+    for case in cases.iter().filter_map(|case| case.selection_reason) {
+        let key = serde_json::to_string(&case)
+            .unwrap_or_else(|_| String::from("\"unknown_selection_reason\""))
+            .trim_matches('"')
+            .to_string();
+        *fallback_reason_counts.entry(key).or_insert(0) += 1;
+    }
+    Some(TassadarHullCacheWorkloadSummary {
+        workload_target,
+        posture,
+        direct_case_count,
+        fallback_case_count,
+        average_speedup_over_reference_linear,
+        average_remaining_gap_vs_cpu_reference,
+        fallback_reason_counts,
+        artifact_ref: String::from(TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF),
+    })
+}
+
+/// Builds the widened HullCache closure report from the committed article-class
+/// benchmark artifact.
+pub fn build_tassadar_hull_cache_closure_report(
+) -> Result<TassadarHullCacheClosureReport, TassadarHullCacheClosureError> {
+    let benchmark_report =
+        read_repo_json::<TassadarBenchmarkReport>(TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF)
+            .map_err(|error| match error {
+                TassadarWorkloadCapabilityMatrixError::Io(error) => {
+                    TassadarHullCacheClosureError::Io(error)
+                }
+                TassadarWorkloadCapabilityMatrixError::Json(error) => {
+                    TassadarHullCacheClosureError::Json(error)
+                }
+                TassadarWorkloadCapabilityMatrixError::MissingWorkloadTarget { .. } => {
+                    unreachable!("benchmark report read cannot surface missing workload-target")
+                }
+            })?;
+    let summaries = [
+        TassadarWorkloadTarget::MicroWasmKernel,
+        TassadarWorkloadTarget::BranchHeavyKernel,
+        TassadarWorkloadTarget::MemoryHeavyKernel,
+        TassadarWorkloadTarget::LongLoopKernel,
+        TassadarWorkloadTarget::SudokuClass,
+        TassadarWorkloadTarget::HungarianMatching,
+    ]
+    .into_iter()
+    .filter_map(|workload_target| {
+        build_hull_cache_workload_summary(&benchmark_report, workload_target)
+    })
+    .collect::<Vec<_>>();
+    let (exact_workloads, fallback_only_workloads): (Vec<_>, Vec<_>) = summaries
+        .into_iter()
+        .partition(|summary| summary.posture == TassadarCapabilityPosture::Exact);
+    let mut report = TassadarHullCacheClosureReport {
+        schema_version: TASSADAR_HULL_CACHE_CLOSURE_SCHEMA_VERSION,
+        exact_workloads,
+        fallback_only_workloads,
+        claim_boundary: String::from(
+            "the widened HullCache closure is now artifact-backed for direct micro, branch-heavy, memory-heavy, and bounded Hungarian workloads, while long-loop and Sudoku search workloads remain explicit fallback-only families under the current control-flow contract",
+        ),
+        report_digest: String::new(),
+    };
+    report.report_digest = stable_serialized_digest(b"tassadar_hull_cache_closure|", &report);
+    Ok(report)
+}
+
+/// Returns the canonical absolute path for the widened HullCache closure report.
+#[must_use]
+pub fn tassadar_hull_cache_closure_report_path() -> std::path::PathBuf {
+    eval_repo_root().join(TASSADAR_HULL_CACHE_CLOSURE_REPORT_REF)
+}
+
+/// Writes the canonical widened HullCache closure report.
+pub fn write_tassadar_hull_cache_closure_report(
+    output_path: impl AsRef<std::path::Path>,
+) -> Result<TassadarHullCacheClosureReport, TassadarHullCacheClosureError> {
+    let output_path = output_path.as_ref();
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let report = build_tassadar_hull_cache_closure_report()?;
+    let bytes = serde_json::to_vec_pretty(&report)?;
+    std::fs::write(output_path, bytes)?;
+    Ok(report)
+}
+
 fn stable_corpus_digest(artifacts: &[TassadarProgramArtifact]) -> String {
     let mut hasher = sha2::Sha256::new();
     hasher.update(b"tassadar_corpus|");
@@ -2263,6 +2436,10 @@ fn stable_corpus_digest(artifacts: &[TassadarProgramArtifact]) -> String {
 
 fn throughput_steps_per_second(steps: u64, elapsed_seconds: f64) -> f64 {
     steps as f64 / elapsed_seconds.max(1e-9)
+}
+
+fn round_metric(value: f64) -> f64 {
+    (value * 1_000_000_000_000.0).round() / 1_000_000_000_000.0
 }
 
 fn benchmark_runner_steps_per_second<F>(
@@ -2775,6 +2952,74 @@ mod tests {
         let bytes = std::fs::read(&report_path)?;
         let persisted: TassadarWorkloadCapabilityMatrixReport = serde_json::from_slice(&bytes)?;
         assert_eq!(persisted, report);
+        std::fs::remove_file(&report_path)?;
+        std::fs::remove_dir(&temp_dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn tassadar_hull_cache_closure_report_tracks_widened_direct_subset(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let report = build_tassadar_hull_cache_closure_report()?;
+        assert!(report.exact_workloads.iter().any(|row| {
+            row.workload_target == TassadarWorkloadTarget::MicroWasmKernel
+                && row.direct_case_count == 1
+                && row.fallback_case_count == 0
+        }));
+        assert!(report.exact_workloads.iter().any(|row| {
+            row.workload_target == TassadarWorkloadTarget::BranchHeavyKernel
+                && row.direct_case_count == 1
+                && row.fallback_case_count == 0
+        }));
+        assert!(report.exact_workloads.iter().any(|row| {
+            row.workload_target == TassadarWorkloadTarget::MemoryHeavyKernel
+                && row.direct_case_count == 1
+                && row.fallback_case_count == 0
+        }));
+        assert!(report.exact_workloads.iter().any(|row| {
+            row.workload_target == TassadarWorkloadTarget::HungarianMatching
+                && row.direct_case_count == 1
+                && row.fallback_case_count == 0
+        }));
+        assert!(report.fallback_only_workloads.iter().any(|row| {
+            row.workload_target == TassadarWorkloadTarget::LongLoopKernel
+                && row.fallback_case_count == 1
+        }));
+        assert!(report.fallback_only_workloads.iter().any(|row| {
+            row.workload_target == TassadarWorkloadTarget::SudokuClass
+                && row.fallback_case_count == 8
+        }));
+        Ok(())
+    }
+
+    #[test]
+    fn tassadar_hull_cache_closure_report_matches_committed_truth(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let report = build_tassadar_hull_cache_closure_report()?;
+        let bytes = std::fs::read(
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join(TASSADAR_HULL_CACHE_CLOSURE_REPORT_REF),
+        )?;
+        let persisted: Value = serde_json::from_slice(&bytes)?;
+        assert_eq!(persisted, serde_json::to_value(&report)?);
+        Ok(())
+    }
+
+    #[test]
+    fn write_tassadar_hull_cache_closure_report_persists_current_truth(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "psionic-tassadar-eval-hull-cache-closure-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&temp_dir)?;
+        let report_path = temp_dir.join("tassadar_hull_cache_closure_report.json");
+        let report = write_tassadar_hull_cache_closure_report(&report_path)?;
+        let bytes = std::fs::read(&report_path)?;
+        let persisted: Value = serde_json::from_slice(&bytes)?;
+        assert_eq!(persisted, serde_json::to_value(&report)?);
         std::fs::remove_file(&report_path)?;
         std::fs::remove_dir(&temp_dir)?;
         Ok(())

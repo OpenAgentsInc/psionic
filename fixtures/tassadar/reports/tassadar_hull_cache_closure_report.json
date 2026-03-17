@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "exact_workloads": [
+    {
+      "workload_target": "micro_wasm_kernel",
+      "posture": "exact",
+      "direct_case_count": 1,
+      "fallback_case_count": 0,
+      "average_speedup_over_reference_linear": 8.110981874502,
+      "average_remaining_gap_vs_cpu_reference": 1.12947713273,
+      "fallback_reason_counts": {},
+      "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+    },
+    {
+      "workload_target": "branch_heavy_kernel",
+      "posture": "exact",
+      "direct_case_count": 1,
+      "fallback_case_count": 0,
+      "average_speedup_over_reference_linear": 10.833589662008,
+      "average_remaining_gap_vs_cpu_reference": 1.178334271477,
+      "fallback_reason_counts": {},
+      "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+    },
+    {
+      "workload_target": "memory_heavy_kernel",
+      "posture": "exact",
+      "direct_case_count": 1,
+      "fallback_case_count": 0,
+      "average_speedup_over_reference_linear": 3.688551829069,
+      "average_remaining_gap_vs_cpu_reference": 1.971903932983,
+      "fallback_reason_counts": {},
+      "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+    },
+    {
+      "workload_target": "hungarian_matching",
+      "posture": "exact",
+      "direct_case_count": 1,
+      "fallback_case_count": 0,
+      "average_speedup_over_reference_linear": 3.762238021524,
+      "average_remaining_gap_vs_cpu_reference": 1.077765914271,
+      "fallback_reason_counts": {},
+      "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+    }
+  ],
+  "fallback_only_workloads": [
+    {
+      "workload_target": "long_loop_kernel",
+      "posture": "fallback_only",
+      "direct_case_count": 0,
+      "fallback_case_count": 1,
+      "average_speedup_over_reference_linear": 0.998377895099,
+      "average_remaining_gap_vs_cpu_reference": 3611.08612815023,
+      "fallback_reason_counts": {
+        "hull_cache_control_flow_unsupported": 1
+      },
+      "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+    },
+    {
+      "workload_target": "sudoku_class",
+      "posture": "fallback_only",
+      "direct_case_count": 0,
+      "fallback_case_count": 8,
+      "average_speedup_over_reference_linear": 1.008306334533,
+      "average_remaining_gap_vs_cpu_reference": 150.478000975381,
+      "fallback_reason_counts": {
+        "hull_cache_control_flow_unsupported": 8
+      },
+      "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+    }
+  ],
+  "claim_boundary": "the widened HullCache closure is now artifact-backed for direct micro, branch-heavy, memory-heavy, and bounded Hungarian workloads, while long-loop and Sudoku search workloads remain explicit fallback-only families under the current control-flow contract",
+  "report_digest": "60aa09acdae0dafd208004fde174fb7139f6372fe85ac75c8563629386340a7c"
+}
