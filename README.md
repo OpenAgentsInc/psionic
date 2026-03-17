@@ -575,6 +575,10 @@ Current posture:
 - `psionic-mlx-workflows`: bounded MLX-style workflow package for synthetic
   datasets, reward/judge helper plans, adapter merge/export, and local publish
   snapshots above the shared data/train substrate.
+- `psionic-mlx-bench`: bounded MLX-style benchmark package over
+  `psionic-eval`, `psionic-mlx-lm`, and `psionic-mlx-vlm`, with suite
+  manifests, local text and served provider adapters, multimodal projection,
+  and repeated benchmark receipts.
 
 ### Backend And Platform Lanes
 
@@ -753,6 +757,10 @@ Implemented now:
   `psionic-data`, `psionic-mlx-recipes`, and `psionic-train`, with synthetic
   SFT/preference dataset bundles, reward/judge helper plans, adapter merge
   artifacts, and a local Hugging Face-style publish snapshot.
+- `psionic-mlx-bench` bounded MLX-style benchmark package over
+  `psionic-eval`, `psionic-mlx-lm`, and `psionic-mlx-vlm`, with
+  machine-readable suite manifests, local text and served provider adapters,
+  multimodal prompt projection, and repeated benchmark receipts.
 - CPU baseline plus a first Metal-backed `psionic.embeddings` lane.
 - generic CPU GGUF decoder execution for GPT-OSS plus representative Llama,
   Qwen, and Mistral families through one Psionic-owned runtime surface.
@@ -1043,6 +1051,10 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
   canonical bounded workflow package spec for `psionic-mlx-workflows`,
   including synthetic dataset bundles, reward/judge helper plans, adapter
   merge/export, and the local publish snapshot boundary.
+- **[docs/MLX_BENCH_PACKAGE.md](docs/MLX_BENCH_PACKAGE.md)** —
+  canonical bounded benchmark-package spec for `psionic-mlx-bench`,
+  including suite manifests, text/served provider adapters, multimodal
+  projection, and repeated benchmark receipts above `psionic-eval`.
 - **[docs/INFERENCE_ENGINE.md](docs/INFERENCE_ENGINE.md)** — canonical
   inference-engine completion criteria and current boundaries.
 - **[docs/TRAIN_SYSTEM.md](docs/TRAIN_SYSTEM.md)** — canonical training

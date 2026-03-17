@@ -591,7 +591,7 @@ ecosystem inside Psionic rather than only as a low-level framework port.
 | `PMLX-705` | done (2026-03-17) | `Psionic MLX: add an audio package for TTS, speech-to-speech, codecs, and speech model IO` | `psionic-mlx-audio` now provides a bounded MLX-style audio package with builtin `kokoro`/`xtts`/`encodec`-class family metadata, quantized-checkpoint descriptors, WAV IO, codec normalization helpers, CPU-reference text-to-speech and speech-to-speech request contracts, explicit stream chunks, and one server-facing speech request/response surface without claiming a production neural speech runtime. |
 | `PMLX-706` | done (2026-03-17) | `Psionic MLX: add a training-recipe layer for LoRA, DoRA, QLoRA, and preference or RL methods above psionic-train` | `psionic-mlx-recipes` now provides a bounded MLX-style training-recipe package and CLI above `psionic-train`, including machine-readable method inventory, explicit stage mapping for SFT/preference/RL families, adapter-plan projection into the open adapter lane, rollout-validator posture for RL-style methods, and recipe-plan emission without creating a second trainer architecture. |
 | `PMLX-707` | done (2026-03-17) | `Psionic MLX: add synthetic-data, judge or reward-model, adapter-merge, and publish workflows` | `psionic-mlx-workflows` now provides a bounded workflow package above `psionic-data`, `psionic-mlx-recipes`, `psionic-train`, and portable model IO, including deterministic synthetic SFT/preference dataset bundles, reward/judge helper plans, adapter merge/export artifacts, a local Hugging Face-style publish snapshot, and explicit GGUF refusal when the current portable model-IO boundary cannot honestly emit GGUF. |
-| `PMLX-708` | planned | `Psionic MLX: add an openbench-class evaluation and benchmark package for local MLX-class providers` | Build the benchmark and eval package plus provider adapter layer that makes local MLX-text, multimodal, and served lanes easy to score across standardized tasks and local or private eval suites while reusing `psionic-eval` and receipt truth. |
+| `PMLX-708` | done (2026-03-17) | `Psionic MLX: add an openbench-class evaluation and benchmark package for local MLX-class providers` | `psionic-mlx-bench` now provides a bounded benchmark package above `psionic-eval`, `psionic-mlx-lm`, and `psionic-mlx-vlm`, including suite manifests, repeated benchmark receipts, local text and served provider adapters, multimodal prompt projection, and structured/text scoring without introducing a second eval runtime. |
 | `PMLX-709` | planned | `Psionic MLX: publish ecosystem CLIs, examples, and migration guides without leaking product UX into app code` | Ship the package-facing CLI and example layer for text, multimodal, audio, serving, training recipes, and evaluation so the MLX lane is usable as an ecosystem in this repo, while keeping Gradio demos, desktop pickers, and product UX out of `crates/psionic-*`. |
 
 ## Current Execution Order
@@ -675,9 +675,9 @@ track in parallel.
 - `PMLX-703` done 2026-03-17
 - `PMLX-704` done 2026-03-17
 - `PMLX-705` done 2026-03-17
-- `PMLX-706`
-- `PMLX-707`
-- `PMLX-708`
+- `PMLX-706` done 2026-03-17
+- `PMLX-707` done 2026-03-17
+- `PMLX-708` done 2026-03-17
 - `PMLX-709`
 
 ### Phase 9: only then add bounded compatibility shells, bindings, and migration facades

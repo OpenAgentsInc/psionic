@@ -3594,6 +3594,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "psionic-mlx-bench"
+version = "0.1.1"
+dependencies = [
+ "psionic-data",
+ "psionic-environments",
+ "psionic-eval",
+ "psionic-mlx-lm",
+ "psionic-mlx-vlm",
+ "psionic-models",
+ "psionic-serve",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "psionic-mlx-capi"
 version = "0.1.1"
 dependencies = [

@@ -1875,7 +1875,7 @@ pub fn builtin_mlx_compatibility_matrix_report() -> MlxCompatibilityMatrixReport
             surface_id: String::from("mlx_package_ecosystem"),
             matrix_status: MlxCompatibilityMatrixStatus::Convertible,
             summary: String::from(
-                "Bounded local MLX-style text, catalog, text-serving, multimodal, audio, recipe, and workflow packages now exist in `psionic-mlx-lm`, `psionic-mlx-catalog`, `psionic-mlx-serve`, `psionic-mlx-vlm`, `psionic-mlx-audio`, `psionic-mlx-recipes`, and `psionic-mlx-workflows`, but benchmark packages and the full ecosystem examples/guides layer remain later work.",
+                "Bounded local MLX-style text, catalog, text-serving, multimodal, audio, recipe, workflow, and benchmark packages now exist in `psionic-mlx-lm`, `psionic-mlx-catalog`, `psionic-mlx-serve`, `psionic-mlx-vlm`, `psionic-mlx-audio`, `psionic-mlx-recipes`, `psionic-mlx-workflows`, and `psionic-mlx-bench`, but the full ecosystem examples/guides layer remains later work.",
             ),
             evidence_refs: vec![
                 String::from("crates/psionic-mlx-lm"),
@@ -1885,6 +1885,7 @@ pub fn builtin_mlx_compatibility_matrix_report() -> MlxCompatibilityMatrixReport
                 String::from("crates/psionic-mlx-audio"),
                 String::from("crates/psionic-mlx-recipes"),
                 String::from("crates/psionic-mlx-workflows"),
+                String::from("crates/psionic-mlx-bench"),
                 String::from("docs/MLX_LM_PACKAGE.md"),
                 String::from("docs/MLX_MODEL_CATALOG.md"),
                 String::from("docs/MLX_TEXT_SERVE.md"),
@@ -1892,6 +1893,7 @@ pub fn builtin_mlx_compatibility_matrix_report() -> MlxCompatibilityMatrixReport
                 String::from("docs/MLX_AUDIO_PACKAGE.md"),
                 String::from("docs/MLX_RECIPE_PACKAGE.md"),
                 String::from("docs/MLX_WORKFLOW_PACKAGE.md"),
+                String::from("docs/MLX_BENCH_PACKAGE.md"),
                 String::from("cargo test -p psionic-mlx-lm --lib --tests"),
                 String::from("cargo test -p psionic-mlx-catalog --lib --tests"),
                 String::from("cargo test -p psionic-mlx-serve --lib --tests"),
@@ -1899,13 +1901,11 @@ pub fn builtin_mlx_compatibility_matrix_report() -> MlxCompatibilityMatrixReport
                 String::from("cargo test -p psionic-mlx-audio --lib --tests"),
                 String::from("cargo test -p psionic-mlx-recipes --lib --tests"),
                 String::from("cargo test -p psionic-mlx-workflows --lib --tests"),
+                String::from("cargo test -p psionic-mlx-bench --lib --tests"),
             ],
-            blocking_issue_refs: vec![
-                String::from("PMLX-708 (#3881)"),
-                String::from("PMLX-709 (#3882)"),
-            ],
+            blocking_issue_refs: vec![String::from("PMLX-709 (#3882)")],
             boundary_note: String::from(
-                "The first local text, catalog, text-serving, multimodal, audio, recipe, and workflow packages are real, but they do not imply benchmark-package completion or the full examples/guides layer.",
+                "The first local text, catalog, text-serving, multimodal, audio, recipe, workflow, and benchmark packages are real, but they do not imply the full examples/guides layer.",
             ),
         },
     ])
@@ -2612,6 +2612,7 @@ mod tests {
         assert!(ecosystem.summary.contains("psionic-mlx-catalog"));
         assert!(ecosystem.summary.contains("psionic-mlx-recipes"));
         assert!(ecosystem.summary.contains("psionic-mlx-workflows"));
+        assert!(ecosystem.summary.contains("psionic-mlx-bench"));
         assert!(
             ecosystem
                 .blocking_issue_refs
@@ -2629,6 +2630,12 @@ mod tests {
                 .blocking_issue_refs
                 .iter()
                 .all(|issue| !issue.contains("PMLX-707"))
+        );
+        assert!(
+            ecosystem
+                .blocking_issue_refs
+                .iter()
+                .all(|issue| !issue.contains("PMLX-708"))
         );
         assert!(
             ecosystem

@@ -64,6 +64,16 @@ The Apple adapter extension now proves a second bounded workload:
    Apple bridge, attaches it to a session, and records machine-legible smoke
    metrics
 
+On 2026-03-17, `PMLX-708` added a third bounded package layer on top of the
+same runtime:
+
+1. define MLX-facing benchmark suites above `BenchmarkPackage`
+2. reuse local text and served provider adapters instead of a second scoring
+   runtime
+3. project multimodal requests through `psionic-mlx-vlm` when needed
+4. emit repeated benchmark receipts that stay tied to `psionic-eval`
+   contracts
+
 ## Pass Criteria
 
 The eval layer is green only if all of the following are true:
