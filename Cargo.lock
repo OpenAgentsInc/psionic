@@ -3583,6 +3583,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "psionic-mlx-compat"
+version = "0.1.1"
+dependencies = [
+ "psionic-array",
+ "psionic-compat",
+ "psionic-compiler",
+ "psionic-core",
+ "psionic-distributed",
+ "psionic-function-io",
+ "psionic-ir",
+ "psionic-nn",
+]
+
+[[package]]
 name = "psionic-models"
 version = "0.1.1"
 dependencies = [

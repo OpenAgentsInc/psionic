@@ -1,8 +1,9 @@
 # Psionic MLX Compatibility Scope
 
-> Status: canonical `PMLX-002` / `#3830` reference record, updated 2026-03-16
+> Status: canonical `PMLX-002` / `#3830` reference record, updated 2026-03-17
 > after freezing the initial upstream MLX version window and claim-language
-> contract in `crates/psionic-compat/src/lib.rs`.
+> contract in `crates/psionic-compat/src/lib.rs` and landing the first bounded
+> optional naming facade in `crates/psionic-mlx-compat`.
 
 This document records the current honest claim boundary for Psionic's MLX lane.
 
@@ -57,6 +58,12 @@ claim window beyond the bounded `v0.31.x` release family.
   frozen upstream window
 - typed refusal or lossy-conversion truth instead of implied full upstream
   closure
+
+The first bounded example of that later shell now exists in
+`crates/psionic-mlx-compat`: it is a thin naming and module-layout facade over
+supported Psionic-native array, transform, `nn`, optimizer, `.mlxfn`, and
+distributed surfaces, not a second execution path or a claim of MLX-identical
+signatures.
 
 ## Forbidden Shortcuts
 

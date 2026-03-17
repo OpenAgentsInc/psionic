@@ -1829,20 +1829,24 @@ pub fn builtin_mlx_compatibility_matrix_report() -> MlxCompatibilityMatrixReport
         },
         MlxCompatibilityMatrixEntry {
             surface_id: String::from("mlx_naming_facade_and_bindings"),
-            matrix_status: MlxCompatibilityMatrixStatus::Unsupported,
+            matrix_status: MlxCompatibilityMatrixStatus::Convertible,
             summary: String::from(
-                "There is no MLX naming facade or Python/C/Swift binding layer in Psionic today.",
+                "The optional psionic-mlx-compat crate now exposes a bounded MLX-like module layout and naming facade over supported Psionic-native core, transform, nn, optimizer, io, and distributed surfaces, but Python/C/Swift bindings and broader migration guidance remain later work.",
             ),
-            evidence_refs: vec![String::from(
-                "ROADMAP_MLX Epic 6 late-surface compatibility work remains open",
-            )],
+            evidence_refs: vec![
+                String::from("psionic-mlx-compat::core::Context"),
+                String::from("psionic-mlx-compat::nn"),
+                String::from("psionic-mlx-compat::optimizers"),
+                String::from("psionic-mlx-compat::transforms"),
+                String::from("psionic-mlx-compat::io"),
+                String::from("psionic-mlx-compat::distributed"),
+            ],
             blocking_issue_refs: vec![
-                String::from("PMLX-606 (#3871)"),
                 String::from("PMLX-607 (#3872)"),
                 String::from("PMLX-608 (#3873)"),
             ],
             boundary_note: String::from(
-                "Adoption-facing names and bindings are explicitly late work and must not be implied early.",
+                "This facade is a thin name and module shim over existing Psionic-native surfaces; it does not imply MLX-identical signatures, missing native semantics, or any Python, C, or Swift binding layer.",
             ),
         },
         MlxCompatibilityMatrixEntry {
@@ -2540,6 +2544,27 @@ mod tests {
             nn.blocking_issue_refs
                 .iter()
                 .all(|issue| !issue.contains("PMLX-306"))
+        );
+
+        let naming = report
+            .surfaces
+            .iter()
+            .find(|surface| surface.surface_id == "mlx_naming_facade_and_bindings")
+            .expect("missing naming facade row");
+        assert_eq!(
+            naming.matrix_status,
+            MlxCompatibilityMatrixStatus::Convertible
+        );
+        assert!(
+            naming
+                .blocking_issue_refs
+                .iter()
+                .all(|issue| !issue.contains("PMLX-606"))
+        );
+        assert!(
+            naming
+                .summary
+                .contains("psionic-mlx-compat")
         );
 
         let distributed = report

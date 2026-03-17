@@ -1,0 +1,24 @@
+[package]
+name = "psionic-mlx-compat"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Optional bounded MLX naming and module-layout facade above Psionic-native surfaces"
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+psionic-array = { path = "../psionic-array" }
+psionic-compat = { path = "../psionic-compat" }
+psionic-compiler = { path = "../psionic-compiler" }
+psionic-core = { path = "../psionic-core" }
+psionic-distributed = { path = "../psionic-distributed" }
+psionic-function-io = { path = "../psionic-function-io" }
+psionic-ir = { path = "../psionic-ir" }
+psionic-nn = { path = "../psionic-nn" }
