@@ -64,12 +64,19 @@
 - If the checkout already contains unrelated changes, do not run broad
   formatters, artifact-generating examples, or repo-wide update commands in
   that checkout.
-- When the current checkout is dirty or shared with other in-flight work, use a
-  fresh `git worktree` from current `origin/main` for the task instead of
-  mixing changes together.
+- Commits and pushes land on `main` unless the user explicitly instructs
+  otherwise.
+- Prefer working directly in the main checkout and cleaning up task-owned dirt
+  there rather than creating extra worktrees or issue branches.
 - Never clean a dirty tree by resetting, discarding, or reverting changes you
-  did not make. Isolate your work instead.
-- Before commit or push, the worktree used for the change must contain only the
+  did not make.
+- If unrelated user-owned dirt in the main checkout makes safe progress
+  impossible, use a temporary `git worktree` or temporary branch only as a last
+  resort.
+- Temporary worktrees and temporary branches are not backlog. Delete them after
+  the change lands on `main`, and do not leave abandoned issue branches or old
+  worktrees behind.
+- Before commit or push, the checkout used for the change must contain only the
   intended task files.
 
 ## Formatting Discipline
@@ -92,7 +99,9 @@
   artifact-generating commands.
 - Before running one of those commands, assume it may rewrite more files than
   the immediate code edit.
-- Prefer running artifact-generating commands in an isolated clean worktree.
+- Prefer running artifact-generating commands from a clean main checkout.
+- If a temporary worktree is truly necessary for an artifact-generating
+  command, remove it after the change lands on `main`.
 - If generated artifacts are part of the task, review them and commit them in
   the same change as the code or doc update that requires them.
 - If generated artifacts are not part of the task, do not leave them behind as
@@ -102,8 +111,10 @@
 
 - Before finalizing a task, run `git status --short --branch`.
 - Do not commit or push from a checkout that still contains unrelated dirt.
-- If the main checkout is dirty but the task still needs to land, finish the
-  work from a clean worktree and leave the unrelated checkout untouched.
+- Push to `origin/main` unless the user explicitly asks for another branch or
+  workflow.
+- If temporary isolation was required, land the change on `main` and then
+  remove the temporary worktree or branch before considering the task done.
 
 ## Extraction Notes
 
