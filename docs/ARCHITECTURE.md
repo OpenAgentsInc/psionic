@@ -575,8 +575,10 @@ The current scope is:
   `psionic-models` plus larger-2D-head family research outputs in
   `psionic-research`, with exact program-artifact binding, explicit
   runtime-contract truth, compile-time proof/runtime-manifest lineage,
-  deterministic head-geometry and parameter-count declarations, and first-class
-  compiled-weight suite artifacts for `program_compiled` candidates
+  deterministic head-geometry and parameter-count declarations, first-class
+  compiled-weight suite artifacts for `program_compiled` candidates, and the
+  machine-readable direct-vs-compiled comparison report at
+  `fixtures/tassadar/reports/tassadar_program_to_weights_benchmark_suite.json`
 - landed Phase 9D bar: typed learned-plus-compiled and learned-circuit
   research in `psionic-research`, with explicit research-line,
   instruction-set, execution-proxy, claim-boundary, and proof-expectation

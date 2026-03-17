@@ -531,7 +531,10 @@ Current posture:
 - its Phase 9C compiled-weight and larger-2D exploration now exists in
   `psionic-models` and `psionic-research`, with program-specialized compiled
   executor artifacts carrying exact program binding, runtime-contract truth,
-  and compile-time proof/runtime-manifest lineage, plus explicit 2D-head family
+  and compile-time proof/runtime-manifest lineage, plus the shared
+  `fixtures/tassadar/reports/tassadar_program_to_weights_benchmark_suite.json`
+  report that compares direct reference-linear execution against compiled-weight
+  deployment on the same widened Wasm workloads, and explicit 2D-head family
   geometry and compiled-weight suite outputs in research runs
 - its Phase 9D learned-plus-compiled and learned-circuit research program now
   exists in `psionic-research`, with a typed research-only family that
