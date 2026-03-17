@@ -63,8 +63,9 @@ The first bounded example of that later shell now exists in
 `crates/psionic-mlx-compat`, and the first optional binding layer now exists in
 `crates/psionic-mlx-capi`: together they provide a thin naming/module-layout
 facade plus one C ABI over supported Psionic-native array, transform, `nn`,
-optimizer, `.mlxfn`, and distributed surfaces, not a second execution path or
-a claim of MLX-identical signatures.
+optimizer, `.mlxfn`, and distributed surfaces, with runnable examples and one
+repo-local migration guide in `docs/MLX_TO_PSIONIC_MIGRATION_GUIDE.md`, not a
+second execution path or a claim of MLX-identical signatures.
 
 ## Forbidden Shortcuts
 

@@ -559,7 +559,7 @@ MLX claims honest.
 | `PMLX-605` | done (2026-03-17) | `Psionic MLX: port the upstream MLX C++ and Python test categories into the parity harness` | `psionic-compat` now upgrades the imported `array_core`, `ops_numeric`, and `device_eval_memory` families from tracked placeholders to seeded parity-harness passes, pointing at the bounded `psionic-array` CPU-reference coverage report, availability-aware Metal/CUDA hooks, and repo-local runner scripts so the MLX test-family evidence base is runnable instead of implied. |
 | `PMLX-606` | done (2026-03-17) | `Psionic MLX: add an optional MLX naming facade and module-layout compatibility crate` | `psionic-mlx-compat` now exposes an optional bounded MLX-like module layout over the supported Psionic-native array, transform, `nn`, optimizer, `.mlxfn`, distributed, and report surfaces, including a thin `core::Context` wrapper and explicit compatibility-report access, while still keeping bindings and broader migration guidance for `PMLX-607` and `PMLX-608`. |
 | `PMLX-607` | done (2026-03-17) | `Psionic MLX: add optional Python, C, or Swift binding layers above the Rust-native core` | `psionic-mlx-capi` now exposes a bounded C ABI over `psionic-mlx-compat`, including owned JSON exports for the compatibility reports and one JSON-driven dense-array eval bridge over the native core facade, so later Python or Swift consumers can bind through a real optional surface without pushing any Python-first architecture into the core. |
-| `PMLX-608` | planned | `Psionic MLX: publish an MLX-to-Psionic migration guide, example suite, and bounded compatibility matrix` | Finish the adoption story with examples, migration steps, and explicit supported, convertible, and unsupported tables. |
+| `PMLX-608` | done (2026-03-17) | `Psionic MLX: publish an MLX-to-Psionic migration guide, example suite, and bounded compatibility matrix` | The repo now ships `MLX_TO_PSIONIC_MIGRATION_GUIDE.md`, runnable `psionic-mlx-compat` and `psionic-mlx-capi` migration examples, and updated compatibility-report truth so the optional naming facade and binding shell have explicit adoption guidance instead of a dangling "later work" note. |
 
 ## Epic 7: Ecosystem Packages And Service Surfaces
 
@@ -682,7 +682,7 @@ track in parallel.
 
 - `PMLX-606` done 2026-03-17
 - `PMLX-607` done 2026-03-17
-- `PMLX-608`
+- `PMLX-608` done 2026-03-17
 
 ## Roadmap Rules
 

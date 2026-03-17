@@ -81,18 +81,19 @@ enum BindingResponse {
     },
 }
 
-fn build_context(
-    backend: BindingBackend,
-    seed: Option<u64>,
-) -> Result<core::Context, String> {
+fn build_context(backend: BindingBackend, seed: Option<u64>) -> Result<core::Context, String> {
     match (backend, seed) {
-        (BindingBackend::Cpu, Some(seed)) => core::cpu_seeded(seed).map_err(|error| error.to_string()),
+        (BindingBackend::Cpu, Some(seed)) => {
+            core::cpu_seeded(seed).map_err(|error| error.to_string())
+        }
         (BindingBackend::Cpu, None) => Ok(core::cpu()),
         (BindingBackend::Metal, Some(seed)) => {
             core::metal_seeded(seed).map_err(|error| error.to_string())
         }
         (BindingBackend::Metal, None) => core::metal().map_err(|error| error.to_string()),
-        (BindingBackend::Cuda, Some(seed)) => core::cuda_seeded(seed).map_err(|error| error.to_string()),
+        (BindingBackend::Cuda, Some(seed)) => {
+            core::cuda_seeded(seed).map_err(|error| error.to_string())
+        }
         (BindingBackend::Cuda, None) => core::cuda().map_err(|error| error.to_string()),
     }
 }
@@ -263,6 +264,46 @@ fn parse_request_json(request_json: *const c_char) -> Result<EvalRequest, Bindin
     })
 }
 
+fn to_owned_json<T: Serialize>(value: &T) -> String {
+    serde_json::to_string(value).unwrap_or_else(|error| {
+        serde_json::to_string(&BindingResponse::Error {
+            message: format!("failed to serialize bounded JSON payload: {error}"),
+        })
+        .unwrap_or_else(|_| {
+            String::from(
+                "{\"status\":\"error\",\"message\":\"failed to serialize bounded JSON payload\"}",
+            )
+        })
+    })
+}
+
+/// Returns one compatibility-scope report as owned JSON for Rust callers that
+/// want the same bounded payload as the C ABI without raw-pointer handling.
+#[must_use]
+pub fn compatibility_scope_json_string() -> String {
+    to_owned_json(&reports::builtin_mlx_compatibility_scope_report())
+}
+
+/// Returns one compatibility-matrix report as owned JSON for Rust callers that
+/// want the same bounded payload as the C ABI without raw-pointer handling.
+#[must_use]
+pub fn compatibility_matrix_json_string() -> String {
+    to_owned_json(&reports::builtin_mlx_compatibility_matrix_report())
+}
+
+/// Evaluates one bounded dense-array request encoded as JSON and returns the
+/// same owned JSON payload as the C ABI.
+#[must_use]
+pub fn eval_json_string(request_json: &str) -> String {
+    let response = match serde_json::from_str::<EvalRequest>(request_json) {
+        Ok(request) => evaluate_request(request),
+        Err(error) => BindingResponse::Error {
+            message: format!("eval request was not valid JSON: {error}"),
+        },
+    };
+    to_owned_json(&response)
+}
+
 /// Returns one compatibility-scope report as owned JSON.
 #[unsafe(no_mangle)]
 pub extern "C" fn psionic_mlx_capi_compatibility_scope_json() -> *mut c_char {
@@ -297,7 +338,10 @@ pub extern "C" fn psionic_mlx_capi_string_free(value: *mut c_char) {
 
 #[cfg(test)]
 mod tests {
-    use super::{BindingResponse, BindingValues, evaluate_request};
+    use super::{
+        BindingResponse, BindingValues, compatibility_matrix_json_string, eval_json_string,
+        evaluate_request,
+    };
     use std::ffi::CString;
 
     #[test]
@@ -371,6 +415,26 @@ mod tests {
         assert!(!response_ptr.is_null());
         let response = unsafe { CString::from_raw(response_ptr) };
         let response = response.into_string()?;
+        let response: BindingResponse = serde_json::from_str(&response)?;
+        assert!(matches!(response, BindingResponse::Ok { .. }));
+        Ok(())
+    }
+
+    #[test]
+    fn safe_rust_wrappers_match_bounded_json_contract() -> Result<(), Box<dyn std::error::Error>> {
+        let matrix = compatibility_matrix_json_string();
+        let matrix: serde_json::Value = serde_json::from_str(&matrix)?;
+        assert_eq!(matrix["schema_version"], 1);
+
+        let response = eval_json_string(
+            r#"{
+                "backend": "cpu",
+                "steps": [
+                    {"id": "values", "op": "ones", "shape": [2, 2]}
+                ],
+                "output": "values"
+            }"#,
+        );
         let response: BindingResponse = serde_json::from_str(&response)?;
         assert!(matches!(response, BindingResponse::Ok { .. }));
         Ok(())

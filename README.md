@@ -914,6 +914,9 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
 - **[docs/MLX_COMPATIBILITY_MATRIX.md](docs/MLX_COMPATIBILITY_MATRIX.md)** —
   canonical supported/convertible/unsupported adoption matrix for the Psionic
   MLX roadmap.
+- **[docs/MLX_TO_PSIONIC_MIGRATION_GUIDE.md](docs/MLX_TO_PSIONIC_MIGRATION_GUIDE.md)** —
+  bounded MLX adoption guide covering runnable examples, native drop-down
+  points, and current supported versus convertible versus unsupported posture.
 - **[docs/INFERENCE_ENGINE.md](docs/INFERENCE_ENGINE.md)** — canonical
   inference-engine completion criteria and current boundaries.
 - **[docs/TRAIN_SYSTEM.md](docs/TRAIN_SYSTEM.md)** — canonical training

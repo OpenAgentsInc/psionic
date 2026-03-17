@@ -228,8 +228,7 @@ impl MlxAcceptanceMatrixReport {
         categories: Vec<MlxAcceptanceCategory>,
         selected_categories: Vec<String>,
     ) -> Self {
-        let schema_path =
-            String::from("docs/mlx_acceptance_matrix_report.schema.json");
+        let schema_path = String::from("docs/mlx_acceptance_matrix_report.schema.json");
         let runner = String::from("scripts/release/check-psionic-mlx-acceptance-matrix.sh");
         let report_posture = MlxAcceptanceMatrixPosture::TrackingOnly;
         let report_digest = stable_mlx_acceptance_matrix_report_digest(
@@ -383,8 +382,7 @@ impl MlxCompatibilityMatrixReport {
         surfaces: Vec<MlxCompatibilityMatrixEntry>,
         selected_surfaces: Vec<String>,
     ) -> Self {
-        let schema_path =
-            String::from("docs/mlx_compatibility_matrix_report.schema.json");
+        let schema_path = String::from("docs/mlx_compatibility_matrix_report.schema.json");
         let runner = String::from("scripts/release/check-psionic-mlx-compatibility-matrix.sh");
         let oracle_window = String::from("ml-explore/mlx:v0.31.0..v0.31.1:matrix_v0");
         let report_digest = stable_mlx_compatibility_matrix_report_digest(
@@ -1165,13 +1163,12 @@ pub fn builtin_mlx_acceptance_matrix_report() -> MlxAcceptanceMatrixReport {
                 String::from("PMLX-605 (#3870)"),
                 String::from("PMLX-606 (#3871)"),
                 String::from("PMLX-607 (#3872)"),
-                String::from("PMLX-608 (#3873)"),
             ],
             green_definition: String::from(
                 "CPU reference, Metal, and CUDA backends honestly cover the declared MLX surface, the parity harness carries the upstream MLX test families, and any compatibility or binding shells stay explicitly bounded.",
             ),
             current_repo_truth: String::from(
-                "Psionic has real backend-specific substrate, the first MLX version window contract, one machine-readable CPU-reference coverage report in psionic-array over imported array_core, ops_numeric, and device_eval_memory families, seeded parity-harness passes over those same imported families in psionic-compat, bounded public Metal and CUDA array-execution slices through ArrayContext::metal and ArrayContext::cuda for dense constant/add/matmul graphs on the selected runtime device while keeping accelerator numerics explicitly dense-f32, and a bounded advanced operator-family evidence layer in psionic-ir over reusable linalg gram-matrix, signal Fourier-projection, and rotary-attention residual programs with explicit refusal posture for still-missing distribution and special-function families; distributed backend-family capability mapping remains explicit in psionic-distributed, and broader MLX-class backend closure or compatibility-shell boundaries still do not exist above that substrate.",
+                "Psionic has real backend-specific substrate, the first MLX version window contract, one machine-readable CPU-reference coverage report in psionic-array over imported array_core, ops_numeric, and device_eval_memory families, seeded parity-harness passes over those same imported families in psionic-compat, bounded public Metal and CUDA array-execution slices through ArrayContext::metal and ArrayContext::cuda for dense constant/add/matmul graphs on the selected runtime device while keeping accelerator numerics explicitly dense-f32, and a bounded advanced operator-family evidence layer in psionic-ir over reusable linalg gram-matrix, signal Fourier-projection, and rotary-attention residual programs with explicit refusal posture for still-missing distribution and special-function families; the optional naming facade, C ABI, runnable examples, and migration guide now make the compatibility-shell boundary explicit too, while distributed backend-family capability mapping remains explicit in psionic-distributed.",
             ),
             boundary_note: String::from(
                 "Do not claim bounded MLX backend or compatibility closure from one backend lane, one demo, or one local checkout until the declared categories have parity evidence and explicit shell boundaries.",
@@ -1831,7 +1828,7 @@ pub fn builtin_mlx_compatibility_matrix_report() -> MlxCompatibilityMatrixReport
             surface_id: String::from("mlx_naming_facade_and_bindings"),
             matrix_status: MlxCompatibilityMatrixStatus::Supported,
             summary: String::from(
-                "The optional psionic-mlx-compat and psionic-mlx-capi crates now expose a bounded MLX-like naming facade plus one C ABI binding layer over supported Psionic-native core, transform, nn, optimizer, io, distributed, and compatibility-report surfaces, while broader migration guidance remains later work.",
+                "The optional psionic-mlx-compat and psionic-mlx-capi crates now expose a bounded MLX-like naming facade plus one C ABI binding layer over supported Psionic-native core, transform, nn, optimizer, io, distributed, and compatibility-report surfaces, and the repo now ships a migration guide plus runnable adoption examples for that bounded shell.",
             ),
             evidence_refs: vec![
                 String::from("psionic-mlx-compat::core::Context"),
@@ -1843,8 +1840,13 @@ pub fn builtin_mlx_compatibility_matrix_report() -> MlxCompatibilityMatrixReport
                 String::from("psionic-mlx-capi::psionic_mlx_capi_eval_json"),
                 String::from("psionic-mlx-capi::psionic_mlx_capi_compatibility_scope_json"),
                 String::from("psionic-mlx-capi::psionic_mlx_capi_compatibility_matrix_json"),
+                String::from("docs/MLX_TO_PSIONIC_MIGRATION_GUIDE.md"),
+                String::from(
+                    "cargo run -p psionic-mlx-compat --example mlx_array_facade_walkthrough",
+                ),
+                String::from("cargo run -p psionic-mlx-capi --example mlx_capi_eval_request"),
             ],
-            blocking_issue_refs: vec![String::from("PMLX-608 (#3873)")],
+            blocking_issue_refs: Vec::new(),
             boundary_note: String::from(
                 "The current binding surface is a thin C ABI over the existing Psionic-native facade with JSON requests and responses for bounded dense array eval and compatibility reports; it does not imply MLX-identical signatures, a broad handle-based runtime API, or dedicated Python or Swift packages.",
             ),
@@ -2387,9 +2389,7 @@ mod tests {
             .expect("missing device/eval/memory family");
         assert_eq!(eval.current_outcome, MlxParityHarnessOutcome::Pass);
         assert!(eval.psionic_hook_commands.iter().any(|hook| {
-            hook.contains(
-                "check-psionic-mlx-cpu-reference-coverage.sh --only device_eval_memory",
-            )
+            hook.contains("check-psionic-mlx-cpu-reference-coverage.sh --only device_eval_memory")
         }));
         assert!(!eval.psionic_hook_commands.is_empty());
 
@@ -2569,9 +2569,11 @@ mod tests {
         );
         assert!(
             naming
-                .summary
-                .contains("psionic-mlx-compat")
+                .blocking_issue_refs
+                .iter()
+                .all(|issue| !issue.contains("PMLX-608"))
         );
+        assert!(naming.summary.contains("psionic-mlx-compat"));
 
         let distributed = report
             .surfaces
