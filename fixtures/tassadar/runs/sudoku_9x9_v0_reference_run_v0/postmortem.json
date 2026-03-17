@@ -1,22 +1,23 @@
 {
   "run_id": "tassadar-executor-transformer-sudoku-9x9-reference-run-v0",
   "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@scale-v0",
-  "sequence_fit_report_digest": "ca1a3e12ba6132425ddf0dc0e8417274e30bfa322c31c25508c662e28510268e",
+  "sequence_fit_report_digest": "46941cb172330e8d10f7e7560756a1beb3d5e68759c50396b56116faa8390ac6",
   "divergence_report_digest": "eb751952b477a9e1bf97475acbde1a9f955e288204f32af7c60316a2ea875e11",
   "findings": [
     {
       "finding_id": "full_sequence_exceeds_context",
-      "summary": "The full 9x9 traces are too long for the current learned lane: the longest sequence is 5335309 tokens against a 524288-token model context.",
+      "summary": "Full 9x9 sequences still exceed one-pass context by 4366934 to 4811021 tokens, but the canonical learned lane is explicitly re-scoped to bounded `incremental_decode_window` windows with separate early, later, and suffix artifacts instead of pretending flat-prefix fit. Longest shared sequence is 5335309 tokens against a 524288-token model context.",
       "supporting_artifacts": [
         "sequence_fit_report.json"
       ]
     },
     {
-      "finding_id": "bounded_prefix_only",
-      "summary": "This run is only an early-prefix truth run: all exactness and divergence artifacts are bounded to the first 512 target tokens.",
+      "finding_id": "bounded_windowed_scope_only",
+      "summary": "This run is an explicit bounded windowed truth run: training-time validation is capped at the first 512 target tokens, and later-window plus suffix artifacts stay separate from full-trace exactness.",
       "supporting_artifacts": [
         "sequence_fit_report.json",
-        "training_report.json"
+        "training_report.json",
+        "later_window_exactness_report.json"
       ]
     },
     {
@@ -36,5 +37,5 @@
       ]
     }
   ],
-  "report_digest": "b2cd07fa43cfb404bbd48571f313a36045627902fa8cbca6f79fff7571c7b2ad"
+  "report_digest": "ffb0a8f137b4a169ff517f457e1c4894231489c722c9dd157ae89769f26c53fd"
 }

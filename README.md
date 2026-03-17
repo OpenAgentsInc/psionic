@@ -317,8 +317,10 @@ Current posture:
   `suffix_window_failure_report.json`, and keeps the claim boundary honest by
   showing that full 9x9 traces still do not fit the current `524288`-token
   model context (`4891222` to `5335309` total tokens, overflow `4366934` to
-  `4811021`), so the run only covers bounded windows; the early `512`-token
-  prefix stays red (`10000` bps first-target, `5938` bps first-32, `0/1`
+  `4811021`), so the canonical learned 9x9 lane is now recorded as an
+  explicit bounded `incremental_decode_window` scope replacement rather than a
+  fake flat-prefix fit; the early `512`-token prefix stays red (`10000` bps
+  first-target, `5938` bps first-32, `0/1`
   exact validation traces), but the new non-zero-offset reports show a more
   specific picture: a fixed later window at target offset `262144` reaches
   `8438` bps first-32 exactness and the furthest fittable suffix window at

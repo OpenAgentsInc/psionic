@@ -16,6 +16,7 @@
   "target_token_count_max": 5283773,
   "total_token_count_min": 4891222,
   "total_token_count_max": 5335309,
+  "one_pass_full_sequence_required_for_declared_contract": false,
   "full_sequence_fits_model_context": false,
   "full_sequence_context_overflow_min": 4366934,
   "full_sequence_context_overflow_max": 4811021,
@@ -130,10 +131,12 @@
       "size_bytes": 329
     }
   ],
-  "outcome_statement": "9x9 only partially fit and remains blocked",
+  "fit_disposition": "bounded_scope_replacement",
+  "scope_statement": "Full 9x9 sequences still exceed one-pass context by 4366934 to 4811021 tokens, but the canonical learned lane is explicitly re-scoped to bounded `incremental_decode_window` windows with separate early, later, and suffix artifacts instead of pretending flat-prefix fit.",
+  "outcome_statement": "9x9 remains a bounded incremental-window learned lane; the fit cliff is now explicit scope replacement rather than a hidden flat-prefix failure",
   "blocking_reasons": [
-    "full 9x9 sequences exceed the current model context by 4366934 to 4811021 tokens",
-    "the run therefore only validates the first 512 target tokens per case"
+    "full 9x9 sequences still exceed one-pass context by 4366934 to 4811021 tokens",
+    "the declared `incremental_decode_window` contract therefore remains bounded to explicit windowed training and eval artifacts rather than one-shot full-sequence learned closure"
   ],
-  "report_digest": "ca1a3e12ba6132425ddf0dc0e8417274e30bfa322c31c25508c662e28510268e"
+  "report_digest": "46941cb172330e8d10f7e7560756a1beb3d5e68759c50396b56116faa8390ac6"
 }

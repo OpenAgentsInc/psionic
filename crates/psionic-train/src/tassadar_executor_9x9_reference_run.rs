@@ -71,6 +71,21 @@ pub struct TassadarExecutorContextStageFit {
     pub context_overflow_tokens: Option<u32>,
 }
 
+/// Honest disposition of the declared 9x9 learned fit contract.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarExecutorSequenceFitDisposition {
+    /// The declared learned contract now fits full 9x9 sequences honestly.
+    FullSequenceFit,
+    /// Full one-pass fit is still unavailable, but the canonical learned lane
+    /// is explicitly re-scoped to bounded incremental windows instead of
+    /// pretending a flat-prefix contract still holds.
+    BoundedScopeReplacement,
+    /// The declared contract still requires one-pass full-sequence fit and
+    /// therefore remains blocked.
+    Blocked,
+}
+
 /// Machine-readable fit analysis for the first honest 9x9 run.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TassadarExecutorSequenceFitReport {
@@ -108,6 +123,8 @@ pub struct TassadarExecutorSequenceFitReport {
     pub total_token_count_min: u32,
     /// Maximum full sequence length in the dataset.
     pub total_token_count_max: u32,
+    /// Whether the declared contract requires one-pass full-sequence fit.
+    pub one_pass_full_sequence_required_for_declared_contract: bool,
     /// Whether any full 9x9 sequence fits the current model context.
     pub full_sequence_fits_model_context: bool,
     /// Smallest overflow over the model context on the full dataset.
@@ -127,6 +144,10 @@ pub struct TassadarExecutorSequenceFitReport {
     pub estimated_incremental_decode_live_bytes_max: u64,
     /// Actual artifact file sizes currently on disk.
     pub artifact_file_sizes: Vec<TassadarExecutorArtifactSizeReport>,
+    /// Honest disposition of the declared learned fit contract.
+    pub fit_disposition: TassadarExecutorSequenceFitDisposition,
+    /// Exact statement describing the current learned 9x9 scope.
+    pub scope_statement: String,
     /// Exact statement the audit must keep honest.
     pub outcome_statement: String,
     /// Plain blockers that keep the learned 9x9 lane partial.
@@ -197,6 +218,8 @@ impl TassadarExecutorSequenceFitReport {
             .max()
             .unwrap_or(0);
         let model_max_sequence_tokens = model.descriptor().config.max_sequence_tokens as u32;
+        let one_pass_full_sequence_required_for_declared_contract =
+            config.long_trace_contract == TassadarExecutorLongTraceContract::FlatPrefixFullForward;
         let full_sequence_fits_model_context = total_token_count_max <= model_max_sequence_tokens;
         let full_sequence_context_overflow_min =
             total_token_count_min.saturating_sub(model_max_sequence_tokens);
@@ -256,16 +279,65 @@ impl TassadarExecutorSequenceFitReport {
             model.descriptor().config.vocab_size,
         );
         let artifact_file_sizes = collect_artifact_sizes(output_dir, run_bundle)?;
-        let blocking_reasons = vec![
-            format!(
-                "full 9x9 sequences exceed the current model context by {} to {} tokens",
-                full_sequence_context_overflow_min, full_sequence_context_overflow_max
+        let fit_disposition = if full_sequence_fits_model_context {
+            TassadarExecutorSequenceFitDisposition::FullSequenceFit
+        } else if one_pass_full_sequence_required_for_declared_contract {
+            TassadarExecutorSequenceFitDisposition::Blocked
+        } else {
+            TassadarExecutorSequenceFitDisposition::BoundedScopeReplacement
+        };
+        let scope_statement = match fit_disposition {
+            TassadarExecutorSequenceFitDisposition::FullSequenceFit => String::from(
+                "The declared learned 9x9 contract now fits full sequences honestly.",
             ),
-            format!(
-                "the run therefore only validates the first {} target tokens per case",
-                config.max_eval_target_tokens_per_example.unwrap_or(0)
+            TassadarExecutorSequenceFitDisposition::BoundedScopeReplacement => format!(
+                "Full 9x9 sequences still exceed one-pass context by {} to {} tokens, but the canonical learned lane is explicitly re-scoped to bounded `{}` windows with separate early, later, and suffix artifacts instead of pretending flat-prefix fit.",
+                full_sequence_context_overflow_min,
+                full_sequence_context_overflow_max,
+                config.long_trace_contract.label(),
             ),
-        ];
+            TassadarExecutorSequenceFitDisposition::Blocked => format!(
+                "The declared `{}` contract still requires one-pass full-sequence fit, and full 9x9 sequences exceed context by {} to {} tokens.",
+                config.long_trace_contract.label(),
+                full_sequence_context_overflow_min,
+                full_sequence_context_overflow_max,
+            ),
+        };
+        let blocking_reasons = match fit_disposition {
+            TassadarExecutorSequenceFitDisposition::FullSequenceFit => Vec::new(),
+            TassadarExecutorSequenceFitDisposition::BoundedScopeReplacement => vec![
+                format!(
+                    "full 9x9 sequences still exceed one-pass context by {} to {} tokens",
+                    full_sequence_context_overflow_min, full_sequence_context_overflow_max
+                ),
+                format!(
+                    "the declared `{}` contract therefore remains bounded to explicit windowed training and eval artifacts rather than one-shot full-sequence learned closure",
+                    config.long_trace_contract.label()
+                ),
+            ],
+            TassadarExecutorSequenceFitDisposition::Blocked => vec![
+                format!(
+                    "full 9x9 sequences exceed the current model context by {} to {} tokens",
+                    full_sequence_context_overflow_min, full_sequence_context_overflow_max
+                ),
+                format!(
+                    "the declared `{}` contract therefore only validates bounded windows up to {} target tokens per case",
+                    config.long_trace_contract.label(),
+                    config.max_eval_target_tokens_per_example.unwrap_or(0)
+                ),
+            ],
+        };
+        let outcome_statement = match fit_disposition {
+            TassadarExecutorSequenceFitDisposition::FullSequenceFit => String::from(
+                "9x9 full-sequence learned fit is now truthful under the declared contract",
+            ),
+            TassadarExecutorSequenceFitDisposition::BoundedScopeReplacement => String::from(
+                "9x9 remains a bounded incremental-window learned lane; the fit cliff is now explicit scope replacement rather than a hidden flat-prefix failure",
+            ),
+            TassadarExecutorSequenceFitDisposition::Blocked => {
+                String::from("9x9 only partially fit and remains blocked")
+            }
+        };
 
         let mut report = Self {
             run_id: run_bundle.run_id.clone(),
@@ -285,6 +357,7 @@ impl TassadarExecutorSequenceFitReport {
             target_token_count_max,
             total_token_count_min,
             total_token_count_max,
+            one_pass_full_sequence_required_for_declared_contract,
             full_sequence_fits_model_context,
             full_sequence_context_overflow_min,
             full_sequence_context_overflow_max,
@@ -296,7 +369,9 @@ impl TassadarExecutorSequenceFitReport {
             estimated_bounded_forward_buffer_bytes_max,
             estimated_incremental_decode_live_bytes_max,
             artifact_file_sizes,
-            outcome_statement: String::from("9x9 only partially fit and remains blocked"),
+            fit_disposition,
+            scope_statement,
+            outcome_statement,
             blocking_reasons,
             report_digest: String::new(),
         };
@@ -583,22 +658,25 @@ impl TassadarSudoku9x9PostmortemReport {
             TassadarSudoku9x9PostmortemFinding {
                 finding_id: String::from("full_sequence_exceeds_context"),
                 summary: format!(
-                    "The full 9x9 traces are too long for the current learned lane: the longest sequence is {} tokens against a {}-token model context.",
-                    fit_report.total_token_count_max, fit_report.model_max_sequence_tokens
+                    "{} Longest shared sequence is {} tokens against a {}-token model context.",
+                    fit_report.scope_statement,
+                    fit_report.total_token_count_max,
+                    fit_report.model_max_sequence_tokens
                 ),
                 supporting_artifacts: vec![String::from(
                     TASSADAR_EXECUTOR_SEQUENCE_FIT_REPORT_FILE,
                 )],
             },
             TassadarSudoku9x9PostmortemFinding {
-                finding_id: String::from("bounded_prefix_only"),
+                finding_id: String::from("bounded_windowed_scope_only"),
                 summary: format!(
-                    "This run is only an early-prefix truth run: all exactness and divergence artifacts are bounded to the first {} target tokens.",
+                    "This run is an explicit bounded windowed truth run: training-time validation is capped at the first {} target tokens, and later-window plus suffix artifacts stay separate from full-trace exactness.",
                     fit_report.eval_target_token_cap.unwrap_or(0)
                 ),
                 supporting_artifacts: vec![
                     String::from(TASSADAR_EXECUTOR_SEQUENCE_FIT_REPORT_FILE),
                     String::from(TRAINING_REPORT_FILE),
+                    String::from(TASSADAR_EXECUTOR_LATER_WINDOW_EXACTNESS_FILE),
                 ],
             },
             TassadarSudoku9x9PostmortemFinding {
@@ -690,11 +768,11 @@ impl TassadarSudoku9x9NextRunPlan {
             TassadarSudoku9x9NextRunAction {
                 action_id: String::from("context_or_model_change"),
                 summary: String::from(
-                    "Either increase the learned lane context budget or adopt an explicitly windowed long-trace training/eval regime beyond the first 512 tokens.",
+                    "Either increase the learned lane context budget enough for truthful one-pass fit or keep widening the explicitly windowed long-trace regime beyond the first 512 tokens.",
                 ),
                 success_criteria: vec![
                     String::from(
-                        "Full 9x9 prompt-plus-target fit becomes truthful, or later windows are covered by explicit machine-readable reports.",
+                        "Full 9x9 prompt-plus-target fit becomes truthful, or the bounded incremental-window regime keeps widening with explicit machine-readable reports.",
                     ),
                     String::from(
                         "No artifact implies full-trace 9x9 exactness before that fit exists.",
@@ -704,10 +782,10 @@ impl TassadarSudoku9x9NextRunPlan {
             TassadarSudoku9x9NextRunAction {
                 action_id: String::from("keep_phase_claim_partial"),
                 summary: String::from(
-                    "Keep the 9x9 learned lane in a partial state until bounded windows are exact and the full-trace fit problem is solved honestly.",
+                    "Keep the 9x9 learned lane in an explicitly bounded partial state until bounded windows are exact and the full article-class bars are solved honestly.",
                 ),
                 success_criteria: vec![String::from(
-                    "Audit language continues to say `9x9 only partially fit and remains blocked` until the blocker is actually removed.",
+                    "Audit language continues to say the 9x9 learned lane is bounded and partial until exactness and long-horizon acceptance both turn green.",
                 )],
             },
         ];

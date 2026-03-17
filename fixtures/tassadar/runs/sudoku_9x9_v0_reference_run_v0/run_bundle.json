@@ -20,7 +20,7 @@
   "exactness_curve_report_digest": "40bb68ee1d22868064bc187e44f3cb3afda70005ea0557af5600799ed0ea6b3e",
   "failure_samples_report_digest": "1431af7f7a6e1d75357707efc78037dc7019c8d46c6b89e85fdbed0241df93c7",
   "exact_trace_samples_report_digest": "4c6c5b6dc33d10a6ffb53da4fbfa87b4f15e4b467ea9d5320044417ee78c4e45",
-  "sequence_fit_report_digest": "ca1a3e12ba6132425ddf0dc0e8417274e30bfa322c31c25508c662e28510268e",
+  "sequence_fit_report_digest": "46941cb172330e8d10f7e7560756a1beb3d5e68759c50396b56116faa8390ac6",
   "checkpoint_artifact_digest": "8d3b7ab2bfda33b4ac393b5ddb6dd6de8e5550433487742880244ac796c32095",
   "model_artifact_digest": "57c86fe5c26c8c51c4acca5f4d9d0e336b0c5b452e84a008bb01fc561a8caced",
   "artifacts": [
@@ -87,17 +87,17 @@
     {
       "artifact_kind": "tassadar_sudoku_9x9_next_run_plan",
       "artifact_ref": "next_run_plan.json",
-      "artifact_digest": "9af62fbcd5ce70620a87dd70f9c8386e7569049793c74d4dba72824e345c2f52"
+      "artifact_digest": "a3a54512d2a345138bf601e0a810c4c7b31789e3f434cafc479cb55879dbd28b"
     },
     {
       "artifact_kind": "tassadar_sudoku_9x9_postmortem",
       "artifact_ref": "postmortem.json",
-      "artifact_digest": "beb77033b05fedf2618ac72c1b617af38670471aeaf1d73cc47b5fd72d91b555"
+      "artifact_digest": "e5e8b09a61f08c29c9baf4f22b470bb94a2183cffcf1ee83cea76b0d4f05e343"
     },
     {
       "artifact_kind": "tassadar_sequence_fit_report",
       "artifact_ref": "sequence_fit_report.json",
-      "artifact_digest": "7c6931d07a480f65df4d839518698e899f7e1bca57f4dcf01824d2d7285e45bd"
+      "artifact_digest": "44b3ba2e8258e5c353509468572f49e35d9e757190fce19dae8bfe131271fbe8"
     },
     {
       "artifact_kind": "tassadar_structural_supervision_report",
@@ -130,5 +130,5 @@
       "artifact_digest": "7ced5d31c3d14dab75510d4983552299fe5288441f324af442c79854cc7ff501"
     }
   ],
-  "bundle_digest": "c74005dcbbee46291d5ca4b5a89efc49719e5e4b632f7a07c9c1d035887fa262"
+  "bundle_digest": "32e8e278390aec4c2251020e998283f81c910db077273c7f49e483e427926ba1"
 }

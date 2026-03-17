@@ -347,7 +347,7 @@ These are not goals of this roadmap:
 | Exact `HullCache` fast path | `partial` | Exact closure exists on bounded validated subsets, but the fast path is not yet honest as a general long-trace answer for all branch-heavy or memory-heavy workloads. |
 | Compiled/proof-backed exact executor lane | `implemented_early` | Exact bounded Sudoku-v0 and Hungarian-v0 lanes exist with proof-bearing deployment bundles, but they remain matched-corpus and `eval_only` rather than article-grade general closure. |
 | Learned 4x4 executor lane | `implemented_early` | The learned 4x4 promotion gate is green on the committed validation corpus. |
-| Learned 9x9 executor lane | `partial` | The first honest 9x9 run is preserved, but the full learned trace still does not fit the current model contract and remains blocked. |
+| Learned 9x9 executor lane | `partial` | The first honest 9x9 run is preserved, and the canonical learned path is now explicitly re-scoped to bounded incremental windows; full one-pass 9x9 fit is still unavailable, so the lane remains bounded rather than article-class. |
 | Article-class long-trace benchmark closure | `partial` | Micro, Sudoku, and Hungarian families exist, but the repo does not yet have one acceptance bar that honestly closes the article-shaped long-trace claim. |
 | Generalized program-specialized weights and compile-to-weights | `partial` | Program-specialized compiled executor artifacts exist, but the repo does not yet have generalized compile-to-weights closure for broader Wasm families. |
 | Full article-parity Wasm compute claim | `planned` | Psionic is not yet at a truthful "arbitrary C/Wasm compute inside the transformer" claim boundary. |
@@ -518,7 +518,7 @@ research-only lane.
 
 | ID | Status | Work |
 | --- | --- | --- |
-| `PTAS-501` | partial | Remove the current learned 9x9 full-trace fit cliff without hiding it behind a bounded first-window metric. |
+| `PTAS-501` | implemented | Remove the current learned 9x9 full-trace fit cliff without hiding it behind a bounded first-window metric. |
 | `PTAS-502` | planned | Land a truthful learned 9x9 promotion gate with later-window and full-trace exactness criteria, not only first-prefix scores. |
 | `PTAS-503` | planned | Land a learned Hungarian-class lane with explicit dual-state supervision and exactness-vs-trace-length reporting. |
 | `PTAS-504` | planned | Add a million-step learned trace benchmark family or an explicit learned refusal policy for workloads beyond the supported horizon. |

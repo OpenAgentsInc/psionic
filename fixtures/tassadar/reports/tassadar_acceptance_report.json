@@ -181,7 +181,7 @@
   "learned_article_class": {
     "verdict_id": "learned_article_class",
     "passed": false,
-    "detail": "Learned article-class closure is still red: the committed 9x9 fit report says full sequences do not fit the current learned model context and the lane remains bounded.",
+    "detail": "Learned article-class closure is still red: the committed 9x9 fit report now records an explicit bounded-scope replacement for the canonical incremental-window lane, but full one-pass sequence fit is still not available and the learned lane remains bounded.",
     "validation_commands": [
       "scripts/check-tassadar-acceptance.sh"
     ],
@@ -194,11 +194,10 @@
       {
         "label": "learned 9x9 fit report",
         "artifact_ref": "fixtures/tassadar/runs/sudoku_9x9_v0_reference_run_v0/sequence_fit_report.json",
-        "digest": "52a905a173672ec49b4c9e8152034696e52535308558810e1652478db888c65d"
+        "digest": "46941cb172330e8d10f7e7560756a1beb3d5e68759c50396b56116faa8390ac6"
       }
     ],
     "missing_evidence": [
-      "PTAS-501 remove the learned 9x9 fit cliff honestly",
       "PTAS-502 truthful learned 9x9 promotion gate with later-window criteria",
       "PTAS-503 learned Hungarian-class lane with explicit dual-state supervision",
       "PTAS-504 million-step learned benchmark or explicit refusal policy",
@@ -218,5 +217,5 @@
     ]
   },
   "current_truth_holds": true,
-  "report_digest": "c4ee61100fc70f33ee656d95623df9712a705b4d9911699f6d7f821085834101"
+  "report_digest": "f671b1c5a9b3cf16f6e02f3d28c2f26208de79db336323f6abd64587e6374ffe"
 }

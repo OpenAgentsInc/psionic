@@ -384,8 +384,10 @@ The current scope is:
   `suffix_window_failure_report.json`, and keeps the claim boundary exact by
   showing that full 9x9 traces still exceed the current `524288`-token model
   context (`4891222` to `5335309` total tokens, overflow `4366934` to
-  `4811021`), so the run is only a bounded-window learned lane; the early
-  `512`-token prefix stays red (`10000` bps first-target, `5938` bps
+  `4811021`), so the run is now explicitly a bounded
+  `incremental_decode_window` scope replacement rather than a blocked
+  flat-prefix lane; the early `512`-token prefix stays red (`10000` bps
+  first-target, `5938` bps
   first-32, `0/1` exact validation traces), but the later fixed offset window
   at target token `262144` and the furthest fittable suffix window at target
   token `472240` both reach `8438` bps first-32 exactness while still staying

@@ -1,6 +1,6 @@
 {
   "run_id": "tassadar-executor-transformer-sudoku-9x9-reference-run-v0",
-  "basis_postmortem_digest": "b2cd07fa43cfb404bbd48571f313a36045627902fa8cbca6f79fff7571c7b2ad",
+  "basis_postmortem_digest": "ffb0a8f137b4a169ff517f457e1c4894231489c722c9dd157ae89769f26c53fd",
   "actions": [
     {
       "action_id": "later_window_closure",
@@ -12,19 +12,19 @@
     },
     {
       "action_id": "context_or_model_change",
-      "summary": "Either increase the learned lane context budget or adopt an explicitly windowed long-trace training/eval regime beyond the first 512 tokens.",
+      "summary": "Either increase the learned lane context budget enough for truthful one-pass fit or keep widening the explicitly windowed long-trace regime beyond the first 512 tokens.",
       "success_criteria": [
-        "Full 9x9 prompt-plus-target fit becomes truthful, or later windows are covered by explicit machine-readable reports.",
+        "Full 9x9 prompt-plus-target fit becomes truthful, or the bounded incremental-window regime keeps widening with explicit machine-readable reports.",
         "No artifact implies full-trace 9x9 exactness before that fit exists."
       ]
     },
     {
       "action_id": "keep_phase_claim_partial",
-      "summary": "Keep the 9x9 learned lane in a partial state until bounded windows are exact and the full-trace fit problem is solved honestly.",
+      "summary": "Keep the 9x9 learned lane in an explicitly bounded partial state until bounded windows are exact and the full article-class bars are solved honestly.",
       "success_criteria": [
-        "Audit language continues to say `9x9 only partially fit and remains blocked` until the blocker is actually removed."
+        "Audit language continues to say the 9x9 learned lane is bounded and partial until exactness and long-horizon acceptance both turn green."
       ]
     }
   ],
-  "plan_digest": "33eeb0db39a6a81854e91d382e47bc0156fabed434e5fe4005c22096dca930d1"
+  "plan_digest": "8e388bbd7bc85b757f085192dcd2982ac8a004328adc4a7e9596aabfc09911d5"
 }

@@ -14,7 +14,7 @@ use psionic_train::{
     TassadarExecutorPromotionGateReport, TassadarExecutorReferenceRunBundle,
     TassadarExecutorSequenceFitReport,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -59,8 +59,7 @@ const COMPILED_KERNEL_SUITE_RUN_BUNDLE_REF: &str =
     "fixtures/tassadar/runs/compiled_kernel_suite_v0/run_bundle.json";
 const COMPILED_KERNEL_SUITE_EXACTNESS_REPORT_REF: &str =
     "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_exactness_report.json";
-const COMPILED_KERNEL_SUITE_COMPATIBILITY_REPORT_REF: &str =
-    "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_compatibility_report.json";
+const COMPILED_KERNEL_SUITE_COMPATIBILITY_REPORT_REF: &str = "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_compatibility_report.json";
 const COMPILED_KERNEL_SUITE_SCALING_REPORT_REF: &str =
     "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_scaling_report.json";
 const COMPILED_KERNEL_SUITE_CLAIM_BOUNDARY_REPORT_REF: &str =
@@ -247,8 +246,8 @@ pub fn tassadar_acceptance_report_path() -> PathBuf {
 
 /// Builds the live Tassadar acceptance report from the canonical committed
 /// fixture roots.
-pub fn build_tassadar_acceptance_report(
-) -> Result<TassadarAcceptanceReport, TassadarAcceptanceError> {
+pub fn build_tassadar_acceptance_report()
+-> Result<TassadarAcceptanceReport, TassadarAcceptanceError> {
     let research_only = build_research_only_verdict()?;
     let compiled_exact = build_compiled_exact_verdict()?;
     let learned_bounded = build_learned_bounded_verdict()?;
@@ -577,8 +576,8 @@ fn build_fast_path_verdict() -> Result<TassadarAcceptanceVerdict, TassadarAccept
     ))
 }
 
-fn build_compiled_article_class_verdict(
-) -> Result<TassadarAcceptanceVerdict, TassadarAcceptanceError> {
+fn build_compiled_article_class_verdict()
+-> Result<TassadarAcceptanceVerdict, TassadarAcceptanceError> {
     let sudoku_9x9_bundle: Value = read_repo_json(
         COMPILED_SUDOKU_9X9_RUN_BUNDLE_REF,
         "tassadar_sudoku_9x9_compiled_executor_run_bundle",
@@ -671,8 +670,8 @@ fn build_compiled_article_class_verdict(
     ))
 }
 
-fn build_learned_article_class_verdict(
-) -> Result<TassadarAcceptanceVerdict, TassadarAcceptanceError> {
+fn build_learned_article_class_verdict()
+-> Result<TassadarAcceptanceVerdict, TassadarAcceptanceError> {
     let promotion_bundle: TassadarExecutorAttentionPromotionRunBundle = read_repo_json(
         LEARNED_BOUNDED_PROMOTION_BUNDLE_REF,
         "tassadar_executor_attention_promotion_bundle",
@@ -691,7 +690,7 @@ fn build_learned_article_class_verdict(
         if passed {
             "The learned lane now clears the article-class fit and exactness bars."
         } else {
-            "Learned article-class closure is still red: the committed 9x9 fit report says full sequences do not fit the current learned model context and the lane remains bounded."
+            "Learned article-class closure is still red: the committed 9x9 fit report now records an explicit bounded-scope replacement for the canonical incremental-window lane, but full one-pass sequence fit is still not available and the learned lane remains bounded."
         },
         vec![String::from(TASSADAR_ACCEPTANCE_CHECKER_COMMAND)],
         vec![
@@ -710,7 +709,6 @@ fn build_learned_article_class_verdict(
             Vec::new()
         } else {
             vec![
-                String::from("PTAS-501 remove the learned 9x9 fit cliff honestly"),
                 String::from(
                     "PTAS-502 truthful learned 9x9 promotion gate with later-window criteria",
                 ),
@@ -804,8 +802,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        build_tassadar_acceptance_report, read_repo_json, tassadar_acceptance_report_ref,
-        write_tassadar_acceptance_report, TassadarAcceptanceReport,
+        TassadarAcceptanceReport, build_tassadar_acceptance_report, read_repo_json,
+        tassadar_acceptance_report_ref, write_tassadar_acceptance_report,
     };
 
     #[test]
@@ -830,8 +828,8 @@ mod tests {
     }
 
     #[test]
-    fn write_tassadar_acceptance_report_persists_current_truth(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn write_tassadar_acceptance_report_persists_current_truth()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempdir()?;
         let report_path = temp_dir.path().join("tassadar_acceptance_report.json");
         let report = write_tassadar_acceptance_report(&report_path)?;

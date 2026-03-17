@@ -436,13 +436,14 @@ That now includes one intentionally narrow executor-training answer:
   `suffix_window_failure_report.json`, and keeps the claim boundary honest by
   stating exactly what the artifacts prove: full 9x9 traces do not fit the
   current `524288`-token model context (`4891222` to `5335309` total tokens,
-  overflow `4366934` to `4811021`), so this run only evaluates bounded
-  windows; the early `512`-token prefix reaches `10000` bps first-target
+  overflow `4366934` to `4811021`), so this run is now explicitly a bounded
+  `incremental_decode_window` scope replacement rather than a blocked
+  flat-prefix lane; the early `512`-token prefix reaches `10000` bps first-target
   exactness but only `5938` bps first-32 exactness and `0/1` exact validation
   traces, while the fixed later window at target token `262144` and the
   furthest fittable suffix window at target token `472240` both improve to
   `8438` bps first-32 exactness but still stay `0/1` exact windows, so the
-  correct audit statement remains “9x9 only partially fit and remains blocked”
+  correct audit statement remains “bounded and partial, not article-class”
   even though later-window truth is now explicit; the companion note is
   `docs/audits/2026-03-16-tassadar-phase-16-9x9-reference-run-audit.md`
 - the first same-corpus flat-prefix-vs-windowed 9x9 comparison now also
