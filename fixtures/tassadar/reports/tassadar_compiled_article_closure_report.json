@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "checker_command": "scripts/check-tassadar-compiled-article-closure.sh",
+  "report_ref": "fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json",
+  "required_workload_families": [
+    "sudoku_search_9x9",
+    "hungarian_matching_10x10",
+    "arithmetic_kernel",
+    "memory_update_kernel",
+    "forward_branch_kernel",
+    "backward_loop_kernel"
+  ],
+  "article_artifact_roots": [
+    "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0",
+    "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0",
+    "fixtures/tassadar/runs/compiled_kernel_suite_v0"
+  ],
+  "bounded_proxy_roots": [
+    "fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0",
+    "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0"
+  ],
+  "requirements": [
+    {
+      "requirement_id": "compiled_article_sudoku_9x9",
+      "label": "Article-sized compiled Sudoku-9x9 bundle exists with benchmark, proof, and exact refusal truth",
+      "artifact_refs": [
+        "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/run_bundle.json",
+        "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/compiled_executor_exactness_report.json",
+        "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/compiled_executor_compatibility_report.json"
+      ],
+      "passed": true,
+      "detail": "claim_class=compiled_article_class; exact_trace_rate_bps=10000; matched_refusal_rate_bps=10000; deployments=4"
+    },
+    {
+      "requirement_id": "compiled_article_hungarian_10x10",
+      "label": "Article-sized compiled Hungarian-10x10 bundle exists with benchmark, proof, and exact refusal truth",
+      "artifact_refs": [
+        "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json",
+        "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_exactness_report.json",
+        "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_compatibility_report.json"
+      ],
+      "passed": true,
+      "detail": "claim_class=compiled_article_class; exact_trace_rate_bps=10000; matched_refusal_rate_bps=10000; deployments=4"
+    },
+    {
+      "requirement_id": "compiled_article_kernel_suite",
+      "label": "Generic compiled kernel suite exists with arithmetic, memory, branch, and loop families plus exactness-vs-trace-length evidence",
+      "artifact_refs": [
+        "fixtures/tassadar/runs/compiled_kernel_suite_v0/run_bundle.json",
+        "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_exactness_report.json",
+        "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_compatibility_report.json",
+        "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_scaling_report.json"
+      ],
+      "passed": true,
+      "detail": "claim_class=compiled_article_class; exact_trace_rate_bps=10000; matched_refusal_rate_bps=10000; deployments=12; family_ids=arithmetic_kernel,backward_loop_kernel,forward_branch_kernel,memory_update_kernel"
+    },
+    {
+      "requirement_id": "stronger_than_bounded_proxies",
+      "label": "The older 4x4 compiled proxies are no longer the strongest exact compiled results in-tree",
+      "artifact_refs": [
+        "fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0/run_bundle.json",
+        "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/run_bundle.json",
+        "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/run_bundle.json",
+        "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json",
+        "fixtures/tassadar/runs/compiled_kernel_suite_v0/run_bundle.json"
+      ],
+      "passed": true,
+      "detail": "bounded_sudoku_claim_class=compiled_exact; bounded_hungarian_claim_class=compiled_exact; article_workloads_green=true"
+    }
+  ],
+  "passed": true,
+  "detail": "Compiled article-closure checker is green: exact compiled article-sized Sudoku-9x9, Hungarian-10x10, and generic arithmetic/memory/branch/loop kernel evidence all exist with benchmark and proof artifacts, and the older 4x4 proxies are no longer the strongest exact compiled results in-tree.",
+  "missing_requirements": [],
+  "report_digest": "64a128df2d28f3835208876167a88888d9687b400555f69bb4cc821c88a9c3e1"
+}

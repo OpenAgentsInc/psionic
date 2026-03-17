@@ -1999,8 +1999,8 @@ fn build_tassadar_article_class_benchmark_package(
 pub fn tassadar_sudoku_9x9_program_artifacts(
     version: &str,
 ) -> Result<Vec<TassadarProgramArtifact>, TassadarBenchmarkError> {
-    let profile = TassadarWasmProfile::hungarian_10x10_matching_v1();
-    let trace_abi = TassadarTraceAbi::hungarian_10x10_matching_v1();
+    let profile = TassadarWasmProfile::sudoku_9x9_search_v1();
+    let trace_abi = TassadarTraceAbi::sudoku_9x9_search_v1();
     tassadar_sudoku_9x9_corpus()
         .into_iter()
         .map(|case| {
@@ -2020,8 +2020,8 @@ fn build_tassadar_sudoku_9x9_environment_bundle(
     artifacts: &[TassadarProgramArtifact],
     corpus_digest: &str,
 ) -> Result<TassadarEnvironmentBundle, TassadarBenchmarkError> {
-    let profile = TassadarWasmProfile::hungarian_10x10_matching_v1();
-    let trace_abi = TassadarTraceAbi::hungarian_10x10_matching_v1();
+    let profile = TassadarWasmProfile::sudoku_9x9_search_v1();
+    let trace_abi = TassadarTraceAbi::sudoku_9x9_search_v1();
     let dataset = DatasetKey::new(TASSADAR_SUDOKU_9X9_DATASET_REF, version);
     TassadarEnvironmentSpec {
         version: String::from(version),

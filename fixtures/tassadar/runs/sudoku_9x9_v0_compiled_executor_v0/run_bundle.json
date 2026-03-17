@@ -1,7 +1,7 @@
 {
   "run_id": "tassadar-sudoku-9x9-v0-compiled-executor-v0",
   "workload_family_id": "tassadar.wasm.sudoku_9x9_search.v1.compiled_executor",
-  "claim_class": "compiled_exact",
+  "claim_class": "compiled_article_class",
   "claim_boundary": "exact compiled/proof-backed Sudoku-9x9 lane on the matched 9x9 corpus with benchmark, proof, readable-log, and compact token-trace artifacts; this is the article-sized Sudoku closure, not full compiled article parity by itself",
   "serve_posture": "eval_only",
   "requested_decode_mode": "reference_linear",
@@ -105,7 +105,7 @@
   "environment_bundle_digest": "8749565e83f54a5a23b033188caef48c09fbd0d24b20ab5c0df50845880ae1dd",
   "exactness_report_digest": "988b23753f3e133b72ea6c0d996671ccab86017fead7e25c1c16e975f9115e40",
   "compatibility_report_digest": "15d30a98b806060abe4179b39672990c0b62ecaa4d33fca426c0b6023c56d606",
-  "throughput_benchmark_receipt_digest": "8c1c44a00261c9d7515fb900fa8e2be9cbbf4d4285b811e2cd5ea65b8a228e63",
+  "throughput_benchmark_receipt_digest": "8b1ca8f4fdddb9e0b36417331f8cad5b8400c34426da6f85799b1ab7dc2cc58c",
   "compiled_suite_artifact_digest": "4dd860547a1714617240f2758a578e90c999bd1af7c7586e03d5b4562c0f4a72",
-  "bundle_digest": "9a433a3ae5932df79c477b3dc49955996fa6825d39eec8f0e6366a2c471e4c66"
+  "bundle_digest": "8659ec0651b1fd4ed3a45f45c1e4e65921f17920f19f54c6fd3f1bc78e0c60db"
 }

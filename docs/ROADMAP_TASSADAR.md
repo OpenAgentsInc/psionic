@@ -195,6 +195,11 @@ The current strongest committed artifacts are:
   - exact compiled/proof-backed arithmetic, memory-update, forward-branch, and
     backward-loop kernel suite now exists with exactness-vs-trace-length
     reporting and proof-bearing deployments
+- `fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json`
+  - compiled article-class closure checker now exists and only turns green when
+    the article-sized 9x9 Sudoku bundle, article-sized 10x10 Hungarian bundle,
+    and generic compiled kernel suite are all present and the older bounded 4x4
+    proxies are no longer the strongest exact compiled evidence in-tree
 
 The current technical reality is:
 
@@ -203,8 +208,8 @@ The current technical reality is:
   rather than general
 - the compiled/proof-backed lane is stronger today than the learned long-trace
   lane and now includes article-sized 9x9 Sudoku, 10x10 Hungarian exactness,
-  and a generic compiled kernel suite over arithmetic, memory, branch, and
-  loop-heavy workloads
+  a generic compiled kernel suite over arithmetic, memory, branch, and
+  loop-heavy workloads, and a dedicated article-closure checker
 - the learned 4x4 lane is real
 - the learned 9x9 lane still does not fit the full trace honestly under the
   current model contract
@@ -431,11 +436,11 @@ lane first, because that is the strongest current path in this repo.
 
 | ID | Status | Work |
 | --- | --- | --- |
-| `PTAS-301` | partial | Widen the compiled/proof-backed lane from today's matched 4x4 corpora to article-class Sudoku and matching workloads. |
+| `PTAS-301` | implemented | Widen the compiled/proof-backed lane from today's matched 4x4 corpora to article-class Sudoku and matching workloads. |
 | `PTAS-302` | implemented | Land an exact compiled/proof-backed 9x9 Sudoku bundle with readable-log, token-trace, proof, and throughput artifacts. |
 | `PTAS-303` | implemented | Land an exact compiled/proof-backed 10x10 Hungarian-class bundle with benchmark-package, proof, throughput, and explicit claim-boundary artifacts. |
 | `PTAS-304` | implemented | Add a generic compiled kernel suite covering arithmetic, memory, branch, and loop-heavy programs with exactness-vs-trace-length reporting. |
-| `PTAS-305` | planned | Add one compiled article-closure checker that only turns green when the bounded 4x4 proxies are no longer the strongest exact compiled result in-tree. |
+| `PTAS-305` | implemented | Add one compiled article-closure checker that only turns green when the bounded 4x4 proxies are no longer the strongest exact compiled result in-tree. |
 
 ## Epic 4: Learned Executor Substrate Redesign
 

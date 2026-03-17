@@ -58,8 +58,8 @@ const READABLE_LOG_FILE: &str = "readable_log.txt";
 const TOKEN_TRACE_WINDOW_TOKENS: usize = 128;
 const TOKEN_TRACE_SUMMARY_SCHEMA_VERSION: u16 = 1;
 
-const fn default_compiled_exact_claim_class() -> TassadarClaimClass {
-    TassadarClaimClass::CompiledExact
+const fn default_compiled_article_class_claim_class() -> TassadarClaimClass {
+    TassadarClaimClass::CompiledArticleClass
 }
 
 /// Compact token-trace artifact for one exact compiled Sudoku-9x9 execution.
@@ -236,7 +236,7 @@ pub struct TassadarSudoku9x9CompiledExecutorRunBundle {
     /// Stable workload family id.
     pub workload_family_id: String,
     /// Coarse claim class.
-    #[serde(default = "default_compiled_exact_claim_class")]
+    #[serde(default = "default_compiled_article_class_claim_class")]
     pub claim_class: TassadarClaimClass,
     /// Explicit claim boundary.
     pub claim_boundary: String,
@@ -286,7 +286,7 @@ impl TassadarSudoku9x9CompiledExecutorRunBundle {
         let mut bundle = Self {
             run_id: String::from("tassadar-sudoku-9x9-v0-compiled-executor-v0"),
             workload_family_id: exactness_report.workload_family_id.clone(),
-            claim_class: TassadarClaimClass::CompiledExact,
+            claim_class: TassadarClaimClass::CompiledArticleClass,
             claim_boundary: String::from(
                 "exact compiled/proof-backed Sudoku-9x9 lane on the matched 9x9 corpus with benchmark, proof, readable-log, and compact token-trace artifacts; this is the article-sized Sudoku closure, not full compiled article parity by itself",
             ),
@@ -720,7 +720,7 @@ mod tests {
         let temp = tempdir()?;
         let bundle = run_tassadar_sudoku_9x9_compiled_executor_bundle(temp.path())?;
 
-        assert_eq!(bundle.claim_class, TassadarClaimClass::CompiledExact);
+        assert_eq!(bundle.claim_class, TassadarClaimClass::CompiledArticleClass);
         assert_eq!(bundle.deployments.len(), 4);
         assert!(
             temp.path()

@@ -258,7 +258,6 @@ pub fn build_tassadar_acceptance_report(
     let article_closure = build_article_closure_verdict(
         &compiled_article_class,
         &fast_path_declared_workload_exact,
-        &learned_bounded,
         &learned_article_class,
     );
 
@@ -294,7 +293,7 @@ pub fn build_tassadar_acceptance_report(
         && compiled_exact.passed
         && learned_bounded.passed
         && fast_path_declared_workload_exact.passed
-        && !compiled_article_class.passed
+        && compiled_article_class.passed
         && !learned_article_class.passed
         && !article_closure.passed;
 
@@ -580,10 +579,6 @@ fn build_fast_path_verdict() -> Result<TassadarAcceptanceVerdict, TassadarAccept
 
 fn build_compiled_article_class_verdict(
 ) -> Result<TassadarAcceptanceVerdict, TassadarAcceptanceError> {
-    let sudoku_bundle: TassadarCompiledExecutorRunBundle = read_repo_json(
-        COMPILED_SUDOKU_RUN_BUNDLE_REF,
-        "tassadar_compiled_executor_run_bundle",
-    )?;
     let sudoku_9x9_bundle: Value = read_repo_json(
         COMPILED_SUDOKU_9X9_RUN_BUNDLE_REF,
         "tassadar_sudoku_9x9_compiled_executor_run_bundle",
@@ -596,31 +591,20 @@ fn build_compiled_article_class_verdict(
         COMPILED_KERNEL_SUITE_RUN_BUNDLE_REF,
         "tassadar_compiled_kernel_suite_run_bundle",
     )?;
-    let kernel_suite_landed =
-        kernel_suite_bundle["claim_class"].as_str() == Some("compiled_article_class");
-    let passed = false
-        && sudoku_bundle.claim_class == TassadarClaimClass::CompiledArticleClass
-        && sudoku_9x9_bundle["claim_class"].as_str() == Some("compiled_article_class")
-        && hungarian_10x10_bundle["claim_class"].as_str() == Some("compiled_article_class")
-        && kernel_suite_landed;
+    let closure_report: crate::TassadarCompiledArticleClosureReport = read_repo_json(
+        crate::TASSADAR_COMPILED_ARTICLE_CLOSURE_REPORT_REF,
+        "tassadar_compiled_article_closure_report",
+    )?;
+    let passed = closure_report.passed;
 
     Ok(TassadarAcceptanceVerdict::new(
         "compiled_article_class",
         passed,
-        if passed {
-            "The compiled/proof-backed lane now advertises article-class closure from committed article workloads and acceptance artifacts."
-        } else if kernel_suite_landed {
-            "Compiled article-class closure is still red: the repo now has exact compiled 9x9 Sudoku, 10x10 Hungarian, and generic arithmetic/memory/branch/loop kernel evidence, but it still lacks the compiled article-closure checker."
-        } else {
-            "Compiled article-class closure is still red: the repo now has exact compiled 9x9 Sudoku and 10x10 Hungarian bundles, but it still lacks the generic compiled kernel suite and the compiled article-closure checker."
-        },
-        vec![String::from(TASSADAR_ACCEPTANCE_CHECKER_COMMAND)],
+        closure_report.detail.as_str(),
+        vec![String::from(
+            crate::TASSADAR_COMPILED_ARTICLE_CLOSURE_CHECKER_COMMAND,
+        )],
         vec![
-            TassadarAcceptanceEvidenceRef::new(
-                "bounded compiled Sudoku run bundle",
-                COMPILED_SUDOKU_RUN_BUNDLE_REF,
-                Some(sudoku_bundle.bundle_digest),
-            ),
             TassadarAcceptanceEvidenceRef::new(
                 "exact compiled Sudoku-9x9 run bundle",
                 COMPILED_SUDOKU_9X9_RUN_BUNDLE_REF,
@@ -677,19 +661,13 @@ fn build_compiled_article_class_verdict(
                 COMPILED_KERNEL_SUITE_CLAIM_BOUNDARY_REPORT_REF,
                 None,
             ),
+            TassadarAcceptanceEvidenceRef::new(
+                "compiled article-closure checker report",
+                crate::TASSADAR_COMPILED_ARTICLE_CLOSURE_REPORT_REF,
+                Some(closure_report.report_digest),
+            ),
         ],
-        if passed {
-            Vec::new()
-        } else if kernel_suite_landed {
-            vec![String::from("PTAS-305 compiled article-closure checker")]
-        } else {
-            vec![
-                String::from(
-                    "PTAS-304 generic compiled arithmetic/memory/branch/loop kernel suite",
-                ),
-                String::from("PTAS-305 compiled article-closure checker"),
-            ]
-        },
+        closure_report.missing_requirements,
     ))
 }
 
@@ -749,17 +727,18 @@ fn build_learned_article_class_verdict(
 fn build_article_closure_verdict(
     compiled_article_class: &TassadarAcceptanceVerdict,
     fast_path_declared_workload_exact: &TassadarAcceptanceVerdict,
-    learned_bounded: &TassadarAcceptanceVerdict,
     learned_article_class: &TassadarAcceptanceVerdict,
 ) -> TassadarAcceptanceVerdict {
     let passed = compiled_article_class.passed
         && fast_path_declared_workload_exact.passed
-        && (learned_article_class.passed || learned_bounded.passed);
+        && learned_article_class.passed;
     TassadarAcceptanceVerdict::new(
         "article_closure",
         passed,
         if passed {
             "The repo can now reproduce article-class Wasm compute claims from local artifacts and commands."
+        } else if compiled_article_class.passed {
+            "Final article-parity closure remains red: the compiled article-class bar is now green, but the learned lane still remains bounded and the repo cannot yet make full article-parity claims."
         } else {
             "Final article-parity closure remains red because the compiled article-class bar is not closed, even though bounded fast-path and bounded learned facts are separately recorded."
         },
@@ -767,11 +746,16 @@ fn build_article_closure_verdict(
         Vec::new(),
         if passed {
             Vec::new()
+        } else if compiled_article_class.passed {
+            vec![
+                String::from("learned-lane article-class workloads must turn green"),
+                String::from("fast decode truth must stay explicit on its exact workload class"),
+            ]
         } else {
             vec![
                 String::from("compiled/proof-backed article-class workloads must turn green"),
                 String::from("fast decode truth must stay explicit on its exact workload class"),
-                String::from("learned-lane claims must remain separately justified"),
+                String::from("learned-lane article-class workloads must turn green"),
             ]
         },
     )
@@ -833,7 +817,7 @@ mod tests {
         assert!(report.compiled_exact.passed);
         assert!(report.learned_bounded.passed);
         assert!(report.fast_path_declared_workload_exact.passed);
-        assert!(!report.compiled_article_class.passed);
+        assert!(report.compiled_article_class.passed);
         assert!(!report.learned_article_class.passed);
         assert!(!report.article_closure.passed);
 

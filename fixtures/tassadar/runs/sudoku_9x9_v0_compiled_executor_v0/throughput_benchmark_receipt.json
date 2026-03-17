@@ -2,9 +2,9 @@
   "workload_family_id": "tassadar.wasm.sudoku_9x9_search.v1.compiled_executor",
   "requested_decode_mode": "reference_linear",
   "total_case_count": 4,
-  "average_cpu_reference_steps_per_second": 10864369.570006317,
-  "average_compiled_executor_steps_per_second": 8554.897661251824,
-  "average_compiled_over_cpu_ratio": 0.000787289926,
+  "average_cpu_reference_steps_per_second": 12459568.27788749,
+  "average_compiled_executor_steps_per_second": 9321.28058165131,
+  "average_compiled_over_cpu_ratio": 0.000748069946,
   "case_receipts": [
     {
       "case_id": "sudoku_9x9_train_a",
@@ -15,9 +15,9 @@
       "requested_decode_mode": "reference_linear",
       "effective_decode_mode": "reference_linear",
       "trace_step_count": 6861,
-      "cpu_reference_steps_per_second": 10840657.561486041,
-      "compiled_executor_steps_per_second": 8658.381922759907,
-      "compiled_over_cpu_ratio": 0.00079869527,
+      "cpu_reference_steps_per_second": 12672285.415228168,
+      "compiled_executor_steps_per_second": 9562.378960331163,
+      "compiled_over_cpu_ratio": 0.00075458993,
       "runtime_trace_digest": "0c58f9b84532f778972391155bface5a73d4419f11c74d58668e3a778e2a5c36",
       "runtime_execution_proof_bundle_digest": "2a4ea31f09b0192f0226bb39f4e7a70e48b36e29ab2115b82456fab440bca4d0"
     },
@@ -30,9 +30,9 @@
       "requested_decode_mode": "reference_linear",
       "effective_decode_mode": "reference_linear",
       "trace_step_count": 6873,
-      "cpu_reference_steps_per_second": 10952736.593049332,
-      "compiled_executor_steps_per_second": 8753.12082052669,
-      "compiled_over_cpu_ratio": 0.000799172038,
+      "cpu_reference_steps_per_second": 12350095.46781325,
+      "compiled_executor_steps_per_second": 9441.317933969583,
+      "compiled_over_cpu_ratio": 0.000764473275,
       "runtime_trace_digest": "9c4fc54c9747acb18ba87e3000d8cfc173660bac0bcc1a4d4a4cc9d05be6fa11",
       "runtime_execution_proof_bundle_digest": "025c47a48d14215a719fb39182a6b52cbce6c7e7d98ce3ebc15f5e6ab019a74c"
     },
@@ -45,9 +45,9 @@
       "requested_decode_mode": "reference_linear",
       "effective_decode_mode": "reference_linear",
       "trace_step_count": 7449,
-      "cpu_reference_steps_per_second": 10725332.371060027,
-      "compiled_executor_steps_per_second": 8096.764338214409,
-      "compiled_over_cpu_ratio": 0.000754919667,
+      "cpu_reference_steps_per_second": 12373095.842223365,
+      "compiled_executor_steps_per_second": 8788.639964911747,
+      "compiled_over_cpu_ratio": 0.000710302424,
       "runtime_trace_digest": "3d4ba4b2ac432c6cf5c041db9316398815b869954229424cddde9be3755d28aa",
       "runtime_execution_proof_bundle_digest": "fe5c9eb89099f638181790400378910cb264e8839598341224de78c3140c8787"
     },
@@ -60,12 +60,12 @@
       "requested_decode_mode": "reference_linear",
       "effective_decode_mode": "reference_linear",
       "trace_step_count": 6823,
-      "cpu_reference_steps_per_second": 10938751.75442986,
-      "compiled_executor_steps_per_second": 8711.323563506287,
-      "compiled_over_cpu_ratio": 0.000796372727,
+      "cpu_reference_steps_per_second": 12442796.386285169,
+      "compiled_executor_steps_per_second": 9492.785467392747,
+      "compiled_over_cpu_ratio": 0.000762914153,
       "runtime_trace_digest": "7dd3fc5643563817c4a4fdcc5323c6f0078efe2b6615d34c6d0c436b6dce58d3",
       "runtime_execution_proof_bundle_digest": "05a9e8234c166967fd84eba528b2fcc8dc81a7831b10a80314e895b14819d9dc"
     }
   ],
-  "report_digest": "8c1c44a00261c9d7515fb900fa8e2be9cbbf4d4285b811e2cd5ea65b8a228e63"
+  "report_digest": "8b1ca8f4fdddb9e0b36417331f8cad5b8400c34426da6f85799b1ab7dc2cc58c"
 }

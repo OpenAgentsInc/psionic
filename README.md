@@ -1226,6 +1226,10 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
   `fixtures/tassadar/reports/tassadar_acceptance_report.json` are the canonical
   live checker and machine-readable acceptance artifact for current Tassadar
   claim truth.
+- `scripts/check-tassadar-compiled-article-closure.sh` and
+  `fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json`
+  are the canonical compiled-lane closure checker and machine-readable report
+  for the article-sized compiled/proof-backed Tassadar bar.
 - `fixtures/tassadar/reports/tassadar_wasm_instruction_coverage_report.json`
   is the canonical machine-readable Tassadar Wasm profile/instruction coverage
   artifact.

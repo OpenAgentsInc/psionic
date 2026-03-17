@@ -478,6 +478,15 @@ The current scope is:
   families while keeping the boundary explicit (`eval_only`, generic kernel
   evidence only, not arbitrary-program closure, and not full compiled article
   parity)
+- landed compiled article-closure checker: `psionic-research` now emits the
+  machine-readable report
+  `fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json`
+  plus the repo-owned validator command
+  `scripts/check-tassadar-compiled-article-closure.sh`, which only turns green
+  once the article-sized compiled 9x9 Sudoku bundle, the article-sized
+  compiled 10x10 Hungarian bundle, and the generic compiled kernel suite all
+  exist with proof and benchmark artifacts and the older 4x4 proxies are no
+  longer the strongest exact compiled evidence in-tree
 - landed Phase 8A bar: typed `psionic-research` executor-variant family with
   benchmark/proof/lineage-backed bounded runs and machine-readable sweep
   records for reproducible same-contract candidate comparison

@@ -6,10 +6,10 @@
   "allowed_claim_classes": [
     "research_only",
     "compiled_exact",
-    "learned_bounded"
+    "learned_bounded",
+    "compiled_article_class"
   ],
   "disallowed_claim_classes": [
-    "compiled_article_class",
     "learned_article_class"
   ],
   "article_parity_language_allowed": false,
@@ -122,21 +122,16 @@
   },
   "compiled_article_class": {
     "verdict_id": "compiled_article_class",
-    "passed": false,
-    "detail": "Compiled article-class closure is still red: the repo now has exact compiled 9x9 Sudoku, 10x10 Hungarian, and generic arithmetic/memory/branch/loop kernel evidence, but it still lacks the compiled article-closure checker.",
+    "passed": true,
+    "detail": "Compiled article-closure checker is green: exact compiled article-sized Sudoku-9x9, Hungarian-10x10, and generic arithmetic/memory/branch/loop kernel evidence all exist with benchmark and proof artifacts, and the older 4x4 proxies are no longer the strongest exact compiled results in-tree.",
     "validation_commands": [
-      "scripts/check-tassadar-acceptance.sh"
+      "scripts/check-tassadar-compiled-article-closure.sh"
     ],
     "evidence": [
       {
-        "label": "bounded compiled Sudoku run bundle",
-        "artifact_ref": "fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0/run_bundle.json",
-        "digest": "94bb2f9398cf02cb91393cc51db8ba5a44ee6195c9f8f87da3f6a4bf96319f67"
-      },
-      {
         "label": "exact compiled Sudoku-9x9 run bundle",
         "artifact_ref": "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/run_bundle.json",
-        "digest": "9a433a3ae5932df79c477b3dc49955996fa6825d39eec8f0e6366a2c471e4c66"
+        "digest": "8659ec0651b1fd4ed3a45f45c1e4e65921f17920f19f54c6fd3f1bc78e0c60db"
       },
       {
         "label": "article-sized compiled Hungarian-10x10 run bundle",
@@ -175,10 +170,12 @@
       {
         "label": "generic compiled kernel-suite claim-boundary report",
         "artifact_ref": "fixtures/tassadar/runs/compiled_kernel_suite_v0/claim_boundary_report.json"
+      },
+      {
+        "label": "compiled article-closure checker report",
+        "artifact_ref": "fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json",
+        "digest": "64a128df2d28f3835208876167a88888d9687b400555f69bb4cc821c88a9c3e1"
       }
-    ],
-    "missing_evidence": [
-      "PTAS-305 compiled article-closure checker"
     ]
   },
   "learned_article_class": {
@@ -211,16 +208,15 @@
   "article_closure": {
     "verdict_id": "article_closure",
     "passed": false,
-    "detail": "Final article-parity closure remains red because the compiled article-class bar is not closed, even though bounded fast-path and bounded learned facts are separately recorded.",
+    "detail": "Final article-parity closure remains red: the compiled article-class bar is now green, but the learned lane still remains bounded and the repo cannot yet make full article-parity claims.",
     "validation_commands": [
       "scripts/check-tassadar-acceptance.sh"
     ],
     "missing_evidence": [
-      "compiled/proof-backed article-class workloads must turn green",
-      "fast decode truth must stay explicit on its exact workload class",
-      "learned-lane claims must remain separately justified"
+      "learned-lane article-class workloads must turn green",
+      "fast decode truth must stay explicit on its exact workload class"
     ]
   },
   "current_truth_holds": true,
-  "report_digest": "444265bf527d26337d6bc62aed487b2cdf41cd8c134d3916ea2211de9d1aa25a"
+  "report_digest": "c4ee61100fc70f33ee656d95623df9712a705b4d9911699f6d7f821085834101"
 }
