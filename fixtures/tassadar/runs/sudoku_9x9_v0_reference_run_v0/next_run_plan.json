@@ -1,13 +1,13 @@
 {
   "run_id": "tassadar-executor-transformer-sudoku-9x9-reference-run-v0",
-  "basis_postmortem_digest": "3f32875df3a24e62a8ea13d591e6577a7aa2368a3c79bb302f5d7a7640b6d875",
+  "basis_postmortem_digest": "b2cd07fa43cfb404bbd48571f313a36045627902fa8cbca6f79fff7571c7b2ad",
   "actions": [
     {
-      "action_id": "later_window_truth",
-      "summary": "Add later-prefix or suffix-window eval artifacts instead of pretending the first bounded window says enough about the full 9x9 trace.",
+      "action_id": "later_window_closure",
+      "summary": "Use the landed non-zero-offset and suffix-window artifacts to drive exactness upward beyond the early prefix instead of over-reading the first 512 tokens.",
       "success_criteria": [
-        "Persist at least one non-zero-offset target window report.",
-        "Keep every window report explicit about which target slice it covers."
+        "The later fixed-offset window and the furthest fittable suffix window both improve over their current bounded exactness.",
+        "Every updated artifact keeps bounded window success separate from full-trace exactness."
       ]
     },
     {
@@ -26,5 +26,5 @@
       ]
     }
   ],
-  "plan_digest": "8018e3352680f35c3c66c0927eb3d65e854458df324748939b66b5e356b73c90"
+  "plan_digest": "33eeb0db39a6a81854e91d382e47bc0156fabed434e5fe4005c22096dca930d1"
 }

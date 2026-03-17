@@ -1,6 +1,6 @@
 {
   "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@scale-v0",
-  "dataset_digest": "62ff118b9980cccc0bfeb49fa86fc9b2703846e6a344c5207ad44a704d7a172a",
+  "dataset_digest": "84c3b00387336badb47aa228b68071a088de25e0429be1287f1e09d38207135d",
   "tokenizer_digest": "f4134f46b2722a420ccb7f72a34e3b45e17a7a03b8a2c24084e1792f7e324bed",
   "vocabulary_digest": "185385130aab45df19fa68f2bbfe7510517831834b1345bc3cc09559de52b42e",
   "trainable_surface": "output_head_only",
@@ -56,13 +56,13 @@
     "packing_mode": "batch_by_token_budget",
     "batches": [
       {
-        "batch_id": "6bde7bac28708c1af7cd5f1f867b8eab2702e40b2466632264683d2bb0468d4a",
+        "batch_id": "a2d66affcec3646c5a8dd73b8befcf84f8d102c5e55a3e766d5d42b50b1fa7ea",
         "rows": [
           {
-            "row_id": "3af5285cc22f2e1aa11b35e1affb26d65ccdd58167e78eb8e5348395cce45a6c",
+            "row_id": "9472bf79e4149df769288094e8b7175ff6d570bcb6e6e9e741a71b7e8c9cfd1e",
             "source_sequences": [
               {
-                "sequence_id": "tassadar.sequence.sudoku_9x9_train_a",
+                "sequence_id": "tassadar.sequence.sudoku_9x9_train_a.sequential_cpu_reference",
                 "shard_key": "train-000",
                 "sequence_index": 0,
                 "token_count": 4918195
@@ -72,10 +72,10 @@
             "padded_token_count": 4918195
           },
           {
-            "row_id": "5590f724d407332288439624005dcef4265eff0018930a196fb8a1c82218c013",
+            "row_id": "9030a80797eb86c2978dac79f527e484add448cae06655bf94b92bd9fb40b02a",
             "source_sequences": [
               {
-                "sequence_id": "tassadar.sequence.sudoku_9x9_train_b",
+                "sequence_id": "tassadar.sequence.sudoku_9x9_train_b.sequential_cpu_reference",
                 "shard_key": "train-000",
                 "sequence_index": 1,
                 "token_count": 4926687
@@ -98,13 +98,13 @@
     "packing_mode": "batch_by_token_budget",
     "batches": [
       {
-        "batch_id": "a2db2140336957a0c0b480662a1c20bc6647e06382a957d08195865d50ac24f1",
+        "batch_id": "36c5f6b10b7008b261bd984d1cd31748b36de15d46362de4ce5b00ba40c7bf1b",
         "rows": [
           {
-            "row_id": "808b55cd1163e440f55f0ee2a590cb94a7bbf95de0eecfc47b89cc92426baf77",
+            "row_id": "6af2aac15d0865b0d168de0f7b24692d368ad87c3da076798a17b07fc2daa139",
             "source_sequences": [
               {
-                "sequence_id": "tassadar.sequence.sudoku_9x9_validation_a",
+                "sequence_id": "tassadar.sequence.sudoku_9x9_validation_a.sequential_cpu_reference",
                 "shard_key": "validation-000",
                 "sequence_index": 0,
                 "token_count": 5335309
@@ -127,13 +127,13 @@
     "packing_mode": "batch_by_token_budget",
     "batches": [
       {
-        "batch_id": "dfed558e100fd14ec9d85814784559d30c661033d5fa5c57c4e67f23476c76cc",
+        "batch_id": "67fc3638b78f97a3ff4ac71db7b5658dc3bf12c9b89bf204cd2e4d1fd4933f5e",
         "rows": [
           {
-            "row_id": "915731c30c30a6e0da9658e0712bc8b19a1cd7bc0c1183b5af62206a3f86176c",
+            "row_id": "7df78a76ea8da174dcfd6b15c5bd3ffb8b80da9157f9e4cd4b5924a6c41abd0a",
             "source_sequences": [
               {
-                "sequence_id": "tassadar.sequence.sudoku_9x9_test_a",
+                "sequence_id": "tassadar.sequence.sudoku_9x9_test_a.sequential_cpu_reference",
                 "shard_key": "test-000",
                 "sequence_index": 0,
                 "token_count": 4891222
@@ -151,5 +151,5 @@
     "total_source_sequences": 1,
     "total_source_tokens": 4891222
   },
-  "manifest_digest": "e2875fb95869913f765edfa4daaf2a170da870c769914169b9dd78d56e242215"
+  "manifest_digest": "f4e450e0e901a1a670682abb1a54e173679a4243e454befd3da6cec1ba18006f"
 }

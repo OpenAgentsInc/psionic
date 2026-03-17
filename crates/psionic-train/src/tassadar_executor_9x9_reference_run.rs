@@ -1,6 +1,10 @@
 use std::{collections::BTreeMap, fs, path::Path};
 
-use psionic_eval::{EvalArtifact, TassadarSequenceEvalError, build_tassadar_sequence_dataset};
+use psionic_eval::{
+    EvalArtifact, TassadarExecutorEvalWindowSpec, TassadarExecutorWindowedEvalReport,
+    TassadarSequenceEvalError, build_tassadar_sequence_dataset,
+    evaluate_tassadar_executor_transformer_with_window,
+};
 use psionic_models::{
     TassadarExecutorLongTraceContract, TassadarExecutorTrainableSurface,
     TassadarExecutorTransformer,
@@ -15,12 +19,13 @@ use crate::{
     TassadarExecutorRunError, TassadarExecutorTeacherForcedTrainingStrategy,
     TassadarExecutorTelemetryError, TassadarExecutorTraceDivergenceReport,
     TassadarExecutorTrainingConfig, TassadarExecutorTrainingReport,
-    augment_tassadar_training_run_with_telemetry,
-    execute_tassadar_training_run_without_benchmark,
+    TassadarExecutorCheckpointState,
+    augment_tassadar_training_run_with_telemetry, execute_tassadar_training_run_without_benchmark,
 };
 
 const RUN_BUNDLE_FILE: &str = "run_bundle.json";
 const TRAINING_REPORT_FILE: &str = "training_report.json";
+const CHECKPOINT_STATE_FILE: &str = "checkpoint_state.json";
 
 /// Stable run identifier for the first honest 9x9 reference run.
 pub const TASSADAR_EXECUTOR_SUDOKU_9X9_REFERENCE_RUN_ID: &str =
@@ -30,6 +35,12 @@ pub const TASSADAR_EXECUTOR_SUDOKU_9X9_REFERENCE_RUN_OUTPUT_DIR: &str =
     "fixtures/tassadar/runs/sudoku_9x9_v0_reference_run_v0";
 /// Canonical machine-readable fit report for the 9x9 reference run.
 pub const TASSADAR_EXECUTOR_SEQUENCE_FIT_REPORT_FILE: &str = "sequence_fit_report.json";
+/// Canonical machine-readable later-window exactness report for the 9x9 reference run.
+pub const TASSADAR_EXECUTOR_LATER_WINDOW_EXACTNESS_FILE: &str =
+    "later_window_exactness_report.json";
+/// Canonical machine-readable suffix-window failure artifact for the 9x9 reference run.
+pub const TASSADAR_EXECUTOR_SUFFIX_WINDOW_FAILURE_FILE: &str =
+    "suffix_window_failure_report.json";
 
 /// One artifact file size captured for the persisted 9x9 run.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -278,7 +289,9 @@ impl TassadarExecutorSequenceFitReport {
             full_sequence_context_overflow_min,
             full_sequence_context_overflow_max,
             stage_fits,
-            eval_target_token_cap: config.max_eval_target_tokens_per_example.map(|value| value as u32),
+            eval_target_token_cap: config
+                .max_eval_target_tokens_per_example
+                .map(|value| value as u32),
             estimated_full_forward_buffer_bytes_max,
             estimated_bounded_forward_buffer_bytes_max,
             estimated_incremental_decode_live_bytes_max,
@@ -290,6 +303,243 @@ impl TassadarExecutorSequenceFitReport {
         report.report_digest =
             stable_digest(b"psionic_tassadar_executor_sequence_fit_report|", &report);
         Ok(report)
+    }
+}
+
+/// One named later-window summary derived from a bounded eval artifact.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarSudoku9x9WindowEvalSummary {
+    /// Stable window identifier.
+    pub window_id: String,
+    /// Aggregate target exactness inside the bounded window.
+    pub aggregate_target_token_exactness_bps: u32,
+    /// Aggregate first-target exactness inside the bounded window.
+    pub first_target_exactness_bps: u32,
+    /// Aggregate first-eight exactness inside the bounded window.
+    pub first_8_token_exactness_bps: u32,
+    /// Aggregate first-32 exactness inside the bounded window.
+    pub first_32_token_exactness_bps: u32,
+    /// Number of cases whose full evaluated window stayed exact.
+    pub exact_window_case_count: u32,
+    /// Number of cases whose full trace stayed exact from the natural prompt.
+    pub full_trace_exact_case_count: u32,
+    /// Number of cases with exact final outputs when the window reached trace end.
+    pub final_output_exact_case_count: u32,
+    /// Number of cases with exact halt markers when the window reached trace end.
+    pub halt_exact_case_count: u32,
+}
+
+impl TassadarSudoku9x9WindowEvalSummary {
+    fn from_report(report: &TassadarExecutorWindowedEvalReport) -> Self {
+        Self {
+            window_id: report.window.window_id.clone(),
+            aggregate_target_token_exactness_bps: report.aggregate_target_token_exactness_bps,
+            first_target_exactness_bps: report.first_target_exactness_bps,
+            first_8_token_exactness_bps: report.first_8_token_exactness_bps,
+            first_32_token_exactness_bps: report.first_32_token_exactness_bps,
+            exact_window_case_count: report.exact_window_case_count,
+            full_trace_exact_case_count: report.full_trace_exact_case_count,
+            final_output_exact_case_count: report.final_output_exact_case_count,
+            halt_exact_case_count: report.halt_exact_case_count,
+        }
+    }
+}
+
+/// Machine-readable early-vs-later exactness comparison for the 9x9 reference run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarSudoku9x9LaterWindowExactnessReport {
+    /// Stable run identifier.
+    pub run_id: String,
+    /// Stable dataset storage key used for evaluation.
+    pub dataset_storage_key: String,
+    /// Stable dataset digest used for evaluation.
+    pub dataset_digest: String,
+    /// Trained model descriptor digest bound to the report.
+    pub trained_model_descriptor_digest: String,
+    /// Early bounded prefix window report.
+    pub early_prefix_window: TassadarExecutorWindowedEvalReport,
+    /// Fixed later bounded window report.
+    pub later_offset_window: TassadarExecutorWindowedEvalReport,
+    /// Furthest fittable suffix-window report.
+    pub furthest_fittable_suffix_window: TassadarExecutorWindowedEvalReport,
+    /// Flat summaries for quick audit review.
+    pub summaries: Vec<TassadarSudoku9x9WindowEvalSummary>,
+    /// Plain-language summary.
+    pub summary: String,
+    /// Stable report digest.
+    pub report_digest: String,
+}
+
+impl TassadarSudoku9x9LaterWindowExactnessReport {
+    fn new(
+        run_bundle: &TassadarExecutorReferenceRunBundle,
+        model: &TassadarExecutorTransformer,
+        config: &TassadarExecutorTrainingConfig,
+    ) -> Result<Self, TassadarSudoku9x9ReferenceRunError> {
+        let dataset_bundle =
+            build_tassadar_sequence_dataset(config.workload, config.dataset_version.as_str())
+                .map_err(TassadarSudoku9x9ReferenceRunError::SequenceEval)?;
+        let early_prefix_window = evaluate_tassadar_executor_transformer_with_window(
+            model,
+            &dataset_bundle.dataset,
+            psionic_data::TassadarSequenceSplit::Validation,
+            &TassadarExecutorEvalWindowSpec::prefix("early_prefix_512", 512),
+        )
+        .map_err(TassadarSudoku9x9ReferenceRunError::WindowEval)?;
+        let later_offset_window = evaluate_tassadar_executor_transformer_with_window(
+            model,
+            &dataset_bundle.dataset,
+            psionic_data::TassadarSequenceSplit::Validation,
+            &TassadarExecutorEvalWindowSpec::offset("later_offset_262144_512", 262_144, 512),
+        )
+        .map_err(TassadarSudoku9x9ReferenceRunError::WindowEval)?;
+        let furthest_fittable_suffix_window = evaluate_tassadar_executor_transformer_with_window(
+            model,
+            &dataset_bundle.dataset,
+            psionic_data::TassadarSequenceSplit::Validation,
+            &TassadarExecutorEvalWindowSpec::furthest_fittable_suffix(
+                "furthest_fittable_suffix_512",
+                512,
+            ),
+        )
+        .map_err(TassadarSudoku9x9ReferenceRunError::WindowEval)?;
+        let summaries = vec![
+            TassadarSudoku9x9WindowEvalSummary::from_report(&early_prefix_window),
+            TassadarSudoku9x9WindowEvalSummary::from_report(&later_offset_window),
+            TassadarSudoku9x9WindowEvalSummary::from_report(&furthest_fittable_suffix_window),
+        ];
+        let mut report = Self {
+            run_id: run_bundle.run_id.clone(),
+            dataset_storage_key: run_bundle.dataset_storage_key.clone(),
+            dataset_digest: run_bundle.dataset_digest.clone(),
+            trained_model_descriptor_digest: run_bundle.trained_model_descriptor_digest.clone(),
+            early_prefix_window,
+            later_offset_window,
+            furthest_fittable_suffix_window,
+            summaries,
+            summary: String::new(),
+            report_digest: String::new(),
+        };
+        report.summary = format!(
+            "Later-window truth is now explicit on the same 9x9 checkpoint: early_first_32_bps={}, later_first_32_bps={}, suffix_first_32_bps={}, early_exact_windows={}, later_exact_windows={}, suffix_exact_windows={}, full_trace_exact_windows={}.",
+            report.early_prefix_window.first_32_token_exactness_bps,
+            report.later_offset_window.first_32_token_exactness_bps,
+            report.furthest_fittable_suffix_window.first_32_token_exactness_bps,
+            report.early_prefix_window.exact_window_case_count,
+            report.later_offset_window.exact_window_case_count,
+            report.furthest_fittable_suffix_window.exact_window_case_count,
+            report.furthest_fittable_suffix_window.full_trace_exact_case_count,
+        );
+        report.report_digest = stable_digest(
+            b"psionic_tassadar_sudoku_9x9_later_window_exactness_report|",
+            &report,
+        );
+        Ok(report)
+    }
+}
+
+/// One suffix-window failure case for the 9x9 reference run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarSudoku9x9SuffixWindowFailureCase {
+    /// Stable sequence identifier.
+    pub sequence_id: String,
+    /// Stable case identifier.
+    pub case_id: String,
+    /// Resolved start offset for the suffix window.
+    pub resolved_start_target_token_index: u32,
+    /// Number of target tokens evaluated in the suffix window.
+    pub evaluated_target_token_count: u32,
+    /// Number of exact tokens before the first failure.
+    pub matched_target_token_count: u32,
+    /// Exactness over the suffix window.
+    pub target_token_exactness_bps: u32,
+    /// First window-relative divergence index.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_divergence_index: Option<u32>,
+    /// Symbolic reference token at divergence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_divergence_token: Option<String>,
+    /// Symbolic predicted token at divergence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub predicted_divergence_token: Option<String>,
+    /// Whether the full suffix window stayed exact.
+    pub exact_window_match: bool,
+    /// Whether final outputs matched when the suffix reached trace end.
+    pub final_output_match: bool,
+    /// Whether the halt marker matched when the suffix reached trace end.
+    pub halt_match: bool,
+}
+
+/// Machine-readable suffix-window failure artifact for the 9x9 reference run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarSudoku9x9SuffixWindowFailureReport {
+    /// Stable run identifier.
+    pub run_id: String,
+    /// Stable dataset storage key used for evaluation.
+    pub dataset_storage_key: String,
+    /// Stable later-window report digest backing the failure slice.
+    pub later_window_report_digest: String,
+    /// Stable window identifier.
+    pub window_id: String,
+    /// Ordered suffix failure cases.
+    pub cases: Vec<TassadarSudoku9x9SuffixWindowFailureCase>,
+    /// Plain-language summary.
+    pub summary: String,
+    /// Stable report digest.
+    pub report_digest: String,
+}
+
+impl TassadarSudoku9x9SuffixWindowFailureReport {
+    fn new(
+        run_bundle: &TassadarExecutorReferenceRunBundle,
+        later_window: &TassadarSudoku9x9LaterWindowExactnessReport,
+    ) -> Self {
+        let cases = later_window
+            .furthest_fittable_suffix_window
+            .case_reports
+            .iter()
+            .map(|case| TassadarSudoku9x9SuffixWindowFailureCase {
+                sequence_id: case.sequence_id.clone(),
+                case_id: case.case_id.clone(),
+                resolved_start_target_token_index: case.window.resolved_start_target_token_index,
+                evaluated_target_token_count: case.window.evaluated_target_token_count,
+                matched_target_token_count: case.matched_target_token_count,
+                target_token_exactness_bps: case.target_token_exactness_bps,
+                first_divergence_index: case.first_divergence_index,
+                reference_divergence_token: case.reference_divergence_token.clone(),
+                predicted_divergence_token: case.predicted_divergence_token.clone(),
+                exact_window_match: case.exact_window_match,
+                final_output_match: case.final_output_match,
+                halt_match: case.halt_match,
+            })
+            .collect::<Vec<_>>();
+        let mut report = Self {
+            run_id: run_bundle.run_id.clone(),
+            dataset_storage_key: run_bundle.dataset_storage_key.clone(),
+            later_window_report_digest: later_window.report_digest.clone(),
+            window_id: later_window
+                .furthest_fittable_suffix_window
+                .window
+                .window_id
+                .clone(),
+            cases,
+            summary: String::new(),
+            report_digest: String::new(),
+        };
+        report.summary = format!(
+            "Suffix-window failure truth is now explicit for `{}`: exact_windows={}, final_output_exact_cases={}, halt_exact_cases={}.",
+            report.window_id,
+            later_window.furthest_fittable_suffix_window.exact_window_case_count,
+            later_window
+                .furthest_fittable_suffix_window
+                .final_output_exact_case_count,
+            later_window.furthest_fittable_suffix_window.halt_exact_case_count,
+        );
+        report.report_digest = stable_digest(
+            b"psionic_tassadar_sudoku_9x9_suffix_window_failure_report|",
+            &report,
+        );
+        report
     }
 }
 
@@ -327,6 +577,7 @@ impl TassadarSudoku9x9PostmortemReport {
         fit_report: &TassadarExecutorSequenceFitReport,
         training_report: &TassadarExecutorTrainingReport,
         divergence: &TassadarExecutorTraceDivergenceReport,
+        later_window: &TassadarSudoku9x9LaterWindowExactnessReport,
     ) -> Self {
         let findings = vec![
             TassadarSudoku9x9PostmortemFinding {
@@ -335,7 +586,9 @@ impl TassadarSudoku9x9PostmortemReport {
                     "The full 9x9 traces are too long for the current learned lane: the longest sequence is {} tokens against a {}-token model context.",
                     fit_report.total_token_count_max, fit_report.model_max_sequence_tokens
                 ),
-                supporting_artifacts: vec![String::from(TASSADAR_EXECUTOR_SEQUENCE_FIT_REPORT_FILE)],
+                supporting_artifacts: vec![String::from(
+                    TASSADAR_EXECUTOR_SEQUENCE_FIT_REPORT_FILE,
+                )],
             },
             TassadarSudoku9x9PostmortemFinding {
                 finding_id: String::from("bounded_prefix_only"),
@@ -349,6 +602,20 @@ impl TassadarSudoku9x9PostmortemReport {
                 ],
             },
             TassadarSudoku9x9PostmortemFinding {
+                finding_id: String::from("later_windows_now_visible"),
+                summary: format!(
+                    "Later-window truth is now explicit on the same checkpoint: early first-32 exactness is {} bps, the fixed later window is {} bps, and the furthest fittable suffix window is {} bps; these are bounded window metrics, not full-trace closure.",
+                    later_window.early_prefix_window.first_32_token_exactness_bps,
+                    later_window.later_offset_window.first_32_token_exactness_bps,
+                    later_window
+                        .furthest_fittable_suffix_window
+                        .first_32_token_exactness_bps,
+                ),
+                supporting_artifacts: vec![String::from(
+                    TASSADAR_EXECUTOR_LATER_WINDOW_EXACTNESS_FILE,
+                )],
+            },
+            TassadarSudoku9x9PostmortemFinding {
                 finding_id: String::from("bounded_prefix_still_inexact"),
                 summary: format!(
                     "Even on that bounded window, validation is still red: first-target exactness is {} bps, first-32 exactness is {} bps, and exact traces are {}/{}.",
@@ -360,6 +627,7 @@ impl TassadarSudoku9x9PostmortemReport {
                 supporting_artifacts: vec![
                     String::from(TRAINING_REPORT_FILE),
                     String::from(TASSADAR_EXECUTOR_TRACE_DIVERGENCE_FILE),
+                    String::from(TASSADAR_EXECUTOR_SUFFIX_WINDOW_FAILURE_FILE),
                 ],
             },
         ];
@@ -406,13 +674,17 @@ impl TassadarSudoku9x9NextRunPlan {
     fn new(run_id: &str, postmortem: &TassadarSudoku9x9PostmortemReport) -> Self {
         let actions = vec![
             TassadarSudoku9x9NextRunAction {
-                action_id: String::from("later_window_truth"),
+                action_id: String::from("later_window_closure"),
                 summary: String::from(
-                    "Add later-prefix or suffix-window eval artifacts instead of pretending the first bounded window says enough about the full 9x9 trace.",
+                    "Use the landed non-zero-offset and suffix-window artifacts to drive exactness upward beyond the early prefix instead of over-reading the first 512 tokens.",
                 ),
                 success_criteria: vec![
-                    String::from("Persist at least one non-zero-offset target window report."),
-                    String::from("Keep every window report explicit about which target slice it covers."),
+                    String::from(
+                        "The later fixed-offset window and the furthest fittable suffix window both improve over their current bounded exactness.",
+                    ),
+                    String::from(
+                        "Every updated artifact keeps bounded window success separate from full-trace exactness.",
+                    ),
                 ],
             },
             TassadarSudoku9x9NextRunAction {
@@ -421,8 +693,12 @@ impl TassadarSudoku9x9NextRunPlan {
                     "Either increase the learned lane context budget or adopt an explicitly windowed long-trace training/eval regime beyond the first 512 tokens.",
                 ),
                 success_criteria: vec![
-                    String::from("Full 9x9 prompt-plus-target fit becomes truthful, or later windows are covered by explicit machine-readable reports."),
-                    String::from("No artifact implies full-trace 9x9 exactness before that fit exists."),
+                    String::from(
+                        "Full 9x9 prompt-plus-target fit becomes truthful, or later windows are covered by explicit machine-readable reports.",
+                    ),
+                    String::from(
+                        "No artifact implies full-trace 9x9 exactness before that fit exists.",
+                    ),
                 ],
             },
             TassadarSudoku9x9NextRunAction {
@@ -430,9 +706,9 @@ impl TassadarSudoku9x9NextRunPlan {
                 summary: String::from(
                     "Keep the 9x9 learned lane in a partial state until bounded windows are exact and the full-trace fit problem is solved honestly.",
                 ),
-                success_criteria: vec![
-                    String::from("Audit language continues to say `9x9 only partially fit and remains blocked` until the blocker is actually removed."),
-                ],
+                success_criteria: vec![String::from(
+                    "Audit language continues to say `9x9 only partially fit and remains blocked` until the blocker is actually removed.",
+                )],
             },
         ];
 
@@ -459,6 +735,9 @@ pub enum TassadarSudoku9x9ReferenceRunError {
     /// Dataset generation failed.
     #[error(transparent)]
     SequenceEval(#[from] TassadarSequenceEvalError),
+    /// One explicit later-window eval failed.
+    #[error(transparent)]
+    WindowEval(#[from] psionic_eval::TassadarExecutorEvalError),
     /// Reading one persisted artifact failed.
     #[error("failed to read `{path}`: {error}")]
     Read {
@@ -511,16 +790,13 @@ pub fn tassadar_executor_sudoku_9x9_reference_run_config() -> TassadarExecutorTr
         teacher_forced_training_strategy:
             TassadarExecutorTeacherForcedTrainingStrategy::IncrementalDecodeWindow,
         long_trace_contract: TassadarExecutorLongTraceContract::IncrementalDecodeWindow,
-        structural_supervision: crate::TassadarExecutorStructuralSupervisionConfig::next_token_only(),
+        structural_supervision: crate::TassadarExecutorStructuralSupervisionConfig::next_token_only(
+        ),
         curriculum_stages: vec![
             crate::TassadarExecutorCurriculumStage::new("prompt_to_first_token", Some(1), 1),
             crate::TassadarExecutorCurriculumStage::new("prompt_to_first_8_tokens", Some(8), 1),
             crate::TassadarExecutorCurriculumStage::new("prompt_to_first_32_tokens", Some(32), 1),
-            crate::TassadarExecutorCurriculumStage::new(
-                "prompt_to_first_128_tokens",
-                Some(128),
-                1,
-            ),
+            crate::TassadarExecutorCurriculumStage::new("prompt_to_first_128_tokens", Some(128), 1),
         ],
         validate_every_epoch: true,
         select_best_checkpoint_by_boundary: true,
@@ -552,17 +828,29 @@ pub fn augment_tassadar_sudoku_9x9_run_with_fit_and_review(
         "tassadar_training_report",
     )?;
     let config: TassadarExecutorTrainingConfig = training_report.config.clone();
+    let checkpoint_state: TassadarExecutorCheckpointState = read_json(
+        output_dir.join(CHECKPOINT_STATE_FILE),
+        "tassadar_executor_checkpoint_state",
+    )?;
     let divergence: TassadarExecutorTraceDivergenceReport = read_json(
         output_dir.join(TASSADAR_EXECUTOR_TRACE_DIVERGENCE_FILE),
         "tassadar_trace_divergence_report",
     )?;
+    let model = checkpoint_state.materialize_model()?;
 
     let fit_report = TassadarExecutorSequenceFitReport::new(output_dir, &run_bundle, &config)?;
+    let later_window = TassadarSudoku9x9LaterWindowExactnessReport::new(
+        &run_bundle,
+        &model,
+        &config,
+    )?;
+    let suffix_failure = TassadarSudoku9x9SuffixWindowFailureReport::new(&run_bundle, &later_window);
     let postmortem = TassadarSudoku9x9PostmortemReport::new(
         &run_bundle,
         &fit_report,
         &training_report,
         &divergence,
+        &later_window,
     );
     let next_run_plan = TassadarSudoku9x9NextRunPlan::new(run_bundle.run_id.as_str(), &postmortem);
 
@@ -587,6 +875,18 @@ pub fn augment_tassadar_sudoku_9x9_run_with_fit_and_review(
         )?,
         write_json_artifact(
             output_dir,
+            TASSADAR_EXECUTOR_LATER_WINDOW_EXACTNESS_FILE,
+            "tassadar_sudoku_9x9_later_window_exactness_report",
+            &later_window,
+        )?,
+        write_json_artifact(
+            output_dir,
+            TASSADAR_EXECUTOR_SUFFIX_WINDOW_FAILURE_FILE,
+            "tassadar_sudoku_9x9_suffix_window_failure_report",
+            &suffix_failure,
+        )?,
+        write_json_artifact(
+            output_dir,
             TASSADAR_EXECUTOR_NEXT_RUN_PLAN_FILE,
             "tassadar_sudoku_9x9_next_run_plan",
             &next_run_plan,
@@ -599,8 +899,10 @@ pub fn augment_tassadar_sudoku_9x9_run_with_fit_and_review(
     updated_bundle.artifacts = artifact_map.into_values().collect();
     updated_bundle.sequence_fit_report_digest = Some(fit_report.report_digest.clone());
     updated_bundle.bundle_digest.clear();
-    updated_bundle.bundle_digest =
-        stable_digest(b"psionic_tassadar_executor_reference_run_bundle|", &updated_bundle);
+    updated_bundle.bundle_digest = stable_digest(
+        b"psionic_tassadar_executor_reference_run_bundle|",
+        &updated_bundle,
+    );
     write_json(
         output_dir.join(RUN_BUNDLE_FILE),
         "tassadar_reference_run_bundle",
@@ -683,10 +985,12 @@ where
         path: path.display().to_string(),
         error,
     })?;
-    serde_json::from_slice(&bytes).map_err(|error| TassadarSudoku9x9ReferenceRunError::Deserialize {
-        artifact_kind: artifact_kind.to_string(),
-        path: path.display().to_string(),
-        error,
+    serde_json::from_slice(&bytes).map_err(|error| {
+        TassadarSudoku9x9ReferenceRunError::Deserialize {
+            artifact_kind: artifact_kind.to_string(),
+            path: path.display().to_string(),
+            error,
+        }
     })
 }
 

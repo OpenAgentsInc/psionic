@@ -1,8 +1,8 @@
 {
   "run_id": "tassadar-executor-transformer-sudoku-9x9-reference-run-v0",
   "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@scale-v0",
-  "sequence_fit_report_digest": "1c793e52f255c9b86e4c8ac34bc300e3a9454ade3535de078724d95707da0991",
-  "divergence_report_digest": "b7d8eaf79f7a5740514cfd174f0d2b46f720983a25d58b3be013edf1ee0db736",
+  "sequence_fit_report_digest": "ca1a3e12ba6132425ddf0dc0e8417274e30bfa322c31c25508c662e28510268e",
+  "divergence_report_digest": "eb751952b477a9e1bf97475acbde1a9f955e288204f32af7c60316a2ea875e11",
   "findings": [
     {
       "finding_id": "full_sequence_exceeds_context",
@@ -20,13 +20,21 @@
       ]
     },
     {
+      "finding_id": "later_windows_now_visible",
+      "summary": "Later-window truth is now explicit on the same checkpoint: early first-32 exactness is 5938 bps, the fixed later window is 8438 bps, and the furthest fittable suffix window is 8438 bps; these are bounded window metrics, not full-trace closure.",
+      "supporting_artifacts": [
+        "later_window_exactness_report.json"
+      ]
+    },
+    {
       "finding_id": "bounded_prefix_still_inexact",
       "summary": "Even on that bounded window, validation is still red: first-target exactness is 10000 bps, first-32 exactness is 5938 bps, and exact traces are 0/1.",
       "supporting_artifacts": [
         "training_report.json",
-        "trace_divergence_report.json"
+        "trace_divergence_report.json",
+        "suffix_window_failure_report.json"
       ]
     }
   ],
-  "report_digest": "3f32875df3a24e62a8ea13d591e6577a7aa2368a3c79bb302f5d7a7640b6d875"
+  "report_digest": "b2cd07fa43cfb404bbd48571f313a36045627902fa8cbca6f79fff7571c7b2ad"
 }

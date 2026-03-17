@@ -1,12 +1,12 @@
 {
   "run_id": "tassadar-executor-transformer-sudoku-9x9-reference-run-v0",
   "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@scale-v0",
-  "dataset_digest": "62ff118b9980cccc0bfeb49fa86fc9b2703846e6a344c5207ad44a704d7a172a",
+  "dataset_digest": "84c3b00387336badb47aa228b68071a088de25e0429be1287f1e09d38207135d",
   "trained_model_descriptor_digest": "86368bf3b94c61317a63f531c689e771c867fef7b2acf0f619f1c99840e7056d",
-  "checkpoint_manifest_digest": "391cbda1996ab6b182ab13c3de3b087f6017faf8a91eb9262219776dd5bef087",
+  "checkpoint_manifest_digest": "cc4edddac9780e544e7c8abd1325179d9bb9ccac1ea33b73a1ab2f2329caf092",
   "case_reports": [
     {
-      "sequence_id": "tassadar.sequence.sudoku_9x9_train_a",
+      "sequence_id": "tassadar.sequence.sudoku_9x9_train_a.sequential_cpu_reference",
       "case_id": "sudoku_9x9_train_a",
       "split": "train",
       "target_token_count": 512,
@@ -22,7 +22,7 @@
       "predicted_target_digest": "105e6212f1855a8e6b732ef9a694ffbabbf18e4cc0599b9e2bb6ae8817ebb2bd"
     },
     {
-      "sequence_id": "tassadar.sequence.sudoku_9x9_train_b",
+      "sequence_id": "tassadar.sequence.sudoku_9x9_train_b.sequential_cpu_reference",
       "case_id": "sudoku_9x9_train_b",
       "split": "train",
       "target_token_count": 512,
@@ -38,7 +38,7 @@
       "predicted_target_digest": "105e6212f1855a8e6b732ef9a694ffbabbf18e4cc0599b9e2bb6ae8817ebb2bd"
     },
     {
-      "sequence_id": "tassadar.sequence.sudoku_9x9_validation_a",
+      "sequence_id": "tassadar.sequence.sudoku_9x9_validation_a.sequential_cpu_reference",
       "case_id": "sudoku_9x9_validation_a",
       "split": "validation",
       "target_token_count": 512,
@@ -54,7 +54,7 @@
       "predicted_target_digest": "105e6212f1855a8e6b732ef9a694ffbabbf18e4cc0599b9e2bb6ae8817ebb2bd"
     },
     {
-      "sequence_id": "tassadar.sequence.sudoku_9x9_test_a",
+      "sequence_id": "tassadar.sequence.sudoku_9x9_test_a.sequential_cpu_reference",
       "case_id": "sudoku_9x9_test_a",
       "split": "test",
       "target_token_count": 512,
@@ -70,5 +70,5 @@
       "predicted_target_digest": "105e6212f1855a8e6b732ef9a694ffbabbf18e4cc0599b9e2bb6ae8817ebb2bd"
     }
   ],
-  "report_digest": "b7d8eaf79f7a5740514cfd174f0d2b46f720983a25d58b3be013edf1ee0db736"
+  "report_digest": "eb751952b477a9e1bf97475acbde1a9f955e288204f32af7c60316a2ea875e11"
 }

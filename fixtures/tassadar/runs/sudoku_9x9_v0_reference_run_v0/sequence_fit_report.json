@@ -1,7 +1,7 @@
 {
   "run_id": "tassadar-executor-transformer-sudoku-9x9-reference-run-v0",
   "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@scale-v0",
-  "dataset_digest": "62ff118b9980cccc0bfeb49fa86fc9b2703846e6a344c5207ad44a704d7a172a",
+  "dataset_digest": "84c3b00387336badb47aa228b68071a088de25e0429be1287f1e09d38207135d",
   "model_id": "tassadar-executor-transformer-sudoku-9x9-windowed-v0",
   "trained_model_descriptor_digest": "86368bf3b94c61317a63f531c689e771c867fef7b2acf0f619f1c99840e7056d",
   "trainable_surface": "output_head_only",
@@ -75,7 +75,7 @@
     },
     {
       "artifact_ref": "training_report.json",
-      "size_bytes": 18876
+      "size_bytes": 19276
     },
     {
       "artifact_ref": "run_bundle.json",
@@ -83,7 +83,7 @@
     },
     {
       "artifact_ref": "training_manifest.json",
-      "size_bytes": 5266
+      "size_bytes": 5366
     },
     {
       "artifact_ref": "model_artifact.json",
@@ -95,11 +95,11 @@
     },
     {
       "artifact_ref": "training_telemetry.json",
-      "size_bytes": 3312
+      "size_bytes": 3562
     },
     {
       "artifact_ref": "trace_divergence_report.json",
-      "size_bytes": 3296
+      "size_bytes": 3396
     },
     {
       "artifact_ref": "checkpoint_leaderboard.json",
@@ -107,7 +107,7 @@
     },
     {
       "artifact_ref": "structural_supervision_report.json",
-      "size_bytes": 2024
+      "size_bytes": 2049
     },
     {
       "artifact_ref": "checkpoint_artifact.json",
@@ -115,7 +115,7 @@
     },
     {
       "artifact_ref": "boundary_exactness_report.json",
-      "size_bytes": 827
+      "size_bytes": 852
     },
     {
       "artifact_ref": "exact_trace_samples.json",
@@ -135,5 +135,5 @@
     "full 9x9 sequences exceed the current model context by 4366934 to 4811021 tokens",
     "the run therefore only validates the first 512 target tokens per case"
   ],
-  "report_digest": "1c793e52f255c9b86e4c8ac34bc300e3a9454ade3535de078724d95707da0991"
+  "report_digest": "ca1a3e12ba6132425ddf0dc0e8417274e30bfa322c31c25508c662e28510268e"
 }

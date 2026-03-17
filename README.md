@@ -313,13 +313,18 @@ Current posture:
   `incremental_decode_window` teacher-forced strategy and
   `incremental_decode_window` long-trace family contract bound into the
   training manifest, persists `sequence_fit_report.json`, `postmortem.json`,
-  and `next_run_plan.json`, and keeps the claim boundary honest by showing
-  that full 9x9 traces still do not fit the current `524288`-token model
-  context (`4891222` to `5335309` total tokens, overflow `4366934` to
-  `4811021`), so the run only covers the first `512` target tokens; within
-  that bounded window the selected checkpoint stays red (`10000` bps
-  first-target, `5938` bps first-32, `0/1` exact validation traces), and the
-  companion
+  `next_run_plan.json`, `later_window_exactness_report.json`, and
+  `suffix_window_failure_report.json`, and keeps the claim boundary honest by
+  showing that full 9x9 traces still do not fit the current `524288`-token
+  model context (`4891222` to `5335309` total tokens, overflow `4366934` to
+  `4811021`), so the run only covers bounded windows; the early `512`-token
+  prefix stays red (`10000` bps first-target, `5938` bps first-32, `0/1`
+  exact validation traces), but the new non-zero-offset reports show a more
+  specific picture: a fixed later window at target offset `262144` reaches
+  `8438` bps first-32 exactness and the furthest fittable suffix window at
+  target offset `472240` also reaches `8438` bps first-32, while both still
+  remain `0/1` exact windows, so later slices are no longer hidden but the
+  lane is still honestly partial, and the companion
   audit is
   `docs/audits/2026-03-16-tassadar-phase-16-9x9-reference-run-audit.md`
 - the first same-corpus 9x9 flat-prefix-vs-windowed learned comparison now

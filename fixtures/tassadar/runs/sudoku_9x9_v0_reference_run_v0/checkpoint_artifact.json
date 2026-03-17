@@ -5,14 +5,14 @@
   "checkpoint_state_file": "checkpoint_state.json",
   "checkpoint_manifest": {
     "stream_id": "checkpoint://tassadar-executor-transformer-sudoku-9x9-reference-run-v0.checkpoint.epoch_0004",
-    "manifest_digest": "391cbda1996ab6b182ab13c3de3b087f6017faf8a91eb9262219776dd5bef087",
+    "manifest_digest": "cc4edddac9780e544e7c8abd1325179d9bb9ccac1ea33b73a1ab2f2329caf092",
     "subject": "checkpoint",
-    "object_digest": "b9e3d6f77be492b0b5f30105c712e15a9e97795f98690cf71f1207ef8f2c7e53",
+    "object_digest": "5817ad1a7cc7fb65878777bf791b4c29eb6d849168dc6560164b3aa6d286fb96",
     "total_bytes": 589952,
     "chunk_count": 145,
     "chunk_bytes": 4096,
     "encoding": "raw_binary",
-    "provenance_digest": "4dac7b413764dfb89d1c9984b44d0e81b313f7113d2b4d0583b3788bf28f9252",
+    "provenance_digest": "3605b64c5b2dd8df5cb999313ebbad13bc72a0cb92cf989f704738e721e26fe1",
     "checkpoint_binding": {
       "checkpoint_family": "train.tassadar.executor_transformer",
       "checkpoint_ref": "checkpoint://tassadar-executor-transformer-sudoku-9x9-reference-run-v0.checkpoint.epoch_0004",
@@ -21,5 +21,5 @@
   },
   "trained_model_descriptor_digest": "86368bf3b94c61317a63f531c689e771c867fef7b2acf0f619f1c99840e7056d",
   "trained_weight_digest": "34e72d066aa6849df9106f3c156b14ac0989a9bd98e9b9c2aee19f446af74c68",
-  "artifact_digest": "57ee854a66c6e27820a093d1ab930cbd024ea6df56998c4a28556a1e1ec51659"
+  "artifact_digest": "8d3b7ab2bfda33b4ac393b5ddb6dd6de8e5550433487742880244ac796c32095"
 }

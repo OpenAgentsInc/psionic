@@ -180,7 +180,9 @@ The current strongest committed artifacts are:
 - `fixtures/tassadar/runs/sudoku_v0_promotion_v3`
   - learned 4x4 validation gate is green
 - `fixtures/tassadar/runs/sudoku_9x9_v0_reference_run_v0`
-  - learned 9x9 lane is honest but still partial
+  - learned 9x9 lane is honest but still partial, and now includes explicit
+    early-vs-later window exactness plus furthest-fittable suffix failure
+    artifacts instead of only the first `512`-token prefix
 - `fixtures/tassadar/runs/sudoku_v0_supervision_ablation_v1`
   - bounded learned structural-supervision comparison proves richer targets
     improve instruction-pointer and stack-delta exactness without widening the
@@ -229,7 +231,8 @@ The current technical reality is:
   sequential trace for Sudoku and Hungarian workloads without widening learned
   execution claims
 - the learned 9x9 lane still does not fit the full trace honestly under the
-  current model contract
+  current model contract, but later-window truth is now explicit instead of
+  being inferred from early-prefix metrics alone
 
 That means the honest article-shaped path is:
 
@@ -484,7 +487,7 @@ compiled-lane truth.
 | `PTAS-401` | implemented | Widen learned supervision beyond next token to instruction pointer, stack delta, memory diff, branch outcome, and workload-specific state such as Hungarian dual variables. |
 | `PTAS-402` | implemented | Add recurrent or windowed executor families that can carry long-horizon state without pretending a flat growing prefix is the only honest option. |
 | `PTAS-403` | implemented | Add parallel or wavefront trace families for Sudoku and Hungarian-class workloads and compare them against sequential CPU-style traces. |
-| `PTAS-404` | planned | Add later-window and suffix-focused eval artifacts so learned long-trace progress is visible after the first bounded prefix. |
+| `PTAS-404` | implemented | Add later-window and suffix-focused eval artifacts so learned long-trace progress is visible after the first bounded prefix. |
 | `PTAS-405` | planned | Compare hull-specialized learned architectures against trainable sparse, hybrid, and recurrent baselines under the same artifact contract. |
 
 ## Epic 5: Learned Long-Trace Closure

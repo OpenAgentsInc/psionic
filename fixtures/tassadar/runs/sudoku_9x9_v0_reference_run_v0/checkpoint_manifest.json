@@ -1,11 +1,11 @@
 {
   "stream_id": "checkpoint://tassadar-executor-transformer-sudoku-9x9-reference-run-v0.checkpoint.epoch_0004",
   "subject": "checkpoint",
-  "object_digest": "b9e3d6f77be492b0b5f30105c712e15a9e97795f98690cf71f1207ef8f2c7e53",
+  "object_digest": "5817ad1a7cc7fb65878777bf791b4c29eb6d849168dc6560164b3aa6d286fb96",
   "total_bytes": 589952,
   "chunk_bytes": 4096,
   "encoding": "raw_binary",
-  "provenance_digest": "4dac7b413764dfb89d1c9984b44d0e81b313f7113d2b4d0583b3788bf28f9252",
+  "provenance_digest": "3605b64c5b2dd8df5cb999313ebbad13bc72a0cb92cf989f704738e721e26fe1",
   "checkpoint_binding": {
     "checkpoint_family": "train.tassadar.executor_transformer",
     "checkpoint_ref": "checkpoint://tassadar-executor-transformer-sudoku-9x9-reference-run-v0.checkpoint.epoch_0004",
@@ -16,7 +16,7 @@
       "index": 0,
       "offset": 0,
       "length": 4096,
-      "chunk_digest": "daf4114918a8226ec6432e3ef9ec5e599e10c8336ad41bca055fbcb0c77841da"
+      "chunk_digest": "8375c7cf8d5f62ecf8f4d58245de94ed6dbc75ad08dcc9af55984485cc9416a4"
     },
     {
       "index": 1,
@@ -880,7 +880,7 @@
       "index": 144,
       "offset": 589824,
       "length": 128,
-      "chunk_digest": "cd30194a232c28c6002947b8e3e2a78cb6085b49344c341c0254e2ad093c7861"
+      "chunk_digest": "d149133273a63f69729ea748782aa4ecc157509f44196fc16aa9fb1b692abca2"
     }
   ]
 }

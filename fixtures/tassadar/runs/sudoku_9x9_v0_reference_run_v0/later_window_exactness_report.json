@@ -1,0 +1,206 @@
+{
+  "run_id": "tassadar-executor-transformer-sudoku-9x9-reference-run-v0",
+  "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@scale-v0",
+  "dataset_digest": "84c3b00387336badb47aa228b68071a088de25e0429be1287f1e09d38207135d",
+  "trained_model_descriptor_digest": "86368bf3b94c61317a63f531c689e771c867fef7b2acf0f619f1c99840e7056d",
+  "early_prefix_window": {
+    "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@scale-v0",
+    "dataset_digest": "84c3b00387336badb47aa228b68071a088de25e0429be1287f1e09d38207135d",
+    "split": "validation",
+    "claim_boundary": "greedy_decode_unvalidated",
+    "window": {
+      "window_id": "early_prefix_512",
+      "mode": "prefix",
+      "start_target_token_index": 0,
+      "target_token_count": 512
+    },
+    "aggregate_target_token_exactness_bps": 8125,
+    "first_target_exactness_bps": 10000,
+    "first_8_token_exactness_bps": 7500,
+    "first_32_token_exactness_bps": 5938,
+    "exact_window_case_count": 0,
+    "full_trace_exact_case_count": 0,
+    "final_output_exact_case_count": 0,
+    "halt_exact_case_count": 0,
+    "case_reports": [
+      {
+        "sequence_id": "tassadar.sequence.sudoku_9x9_validation_a.sequential_cpu_reference",
+        "case_id": "sudoku_9x9_validation_a",
+        "window": {
+          "window_id": "early_prefix_512",
+          "mode": "prefix",
+          "requested_start_target_token_index": 0,
+          "resolved_start_target_token_index": 0,
+          "evaluated_target_token_count": 512,
+          "full_target_token_count": 5283773,
+          "teacher_forced_prefix_target_token_count": 0,
+          "total_sequence_tokens_to_window_end": 52048
+        },
+        "target_token_exactness_bps": 8125,
+        "boundary": {
+          "first_target_exactness_bps": 10000,
+          "first_8_token_exactness_bps": 7500,
+          "first_32_token_exactness_bps": 5938
+        },
+        "matched_target_token_count": 1,
+        "first_divergence_index": 1,
+        "reference_divergence_token": "<step_index>",
+        "predicted_divergence_token": "<byte_00>",
+        "exact_window_match": false,
+        "full_trace_exact_match": false,
+        "final_output_match": false,
+        "halt_match": false,
+        "reference_target_digest": "308510ed730260f77f35e5ad50ce4fcf2e148ca1493736e99813890bb4401023",
+        "predicted_target_digest": "a2d6296759f0c2155216efa139fbe2fa53d013966aa0d80dcf6478756e1177d2",
+        "failures": [
+          "exact_trace_mismatch"
+        ]
+      }
+    ]
+  },
+  "later_offset_window": {
+    "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@scale-v0",
+    "dataset_digest": "84c3b00387336badb47aa228b68071a088de25e0429be1287f1e09d38207135d",
+    "split": "validation",
+    "claim_boundary": "greedy_decode_unvalidated",
+    "window": {
+      "window_id": "later_offset_262144_512",
+      "mode": "offset",
+      "start_target_token_index": 262144,
+      "target_token_count": 512
+    },
+    "aggregate_target_token_exactness_bps": 7852,
+    "first_target_exactness_bps": 10000,
+    "first_8_token_exactness_bps": 8750,
+    "first_32_token_exactness_bps": 8438,
+    "exact_window_case_count": 0,
+    "full_trace_exact_case_count": 0,
+    "final_output_exact_case_count": 0,
+    "halt_exact_case_count": 0,
+    "case_reports": [
+      {
+        "sequence_id": "tassadar.sequence.sudoku_9x9_validation_a.sequential_cpu_reference",
+        "case_id": "sudoku_9x9_validation_a",
+        "window": {
+          "window_id": "later_offset_262144_512",
+          "mode": "offset",
+          "requested_start_target_token_index": 262144,
+          "resolved_start_target_token_index": 262144,
+          "evaluated_target_token_count": 512,
+          "full_target_token_count": 5283773,
+          "teacher_forced_prefix_target_token_count": 262144,
+          "total_sequence_tokens_to_window_end": 314192
+        },
+        "target_token_exactness_bps": 7852,
+        "boundary": {
+          "first_target_exactness_bps": 10000,
+          "first_8_token_exactness_bps": 8750,
+          "first_32_token_exactness_bps": 8438
+        },
+        "matched_target_token_count": 6,
+        "first_divergence_index": 6,
+        "reference_divergence_token": "<byte_08>",
+        "predicted_divergence_token": "<byte_00>",
+        "exact_window_match": false,
+        "full_trace_exact_match": false,
+        "final_output_match": false,
+        "halt_match": false,
+        "reference_target_digest": "7f20cb6c8394f5850d416da31c4a6691fe79469c5198647926a33341bc136d7a",
+        "predicted_target_digest": "aab16f785f200e07b407d743b9dfd5f7c6e1047001adf6d2464fcfa97309bc28",
+        "failures": [
+          "exact_trace_mismatch"
+        ]
+      }
+    ]
+  },
+  "furthest_fittable_suffix_window": {
+    "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@scale-v0",
+    "dataset_digest": "84c3b00387336badb47aa228b68071a088de25e0429be1287f1e09d38207135d",
+    "split": "validation",
+    "claim_boundary": "greedy_decode_unvalidated",
+    "window": {
+      "window_id": "furthest_fittable_suffix_512",
+      "mode": "furthest_fittable_suffix",
+      "target_token_count": 512
+    },
+    "aggregate_target_token_exactness_bps": 8008,
+    "first_target_exactness_bps": 10000,
+    "first_8_token_exactness_bps": 8750,
+    "first_32_token_exactness_bps": 8438,
+    "exact_window_case_count": 0,
+    "full_trace_exact_case_count": 0,
+    "final_output_exact_case_count": 0,
+    "halt_exact_case_count": 0,
+    "case_reports": [
+      {
+        "sequence_id": "tassadar.sequence.sudoku_9x9_validation_a.sequential_cpu_reference",
+        "case_id": "sudoku_9x9_validation_a",
+        "window": {
+          "window_id": "furthest_fittable_suffix_512",
+          "mode": "furthest_fittable_suffix",
+          "resolved_start_target_token_index": 472240,
+          "evaluated_target_token_count": 512,
+          "full_target_token_count": 5283773,
+          "teacher_forced_prefix_target_token_count": 472240,
+          "total_sequence_tokens_to_window_end": 524288
+        },
+        "target_token_exactness_bps": 8008,
+        "boundary": {
+          "first_target_exactness_bps": 10000,
+          "first_8_token_exactness_bps": 8750,
+          "first_32_token_exactness_bps": 8438
+        },
+        "matched_target_token_count": 2,
+        "first_divergence_index": 2,
+        "reference_divergence_token": "<byte_01>",
+        "predicted_divergence_token": "<byte_00>",
+        "exact_window_match": false,
+        "full_trace_exact_match": false,
+        "final_output_match": false,
+        "halt_match": false,
+        "reference_target_digest": "a79ab8d5943f19aa43a679d902d28895b8d41838254403167c9904c718067a7b",
+        "predicted_target_digest": "aab16f785f200e07b407d743b9dfd5f7c6e1047001adf6d2464fcfa97309bc28",
+        "failures": [
+          "exact_trace_mismatch"
+        ]
+      }
+    ]
+  },
+  "summaries": [
+    {
+      "window_id": "early_prefix_512",
+      "aggregate_target_token_exactness_bps": 8125,
+      "first_target_exactness_bps": 10000,
+      "first_8_token_exactness_bps": 7500,
+      "first_32_token_exactness_bps": 5938,
+      "exact_window_case_count": 0,
+      "full_trace_exact_case_count": 0,
+      "final_output_exact_case_count": 0,
+      "halt_exact_case_count": 0
+    },
+    {
+      "window_id": "later_offset_262144_512",
+      "aggregate_target_token_exactness_bps": 7852,
+      "first_target_exactness_bps": 10000,
+      "first_8_token_exactness_bps": 8750,
+      "first_32_token_exactness_bps": 8438,
+      "exact_window_case_count": 0,
+      "full_trace_exact_case_count": 0,
+      "final_output_exact_case_count": 0,
+      "halt_exact_case_count": 0
+    },
+    {
+      "window_id": "furthest_fittable_suffix_512",
+      "aggregate_target_token_exactness_bps": 8008,
+      "first_target_exactness_bps": 10000,
+      "first_8_token_exactness_bps": 8750,
+      "first_32_token_exactness_bps": 8438,
+      "exact_window_case_count": 0,
+      "full_trace_exact_case_count": 0,
+      "final_output_exact_case_count": 0,
+      "halt_exact_case_count": 0
+    }
+  ],
+  "summary": "Later-window truth is now explicit on the same 9x9 checkpoint: early_first_32_bps=5938, later_first_32_bps=8438, suffix_first_32_bps=8438, early_exact_windows=0, later_exact_windows=0, suffix_exact_windows=0, full_trace_exact_windows=0.",
+  "report_digest": "b5e908c6c309dedaa9eebaa6593f09daf0971e986430da64af8f5cadc6a7aa2c"
+}

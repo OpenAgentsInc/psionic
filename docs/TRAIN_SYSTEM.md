@@ -431,15 +431,19 @@ That now includes one intentionally narrow executor-training answer:
   `fixtures/tassadar/runs/sudoku_9x9_v0_reference_run_v0`; the learned lane
   now records an explicit `incremental_decode_window` teacher-forced strategy
   and `incremental_decode_window` long-trace family contract in the training
-  manifest, persists `sequence_fit_report.json`, `postmortem.json`, and
-  `next_run_plan.json`, and keeps the claim boundary honest by stating exactly
-  what the artifacts prove: full 9x9 traces do not fit the current `524288`-
-  token model context (`4891222` to `5335309` total tokens, overflow
-  `4366934` to `4811021`), so this run only evaluates the first `512` target
-  tokens; on that bounded window the selected checkpoint reaches `10000` bps
-  first-target exactness but only `5938` bps first-32 exactness and `0/1`
-  exact validation traces, so the correct audit statement remains “9x9 only
-  partially fit and remains blocked”; the companion note is
+  manifest, persists `sequence_fit_report.json`, `postmortem.json`,
+  `next_run_plan.json`, `later_window_exactness_report.json`, and
+  `suffix_window_failure_report.json`, and keeps the claim boundary honest by
+  stating exactly what the artifacts prove: full 9x9 traces do not fit the
+  current `524288`-token model context (`4891222` to `5335309` total tokens,
+  overflow `4366934` to `4811021`), so this run only evaluates bounded
+  windows; the early `512`-token prefix reaches `10000` bps first-target
+  exactness but only `5938` bps first-32 exactness and `0/1` exact validation
+  traces, while the fixed later window at target token `262144` and the
+  furthest fittable suffix window at target token `472240` both improve to
+  `8438` bps first-32 exactness but still stay `0/1` exact windows, so the
+  correct audit statement remains “9x9 only partially fit and remains blocked”
+  even though later-window truth is now explicit; the companion note is
   `docs/audits/2026-03-16-tassadar-phase-16-9x9-reference-run-audit.md`
 - the first same-corpus flat-prefix-vs-windowed 9x9 comparison now also
   exists in `psionic-train` under

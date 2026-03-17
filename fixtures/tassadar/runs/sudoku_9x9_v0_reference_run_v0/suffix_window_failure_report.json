@@ -1,0 +1,24 @@
+{
+  "run_id": "tassadar-executor-transformer-sudoku-9x9-reference-run-v0",
+  "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@scale-v0",
+  "later_window_report_digest": "b5e908c6c309dedaa9eebaa6593f09daf0971e986430da64af8f5cadc6a7aa2c",
+  "window_id": "furthest_fittable_suffix_512",
+  "cases": [
+    {
+      "sequence_id": "tassadar.sequence.sudoku_9x9_validation_a.sequential_cpu_reference",
+      "case_id": "sudoku_9x9_validation_a",
+      "resolved_start_target_token_index": 472240,
+      "evaluated_target_token_count": 512,
+      "matched_target_token_count": 2,
+      "target_token_exactness_bps": 8008,
+      "first_divergence_index": 2,
+      "reference_divergence_token": "<byte_01>",
+      "predicted_divergence_token": "<byte_00>",
+      "exact_window_match": false,
+      "final_output_match": false,
+      "halt_match": false
+    }
+  ],
+  "summary": "Suffix-window failure truth is now explicit for `furthest_fittable_suffix_512`: exact_windows=0, final_output_exact_cases=0, halt_exact_cases=0.",
+  "report_digest": "06cb43fbf3be0ac0869be94a57a5d17e91b54d1755e176762d077a3667b3fb10"
+}

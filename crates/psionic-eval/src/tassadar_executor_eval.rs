@@ -5,8 +5,8 @@ use psionic_data::{
 };
 use psionic_models::{
     TassadarExecutorTransformer, TassadarExecutorTransformerClaimBoundary,
-    TassadarExecutorTransformerError, TassadarStructuralSupervisionFamily, TokenId,
-    TokenSequence, TokenizerBoundary,
+    TassadarExecutorTransformerError, TassadarStructuralSupervisionFamily, TokenId, TokenSequence,
+    TokenizerBoundary,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -99,6 +99,170 @@ pub struct TassadarExecutorEvalReport {
     pub halt_exact_case_count: u32,
     /// Per-case reports.
     pub case_reports: Vec<TassadarExecutorEvalCaseReport>,
+}
+
+/// Evaluation-window selection mode for one bounded long-trace report.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarExecutorEvalWindowMode {
+    /// Evaluate the first `target_token_count` target tokens.
+    Prefix,
+    /// Evaluate `target_token_count` target tokens starting at a fixed later offset.
+    Offset,
+    /// Evaluate the furthest suffix window that still fits the current model context.
+    FurthestFittableSuffix,
+}
+
+/// Explicit bounded target-window specification.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutorEvalWindowSpec {
+    /// Stable machine-readable window identifier.
+    pub window_id: String,
+    /// Window-selection mode.
+    pub mode: TassadarExecutorEvalWindowMode,
+    /// Requested start offset when the mode is `offset`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_target_token_index: Option<u32>,
+    /// Requested target-token count for the window.
+    pub target_token_count: u32,
+}
+
+impl TassadarExecutorEvalWindowSpec {
+    /// Builds a prefix window from target index zero.
+    #[must_use]
+    pub fn prefix(window_id: impl Into<String>, target_token_count: u32) -> Self {
+        Self {
+            window_id: window_id.into(),
+            mode: TassadarExecutorEvalWindowMode::Prefix,
+            start_target_token_index: Some(0),
+            target_token_count,
+        }
+    }
+
+    /// Builds a fixed-offset later window.
+    #[must_use]
+    pub fn offset(
+        window_id: impl Into<String>,
+        start_target_token_index: u32,
+        target_token_count: u32,
+    ) -> Self {
+        Self {
+            window_id: window_id.into(),
+            mode: TassadarExecutorEvalWindowMode::Offset,
+            start_target_token_index: Some(start_target_token_index),
+            target_token_count,
+        }
+    }
+
+    /// Builds a suffix window anchored to the furthest start that still fits.
+    #[must_use]
+    pub fn furthest_fittable_suffix(
+        window_id: impl Into<String>,
+        target_token_count: u32,
+    ) -> Self {
+        Self {
+            window_id: window_id.into(),
+            mode: TassadarExecutorEvalWindowMode::FurthestFittableSuffix,
+            start_target_token_index: None,
+            target_token_count,
+        }
+    }
+}
+
+/// One resolved target window for one evaluated case.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutorResolvedEvalWindow {
+    /// Stable window identifier.
+    pub window_id: String,
+    /// Window-selection mode.
+    pub mode: TassadarExecutorEvalWindowMode,
+    /// Requested start offset when one exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_start_target_token_index: Option<u32>,
+    /// Actual start offset used for the evaluated case.
+    pub resolved_start_target_token_index: u32,
+    /// Number of target tokens evaluated in the case.
+    pub evaluated_target_token_count: u32,
+    /// Number of target tokens in the full CPU-reference suffix.
+    pub full_target_token_count: u32,
+    /// Number of teacher-forced target tokens prepended before the evaluated slice.
+    pub teacher_forced_prefix_target_token_count: u32,
+    /// Total prompt-plus-prefix-plus-window length used for decode.
+    pub total_sequence_tokens_to_window_end: u32,
+}
+
+/// Per-case exactness report for one bounded target window.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutorWindowedEvalCaseReport {
+    /// Stable sequence identifier.
+    pub sequence_id: String,
+    /// Stable corpus case identifier.
+    pub case_id: String,
+    /// Explicit resolved window for the case.
+    pub window: TassadarExecutorResolvedEvalWindow,
+    /// Token-level exactness over the evaluated window.
+    pub target_token_exactness_bps: u32,
+    /// Boundary-first exactness metrics inside the evaluated window.
+    pub boundary: TassadarExecutorBoundaryMetrics,
+    /// Number of exact window tokens before the first divergence.
+    pub matched_target_token_count: u32,
+    /// First window-relative token index where divergence appeared.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_divergence_index: Option<u32>,
+    /// Symbolic reference token at the first divergence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reference_divergence_token: Option<String>,
+    /// Symbolic predicted token at the first divergence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub predicted_divergence_token: Option<String>,
+    /// Whether the entire evaluated window stayed exact.
+    pub exact_window_match: bool,
+    /// Whether the full trace stayed exact from the natural prompt, not only inside the bounded window.
+    pub full_trace_exact_match: bool,
+    /// Whether final output values matched when the evaluated window reached trace end.
+    pub final_output_match: bool,
+    /// Whether the terminal halt marker matched when the evaluated window reached trace end.
+    pub halt_match: bool,
+    /// Stable digest over the reference evaluated window.
+    pub reference_target_digest: String,
+    /// Stable digest over the predicted evaluated window.
+    pub predicted_target_digest: String,
+    /// Typed failure summary.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failures: Vec<TassadarExecutorEvalFailure>,
+}
+
+/// Aggregate exactness report for one explicit bounded target window.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutorWindowedEvalReport {
+    /// Stable dataset storage key used for evaluation.
+    pub dataset_storage_key: String,
+    /// Stable dataset digest.
+    pub dataset_digest: String,
+    /// Split that was evaluated.
+    pub split: TassadarSequenceSplit,
+    /// Explicit model claim boundary.
+    pub claim_boundary: TassadarExecutorTransformerClaimBoundary,
+    /// Window specification applied to the report.
+    pub window: TassadarExecutorEvalWindowSpec,
+    /// Aggregate token-level exactness over the evaluated window.
+    pub aggregate_target_token_exactness_bps: u32,
+    /// Aggregate exactness over the first target token inside the window.
+    pub first_target_exactness_bps: u32,
+    /// Aggregate exactness over the first eight target tokens inside the window.
+    pub first_8_token_exactness_bps: u32,
+    /// Aggregate exactness over the first 32 target tokens inside the window.
+    pub first_32_token_exactness_bps: u32,
+    /// Number of cases whose full evaluated window stayed exact.
+    pub exact_window_case_count: u32,
+    /// Number of cases whose full trace stayed exact from the natural prompt.
+    pub full_trace_exact_case_count: u32,
+    /// Number of cases with exact final outputs when the window reached trace end.
+    pub final_output_exact_case_count: u32,
+    /// Number of cases with exact halt markers when the window reached trace end.
+    pub halt_exact_case_count: u32,
+    /// Per-case reports.
+    pub case_reports: Vec<TassadarExecutorWindowedEvalCaseReport>,
 }
 
 /// Per-case progress facts emitted while a held-out eval is still running.
@@ -279,6 +443,20 @@ pub enum TassadarExecutorEvalError {
     /// Model forward/decode failed.
     #[error(transparent)]
     Model(#[from] TassadarExecutorTransformerError),
+    /// One requested later window exceeded the current model context budget.
+    #[error(
+        "eval window `{window_id}` for sequence `{sequence_id}` requires {required_total_tokens} tokens but the model only supports {model_max_sequence_tokens}"
+    )]
+    WindowExceedsModelContext {
+        /// Stable window identifier.
+        window_id: String,
+        /// Stable sequence identifier.
+        sequence_id: String,
+        /// Required total prompt-plus-prefix-plus-window tokens.
+        required_total_tokens: u32,
+        /// Maximum supported sequence tokens.
+        model_max_sequence_tokens: u32,
+    },
 }
 
 /// Greedily evaluates one trained executor model against the frozen CPU-reference dataset split.
@@ -492,6 +670,200 @@ where
     })
 }
 
+/// Greedily evaluates one trained executor model on an explicit bounded target window.
+pub fn evaluate_tassadar_executor_transformer_with_window(
+    model: &TassadarExecutorTransformer,
+    dataset: &TassadarSequenceDatasetContract,
+    split: TassadarSequenceSplit,
+    window: &TassadarExecutorEvalWindowSpec,
+) -> Result<TassadarExecutorWindowedEvalReport, TassadarExecutorEvalError> {
+    dataset.validate()?;
+    let tokenizer = model.tokenizer();
+    let mut case_reports = Vec::new();
+    let split_examples = dataset.split_examples(split);
+    let model_max_sequence_tokens = model.descriptor().config.max_sequence_tokens as u32;
+
+    for example in split_examples {
+        let prompt_len = example.metadata.prompt_token_count as usize;
+        let prompt_tokens = example.token_ids[..prompt_len]
+            .iter()
+            .map(|token| TokenId(*token))
+            .collect::<Vec<_>>();
+        let full_reference_target = example.token_ids[prompt_len..]
+            .iter()
+            .map(|token| TokenId(*token))
+            .collect::<Vec<_>>();
+        let resolved_window =
+            resolve_eval_window(window, prompt_len as u32, full_reference_target.len() as u32, model_max_sequence_tokens)?;
+        let start = resolved_window.resolved_start_target_token_index as usize;
+        let evaluated_target_len = resolved_window.evaluated_target_token_count as usize;
+        let teacher_forced_prefix = full_reference_target[..start].to_vec();
+        let reference_target =
+            full_reference_target[start..start.saturating_add(evaluated_target_len)].to_vec();
+        let prompt = TokenSequence::new(
+            prompt_tokens
+                .iter()
+                .copied()
+                .chain(teacher_forced_prefix.iter().copied())
+                .collect::<Vec<_>>(),
+        );
+        let predicted_target = greedy_decode_target(model, prompt, reference_target.len())?;
+        let matched_target_token_count =
+            matched_target_token_count(reference_target.as_slice(), predicted_target.as_slice());
+        let first_divergence_index =
+            first_divergence_index(reference_target.as_slice(), predicted_target.as_slice());
+        let exact_window_match = predicted_target == reference_target;
+        let full_trace_exact_match = start == 0
+            && evaluated_target_len == full_reference_target.len()
+            && exact_window_match;
+        let window_reaches_trace_end = start.saturating_add(evaluated_target_len) == full_reference_target.len();
+        let predicted_full = if window_reaches_trace_end {
+            Some(
+                prompt_tokens
+                    .iter()
+                    .copied()
+                    .chain(teacher_forced_prefix.iter().copied())
+                    .chain(predicted_target.iter().copied())
+                    .collect::<Vec<_>>(),
+            )
+        } else {
+            None
+        };
+        let reference_full = if window_reaches_trace_end {
+            Some(
+                example
+                    .token_ids
+                    .iter()
+                    .map(|token| TokenId(*token))
+                    .collect::<Vec<_>>(),
+            )
+        } else {
+            None
+        };
+        let target_token_exactness_bps =
+            suffix_exactness_bps(reference_target.as_slice(), predicted_target.as_slice());
+        let boundary = TassadarExecutorBoundaryMetrics {
+            first_target_exactness_bps: prefix_exactness_bps(
+                reference_target.as_slice(),
+                predicted_target.as_slice(),
+                1,
+            ),
+            first_8_token_exactness_bps: prefix_exactness_bps(
+                reference_target.as_slice(),
+                predicted_target.as_slice(),
+                8,
+            ),
+            first_32_token_exactness_bps: prefix_exactness_bps(
+                reference_target.as_slice(),
+                predicted_target.as_slice(),
+                32,
+            ),
+        };
+        let reference_divergence_token = first_divergence_index.and_then(|index| {
+            reference_target
+                .get(index as usize)
+                .map(|token| symbolic_token(tokenizer, Some(*token)))
+        });
+        let predicted_divergence_token = first_divergence_index
+            .map(|index| symbolic_token(tokenizer, predicted_target.get(index as usize).copied()));
+        let final_output_match = reference_full.as_ref().is_some_and(|reference_full| {
+            predicted_full.as_ref().is_some_and(|predicted_full| {
+                tokenizer.extract_output_values(reference_full.as_slice())
+                    == tokenizer.extract_output_values(predicted_full.as_slice())
+            })
+        });
+        let halt_match = reference_full.as_ref().is_some_and(|reference_full| {
+            predicted_full.as_ref().is_some_and(|predicted_full| {
+                tokenizer.extract_halt_marker(reference_full.as_slice())
+                    == tokenizer.extract_halt_marker(predicted_full.as_slice())
+            })
+        });
+        let mut failures = Vec::new();
+        if !exact_window_match {
+            failures.push(TassadarExecutorEvalFailure::ExactTraceMismatch);
+        }
+        if window_reaches_trace_end && !final_output_match {
+            failures.push(TassadarExecutorEvalFailure::FinalOutputMismatch);
+        }
+        if window_reaches_trace_end && !halt_match {
+            failures.push(TassadarExecutorEvalFailure::HaltMismatch);
+        }
+        case_reports.push(TassadarExecutorWindowedEvalCaseReport {
+            sequence_id: example.sequence_id.clone(),
+            case_id: example.metadata.case_id.clone(),
+            window: resolved_window,
+            target_token_exactness_bps,
+            boundary,
+            matched_target_token_count,
+            first_divergence_index,
+            reference_divergence_token,
+            predicted_divergence_token,
+            exact_window_match,
+            full_trace_exact_match,
+            final_output_match,
+            halt_match,
+            reference_target_digest: stable_digest(
+                b"psionic_tassadar_executor_window_eval_reference_target|",
+                &reference_target
+                    .iter()
+                    .map(|token| token.as_u32())
+                    .collect::<Vec<_>>(),
+            ),
+            predicted_target_digest: stable_digest(
+                b"psionic_tassadar_executor_window_eval_predicted_target|",
+                &predicted_target
+                    .iter()
+                    .map(|token| token.as_u32())
+                    .collect::<Vec<_>>(),
+            ),
+            failures,
+        });
+    }
+
+    let case_count = case_reports.len().max(1) as u32;
+    Ok(TassadarExecutorWindowedEvalReport {
+        dataset_storage_key: dataset.storage_key(),
+        dataset_digest: dataset.stable_digest(),
+        split,
+        claim_boundary: model.descriptor().claim_boundary,
+        window: window.clone(),
+        aggregate_target_token_exactness_bps: case_reports
+            .iter()
+            .map(|case| case.target_token_exactness_bps)
+            .sum::<u32>()
+            / case_count,
+        first_target_exactness_bps: case_reports
+            .iter()
+            .map(|case| case.boundary.first_target_exactness_bps)
+            .sum::<u32>()
+            / case_count,
+        first_8_token_exactness_bps: case_reports
+            .iter()
+            .map(|case| case.boundary.first_8_token_exactness_bps)
+            .sum::<u32>()
+            / case_count,
+        first_32_token_exactness_bps: case_reports
+            .iter()
+            .map(|case| case.boundary.first_32_token_exactness_bps)
+            .sum::<u32>()
+            / case_count,
+        exact_window_case_count: case_reports
+            .iter()
+            .filter(|case| case.exact_window_match)
+            .count() as u32,
+        full_trace_exact_case_count: case_reports
+            .iter()
+            .filter(|case| case.full_trace_exact_match)
+            .count() as u32,
+        final_output_exact_case_count: case_reports
+            .iter()
+            .filter(|case| case.final_output_match)
+            .count() as u32,
+        halt_exact_case_count: case_reports.iter().filter(|case| case.halt_match).count() as u32,
+        case_reports,
+    })
+}
+
 /// Builds a standalone boundary exactness report from one eval summary.
 #[must_use]
 pub fn build_tassadar_executor_boundary_exactness_report(
@@ -620,8 +992,7 @@ pub fn build_tassadar_executor_structural_supervision_report(
     dataset.validate()?;
     let tokenizer = model.tokenizer();
     let mut case_reports = Vec::new();
-    let mut aggregate_counts =
-        BTreeMap::<TassadarStructuralSupervisionFamily, (u32, u32)>::new();
+    let mut aggregate_counts = BTreeMap::<TassadarStructuralSupervisionFamily, (u32, u32)>::new();
     for family in structural_supervision_families() {
         aggregate_counts.insert(family, (0, 0));
     }
@@ -810,6 +1181,51 @@ fn first_divergence_index(reference: &[TokenId], predicted: &[TokenId]) -> Optio
     }
 }
 
+fn resolve_eval_window(
+    window: &TassadarExecutorEvalWindowSpec,
+    prompt_token_count: u32,
+    full_target_token_count: u32,
+    model_max_sequence_tokens: u32,
+) -> Result<TassadarExecutorResolvedEvalWindow, TassadarExecutorEvalError> {
+    let requested_window_token_count = window.target_token_count.min(full_target_token_count);
+    let resolved_start_target_token_index = match window.mode {
+        TassadarExecutorEvalWindowMode::Prefix => 0,
+        TassadarExecutorEvalWindowMode::Offset => window.start_target_token_index.unwrap_or(0),
+        TassadarExecutorEvalWindowMode::FurthestFittableSuffix => {
+            let max_start = model_max_sequence_tokens
+                .saturating_sub(prompt_token_count)
+                .saturating_sub(requested_window_token_count);
+            full_target_token_count
+                .saturating_sub(requested_window_token_count)
+                .min(max_start)
+        }
+    }
+    .min(full_target_token_count);
+    let evaluated_target_token_count =
+        requested_window_token_count.min(full_target_token_count.saturating_sub(resolved_start_target_token_index));
+    let total_sequence_tokens_to_window_end = prompt_token_count
+        .saturating_add(resolved_start_target_token_index)
+        .saturating_add(evaluated_target_token_count);
+    if total_sequence_tokens_to_window_end > model_max_sequence_tokens {
+        return Err(TassadarExecutorEvalError::WindowExceedsModelContext {
+            window_id: window.window_id.clone(),
+            sequence_id: String::from("<resolved-per-case>"),
+            required_total_tokens: total_sequence_tokens_to_window_end,
+            model_max_sequence_tokens,
+        });
+    }
+    Ok(TassadarExecutorResolvedEvalWindow {
+        window_id: window.window_id.clone(),
+        mode: window.mode,
+        requested_start_target_token_index: window.start_target_token_index,
+        resolved_start_target_token_index,
+        evaluated_target_token_count,
+        full_target_token_count,
+        teacher_forced_prefix_target_token_count: resolved_start_target_token_index,
+        total_sequence_tokens_to_window_end,
+    })
+}
+
 fn symbolic_token(tokenizer: &impl TokenizerBoundary, token: Option<TokenId>) -> String {
     token
         .and_then(|token_id| tokenizer.vocabulary().token(token_id))
@@ -838,8 +1254,10 @@ mod tests {
         build_tassadar_executor_boundary_exactness_report,
         build_tassadar_executor_divergence_histogram_report,
         build_tassadar_executor_first_token_confusion_report,
+        evaluate_tassadar_executor_transformer_with_window,
         evaluate_tassadar_executor_transformer,
         evaluate_tassadar_executor_transformer_with_target_cap,
+        TassadarExecutorEvalWindowSpec,
     };
 
     #[test]
@@ -908,6 +1326,52 @@ mod tests {
         assert_eq!(histogram.buckets[0].first_divergence_index, 0);
         assert_eq!(confusion.token_zero_divergence_case_count, 2);
         assert_eq!(confusion.entries.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn executor_eval_can_evaluate_later_fixed_offset_windows()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let bundle = build_tassadar_sudoku_v0_sequence_dataset("train-v0")?;
+        let model = psionic_models::TassadarExecutorTransformer::sudoku_v0();
+        let window = TassadarExecutorEvalWindowSpec::offset("later_window_32", 32, 16);
+        let report = evaluate_tassadar_executor_transformer_with_window(
+            &model,
+            &bundle.dataset,
+            TassadarSequenceSplit::Validation,
+            &window,
+        )?;
+
+        assert_eq!(report.window.window_id, "later_window_32");
+        assert_eq!(report.case_reports.len(), 2);
+        assert!(
+            report
+                .case_reports
+                .iter()
+                .all(|case| case.window.resolved_start_target_token_index == 32)
+        );
+        assert_eq!(report.full_trace_exact_case_count, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn executor_eval_can_resolve_furthest_fittable_suffix_windows()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let bundle = build_tassadar_sudoku_v0_sequence_dataset("train-v0")?;
+        let model = psionic_models::TassadarExecutorTransformer::sudoku_v0();
+        let window = TassadarExecutorEvalWindowSpec::furthest_fittable_suffix("suffix_16", 16);
+        let report = evaluate_tassadar_executor_transformer_with_window(
+            &model,
+            &bundle.dataset,
+            TassadarSequenceSplit::Validation,
+            &window,
+        )?;
+
+        assert_eq!(report.window.window_id, "suffix_16");
+        assert!(report.case_reports.iter().all(|case| {
+            case.window.total_sequence_tokens_to_window_end
+                <= model.descriptor().config.max_sequence_tokens as u32
+        }));
         Ok(())
     }
 }

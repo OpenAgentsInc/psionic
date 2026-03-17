@@ -379,15 +379,18 @@ The current scope is:
   `fixtures/tassadar/runs/sudoku_9x9_v0_reference_run_v0`; the learned lane
   now records an explicit `incremental_decode_window` teacher-forced strategy
   and `incremental_decode_window` long-trace family contract in the training
-  manifest, persists `sequence_fit_report.json`, `postmortem.json`, and
-  `next_run_plan.json`, and keeps the claim boundary exact by showing that
-  full 9x9 traces still exceed the current `524288`-token model context
-  (`4891222` to `5335309` total tokens, overflow `4366934` to `4811021`), so
-  the run is only a bounded first-`512` target-token learned lane; on that
-  bounded window the selected checkpoint is still red (`10000` bps
-  first-target, `5938` bps first-32, `0/1` exact validation traces), so the
-  honest Phase 16 statement is “9x9 only partially fit and remains blocked”
-  rather than 9x9 learned-lane success
+  manifest, persists `sequence_fit_report.json`, `postmortem.json`,
+  `next_run_plan.json`, `later_window_exactness_report.json`, and
+  `suffix_window_failure_report.json`, and keeps the claim boundary exact by
+  showing that full 9x9 traces still exceed the current `524288`-token model
+  context (`4891222` to `5335309` total tokens, overflow `4366934` to
+  `4811021`), so the run is only a bounded-window learned lane; the early
+  `512`-token prefix stays red (`10000` bps first-target, `5938` bps
+  first-32, `0/1` exact validation traces), but the later fixed offset window
+  at target token `262144` and the furthest fittable suffix window at target
+  token `472240` both reach `8438` bps first-32 exactness while still staying
+  `0/1` exact windows, so later slices are now visible without pretending the
+  full fit problem is solved
 - landed explicit 9x9 long-trace family comparison: `psionic-train` now also
   materializes `fixtures/tassadar/runs/sudoku_9x9_v0_windowed_family_comparison_v1`,
   which keeps the learned claim bounded while making the family split explicit:

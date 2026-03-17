@@ -1,6 +1,6 @@
 {
   "dataset_storage_key": "oa.tassadar.sudoku_9x9.sequence@scale-v0",
-  "dataset_digest": "62ff118b9980cccc0bfeb49fa86fc9b2703846e6a344c5207ad44a704d7a172a",
+  "dataset_digest": "84c3b00387336badb47aa228b68071a088de25e0429be1287f1e09d38207135d",
   "split": "validation",
   "claim_boundary": "greedy_decode_unvalidated",
   "aggregate_target_token_exactness_bps": 8125,
@@ -10,7 +10,7 @@
   "exact_trace_case_count": 0,
   "case_reports": [
     {
-      "sequence_id": "tassadar.sequence.sudoku_9x9_validation_a",
+      "sequence_id": "tassadar.sequence.sudoku_9x9_validation_a.sequential_cpu_reference",
       "case_id": "sudoku_9x9_validation_a",
       "first_target_exactness_bps": 10000,
       "first_8_token_exactness_bps": 7500,
@@ -18,5 +18,5 @@
       "exact_trace_match": false
     }
   ],
-  "report_digest": "a3920a79a60bd0d367102342fb3bebd14d086c1d0b3a0a007fe8abbe860a6ec7"
+  "report_digest": "2df0f0ec2e3a403aff55eedac9256a8d400d6731eed33135a37f1944b932ee95"
 }
