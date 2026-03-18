@@ -3859,6 +3859,7 @@ version = "0.1.1"
 dependencies = [
  "hex",
  "psionic-core",
+ "psionic-runtime",
  "serde",
  "serde_json",
  "sha2",

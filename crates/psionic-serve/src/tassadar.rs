@@ -6,8 +6,8 @@ use std::{
 
 use psionic_models::{
     TassadarExecutorContractError, TassadarExecutorFixture, TassadarExecutorModelDescriptor,
-    TassadarTraceTokenizer, TassadarWorkloadCapabilityMatrix,
-    TassadarWorkloadCapabilityMatrixError,
+    TassadarModuleExecutionCapabilityPublication, TassadarTraceTokenizer,
+    TassadarWorkloadCapabilityMatrix, TassadarWorkloadCapabilityMatrixError,
 };
 use psionic_research::{
     TassadarAcceptanceReport, TassadarCompiledArticleClosureReport,
@@ -65,6 +65,8 @@ pub struct TassadarExecutorCapabilityPublication {
     pub model_descriptor: TassadarExecutorModelDescriptor,
     /// Runtime capability visible to the caller.
     pub runtime_capability: TassadarRuntimeCapabilityReport,
+    /// Repo-facing publication for bounded module execution and host-import boundary truth.
+    pub module_execution_capability: TassadarModuleExecutionCapabilityPublication,
     /// Machine-readable workload capability matrix for the served lane.
     pub workload_capability_matrix: TassadarWorkloadCapabilityMatrix,
 }
@@ -400,6 +402,7 @@ impl LocalTassadarExecutorService {
             product_id: String::from(EXECUTOR_TRACE_PRODUCT_ID),
             model_descriptor: fixture.descriptor().clone(),
             runtime_capability: fixture.runtime_capability_report(),
+            module_execution_capability: fixture.module_execution_capability_publication(),
             workload_capability_matrix,
         })
     }
@@ -4979,6 +4982,14 @@ mod tests {
         assert_eq!(
             encoded["model_descriptor"]["model"]["model_id"],
             serde_json::json!(TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID)
+        );
+        assert_eq!(
+            encoded["module_execution_capability"]["runtime_capability"]["supports_call_indirect"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            encoded["module_execution_capability"]["runtime_capability"]["host_import_boundary"]["unsupported_host_call_refusal"],
+            serde_json::json!("unsupported_host_import")
         );
         let workload_classes = encoded["workload_capability_matrix"]["rows"]
             .as_array()

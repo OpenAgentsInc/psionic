@@ -10,6 +10,7 @@ mod structured_output;
 mod tassadar_call_frames;
 mod tassadar;
 mod tassadar_memory_abi_v2;
+mod tassadar_module_execution;
 mod tassadar_structured_control;
 mod validation;
 
@@ -35,6 +36,7 @@ pub use structured_output::*;
 pub use tassadar_call_frames::*;
 pub use tassadar::*;
 pub use tassadar_memory_abi_v2::*;
+pub use tassadar_module_execution::*;
 pub use tassadar_structured_control::*;
 use thiserror::Error;
 pub use validation::*;

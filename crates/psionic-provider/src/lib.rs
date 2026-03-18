@@ -8236,6 +8236,15 @@ mod tests {
             encoded["publication"]["model_descriptor"]["model"]["model_id"],
             json!(TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID)
         );
+        assert_eq!(
+            encoded["publication"]["module_execution_capability"]["runtime_capability"]["supports_call_indirect"],
+            json!(true)
+        );
+        assert_eq!(
+            encoded["publication"]["module_execution_capability"]["runtime_capability"]["host_import_boundary"]
+                ["unsupported_host_call_refusal"],
+            json!("unsupported_host_import")
+        );
         let workload_classes = encoded["publication"]["workload_capability_matrix"]["rows"]
             .as_array()
             .expect("rows should encode as an array")

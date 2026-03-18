@@ -276,6 +276,15 @@ The current scope is:
   `fixtures/tassadar/reports/tassadar_numeric_opcode_ladder_report.json`
   instead of pretending numeric closure already jumped from tiny i32 kernels
   to arbitrary Wasm
+- landed module-boundary bar: `psionic-runtime` now owns a bounded
+  module-execution contract with explicit i32 globals, funcref tables,
+  bounded `call_indirect`, deterministic import stubs, and typed refusal for
+  unsupported host calls; `psionic-models` now publishes that boundary as a
+  repo-facing module-capability publication; `psionic-serve` and
+  `psionic-provider` now carry the same module-support and host-import refusal
+  facts through the served capability path; and `psionic-sandbox` now exposes
+  a sandbox-facing import-boundary contract instead of leaving host-import
+  posture implicit
 - landed exactness/refusal evidence bar: `psionic-runtime` now owns a shared
   `TassadarExactnessRefusalReport` contract that records exact, mismatch, and
   refused posture above current selection diagnostics and trace/output/halt

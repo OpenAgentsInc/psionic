@@ -187,6 +187,13 @@ Current posture:
   refusal, widened structured-control lowering and execution support for the
   implemented i32 families, and the committed report at
   `fixtures/tassadar/reports/tassadar_numeric_opcode_ladder_report.json`
+- its bounded module-execution boundary now also exists across
+  `psionic-runtime`, `psionic-models`, `psionic-serve`, `psionic-provider`,
+  and `psionic-sandbox`, with explicit i32 global and funcref-table runtime
+  models, bounded `call_indirect`, deterministic import stubs, typed refusal
+  for unsupported host calls, a model-facing module-capability publication,
+  served/provider capability-path projection, and a sandbox-facing import
+  boundary contract
 - the repo now also carries a standardized exactness/refusal evidence surface
   across `psionic-runtime`, `psionic-provider`, and `psionic-eval`, with a
   shared runtime report schema for exact direct, exact fallback, mismatch, and
