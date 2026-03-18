@@ -15,6 +15,7 @@ mod response_state;
 mod tassadar_composite_routing;
 mod tassadar_delegation_benchmark;
 mod tassadar_evidence_routing;
+mod tassadar_latency_evidence_tradeoff;
 mod tassadar_module_catalog;
 mod tassadar_module_installation;
 mod tassadar_module_overlap_resolution;
@@ -32,6 +33,7 @@ pub use response_state::{
 pub use tassadar_composite_routing::*;
 pub use tassadar_delegation_benchmark::*;
 pub use tassadar_evidence_routing::*;
+pub use tassadar_latency_evidence_tradeoff::*;
 pub use tassadar_module_catalog::*;
 pub use tassadar_module_installation::*;
 pub use tassadar_module_overlap_resolution::*;

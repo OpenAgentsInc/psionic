@@ -574,6 +574,14 @@ The current scope is:
   workload properties, validator attachment, evidence completeness, and
   fallback-versus-internal comparisons instead of treating one domain demo as a
   full wedge claim
+- landed latency-evidence-tradeoff follow-on: `psionic-router` now publishes
+  the validator-heavy workload pack and threshold publication for compiled,
+  learned, external, and hybrid lanes; and `psionic-eval` now publishes the
+  benchmark-bound Pareto report at
+  `fixtures/tassadar/reports/tassadar_latency_evidence_tradeoff_report.json`,
+  freezing latency/correctness/evidence fronts, validator cost, challenge rate,
+  and threshold-crossing cases without treating low latency as a win once
+  evidence posture becomes invalid
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the

@@ -64,6 +64,8 @@ mod tassadar_internal_external_delegation;
 mod tassadar_installed_module_evidence;
 #[path = "tassadar_kernel_module_scaling.rs"]
 mod tassadar_kernel_module_scaling;
+#[path = "tassadar_latency_evidence_tradeoff.rs"]
+mod tassadar_latency_evidence_tradeoff;
 #[path = "tassadar_learnability_gap.rs"]
 mod tassadar_learnability_gap;
 #[path = "tassadar_locality_scratchpad.rs"]
@@ -163,6 +165,7 @@ pub use tassadar_hungarian_compiled_executor::*;
 pub use tassadar_internal_external_delegation::*;
 pub use tassadar_installed_module_evidence::*;
 pub use tassadar_kernel_module_scaling::*;
+pub use tassadar_latency_evidence_tradeoff::*;
 pub use tassadar_learnability_gap::*;
 pub use tassadar_locality_scratchpad::*;
 pub use tassadar_memory_abi_v2::*;

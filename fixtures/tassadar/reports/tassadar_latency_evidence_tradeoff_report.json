@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.latency_evidence_tradeoff.report.v1",
+  "pack_id": "psionic.tassadar_validator_heavy_workload_pack.v1",
+  "case_reports": [
+    {
+      "case_id": "validator_patch_fast",
+      "threshold_crossed": false,
+      "preferred_route_family": "compiled",
+      "route_observations": [
+        {
+          "route_family": "compiled",
+          "latency_ms": 80,
+          "correctness_bps": 10000,
+          "evidence_completeness_bps": 9500,
+          "validator_cost_milliunits": 700,
+          "pareto_optimal": true,
+          "note": "compiled route stays on the Pareto front for fast validator-bound patch work"
+        },
+        {
+          "route_family": "learned",
+          "latency_ms": 45,
+          "correctness_bps": 9200,
+          "evidence_completeness_bps": 7800,
+          "validator_cost_milliunits": 200,
+          "pareto_optimal": false,
+          "note": "learned route is fast but falls below the validator-heavy evidence floor"
+        },
+        {
+          "route_family": "external",
+          "latency_ms": 170,
+          "correctness_bps": 9900,
+          "evidence_completeness_bps": 9700,
+          "validator_cost_milliunits": 1200,
+          "pareto_optimal": true,
+          "note": "external route is slower but still Pareto-valid on evidence"
+        },
+        {
+          "route_family": "hybrid",
+          "latency_ms": 105,
+          "correctness_bps": 10000,
+          "evidence_completeness_bps": 9400,
+          "validator_cost_milliunits": 900,
+          "pareto_optimal": true,
+          "note": "hybrid route remains competitive but does not beat compiled on latency"
+        }
+      ],
+      "note": "patch case shows where lower latency and valid evidence can coexist without externalization"
+    },
+    {
+      "case_id": "challenge_search",
+      "threshold_crossed": true,
+      "preferred_route_family": "external",
+      "route_observations": [
+        {
+          "route_family": "compiled",
+          "latency_ms": 95,
+          "correctness_bps": 8900,
+          "evidence_completeness_bps": 7100,
+          "validator_cost_milliunits": 600,
+          "pareto_optimal": false,
+          "note": "compiled route is too under-evidenced for the challenge-heavy search pack"
+        },
+        {
+          "route_family": "learned",
+          "latency_ms": 55,
+          "correctness_bps": 8400,
+          "evidence_completeness_bps": 6200,
+          "validator_cost_milliunits": 300,
+          "pareto_optimal": false,
+          "note": "learned route is fastest but invalid once challenge and validator costs are counted"
+        },
+        {
+          "route_family": "external",
+          "latency_ms": 210,
+          "correctness_bps": 9950,
+          "evidence_completeness_bps": 9900,
+          "validator_cost_milliunits": 1600,
+          "pareto_optimal": true,
+          "note": "external route owns the honest high-evidence frontier for challenge-heavy search"
+        },
+        {
+          "route_family": "hybrid",
+          "latency_ms": 170,
+          "correctness_bps": 9700,
+          "evidence_completeness_bps": 9400,
+          "validator_cost_milliunits": 1200,
+          "pareto_optimal": true,
+          "note": "hybrid route stays Pareto-valid but still loses to external on correctness and evidence"
+        }
+      ],
+      "note": "challenge-heavy search is the core case where lower latency is not a win once evidence posture becomes invalid"
+    },
+    {
+      "case_id": "learned_trial_error",
+      "threshold_crossed": false,
+      "preferred_route_family": "hybrid",
+      "route_observations": [
+        {
+          "route_family": "compiled",
+          "latency_ms": 140,
+          "correctness_bps": 9400,
+          "evidence_completeness_bps": 8900,
+          "validator_cost_milliunits": 700,
+          "pareto_optimal": false,
+          "note": "compiled route remains stable but not Pareto-best on this medium-evidence trial-and-error pack"
+        },
+        {
+          "route_family": "learned",
+          "latency_ms": 70,
+          "correctness_bps": 9500,
+          "evidence_completeness_bps": 8900,
+          "validator_cost_milliunits": 400,
+          "pareto_optimal": true,
+          "note": "learned route stays Pareto-valid when the evidence floor is moderate rather than validator-heavy"
+        },
+        {
+          "route_family": "external",
+          "latency_ms": 200,
+          "correctness_bps": 9800,
+          "evidence_completeness_bps": 9500,
+          "validator_cost_milliunits": 1300,
+          "pareto_optimal": true,
+          "note": "external route stays on the frontier for maximum evidence"
+        },
+        {
+          "route_family": "hybrid",
+          "latency_ms": 110,
+          "correctness_bps": 9700,
+          "evidence_completeness_bps": 9200,
+          "validator_cost_milliunits": 900,
+          "pareto_optimal": true,
+          "note": "hybrid route balances latency and evidence most cleanly here"
+        }
+      ],
+      "note": "medium-evidence trial-and-error work is where learned and hybrid routes can honestly stay on the Pareto frontier together"
+    },
+    {
+      "case_id": "long_loop_validator",
+      "threshold_crossed": true,
+      "preferred_route_family": "hybrid",
+      "route_observations": [
+        {
+          "route_family": "compiled",
+          "latency_ms": 120,
+          "correctness_bps": 8700,
+          "evidence_completeness_bps": 7400,
+          "validator_cost_milliunits": 700,
+          "pareto_optimal": false,
+          "note": "compiled route breaks the long-loop validator thresholds"
+        },
+        {
+          "route_family": "learned",
+          "latency_ms": 85,
+          "correctness_bps": 8800,
+          "evidence_completeness_bps": 7000,
+          "validator_cost_milliunits": 500,
+          "pareto_optimal": false,
+          "note": "learned route stays too brittle under long-loop validator pressure"
+        },
+        {
+          "route_family": "external",
+          "latency_ms": 240,
+          "correctness_bps": 9900,
+          "evidence_completeness_bps": 9600,
+          "validator_cost_milliunits": 1700,
+          "pareto_optimal": true,
+          "note": "external route is the strongest evidence path but very slow"
+        },
+        {
+          "route_family": "hybrid",
+          "latency_ms": 180,
+          "correctness_bps": 9850,
+          "evidence_completeness_bps": 9500,
+          "validator_cost_milliunits": 1200,
+          "pareto_optimal": true,
+          "note": "hybrid route offers the best latency/evidence compromise under the current thresholds"
+        }
+      ],
+      "note": "long-loop validator work is where the hybrid route becomes justified even though external delegation still has the strongest evidence posture"
+    }
+  ],
+  "validator_heavy_case_count": 3,
+  "threshold_crossing_case_count": 2,
+  "average_challenge_rate_bps": 2000,
+  "generated_from_refs": [
+    "fixtures/tassadar/reports/tassadar_cost_per_correct_job_report.json",
+    "fixtures/tassadar/reports/tassadar_wedge_taxonomy_report.json"
+  ],
+  "compute_market_dependency_marker": "compute-market remains the owner of canonical route-to-product promotion outside standalone psionic",
+  "nexus_dependency_marker": "nexus remains the owner of accepted-outcome and settlement-qualified tradeoff closure outside standalone psionic",
+  "claim_boundary": "this eval report is benchmark-bound product research over latency, correctness, and evidence tradeoffs. It keeps validator cost, challenge rate, and route thresholds explicit without treating the current Pareto fronts as product truth or authority closure",
+  "summary": "Latency/evidence tradeoff report covers 4 cases with 3 validator-heavy cases and 2 threshold-crossing cases.",
+  "report_digest": "2c5c4246c7ee0e42d6d55d8edda582ded675b5659b935bee67abb75b9cb2027a"
+}
