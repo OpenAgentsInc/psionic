@@ -24,6 +24,7 @@ mod openai_http;
 mod tassadar;
 mod tassadar_module_installation;
 mod tassadar_module_library;
+mod tassadar_quantization_truth_envelope;
 
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -38,6 +39,7 @@ pub use openai_http::*;
 pub use psionic_adapters::*;
 pub use tassadar_module_installation::*;
 pub use tassadar_module_library::*;
+pub use tassadar_quantization_truth_envelope::*;
 use psionic_backend_cpu::CpuBackend;
 use psionic_backend_cuda::{
     CudaBackend, EMBEDDINGS_SUPPORTED_OPS as CUDA_EMBEDDINGS_SUPPORTED_OPS,

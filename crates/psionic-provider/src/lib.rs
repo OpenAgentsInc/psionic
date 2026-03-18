@@ -7,6 +7,7 @@
 
 mod tassadar_module_library;
 mod tassadar_module_installation;
+mod tassadar_quantization_truth_envelope;
 
 use std::collections::BTreeMap;
 
@@ -15,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use tassadar_module_library::*;
 pub use tassadar_module_installation::*;
+pub use tassadar_quantization_truth_envelope::*;
 
 use psionic_research::{
     TassadarDecompilationArtifactSummary,
@@ -360,6 +362,8 @@ pub struct TassadarCapabilityEnvelope {
     pub runtime_backend: String,
     /// Served capability publication that the provider is exporting.
     pub publication: TassadarExecutorCapabilityPublication,
+    /// Backend and quantization deployment truth for the served lane.
+    pub quantization_truth_envelope: TassadarDeploymentTruthEnvelope,
     /// Current provider readiness state.
     pub readiness: ProviderReadiness,
 }
@@ -378,11 +382,21 @@ impl TassadarCapabilityEnvelope {
                     detail: error.to_string(),
                 },
             )?;
+        let quantization_truth_envelope =
+            TassadarDeploymentTruthEnvelope::from_served_quantization_truth_envelope(
+                &publication.quantization_truth_envelope,
+            )
+            .map_err(
+                |error| TassadarCapabilityEnvelopeError::UnpublishableQuantizationTruthEnvelope {
+                    detail: format!("{error:?}"),
+                },
+            )?;
         Ok(Self {
             backend_family: String::from(BACKEND_FAMILY),
             product_id: publication.product_id.clone(),
             runtime_backend: publication.runtime_capability.runtime_backend.clone(),
             publication: publication.clone(),
+            quantization_truth_envelope,
             readiness,
         })
     }
@@ -394,6 +408,11 @@ impl TassadarCapabilityEnvelope {
 pub enum TassadarCapabilityEnvelopeError {
     /// The served matrix is not benchmark-gated enough for provider publication.
     UnpublishableWorkloadMatrix {
+        /// Plain-text validation detail.
+        detail: String,
+    },
+    /// The served quantization truth envelope was not publishable provider-side.
+    UnpublishableQuantizationTruthEnvelope {
         /// Plain-text validation detail.
         detail: String,
     },
@@ -8393,6 +8412,10 @@ mod tests {
             encoded["publication"]["module_execution_capability"]["runtime_capability"]["host_import_boundary"]
                 ["unsupported_host_call_refusal"],
             json!("unsupported_host_import")
+        );
+        assert_eq!(
+            encoded["quantization_truth_envelope"]["active_backend_family"],
+            json!("cpu_reference")
         );
         let workload_classes = encoded["publication"]["workload_capability_matrix"]["rows"]
             .as_array()

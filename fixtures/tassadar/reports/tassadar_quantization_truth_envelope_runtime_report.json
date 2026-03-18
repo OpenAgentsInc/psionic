@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.quantization_truth_envelope.runtime_report.v1",
+  "audit_anchor_report_ref": "fixtures/tassadar/reports/tassadar_precision_attention_runtime_audit.json",
+  "envelope_receipts": [
+    {
+      "envelope_id": "cpu_reference_fp32_dense",
+      "backend_family": "cpu_reference",
+      "numeric_regime": "fp32_reference",
+      "quantization_setting": "none_dense",
+      "audit_anchor_numeric_regime": "fp32_reference",
+      "audit_anchor_attention_family": "hard_selection_reference",
+      "exact_workload_families": [
+        "micro_wasm_kernel",
+        "branch_heavy_kernel",
+        "memory_heavy_kernel",
+        "long_loop_kernel",
+        "sudoku_class",
+        "hungarian_matching"
+      ],
+      "approximate_workload_families": [],
+      "refused_workload_families": [],
+      "refusal_reasons": [],
+      "publication_posture": "publish_exact",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_precision_attention_runtime_audit.json"
+      ],
+      "claim_boundary": "the envelope stays keyed to one backend family, one numeric regime, and one quantization family, and it preserves constrained workloads and refusal posture explicitly instead of silently carrying one executor claim across deployment changes",
+      "detail": "deployment envelope `cpu_reference_fp32_dense` maps `none_dense` on `cpu_reference` to the finite-precision audit anchor `fp32_reference` with hard-selection attention and stays exact across the current workload families"
+    },
+    {
+      "envelope_id": "metal_served_bf16_cast",
+      "backend_family": "metal_served",
+      "numeric_regime": "bf16_served",
+      "quantization_setting": "bf16_cast",
+      "audit_anchor_numeric_regime": "fp16_served",
+      "audit_anchor_attention_family": "hard_selection_reference",
+      "exact_workload_families": [
+        "micro_wasm_kernel",
+        "branch_heavy_kernel",
+        "memory_heavy_kernel",
+        "long_loop_kernel",
+        "hungarian_matching"
+      ],
+      "approximate_workload_families": [
+        "sudoku_class"
+      ],
+      "refused_workload_families": [],
+      "refusal_reasons": [],
+      "publication_posture": "publish_constrained",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_precision_attention_runtime_audit.json"
+      ],
+      "claim_boundary": "the envelope stays keyed to one backend family, one numeric regime, and one quantization family, and it preserves constrained workloads and refusal posture explicitly instead of silently carrying one executor claim across deployment changes",
+      "detail": "deployment envelope `metal_served_bf16_cast` maps `bf16_cast` on `metal_served` to the finite-precision audit anchor `fp16_served` with hard-selection attention and stays publishable only with constrained workload boundaries kept explicit"
+    },
+    {
+      "envelope_id": "metal_served_fp8_block",
+      "backend_family": "metal_served",
+      "numeric_regime": "fp8_served",
+      "quantization_setting": "fp8_block",
+      "audit_anchor_numeric_regime": "int8_served",
+      "audit_anchor_attention_family": "hard_selection_reference",
+      "exact_workload_families": [
+        "micro_wasm_kernel",
+        "branch_heavy_kernel",
+        "memory_heavy_kernel"
+      ],
+      "approximate_workload_families": [
+        "long_loop_kernel",
+        "sudoku_class",
+        "hungarian_matching"
+      ],
+      "refused_workload_families": [],
+      "refusal_reasons": [],
+      "publication_posture": "publish_constrained",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_precision_attention_runtime_audit.json"
+      ],
+      "claim_boundary": "the envelope stays keyed to one backend family, one numeric regime, and one quantization family, and it preserves constrained workloads and refusal posture explicitly instead of silently carrying one executor claim across deployment changes",
+      "detail": "deployment envelope `metal_served_fp8_block` maps `fp8_block` on `metal_served` to the finite-precision audit anchor `int8_served` with hard-selection attention and stays publishable only with constrained workload boundaries kept explicit"
+    },
+    {
+      "envelope_id": "cuda_served_int8_block",
+      "backend_family": "cuda_served",
+      "numeric_regime": "int8_served",
+      "quantization_setting": "int8_block",
+      "audit_anchor_numeric_regime": "int8_served",
+      "audit_anchor_attention_family": "hard_selection_reference",
+      "exact_workload_families": [
+        "micro_wasm_kernel",
+        "branch_heavy_kernel",
+        "memory_heavy_kernel"
+      ],
+      "approximate_workload_families": [
+        "long_loop_kernel",
+        "sudoku_class",
+        "hungarian_matching"
+      ],
+      "refused_workload_families": [],
+      "refusal_reasons": [],
+      "publication_posture": "publish_constrained",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_precision_attention_runtime_audit.json"
+      ],
+      "claim_boundary": "the envelope stays keyed to one backend family, one numeric regime, and one quantization family, and it preserves constrained workloads and refusal posture explicitly instead of silently carrying one executor claim across deployment changes",
+      "detail": "deployment envelope `cuda_served_int8_block` maps `int8_block` on `cuda_served` to the finite-precision audit anchor `int8_served` with hard-selection attention and stays publishable only with constrained workload boundaries kept explicit"
+    },
+    {
+      "envelope_id": "cuda_served_int4_grouped",
+      "backend_family": "cuda_served",
+      "numeric_regime": "int4_served",
+      "quantization_setting": "int4_grouped",
+      "audit_anchor_numeric_regime": "int8_served_with_noise",
+      "audit_anchor_attention_family": "hard_selection_reference",
+      "exact_workload_families": [
+        "micro_wasm_kernel"
+      ],
+      "approximate_workload_families": [
+        "branch_heavy_kernel",
+        "memory_heavy_kernel",
+        "long_loop_kernel",
+        "hungarian_matching"
+      ],
+      "refused_workload_families": [
+        "sudoku_class"
+      ],
+      "refusal_reasons": [
+        "search_budget_not_stable_under_quantized_noise"
+      ],
+      "publication_posture": "refuse_publication",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_precision_attention_runtime_audit.json"
+      ],
+      "claim_boundary": "the envelope stays keyed to one backend family, one numeric regime, and one quantization family, and it preserves constrained workloads and refusal posture explicitly instead of silently carrying one executor claim across deployment changes",
+      "detail": "deployment envelope `cuda_served_int4_grouped` maps `int4_grouped` on `cuda_served` to the finite-precision audit anchor `int8_served_with_noise` with hard-selection attention and must refuse publication for at least one workload family"
+    }
+  ],
+  "exact_envelope_count": 1,
+  "constrained_envelope_count": 3,
+  "refused_envelope_count": 1,
+  "claim_boundary": "this runtime report projects backend-specific deployment envelopes from the finite-precision audit lane so backend family, numeric regime, quantization family, constrained workloads, and refusal posture stay explicit. It does not assume one executor artifact preserves semantics across backend or quantization changes",
+  "summary": "Quantization truth envelope runtime report now freezes 5 deployment envelopes: 1 exact, 3 constrained, 1 refused.",
+  "report_digest": "3f9f3c1fc62ba40e1708a9a036088461434f7c1c342eb31ed7e75cb98405096c"
+}

@@ -72,6 +72,8 @@ pub struct TassadarExecutorCapabilityPublication {
     pub module_execution_capability: TassadarModuleExecutionCapabilityPublication,
     /// Machine-readable workload capability matrix for the served lane.
     pub workload_capability_matrix: TassadarWorkloadCapabilityMatrix,
+    /// Backend and quantization deployment truth carried through served publication.
+    pub quantization_truth_envelope: crate::TassadarServedQuantizationTruthEnvelope,
 }
 
 /// Capability-publication failure for the explicit executor-trace lane.
@@ -88,6 +90,12 @@ pub enum TassadarExecutorCapabilityPublicationError {
     InvalidWorkloadCapabilityMatrix {
         /// Validation failure from the shared model contract.
         error: TassadarWorkloadCapabilityMatrixError,
+    },
+    /// The backend-specific quantization truth envelope was not publishable.
+    #[error("invalid Tassadar quantization truth envelope: {error}")]
+    InvalidQuantizationTruthEnvelope {
+        /// Validation failure from the served quantization-envelope projection.
+        error: crate::TassadarServedQuantizationTruthEnvelopeError,
     },
 }
 
@@ -401,12 +409,23 @@ impl LocalTassadarExecutorService {
                     error,
                 }
             })?;
+        let runtime_capability = fixture.runtime_capability_report();
+        let quantization_truth_envelope =
+            crate::build_tassadar_served_quantization_truth_envelope(
+                runtime_capability.runtime_backend.as_str(),
+            )
+            .map_err(|error| {
+                TassadarExecutorCapabilityPublicationError::InvalidQuantizationTruthEnvelope {
+                    error,
+                }
+            })?;
         Ok(TassadarExecutorCapabilityPublication {
             product_id: String::from(EXECUTOR_TRACE_PRODUCT_ID),
             model_descriptor: fixture.descriptor().clone(),
-            runtime_capability: fixture.runtime_capability_report(),
+            runtime_capability,
             module_execution_capability: fixture.module_execution_capability_publication(),
             workload_capability_matrix,
+            quantization_truth_envelope,
         })
     }
 
@@ -5203,6 +5222,10 @@ mod tests {
         assert_eq!(
             encoded["module_execution_capability"]["runtime_capability"]["host_import_boundary"]["unsupported_host_call_refusal"],
             serde_json::json!("unsupported_host_import")
+        );
+        assert_eq!(
+            encoded["quantization_truth_envelope"]["active_backend_family"],
+            serde_json::json!("cpu_reference")
         );
         let workload_classes = encoded["workload_capability_matrix"]["rows"]
             .as_array()

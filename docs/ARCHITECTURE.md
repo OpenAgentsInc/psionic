@@ -232,6 +232,21 @@ The current scope is:
   This lane keeps fragile workloads, refusal hotspots, and regime-specific
   degradation explicit instead of treating lower precision or proxy attention
   survival as proof of deployment-robust exactness
+- landed quantization-truth-envelope follow-on: `psionic-runtime` now projects
+  backend-specific deployment envelopes from the finite-precision audit lane in
+  `fixtures/tassadar/reports/tassadar_quantization_truth_envelope_runtime_report.json`,
+  keyed by backend family, numeric regime, and quantization setting with exact,
+  constrained, and refused workload posture kept explicit; `psionic-models` now
+  publishes the public `TassadarQuantizationTruthEnvelopePublication` above
+  that runtime-owned truth; `psionic-serve` now carries the active backend
+  family and deployment envelopes through the executor capability publication;
+  `psionic-provider` now validates and projects the same surface as a provider
+  deployment-truth envelope; and `psionic-eval` now freezes the joined summary
+  at
+  `fixtures/tassadar/reports/tassadar_quantization_truth_envelope_eval_report.json`.
+  This lane keeps backend and quantization drift explicit instead of assuming
+  one executor artifact preserves semantics across export, quantization, and
+  served backend changes
 - landed shared primitive transfer follow-on: `psionic-data` now publishes a
   public `TassadarSharedPrimitiveTransferContract` over explicit
   reachability-expand, relax-state, compare, select, merge, and
