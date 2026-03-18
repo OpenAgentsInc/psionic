@@ -809,6 +809,18 @@ The current scope is:
   the lane remains research-only learned bounded architecture work and does not
   imply arbitrary long-horizon learned exactness, arbitrary Wasm closure, or
   served promotion
+- landed conditional masking and address-selection follow-on:
+  `psionic-runtime` now owns a bounded conditional-masking contract over
+  local-slot, frame-window, and memory-region address families with explicit
+  refusal kinds for wider or out-of-family access regimes, `psionic-models`
+  now publishes a learned-bounded-success executor lane with explicit local,
+  frame, and memory pointer heads above that runtime contract, `psionic-train`
+  now materializes deterministic masked-versus-unmasked pointer/value and OOD
+  locality comparisons, and `psionic-eval` now freezes the committed report at
+  `fixtures/tassadar/reports/tassadar_conditional_masking_report.json`; the
+  lane keeps masked access bounded and refuses broader address regimes instead
+  of implying compiled exactness, arbitrary pointer arithmetic, or arbitrary
+  Wasm closure
 - landed Phase 9D bar: typed learned-plus-compiled and learned-circuit
   research in `psionic-research`, with explicit research-line,
   instruction-set, execution-proxy, claim-boundary, and proof-expectation

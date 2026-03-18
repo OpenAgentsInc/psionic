@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.conditional_masking.report.v1",
+  "publication": {
+    "schema_version": 1,
+    "publication_id": "tassadar.conditional_masking_executor.publication.v1",
+    "status": "implemented_early",
+    "claim_class": "learned_bounded_success",
+    "model": {
+      "model_id": "tassadar-conditional-masking-executor-candidate-v0",
+      "family": "tassadar_conditional_masking_executor",
+      "revision": "v0"
+    },
+    "runtime_contract": {
+      "schema_version": 1,
+      "contract_id": "tassadar.conditional_masking.contract.v1",
+      "supported_domains": [
+        "local_slot",
+        "call_frame",
+        "memory_region"
+      ],
+      "supported_mask_kinds": [
+        "local_window",
+        "frame_window",
+        "memory_region_window"
+      ],
+      "max_local_window_width": 16,
+      "max_frame_depth": 8,
+      "max_memory_region_span": 64,
+      "refusal_kinds": [
+        "unsupported_domain",
+        "unsupported_mask_kind",
+        "window_too_wide",
+        "frame_depth_too_deep",
+        "memory_region_too_wide"
+      ],
+      "refusal_boundary": "conditional masking stays bounded to declared local-slot windows, bounded frame windows, and contiguous memory-region spans only; out-of-family address domains, wider spans, or deeper frame traversals must refuse explicitly instead of silently widening learned access",
+      "contract_digest": "c63b38a7b2f3845d690a473bd92648e7c32905473b7f6a6ddc7613c4b6cc517d"
+    },
+    "pointer_heads": [
+      "local_slot_pointer",
+      "frame_slot_pointer",
+      "memory_region_pointer"
+    ],
+    "target_surfaces": [
+      "crates/psionic-models",
+      "crates/psionic-train",
+      "crates/psionic-runtime",
+      "crates/psionic-eval"
+    ],
+    "validation_refs": [
+      "fixtures/tassadar/reports/tassadar_conditional_masking_report.json"
+    ],
+    "support_boundaries": [
+      "pointer prediction here is bounded to explicit local-slot, frame-window, and memory-region families only; it is not a claim of arbitrary pointer arithmetic or arbitrary mutable-address closure",
+      "conditional masks may constrain attention and selection over bounded candidate sets only; out-of-family address regimes must refuse instead of silently degrading",
+      "the lane stays a learned bounded success surface and does not imply compiled exactness, arbitrary Wasm closure, or served promotion"
+    ],
+    "publication_digest": "e0ee330b21a0b3507befe95a9355d6464b7972e8123ec9d57d8aa7ff91212340"
+  },
+  "runtime_contract": {
+    "schema_version": 1,
+    "contract_id": "tassadar.conditional_masking.contract.v1",
+    "supported_domains": [
+      "local_slot",
+      "call_frame",
+      "memory_region"
+    ],
+    "supported_mask_kinds": [
+      "local_window",
+      "frame_window",
+      "memory_region_window"
+    ],
+    "max_local_window_width": 16,
+    "max_frame_depth": 8,
+    "max_memory_region_span": 64,
+    "refusal_kinds": [
+      "unsupported_domain",
+      "unsupported_mask_kind",
+      "window_too_wide",
+      "frame_depth_too_deep",
+      "memory_region_too_wide"
+    ],
+    "refusal_boundary": "conditional masking stays bounded to declared local-slot windows, bounded frame windows, and contiguous memory-region spans only; out-of-family address domains, wider spans, or deeper frame traversals must refuse explicitly instead of silently widening learned access",
+    "contract_digest": "c63b38a7b2f3845d690a473bd92648e7c32905473b7f6a6ddc7613c4b6cc517d"
+  },
+  "stress_summaries": [
+    {
+      "variant_id": "unmasked_baseline",
+      "pointer_accuracy_average_bps": 5733,
+      "value_accuracy_average_bps": 7466,
+      "held_out_ood_pointer_accuracy_average_bps": 4200,
+      "mean_candidate_span": 35,
+      "pointer_vs_value_gap_bps": 1733
+    },
+    {
+      "variant_id": "memory_pointer_masking",
+      "pointer_accuracy_average_bps": 6933,
+      "value_accuracy_average_bps": 8033,
+      "held_out_ood_pointer_accuracy_average_bps": 5800,
+      "mean_candidate_span": 17,
+      "pointer_vs_value_gap_bps": 1100
+    },
+    {
+      "variant_id": "full_conditional_masking",
+      "pointer_accuracy_average_bps": 8400,
+      "value_accuracy_average_bps": 8600,
+      "held_out_ood_pointer_accuracy_average_bps": 7600,
+      "mean_candidate_span": 12,
+      "pointer_vs_value_gap_bps": 200
+    }
+  ],
+  "full_masking_ood_pointer_gain_bps": 3400,
+  "full_masking_beats_baseline_on_ood_pointer_accuracy": true,
+  "full_masking_narrows_pointer_value_gap": true,
+  "claim_boundary": "this report proves one learned bounded success lane with explicit pointer heads and bounded conditional masks over local-slot, frame-window, and memory-region families; it does not claim compiled exactness, arbitrary pointer arithmetic, arbitrary Wasm closure, or served promotion",
+  "report_digest": "42a78f68086329e75309657b69ae1a57e124bc5601d0871f0e9937dcb061b92b"
+}
