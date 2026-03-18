@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.module_installation_staging.report.v1",
+  "activated_case_count": 1,
+  "challenge_window_case_count": 1,
+  "rolled_back_case_count": 1,
+  "refused_case_count": 1,
+  "case_reports": [
+    {
+      "install_id": "install.frontier_relax_core.session.v1",
+      "module_id": "frontier_relax_core",
+      "requested_version": "1.0.0",
+      "resolved_version": "1.0.0",
+      "scope": "session_mount",
+      "outcome": "activated",
+      "challenge_ticket_present": false,
+      "rollback_receipt_present": false,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_internal_module_library_report.json"
+      ],
+      "note": "frontier_relax_core activated on a bounded session mount after compatibility and benchmark checks passed"
+    },
+    {
+      "install_id": "install.candidate_select_core.challenge.v1",
+      "module_id": "candidate_select_core",
+      "requested_version": "1.2.0",
+      "scope": "worker_mount",
+      "outcome": "challenge_window",
+      "challenge_ticket_present": true,
+      "rollback_receipt_present": false,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_internal_module_library_report.json"
+      ],
+      "note": "candidate_select_core entered a worker-mount challenge window before activation"
+    },
+    {
+      "install_id": "install.candidate_select_core.rollback.v1",
+      "module_id": "candidate_select_core",
+      "requested_version": "1.2.0",
+      "resolved_version": "1.1.0",
+      "scope": "worker_mount",
+      "outcome": "rolled_back",
+      "challenge_ticket_present": true,
+      "rollback_receipt_present": true,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_internal_module_library_report.json"
+      ],
+      "note": "candidate_select_core rolled back to 1.1.0 after the challenge drill failed"
+    },
+    {
+      "install_id": "install.branch_prune_core.refused.v1",
+      "module_id": "branch_prune_core",
+      "requested_version": "0.1.0",
+      "scope": "session_mount",
+      "outcome": "refused",
+      "challenge_ticket_present": false,
+      "rollback_receipt_present": false,
+      "benchmark_refs": [],
+      "note": "branch_prune_core was refused because it lacked trusted-class and benchmark evidence"
+    }
+  ],
+  "claim_boundary": "this report freezes bounded staged-install drills with explicit challenge windows, rollback lineage, and refusal paths. It does not treat controlled installation as evidence of unrestricted self-modification",
+  "summary": "Module-install staging report now freezes 4 drill cases with 1 activated installs, 1 challenge-window installs, 1 rollback drills, and 1 refused installs.",
+  "report_digest": "67d87631d59de7c74814277070adabcd091436171c7f5cc1d8976aed68bcfdfd"
+}

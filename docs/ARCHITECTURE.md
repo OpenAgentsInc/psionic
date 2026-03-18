@@ -299,6 +299,19 @@ The current scope is:
   This lane keeps reuse, rollback, and refusal explicit instead of treating a
   versioned module library as unrestricted self-extension or arbitrary install
   closure
+- landed module-installation-staging follow-on: `psionic-serve` now publishes a
+  bounded staged-install surface with explicit session-mount versus worker-mount
+  scope, challenge windows, activation, rollback, and refusal receipts over the
+  current trusted module classes; `psionic-provider` now projects those served
+  install receipts provider-side; `psionic-router` now owns policy-bound module
+  install route negotiation with explicit challenge-ticket, scope, unsafe-class,
+  and missing-benchmark refusal reasons; `psionic-eval` now freezes the staged
+  drill report at
+  `fixtures/tassadar/reports/tassadar_module_installation_staging_report.json`;
+  and `psionic-research` now freezes the companion summary at
+  `fixtures/tassadar/reports/tassadar_module_installation_staging_summary.json`.
+  This lane keeps install, challenge, rollback, and refusal explicit instead of
+  treating bounded installation as unrestricted self-modification
 - landed route-contract follow-on: `psionic-router` now also owns a routeable
   Wasm capability matrix for `psionic.planner_executor_route`, with explicit
   module-class rows, opcode-family facts, import posture, module-class-specific

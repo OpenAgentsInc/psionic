@@ -6,6 +6,7 @@
 )]
 
 mod tassadar_module_library;
+mod tassadar_module_installation;
 
 use std::collections::BTreeMap;
 
@@ -13,6 +14,7 @@ use ed25519_dalek::SigningKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use tassadar_module_library::*;
+pub use tassadar_module_installation::*;
 
 use psionic_research::{
     TassadarDecompilationArtifactSummary,
