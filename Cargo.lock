@@ -3796,6 +3796,7 @@ dependencies = [
  "psionic-research",
  "psionic-router",
  "psionic-runtime",
+ "psionic-sandbox",
  "psionic-serve",
  "serde",
  "serde_json",
@@ -3877,6 +3878,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

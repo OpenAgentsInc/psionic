@@ -457,6 +457,16 @@ The current scope is:
   overlapping capability resolution honest instead of hiding selector drift
   behind defaults, while named `world-mounts` follow-ons remain explicit
   dependency markers outside standalone `psionic`
+- landed import-policy follow-on: `psionic-sandbox` now publishes the typed
+  host-call policy matrix at
+  `fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json`,
+  separating deterministic internal stubs, sandbox-only delegation, and refused
+  side effects with explicit descriptor, challenge-receipt, and refusal paths;
+  and `psionic-provider` now projects that report into a provider-facing
+  `TassadarImportPolicyMatrixReceipt`. This lane keeps internal execution
+  distinct from external delegation instead of letting import availability hide
+  a boundary crossing, while named `kernel-policy` and `world-mounts`
+  follow-ons remain explicit dependency markers outside standalone `psionic`
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the

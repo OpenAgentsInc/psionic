@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.import_policy_matrix.report.v1",
+  "policy_matrix": {
+    "matrix_id": "tassadar.import_policy_matrix.v1",
+    "supported_internal_stub_kinds": [
+      "deterministic_i32_const"
+    ],
+    "entries": [
+      {
+        "import_ref": "env.clock_stub",
+        "import_class": "deterministic_stub",
+        "execution_boundary": "internal_only",
+        "runtime_stub_kind": "deterministic_i32_const",
+        "side_effect_policy": "no_side_effects",
+        "evidence_requirement": "capability_publication_only",
+        "refusal_kind": "unsupported_host_import",
+        "note": "deterministic zero-side-effect import stub stays inside the bounded internal execution lane"
+      },
+      {
+        "import_ref": "sandbox.math_eval",
+        "import_class": "external_sandbox_delegation",
+        "execution_boundary": "sandbox_delegation_only",
+        "evidence_requirement": "sandbox_descriptor_and_challenge_receipt",
+        "refusal_kind": "unsupported_host_import",
+        "note": "external math delegation is allowed only through an explicit sandbox descriptor and challengeable receipt path"
+      },
+      {
+        "import_ref": "host.fs_write",
+        "import_class": "unsafe_side_effect",
+        "execution_boundary": "refused",
+        "runtime_stub_kind": "unsupported_host_call",
+        "evidence_requirement": "refused",
+        "refusal_kind": "unsupported_host_import",
+        "note": "filesystem writes remain disallowed because they collapse bounded internal execution into side-effectful host behavior"
+      }
+    ],
+    "kernel_policy_dependency_marker": "kernel-policy remains the authority owner for settlement-grade import admission outside standalone psionic",
+    "world_mount_dependency_marker": "world-mounts remain the authority owner for task-scoped import admission outside standalone psionic",
+    "claim_boundary": "this matrix keeps bounded internal deterministic stubs separate from sandbox delegation and refused side effects. It does not collapse external delegation into internal exact compute",
+    "matrix_digest": "9a6bc7473d4a94f8a3c4d1a9863e64e29c23ba137a6db4ad0a072711a0205998"
+  },
+  "allowed_internal_case_count": 1,
+  "delegated_case_count": 1,
+  "refused_case_count": 2,
+  "case_reports": [
+    {
+      "case_id": "import_policy.internal_allowed.v1",
+      "request": {
+        "request_id": "request.internal_allowed",
+        "import_ref": "env.clock_stub",
+        "allow_external_delegation": false,
+        "sandbox_descriptor_present": false,
+        "challenge_receipt_present": false
+      },
+      "selection": {
+        "request_id": "request.internal_allowed",
+        "import_ref": "env.clock_stub",
+        "decision": "allowed_internal",
+        "note": "deterministic zero-side-effect import stub stays inside the bounded internal execution lane"
+      },
+      "note": "deterministic clock stub stays internal and is admissible without sandbox delegation"
+    },
+    {
+      "case_id": "import_policy.sandbox_delegated.v1",
+      "request": {
+        "request_id": "request.sandbox_delegated",
+        "import_ref": "sandbox.math_eval",
+        "allow_external_delegation": true,
+        "sandbox_descriptor_present": true,
+        "challenge_receipt_present": true
+      },
+      "selection": {
+        "request_id": "request.sandbox_delegated",
+        "import_ref": "sandbox.math_eval",
+        "decision": "delegated_sandbox",
+        "note": "external math delegation is allowed only through an explicit sandbox descriptor and challengeable receipt path"
+      },
+      "note": "sandbox math delegation stays explicit as an external boundary with descriptor and challenge receipt attached"
+    },
+    {
+      "case_id": "import_policy.delegation_denied.v1",
+      "request": {
+        "request_id": "request.delegation_denied",
+        "import_ref": "sandbox.math_eval",
+        "allow_external_delegation": false,
+        "sandbox_descriptor_present": true,
+        "challenge_receipt_present": true
+      },
+      "refusal_reason": "external_delegation_disallowed",
+      "note": "mount-time policy denial remains explicit instead of silently treating external delegation as an internal import"
+    },
+    {
+      "case_id": "import_policy.unsafe_refused.v1",
+      "request": {
+        "request_id": "request.unsafe_refused",
+        "import_ref": "host.fs_write",
+        "allow_external_delegation": true,
+        "sandbox_descriptor_present": true,
+        "challenge_receipt_present": true
+      },
+      "refusal_reason": "unsafe_import_class",
+      "note": "unsafe side effects remain blocked even when the caller offers delegation and receipts"
+    }
+  ],
+  "claim_boundary": "this sandbox report keeps deterministic internal stubs, sandbox delegation, and refused side effects explicit. It does not claim kernel-policy or world-mount settlement closure inside standalone psionic",
+  "summary": "Import-policy matrix report now freezes 1 internal cases, 1 delegated sandbox cases, and 2 refused cases.",
+  "report_digest": "62d7e2eb8bc8bdcef179f6150a1694ff1dd150cdea39d92cb8dbac2c845f50e3"
+}

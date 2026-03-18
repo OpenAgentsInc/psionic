@@ -17,3 +17,6 @@ pub use tassadar_external_delegation::*;
 
 mod tassadar_import_boundary;
 pub use tassadar_import_boundary::*;
+
+mod tassadar_import_policy_matrix;
+pub use tassadar_import_policy_matrix::*;
