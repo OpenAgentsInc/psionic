@@ -652,6 +652,21 @@ The current scope is:
   representation limits explicit across graph, arithmetic, search, and
   module-scale Wasm workloads instead of flattening them into one blended
   learned-executor failure mode
+- landed search-native executor follow-on: `psionic-data` now publishes the
+  public `TassadarSearchNativeExecutorContract` over explicit `guess`,
+  `verify`, `contradict`, `backtrack`, `branch_summary`, and `search_budget`
+  event families plus seeded Sudoku, branch-heavy CLRS, search-kernel, and
+  verifier-heavy workload rows; `psionic-models` now publishes the companion
+  `TassadarSearchNativeExecutorPublication`; `psionic-train` now freezes the
+  same-budget evidence bundle at
+  `fixtures/tassadar/runs/tassadar_search_native_executor_v1/search_native_executor_evidence_bundle.json`;
+  `psionic-runtime` now publishes the runtime report at
+  `fixtures/tassadar/reports/tassadar_search_native_executor_runtime_report.json`;
+  and `psionic-eval` now publishes the comparison report at
+  `fixtures/tassadar/reports/tassadar_search_native_executor_report.json`.
+  This lane keeps search-native wins, guess and recovery metrics, and
+  search-budget refusal posture explicit instead of flattening combinatorial
+  workloads into one straight-trace executor story
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the

@@ -100,6 +100,8 @@ mod tassadar_pointer_memory_scratchpad;
 mod tassadar_precision_attention_robustness_audit;
 #[path = "tassadar_quantization_truth_envelope.rs"]
 mod tassadar_quantization_truth_envelope;
+#[path = "tassadar_search_native_executor.rs"]
+mod tassadar_search_native_executor;
 #[path = "tassadar_sequence.rs"]
 mod tassadar_sequence;
 #[path = "tassadar_shared_depth_halting_calibration.rs"]
@@ -195,6 +197,7 @@ pub use tassadar_numeric_opcode_ladder::*;
 pub use tassadar_pointer_memory_scratchpad::*;
 pub use tassadar_precision_attention_robustness_audit::*;
 pub use tassadar_quantization_truth_envelope::*;
+pub use tassadar_search_native_executor::*;
 pub use tassadar_sequence::*;
 pub use tassadar_shared_depth_halting_calibration::*;
 pub use tassadar_shared_primitive_transfer::*;

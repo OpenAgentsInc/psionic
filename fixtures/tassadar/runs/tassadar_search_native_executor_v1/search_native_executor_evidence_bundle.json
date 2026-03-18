@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.search_native_executor.evidence_bundle.v1",
+  "contract_ref": "dataset://openagents/tassadar/search_native_executor",
+  "publication_id": "tassadar.search_native_executor.publication.v1",
+  "workload_families": [
+    "sudoku_backtracking_search",
+    "branch_heavy_clrs_variant",
+    "search_kernel_recovery",
+    "verifier_heavy_workload_pack"
+  ],
+  "evidence_cases": [
+    {
+      "case_id": "sudoku_backtracking_search",
+      "workload_family": "sudoku_backtracking_search",
+      "train_budget_tokens": 1100000,
+      "eval_case_budget": 20,
+      "search_budget_limit": 12,
+      "straight_trace_baseline_ref": "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json",
+      "verifier_guided_baseline_ref": "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+      "target_signal_refs": [
+        "fixtures/tassadar/runs/tassadar_verifier_guided_search_trace_family_v1/search_trace_family_report.json",
+        "fixtures/tassadar/reports/tassadar_supervision_density_report.json"
+      ],
+      "note": "Sudoku keeps guess, contradiction, and backtrack signals first-class under one shared budget"
+    },
+    {
+      "case_id": "branch_heavy_clrs_variant",
+      "workload_family": "branch_heavy_clrs_variant",
+      "train_budget_tokens": 1100000,
+      "eval_case_budget": 20,
+      "search_budget_limit": 10,
+      "straight_trace_baseline_ref": "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json",
+      "verifier_guided_baseline_ref": "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+      "target_signal_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+        "fixtures/tassadar/reports/tassadar_pointer_memory_scratchpad_report.json"
+      ],
+      "note": "branch-heavy CLRS keeps graph-search structure and branch-summary signals explicit instead of forcing a straight trace"
+    },
+    {
+      "case_id": "search_kernel_recovery",
+      "workload_family": "search_kernel_recovery",
+      "train_budget_tokens": 1100000,
+      "eval_case_budget": 20,
+      "search_budget_limit": 8,
+      "straight_trace_baseline_ref": "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json",
+      "verifier_guided_baseline_ref": "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+      "target_signal_refs": [
+        "fixtures/tassadar/reports/tassadar_shared_primitive_transfer_report.json",
+        "fixtures/tassadar/reports/tassadar_error_regime_catalog.json"
+      ],
+      "note": "search-kernel recovery keeps guess/verify/backtrack state aligned with explicit recovery metrics under one fixed budget"
+    },
+    {
+      "case_id": "verifier_heavy_workload_pack",
+      "workload_family": "verifier_heavy_workload_pack",
+      "train_budget_tokens": 1100000,
+      "eval_case_budget": 20,
+      "search_budget_limit": 10,
+      "straight_trace_baseline_ref": "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json",
+      "verifier_guided_baseline_ref": "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+      "target_signal_refs": [
+        "fixtures/tassadar/reports/tassadar_latency_evidence_tradeoff_report.json",
+        "fixtures/tassadar/reports/tassadar_receipt_supervision_report.json"
+      ],
+      "note": "verifier-heavy pack keeps search-budget exhaustion explicit so the family can refuse instead of silently degrading"
+    }
+  ],
+  "claim_boundary": "this train bundle freezes one same-budget search-native study over Sudoku, branch-heavy CLRS, search-kernel recovery, and verifier-heavy packs. It stays benchmark-bound and does not widen served capability or imply broad learned search closure",
+  "summary": "Search-native evidence bundle freezes 4 workload families with 4 same-budget cases.",
+  "bundle_digest": "53105b472bb75f65f704039d80344709ed4009bea9d9aa4d34f061eed9b92fb1"
+}

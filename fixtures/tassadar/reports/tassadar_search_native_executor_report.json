@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.search_native_executor.report.v1",
+  "contract": {
+    "abi_version": "psionic.tassadar.search_native_executor.v1",
+    "contract_ref": "dataset://openagents/tassadar/search_native_executor",
+    "version": "2026.03.18",
+    "event_kinds": [
+      "guess",
+      "verify",
+      "contradict",
+      "backtrack",
+      "branch_summary",
+      "search_budget"
+    ],
+    "state_surfaces": [
+      "guess_state",
+      "verifier_state",
+      "contradiction_state",
+      "backtrack_state",
+      "branch_summary_state",
+      "search_budget_state"
+    ],
+    "workload_rows": [
+      {
+        "workload_family": "sudoku_backtracking_search",
+        "search_budget_limit": 12,
+        "baseline_refs": [
+          "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+          "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json"
+        ],
+        "claim_boundary": "search-native Sudoku rows stay benchmark-bound and do not imply general solver closure outside the seeded search family"
+      },
+      {
+        "workload_family": "branch_heavy_clrs_variant",
+        "search_budget_limit": 10,
+        "baseline_refs": [
+          "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+          "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json"
+        ],
+        "claim_boundary": "branch-heavy CLRS rows keep graph-search gains benchmark-bound instead of treating them as general CLRS ownership"
+      },
+      {
+        "workload_family": "search_kernel_recovery",
+        "search_budget_limit": 8,
+        "baseline_refs": [
+          "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+          "fixtures/tassadar/reports/tassadar_shared_primitive_transfer_report.json"
+        ],
+        "claim_boundary": "search-kernel rows keep guess and recovery improvements explicit without widening the current search trace family into broad executor promotion"
+      },
+      {
+        "workload_family": "verifier_heavy_workload_pack",
+        "search_budget_limit": 10,
+        "baseline_refs": [
+          "fixtures/tassadar/reports/tassadar_latency_evidence_tradeoff_report.json",
+          "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+        ],
+        "claim_boundary": "verifier-heavy pack rows keep search-budget refusal explicit and do not turn one refusal-clean path into broad validator-heavy closure"
+      }
+    ],
+    "evaluation_axes": [
+      "exactness_bps",
+      "recovery_quality_bps",
+      "guess_efficiency_bps",
+      "search_budget_utilization_bps",
+      "refusal_cleanliness_bps"
+    ],
+    "evidence_bundle_ref": "fixtures/tassadar/runs/tassadar_search_native_executor_v1/search_native_executor_evidence_bundle.json",
+    "runtime_report_ref": "fixtures/tassadar/reports/tassadar_search_native_executor_runtime_report.json",
+    "report_ref": "fixtures/tassadar/reports/tassadar_search_native_executor_report.json",
+    "contract_digest": "747d6007170098ee520620039300a597c61166a0d1642382c13854b952fc68a7"
+  },
+  "publication": {
+    "schema_version": 1,
+    "publication_id": "tassadar.search_native_executor.publication.v1",
+    "status": "implemented",
+    "claim_class": "learned_bounded / research_only_architecture",
+    "model": {
+      "model_id": "tassadar-search-native-executor-v0",
+      "family": "tassadar_search_native_executor",
+      "revision": "v0"
+    },
+    "event_surfaces": [
+      "guess",
+      "verify",
+      "contradict",
+      "backtrack",
+      "branch_summary",
+      "search_budget"
+    ],
+    "workload_families": [
+      "sudoku_backtracking_search",
+      "branch_heavy_clrs_variant",
+      "search_kernel_recovery",
+      "verifier_heavy_workload_pack"
+    ],
+    "baseline_refs": [
+      "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+      "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json",
+      "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+    ],
+    "target_surfaces": [
+      "crates/psionic-models",
+      "crates/psionic-data",
+      "crates/psionic-train",
+      "crates/psionic-runtime",
+      "crates/psionic-eval"
+    ],
+    "support_boundaries": [
+      "search-native publication is benchmark-bound and research-only; it does not widen served capability or imply arbitrary combinatorial-solver closure",
+      "search-budget refusal remains explicit and is preferred over silent degradation on verifier-heavy or nested-branch regimes",
+      "search-native wins on seeded workloads do not displace straight-trace, pointer, or verifier-guided baselines outside the compared rows"
+    ],
+    "report_ref": "fixtures/tassadar/reports/tassadar_search_native_executor_report.json",
+    "publication_digest": "99810858e72dda13b700b84c589ff296c5136dbeb6f09491a9c2249fff202a94"
+  },
+  "runtime_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.search_native_executor.runtime_report.v1",
+    "claim_class": "learned_bounded / research_only_architecture",
+    "workload_receipts": [
+      {
+        "workload_family": "sudoku_backtracking_search",
+        "guess_count": 5,
+        "verify_count": 7,
+        "contradiction_count": 2,
+        "backtrack_count": 2,
+        "branch_summary_count": 3,
+        "search_budget_limit": 12,
+        "search_budget_used": 9,
+        "search_budget_utilization_bps": 7500,
+        "exactness_bps": 9600,
+        "recovery_quality_bps": 9400,
+        "straight_trace_baseline_exactness_bps": 4200,
+        "verifier_guided_baseline_exactness_bps": 9100,
+        "status": "within_budget",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+          "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json"
+        ],
+        "note": "search-native Sudoku stays within budget and outperforms the straight-trace and verifier-guided baselines on the seeded row"
+      },
+      {
+        "workload_family": "branch_heavy_clrs_variant",
+        "guess_count": 4,
+        "verify_count": 6,
+        "contradiction_count": 1,
+        "backtrack_count": 1,
+        "branch_summary_count": 4,
+        "search_budget_limit": 10,
+        "search_budget_used": 8,
+        "search_budget_utilization_bps": 8000,
+        "exactness_bps": 8800,
+        "recovery_quality_bps": 8700,
+        "straight_trace_baseline_exactness_bps": 6100,
+        "verifier_guided_baseline_exactness_bps": 8400,
+        "status": "within_budget",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+          "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json"
+        ],
+        "note": "branch-heavy CLRS benefits from first-class branch-summary and backtrack state without claiming generic CLRS ownership"
+      },
+      {
+        "workload_family": "search_kernel_recovery",
+        "guess_count": 3,
+        "verify_count": 5,
+        "contradiction_count": 1,
+        "backtrack_count": 1,
+        "branch_summary_count": 2,
+        "search_budget_limit": 8,
+        "search_budget_used": 6,
+        "search_budget_utilization_bps": 7500,
+        "exactness_bps": 9700,
+        "recovery_quality_bps": 9800,
+        "straight_trace_baseline_exactness_bps": 5400,
+        "verifier_guided_baseline_exactness_bps": 9300,
+        "status": "within_budget",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+          "fixtures/tassadar/reports/tassadar_error_regime_catalog.json"
+        ],
+        "note": "search-kernel recovery benefits from explicit guess, verify, and backtrack state under one bounded search budget"
+      },
+      {
+        "workload_family": "verifier_heavy_workload_pack",
+        "guess_count": 6,
+        "verify_count": 8,
+        "contradiction_count": 3,
+        "backtrack_count": 2,
+        "branch_summary_count": 5,
+        "search_budget_limit": 10,
+        "search_budget_used": 10,
+        "search_budget_utilization_bps": 10000,
+        "exactness_bps": 0,
+        "recovery_quality_bps": 0,
+        "straight_trace_baseline_exactness_bps": 6200,
+        "verifier_guided_baseline_exactness_bps": 7600,
+        "status": "budget_exhausted_refusal",
+        "refusal_reason": "search_budget_exhausted_for_nested_validator_recovery",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_latency_evidence_tradeoff_report.json",
+          "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+        ],
+        "note": "verifier-heavy packs currently hit the seeded search-budget ceiling, so the lane refuses instead of silently degrading"
+      }
+    ],
+    "within_budget_case_count": 3,
+    "refused_case_count": 1,
+    "straight_trace_win_count": 3,
+    "verifier_guided_win_count": 3,
+    "claim_boundary": "this runtime report is a benchmark-bound search-native executor lane over seeded search-heavy workloads. It keeps guess, verify, contradiction, backtrack, branch-summary, and search-budget state explicit and prefers refusal over silent degradation on unsupported regimes",
+    "summary": "Search-native runtime report covers 4 workload receipts with 3 within-budget rows and 1 refusal rows.",
+    "report_digest": "249b8a79d9439349ce1ac9d62883b6f28aa2beba6c9c795ef1489c7c25f51b7e"
+  },
+  "evidence_bundle_ref": "fixtures/tassadar/runs/tassadar_search_native_executor_v1/search_native_executor_evidence_bundle.json",
+  "comparison_cells": [
+    {
+      "workload_family": "sudoku_backtracking_search",
+      "guess_count": 5,
+      "backtrack_count": 2,
+      "recovery_quality_bps": 9400,
+      "search_native_exactness_bps": 9600,
+      "straight_trace_exactness_bps": 4200,
+      "verifier_guided_exactness_bps": 9100,
+      "search_native_status": "within_budget",
+      "preferred_lane": "search_native_executor",
+      "refusal_preferred": false,
+      "note": "search-native Sudoku stays within budget and outperforms the straight-trace and verifier-guided baselines on the seeded row"
+    },
+    {
+      "workload_family": "branch_heavy_clrs_variant",
+      "guess_count": 4,
+      "backtrack_count": 1,
+      "recovery_quality_bps": 8700,
+      "search_native_exactness_bps": 8800,
+      "straight_trace_exactness_bps": 6100,
+      "verifier_guided_exactness_bps": 8400,
+      "search_native_status": "within_budget",
+      "preferred_lane": "search_native_executor",
+      "refusal_preferred": false,
+      "note": "branch-heavy CLRS benefits from first-class branch-summary and backtrack state without claiming generic CLRS ownership"
+    },
+    {
+      "workload_family": "search_kernel_recovery",
+      "guess_count": 3,
+      "backtrack_count": 1,
+      "recovery_quality_bps": 9800,
+      "search_native_exactness_bps": 9700,
+      "straight_trace_exactness_bps": 5400,
+      "verifier_guided_exactness_bps": 9300,
+      "search_native_status": "within_budget",
+      "preferred_lane": "search_native_executor",
+      "refusal_preferred": false,
+      "note": "search-kernel recovery benefits from explicit guess, verify, and backtrack state under one bounded search budget"
+    },
+    {
+      "workload_family": "verifier_heavy_workload_pack",
+      "guess_count": 6,
+      "backtrack_count": 2,
+      "recovery_quality_bps": 0,
+      "search_native_exactness_bps": 0,
+      "straight_trace_exactness_bps": 6200,
+      "verifier_guided_exactness_bps": 7600,
+      "search_native_status": "budget_exhausted_refusal",
+      "preferred_lane": "verifier_guided_search",
+      "refusal_preferred": true,
+      "note": "verifier-heavy packs currently hit the seeded search-budget ceiling, so the lane refuses instead of silently degrading"
+    }
+  ],
+  "search_native_preferred_case_count": 3,
+  "verifier_guided_preferred_case_count": 1,
+  "straight_trace_preferred_case_count": 0,
+  "refusal_case_count": 1,
+  "generated_from_refs": [
+    "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json",
+    "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+    "fixtures/tassadar/reports/tassadar_latency_evidence_tradeoff_report.json",
+    "fixtures/tassadar/reports/tassadar_search_native_executor_runtime_report.json",
+    "fixtures/tassadar/reports/tassadar_shared_primitive_transfer_report.json",
+    "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+    "fixtures/tassadar/runs/tassadar_search_native_executor_v1/search_native_executor_evidence_bundle.json"
+  ],
+  "claim_boundary": "this eval report compares search-native, straight-trace, and verifier-guided baselines on seeded search-heavy workloads. It remains benchmark-bound and refusal-bounded, and it does not widen served capability or imply broad learned-compute closure",
+  "summary": "Search-native eval report covers 4 workload rows with 3 search-native-preferred rows, 1 verifier-guided-preferred rows, and 1 refusal rows.",
+  "report_digest": "650afc5b8a68d68b5c54cc6562a3deac6cde24ab171f6e79d037e4d3e98e6a2f"
+}

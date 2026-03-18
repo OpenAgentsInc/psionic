@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.search_native_executor.runtime_report.v1",
+  "claim_class": "learned_bounded / research_only_architecture",
+  "workload_receipts": [
+    {
+      "workload_family": "sudoku_backtracking_search",
+      "guess_count": 5,
+      "verify_count": 7,
+      "contradiction_count": 2,
+      "backtrack_count": 2,
+      "branch_summary_count": 3,
+      "search_budget_limit": 12,
+      "search_budget_used": 9,
+      "search_budget_utilization_bps": 7500,
+      "exactness_bps": 9600,
+      "recovery_quality_bps": 9400,
+      "straight_trace_baseline_exactness_bps": 4200,
+      "verifier_guided_baseline_exactness_bps": 9100,
+      "status": "within_budget",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+        "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json"
+      ],
+      "note": "search-native Sudoku stays within budget and outperforms the straight-trace and verifier-guided baselines on the seeded row"
+    },
+    {
+      "workload_family": "branch_heavy_clrs_variant",
+      "guess_count": 4,
+      "verify_count": 6,
+      "contradiction_count": 1,
+      "backtrack_count": 1,
+      "branch_summary_count": 4,
+      "search_budget_limit": 10,
+      "search_budget_used": 8,
+      "search_budget_utilization_bps": 8000,
+      "exactness_bps": 8800,
+      "recovery_quality_bps": 8700,
+      "straight_trace_baseline_exactness_bps": 6100,
+      "verifier_guided_baseline_exactness_bps": 8400,
+      "status": "within_budget",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+        "fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json"
+      ],
+      "note": "branch-heavy CLRS benefits from first-class branch-summary and backtrack state without claiming generic CLRS ownership"
+    },
+    {
+      "workload_family": "search_kernel_recovery",
+      "guess_count": 3,
+      "verify_count": 5,
+      "contradiction_count": 1,
+      "backtrack_count": 1,
+      "branch_summary_count": 2,
+      "search_budget_limit": 8,
+      "search_budget_used": 6,
+      "search_budget_utilization_bps": 7500,
+      "exactness_bps": 9700,
+      "recovery_quality_bps": 9800,
+      "straight_trace_baseline_exactness_bps": 5400,
+      "verifier_guided_baseline_exactness_bps": 9300,
+      "status": "within_budget",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+        "fixtures/tassadar/reports/tassadar_error_regime_catalog.json"
+      ],
+      "note": "search-kernel recovery benefits from explicit guess, verify, and backtrack state under one bounded search budget"
+    },
+    {
+      "workload_family": "verifier_heavy_workload_pack",
+      "guess_count": 6,
+      "verify_count": 8,
+      "contradiction_count": 3,
+      "backtrack_count": 2,
+      "branch_summary_count": 5,
+      "search_budget_limit": 10,
+      "search_budget_used": 10,
+      "search_budget_utilization_bps": 10000,
+      "exactness_bps": 0,
+      "recovery_quality_bps": 0,
+      "straight_trace_baseline_exactness_bps": 6200,
+      "verifier_guided_baseline_exactness_bps": 7600,
+      "status": "budget_exhausted_refusal",
+      "refusal_reason": "search_budget_exhausted_for_nested_validator_recovery",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_latency_evidence_tradeoff_report.json",
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+      ],
+      "note": "verifier-heavy packs currently hit the seeded search-budget ceiling, so the lane refuses instead of silently degrading"
+    }
+  ],
+  "within_budget_case_count": 3,
+  "refused_case_count": 1,
+  "straight_trace_win_count": 3,
+  "verifier_guided_win_count": 3,
+  "claim_boundary": "this runtime report is a benchmark-bound search-native executor lane over seeded search-heavy workloads. It keeps guess, verify, contradiction, backtrack, branch-summary, and search-budget state explicit and prefers refusal over silent degradation on unsupported regimes",
+  "summary": "Search-native runtime report covers 4 workload receipts with 3 within-budget rows and 1 refusal rows.",
+  "report_digest": "249b8a79d9439349ce1ac9d62883b6f28aa2beba6c9c795ef1489c7c25f51b7e"
+}
