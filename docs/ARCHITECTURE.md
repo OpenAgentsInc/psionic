@@ -216,6 +216,22 @@ The current scope is:
   provider-facing `TassadarWorkloadCapabilityFrontierReceipt`. The frontier
   keeps preferred-lane recommendations, refusal-first regions, and under-mapped
   families explicit instead of widening any served capability claim
+- landed finite-precision and attention-semantics robustness follow-on:
+  `psionic-models` now publishes a public
+  `TassadarPrecisionAttentionAuditPublication` over explicit `fp32`, `fp16`,
+  `int8`, and noisy-`int8` numeric regimes plus hard-selection, sparse, and
+  soft-proxy attention families; `psionic-runtime` now freezes the
+  deterministic receipt-level audit at
+  `fixtures/tassadar/reports/tassadar_precision_attention_runtime_audit.json`
+  with explicit exact, approximate-bounded, and refused drift classes across
+  the current six workload families; `psionic-eval` now joins that runtime
+  audit to the efficient-attention baseline matrix in
+  `fixtures/tassadar/reports/tassadar_precision_attention_robustness_audit.json`;
+  and `psionic-research` now freezes the companion summary at
+  `fixtures/tassadar/reports/tassadar_precision_attention_robustness_summary.json`.
+  This lane keeps fragile workloads, refusal hotspots, and regime-specific
+  degradation explicit instead of treating lower precision or proxy attention
+  survival as proof of deployment-robust exactness
 - landed route-contract follow-on: `psionic-router` now also owns a routeable
   Wasm capability matrix for `psionic.planner_executor_route`, with explicit
   module-class rows, opcode-family facts, import posture, module-class-specific

@@ -1,0 +1,765 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.precision_attention_runtime_audit.report.v1",
+  "workload_families": [
+    "micro_wasm_kernel",
+    "branch_heavy_kernel",
+    "memory_heavy_kernel",
+    "long_loop_kernel",
+    "sudoku_class",
+    "hungarian_matching"
+  ],
+  "numeric_regimes": [
+    "fp32_reference",
+    "fp16_served",
+    "int8_served",
+    "int8_served_with_noise"
+  ],
+  "attention_families": [
+    "hard_selection_reference",
+    "sparse_validated",
+    "soft_proxy"
+  ],
+  "receipts": [
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` stays exact under `fp32_reference` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "sparse_validated",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` stays exact under `fp32_reference` plus `sparse_validated` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "soft_proxy",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` stays exact under `fp32_reference` plus `soft_proxy` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` stays exact under `fp16_served` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` stays exact under `fp16_served` plus `sparse_validated` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` stays exact under `fp16_served` plus `soft_proxy` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` stays exact under `int8_served` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` stays exact under `int8_served` plus `sparse_validated` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` remains bounded but loses exact equivalence under `int8_served` plus `soft_proxy`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` stays exact under `int8_served_with_noise` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "sparse_validated",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` remains bounded but loses exact equivalence under `int8_served_with_noise` plus `sparse_validated`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "soft_proxy",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `micro_wasm_kernel` remains bounded but loses exact equivalence under `int8_served_with_noise` plus `soft_proxy`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` stays exact under `fp32_reference` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "sparse_validated",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` stays exact under `fp32_reference` plus `sparse_validated` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "soft_proxy",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` stays exact under `fp32_reference` plus `soft_proxy` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` stays exact under `fp16_served` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` stays exact under `fp16_served` plus `sparse_validated` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` remains bounded but loses exact equivalence under `fp16_served` plus `soft_proxy`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` stays exact under `int8_served` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` remains bounded but loses exact equivalence under `int8_served` plus `sparse_validated`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` remains bounded but loses exact equivalence under `int8_served` plus `soft_proxy`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` remains bounded but loses exact equivalence under `int8_served_with_noise` plus `hard_selection_reference`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "sparse_validated",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` remains bounded but loses exact equivalence under `int8_served_with_noise` plus `sparse_validated`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "soft_proxy",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "numeric_and_attention_regime_outside_exactness_budget",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `branch_heavy_kernel` should refuse under `int8_served_with_noise` plus `soft_proxy` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` stays exact under `fp32_reference` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "sparse_validated",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` stays exact under `fp32_reference` plus `sparse_validated` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "soft_proxy",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` stays exact under `fp32_reference` plus `soft_proxy` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` stays exact under `fp16_served` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` stays exact under `fp16_served` plus `sparse_validated` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` remains bounded but loses exact equivalence under `fp16_served` plus `soft_proxy`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` stays exact under `int8_served` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` remains bounded but loses exact equivalence under `int8_served` plus `sparse_validated`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` remains bounded but loses exact equivalence under `int8_served` plus `soft_proxy`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` remains bounded but loses exact equivalence under `int8_served_with_noise` plus `hard_selection_reference`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "sparse_validated",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` remains bounded but loses exact equivalence under `int8_served_with_noise` plus `sparse_validated`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "soft_proxy",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "numeric_and_attention_regime_outside_exactness_budget",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `memory_heavy_kernel` should refuse under `int8_served_with_noise` plus `soft_proxy` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` stays exact under `fp32_reference` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "sparse_validated",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` stays exact under `fp32_reference` plus `sparse_validated` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "soft_proxy",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` remains bounded but loses exact equivalence under `fp32_reference` plus `soft_proxy`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` stays exact under `fp16_served` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` remains bounded but loses exact equivalence under `fp16_served` plus `sparse_validated`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "fp16_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` remains bounded but loses exact equivalence under `fp16_served` plus `soft_proxy`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` remains bounded but loses exact equivalence under `int8_served` plus `hard_selection_reference`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` remains bounded but loses exact equivalence under `int8_served` plus `sparse_validated`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "int8_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "soft_attention_proxy_breaks_long_horizon_control_boundary",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` should refuse under `int8_served` plus `soft_proxy` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` remains bounded but loses exact equivalence under `int8_served_with_noise` plus `hard_selection_reference`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "sparse_validated",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "loop_horizon_not_stable_under_quantized_noise",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` should refuse under `int8_served_with_noise` plus `sparse_validated` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "soft_proxy",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "loop_horizon_not_stable_under_quantized_noise",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `long_loop_kernel` should refuse under `int8_served_with_noise` plus `soft_proxy` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` stays exact under `fp32_reference` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "sparse_validated",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` remains bounded but loses exact equivalence under `fp32_reference` plus `sparse_validated`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "soft_proxy",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` remains bounded but loses exact equivalence under `fp32_reference` plus `soft_proxy`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "fp16_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` remains bounded but loses exact equivalence under `fp16_served` plus `hard_selection_reference`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "fp16_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` remains bounded but loses exact equivalence under `fp16_served` plus `sparse_validated`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "fp16_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "soft_attention_proxy_breaks_backtracking_search_boundary",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` should refuse under `fp16_served` plus `soft_proxy` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "int8_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` remains bounded but loses exact equivalence under `int8_served` plus `hard_selection_reference`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "int8_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "numeric_and_attention_regime_outside_exactness_budget",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` should refuse under `int8_served` plus `sparse_validated` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "int8_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "soft_attention_proxy_breaks_backtracking_search_boundary",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` should refuse under `int8_served` plus `soft_proxy` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "search_budget_not_stable_under_quantized_noise",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` should refuse under `int8_served_with_noise` plus `hard_selection_reference` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "sparse_validated",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "search_budget_not_stable_under_quantized_noise",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` should refuse under `int8_served_with_noise` plus `sparse_validated` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "soft_proxy",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "search_budget_not_stable_under_quantized_noise",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `sudoku_class` should refuse under `int8_served_with_noise` plus `soft_proxy` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` stays exact under `fp32_reference` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "sparse_validated",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` stays exact under `fp32_reference` plus `sparse_validated` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "fp32_reference",
+      "attention_family": "soft_proxy",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` remains bounded but loses exact equivalence under `fp32_reference` plus `soft_proxy`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "fp16_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "exact",
+      "exactness_bps": 10000,
+      "tolerance_budget_bps": 0,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` stays exact under `fp16_served` plus `hard_selection_reference` in the current deterministic audit"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "fp16_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` remains bounded but loses exact equivalence under `fp16_served` plus `sparse_validated`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "fp16_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` remains bounded but loses exact equivalence under `fp16_served` plus `soft_proxy`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "int8_served",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9600,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` remains bounded but loses exact equivalence under `int8_served` plus `hard_selection_reference`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "int8_served",
+      "attention_family": "sparse_validated",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` remains bounded but loses exact equivalence under `int8_served` plus `sparse_validated`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "int8_served",
+      "attention_family": "soft_proxy",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "soft_attention_proxy_breaks_matching_frontier_boundary",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` should refuse under `int8_served` plus `soft_proxy` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "hard_selection_reference",
+      "drift_class": "approximate_bounded",
+      "exactness_bps": 9200,
+      "tolerance_budget_bps": 1000,
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` remains bounded but loses exact equivalence under `int8_served_with_noise` plus `hard_selection_reference`; the audit records that drift explicitly instead of widening the regime"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "sparse_validated",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "numeric_and_attention_regime_outside_exactness_budget",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` should refuse under `int8_served_with_noise` plus `sparse_validated` because the audited regime no longer preserves the declared semantics budget"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "numeric_regime": "int8_served_with_noise",
+      "attention_family": "soft_proxy",
+      "drift_class": "refused",
+      "exactness_bps": 0,
+      "tolerance_budget_bps": 0,
+      "refusal_reason": "soft_attention_proxy_breaks_matching_frontier_boundary",
+      "claim_boundary": "the receipt classifies the audited regime as exact, approximate_bounded, or refused against the current workload family; approximate_bounded remains a research-only drift class and refusal remains mandatory once the audited regime no longer preserves the declared semantics",
+      "note": "workload `hungarian_matching` should refuse under `int8_served_with_noise` plus `soft_proxy` because the audited regime no longer preserves the declared semantics budget"
+    }
+  ],
+  "exact_receipt_count": 28,
+  "approximate_receipt_count": 30,
+  "refused_receipt_count": 14,
+  "claim_boundary": "this runtime report is a deterministic finite-precision and attention-semantics audit over the current Tassadar workload families. It keeps exact, approximate_bounded, and refused drift classes explicit, and it does not treat lower-precision or proxy-attention survival as proof of deployment-robust executor closure",
+  "summary": "Runtime precision/attention audit now freezes 72 receipts across 6 workloads, 4 numeric regimes, and 3 attention families: 28 exact, 30 approximate_bounded, 14 refused.",
+  "report_digest": "9d2809bd73c6ac52869303954615ad8f53f59c598c17b9a8a72074018a227c80"
+}
