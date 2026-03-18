@@ -1,8 +1,9 @@
 use psionic_runtime::{
     TassadarCompilerToolchainIdentity, TassadarProgramSourceIdentity, TassadarProgramSourceKind,
-    TassadarStructuredControlError, TassadarStructuredControlExecution,
-    TassadarStructuredControlHaltReason, TassadarStructuredControlInstruction,
-    TassadarStructuredControlProgram, execute_tassadar_structured_control_program,
+    TassadarStructuredControlBinaryOp, TassadarStructuredControlError,
+    TassadarStructuredControlExecution, TassadarStructuredControlHaltReason,
+    TassadarStructuredControlInstruction, TassadarStructuredControlProgram,
+    TassadarStructuredControlUnaryOp, execute_tassadar_structured_control_program,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -468,6 +469,255 @@ pub fn tassadar_seeded_structured_control_invalid_label_module() -> Vec<u8> {
     module.finish()
 }
 
+pub fn tassadar_seeded_numeric_i32_core_arithmetic_module() -> Vec<u8> {
+    let mut module = Module::new();
+    let mut types = TypeSection::new();
+    types.ty().function(vec![], vec![ValType::I32]);
+    module.section(&types);
+
+    let mut functions = FunctionSection::new();
+    functions.function(0);
+    module.section(&functions);
+
+    let mut exports = ExportSection::new();
+    exports.export("i32_core_arithmetic_suite", ExportKind::Func, 0);
+    module.section(&exports);
+
+    let mut code = CodeSection::new();
+    let mut function = Function::new([(1, ValType::I32)]);
+    function.instruction(&Instruction::I32Const(2));
+    function.instruction(&Instruction::I32Const(3));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Const(10));
+    function.instruction(&Instruction::I32Const(4));
+    function.instruction(&Instruction::I32Sub);
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Const(3));
+    function.instruction(&Instruction::I32Const(7));
+    function.instruction(&Instruction::I32Mul);
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::Return);
+    function.instruction(&Instruction::End);
+    code.function(&function);
+    module.section(&code);
+    module.finish()
+}
+
+pub fn tassadar_seeded_numeric_i32_comparison_module() -> Vec<u8> {
+    let mut module = Module::new();
+    let mut types = TypeSection::new();
+    types.ty().function(vec![], vec![ValType::I32]);
+    module.section(&types);
+
+    let mut functions = FunctionSection::new();
+    functions.function(0);
+    module.section(&functions);
+
+    let mut exports = ExportSection::new();
+    exports.export("i32_comparison_suite", ExportKind::Func, 0);
+    module.section(&exports);
+
+    let mut code = CodeSection::new();
+    let mut function = Function::new([(1, ValType::I32)]);
+    function.instruction(&Instruction::I32Const(0));
+    function.instruction(&Instruction::I32Eqz);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::I32Const(7));
+    function.instruction(&Instruction::I32Const(7));
+    function.instruction(&Instruction::I32Eq);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::I32Const(7));
+    function.instruction(&Instruction::I32Const(8));
+    function.instruction(&Instruction::I32Ne);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::I32Const(2));
+    function.instruction(&Instruction::I32Const(7));
+    function.instruction(&Instruction::I32LtS);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::I32Const(-1));
+    function.instruction(&Instruction::I32Const(1));
+    function.instruction(&Instruction::I32LtU);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::I32Const(9));
+    function.instruction(&Instruction::I32Const(3));
+    function.instruction(&Instruction::I32GtS);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::I32Const(-1));
+    function.instruction(&Instruction::I32Const(1));
+    function.instruction(&Instruction::I32GtU);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::I32Const(3));
+    function.instruction(&Instruction::I32Const(3));
+    function.instruction(&Instruction::I32LeS);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::I32Const(1));
+    function.instruction(&Instruction::I32Const(-1));
+    function.instruction(&Instruction::I32LeU);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::I32Const(4));
+    function.instruction(&Instruction::I32Const(4));
+    function.instruction(&Instruction::I32GeS);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::I32Const(-1));
+    function.instruction(&Instruction::I32Const(1));
+    function.instruction(&Instruction::I32GeU);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::Return);
+    function.instruction(&Instruction::End);
+    code.function(&function);
+    module.section(&code);
+    module.finish()
+}
+
+pub fn tassadar_seeded_numeric_i32_bit_ops_module() -> Vec<u8> {
+    let mut module = Module::new();
+    let mut types = TypeSection::new();
+    types.ty().function(vec![], vec![ValType::I32]);
+    module.section(&types);
+
+    let mut functions = FunctionSection::new();
+    functions.function(0);
+    module.section(&functions);
+
+    let mut exports = ExportSection::new();
+    exports.export("i32_bit_ops_suite", ExportKind::Func, 0);
+    module.section(&exports);
+
+    let mut code = CodeSection::new();
+    let mut function = Function::new([(1, ValType::I32)]);
+    function.instruction(&Instruction::I32Const(0));
+    function.instruction(&Instruction::LocalSet(0));
+
+    function.instruction(&Instruction::I32Const(6));
+    function.instruction(&Instruction::I32Const(3));
+    function.instruction(&Instruction::I32And);
+    function.instruction(&Instruction::I32Const(2));
+    function.instruction(&Instruction::I32Eq);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+
+    function.instruction(&Instruction::I32Const(6));
+    function.instruction(&Instruction::I32Const(3));
+    function.instruction(&Instruction::I32Or);
+    function.instruction(&Instruction::I32Const(7));
+    function.instruction(&Instruction::I32Eq);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+
+    function.instruction(&Instruction::I32Const(6));
+    function.instruction(&Instruction::I32Const(3));
+    function.instruction(&Instruction::I32Xor);
+    function.instruction(&Instruction::I32Const(5));
+    function.instruction(&Instruction::I32Eq);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+
+    function.instruction(&Instruction::I32Const(1));
+    function.instruction(&Instruction::I32Const(3));
+    function.instruction(&Instruction::I32Shl);
+    function.instruction(&Instruction::I32Const(8));
+    function.instruction(&Instruction::I32Eq);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+
+    function.instruction(&Instruction::I32Const(-8));
+    function.instruction(&Instruction::I32Const(1));
+    function.instruction(&Instruction::I32ShrS);
+    function.instruction(&Instruction::I32Const(-4));
+    function.instruction(&Instruction::I32Eq);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::LocalSet(0));
+
+    function.instruction(&Instruction::I32Const(-8));
+    function.instruction(&Instruction::I32Const(1));
+    function.instruction(&Instruction::I32ShrU);
+    function.instruction(&Instruction::I32Const(0x7fff_fffc_u32 as i32));
+    function.instruction(&Instruction::I32Eq);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::I32Add);
+    function.instruction(&Instruction::Return);
+    function.instruction(&Instruction::End);
+    code.function(&function);
+    module.section(&code);
+    module.finish()
+}
+
+pub fn tassadar_seeded_numeric_i64_refusal_module() -> Vec<u8> {
+    let mut module = Module::new();
+    let mut types = TypeSection::new();
+    types.ty().function(vec![], vec![ValType::I64]);
+    module.section(&types);
+
+    let mut functions = FunctionSection::new();
+    functions.function(0);
+    module.section(&functions);
+
+    let mut exports = ExportSection::new();
+    exports.export("i64_refusal", ExportKind::Func, 0);
+    module.section(&exports);
+
+    let mut code = CodeSection::new();
+    let mut function = Function::new([]);
+    function.instruction(&Instruction::I64Const(1));
+    function.instruction(&Instruction::Return);
+    function.instruction(&Instruction::End);
+    code.function(&function);
+    module.section(&code);
+    module.finish()
+}
+
+pub fn tassadar_seeded_numeric_float_refusal_module() -> Vec<u8> {
+    let mut module = Module::new();
+    let mut types = TypeSection::new();
+    types.ty().function(vec![], vec![ValType::F32]);
+    module.section(&types);
+
+    let mut functions = FunctionSection::new();
+    functions.function(0);
+    module.section(&functions);
+
+    let mut exports = ExportSection::new();
+    exports.export("float_refusal", ExportKind::Func, 0);
+    module.section(&exports);
+
+    let mut code = CodeSection::new();
+    let mut function = Function::new([]);
+    function.instruction(&Instruction::F32Const(1.5f32.into()));
+    function.instruction(&Instruction::Return);
+    function.instruction(&Instruction::End);
+    code.function(&function);
+    module.section(&code);
+    module.finish()
+}
+
 struct ParsedStructuredControlModule {
     types: Vec<ParsedFunctionSignature>,
     function_type_indices: Vec<u32>,
@@ -629,22 +879,102 @@ fn parse_function_body(
                 .push(TassadarStructuredControlInstruction::LocalTee { local_index }),
             Operator::I32Add => frame_stack.last_mut().expect("root frame").push(
                 TassadarStructuredControlInstruction::BinaryOp {
-                    op: psionic_runtime::TassadarStructuredControlBinaryOp::Add,
+                    op: TassadarStructuredControlBinaryOp::Add,
                 },
             ),
             Operator::I32Sub => frame_stack.last_mut().expect("root frame").push(
                 TassadarStructuredControlInstruction::BinaryOp {
-                    op: psionic_runtime::TassadarStructuredControlBinaryOp::Sub,
+                    op: TassadarStructuredControlBinaryOp::Sub,
                 },
             ),
             Operator::I32Mul => frame_stack.last_mut().expect("root frame").push(
                 TassadarStructuredControlInstruction::BinaryOp {
-                    op: psionic_runtime::TassadarStructuredControlBinaryOp::Mul,
+                    op: TassadarStructuredControlBinaryOp::Mul,
+                },
+            ),
+            Operator::I32Eqz => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::UnaryOp {
+                    op: TassadarStructuredControlUnaryOp::Eqz,
+                },
+            ),
+            Operator::I32Eq => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Eq,
+                },
+            ),
+            Operator::I32Ne => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Ne,
                 },
             ),
             Operator::I32LtS => frame_stack.last_mut().expect("root frame").push(
                 TassadarStructuredControlInstruction::BinaryOp {
-                    op: psionic_runtime::TassadarStructuredControlBinaryOp::LtS,
+                    op: TassadarStructuredControlBinaryOp::LtS,
+                },
+            ),
+            Operator::I32LtU => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::LtU,
+                },
+            ),
+            Operator::I32GtS => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::GtS,
+                },
+            ),
+            Operator::I32GtU => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::GtU,
+                },
+            ),
+            Operator::I32LeS => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::LeS,
+                },
+            ),
+            Operator::I32LeU => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::LeU,
+                },
+            ),
+            Operator::I32GeS => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::GeS,
+                },
+            ),
+            Operator::I32GeU => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::GeU,
+                },
+            ),
+            Operator::I32And => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::And,
+                },
+            ),
+            Operator::I32Or => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Or,
+                },
+            ),
+            Operator::I32Xor => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Xor,
+                },
+            ),
+            Operator::I32Shl => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Shl,
+                },
+            ),
+            Operator::I32ShrS => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::ShrS,
+                },
+            ),
+            Operator::I32ShrU => frame_stack.last_mut().expect("root frame").push(
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::ShrU,
                 },
             ),
             Operator::Drop => frame_stack
@@ -931,6 +1261,10 @@ mod tests {
     use super::{
         TassadarStructuredControlBundleError,
         compile_tassadar_wasm_binary_module_to_structured_control_bundle,
+        tassadar_seeded_numeric_float_refusal_module, tassadar_seeded_numeric_i32_bit_ops_module,
+        tassadar_seeded_numeric_i32_comparison_module,
+        tassadar_seeded_numeric_i32_core_arithmetic_module,
+        tassadar_seeded_numeric_i64_refusal_module,
         tassadar_seeded_structured_control_branch_table_module,
         tassadar_seeded_structured_control_if_else_module,
         tassadar_seeded_structured_control_invalid_label_module,
@@ -1012,6 +1346,88 @@ mod tests {
             TassadarStructuredControlBundleError::Runtime(
                 psionic_runtime::TassadarStructuredControlError::InvalidBranchDepth { .. }
             )
+        ));
+    }
+
+    #[test]
+    fn structured_control_numeric_i32_comparison_bundle_matches_cpu_reference_truth() {
+        let bundle = compile_tassadar_wasm_binary_module_to_structured_control_bundle(
+            "numeric_i32_comparison",
+            &tassadar_seeded_numeric_i32_comparison_module(),
+        )
+        .expect("bundle");
+        assert_eq!(bundle.artifacts.len(), 1);
+        let artifact = &bundle.artifacts[0];
+        let execution =
+            execute_tassadar_structured_control_program(&artifact.program).expect("execute");
+        assert_eq!(execution.returned_value, Some(10));
+        assert_eq!(
+            execution.execution_digest(),
+            artifact.execution_manifest.expected_trace_digest
+        );
+    }
+
+    #[test]
+    fn structured_control_numeric_i32_core_arithmetic_bundle_matches_cpu_reference_truth() {
+        let bundle = compile_tassadar_wasm_binary_module_to_structured_control_bundle(
+            "numeric_i32_core_arithmetic",
+            &tassadar_seeded_numeric_i32_core_arithmetic_module(),
+        )
+        .expect("bundle");
+        assert_eq!(bundle.artifacts.len(), 1);
+        let artifact = &bundle.artifacts[0];
+        let execution =
+            execute_tassadar_structured_control_program(&artifact.program).expect("execute");
+        assert_eq!(execution.returned_value, Some(32));
+        assert_eq!(
+            execution.execution_digest(),
+            artifact.execution_manifest.expected_trace_digest
+        );
+    }
+
+    #[test]
+    fn structured_control_numeric_i32_bit_ops_bundle_matches_cpu_reference_truth() {
+        let bundle = compile_tassadar_wasm_binary_module_to_structured_control_bundle(
+            "numeric_i32_bit_ops",
+            &tassadar_seeded_numeric_i32_bit_ops_module(),
+        )
+        .expect("bundle");
+        assert_eq!(bundle.artifacts.len(), 1);
+        let artifact = &bundle.artifacts[0];
+        let execution =
+            execute_tassadar_structured_control_program(&artifact.program).expect("execute");
+        assert_eq!(execution.returned_value, Some(6));
+        assert_eq!(
+            execution.execution_digest(),
+            artifact.execution_manifest.expected_trace_digest
+        );
+    }
+
+    #[test]
+    fn structured_control_numeric_i64_module_refuses_explicitly() {
+        let error = compile_tassadar_wasm_binary_module_to_structured_control_bundle(
+            "numeric_i64_refusal",
+            &tassadar_seeded_numeric_i64_refusal_module(),
+        )
+        .expect_err("i64 should refuse");
+        assert!(matches!(
+            error,
+            TassadarStructuredControlBundleError::UnsupportedResultTypes { .. }
+                | TassadarStructuredControlBundleError::UnsupportedInstruction { .. }
+        ));
+    }
+
+    #[test]
+    fn structured_control_numeric_float_module_refuses_explicitly() {
+        let error = compile_tassadar_wasm_binary_module_to_structured_control_bundle(
+            "numeric_float_refusal",
+            &tassadar_seeded_numeric_float_refusal_module(),
+        )
+        .expect_err("float should refuse");
+        assert!(matches!(
+            error,
+            TassadarStructuredControlBundleError::UnsupportedResultTypes { .. }
+                | TassadarStructuredControlBundleError::UnsupportedInstruction { .. }
         ));
     }
 }

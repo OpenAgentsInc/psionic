@@ -14,8 +14,46 @@ pub enum TassadarStructuredControlBinaryOp {
     Sub,
     /// Integer multiplication.
     Mul,
+    /// Equality comparison.
+    Eq,
+    /// Inequality comparison.
+    Ne,
     /// Signed less-than comparison.
     LtS,
+    /// Unsigned less-than comparison.
+    LtU,
+    /// Signed greater-than comparison.
+    GtS,
+    /// Unsigned greater-than comparison.
+    GtU,
+    /// Signed less-than-or-equal comparison.
+    LeS,
+    /// Unsigned less-than-or-equal comparison.
+    LeU,
+    /// Signed greater-than-or-equal comparison.
+    GeS,
+    /// Unsigned greater-than-or-equal comparison.
+    GeU,
+    /// Bitwise and.
+    And,
+    /// Bitwise or.
+    Or,
+    /// Bitwise xor.
+    Xor,
+    /// Left shift.
+    Shl,
+    /// Arithmetic right shift.
+    ShrS,
+    /// Logical right shift.
+    ShrU,
+}
+
+/// Unary integer operation supported by the structured-control lane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarStructuredControlUnaryOp {
+    /// Integer equals-zero check.
+    Eqz,
 }
 
 /// One executor-ready structured-control instruction.
@@ -41,6 +79,11 @@ pub enum TassadarStructuredControlInstruction {
     LocalTee {
         /// Local index.
         local_index: u32,
+    },
+    /// Apply one unary integer operation.
+    UnaryOp {
+        /// Unary operation family.
+        op: TassadarStructuredControlUnaryOp,
     },
     /// Pop two `i32` values and push one arithmetic result.
     BinaryOp {
@@ -164,6 +207,15 @@ pub enum TassadarStructuredControlTraceEvent {
         local_index: u32,
         /// Value copied into the local.
         value: i32,
+    },
+    /// One unary integer operation completed.
+    UnaryOp {
+        /// Unary operation family.
+        op: TassadarStructuredControlUnaryOp,
+        /// Input value.
+        input: i32,
+        /// Result value.
+        result: i32,
     },
     /// One arithmetic operation completed.
     BinaryOp {
@@ -530,6 +582,21 @@ fn execute_instruction_list(
                     },
                 )?;
             }
+            TassadarStructuredControlInstruction::UnaryOp { op } => {
+                let input = pop_stack_value(state, "unary_op")?;
+                let result = match op {
+                    TassadarStructuredControlUnaryOp::Eqz => i32::from(input == 0),
+                };
+                state.stack.push(result);
+                state.push_step(
+                    control_depth,
+                    TassadarStructuredControlTraceEvent::UnaryOp {
+                        op: *op,
+                        input,
+                        result,
+                    },
+                )?;
+            }
             TassadarStructuredControlInstruction::BinaryOp { op } => {
                 let right = pop_stack_value(state, "binary_op")?;
                 let left = pop_stack_value(state, "binary_op")?;
@@ -537,7 +604,32 @@ fn execute_instruction_list(
                     TassadarStructuredControlBinaryOp::Add => left.saturating_add(right),
                     TassadarStructuredControlBinaryOp::Sub => left.saturating_sub(right),
                     TassadarStructuredControlBinaryOp::Mul => left.saturating_mul(right),
+                    TassadarStructuredControlBinaryOp::Eq => i32::from(left == right),
+                    TassadarStructuredControlBinaryOp::Ne => i32::from(left != right),
                     TassadarStructuredControlBinaryOp::LtS => i32::from(left < right),
+                    TassadarStructuredControlBinaryOp::LtU => {
+                        i32::from((left as u32) < (right as u32))
+                    }
+                    TassadarStructuredControlBinaryOp::GtS => i32::from(left > right),
+                    TassadarStructuredControlBinaryOp::GtU => {
+                        i32::from((left as u32) > (right as u32))
+                    }
+                    TassadarStructuredControlBinaryOp::LeS => i32::from(left <= right),
+                    TassadarStructuredControlBinaryOp::LeU => {
+                        i32::from((left as u32) <= (right as u32))
+                    }
+                    TassadarStructuredControlBinaryOp::GeS => i32::from(left >= right),
+                    TassadarStructuredControlBinaryOp::GeU => {
+                        i32::from((left as u32) >= (right as u32))
+                    }
+                    TassadarStructuredControlBinaryOp::And => left & right,
+                    TassadarStructuredControlBinaryOp::Or => left | right,
+                    TassadarStructuredControlBinaryOp::Xor => left ^ right,
+                    TassadarStructuredControlBinaryOp::Shl => left.wrapping_shl(right as u32),
+                    TassadarStructuredControlBinaryOp::ShrS => left.wrapping_shr(right as u32),
+                    TassadarStructuredControlBinaryOp::ShrU => {
+                        ((left as u32).wrapping_shr(right as u32)) as i32
+                    }
                 };
                 state.stack.push(result);
                 state.push_step(
@@ -824,7 +916,8 @@ mod tests {
     use super::{
         TassadarStructuredControlBinaryOp, TassadarStructuredControlError,
         TassadarStructuredControlHaltReason, TassadarStructuredControlInstruction,
-        TassadarStructuredControlProgram, execute_tassadar_structured_control_program,
+        TassadarStructuredControlProgram, TassadarStructuredControlUnaryOp,
+        execute_tassadar_structured_control_program,
     };
 
     #[test]
@@ -952,5 +1045,63 @@ mod tests {
         let branch_execution = execute_tassadar_structured_control_program(&branch_table_program)
             .expect("branch execute");
         assert_eq!(branch_execution.returned_value, Some(200));
+    }
+
+    #[test]
+    fn structured_control_program_executes_widened_i32_numeric_ops_exactly() {
+        let program = TassadarStructuredControlProgram::new(
+            "numeric_widening",
+            1,
+            1,
+            vec![
+                TassadarStructuredControlInstruction::I32Const { value: 0 },
+                TassadarStructuredControlInstruction::UnaryOp {
+                    op: TassadarStructuredControlUnaryOp::Eqz,
+                },
+                TassadarStructuredControlInstruction::LocalSet { local_index: 0 },
+                TassadarStructuredControlInstruction::I32Const { value: 7 },
+                TassadarStructuredControlInstruction::I32Const { value: 7 },
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Eq,
+                },
+                TassadarStructuredControlInstruction::LocalGet { local_index: 0 },
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Add,
+                },
+                TassadarStructuredControlInstruction::LocalSet { local_index: 0 },
+                TassadarStructuredControlInstruction::I32Const { value: 6 },
+                TassadarStructuredControlInstruction::I32Const { value: 3 },
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::And,
+                },
+                TassadarStructuredControlInstruction::I32Const { value: 2 },
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Eq,
+                },
+                TassadarStructuredControlInstruction::LocalGet { local_index: 0 },
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Add,
+                },
+                TassadarStructuredControlInstruction::LocalSet { local_index: 0 },
+                TassadarStructuredControlInstruction::I32Const { value: -8 },
+                TassadarStructuredControlInstruction::I32Const { value: 1 },
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::ShrU,
+                },
+                TassadarStructuredControlInstruction::I32Const {
+                    value: 0x7fff_fffc_u32 as i32,
+                },
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Eq,
+                },
+                TassadarStructuredControlInstruction::LocalGet { local_index: 0 },
+                TassadarStructuredControlInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Add,
+                },
+                TassadarStructuredControlInstruction::Return,
+            ],
+        );
+        let execution = execute_tassadar_structured_control_program(&program).expect("execute");
+        assert_eq!(execution.returned_value, Some(4));
     }
 }

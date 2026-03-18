@@ -180,6 +180,13 @@ Current posture:
   call-frame model, multi-function execution, replayable frame-stack traces,
   bounded-recursion refusal, and the committed report at
   `fixtures/tassadar/reports/tassadar_call_frame_report.json`
+- its staged numeric-opcode widening ladder now also exists across
+  `psionic-data`, `psionic-compiler`, `psionic-runtime`, and `psionic-eval`,
+  with a public family-by-family contract for exact i32 arithmetic,
+  comparisons, and bit operations versus explicit i64 and floating-point
+  refusal, widened structured-control lowering and execution support for the
+  implemented i32 families, and the committed report at
+  `fixtures/tassadar/reports/tassadar_numeric_opcode_ladder_report.json`
 - the repo now also carries a standardized exactness/refusal evidence surface
   across `psionic-runtime`, `psionic-provider`, and `psionic-eval`, with a
   shared runtime report schema for exact direct, exact fallback, mismatch, and

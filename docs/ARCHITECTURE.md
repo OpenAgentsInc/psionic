@@ -265,6 +265,17 @@ The current scope is:
   `fixtures/tassadar/reports/tassadar_call_frame_report.json` instead of
   keeping multi-function execution trapped behind the old single-frame
   boundary
+- landed numeric-opcode widening bar: `psionic-data` now publishes a public
+  `TassadarNumericOpcodeLadderContract` that keeps i32 core arithmetic,
+  comparisons, bit operations, i64 integer work, and floating-point work as
+  separate explicit families; `psionic-compiler` and `psionic-runtime` now
+  widen the bounded structured-control lane through exact i32 comparisons,
+  `eqz`, and bitwise/shift operations while still refusing i64 and
+  floating-point instructions explicitly; and `psionic-eval` now freezes the
+  current evidence at
+  `fixtures/tassadar/reports/tassadar_numeric_opcode_ladder_report.json`
+  instead of pretending numeric closure already jumped from tiny i32 kernels
+  to arbitrary Wasm
 - landed exactness/refusal evidence bar: `psionic-runtime` now owns a shared
   `TassadarExactnessRefusalReport` contract that records exact, mismatch, and
   refused posture above current selection diagnostics and trace/output/halt

@@ -466,7 +466,32 @@ pub fn execute_tassadar_call_frame_program(
                     TassadarStructuredControlBinaryOp::Add => left.saturating_add(right),
                     TassadarStructuredControlBinaryOp::Sub => left.saturating_sub(right),
                     TassadarStructuredControlBinaryOp::Mul => left.saturating_mul(right),
+                    TassadarStructuredControlBinaryOp::Eq => i32::from(left == right),
+                    TassadarStructuredControlBinaryOp::Ne => i32::from(left != right),
                     TassadarStructuredControlBinaryOp::LtS => i32::from(left < right),
+                    TassadarStructuredControlBinaryOp::LtU => {
+                        i32::from((left as u32) < (right as u32))
+                    }
+                    TassadarStructuredControlBinaryOp::GtS => i32::from(left > right),
+                    TassadarStructuredControlBinaryOp::GtU => {
+                        i32::from((left as u32) > (right as u32))
+                    }
+                    TassadarStructuredControlBinaryOp::LeS => i32::from(left <= right),
+                    TassadarStructuredControlBinaryOp::LeU => {
+                        i32::from((left as u32) <= (right as u32))
+                    }
+                    TassadarStructuredControlBinaryOp::GeS => i32::from(left >= right),
+                    TassadarStructuredControlBinaryOp::GeU => {
+                        i32::from((left as u32) >= (right as u32))
+                    }
+                    TassadarStructuredControlBinaryOp::And => left & right,
+                    TassadarStructuredControlBinaryOp::Or => left | right,
+                    TassadarStructuredControlBinaryOp::Xor => left ^ right,
+                    TassadarStructuredControlBinaryOp::Shl => left.wrapping_shl(right as u32),
+                    TassadarStructuredControlBinaryOp::ShrS => left.wrapping_shr(right as u32),
+                    TassadarStructuredControlBinaryOp::ShrU => {
+                        ((left as u32).wrapping_shr(right as u32)) as i32
+                    }
                 };
                 state.frames[current_index].operand_stack.push(result);
                 state.frames[current_index].pc += 1;

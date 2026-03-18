@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use psionic_datastream::{DatastreamEncoding, DatastreamManifest, DatastreamSubjectKind};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -17,6 +17,9 @@ pub const TASSADAR_SEQUENCE_DATASET_ABI_VERSION: &str = "psionic.tassadar.sequen
 /// Stable ABI version for Tassadar benchmark-package-set contracts.
 pub const TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION: &str =
     "psionic.tassadar.benchmark_package_set.v1";
+/// Stable ABI version for Tassadar numeric-opcode ladder contracts.
+pub const TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION: &str =
+    "psionic.tassadar.numeric_opcode_ladder.v1";
 /// Stable ABI version for Tassadar trace-family-set contracts.
 pub const TASSADAR_TRACE_FAMILY_SET_ABI_VERSION: &str = "psionic.tassadar.trace_family_set.v1";
 
@@ -46,6 +49,401 @@ pub enum TassadarBenchmarkAxis {
     LengthGeneralization,
     /// Whether the family is useful for planner or route selection rather than only systems work.
     PlannerUsefulness,
+}
+
+/// Numeric-opcode family tracked by the public Tassadar widening ladder.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarNumericOpcodeFamily {
+    /// Core i32 arithmetic already admitted by the bounded lane.
+    I32CoreArithmetic,
+    /// Full i32 comparison and equality family, including `eqz`.
+    I32Comparisons,
+    /// i32 bitwise and shift family.
+    I32BitOps,
+    /// i64 integer family that remains out of scope today.
+    I64Integer,
+    /// Floating-point family that remains out of scope today.
+    FloatingPoint,
+}
+
+/// Current support posture for one numeric-opcode family.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarNumericOpcodeFamilyStatus {
+    /// The family has exact bounded coverage today.
+    Implemented,
+    /// The family still refuses explicitly today.
+    Refused,
+}
+
+/// Family-level contract row for the public numeric-opcode widening ladder.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarNumericOpcodeFamilyContract {
+    /// Stable numeric family.
+    pub family: TassadarNumericOpcodeFamily,
+    /// Current support posture for the family.
+    pub status: TassadarNumericOpcodeFamilyStatus,
+    /// Human-readable family summary.
+    pub summary: String,
+    /// Explicit claim boundary for the family.
+    pub claim_boundary: String,
+    /// Opcodes implemented exactly for the family today.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub supported_opcodes: Vec<String>,
+    /// Typed refusal classes still expected for the family today.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refusal_kinds: Vec<String>,
+    /// Stable seeded case identifiers that anchor the family today.
+    pub case_ids: Vec<String>,
+}
+
+impl TassadarNumericOpcodeFamilyContract {
+    fn validate(&self) -> Result<(), TassadarNumericOpcodeLadderError> {
+        if self.summary.trim().is_empty() {
+            return Err(TassadarNumericOpcodeLadderError::MissingFamilySummary {
+                family: self.family,
+            });
+        }
+        if self.claim_boundary.trim().is_empty() {
+            return Err(TassadarNumericOpcodeLadderError::MissingClaimBoundary {
+                family: self.family,
+            });
+        }
+        if self.case_ids.is_empty() {
+            return Err(TassadarNumericOpcodeLadderError::MissingCaseIds {
+                family: self.family,
+            });
+        }
+
+        match self.status {
+            TassadarNumericOpcodeFamilyStatus::Implemented if self.supported_opcodes.is_empty() => {
+                return Err(TassadarNumericOpcodeLadderError::MissingSupportedOpcodes {
+                    family: self.family,
+                });
+            }
+            TassadarNumericOpcodeFamilyStatus::Refused if self.refusal_kinds.is_empty() => {
+                return Err(TassadarNumericOpcodeLadderError::MissingRefusalKinds {
+                    family: self.family,
+                });
+            }
+            _ => {}
+        }
+
+        let mut seen_supported_opcodes = BTreeSet::new();
+        for opcode in &self.supported_opcodes {
+            if opcode.trim().is_empty() {
+                return Err(TassadarNumericOpcodeLadderError::MissingSupportedOpcode {
+                    family: self.family,
+                });
+            }
+            if !seen_supported_opcodes.insert(opcode.clone()) {
+                return Err(TassadarNumericOpcodeLadderError::DuplicateSupportedOpcode {
+                    family: self.family,
+                    opcode: opcode.clone(),
+                });
+            }
+        }
+
+        let mut seen_refusal_kinds = BTreeSet::new();
+        for refusal_kind in &self.refusal_kinds {
+            if refusal_kind.trim().is_empty() {
+                return Err(TassadarNumericOpcodeLadderError::MissingRefusalKind {
+                    family: self.family,
+                });
+            }
+            if !seen_refusal_kinds.insert(refusal_kind.clone()) {
+                return Err(TassadarNumericOpcodeLadderError::DuplicateRefusalKind {
+                    family: self.family,
+                    refusal_kind: refusal_kind.clone(),
+                });
+            }
+        }
+
+        let mut seen_case_ids = BTreeSet::new();
+        for case_id in &self.case_ids {
+            if case_id.trim().is_empty() {
+                return Err(TassadarNumericOpcodeLadderError::MissingCaseId {
+                    family: self.family,
+                });
+            }
+            if !seen_case_ids.insert(case_id.clone()) {
+                return Err(TassadarNumericOpcodeLadderError::DuplicateCaseId {
+                    family: self.family,
+                    case_id: case_id.clone(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Public contract for the current numeric-opcode widening ladder.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarNumericOpcodeLadderContract {
+    /// Stable ABI version.
+    pub abi_version: String,
+    /// Stable ladder reference.
+    pub ladder_ref: String,
+    /// Immutable ladder version.
+    pub version: String,
+    /// Family rows covered by the ladder.
+    pub families: Vec<TassadarNumericOpcodeFamilyContract>,
+}
+
+impl TassadarNumericOpcodeLadderContract {
+    /// Creates and validates a numeric-opcode ladder contract.
+    pub fn new(
+        ladder_ref: impl Into<String>,
+        version: impl Into<String>,
+        families: Vec<TassadarNumericOpcodeFamilyContract>,
+    ) -> Result<Self, TassadarNumericOpcodeLadderError> {
+        let contract = Self {
+            abi_version: String::from(TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION),
+            ladder_ref: ladder_ref.into(),
+            version: version.into(),
+            families,
+        };
+        contract.validate()?;
+        Ok(contract)
+    }
+
+    /// Validates the contract.
+    pub fn validate(&self) -> Result<(), TassadarNumericOpcodeLadderError> {
+        if self.abi_version != TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION {
+            return Err(TassadarNumericOpcodeLadderError::UnsupportedAbiVersion {
+                abi_version: self.abi_version.clone(),
+            });
+        }
+        if self.ladder_ref.trim().is_empty() {
+            return Err(TassadarNumericOpcodeLadderError::MissingLadderRef);
+        }
+        if self.version.trim().is_empty() {
+            return Err(TassadarNumericOpcodeLadderError::MissingLadderVersion);
+        }
+        if self.families.is_empty() {
+            return Err(TassadarNumericOpcodeLadderError::MissingFamilies);
+        }
+
+        let mut seen_families = BTreeSet::new();
+        for family in &self.families {
+            family.validate()?;
+            if !seen_families.insert(family.family) {
+                return Err(TassadarNumericOpcodeLadderError::DuplicateFamily {
+                    family: family.family,
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Returns a stable digest over the contract.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        stable_digest(b"psionic_tassadar_numeric_opcode_ladder_contract|", self)
+    }
+}
+
+/// Returns the current public numeric-opcode widening ladder contract.
+#[must_use]
+pub fn tassadar_numeric_opcode_ladder_contract() -> TassadarNumericOpcodeLadderContract {
+    TassadarNumericOpcodeLadderContract::new(
+        "tassadar://numeric_opcode_ladder/structured_control_v1",
+        "2026.03.17",
+        vec![
+            TassadarNumericOpcodeFamilyContract {
+                family: TassadarNumericOpcodeFamily::I32CoreArithmetic,
+                status: TassadarNumericOpcodeFamilyStatus::Implemented,
+                summary: String::from(
+                    "core i32 arithmetic remains exact in the bounded structured-control lane",
+                ),
+                claim_boundary: String::from(
+                    "compiled_bounded_exactness over zero-parameter i32-only Wasm functions with empty block types",
+                ),
+                supported_opcodes: vec![
+                    String::from("i32.add"),
+                    String::from("i32.sub"),
+                    String::from("i32.mul"),
+                ],
+                refusal_kinds: Vec::new(),
+                case_ids: vec![String::from("i32_core_arithmetic_suite")],
+            },
+            TassadarNumericOpcodeFamilyContract {
+                family: TassadarNumericOpcodeFamily::I32Comparisons,
+                status: TassadarNumericOpcodeFamilyStatus::Implemented,
+                summary: String::from(
+                    "full i32 equality and comparison coverage now exists, including `eqz` and signed-vs-unsigned forms",
+                ),
+                claim_boundary: String::from(
+                    "compiled_bounded_exactness for the current zero-parameter i32-only structured-control lowering lane",
+                ),
+                supported_opcodes: vec![
+                    String::from("i32.eqz"),
+                    String::from("i32.eq"),
+                    String::from("i32.ne"),
+                    String::from("i32.lt_s"),
+                    String::from("i32.lt_u"),
+                    String::from("i32.gt_s"),
+                    String::from("i32.gt_u"),
+                    String::from("i32.le_s"),
+                    String::from("i32.le_u"),
+                    String::from("i32.ge_s"),
+                    String::from("i32.ge_u"),
+                ],
+                refusal_kinds: Vec::new(),
+                case_ids: vec![String::from("i32_comparison_suite")],
+            },
+            TassadarNumericOpcodeFamilyContract {
+                family: TassadarNumericOpcodeFamily::I32BitOps,
+                status: TassadarNumericOpcodeFamilyStatus::Implemented,
+                summary: String::from(
+                    "i32 bitwise logic and shift operations now lower exactly in the bounded lane",
+                ),
+                claim_boundary: String::from(
+                    "compiled_bounded_exactness for the current zero-parameter i32-only structured-control lowering lane",
+                ),
+                supported_opcodes: vec![
+                    String::from("i32.and"),
+                    String::from("i32.or"),
+                    String::from("i32.xor"),
+                    String::from("i32.shl"),
+                    String::from("i32.shr_s"),
+                    String::from("i32.shr_u"),
+                ],
+                refusal_kinds: Vec::new(),
+                case_ids: vec![String::from("i32_bit_ops_suite")],
+            },
+            TassadarNumericOpcodeFamilyContract {
+                family: TassadarNumericOpcodeFamily::I64Integer,
+                status: TassadarNumericOpcodeFamilyStatus::Refused,
+                summary: String::from(
+                    "i64 result and instruction families remain outside the current i32-only lowering lane",
+                ),
+                claim_boundary: String::from(
+                    "typed refusal only; this issue does not claim i64 closure or mixed-width execution",
+                ),
+                supported_opcodes: Vec::new(),
+                refusal_kinds: vec![String::from("unsupported_instruction")],
+                case_ids: vec![String::from("i64_refusal")],
+            },
+            TassadarNumericOpcodeFamilyContract {
+                family: TassadarNumericOpcodeFamily::FloatingPoint,
+                status: TassadarNumericOpcodeFamilyStatus::Refused,
+                summary: String::from(
+                    "floating-point lowering remains explicitly gated outside the current structured-control lane",
+                ),
+                claim_boundary: String::from(
+                    "typed refusal only; no floating-point exactness or conformance claim is made here",
+                ),
+                supported_opcodes: Vec::new(),
+                refusal_kinds: vec![String::from("unsupported_instruction")],
+                case_ids: vec![String::from("float_refusal")],
+            },
+        ],
+    )
+    .expect("current Tassadar numeric-opcode ladder contract should stay valid")
+}
+
+/// Numeric-opcode-ladder validation failure.
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum TassadarNumericOpcodeLadderError {
+    /// Unsupported ABI version.
+    #[error("unsupported Tassadar numeric-opcode ladder ABI version `{abi_version}`")]
+    UnsupportedAbiVersion {
+        /// Observed ABI version.
+        abi_version: String,
+    },
+    /// Missing ladder ref.
+    #[error("Tassadar numeric-opcode ladder is missing `ladder_ref`")]
+    MissingLadderRef,
+    /// Missing ladder version.
+    #[error("Tassadar numeric-opcode ladder is missing `version`")]
+    MissingLadderVersion,
+    /// No families declared.
+    #[error("Tassadar numeric-opcode ladder must contain at least one family contract")]
+    MissingFamilies,
+    /// One family repeated.
+    #[error("Tassadar numeric-opcode ladder repeated family `{family:?}`")]
+    DuplicateFamily {
+        /// Repeated family.
+        family: TassadarNumericOpcodeFamily,
+    },
+    /// Family summary missing.
+    #[error("Tassadar numeric-opcode family `{family:?}` is missing `summary`")]
+    MissingFamilySummary {
+        /// Family.
+        family: TassadarNumericOpcodeFamily,
+    },
+    /// Family claim boundary missing.
+    #[error("Tassadar numeric-opcode family `{family:?}` is missing `claim_boundary`")]
+    MissingClaimBoundary {
+        /// Family.
+        family: TassadarNumericOpcodeFamily,
+    },
+    /// Implemented family lacks supported opcode list.
+    #[error(
+        "implemented Tassadar numeric-opcode family `{family:?}` must declare supported opcodes"
+    )]
+    MissingSupportedOpcodes {
+        /// Family.
+        family: TassadarNumericOpcodeFamily,
+    },
+    /// Refused family lacks refusal list.
+    #[error("refused Tassadar numeric-opcode family `{family:?}` must declare refusal kinds")]
+    MissingRefusalKinds {
+        /// Family.
+        family: TassadarNumericOpcodeFamily,
+    },
+    /// One supported opcode was empty.
+    #[error("Tassadar numeric-opcode family `{family:?}` contains an empty supported opcode")]
+    MissingSupportedOpcode {
+        /// Family.
+        family: TassadarNumericOpcodeFamily,
+    },
+    /// One refusal kind was empty.
+    #[error("Tassadar numeric-opcode family `{family:?}` contains an empty refusal kind")]
+    MissingRefusalKind {
+        /// Family.
+        family: TassadarNumericOpcodeFamily,
+    },
+    /// No case ids declared.
+    #[error("Tassadar numeric-opcode family `{family:?}` must declare at least one case id")]
+    MissingCaseIds {
+        /// Family.
+        family: TassadarNumericOpcodeFamily,
+    },
+    /// One case id was empty.
+    #[error("Tassadar numeric-opcode family `{family:?}` contains an empty case id")]
+    MissingCaseId {
+        /// Family.
+        family: TassadarNumericOpcodeFamily,
+    },
+    /// One supported opcode repeated.
+    #[error("Tassadar numeric-opcode family `{family:?}` repeated supported opcode `{opcode}`")]
+    DuplicateSupportedOpcode {
+        /// Family.
+        family: TassadarNumericOpcodeFamily,
+        /// Repeated opcode.
+        opcode: String,
+    },
+    /// One refusal kind repeated.
+    #[error("Tassadar numeric-opcode family `{family:?}` repeated refusal kind `{refusal_kind}`")]
+    DuplicateRefusalKind {
+        /// Family.
+        family: TassadarNumericOpcodeFamily,
+        /// Repeated refusal kind.
+        refusal_kind: String,
+    },
+    /// One case id repeated.
+    #[error("Tassadar numeric-opcode family `{family:?}` repeated case id `{case_id}`")]
+    DuplicateCaseId {
+        /// Family.
+        family: TassadarNumericOpcodeFamily,
+        /// Repeated case id.
+        case_id: String,
+    },
 }
 
 /// One benchmark package that participates in the public Tassadar package set.
@@ -288,9 +686,7 @@ pub enum TassadarBenchmarkPackageSetError {
         family: TassadarBenchmarkFamily,
     },
     /// Family has no packages.
-    #[error(
-        "Tassadar benchmark family `{family:?}` must reference at least one benchmark package"
-    )]
+    #[error("Tassadar benchmark family `{family:?}` must reference at least one benchmark package")]
     MissingBenchmarkPackages {
         /// Benchmark family.
         family: TassadarBenchmarkFamily,
@@ -816,10 +1212,12 @@ impl TassadarSequenceDatasetContract {
 
             manifest.metadata.insert(
                 format!("tassadar.{}.sequence_ids", split_name),
-                json!(split_examples
-                    .iter()
-                    .map(|example| example.sequence_id.clone())
-                    .collect::<Vec<_>>()),
+                json!(
+                    split_examples
+                        .iter()
+                        .map(|example| example.sequence_id.clone())
+                        .collect::<Vec<_>>()
+                ),
             );
         }
 
@@ -1096,13 +1494,16 @@ mod tests {
     use serde_json::Value;
 
     use super::{
+        TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION, TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION,
+        TASSADAR_SEQUENCE_DATASET_ABI_VERSION, TASSADAR_TRACE_FAMILY_SET_ABI_VERSION,
         TassadarBenchmarkAxis, TassadarBenchmarkFamily, TassadarBenchmarkFamilyContract,
         TassadarBenchmarkPackageBinding, TassadarBenchmarkPackageSetContract,
-        TassadarSequenceDatasetContract, TassadarSequenceExample, TassadarSequenceExampleMetadata,
-        TassadarSequenceSplit, TassadarTraceFamilyAuthorityScope, TassadarTraceFamilyContract,
+        TassadarNumericOpcodeFamily, TassadarNumericOpcodeFamilyStatus,
+        TassadarNumericOpcodeLadderContract, TassadarSequenceDatasetContract,
+        TassadarSequenceExample, TassadarSequenceExampleMetadata, TassadarSequenceSplit,
+        TassadarTraceFamilyAuthorityScope, TassadarTraceFamilyContract,
         TassadarTraceFamilySetContract, TassadarTraceFamilyTopology,
-        TassadarTraceFamilyWorkloadBinding, TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION,
-        TASSADAR_SEQUENCE_DATASET_ABI_VERSION, TASSADAR_TRACE_FAMILY_SET_ABI_VERSION,
+        TassadarTraceFamilyWorkloadBinding, tassadar_numeric_opcode_ladder_contract,
     };
     use crate::{DatasetKey, TokenizerDigest, TokenizerFamily};
 
@@ -1242,6 +1643,39 @@ mod tests {
         );
         assert_eq!(contract.families.len(), 2);
         assert!(!contract.stable_digest().is_empty());
+    }
+
+    #[test]
+    fn numeric_opcode_ladder_contract_is_machine_legible() {
+        let contract = tassadar_numeric_opcode_ladder_contract();
+        assert_eq!(
+            contract.abi_version,
+            TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION
+        );
+        assert_eq!(contract.families.len(), 5);
+        assert_eq!(
+            contract.families[1].family,
+            TassadarNumericOpcodeFamily::I32Comparisons
+        );
+        assert_eq!(
+            contract.families[3].status,
+            TassadarNumericOpcodeFamilyStatus::Refused
+        );
+        assert!(!contract.stable_digest().is_empty());
+    }
+
+    #[test]
+    fn numeric_opcode_ladder_contract_rejects_duplicate_family() {
+        let error = TassadarNumericOpcodeLadderContract::new(
+            "tassadar://numeric_opcode_ladder/test",
+            "v1",
+            vec![
+                tassadar_numeric_opcode_ladder_contract().families[0].clone(),
+                tassadar_numeric_opcode_ladder_contract().families[0].clone(),
+            ],
+        )
+        .expect_err("duplicate family should fail");
+        assert!(format!("{error}").contains("repeated family"));
     }
 
     #[test]

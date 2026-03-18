@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.numeric_opcode_ladder.report.v1",
+  "ladder_contract": {
+    "abi_version": "psionic.tassadar.numeric_opcode_ladder.v1",
+    "ladder_ref": "tassadar://numeric_opcode_ladder/structured_control_v1",
+    "version": "2026.03.17",
+    "families": [
+      {
+        "family": "i32_core_arithmetic",
+        "status": "implemented",
+        "summary": "core i32 arithmetic remains exact in the bounded structured-control lane",
+        "claim_boundary": "compiled_bounded_exactness over zero-parameter i32-only Wasm functions with empty block types",
+        "supported_opcodes": [
+          "i32.add",
+          "i32.sub",
+          "i32.mul"
+        ],
+        "case_ids": [
+          "i32_core_arithmetic_suite"
+        ]
+      },
+      {
+        "family": "i32_comparisons",
+        "status": "implemented",
+        "summary": "full i32 equality and comparison coverage now exists, including `eqz` and signed-vs-unsigned forms",
+        "claim_boundary": "compiled_bounded_exactness for the current zero-parameter i32-only structured-control lowering lane",
+        "supported_opcodes": [
+          "i32.eqz",
+          "i32.eq",
+          "i32.ne",
+          "i32.lt_s",
+          "i32.lt_u",
+          "i32.gt_s",
+          "i32.gt_u",
+          "i32.le_s",
+          "i32.le_u",
+          "i32.ge_s",
+          "i32.ge_u"
+        ],
+        "case_ids": [
+          "i32_comparison_suite"
+        ]
+      },
+      {
+        "family": "i32_bit_ops",
+        "status": "implemented",
+        "summary": "i32 bitwise logic and shift operations now lower exactly in the bounded lane",
+        "claim_boundary": "compiled_bounded_exactness for the current zero-parameter i32-only structured-control lowering lane",
+        "supported_opcodes": [
+          "i32.and",
+          "i32.or",
+          "i32.xor",
+          "i32.shl",
+          "i32.shr_s",
+          "i32.shr_u"
+        ],
+        "case_ids": [
+          "i32_bit_ops_suite"
+        ]
+      },
+      {
+        "family": "i64_integer",
+        "status": "refused",
+        "summary": "i64 result and instruction families remain outside the current i32-only lowering lane",
+        "claim_boundary": "typed refusal only; this issue does not claim i64 closure or mixed-width execution",
+        "refusal_kinds": [
+          "unsupported_instruction"
+        ],
+        "case_ids": [
+          "i64_refusal"
+        ]
+      },
+      {
+        "family": "floating_point",
+        "status": "refused",
+        "summary": "floating-point lowering remains explicitly gated outside the current structured-control lane",
+        "claim_boundary": "typed refusal only; no floating-point exactness or conformance claim is made here",
+        "refusal_kinds": [
+          "unsupported_instruction"
+        ],
+        "case_ids": [
+          "float_refusal"
+        ]
+      }
+    ]
+  },
+  "family_coverage": [
+    {
+      "family": "i32_core_arithmetic",
+      "status": "implemented",
+      "supported_opcode_count": 3,
+      "exact_case_ids": [
+        "i32_core_arithmetic_suite"
+      ],
+      "refusal_case_ids": [],
+      "exact_export_count": 1,
+      "conformance_verified": true
+    },
+    {
+      "family": "i32_comparisons",
+      "status": "implemented",
+      "supported_opcode_count": 11,
+      "exact_case_ids": [
+        "i32_comparison_suite"
+      ],
+      "refusal_case_ids": [],
+      "exact_export_count": 1,
+      "conformance_verified": true
+    },
+    {
+      "family": "i32_bit_ops",
+      "status": "implemented",
+      "supported_opcode_count": 6,
+      "exact_case_ids": [
+        "i32_bit_ops_suite"
+      ],
+      "refusal_case_ids": [],
+      "exact_export_count": 1,
+      "conformance_verified": true
+    },
+    {
+      "family": "i64_integer",
+      "status": "refused",
+      "supported_opcode_count": 0,
+      "exact_case_ids": [],
+      "refusal_case_ids": [
+        "i64_refusal"
+      ],
+      "exact_export_count": 0,
+      "conformance_verified": true
+    },
+    {
+      "family": "floating_point",
+      "status": "refused",
+      "supported_opcode_count": 0,
+      "exact_case_ids": [],
+      "refusal_case_ids": [
+        "float_refusal"
+      ],
+      "exact_export_count": 0,
+      "conformance_verified": true
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "i32_core_arithmetic_suite",
+      "family": "i32_core_arithmetic",
+      "source_ref": "synthetic://tassadar/numeric_opcode_ladder/i32_core_arithmetic_v1",
+      "status": "exact",
+      "bundle_digest": "b82b5da9b4b08041504b378b3da9ae411b9a73ab3b05c30dba9fc0c6392d9000",
+      "return_values_by_export": {
+        "i32_core_arithmetic_suite": 32
+      },
+      "trace_digests_by_export": {
+        "i32_core_arithmetic_suite": "a8a0bb5ba81cca46546508d4f326a455a32c30c86995bd8b93dbd56ad8241ff2"
+      },
+      "trace_steps_by_export": {
+        "i32_core_arithmetic_suite": 16
+      }
+    },
+    {
+      "case_id": "i32_comparison_suite",
+      "family": "i32_comparisons",
+      "source_ref": "synthetic://tassadar/numeric_opcode_ladder/i32_comparison_v1",
+      "status": "exact",
+      "bundle_digest": "9707376d3e79e1a2e52144a4f54b35887c9e2ce512140b1fd9c820b403399520",
+      "return_values_by_export": {
+        "i32_comparison_suite": 10
+      },
+      "trace_digests_by_export": {
+        "i32_comparison_suite": "7263a2766cee64355014fa2834c6a3fb8926a141184e8166552533d6436190ba"
+      },
+      "trace_steps_by_export": {
+        "i32_comparison_suite": 63
+      }
+    },
+    {
+      "case_id": "i32_bit_ops_suite",
+      "family": "i32_bit_ops",
+      "source_ref": "synthetic://tassadar/numeric_opcode_ladder/i32_bit_ops_v1",
+      "status": "exact",
+      "bundle_digest": "e9769c4d1642ecae46f14d0c6687adf0d84edac7ad2c8a1ee2220daa89256c75",
+      "return_values_by_export": {
+        "i32_bit_ops_suite": 6
+      },
+      "trace_digests_by_export": {
+        "i32_bit_ops_suite": "6d9cb32f80d92dd7a79b7aad2a5764046178f80acdc26f825ab6ac0f9bc7dd25"
+      },
+      "trace_steps_by_export": {
+        "i32_bit_ops_suite": 50
+      }
+    },
+    {
+      "case_id": "i64_refusal",
+      "family": "i64_integer",
+      "source_ref": "synthetic://tassadar/numeric_opcode_ladder/i64_refusal_v1",
+      "status": "refused",
+      "refusal_kind": "unsupported_instruction",
+      "refusal_detail": "export `i64_refusal` function 0 uses unsupported instruction `I64Const { value: 1 }`"
+    },
+    {
+      "case_id": "float_refusal",
+      "family": "floating_point",
+      "source_ref": "synthetic://tassadar/numeric_opcode_ladder/float_refusal_v1",
+      "status": "refused",
+      "refusal_kind": "unsupported_instruction",
+      "refusal_detail": "export `float_refusal` function 0 uses unsupported instruction `F32Const { value: Ieee32(1069547520) }`"
+    }
+  ],
+  "claim_boundary": "this report proves the current staged numeric widening ladder only: exact bounded coverage for i32 core arithmetic, comparisons, and bit operations in the zero-parameter i32-only structured-control lane, plus typed refusal for i64 and floating-point families; it does not claim arbitrary Wasm numeric closure, mixed-width execution, floating-point exactness, or served capability promotion",
+  "report_digest": "91bb49cb625db027d89fe30ab27cb0fca0f7fe840fb21fb45ef733078a04f164"
+}
