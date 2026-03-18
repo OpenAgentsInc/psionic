@@ -31,6 +31,7 @@ mod tassadar_sequence;
 mod tassadar_state_design_study;
 mod tassadar_subroutine;
 mod tassadar_symbolic;
+mod tassadar_weak_supervision;
 mod tassadar_workload_frontier;
 
 use std::{
@@ -83,6 +84,7 @@ pub use tassadar_sequence::*;
 pub use tassadar_state_design_study::*;
 pub use tassadar_subroutine::*;
 pub use tassadar_symbolic::*;
+pub use tassadar_weak_supervision::*;
 pub use tassadar_workload_frontier::*;
 
 /// Human-readable crate ownership summary.

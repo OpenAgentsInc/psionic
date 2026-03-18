@@ -295,6 +295,24 @@ The current scope is:
   keeps self-healing, slow drift, catastrophic divergence, and explicit
   checkpoint-versus-verifier tradeoffs separate instead of treating the mere
   existence of a correction path as proof of exactness
+- landed weak-supervision-executor follow-on: `psionic-data` now publishes a
+  public `TassadarWeakSupervisionContract` over explicit `full_trace`,
+  `mixed_weak`, and `io_only` supervision regimes plus machine-legible
+  `io_targets`, `invariants`, `partial_state`, and `subroutine_labels` signal
+  components for the seeded module-trace-v2, Hungarian-module,
+  verifier-search-kernel, and module-state-control families; `psionic-models`
+  now publishes the research-only `TassadarWeakSupervisionPublication` above
+  that contract; `psionic-train` now freezes the committed evidence bundle at
+  `fixtures/tassadar/runs/tassadar_weak_supervision_executor_v1/weak_supervision_evidence_bundle.json`
+  with later-window exactness, final-output exactness, refusal calibration, and
+  under-supervised failure counts kept explicit per workload/regime cell;
+  `psionic-eval` now freezes the joined regime-versus-workload report at
+  `fixtures/tassadar/reports/tassadar_weak_supervision_executor_report.json`;
+  and `psionic-research` now freezes the companion summary at
+  `fixtures/tassadar/reports/tassadar_weak_supervision_executor_summary.json`.
+  This lane keeps mixed-supervision viability, io-only fragility, and
+  full-trace-only outliers explicit instead of overstating weaker supervision as
+  broad learned module-execution closure
 - landed shared primitive transfer follow-on: `psionic-data` now publishes a
   public `TassadarSharedPrimitiveTransferContract` over explicit
   reachability-expand, relax-state, compare, select, merge, and

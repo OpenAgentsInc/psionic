@@ -85,6 +85,7 @@ mod tassadar_shared_primitive_transfer;
 mod tassadar_subroutine_supervision;
 mod tassadar_trace_family_comparison;
 mod tassadar_verifier_guided_search_trace_family;
+mod tassadar_weak_supervision_executor;
 mod worker_protocol;
 
 pub use adapter_aggregation::*;
@@ -152,6 +153,7 @@ pub use tassadar_shared_primitive_transfer::*;
 pub use tassadar_subroutine_supervision::*;
 pub use tassadar_trace_family_comparison::*;
 pub use tassadar_verifier_guided_search_trace_family::*;
+pub use tassadar_weak_supervision_executor::*;
 pub use worker_protocol::*;
 
 /// Human-readable crate ownership summary.

@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.weak_supervision.report.v1",
+  "publication_digest": "b44b1354370009b7085dd6c492fafa7a06630932095b52cd5372951e6b2a03ba",
+  "contract_ref": "dataset://openagents/tassadar/weak_supervision_executor",
+  "contract_digest": "b505e56e100c6bb9ffe70f9fc66e7fd4f944ef1c58de403592966b0ecd4e1940",
+  "evidence_bundle_ref": "fixtures/tassadar/runs/tassadar_weak_supervision_executor_v1/weak_supervision_evidence_bundle.json",
+  "evidence_bundle_digest": "8201d84d4efbc9687ce25b19176aaf0ccc4fddf3ec09bef09354577592249f88",
+  "regime_summaries": [
+    {
+      "supervision_regime": "full_trace",
+      "mean_later_window_exactness_bps": 9175,
+      "mean_final_output_exactness_bps": 9525,
+      "mean_refusal_calibration_bps": 8950,
+      "mean_under_supervised_failure_count": 1,
+      "dominant_failure_modes": [
+        "bounded_residual_trace_noise",
+        "assignment_frontier_noise",
+        "bounded_backtrack_miss",
+        "carried_state_noise"
+      ]
+    },
+    {
+      "supervision_regime": "mixed_weak",
+      "mean_later_window_exactness_bps": 8475,
+      "mean_final_output_exactness_bps": 9175,
+      "mean_refusal_calibration_bps": 8625,
+      "mean_under_supervised_failure_count": 2,
+      "dominant_failure_modes": [
+        "later_window_drift",
+        "frontier_tie_breaker_drift",
+        "contradiction_repair_delay",
+        "late_state_alias"
+      ]
+    },
+    {
+      "supervision_regime": "io_only",
+      "mean_later_window_exactness_bps": 4775,
+      "mean_final_output_exactness_bps": 6825,
+      "mean_refusal_calibration_bps": 5975,
+      "mean_under_supervised_failure_count": 8,
+      "dominant_failure_modes": [
+        "hidden_frame_mismatch",
+        "latent_matching_alias",
+        "search_collapse",
+        "state_alias_refusal"
+      ]
+    }
+  ],
+  "workload_summaries": [
+    {
+      "workload_family": "module_trace_v2",
+      "best_regime": "full_trace",
+      "mixed_gap_vs_full_trace_bps": -500,
+      "mixed_refusal_calibration_bps": 9000,
+      "io_only_gap_vs_full_trace_bps": -3400,
+      "io_only_later_window_exactness_bps": 6200,
+      "io_only_refusal_gap_vs_full_trace_bps": -4100,
+      "note": "module_trace_v2 currently prefers full_trace under the seeded weak-supervision comparison."
+    },
+    {
+      "workload_family": "hungarian_module",
+      "best_regime": "full_trace",
+      "mixed_gap_vs_full_trace_bps": -500,
+      "mixed_refusal_calibration_bps": 8800,
+      "io_only_gap_vs_full_trace_bps": -3600,
+      "io_only_later_window_exactness_bps": 5800,
+      "io_only_refusal_gap_vs_full_trace_bps": -3700,
+      "note": "hungarian_module currently prefers full_trace under the seeded weak-supervision comparison."
+    },
+    {
+      "workload_family": "verifier_search_kernel",
+      "best_regime": "full_trace",
+      "mixed_gap_vs_full_trace_bps": -600,
+      "mixed_refusal_calibration_bps": 8600,
+      "io_only_gap_vs_full_trace_bps": -5100,
+      "io_only_later_window_exactness_bps": 3900,
+      "io_only_refusal_gap_vs_full_trace_bps": -1700,
+      "note": "verifier_search_kernel currently prefers full_trace under the seeded weak-supervision comparison."
+    },
+    {
+      "workload_family": "module_state_control",
+      "best_regime": "full_trace",
+      "mixed_gap_vs_full_trace_bps": -1200,
+      "mixed_refusal_calibration_bps": 8100,
+      "io_only_gap_vs_full_trace_bps": -5500,
+      "io_only_later_window_exactness_bps": 3200,
+      "io_only_refusal_gap_vs_full_trace_bps": -2400,
+      "note": "module_state_control currently prefers full_trace under the seeded weak-supervision comparison."
+    }
+  ],
+  "mixed_viable_workloads": [
+    "module_trace_v2",
+    "hungarian_module",
+    "verifier_search_kernel"
+  ],
+  "io_only_fragile_workloads": [
+    "module_trace_v2",
+    "hungarian_module",
+    "verifier_search_kernel",
+    "module_state_control"
+  ],
+  "claim_boundary": "this report compares full-trace, mixed-weak, and io-only supervision on the seeded module-scale workloads. It keeps later-window exactness, refusal calibration, and under-supervised failure modes explicit instead of treating weaker supervision as broad learned closure",
+  "summary": "Weak-supervision report now compares 4 workloads across 3 regimes, with 3 mixed-viable workloads and 4 io-only fragile workloads.",
+  "report_digest": "af86060d5fb63e5569168ca4c8ce9b2773f8a502e336ccb7ed90063faee90ccf"
+}

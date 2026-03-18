@@ -1,0 +1,243 @@
+{
+  "contract": {
+    "abi_version": "psionic.tassadar.weak_supervision.v1",
+    "contract_ref": "dataset://openagents/tassadar/weak_supervision_executor",
+    "version": "2026.03.18",
+    "regimes": [
+      "full_trace",
+      "mixed_weak",
+      "io_only"
+    ],
+    "signal_components": [
+      "io_targets",
+      "invariants",
+      "partial_state",
+      "subroutine_labels",
+      "full_trace_tokens"
+    ],
+    "workload_rows": [
+      {
+        "workload_family": "module_trace_v2",
+        "compared_regimes": [
+          "full_trace",
+          "mixed_weak",
+          "io_only"
+        ],
+        "mixed_signal_components": [
+          "io_targets",
+          "invariants",
+          "partial_state",
+          "subroutine_labels"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_module_trace_abi_v2_report.json",
+          "fixtures/tassadar/reports/tassadar_state_design_study_report.json"
+        ],
+        "claim_boundary": "module-trace-v2 remains bounded to the current machine-legible frame and call-trace authorities; weak supervision here does not imply arbitrary module execution closure"
+      },
+      {
+        "workload_family": "hungarian_module",
+        "compared_regimes": [
+          "full_trace",
+          "mixed_weak",
+          "io_only"
+        ],
+        "mixed_signal_components": [
+          "io_targets",
+          "invariants",
+          "partial_state",
+          "subroutine_labels"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+          "fixtures/tassadar/reports/tassadar_compiled_distillation_report.json"
+        ],
+        "claim_boundary": "Hungarian module supervision remains bounded to the current module-scale family and does not widen compiled exactness or served claims"
+      },
+      {
+        "workload_family": "verifier_search_kernel",
+        "compared_regimes": [
+          "full_trace",
+          "mixed_weak",
+          "io_only"
+        ],
+        "mixed_signal_components": [
+          "io_targets",
+          "invariants",
+          "partial_state",
+          "subroutine_labels"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+          "fixtures/tassadar/reports/tassadar_error_regime_catalog.json"
+        ],
+        "claim_boundary": "verifier-search supervision remains bounded to the current search-kernel witnesses and explicit contradiction semantics"
+      },
+      {
+        "workload_family": "module_state_control",
+        "compared_regimes": [
+          "full_trace",
+          "mixed_weak",
+          "io_only"
+        ],
+        "mixed_signal_components": [
+          "io_targets",
+          "invariants",
+          "partial_state",
+          "subroutine_labels"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_module_state_architecture_report.json",
+          "fixtures/tassadar/reports/tassadar_state_design_study_report.json"
+        ],
+        "claim_boundary": "module-state control remains a bounded later-window family with explicit refusal when weaker supervision cannot preserve the declared carried-state semantics"
+      }
+    ],
+    "evaluation_axes": [
+      "later_window_exactness_bps",
+      "refusal_calibration_bps",
+      "final_output_exactness_bps",
+      "under_supervised_failure_count"
+    ],
+    "evidence_bundle_ref": "fixtures/tassadar/runs/tassadar_weak_supervision_executor_v1/weak_supervision_evidence_bundle.json",
+    "report_ref": "fixtures/tassadar/reports/tassadar_weak_supervision_executor_report.json",
+    "summary_report_ref": "fixtures/tassadar/reports/tassadar_weak_supervision_executor_summary.json",
+    "contract_digest": "b505e56e100c6bb9ffe70f9fc66e7fd4f944ef1c58de403592966b0ecd4e1940"
+  },
+  "case_reports": [
+    {
+      "case_id": "module_trace_v2.full_trace",
+      "workload_family": "module_trace_v2",
+      "supervision_regime": "full_trace",
+      "later_window_exactness_bps": 9600,
+      "final_output_exactness_bps": 9800,
+      "refusal_calibration_bps": 9300,
+      "under_supervised_failure_count": 1,
+      "dominant_failure_mode": "bounded_residual_trace_noise",
+      "note": "full trace remains the strongest seeded authority on module-trace-v2, but the gap to mixed supervision is already modest"
+    },
+    {
+      "case_id": "module_trace_v2.mixed_weak",
+      "workload_family": "module_trace_v2",
+      "supervision_regime": "mixed_weak",
+      "later_window_exactness_bps": 9100,
+      "final_output_exactness_bps": 9600,
+      "refusal_calibration_bps": 9000,
+      "under_supervised_failure_count": 2,
+      "dominant_failure_mode": "later_window_drift",
+      "note": "mixed supervision keeps later-window module-trace behavior close to full trace with explicit invariants and partial-state anchors"
+    },
+    {
+      "case_id": "module_trace_v2.io_only",
+      "workload_family": "module_trace_v2",
+      "supervision_regime": "io_only",
+      "later_window_exactness_bps": 6200,
+      "final_output_exactness_bps": 8100,
+      "refusal_calibration_bps": 5200,
+      "under_supervised_failure_count": 7,
+      "dominant_failure_mode": "hidden_frame_mismatch",
+      "note": "io-only module-trace supervision overfits final outputs and misses later frame semantics without refusal help"
+    },
+    {
+      "case_id": "hungarian_module.full_trace",
+      "workload_family": "hungarian_module",
+      "supervision_regime": "full_trace",
+      "later_window_exactness_bps": 9400,
+      "final_output_exactness_bps": 9700,
+      "refusal_calibration_bps": 9100,
+      "under_supervised_failure_count": 1,
+      "dominant_failure_mode": "assignment_frontier_noise",
+      "note": "full trace remains best on the seeded Hungarian module family, but mixed supervision stays close while using less brittle signal density"
+    },
+    {
+      "case_id": "hungarian_module.mixed_weak",
+      "workload_family": "hungarian_module",
+      "supervision_regime": "mixed_weak",
+      "later_window_exactness_bps": 8900,
+      "final_output_exactness_bps": 9400,
+      "refusal_calibration_bps": 8800,
+      "under_supervised_failure_count": 2,
+      "dominant_failure_mode": "frontier_tie_breaker_drift",
+      "note": "mixed supervision keeps most of the seeded Hungarian later-window benefit through invariants and subroutine labels"
+    },
+    {
+      "case_id": "hungarian_module.io_only",
+      "workload_family": "hungarian_module",
+      "supervision_regime": "io_only",
+      "later_window_exactness_bps": 5800,
+      "final_output_exactness_bps": 7900,
+      "refusal_calibration_bps": 5400,
+      "under_supervised_failure_count": 6,
+      "dominant_failure_mode": "latent_matching_alias",
+      "note": "io-only Hungarian training preserves some final matches but loses later-window frontier discipline"
+    },
+    {
+      "case_id": "verifier_search_kernel.full_trace",
+      "workload_family": "verifier_search_kernel",
+      "supervision_regime": "full_trace",
+      "later_window_exactness_bps": 9000,
+      "final_output_exactness_bps": 9400,
+      "refusal_calibration_bps": 8900,
+      "under_supervised_failure_count": 2,
+      "dominant_failure_mode": "bounded_backtrack_miss",
+      "note": "full trace remains best on the seeded verifier-search kernel, but mixed supervision is still competitive with explicit subroutine and invariant signals"
+    },
+    {
+      "case_id": "verifier_search_kernel.mixed_weak",
+      "workload_family": "verifier_search_kernel",
+      "supervision_regime": "mixed_weak",
+      "later_window_exactness_bps": 8400,
+      "final_output_exactness_bps": 9000,
+      "refusal_calibration_bps": 8600,
+      "under_supervised_failure_count": 3,
+      "dominant_failure_mode": "contradiction_repair_delay",
+      "note": "mixed supervision keeps contradiction handling mostly intact while avoiding full token-by-token traces"
+    },
+    {
+      "case_id": "verifier_search_kernel.io_only",
+      "workload_family": "verifier_search_kernel",
+      "supervision_regime": "io_only",
+      "later_window_exactness_bps": 3900,
+      "final_output_exactness_bps": 6100,
+      "refusal_calibration_bps": 7200,
+      "under_supervised_failure_count": 9,
+      "dominant_failure_mode": "search_collapse",
+      "note": "io-only search training learns to refuse some hard states but still collapses later-window search structure too often"
+    },
+    {
+      "case_id": "module_state_control.full_trace",
+      "workload_family": "module_state_control",
+      "supervision_regime": "full_trace",
+      "later_window_exactness_bps": 8700,
+      "final_output_exactness_bps": 9200,
+      "refusal_calibration_bps": 8500,
+      "under_supervised_failure_count": 2,
+      "dominant_failure_mode": "carried_state_noise",
+      "note": "full trace is still the strongest seeded regime on module-state control because later-window carried-state semantics remain fragile"
+    },
+    {
+      "case_id": "module_state_control.mixed_weak",
+      "workload_family": "module_state_control",
+      "supervision_regime": "mixed_weak",
+      "later_window_exactness_bps": 7500,
+      "final_output_exactness_bps": 8700,
+      "refusal_calibration_bps": 8100,
+      "under_supervised_failure_count": 4,
+      "dominant_failure_mode": "late_state_alias",
+      "note": "mixed supervision remains usable on module-state control, but the later-window gap to full trace is still material"
+    },
+    {
+      "case_id": "module_state_control.io_only",
+      "workload_family": "module_state_control",
+      "supervision_regime": "io_only",
+      "later_window_exactness_bps": 3200,
+      "final_output_exactness_bps": 5200,
+      "refusal_calibration_bps": 6100,
+      "under_supervised_failure_count": 10,
+      "dominant_failure_mode": "state_alias_refusal",
+      "note": "io-only module-state training needs frequent refusal to avoid silently drifting through carried-state aliasing"
+    }
+  ],
+  "summary": "Weak-supervision executor bundle now freezes 12 workload/regime cells with mixed later-window mean=8475bps versus io-only mean=4775bps while keeping refusal calibration and failure modes explicit.",
+  "report_digest": "8201d84d4efbc9687ce25b19176aaf0ccc4fddf3ec09bef09354577592249f88"
+}

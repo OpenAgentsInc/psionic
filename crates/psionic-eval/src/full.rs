@@ -100,6 +100,8 @@ mod tassadar_wasm_module_ingress;
 mod tassadar_working_memory_tier;
 #[path = "tassadar_workload_capability_frontier.rs"]
 mod tassadar_workload_capability_frontier;
+#[path = "tassadar_weak_supervision_executor.rs"]
+mod tassadar_weak_supervision_executor;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -161,6 +163,7 @@ pub use tassadar_verifier_guided_search_report::*;
 pub use tassadar_wasm_module_ingress::*;
 pub use tassadar_working_memory_tier::*;
 pub use tassadar_workload_capability_frontier::*;
+pub use tassadar_weak_supervision_executor::*;
 
 /// Human-readable crate ownership summary.
 pub const CRATE_ROLE: &str = "held-out eval, benchmark packages, and rubric runtime for Psionic";
