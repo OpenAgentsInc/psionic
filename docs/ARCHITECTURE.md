@@ -235,6 +235,13 @@ The current scope is:
   long-loop and 4x4 Sudoku article workloads, but the widened class remains
   research-only until decode-mode identity and runtime closure bars are
   promoted explicitly
+- landed exactness/refusal evidence bar: `psionic-runtime` now owns a shared
+  `TassadarExactnessRefusalReport` contract that records exact, mismatch, and
+  refused posture above current selection diagnostics and trace/output/halt
+  parity facts; `psionic-provider` now projects the same report into a
+  provider-facing receipt; and `psionic-eval` now commits the current exact
+  direct, exact fallback, and explicit refusal examples at
+  `fixtures/tassadar/reports/tassadar_exactness_refusal_report.json`
 - landed trained-executor Phase 1 follow-on bar: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile now exists with a real 4x4
   backtracking Sudoku program representation on the CPU reference lane, while

@@ -161,6 +161,12 @@ Current posture:
   hierarchical-hull candidate; the candidate stays direct and exact on
   long-loop and 4x4 Sudoku article workloads, but that widened class remains
   explicitly unpromoted until runtime closure bars are landed
+- the repo now also carries a standardized exactness/refusal evidence surface
+  across `psionic-runtime`, `psionic-provider`, and `psionic-eval`, with a
+  shared runtime report schema for exact direct, exact fallback, mismatch, and
+  refused posture, a provider-facing receipt projection, and the committed
+  artifact at
+  `fixtures/tassadar/reports/tassadar_exactness_refusal_report.json`
 - the first trained-executor follow-on bar now also exists in
   `psionic-runtime` and `psionic-models`: a dedicated
   `tassadar.wasm.sudoku_v0_search.v1` profile plus a real 4x4 backtracking

@@ -31,8 +31,9 @@ use psionic_runtime::{
     QuantizedActivationFingerprintAdapter, SandboxExecutionCapabilityProfile,
     SandboxExecutionEvidence, SandboxExecutionExitKind, SandboxExecutionRequestIdentity,
     ServedArtifactIdentity, SettlementLinkageInput, SignedClusterEvidenceBundle,
-    TassadarTraceArtifact, TassadarTraceDiffReport, ValidationMatrixReference,
-    validation_reference_for_served_product, validation_reference_for_text_generation_model,
+    TassadarExactnessRefusalReport, TassadarMismatchSummary, TassadarTraceArtifact,
+    TassadarTraceDiffReport, ValidationMatrixReference, validation_reference_for_served_product,
+    validation_reference_for_text_generation_model,
 };
 use psionic_serve::{
     AdapterServingBinding, DecoderModelDescriptor, EMBEDDINGS_PRODUCT_ID, EmbeddingModelDescriptor,
@@ -120,6 +121,68 @@ impl TassadarTraceDiffReceipt {
             exact_match: report.exact_match,
             first_divergence_step_index: report.first_divergence_step_index,
             diff_entry_count: report.entries.len(),
+        }
+    }
+}
+
+/// Provider-facing receipt for one standardized Tassadar exactness/refusal report.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExactnessRefusalReceipt {
+    /// Stable subject identifier.
+    pub subject_id: String,
+    /// Requested decode mode.
+    pub requested_decode_mode: psionic_runtime::TassadarExecutorDecodeMode,
+    /// Effective decode mode when execution remained allowed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective_decode_mode: Option<psionic_runtime::TassadarExecutorDecodeMode>,
+    /// Direct/fallback/refused state reported by runtime selection.
+    pub selection_state: psionic_runtime::TassadarExecutorSelectionState,
+    /// Typed selection reason when fallback or refusal occurred.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_reason: Option<psionic_runtime::TassadarExecutorSelectionReason>,
+    /// Exact, mismatch, or refused posture.
+    pub exactness_posture: psionic_runtime::TassadarExactnessPosture,
+    /// Whether trace digests matched the declared reference.
+    pub trace_digest_equal: bool,
+    /// Whether final outputs matched the declared reference.
+    pub outputs_equal: bool,
+    /// Whether halt reasons matched the declared reference.
+    pub halt_equal: bool,
+    /// Reference behavior digest when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_behavior_digest: Option<String>,
+    /// Observed behavior digest when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actual_behavior_digest: Option<String>,
+    /// Typed mismatch summary when execution diverged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mismatch_summary: Option<TassadarMismatchSummary>,
+    /// Typed runtime execution refusal when one occurred after selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_refusal: Option<psionic_runtime::TassadarExecutionRefusal>,
+    /// Plain-language detail.
+    pub detail: String,
+}
+
+impl TassadarExactnessRefusalReceipt {
+    /// Builds a provider-facing receipt from the shared runtime report.
+    #[must_use]
+    pub fn from_runtime_report(report: &TassadarExactnessRefusalReport) -> Self {
+        Self {
+            subject_id: report.subject_id.clone(),
+            requested_decode_mode: report.requested_decode_mode,
+            effective_decode_mode: report.effective_decode_mode,
+            selection_state: report.selection_state,
+            selection_reason: report.selection_reason,
+            exactness_posture: report.exactness_posture,
+            trace_digest_equal: report.trace_digest_equal,
+            outputs_equal: report.outputs_equal,
+            halt_equal: report.halt_equal,
+            expected_behavior_digest: report.expected_behavior_digest.clone(),
+            actual_behavior_digest: report.actual_behavior_digest.clone(),
+            mismatch_summary: report.mismatch_summary.clone(),
+            execution_refusal: report.execution_refusal.clone(),
+            detail: report.detail.clone(),
         }
     }
 }
@@ -2974,7 +3037,8 @@ mod tests {
         RuntimeTransitionEvent, RuntimeTransitionKind, SandboxExecutionCapabilityProfile,
         SandboxExecutionEvidence, SandboxExecutionExit, SandboxExecutionExitKind,
         SandboxExecutionRequestIdentity, SandboxExecutionResourceSummary,
-        ServedProductBackendPolicy, TassadarTraceArtifact, ValidationCoverage,
+        ServedProductBackendPolicy, TassadarCpuReferenceRunner, TassadarExactnessPosture,
+        TassadarExactnessRefusalReport, TassadarTraceArtifact, ValidationCoverage,
     };
     use psionic_serve::{
         AdapterArtifactFormat, AdapterArtifactIdentity, AdapterArtifactKind, AdapterResidencyMode,
@@ -2997,13 +3061,13 @@ mod tests {
         CapabilityEnvelope, ComputeMarketSupplyViolationCode, ExecutionReceipt, KvCacheMode,
         LocalRuntimeObservabilityEnvelope, ProviderReadiness, ReceiptStatus,
         SandboxExecutionCapabilityEnvelope, SandboxExecutionReceipt, TassadarCapabilityEnvelope,
-        TassadarCapabilityEnvelopeError, TassadarPlannerRouteCapabilityEnvelope,
-        TassadarPlannerRouteCapabilityEnvelopeError, TassadarTraceArtifactReceipt,
-        TassadarTraceDiffReceipt, TextGenerationCapabilityEnvelope, TextGenerationReceipt,
-        WeightBundleEvidence, cache_invalidation_policy, compute_market_supply_refusal_diagnostic,
-        default_compute_market_supply_policy, digest_embedding_request, digest_generation_request,
-        digest_sandbox_execution_request, evaluate_compute_market_supply,
-        served_artifact_identity_for_decoder_model,
+        TassadarCapabilityEnvelopeError, TassadarExactnessRefusalReceipt,
+        TassadarPlannerRouteCapabilityEnvelope, TassadarPlannerRouteCapabilityEnvelopeError,
+        TassadarTraceArtifactReceipt, TassadarTraceDiffReceipt, TextGenerationCapabilityEnvelope,
+        TextGenerationReceipt, WeightBundleEvidence, cache_invalidation_policy,
+        compute_market_supply_refusal_diagnostic, default_compute_market_supply_policy,
+        digest_embedding_request, digest_generation_request, digest_sandbox_execution_request,
+        evaluate_compute_market_supply, served_artifact_identity_for_decoder_model,
     };
 
     #[test]
@@ -8249,5 +8313,65 @@ mod tests {
             err,
             TassadarPlannerRouteCapabilityEnvelopeError::MissingBenchmarkGate { .. }
         ));
+    }
+
+    #[test]
+    fn tassadar_exactness_refusal_receipt_round_trips_runtime_report() {
+        let case = psionic_runtime::tassadar_validation_corpus()
+            .into_iter()
+            .next()
+            .expect("validation corpus");
+        let expected = TassadarCpuReferenceRunner::new()
+            .execute(&case.program)
+            .expect("case should run");
+        let execution_report = psionic_runtime::execute_tassadar_executor_request(
+            &case.program,
+            psionic_runtime::TassadarExecutorDecodeMode::ReferenceLinear,
+            psionic_runtime::TassadarTraceAbi::core_i32_v1().schema_version,
+            None,
+        )
+        .expect("reference-linear execution should succeed");
+        let runtime_report = TassadarExactnessRefusalReport::from_execution_report(
+            &case.case_id,
+            &expected,
+            &execution_report,
+        );
+
+        let receipt = TassadarExactnessRefusalReceipt::from_runtime_report(&runtime_report);
+
+        assert_eq!(receipt.subject_id, case.case_id);
+        assert_eq!(receipt.exactness_posture, TassadarExactnessPosture::Exact);
+        assert!(receipt.trace_digest_equal);
+        assert!(receipt.outputs_equal);
+        assert!(receipt.halt_equal);
+        assert!(receipt.mismatch_summary.is_none());
+    }
+
+    #[test]
+    fn tassadar_exactness_refusal_receipt_preserves_refusal_reason() {
+        let case = psionic_runtime::tassadar_validation_corpus()
+            .into_iter()
+            .next()
+            .expect("validation corpus");
+        let mut refused_program = case.program.clone();
+        refused_program.profile_id = String::from("tassadar.wasm.unsupported_profile.v0");
+        let selection = psionic_runtime::diagnose_tassadar_executor_request(
+            &refused_program,
+            psionic_runtime::TassadarExecutorDecodeMode::ReferenceLinear,
+            psionic_runtime::TassadarTraceAbi::core_i32_v1().schema_version,
+            None,
+        );
+        let runtime_report =
+            TassadarExactnessRefusalReport::from_refusal(&case.case_id, &selection, None);
+
+        let receipt = TassadarExactnessRefusalReceipt::from_runtime_report(&runtime_report);
+
+        assert_eq!(receipt.exactness_posture, TassadarExactnessPosture::Refused);
+        assert_eq!(
+            receipt.selection_reason,
+            Some(psionic_runtime::TassadarExecutorSelectionReason::UnsupportedWasmProfile)
+        );
+        assert!(receipt.expected_behavior_digest.is_none());
+        assert!(receipt.actual_behavior_digest.is_none());
     }
 }

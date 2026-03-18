@@ -281,6 +281,246 @@ pub struct TassadarExecutorExecutionReport {
     pub execution: TassadarExecution,
 }
 
+/// Exactness posture recorded for one benchmark-bound Tassadar evidence report.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarExactnessPosture {
+    /// The compared execution stayed exact against the declared reference.
+    Exact,
+    /// The compared execution completed but diverged from the declared reference.
+    Mismatch,
+    /// The requested lane was refused before trustworthy execution could complete.
+    Refused,
+}
+
+/// Primary mismatch class surfaced by one exactness/refusal report.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarMismatchClass {
+    /// Expected and actual traces diverged on one shared step.
+    StepMismatch,
+    /// The expected trace continued after the actual trace stopped.
+    MissingActualStep,
+    /// The actual trace continued after the expected trace stopped.
+    UnexpectedActualStep,
+    /// Final outputs diverged while the trace boundary remained comparable.
+    FinalOutputMismatch,
+    /// Halt reasons diverged while the trace boundary remained comparable.
+    HaltReasonMismatch,
+}
+
+/// Stable mismatch summary for one exactness/refusal report.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarMismatchSummary {
+    /// Primary mismatch class.
+    pub mismatch_class: TassadarMismatchClass,
+    /// Stable digest of the expected reference behavior.
+    pub expected_behavior_digest: String,
+    /// Stable digest of the observed behavior.
+    pub actual_behavior_digest: String,
+    /// First divergent step index when the mismatch came from trace comparison.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_divergence_step_index: Option<usize>,
+    /// Number of typed diff entries consulted during classification.
+    pub trace_diff_entry_count: usize,
+    /// Plain-language classification detail safe for logs or artifacts.
+    pub detail: String,
+}
+
+/// Standardized exactness/refusal evidence report for one Tassadar request.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExactnessRefusalReport {
+    /// Stable subject identifier for the report.
+    pub subject_id: String,
+    /// Requested decode mode.
+    pub requested_decode_mode: TassadarExecutorDecodeMode,
+    /// Effective decode mode after selection, when execution remained allowed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective_decode_mode: Option<TassadarExecutorDecodeMode>,
+    /// Direct/fallback/refused selection state.
+    pub selection_state: TassadarExecutorSelectionState,
+    /// Typed selection reason when fallback or refusal occurred.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection_reason: Option<TassadarExecutorSelectionReason>,
+    /// Exact, mismatch, or refused posture for the request.
+    pub exactness_posture: TassadarExactnessPosture,
+    /// Whether trace digests matched the declared reference.
+    pub trace_digest_equal: bool,
+    /// Whether final outputs matched the declared reference.
+    pub outputs_equal: bool,
+    /// Whether halt reasons matched the declared reference.
+    pub halt_equal: bool,
+    /// Reference behavior digest when a trusted reference existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_behavior_digest: Option<String>,
+    /// Observed behavior digest when execution completed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actual_behavior_digest: Option<String>,
+    /// Typed mismatch summary when execution completed but diverged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mismatch_summary: Option<TassadarMismatchSummary>,
+    /// Typed execution refusal when selection succeeded but execution still failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_refusal: Option<TassadarExecutionRefusal>,
+    /// Plain-language report detail safe for logs or machine-audited artifacts.
+    pub detail: String,
+}
+
+impl TassadarExactnessRefusalReport {
+    /// Builds an exactness/refusal report from explicit selection plus completed execution.
+    #[must_use]
+    pub fn from_selection_and_execution(
+        subject_id: impl Into<String>,
+        selection: &TassadarExecutorSelectionDiagnostic,
+        expected: &TassadarExecution,
+        actual: &TassadarExecution,
+    ) -> Self {
+        let subject_id = subject_id.into();
+        let trace_digest_equal = expected.trace_digest() == actual.trace_digest();
+        let outputs_equal = expected.outputs == actual.outputs;
+        let halt_equal = expected.halt_reason == actual.halt_reason;
+        let mismatch_summary = if trace_digest_equal && outputs_equal && halt_equal {
+            None
+        } else {
+            Some(classify_tassadar_mismatch(expected, actual))
+        };
+        let exactness_posture = if mismatch_summary.is_none() {
+            TassadarExactnessPosture::Exact
+        } else {
+            TassadarExactnessPosture::Mismatch
+        };
+        let detail = if matches!(exactness_posture, TassadarExactnessPosture::Exact) {
+            format!(
+                "selection `{}` stayed exact for subject `{}` under requested decode `{}`",
+                match selection.selection_state {
+                    TassadarExecutorSelectionState::Direct => "direct",
+                    TassadarExecutorSelectionState::Fallback => "fallback",
+                    TassadarExecutorSelectionState::Refused => "refused",
+                },
+                subject_id,
+                selection.requested_decode_mode.as_str()
+            )
+        } else {
+            mismatch_summary
+                .as_ref()
+                .map(|summary| summary.detail.clone())
+                .unwrap_or_else(|| String::from("execution diverged from the declared reference"))
+        };
+        Self {
+            subject_id,
+            requested_decode_mode: selection.requested_decode_mode,
+            effective_decode_mode: selection.effective_decode_mode,
+            selection_state: selection.selection_state,
+            selection_reason: selection.selection_reason,
+            exactness_posture,
+            trace_digest_equal,
+            outputs_equal,
+            halt_equal,
+            expected_behavior_digest: Some(expected.behavior_digest()),
+            actual_behavior_digest: Some(actual.behavior_digest()),
+            mismatch_summary,
+            execution_refusal: None,
+            detail,
+        }
+    }
+
+    /// Builds an exactness/refusal report from an execution report plus trusted reference.
+    #[must_use]
+    pub fn from_execution_report(
+        subject_id: impl Into<String>,
+        expected: &TassadarExecution,
+        execution_report: &TassadarExecutorExecutionReport,
+    ) -> Self {
+        Self::from_selection_and_execution(
+            subject_id,
+            &execution_report.selection,
+            expected,
+            &execution_report.execution,
+        )
+    }
+
+    /// Builds a refusal report when selection or execution refused the request.
+    #[must_use]
+    pub fn from_refusal(
+        subject_id: impl Into<String>,
+        selection: &TassadarExecutorSelectionDiagnostic,
+        execution_refusal: Option<TassadarExecutionRefusal>,
+    ) -> Self {
+        Self {
+            subject_id: subject_id.into(),
+            requested_decode_mode: selection.requested_decode_mode,
+            effective_decode_mode: selection.effective_decode_mode,
+            selection_state: TassadarExecutorSelectionState::Refused,
+            selection_reason: selection.selection_reason,
+            exactness_posture: TassadarExactnessPosture::Refused,
+            trace_digest_equal: false,
+            outputs_equal: false,
+            halt_equal: false,
+            expected_behavior_digest: None,
+            actual_behavior_digest: None,
+            mismatch_summary: None,
+            detail: execution_refusal
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_else(|| selection.detail.clone()),
+            execution_refusal,
+        }
+    }
+}
+
+fn classify_tassadar_mismatch(
+    expected: &TassadarExecution,
+    actual: &TassadarExecution,
+) -> TassadarMismatchSummary {
+    let diff = TassadarTraceDiffReport::from_executions(expected, actual);
+    let expected_behavior_digest = expected.behavior_digest();
+    let actual_behavior_digest = actual.behavior_digest();
+    if let Some(entry) = diff.entries.first() {
+        let mismatch_class = match entry.kind {
+            TassadarTraceDiffKind::StepMismatch => TassadarMismatchClass::StepMismatch,
+            TassadarTraceDiffKind::MissingActualStep => TassadarMismatchClass::MissingActualStep,
+            TassadarTraceDiffKind::UnexpectedActualStep => {
+                TassadarMismatchClass::UnexpectedActualStep
+            }
+        };
+        return TassadarMismatchSummary {
+            mismatch_class,
+            expected_behavior_digest,
+            actual_behavior_digest,
+            first_divergence_step_index: diff.first_divergence_step_index,
+            trace_diff_entry_count: diff.entries.len(),
+            detail: format!(
+                "trace mismatch for program `{}` at step {:?} (`{:?}`)",
+                expected.program_id, diff.first_divergence_step_index, entry.kind
+            ),
+        };
+    }
+    if expected.outputs != actual.outputs {
+        return TassadarMismatchSummary {
+            mismatch_class: TassadarMismatchClass::FinalOutputMismatch,
+            expected_behavior_digest,
+            actual_behavior_digest,
+            first_divergence_step_index: None,
+            trace_diff_entry_count: 0,
+            detail: format!(
+                "final outputs diverged for program `{}`: expected {:?}, actual {:?}",
+                expected.program_id, expected.outputs, actual.outputs
+            ),
+        };
+    }
+    TassadarMismatchSummary {
+        mismatch_class: TassadarMismatchClass::HaltReasonMismatch,
+        expected_behavior_digest,
+        actual_behavior_digest,
+        first_divergence_step_index: None,
+        trace_diff_entry_count: 0,
+        detail: format!(
+            "halt reason diverged for program `{}`: expected {:?}, actual {:?}",
+            expected.program_id, expected.halt_reason, actual.halt_reason
+        ),
+    }
+}
+
 /// Machine-legible supported WebAssembly-first profile for the Phase 1 lane.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1564,8 +1804,8 @@ where
 }
 
 /// Builds the canonical million-step decode benchmark bundle.
-pub fn build_tassadar_million_step_decode_benchmark_bundle(
-) -> Result<TassadarMillionStepDecodeBenchmarkBundle, TassadarMillionStepBenchmarkError> {
+pub fn build_tassadar_million_step_decode_benchmark_bundle()
+-> Result<TassadarMillionStepDecodeBenchmarkBundle, TassadarMillionStepBenchmarkError> {
     let profile = TassadarWasmProfile::sudoku_9x9_search_v1();
     let trace_abi = TassadarTraceAbi::sudoku_9x9_search_v1();
     let program = tassadar_million_step_loop_program();
@@ -1739,8 +1979,8 @@ pub fn write_tassadar_million_step_decode_benchmark_bundle(
     Ok(bundle)
 }
 
-fn canonical_long_horizon_trace_case(
-) -> Result<TassadarValidationCase, TassadarTraceAbiArtifactError> {
+fn canonical_long_horizon_trace_case()
+-> Result<TassadarValidationCase, TassadarTraceAbiArtifactError> {
     tassadar_article_class_corpus()
         .into_iter()
         .find(|case| case.case_id == TASSADAR_LONG_HORIZON_TRACE_CASE_ID)
@@ -1751,8 +1991,8 @@ fn canonical_long_horizon_trace_case(
 
 /// Builds the canonical long-horizon execution evidence bundle used to anchor
 /// the trace-ABI decision report.
-pub fn build_tassadar_long_horizon_trace_evidence_bundle(
-) -> Result<TassadarExecutionEvidenceBundle, TassadarTraceAbiArtifactError> {
+pub fn build_tassadar_long_horizon_trace_evidence_bundle()
+-> Result<TassadarExecutionEvidenceBundle, TassadarTraceAbiArtifactError> {
     let case = canonical_long_horizon_trace_case()?;
     let profile =
         tassadar_wasm_profile_for_id(case.program.profile_id.as_str()).ok_or_else(|| {
@@ -1846,8 +2086,8 @@ fn build_tassadar_trace_abi_decision_report_for_refs(
 }
 
 /// Builds the canonical long-horizon trace-ABI decision report.
-pub fn build_tassadar_trace_abi_decision_report(
-) -> Result<TassadarTraceAbiDecisionReport, TassadarTraceAbiArtifactError> {
+pub fn build_tassadar_trace_abi_decision_report()
+-> Result<TassadarTraceAbiDecisionReport, TassadarTraceAbiArtifactError> {
     let evidence_bundle = build_tassadar_long_horizon_trace_evidence_bundle()?;
     Ok(build_tassadar_trace_abi_decision_report_for_refs(
         TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF,
@@ -6799,9 +7039,11 @@ fn build_tassadar_sudoku_search_program(
     let given_offset = cell_count;
     let memory_slots = cell_count * 2;
     debug_assert_eq!(cell_count, puzzle_cells.len());
-    debug_assert!(puzzle_cells
-        .iter()
-        .all(|value| (0..=max_value).contains(value)));
+    debug_assert!(
+        puzzle_cells
+            .iter()
+            .all(|value| (0..=max_value).contains(value))
+    );
 
     let mut initial_memory = vec![0; memory_slots];
     for (index, value) in puzzle_cells.iter().copied().enumerate() {
@@ -9349,6 +9591,23 @@ mod tests {
     use crate::TassadarClaimClass;
 
     use super::{
+        TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF, TASSADAR_C_TO_WASM_COMPILE_RECEIPT_REF,
+        TASSADAR_CANONICAL_C_PROGRAM_ARTIFACT_ID, TASSADAR_CANONICAL_C_SOURCE_REF,
+        TASSADAR_FIXTURE_RUNNER_ID, TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE,
+        TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF, TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE,
+        TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF, TASSADAR_RUNTIME_BACKEND_ID,
+        TASSADAR_TRACE_ABI_DECISION_REPORT_REF, TASSADAR_WASM_INSTRUCTION_COVERAGE_REPORT_REF,
+        TassadarCToWasmCompileConfig, TassadarCToWasmCompileReceipt, TassadarCompileRefusal,
+        TassadarCompilerToolchainIdentity, TassadarCpuReferenceRunner, TassadarExactnessPosture,
+        TassadarExactnessRefusalReport, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
+        TassadarExecutorSelectionReason, TassadarExecutorSelectionState, TassadarFixtureRunner,
+        TassadarHullCacheRunner, TassadarInstruction, TassadarMillionStepDecodeBenchmarkBundle,
+        TassadarMillionStepMeasurementPosture, TassadarMismatchClass, TassadarProgram,
+        TassadarProgramArtifact, TassadarProgramArtifactError, TassadarProgramSourceIdentity,
+        TassadarProgramSourceKind, TassadarSparseTopKRunner, TassadarSudokuV0CorpusSplit,
+        TassadarTraceAbi, TassadarTraceAbiDecisionReport, TassadarTraceArtifact,
+        TassadarTraceDiffKind, TassadarTraceDiffReport, TassadarTraceEvent,
+        TassadarWasmInstructionCoverageReport, TassadarWasmProfile, TassadarWasmProfileId,
         build_tassadar_execution_evidence_bundle,
         build_tassadar_long_horizon_trace_evidence_bundle,
         build_tassadar_million_step_decode_benchmark_bundle,
@@ -9364,23 +9623,7 @@ mod tests {
         write_tassadar_c_to_wasm_compile_receipt,
         write_tassadar_million_step_decode_benchmark_bundle,
         write_tassadar_trace_abi_decision_artifacts,
-        write_tassadar_wasm_instruction_coverage_report, TassadarCToWasmCompileConfig,
-        TassadarCToWasmCompileReceipt, TassadarCompileRefusal, TassadarCompilerToolchainIdentity,
-        TassadarCpuReferenceRunner, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
-        TassadarExecutorSelectionReason, TassadarExecutorSelectionState, TassadarFixtureRunner,
-        TassadarHullCacheRunner, TassadarInstruction, TassadarMillionStepDecodeBenchmarkBundle,
-        TassadarMillionStepMeasurementPosture, TassadarProgram, TassadarProgramArtifact,
-        TassadarProgramArtifactError, TassadarProgramSourceIdentity, TassadarProgramSourceKind,
-        TassadarSparseTopKRunner, TassadarSudokuV0CorpusSplit, TassadarTraceAbi,
-        TassadarTraceAbiDecisionReport, TassadarTraceArtifact, TassadarTraceDiffKind,
-        TassadarTraceDiffReport, TassadarTraceEvent, TassadarWasmInstructionCoverageReport,
-        TassadarWasmProfile, TassadarWasmProfileId, TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
-        TASSADAR_CANONICAL_C_PROGRAM_ARTIFACT_ID, TASSADAR_CANONICAL_C_SOURCE_REF,
-        TASSADAR_C_TO_WASM_COMPILE_RECEIPT_REF, TASSADAR_FIXTURE_RUNNER_ID,
-        TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE,
-        TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF, TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE,
-        TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF, TASSADAR_RUNTIME_BACKEND_ID,
-        TASSADAR_TRACE_ABI_DECISION_REPORT_REF, TASSADAR_WASM_INSTRUCTION_COVERAGE_REPORT_REF,
+        write_tassadar_wasm_instruction_coverage_report,
     };
 
     fn read_repo_json<T: serde::de::DeserializeOwned>(
@@ -10025,12 +10268,16 @@ mod tests {
                 .count(),
             2
         );
-        assert!(corpus
-            .iter()
-            .all(|case| !case.validation_case.expected_trace.is_empty()));
-        assert!(corpus
-            .iter()
-            .all(|case| case.validation_case.expected_outputs.len() == 16));
+        assert!(
+            corpus
+                .iter()
+                .all(|case| !case.validation_case.expected_trace.is_empty())
+        );
+        assert!(
+            corpus
+                .iter()
+                .all(|case| case.validation_case.expected_outputs.len() == 16)
+        );
     }
 
     #[test]
@@ -10058,12 +10305,16 @@ mod tests {
                 .count(),
             1
         );
-        assert!(corpus
-            .iter()
-            .all(|case| !case.validation_case.expected_trace.is_empty()));
-        assert!(corpus
-            .iter()
-            .all(|case| case.validation_case.expected_outputs.len() == 81));
+        assert!(
+            corpus
+                .iter()
+                .all(|case| !case.validation_case.expected_trace.is_empty())
+        );
+        assert!(
+            corpus
+                .iter()
+                .all(|case| case.validation_case.expected_outputs.len() == 81)
+        );
     }
 
     #[test]
@@ -10490,6 +10741,102 @@ mod tests {
     }
 
     #[test]
+    fn exactness_refusal_report_marks_exact_direct_execution() {
+        let case = tassadar_validation_corpus()
+            .into_iter()
+            .next()
+            .expect("validation corpus");
+        let expected = TassadarCpuReferenceRunner::new()
+            .execute(&case.program)
+            .expect("case should run");
+        let execution_report = execute_tassadar_executor_request(
+            &case.program,
+            TassadarExecutorDecodeMode::ReferenceLinear,
+            TassadarTraceAbi::core_i32_v1().schema_version,
+            None,
+        )
+        .expect("reference-linear execution should succeed");
+
+        let report = TassadarExactnessRefusalReport::from_execution_report(
+            &case.case_id,
+            &expected,
+            &execution_report,
+        );
+
+        assert_eq!(report.exactness_posture, TassadarExactnessPosture::Exact);
+        assert_eq!(
+            report.selection_state,
+            TassadarExecutorSelectionState::Direct
+        );
+        assert!(report.trace_digest_equal);
+        assert!(report.outputs_equal);
+        assert!(report.halt_equal);
+        assert!(report.mismatch_summary.is_none());
+    }
+
+    #[test]
+    fn exactness_refusal_report_classifies_step_mismatch() {
+        let case = tassadar_validation_corpus()
+            .into_iter()
+            .next()
+            .expect("validation corpus");
+        let expected = TassadarCpuReferenceRunner::new()
+            .execute(&case.program)
+            .expect("case should run");
+        let mut divergent = expected.clone();
+        divergent.steps[0].next_pc = divergent.steps[0].next_pc.saturating_add(1);
+        let selection = diagnose_tassadar_executor_request(
+            &case.program,
+            TassadarExecutorDecodeMode::ReferenceLinear,
+            TassadarTraceAbi::core_i32_v1().schema_version,
+            None,
+        );
+
+        let report = TassadarExactnessRefusalReport::from_selection_and_execution(
+            &case.case_id,
+            &selection,
+            &expected,
+            &divergent,
+        );
+
+        assert_eq!(report.exactness_posture, TassadarExactnessPosture::Mismatch);
+        let mismatch = report
+            .mismatch_summary
+            .expect("mismatch summary should exist");
+        assert_eq!(mismatch.mismatch_class, TassadarMismatchClass::StepMismatch);
+        assert_eq!(mismatch.first_divergence_step_index, Some(0));
+    }
+
+    #[test]
+    fn exactness_refusal_report_surfaces_refused_selection_reason() {
+        let case = tassadar_validation_corpus()
+            .into_iter()
+            .next()
+            .expect("validation corpus");
+        let mut refused_program = case.program.clone();
+        refused_program.profile_id = String::from("tassadar.wasm.unsupported_profile.v0");
+        let selection = diagnose_tassadar_executor_request(
+            &refused_program,
+            TassadarExecutorDecodeMode::ReferenceLinear,
+            TassadarTraceAbi::core_i32_v1().schema_version,
+            None,
+        );
+
+        let report = TassadarExactnessRefusalReport::from_refusal(&case.case_id, &selection, None);
+
+        assert_eq!(report.exactness_posture, TassadarExactnessPosture::Refused);
+        assert_eq!(
+            report.selection_state,
+            TassadarExecutorSelectionState::Refused
+        );
+        assert_eq!(
+            report.selection_reason,
+            Some(TassadarExecutorSelectionReason::UnsupportedWasmProfile)
+        );
+        assert!(report.execution_refusal.is_none());
+    }
+
+    #[test]
     fn validation_corpus_includes_shortest_path_fixture() {
         let case = tassadar_validation_corpus()
             .into_iter()
@@ -10778,17 +11125,29 @@ mod tests {
 
     #[test]
     fn tassadar_claim_class_transitions_preserve_lane_separation() {
-        assert!(TassadarClaimClass::ResearchOnly
-            .allows_transition_to(TassadarClaimClass::CompiledExact));
-        assert!(TassadarClaimClass::ResearchOnly
-            .allows_transition_to(TassadarClaimClass::LearnedBounded));
-        assert!(TassadarClaimClass::CompiledExact
-            .allows_transition_to(TassadarClaimClass::CompiledArticleClass));
-        assert!(TassadarClaimClass::LearnedBounded
-            .allows_transition_to(TassadarClaimClass::LearnedArticleClass));
-        assert!(!TassadarClaimClass::CompiledExact
-            .allows_transition_to(TassadarClaimClass::LearnedArticleClass));
-        assert!(!TassadarClaimClass::LearnedBounded
-            .allows_transition_to(TassadarClaimClass::CompiledArticleClass));
+        assert!(
+            TassadarClaimClass::ResearchOnly
+                .allows_transition_to(TassadarClaimClass::CompiledExact)
+        );
+        assert!(
+            TassadarClaimClass::ResearchOnly
+                .allows_transition_to(TassadarClaimClass::LearnedBounded)
+        );
+        assert!(
+            TassadarClaimClass::CompiledExact
+                .allows_transition_to(TassadarClaimClass::CompiledArticleClass)
+        );
+        assert!(
+            TassadarClaimClass::LearnedBounded
+                .allows_transition_to(TassadarClaimClass::LearnedArticleClass)
+        );
+        assert!(
+            !TassadarClaimClass::CompiledExact
+                .allows_transition_to(TassadarClaimClass::LearnedArticleClass)
+        );
+        assert!(
+            !TassadarClaimClass::LearnedBounded
+                .allows_transition_to(TassadarClaimClass::CompiledArticleClass)
+        );
     }
 }

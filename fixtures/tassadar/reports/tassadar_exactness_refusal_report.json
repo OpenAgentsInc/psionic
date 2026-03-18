@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.exactness_refusal_report.v1",
+  "benchmark_ref": "benchmark://openagents/tassadar/article_class/reference_fixture",
+  "cases": [
+    {
+      "case_id": "micro_wasm_kernel",
+      "summary": "unrolled weighted-sum and checksum micro-kernel over memory-backed inputs",
+      "runtime_report": {
+        "subject_id": "micro_wasm_kernel:reference_linear",
+        "requested_decode_mode": "reference_linear",
+        "effective_decode_mode": "reference_linear",
+        "selection_state": "direct",
+        "exactness_posture": "exact",
+        "trace_digest_equal": true,
+        "outputs_equal": true,
+        "halt_equal": true,
+        "expected_behavior_digest": "6e6aae3c54a46a360a2c4aed6a14b1c8dd64deb926b1fd23653aa0a8835a2433",
+        "actual_behavior_digest": "6e6aae3c54a46a360a2c4aed6a14b1c8dd64deb926b1fd23653aa0a8835a2433",
+        "detail": "selection `direct` stayed exact for subject `micro_wasm_kernel:reference_linear` under requested decode `tassadar.decode.reference_linear.v1`"
+      }
+    },
+    {
+      "case_id": "long_loop_kernel",
+      "summary": "longer-horizon decrement loop that keeps exact backward-branch behavior explicit under the current article-shaped profile",
+      "runtime_report": {
+        "subject_id": "long_loop_kernel:hull_cache",
+        "requested_decode_mode": "hull_cache",
+        "effective_decode_mode": "reference_linear",
+        "selection_state": "fallback",
+        "selection_reason": "hull_cache_control_flow_unsupported",
+        "exactness_posture": "exact",
+        "trace_digest_equal": true,
+        "outputs_equal": true,
+        "halt_equal": true,
+        "expected_behavior_digest": "f48e7726528dceb4b40e839da5330828bd307d743503d32b99f7a31df05d0c3b",
+        "actual_behavior_digest": "f48e7726528dceb4b40e839da5330828bd307d743503d32b99f7a31df05d0c3b",
+        "detail": "selection `fallback` stayed exact for subject `long_loop_kernel:hull_cache` under requested decode `tassadar.decode.hull_cache.v1`"
+      }
+    },
+    {
+      "case_id": "unsupported_profile_refusal",
+      "summary": "unsupported Wasm-profile refusal over the current exactness/refusal report contract",
+      "runtime_report": {
+        "subject_id": "unsupported_profile:reference_linear",
+        "requested_decode_mode": "reference_linear",
+        "selection_state": "refused",
+        "selection_reason": "unsupported_wasm_profile",
+        "exactness_posture": "refused",
+        "trace_digest_equal": false,
+        "outputs_equal": false,
+        "halt_equal": false,
+        "detail": "runtime supports profiles [\"tassadar.wasm.core_i32.v1\", \"tassadar.wasm.core_i32.v2\", \"tassadar.wasm.article_i32_compute.v1\", \"tassadar.wasm.sudoku_v0_search.v1\", \"tassadar.wasm.hungarian_v0_matching.v1\", \"tassadar.wasm.hungarian_10x10_matching.v1\", \"tassadar.wasm.sudoku_9x9_search.v1\"], but request targeted `tassadar.wasm.unsupported_profile.v0`"
+      }
+    }
+  ],
+  "claim_boundary": "this artifact records one exact direct case, one exact fallback case, and one explicit refusal case for the current article-class runtime contract; it is a benchmark-bound evidence surface and does not widen served closure beyond the cited runtime selection and refusal facts",
+  "report_digest": "9301c4147a776f97094751380f4cd7ee1259b6ca81201a323d30457f446392c1"
+}
