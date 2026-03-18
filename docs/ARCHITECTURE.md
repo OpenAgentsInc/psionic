@@ -525,6 +525,16 @@ The current scope is:
   that report into a provider-facing `TassadarWorldMountCompatibilityReceipt`.
   This lane keeps mount compatibility distinct from accepted-outcome or
   settlement transitions instead of hiding it inside route heuristics
+- landed accepted-outcome-binding follow-on: `psionic-provider` now publishes
+  the accepted-outcome binding report at
+  `fixtures/tassadar/reports/tassadar_accepted_outcome_binding_report.json`,
+  freezing exact-compute accepted-outcome templates over explicit provider
+  execution-unit receipts, world-mount compatibility receipts, evidence-routing
+  receipts, validator policy bindings, challenge windows, and settlement
+  dependencies with distinct candidate-outcome, accepted-outcome, and
+  provider-receipt identities. This lane keeps runtime success separate from
+  accepted-outcome closure or settlement-qualified authority instead of
+  letting provider receipts imply either one
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the

@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.accepted_outcome_binding.report.v1",
+  "execution_unit_receipt": {
+    "report_id": "tassadar.execution_unit_registration.report.v1",
+    "unit_id": "execution-unit:tassadar:tassadar-executor-fixture-v0",
+    "publishable_workload_class_count": 4,
+    "refusal_taxonomy_count": 2,
+    "runtime_backend": "cpu",
+    "pricing_posture": "benchmark_calibrated_indicative",
+    "settlement_eligible": false,
+    "detail": "execution-unit registration `tassadar.execution_unit_registration.report.v1` exposes unit_id=`execution-unit:tassadar:tassadar-executor-fixture-v0`, publishable_workload_classes=4, refusal_taxonomy_count=2, runtime_backend=`cpu`, pricing_posture=`BenchmarkCalibratedIndicative`, settlement_eligible=false"
+  },
+  "world_mount_receipt": {
+    "report_id": "tassadar.world_mount_compatibility.report.v1",
+    "allowed_case_count": 2,
+    "denied_case_count": 1,
+    "unresolved_case_count": 1,
+    "supported_trust_posture_count": 3,
+    "validator_binding_available": true,
+    "detail": "world-mount compatibility report `tassadar.world_mount_compatibility.report.v1` exposes allowed=2, denied=1, unresolved=1, supported_trust_postures=3, validator_binding_available=true"
+  },
+  "evidence_routing_receipt": {
+    "report_id": "tassadar.evidence_calibrated_routing.report.v1",
+    "case_count": 6,
+    "capability_only_mount_violation_rate_bps": 5000,
+    "evidence_aware_policy_compliance_rate_bps": 10000,
+    "misroute_avoidance_rate_bps": 5000,
+    "accepted_outcome_required_case_count": 2,
+    "accepted_outcome_ready_selection_rate_bps": 10000,
+    "validator_required_case_count": 3,
+    "validator_requirement_satisfaction_rate_bps": 10000,
+    "average_selected_evidence_burden_bps": 2805,
+    "average_selected_cost_milliunits": 2978,
+    "validation_ref_count": 3,
+    "report_digest": "126e8fa95d57c7a9ba1d6bfadc6a2601f0a24285029df077179eace4751238a0",
+    "detail": "evidence-aware routing `tassadar.evidence_calibrated_routing.report.v1` covers 6 mount-scoped cases with capability_only_mount_violations_bps=5000, policy_compliance_bps=10000, misroute_avoidance_bps=5000, accepted_outcome_ready_bps=10000, and validator_satisfaction_bps=10000"
+  },
+  "simulation_cases": [
+    {
+      "case_id": "accepted.patch_apply.validator_bound",
+      "template": {
+        "template_id": "accepted_outcome.patch_apply.internal_exact.v1",
+        "exact_compute_job_class": "patch_apply_internal_exact",
+        "execution_unit_receipt_id": "tassadar.execution_unit_registration.report.v1",
+        "world_mount_receipt_id": "tassadar.world_mount_compatibility.report.v1",
+        "evidence_routing_receipt_id": "tassadar.evidence_calibrated_routing.report.v1",
+        "required_evidence_families": [
+          "execution_receipt",
+          "canonical_trace_bundle",
+          "benchmark_lineage",
+          "world_mount_compatibility_receipt",
+          "validator_verdict"
+        ],
+        "validator_policy_ref": "validator-policies.exact_compute.patch_apply.v1",
+        "validator_attachment_required": true,
+        "challenge_window_minutes": 0,
+        "settlement_dependency_refs": [
+          "kernel-policy.accepted-outcome.patch_apply.v1",
+          "nexus.accepted-outcome.patch_apply.v1"
+        ],
+        "note": "fully satisfied exact-compute patch path where runtime truth, validator truth, and settlement dependencies all line up"
+      },
+      "runtime_success": true,
+      "candidate_outcome_id": "candidate.patch_apply.validator_bound.v1",
+      "accepted_outcome_id": "accepted.patch_apply.validator_bound.v1",
+      "provider_receipt_id": "provider_receipt.patch_apply.validator_bound.v1",
+      "validator_attachment_present": true,
+      "validator_policy_matches": true,
+      "challenge_window_open": false,
+      "settlement_dependencies_satisfied": true,
+      "status": "accepted",
+      "note": "runtime success is necessary here, but accepted-outcome closure only happens because validator and settlement requirements are also satisfied"
+    },
+    {
+      "case_id": "candidate.search.challenge_window",
+      "template": {
+        "template_id": "accepted_outcome.search.validator_challenge.v1",
+        "exact_compute_job_class": "search_validator_challenge",
+        "execution_unit_receipt_id": "tassadar.execution_unit_registration.report.v1",
+        "world_mount_receipt_id": "tassadar.world_mount_compatibility.report.v1",
+        "evidence_routing_receipt_id": "tassadar.evidence_calibrated_routing.report.v1",
+        "required_evidence_families": [
+          "execution_receipt",
+          "canonical_trace_bundle",
+          "validator_verdict"
+        ],
+        "validator_policy_ref": "validator-policies.exact_compute.search.v1",
+        "validator_attachment_required": true,
+        "challenge_window_minutes": 60,
+        "settlement_dependency_refs": [
+          "nexus.accepted-outcome.search.challenge.v1"
+        ],
+        "note": "validator-attached search stays candidate-only while the challenge window remains open"
+      },
+      "runtime_success": true,
+      "candidate_outcome_id": "candidate.search.challenge_window.v1",
+      "provider_receipt_id": "provider_receipt.search.challenge_window.v1",
+      "validator_attachment_present": true,
+      "validator_policy_matches": true,
+      "challenge_window_open": true,
+      "settlement_dependencies_satisfied": true,
+      "status": "candidate_only",
+      "refusal_reason": "challenge_window_open",
+      "note": "candidate and accepted outcomes stay distinct because challenge posture has not yet closed"
+    },
+    {
+      "case_id": "refused.long_loop.validator_missing",
+      "template": {
+        "template_id": "accepted_outcome.long_loop.validator_required.v1",
+        "exact_compute_job_class": "long_loop_validator_heavy",
+        "execution_unit_receipt_id": "tassadar.execution_unit_registration.report.v1",
+        "world_mount_receipt_id": "tassadar.world_mount_compatibility.report.v1",
+        "evidence_routing_receipt_id": "tassadar.evidence_calibrated_routing.report.v1",
+        "required_evidence_families": [
+          "execution_receipt",
+          "canonical_trace_bundle",
+          "world_mount_compatibility_receipt",
+          "validator_verdict"
+        ],
+        "validator_policy_ref": "validator-policies.exact_compute.long_loop.v1",
+        "validator_attachment_required": true,
+        "challenge_window_minutes": 0,
+        "settlement_dependency_refs": [
+          "kernel-policy.accepted-outcome.long_loop.v1"
+        ],
+        "note": "long-loop accepted outcomes stay refused when validator attachment is missing even if runtime execution succeeded"
+      },
+      "runtime_success": true,
+      "candidate_outcome_id": "candidate.long_loop.validator_missing.v1",
+      "provider_receipt_id": "provider_receipt.long_loop.validator_missing.v1",
+      "validator_attachment_present": false,
+      "validator_policy_matches": false,
+      "challenge_window_open": false,
+      "settlement_dependencies_satisfied": true,
+      "status": "refused",
+      "refusal_reason": "validator_attachment_missing",
+      "note": "provider-side execution receipts alone cannot escalate this case into accepted-outcome closure"
+    },
+    {
+      "case_id": "refused.search.validator_mismatch",
+      "template": {
+        "template_id": "accepted_outcome.search.policy_match.v1",
+        "exact_compute_job_class": "served_search_validator_mount",
+        "execution_unit_receipt_id": "tassadar.execution_unit_registration.report.v1",
+        "world_mount_receipt_id": "tassadar.world_mount_compatibility.report.v1",
+        "evidence_routing_receipt_id": "tassadar.evidence_calibrated_routing.report.v1",
+        "required_evidence_families": [
+          "execution_receipt",
+          "canonical_trace_bundle",
+          "validator_verdict"
+        ],
+        "validator_policy_ref": "validator-policies.exact_compute.search.strict.v1",
+        "validator_attachment_required": true,
+        "challenge_window_minutes": 0,
+        "settlement_dependency_refs": [
+          "kernel-policy.accepted-outcome.search.strict.v1"
+        ],
+        "note": "validator-attached search still refuses when the validator policy family does not match the mount contract"
+      },
+      "runtime_success": true,
+      "candidate_outcome_id": "candidate.search.validator_mismatch.v1",
+      "provider_receipt_id": "provider_receipt.search.validator_mismatch.v1",
+      "validator_attachment_present": true,
+      "validator_policy_matches": false,
+      "challenge_window_open": false,
+      "settlement_dependencies_satisfied": true,
+      "status": "refused",
+      "refusal_reason": "validator_policy_mismatch",
+      "note": "validator presence is not enough; the validator family must match the exact accepted-outcome template"
+    },
+    {
+      "case_id": "refused.patch_apply.settlement_missing",
+      "template": {
+        "template_id": "accepted_outcome.patch_apply.settlement_gate.v1",
+        "exact_compute_job_class": "patch_apply_internal_exact",
+        "execution_unit_receipt_id": "tassadar.execution_unit_registration.report.v1",
+        "world_mount_receipt_id": "tassadar.world_mount_compatibility.report.v1",
+        "evidence_routing_receipt_id": "tassadar.evidence_calibrated_routing.report.v1",
+        "required_evidence_families": [
+          "execution_receipt",
+          "canonical_trace_bundle",
+          "benchmark_lineage",
+          "validator_verdict"
+        ],
+        "validator_policy_ref": "validator-policies.exact_compute.patch_apply.v1",
+        "validator_attachment_required": true,
+        "challenge_window_minutes": 0,
+        "settlement_dependency_refs": [
+          "kernel-policy.accepted-outcome.patch_apply.v2",
+          "nexus.accepted-outcome.patch_apply.v2"
+        ],
+        "note": "runtime and validator success stay insufficient when settlement-facing dependency refs are missing or stale"
+      },
+      "runtime_success": true,
+      "candidate_outcome_id": "candidate.patch_apply.settlement_missing.v1",
+      "provider_receipt_id": "provider_receipt.patch_apply.settlement_missing.v1",
+      "validator_attachment_present": true,
+      "validator_policy_matches": true,
+      "challenge_window_open": false,
+      "settlement_dependencies_satisfied": false,
+      "status": "refused",
+      "refusal_reason": "settlement_dependency_missing",
+      "note": "the exact-compute job finished successfully, but settlement gating remains unresolved so accepted-outcome issuance must refuse"
+    }
+  ],
+  "accepted_case_count": 1,
+  "candidate_only_case_count": 1,
+  "refused_case_count": 3,
+  "validator_required_case_count": 5,
+  "settlement_gated_refusal_count": 1,
+  "nexus_dependency_marker": "nexus remains the owner of canonical accepted-outcome issuance and cross-provider dispute closure outside standalone psionic",
+  "kernel_policy_dependency_marker": "kernel-policy remains the owner of settlement-qualified outcome authority outside standalone psionic",
+  "validator_policies_dependency_marker": "validator-policies remain the owner of canonical validator attachment rules and challenge adjudication outside standalone psionic",
+  "claim_boundary": "this provider report keeps candidate outcomes, accepted-outcome templates, validator posture, challenge windows, and settlement dependencies explicit for exact-compute jobs. It does not treat runtime success or provider receipts as accepted-outcome or settlement authority",
+  "summary": "Accepted-outcome binding report now freezes 1 accepted cases, 1 candidate-only cases, and 3 refused cases across exact-compute validator and settlement drills.",
+  "report_digest": "c0168b679136bed0cf86fb69ff31d9b89a4e986b27c6c7362f54aeb698d8db40"
+}
