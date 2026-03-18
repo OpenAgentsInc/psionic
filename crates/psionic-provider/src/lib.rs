@@ -5,11 +5,14 @@
     allow(clippy::expect_used, clippy::panic, clippy::panic_in_result_fn)
 )]
 
+mod tassadar_module_library;
+
 use std::collections::BTreeMap;
 
 use ed25519_dalek::SigningKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+pub use tassadar_module_library::*;
 
 use psionic_research::{
     TassadarDecompilationArtifactSummary,

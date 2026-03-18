@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.internal_module_library.report.v1",
+  "library_id": "tassadar.internal_module_library.v1",
+  "active_modules": [
+    {
+      "module_id": "frontier_relax_core",
+      "active_version": "1.0.0",
+      "compatibility_digest": "compat.frontier_relax_core.1_0_0",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+        "fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json"
+      ],
+      "reusable_consumer_families": [
+        "clrs_shortest_path",
+        "clrs_wasm_shortest_path"
+      ]
+    },
+    {
+      "module_id": "candidate_select_core",
+      "active_version": "1.1.0",
+      "candidate_version": "1.2.0",
+      "rollback_version": "1.1.0",
+      "compatibility_digest": "compat.candidate_select_core.1_1_0",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json",
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+      ],
+      "reusable_consumer_families": [
+        "hungarian_matching",
+        "verifier_search"
+      ]
+    },
+    {
+      "module_id": "checkpoint_backtrack_core",
+      "active_version": "1.0.0",
+      "compatibility_digest": "compat.checkpoint_backtrack_core.1_0_0",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+      ],
+      "reusable_consumer_families": [
+        "verifier_search"
+      ]
+    }
+  ],
+  "exact_reuse_case_count": 3,
+  "rollback_case_count": 1,
+  "refused_case_count": 1,
+  "cross_program_reused_module_ids": [
+    "frontier_relax_core",
+    "candidate_select_core"
+  ],
+  "case_reports": [
+    {
+      "case_id": "clrs_shortest_path_reference",
+      "consumer_program_family": "clrs_shortest_path",
+      "requested_module_refs": [
+        "frontier_relax_core@1.0.0"
+      ],
+      "selected_module_refs": [
+        "frontier_relax_core@1.0.0"
+      ],
+      "link_posture": "exact_reuse",
+      "exact_outputs_preserved": true,
+      "exact_trace_match": true,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json"
+      ],
+      "note": "The CLRS shortest-path family reuses frontier_relax_core directly under the published compatibility digest."
+    },
+    {
+      "case_id": "clrs_wasm_shortest_path_reference",
+      "consumer_program_family": "clrs_wasm_shortest_path",
+      "requested_module_refs": [
+        "frontier_relax_core@1.0.0"
+      ],
+      "selected_module_refs": [
+        "frontier_relax_core@1.0.0"
+      ],
+      "link_posture": "exact_reuse",
+      "exact_outputs_preserved": true,
+      "exact_trace_match": true,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+      ],
+      "note": "The CLRS-to-Wasm bridge reuses the same frontier_relax_core module instead of compiling a separate one-off relaxer."
+    },
+    {
+      "case_id": "verifier_search_reference",
+      "consumer_program_family": "verifier_search",
+      "requested_module_refs": [
+        "candidate_select_core@1.1.0",
+        "checkpoint_backtrack_core@1.0.0"
+      ],
+      "selected_module_refs": [
+        "candidate_select_core@1.1.0",
+        "checkpoint_backtrack_core@1.0.0"
+      ],
+      "link_posture": "exact_reuse",
+      "exact_outputs_preserved": true,
+      "exact_trace_match": true,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+      ],
+      "note": "Verifier-guided search reuses the candidate selector and checkpoint core directly under the bounded library lane."
+    },
+    {
+      "case_id": "hungarian_matching_reference",
+      "consumer_program_family": "hungarian_matching",
+      "requested_module_refs": [
+        "candidate_select_core@1.2.0"
+      ],
+      "selected_module_refs": [
+        "candidate_select_core@1.1.0"
+      ],
+      "link_posture": "rolled_back",
+      "rollback_detail": "candidate_select_core@1.2.0 drifted on assignment-stability witnesses, so the runtime linked the explicit rollback target candidate_select_core@1.1.0",
+      "exact_outputs_preserved": true,
+      "exact_trace_match": true,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json"
+      ],
+      "note": "Hungarian matching keeps replacement posture explicit by rolling back from the candidate selector version under the published rollback plan."
+    },
+    {
+      "case_id": "sudoku_search_reference",
+      "consumer_program_family": "sudoku_search",
+      "requested_module_refs": [
+        "checkpoint_backtrack_core@1.0.0",
+        "branch_prune_core@0.1.0"
+      ],
+      "selected_module_refs": [
+        "checkpoint_backtrack_core@1.0.0"
+      ],
+      "link_posture": "refused",
+      "refusal_reason": "import_outside_bounded_library",
+      "exact_outputs_preserved": false,
+      "exact_trace_match": false,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+      ],
+      "note": "Sudoku search refuses because branch_prune_core is not part of the published bounded library surface yet."
+    }
+  ],
+  "claim_boundary": "this runtime report keeps internal module reuse bounded to the published library, compatibility digests, and rollback plans. Exact reuse, rollback, and refusal stay explicit; none of that implies arbitrary module installation or unrestricted software growth inside the model",
+  "summary": "Internal module library report now freezes 3 active modules across 5 link cases, with 3 exact-reuse cases, 1 rollback cases, and 1 refused cases.",
+  "report_digest": "a5735df2114778a005618710f863c1494128c39ed1e453a1064a57ad6dfa15dc"
+}

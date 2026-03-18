@@ -22,6 +22,7 @@ mod gguf;
 mod gpt_oss;
 mod openai_http;
 mod tassadar;
+mod tassadar_module_library;
 
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -34,6 +35,7 @@ pub use gguf::*;
 pub use gpt_oss::*;
 pub use openai_http::*;
 pub use psionic_adapters::*;
+pub use tassadar_module_library::*;
 use psionic_backend_cpu::CpuBackend;
 use psionic_backend_cuda::{
     CudaBackend, EMBEDDINGS_SUPPORTED_OPS as CUDA_EMBEDDINGS_SUPPORTED_OPS,

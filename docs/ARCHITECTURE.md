@@ -282,6 +282,23 @@ The current scope is:
   lane keeps bounded widening, trace-shaping-only behavior, and overflow
   refusal explicit instead of treating one memory tier as arbitrary-memory
   closure or a license to hide external tool semantics
+- landed internal-module-library follow-on: `psionic-compiler` now publishes a
+  bounded `TassadarInternalModuleLibrary` with versioned module artifacts, link
+  manifests, compatibility digests, and explicit replacement or rollback
+  plans; `psionic-models` now publishes the public
+  `TassadarInternalModuleLibraryPublication`; `psionic-runtime` now freezes the
+  benchmark-bound link report at
+  `fixtures/tassadar/reports/tassadar_internal_module_library_report.json`
+  with exact reuse, rollback, and refusal cases across CLRS, Hungarian, and
+  verifier-search families; `psionic-serve` now publishes a benchmark-gated
+  served module-library surface above that runtime report; `psionic-provider`
+  now wraps that served surface in a provider-facing
+  `TassadarInternalModuleLibraryReceipt`; and `psionic-research` now freezes
+  the companion summary at
+  `fixtures/tassadar/reports/tassadar_internal_module_library_summary.json`.
+  This lane keeps reuse, rollback, and refusal explicit instead of treating a
+  versioned module library as unrestricted self-extension or arbitrary install
+  closure
 - landed route-contract follow-on: `psionic-router` now also owns a routeable
   Wasm capability matrix for `psionic.planner_executor_route`, with explicit
   module-class rows, opcode-family facts, import posture, module-class-specific
