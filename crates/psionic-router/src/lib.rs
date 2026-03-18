@@ -12,6 +12,7 @@
 )]
 
 mod response_state;
+mod tassadar_evidence_routing;
 mod tassadar_module_installation;
 mod tassadar_planner_policy;
 mod tassadar_route;
@@ -21,6 +22,7 @@ pub use response_state::{
     ResponseConversationRef, ResponseStateBackend, ResponseStateCapability, ResponseStateContext,
     ResponseStateError, ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore,
 };
+pub use tassadar_evidence_routing::*;
 pub use tassadar_module_installation::*;
 pub use tassadar_planner_policy::*;
 pub use tassadar_route::*;

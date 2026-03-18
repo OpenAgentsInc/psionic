@@ -5,6 +5,7 @@
     allow(clippy::expect_used, clippy::panic, clippy::panic_in_result_fn)
 )]
 
+mod tassadar_evidence_routing;
 mod tassadar_module_installation;
 mod tassadar_module_library;
 mod tassadar_planner_policy;
@@ -15,6 +16,7 @@ use std::collections::BTreeMap;
 use ed25519_dalek::SigningKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+pub use tassadar_evidence_routing::*;
 pub use tassadar_module_installation::*;
 pub use tassadar_module_library::*;
 pub use tassadar_planner_policy::*;

@@ -1159,6 +1159,17 @@ The current scope is:
   `fixtures/tassadar/reports/tassadar_mixed_trajectory_report.json`; the lane
   remains execution-truth substrate for hybrid replay and training and does
   not imply accepted-outcome closure or settlement authority
+- landed evidence-calibrated routing follow-on: `psionic-router` now freezes a
+  public mount-scoped `TassadarEvidenceCalibratedRoutingReport` at
+  `fixtures/tassadar/reports/tassadar_evidence_calibrated_routing_report.json`
+  over seeded hybrid cases that score `language_only`,
+  `internal_exact_compute`, and `external_tool` routes against explicit
+  evidence burden, trust tier, validator attachment, accepted-outcome
+  requirements, route allowlists, and world-mount budgets instead of
+  capability alone, and `psionic-provider` now projects that report into a
+  provider-facing `TassadarEvidenceCalibratedRoutingReceipt`; the lane remains
+  policy-bound routing research and does not imply accepted-outcome authority,
+  settlement truth, or served capability widening
 - the final article-parity closeout audit now exists at
   `docs/audits/2026-03-17-tassadar-article-parity-closeout-audit.md`; it is
   explicitly subordinate to `fixtures/tassadar/reports/tassadar_acceptance_report.json`
