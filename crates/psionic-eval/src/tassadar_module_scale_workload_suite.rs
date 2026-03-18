@@ -527,6 +527,7 @@ fn build_tassadar_module_scale_environment_bundle(
             evaluation_axes: suite_contract.evaluation_axes.clone(),
             report_ref: String::from(TASSADAR_MODULE_SCALE_WORKLOAD_SUITE_REPORT_REF),
         }),
+        clrs_wasm_bridge_binding: None,
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/module_scale/eval/verification"),

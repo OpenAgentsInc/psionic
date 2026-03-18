@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
 use psionic_data::{
-    DatasetKey, TassadarBenchmarkAxis, TassadarBenchmarkFamily, TassadarModuleScaleWorkloadFamily,
+    DatasetKey, TassadarBenchmarkAxis, TassadarBenchmarkFamily, TassadarClrsAlgorithmFamily,
+    TassadarClrsLengthBucket, TassadarClrsTrajectoryFamily, TassadarModuleScaleWorkloadFamily,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -30,6 +31,7 @@ const TASSADAR_METADATA_COMPILE_PIPELINE_MATRIX_KEY: &str = "tassadar.compile_pi
 const TASSADAR_METADATA_WASM_CONFORMANCE_KEY: &str = "tassadar.wasm_conformance";
 const TASSADAR_METADATA_MODULE_SCALE_WORKLOAD_SUITE_KEY: &str =
     "tassadar.module_scale_workload_suite";
+const TASSADAR_METADATA_CLRS_WASM_BRIDGE_KEY: &str = "tassadar.clrs_wasm_bridge";
 const TASSADAR_METADATA_ABI_VERSION_KEY: &str = "tassadar.abi_version";
 const TASSADAR_EVAL_METADATA_SURFACE: &str = "eval";
 const TASSADAR_BENCHMARK_METADATA_SURFACE: &str = "benchmark";
@@ -283,6 +285,57 @@ impl TassadarModuleScaleWorkloadSuiteBinding {
         }
         if self.report_ref.trim().is_empty() {
             return Err(TassadarEnvironmentError::MissingModuleScaleReportRef);
+        }
+        Ok(())
+    }
+}
+
+/// Public CLRS-to-Wasm bridge binding reused by Tassadar environment bundles.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarClrsWasmBridgeBinding {
+    /// Stable bridge reference.
+    pub bridge_ref: String,
+    /// Immutable bridge version.
+    pub bridge_version: String,
+    /// CLRS algorithm families surfaced by this environment bundle.
+    pub supported_algorithms: Vec<TassadarClrsAlgorithmFamily>,
+    /// Trajectory families surfaced by this environment bundle.
+    pub trajectory_families: Vec<TassadarClrsTrajectoryFamily>,
+    /// Length buckets surfaced by this environment bundle.
+    pub length_buckets: Vec<TassadarClrsLengthBucket>,
+    /// Canonical machine-readable report ref for the bridge.
+    pub report_ref: String,
+}
+
+impl TassadarClrsWasmBridgeBinding {
+    /// Returns a stable digest over the binding.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let encoded = serde_json::to_vec(self)
+            .expect("Tassadar CLRS-to-Wasm bridge binding should serialize");
+        let digest = sha2::Sha256::digest(encoded.as_slice());
+        hex::encode(digest)
+    }
+
+    /// Validates that the binding is explicit.
+    pub fn validate(&self) -> Result<(), TassadarEnvironmentError> {
+        if self.bridge_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingClrsWasmBridgeRef);
+        }
+        if self.bridge_version.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingClrsWasmBridgeVersion);
+        }
+        if self.supported_algorithms.is_empty() {
+            return Err(TassadarEnvironmentError::MissingClrsWasmBridgeAlgorithms);
+        }
+        if self.trajectory_families.is_empty() {
+            return Err(TassadarEnvironmentError::MissingClrsWasmBridgeTrajectories);
+        }
+        if self.length_buckets.is_empty() {
+            return Err(TassadarEnvironmentError::MissingClrsWasmBridgeLengthBuckets);
+        }
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingClrsWasmBridgeReportRef);
         }
         Ok(())
     }
@@ -545,6 +598,9 @@ pub struct TassadarEnvironmentSpec {
     /// Optional public module-scale workload-suite binding.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub module_scale_workload_suite_binding: Option<TassadarModuleScaleWorkloadSuiteBinding>,
+    /// Optional public CLRS-to-Wasm bridge binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clrs_wasm_bridge_binding: Option<TassadarClrsWasmBridgeBinding>,
     /// Policy refs for the eval package.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub eval_policy_references: Vec<EnvironmentPolicyReference>,
@@ -633,6 +689,7 @@ impl TassadarEnvironmentSpec {
             compile_pipeline_matrix_binding: self.compile_pipeline_matrix_binding.clone(),
             wasm_conformance_binding: self.wasm_conformance_binding.clone(),
             module_scale_workload_suite_binding: self.module_scale_workload_suite_binding.clone(),
+            clrs_wasm_bridge_binding: self.clrs_wasm_bridge_binding.clone(),
             current_workload_targets: self.current_workload_targets.clone(),
             planned_workload_targets: self.planned_workload_targets.clone(),
         })
@@ -668,6 +725,9 @@ impl TassadarEnvironmentSpec {
         self.compile_pipeline_matrix_binding.validate()?;
         self.wasm_conformance_binding.validate()?;
         if let Some(binding) = &self.module_scale_workload_suite_binding {
+            binding.validate()?;
+        }
+        if let Some(binding) = &self.clrs_wasm_bridge_binding {
             binding.validate()?;
         }
         if self.current_workload_targets.is_empty() {
@@ -856,6 +916,12 @@ impl TassadarEnvironmentSpec {
                 serde_json::to_value(binding).unwrap_or(Value::Null),
             );
         }
+        if let Some(binding) = &self.clrs_wasm_bridge_binding {
+            metadata.insert(
+                String::from(TASSADAR_METADATA_CLRS_WASM_BRIDGE_KEY),
+                serde_json::to_value(binding).unwrap_or(Value::Null),
+            );
+        }
         metadata.insert(
             String::from(TASSADAR_METADATA_CURRENT_TARGETS_KEY),
             serde_json::to_value(&self.current_workload_targets).unwrap_or(Value::Null),
@@ -887,9 +953,10 @@ impl TassadarEnvironmentSpec {
                     pin_alias: self.package_refs.benchmark_pin_alias.clone(),
                     surfaces: vec![EnvironmentUsageSurface::Benchmark],
                     required_workloads: vec![EnvironmentWorkloadClass::ValidatorBenchmark],
-                    required_benchmark_profiles: vec![
-                        self.package_refs.benchmark_profile_ref.clone(),
-                    ],
+                    required_benchmark_profiles: vec![self
+                        .package_refs
+                        .benchmark_profile_ref
+                        .clone()],
                 },
             ],
         }
@@ -926,6 +993,9 @@ pub struct TassadarEnvironmentBundle {
     /// Optional module-scale workload-suite binding.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub module_scale_workload_suite_binding: Option<TassadarModuleScaleWorkloadSuiteBinding>,
+    /// Optional CLRS-to-Wasm bridge binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clrs_wasm_bridge_binding: Option<TassadarClrsWasmBridgeBinding>,
     /// Current workload targets implemented now.
     pub current_workload_targets: Vec<TassadarWorkloadTarget>,
     /// Planned workload targets still to widen later.
@@ -957,7 +1027,9 @@ pub enum TassadarEnvironmentError {
     #[error("Tassadar environment spec is missing the benchmark dataset binding")]
     MissingBenchmarkDataset,
     /// Missing benchmark package-set ref.
-    #[error("Tassadar environment spec is missing `benchmark_package_set_binding.package_set_ref`")]
+    #[error(
+        "Tassadar environment spec is missing `benchmark_package_set_binding.package_set_ref`"
+    )]
     MissingBenchmarkPackageSetRef,
     /// Missing benchmark package-set version.
     #[error(
@@ -1005,7 +1077,9 @@ pub enum TassadarEnvironmentError {
     #[error("Tassadar environment spec includes an empty Wasm conformance case family id")]
     InvalidWasmConformanceCaseFamilyId,
     /// Missing module-scale suite ref.
-    #[error("Tassadar environment spec is missing `module_scale_workload_suite_binding.suite_ref`")]
+    #[error(
+        "Tassadar environment spec is missing `module_scale_workload_suite_binding.suite_ref`"
+    )]
     MissingModuleScaleSuiteRef,
     /// Missing module-scale suite version.
     #[error(
@@ -1026,6 +1100,24 @@ pub enum TassadarEnvironmentError {
         "Tassadar environment spec is missing `module_scale_workload_suite_binding.report_ref`"
     )]
     MissingModuleScaleReportRef,
+    /// Missing CLRS-to-Wasm bridge ref.
+    #[error("Tassadar environment spec is missing `clrs_wasm_bridge_binding.bridge_ref`")]
+    MissingClrsWasmBridgeRef,
+    /// Missing CLRS-to-Wasm bridge version.
+    #[error("Tassadar environment spec is missing `clrs_wasm_bridge_binding.bridge_version`")]
+    MissingClrsWasmBridgeVersion,
+    /// Missing CLRS-to-Wasm bridge algorithms.
+    #[error("Tassadar environment spec must declare CLRS-to-Wasm bridge algorithms")]
+    MissingClrsWasmBridgeAlgorithms,
+    /// Missing CLRS-to-Wasm bridge trajectory families.
+    #[error("Tassadar environment spec must declare CLRS-to-Wasm bridge trajectory families")]
+    MissingClrsWasmBridgeTrajectories,
+    /// Missing CLRS-to-Wasm bridge length buckets.
+    #[error("Tassadar environment spec must declare CLRS-to-Wasm bridge length buckets")]
+    MissingClrsWasmBridgeLengthBuckets,
+    /// Missing CLRS-to-Wasm bridge report ref.
+    #[error("Tassadar environment spec is missing `clrs_wasm_bridge_binding.report_ref`")]
+    MissingClrsWasmBridgeReportRef,
     /// Missing group ref.
     #[error("Tassadar environment refs are missing `group_ref`")]
     MissingGroupRef,
@@ -1253,6 +1345,7 @@ mod tests {
                 ],
             },
             module_scale_workload_suite_binding: None,
+            clrs_wasm_bridge_binding: None,
             eval_policy_references: vec![EnvironmentPolicyReference {
                 kind: EnvironmentPolicyKind::Verification,
                 policy_ref: String::from("policy://tassadar/eval/verification"),
@@ -1354,8 +1447,8 @@ mod tests {
     }
 
     #[test]
-    fn tassadar_environment_bundle_carries_optional_module_scale_suite_binding()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn tassadar_environment_bundle_carries_optional_module_scale_suite_binding(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut spec = sample_spec();
         spec.module_scale_workload_suite_binding = Some(TassadarModuleScaleWorkloadSuiteBinding {
             suite_ref: String::from("benchmark-suite://openagents/tassadar/module_scale"),
@@ -1393,6 +1486,47 @@ mod tests {
                 .as_ref()
                 .map(|binding| binding.supported_families.len()),
             Some(4)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn tassadar_environment_bundle_carries_optional_clrs_wasm_bridge_binding(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut spec = sample_spec();
+        spec.clrs_wasm_bridge_binding = Some(TassadarClrsWasmBridgeBinding {
+            bridge_ref: String::from("benchmark-bridge://openagents/tassadar/clrs_wasm"),
+            bridge_version: String::from("2026.03.18"),
+            supported_algorithms: vec![TassadarClrsAlgorithmFamily::ShortestPath],
+            trajectory_families: vec![
+                TassadarClrsTrajectoryFamily::SequentialRelaxation,
+                TassadarClrsTrajectoryFamily::WavefrontRelaxation,
+            ],
+            length_buckets: vec![
+                TassadarClrsLengthBucket::Tiny,
+                TassadarClrsLengthBucket::Small,
+            ],
+            report_ref: String::from(
+                "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+            ),
+        });
+
+        let bundle = spec.build_bundle()?;
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
+                .get(TASSADAR_METADATA_CLRS_WASM_BRIDGE_KEY)
+                .and_then(|value| value.get("report_ref"))
+                .and_then(Value::as_str),
+            Some("fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json")
+        );
+        assert_eq!(
+            bundle
+                .clrs_wasm_bridge_binding
+                .as_ref()
+                .map(|binding| binding.trajectory_families.len()),
+            Some(2)
         );
         Ok(())
     }

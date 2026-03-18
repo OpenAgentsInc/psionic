@@ -1,0 +1,913 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.clrs_wasm_bridge.report.v1",
+  "bridge": {
+    "abi_version": "psionic.tassadar.clrs_wasm_bridge.v1",
+    "bridge_ref": "benchmark-bridge://openagents/tassadar/clrs_wasm",
+    "version": "2026.03.18",
+    "benchmark_ref": "benchmark://openagents/tassadar/clrs_wasm_bridge/reference_fixture",
+    "environment_ref": "env.openagents.tassadar.clrs_wasm_bridge.benchmark",
+    "supported_algorithms": [
+      "shortest_path"
+    ],
+    "trajectory_families": [
+      "sequential_relaxation",
+      "wavefront_relaxation"
+    ],
+    "length_buckets": [
+      "tiny",
+      "small"
+    ],
+    "evaluation_axes": [
+      "exactness_bps",
+      "module_trace_steps",
+      "cpu_reference_cost_units",
+      "trajectory_step_delta"
+    ],
+    "cases": [
+      {
+        "case_id": "clrs_shortest_path_sequential",
+        "algorithm_family": "shortest_path",
+        "trajectory_family": "sequential_relaxation",
+        "summary": "fixed shortest-path witness compiled as sequential relaxation over tiny and small graph buckets",
+        "source_ref": "fixtures/tassadar/sources/tassadar_clrs_shortest_path_sequential.wat",
+        "export_bindings": [
+          {
+            "length_bucket": "tiny",
+            "export_name": "distance_tiny"
+          },
+          {
+            "length_bucket": "small",
+            "export_name": "distance_small"
+          }
+        ]
+      },
+      {
+        "case_id": "clrs_shortest_path_wavefront",
+        "algorithm_family": "shortest_path",
+        "trajectory_family": "wavefront_relaxation",
+        "summary": "fixed shortest-path witness compiled as wavefront relaxation over the same tiny and small graph buckets",
+        "source_ref": "fixtures/tassadar/sources/tassadar_clrs_shortest_path_wavefront.wat",
+        "export_bindings": [
+          {
+            "length_bucket": "tiny",
+            "export_name": "distance_tiny"
+          },
+          {
+            "length_bucket": "small",
+            "export_name": "distance_small"
+          }
+        ]
+      }
+    ],
+    "report_ref": "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+  },
+  "environment_bundle": {
+    "eval_package": {
+      "abi_version": "psionic.environment.v1",
+      "key": {
+        "environment_ref": "env.openagents.tassadar.clrs_wasm_bridge.eval",
+        "version": "2026.03.18"
+      },
+      "family": "evaluation",
+      "display_name": "Tassadar CLRS-to-Wasm Bridge Eval",
+      "execution": {
+        "runtime_family": "evaluator",
+        "entrypoint": "tassadar_eval::run",
+        "args": [
+          "runtime://tassadar/clrs_wasm_bridge/eval"
+        ],
+        "max_turns": 1,
+        "state_mode": "stateless",
+        "time_budget_ms": 15000
+      },
+      "supported_workloads": [
+        "online_eval",
+        "offline_eval"
+      ],
+      "datasets": [
+        {
+          "dataset": {
+            "dataset_ref": "dataset://openagents/tassadar/clrs_wasm_bridge",
+            "version": "2026.03.18"
+          },
+          "split": "validation",
+          "mount_path": "/datasets/tassadar/clrs_wasm_bridge/validation",
+          "required": true
+        }
+      ],
+      "rubric_hooks": [
+        {
+          "rubric_ref": "tassadar://rubric/exactness/final_output_exactness",
+          "hook_name": "score_final_output_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        },
+        {
+          "rubric_ref": "tassadar://rubric/exactness/step_exactness",
+          "hook_name": "score_step_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        },
+        {
+          "rubric_ref": "tassadar://rubric/exactness/halt_exactness",
+          "hook_name": "score_halt_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        }
+      ],
+      "expected_artifacts": [
+        {
+          "artifact_kind": "tassadar_program_artifact.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/program_artifact"
+        },
+        {
+          "artifact_kind": "tassadar_trace.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/trace"
+        },
+        {
+          "artifact_kind": "tassadar_eval_report.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/eval_report"
+        }
+      ],
+      "policy_references": [
+        {
+          "kind": "verification",
+          "policy_ref": "policy://tassadar/clrs_wasm_bridge/eval/verification",
+          "required": true
+        }
+      ],
+      "metadata": {
+        "tassadar.abi_version": "psionic.tassadar_environment.v1",
+        "tassadar.benchmark_package_set": {
+          "package_set_ref": "benchmark-set://openagents/tassadar/public",
+          "package_set_version": "2026.03.18",
+          "supported_families": [
+            "clrs_subset"
+          ],
+          "axis_coverage": [
+            "exactness",
+            "length_generalization",
+            "planner_usefulness"
+          ],
+          "summary_report_ref": "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json"
+        },
+        "tassadar.clrs_wasm_bridge": {
+          "bridge_ref": "benchmark-bridge://openagents/tassadar/clrs_wasm",
+          "bridge_version": "2026.03.18",
+          "supported_algorithms": [
+            "shortest_path"
+          ],
+          "trajectory_families": [
+            "sequential_relaxation",
+            "wavefront_relaxation"
+          ],
+          "length_buckets": [
+            "tiny",
+            "small"
+          ],
+          "report_ref": "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+        },
+        "tassadar.compile_pipeline_matrix": {
+          "report_ref": "fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json",
+          "report_id": "tassadar.compile_pipeline_matrix_report.v1",
+          "source_family_ids": [
+            "wasm_text.multi_export_arithmetic",
+            "wasm_text.memory_lookup",
+            "wasm_text.param_abi",
+            "c_source.toolchain_unavailable"
+          ]
+        },
+        "tassadar.current_workload_targets": [
+          "clrs_shortest_path"
+        ],
+        "tassadar.exactness_contract": {
+          "require_final_output_exactness": true,
+          "require_step_exactness": true,
+          "require_halt_exactness": true,
+          "timeout_budget_ms": 15000,
+          "trace_budget_steps": 256,
+          "require_cpu_reference_baseline": true,
+          "require_reference_linear_baseline": true
+        },
+        "tassadar.io_contract": {
+          "input_family": "no_external_input",
+          "output_family": "i32_sequence",
+          "output_element_type": "i32",
+          "deterministic_outputs": true
+        },
+        "tassadar.package_refs": {
+          "group_ref": "group.tassadar.clrs_wasm_bridge",
+          "eval_pin_alias": "tassadar_clrs_wasm_bridge_eval",
+          "benchmark_pin_alias": "tassadar_clrs_wasm_bridge_benchmark",
+          "eval_member_ref": "tassadar_clrs_wasm_bridge_eval_member",
+          "benchmark_member_ref": "tassadar_clrs_wasm_bridge_benchmark_member",
+          "program_corpus_ref": "tassadar://corpus/clrs_wasm_bridge.validation",
+          "io_contract_ref": "tassadar://io/exact_i32_sequence",
+          "rubric_binding_ref": "tassadar://rubric/exactness",
+          "eval_runtime_profile_ref": "runtime://tassadar/clrs_wasm_bridge/eval",
+          "benchmark_profile_ref": "benchmark://openagents/tassadar/clrs_wasm_bridge/reference_fixture",
+          "benchmark_runtime_profile_ref": "runtime://tassadar/clrs_wasm_bridge/benchmark"
+        },
+        "tassadar.planned_workload_targets": [],
+        "tassadar.program_binding": {
+          "dataset": {
+            "dataset_ref": "dataset://openagents/tassadar/clrs_wasm_bridge",
+            "version": "2026.03.18"
+          },
+          "program_corpus_ref": "tassadar://corpus/clrs_wasm_bridge.validation",
+          "corpus_digest": "02ee9c589b5952beac29840cef7b64f0912814e6fe881462b8ce9dd673179c47",
+          "wasm_profile_id": "tassadar.wasm.article_i32_compute.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "opcode_vocabulary_digest": "b458516f694c301a7b209bb6e710dfc4b7c2756a107738dd38a8fdc8b2dcd64c",
+          "artifact_digests": [
+            "c4890fba896571744c733020649137b706ae6a74248bf60e50ece5b96dc2d942",
+            "92da04743ad339fe42a2ce9e48ba20d88f0bc171e1ca4e6cc5ca8507a7dcc50e"
+          ]
+        },
+        "tassadar.surface": "eval",
+        "tassadar.wasm_conformance": {
+          "report_ref": "fixtures/tassadar/reports/tassadar_wasm_conformance_report.json",
+          "report_id": "tassadar.wasm_conformance.report.v1",
+          "reference_authority_id": "wasmi.reference.v1",
+          "case_family_ids": [
+            "curated.global_state",
+            "curated.call_indirect",
+            "curated.deterministic_import",
+            "curated.call_indirect_trap",
+            "curated.unsupported_host_import",
+            "generated.call_indirect",
+            "generated.call_indirect_trap",
+            "generated.global_state"
+          ]
+        }
+      }
+    },
+    "benchmark_package": {
+      "abi_version": "psionic.environment.v1",
+      "key": {
+        "environment_ref": "env.openagents.tassadar.clrs_wasm_bridge.benchmark",
+        "version": "2026.03.18"
+      },
+      "family": "evaluation",
+      "display_name": "Tassadar CLRS-to-Wasm Bridge Benchmark",
+      "execution": {
+        "runtime_family": "evaluator",
+        "entrypoint": "tassadar_benchmark::run",
+        "args": [
+          "runtime://tassadar/clrs_wasm_bridge/benchmark"
+        ],
+        "max_turns": 1,
+        "state_mode": "turn_scoped",
+        "time_budget_ms": 15000
+      },
+      "supported_workloads": [
+        "offline_eval",
+        "validator_benchmark"
+      ],
+      "datasets": [
+        {
+          "dataset": {
+            "dataset_ref": "dataset://openagents/tassadar/clrs_wasm_bridge",
+            "version": "2026.03.18"
+          },
+          "split": "benchmark",
+          "mount_path": "/datasets/tassadar/clrs_wasm_bridge/benchmark",
+          "required": true
+        }
+      ],
+      "rubric_hooks": [
+        {
+          "rubric_ref": "tassadar://rubric/exactness/final_output_exactness",
+          "hook_name": "score_final_output_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        },
+        {
+          "rubric_ref": "tassadar://rubric/exactness/step_exactness",
+          "hook_name": "score_step_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        },
+        {
+          "rubric_ref": "tassadar://rubric/exactness/halt_exactness",
+          "hook_name": "score_halt_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        }
+      ],
+      "expected_artifacts": [
+        {
+          "artifact_kind": "tassadar_program_artifact.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/program_artifact"
+        },
+        {
+          "artifact_kind": "tassadar_trace.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/trace"
+        },
+        {
+          "artifact_kind": "tassadar_eval_report.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/eval_report"
+        }
+      ],
+      "policy_references": [
+        {
+          "kind": "benchmark",
+          "policy_ref": "policy://tassadar/clrs_wasm_bridge/benchmark",
+          "required": true
+        },
+        {
+          "kind": "verification",
+          "policy_ref": "policy://tassadar/clrs_wasm_bridge/benchmark/verification",
+          "required": true
+        }
+      ],
+      "benchmark_profiles": [
+        {
+          "benchmark_profile_ref": "benchmark://openagents/tassadar/clrs_wasm_bridge/reference_fixture",
+          "runtime_profile_ref": "runtime://tassadar/clrs_wasm_bridge/benchmark",
+          "verification_posture": "validator_required",
+          "expected_execution_strategy": "tassadar_reference_fixture"
+        }
+      ],
+      "metadata": {
+        "tassadar.abi_version": "psionic.tassadar_environment.v1",
+        "tassadar.benchmark_package_set": {
+          "package_set_ref": "benchmark-set://openagents/tassadar/public",
+          "package_set_version": "2026.03.18",
+          "supported_families": [
+            "clrs_subset"
+          ],
+          "axis_coverage": [
+            "exactness",
+            "length_generalization",
+            "planner_usefulness"
+          ],
+          "summary_report_ref": "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json"
+        },
+        "tassadar.clrs_wasm_bridge": {
+          "bridge_ref": "benchmark-bridge://openagents/tassadar/clrs_wasm",
+          "bridge_version": "2026.03.18",
+          "supported_algorithms": [
+            "shortest_path"
+          ],
+          "trajectory_families": [
+            "sequential_relaxation",
+            "wavefront_relaxation"
+          ],
+          "length_buckets": [
+            "tiny",
+            "small"
+          ],
+          "report_ref": "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+        },
+        "tassadar.compile_pipeline_matrix": {
+          "report_ref": "fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json",
+          "report_id": "tassadar.compile_pipeline_matrix_report.v1",
+          "source_family_ids": [
+            "wasm_text.multi_export_arithmetic",
+            "wasm_text.memory_lookup",
+            "wasm_text.param_abi",
+            "c_source.toolchain_unavailable"
+          ]
+        },
+        "tassadar.current_workload_targets": [
+          "clrs_shortest_path"
+        ],
+        "tassadar.exactness_contract": {
+          "require_final_output_exactness": true,
+          "require_step_exactness": true,
+          "require_halt_exactness": true,
+          "timeout_budget_ms": 15000,
+          "trace_budget_steps": 256,
+          "require_cpu_reference_baseline": true,
+          "require_reference_linear_baseline": true
+        },
+        "tassadar.io_contract": {
+          "input_family": "no_external_input",
+          "output_family": "i32_sequence",
+          "output_element_type": "i32",
+          "deterministic_outputs": true
+        },
+        "tassadar.package_refs": {
+          "group_ref": "group.tassadar.clrs_wasm_bridge",
+          "eval_pin_alias": "tassadar_clrs_wasm_bridge_eval",
+          "benchmark_pin_alias": "tassadar_clrs_wasm_bridge_benchmark",
+          "eval_member_ref": "tassadar_clrs_wasm_bridge_eval_member",
+          "benchmark_member_ref": "tassadar_clrs_wasm_bridge_benchmark_member",
+          "program_corpus_ref": "tassadar://corpus/clrs_wasm_bridge.validation",
+          "io_contract_ref": "tassadar://io/exact_i32_sequence",
+          "rubric_binding_ref": "tassadar://rubric/exactness",
+          "eval_runtime_profile_ref": "runtime://tassadar/clrs_wasm_bridge/eval",
+          "benchmark_profile_ref": "benchmark://openagents/tassadar/clrs_wasm_bridge/reference_fixture",
+          "benchmark_runtime_profile_ref": "runtime://tassadar/clrs_wasm_bridge/benchmark"
+        },
+        "tassadar.planned_workload_targets": [],
+        "tassadar.program_binding": {
+          "dataset": {
+            "dataset_ref": "dataset://openagents/tassadar/clrs_wasm_bridge",
+            "version": "2026.03.18"
+          },
+          "program_corpus_ref": "tassadar://corpus/clrs_wasm_bridge.validation",
+          "corpus_digest": "02ee9c589b5952beac29840cef7b64f0912814e6fe881462b8ce9dd673179c47",
+          "wasm_profile_id": "tassadar.wasm.article_i32_compute.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "opcode_vocabulary_digest": "b458516f694c301a7b209bb6e710dfc4b7c2756a107738dd38a8fdc8b2dcd64c",
+          "artifact_digests": [
+            "c4890fba896571744c733020649137b706ae6a74248bf60e50ece5b96dc2d942",
+            "92da04743ad339fe42a2ce9e48ba20d88f0bc171e1ca4e6cc5ca8507a7dcc50e"
+          ]
+        },
+        "tassadar.surface": "benchmark",
+        "tassadar.wasm_conformance": {
+          "report_ref": "fixtures/tassadar/reports/tassadar_wasm_conformance_report.json",
+          "report_id": "tassadar.wasm_conformance.report.v1",
+          "reference_authority_id": "wasmi.reference.v1",
+          "case_family_ids": [
+            "curated.global_state",
+            "curated.call_indirect",
+            "curated.deterministic_import",
+            "curated.call_indirect_trap",
+            "curated.unsupported_host_import",
+            "generated.call_indirect",
+            "generated.call_indirect_trap",
+            "generated.global_state"
+          ]
+        }
+      }
+    },
+    "group": {
+      "group_ref": "group.tassadar.clrs_wasm_bridge",
+      "display_name": "Tassadar CLRS-to-Wasm Bridge",
+      "members": [
+        {
+          "member_ref": "tassadar_clrs_wasm_bridge_eval_member",
+          "pin_alias": "tassadar_clrs_wasm_bridge_eval",
+          "surfaces": [
+            "eval"
+          ],
+          "required_workloads": [
+            "online_eval",
+            "offline_eval"
+          ]
+        },
+        {
+          "member_ref": "tassadar_clrs_wasm_bridge_benchmark_member",
+          "pin_alias": "tassadar_clrs_wasm_bridge_benchmark",
+          "surfaces": [
+            "benchmark"
+          ],
+          "required_workloads": [
+            "validator_benchmark"
+          ],
+          "required_benchmark_profiles": [
+            "benchmark://openagents/tassadar/clrs_wasm_bridge/reference_fixture"
+          ]
+        }
+      ]
+    },
+    "eval_resolution": {
+      "group_ref": "group.tassadar.clrs_wasm_bridge",
+      "surface": "eval",
+      "members": [
+        {
+          "member_ref": "tassadar_clrs_wasm_bridge_eval_member",
+          "surface": "eval",
+          "package": {
+            "alias": "tassadar_clrs_wasm_bridge_eval",
+            "package_key": {
+              "environment_ref": "env.openagents.tassadar.clrs_wasm_bridge.eval",
+              "version": "2026.03.18"
+            },
+            "package_digest": "aa37ed7b12cc2935c08644dcadc9b1981777bbd2746c8e4296811fa139625317",
+            "supported_workloads": [
+              "online_eval",
+              "offline_eval"
+            ]
+          }
+        }
+      ],
+      "resolution_digest": "fcd4307a5ee8cab0039f4c9a5b6948b92c593f355ca786e2c51bd9a49b9860d9"
+    },
+    "benchmark_resolution": {
+      "group_ref": "group.tassadar.clrs_wasm_bridge",
+      "surface": "benchmark",
+      "members": [
+        {
+          "member_ref": "tassadar_clrs_wasm_bridge_benchmark_member",
+          "surface": "benchmark",
+          "package": {
+            "alias": "tassadar_clrs_wasm_bridge_benchmark",
+            "package_key": {
+              "environment_ref": "env.openagents.tassadar.clrs_wasm_bridge.benchmark",
+              "version": "2026.03.18"
+            },
+            "package_digest": "089e16bdef6238d730ae3950b0f4eb495003f413ba0019e9ef452780266778db",
+            "dependencies": [
+              {
+                "environment_ref": "env.openagents.tassadar.clrs_wasm_bridge.eval",
+                "version": "2026.03.18"
+              }
+            ],
+            "supported_workloads": [
+              "offline_eval",
+              "validator_benchmark"
+            ]
+          },
+          "benchmark_profiles": [
+            "benchmark://openagents/tassadar/clrs_wasm_bridge/reference_fixture"
+          ]
+        }
+      ],
+      "resolution_digest": "c1ee3bb0260331f4e98e7c24e30a0cf893093185b5e3356809bff69ebe7f2f8a"
+    },
+    "package_refs": {
+      "group_ref": "group.tassadar.clrs_wasm_bridge",
+      "eval_pin_alias": "tassadar_clrs_wasm_bridge_eval",
+      "benchmark_pin_alias": "tassadar_clrs_wasm_bridge_benchmark",
+      "eval_member_ref": "tassadar_clrs_wasm_bridge_eval_member",
+      "benchmark_member_ref": "tassadar_clrs_wasm_bridge_benchmark_member",
+      "program_corpus_ref": "tassadar://corpus/clrs_wasm_bridge.validation",
+      "io_contract_ref": "tassadar://io/exact_i32_sequence",
+      "rubric_binding_ref": "tassadar://rubric/exactness",
+      "eval_runtime_profile_ref": "runtime://tassadar/clrs_wasm_bridge/eval",
+      "benchmark_profile_ref": "benchmark://openagents/tassadar/clrs_wasm_bridge/reference_fixture",
+      "benchmark_runtime_profile_ref": "runtime://tassadar/clrs_wasm_bridge/benchmark"
+    },
+    "program_binding": {
+      "dataset": {
+        "dataset_ref": "dataset://openagents/tassadar/clrs_wasm_bridge",
+        "version": "2026.03.18"
+      },
+      "program_corpus_ref": "tassadar://corpus/clrs_wasm_bridge.validation",
+      "corpus_digest": "02ee9c589b5952beac29840cef7b64f0912814e6fe881462b8ce9dd673179c47",
+      "wasm_profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "trace_abi_id": "tassadar.trace.v1",
+      "trace_abi_version": 1,
+      "opcode_vocabulary_digest": "b458516f694c301a7b209bb6e710dfc4b7c2756a107738dd38a8fdc8b2dcd64c",
+      "artifact_digests": [
+        "c4890fba896571744c733020649137b706ae6a74248bf60e50ece5b96dc2d942",
+        "92da04743ad339fe42a2ce9e48ba20d88f0bc171e1ca4e6cc5ca8507a7dcc50e"
+      ]
+    },
+    "io_contract": {
+      "input_family": "no_external_input",
+      "output_family": "i32_sequence",
+      "output_element_type": "i32",
+      "deterministic_outputs": true
+    },
+    "exactness_contract": {
+      "require_final_output_exactness": true,
+      "require_step_exactness": true,
+      "require_halt_exactness": true,
+      "timeout_budget_ms": 15000,
+      "trace_budget_steps": 256,
+      "require_cpu_reference_baseline": true,
+      "require_reference_linear_baseline": true
+    },
+    "benchmark_package_set_binding": {
+      "package_set_ref": "benchmark-set://openagents/tassadar/public",
+      "package_set_version": "2026.03.18",
+      "supported_families": [
+        "clrs_subset"
+      ],
+      "axis_coverage": [
+        "exactness",
+        "length_generalization",
+        "planner_usefulness"
+      ],
+      "summary_report_ref": "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json"
+    },
+    "compile_pipeline_matrix_binding": {
+      "report_ref": "fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json",
+      "report_id": "tassadar.compile_pipeline_matrix_report.v1",
+      "source_family_ids": [
+        "wasm_text.multi_export_arithmetic",
+        "wasm_text.memory_lookup",
+        "wasm_text.param_abi",
+        "c_source.toolchain_unavailable"
+      ]
+    },
+    "wasm_conformance_binding": {
+      "report_ref": "fixtures/tassadar/reports/tassadar_wasm_conformance_report.json",
+      "report_id": "tassadar.wasm_conformance.report.v1",
+      "reference_authority_id": "wasmi.reference.v1",
+      "case_family_ids": [
+        "curated.global_state",
+        "curated.call_indirect",
+        "curated.deterministic_import",
+        "curated.call_indirect_trap",
+        "curated.unsupported_host_import",
+        "generated.call_indirect",
+        "generated.call_indirect_trap",
+        "generated.global_state"
+      ]
+    },
+    "clrs_wasm_bridge_binding": {
+      "bridge_ref": "benchmark-bridge://openagents/tassadar/clrs_wasm",
+      "bridge_version": "2026.03.18",
+      "supported_algorithms": [
+        "shortest_path"
+      ],
+      "trajectory_families": [
+        "sequential_relaxation",
+        "wavefront_relaxation"
+      ],
+      "length_buckets": [
+        "tiny",
+        "small"
+      ],
+      "report_ref": "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+    },
+    "current_workload_targets": [
+      "clrs_shortest_path"
+    ],
+    "planned_workload_targets": []
+  },
+  "benchmark_package": {
+    "abi_version": "psionic.benchmark.v1",
+    "key": {
+      "benchmark_ref": "benchmark://openagents/tassadar/clrs_wasm_bridge/reference_fixture",
+      "version": "2026.03.18"
+    },
+    "display_name": "Tassadar CLRS-to-Wasm Bridge",
+    "environment": {
+      "environment_ref": "env.openagents.tassadar.clrs_wasm_bridge.benchmark",
+      "version": "2026.03.18"
+    },
+    "dataset": {
+      "dataset_ref": "dataset://openagents/tassadar/clrs_wasm_bridge",
+      "version": "2026.03.18"
+    },
+    "split": "benchmark",
+    "repeat_count": 1,
+    "aggregation": "median_score",
+    "verification_policy": {
+      "require_timer_integrity": true,
+      "require_token_accounting": false,
+      "require_final_state_capture": true,
+      "require_execution_strategy": true
+    },
+    "cases": [
+      {
+        "case_id": "clrs_shortest_path_sequential",
+        "ordinal": 0,
+        "input_ref": "tassadar://input/clrs_shortest_path_sequential/none",
+        "expected_output_ref": "tassadar://expected_output/clrs_shortest_path_sequential",
+        "metadata": {
+          "algorithm_family": "shortest_path",
+          "trajectory_family": "sequential_relaxation",
+          "summary": "fixed shortest-path witness compiled as sequential relaxation over tiny and small graph buckets",
+          "source_ref": "fixtures/tassadar/sources/tassadar_clrs_shortest_path_sequential.wat",
+          "compile_receipt_digest": "e58560dfc265b660fbe1155e4a4beda5f3c6aa3d1da4287925d6a944c621d112",
+          "artifact_bundle_digest": "c4890fba896571744c733020649137b706ae6a74248bf60e50ece5b96dc2d942",
+          "exports": [
+            {
+              "length_bucket": "tiny",
+              "export_name": "distance_tiny",
+              "exact_outputs": [
+                5
+              ],
+              "module_trace_steps": 13,
+              "cpu_reference_cost_units": 169,
+              "exactness_bps": 10000
+            },
+            {
+              "length_bucket": "small",
+              "export_name": "distance_small",
+              "exact_outputs": [
+                11
+              ],
+              "module_trace_steps": 19,
+              "cpu_reference_cost_units": 361,
+              "exactness_bps": 10000
+            }
+          ],
+          "trace_budget_steps": 256,
+          "timeout_budget_ms": 15000
+        }
+      },
+      {
+        "case_id": "clrs_shortest_path_wavefront",
+        "ordinal": 1,
+        "input_ref": "tassadar://input/clrs_shortest_path_wavefront/none",
+        "expected_output_ref": "tassadar://expected_output/clrs_shortest_path_wavefront",
+        "metadata": {
+          "algorithm_family": "shortest_path",
+          "trajectory_family": "wavefront_relaxation",
+          "summary": "fixed shortest-path witness compiled as wavefront relaxation over the same tiny and small graph buckets",
+          "source_ref": "fixtures/tassadar/sources/tassadar_clrs_shortest_path_wavefront.wat",
+          "compile_receipt_digest": "51ef4ed52cb93a54d5752d93330bd94ca974b1d765e9c7ccd6563d2ffcde0c3e",
+          "artifact_bundle_digest": "92da04743ad339fe42a2ce9e48ba20d88f0bc171e1ca4e6cc5ca8507a7dcc50e",
+          "exports": [
+            {
+              "length_bucket": "tiny",
+              "export_name": "distance_tiny",
+              "exact_outputs": [
+                5
+              ],
+              "module_trace_steps": 5,
+              "cpu_reference_cost_units": 25,
+              "exactness_bps": 10000
+            },
+            {
+              "length_bucket": "small",
+              "export_name": "distance_small",
+              "exact_outputs": [
+                11
+              ],
+              "module_trace_steps": 13,
+              "cpu_reference_cost_units": 169,
+              "exactness_bps": 10000
+            }
+          ],
+          "trace_budget_steps": 256,
+          "timeout_budget_ms": 15000
+        }
+      }
+    ],
+    "metadata": {
+      "tassadar.clrs_wasm_bridge_ref": "benchmark-bridge://openagents/tassadar/clrs_wasm",
+      "tassadar.corpus_digest": "02ee9c589b5952beac29840cef7b64f0912814e6fe881462b8ce9dd673179c47",
+      "tassadar.current_workload_targets": [
+        "clrs_shortest_path"
+      ]
+    }
+  },
+  "cases": [
+    {
+      "case_id": "clrs_shortest_path_sequential",
+      "algorithm_family": "shortest_path",
+      "trajectory_family": "sequential_relaxation",
+      "summary": "fixed shortest-path witness compiled as sequential relaxation over tiny and small graph buckets",
+      "source_ref": "fixtures/tassadar/sources/tassadar_clrs_shortest_path_sequential.wat",
+      "source_kind": "wasm_text",
+      "source_digest": "e8647902caaac50f1ccfa84a58ab26efdc266808dc0805b408d0f02f8a2aab73",
+      "compile_config_digest": "5c179b53abfec4ff32bb983c53dedf796559cd6d46d777a0ce7edacea6da9794",
+      "compile_receipt_digest": "e58560dfc265b660fbe1155e4a4beda5f3c6aa3d1da4287925d6a944c621d112",
+      "toolchain_digest": "5fd796dab07b3a4cb159cb1db8ed566e06672aab242ed541cb551fa8f20158c8",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_clrs_shortest_path_sequential.wasm",
+      "wasm_binary_digest": "5c34cab99a6459bf403051d85f5f159103a1299cc42e43ed4259e371ad7422a3",
+      "wasm_binary_summary": {
+        "byte_len": 119,
+        "exported_functions": [
+          "distance_small",
+          "distance_tiny"
+        ],
+        "function_count": 2,
+        "imported_function_count": 0,
+        "memory_count": 0,
+        "custom_sections": []
+      },
+      "normalized_module_digest": "9ae73a949527370e8fb917153ff9645dde523698e2228b3980c51ac2018a31ab",
+      "artifact_bundle_digest": "c4890fba896571744c733020649137b706ae6a74248bf60e50ece5b96dc2d942",
+      "exports": [
+        {
+          "length_bucket": "tiny",
+          "export_name": "distance_tiny",
+          "exact_outputs": [
+            5
+          ],
+          "module_trace_steps": 13,
+          "cpu_reference_cost_units": 169,
+          "exactness_bps": 10000
+        },
+        {
+          "length_bucket": "small",
+          "export_name": "distance_small",
+          "exact_outputs": [
+            11
+          ],
+          "module_trace_steps": 19,
+          "cpu_reference_cost_units": 361,
+          "exactness_bps": 10000
+        }
+      ]
+    },
+    {
+      "case_id": "clrs_shortest_path_wavefront",
+      "algorithm_family": "shortest_path",
+      "trajectory_family": "wavefront_relaxation",
+      "summary": "fixed shortest-path witness compiled as wavefront relaxation over the same tiny and small graph buckets",
+      "source_ref": "fixtures/tassadar/sources/tassadar_clrs_shortest_path_wavefront.wat",
+      "source_kind": "wasm_text",
+      "source_digest": "5fd8990fd100152c5d227c027388ee837c1b43023be17ed9831dc00af29da767",
+      "compile_config_digest": "5c179b53abfec4ff32bb983c53dedf796559cd6d46d777a0ce7edacea6da9794",
+      "compile_receipt_digest": "51ef4ed52cb93a54d5752d93330bd94ca974b1d765e9c7ccd6563d2ffcde0c3e",
+      "toolchain_digest": "5fd796dab07b3a4cb159cb1db8ed566e06672aab242ed541cb551fa8f20158c8",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_clrs_shortest_path_wavefront.wasm",
+      "wasm_binary_digest": "e17d3ee4ebc19e35ba6f795ee8d28b66812cf3c2449354040ff4ad27a90975fd",
+      "wasm_binary_summary": {
+        "byte_len": 91,
+        "exported_functions": [
+          "distance_small",
+          "distance_tiny"
+        ],
+        "function_count": 2,
+        "imported_function_count": 0,
+        "memory_count": 0,
+        "custom_sections": []
+      },
+      "normalized_module_digest": "d0780898bbdd09182b70563d54779f91d139d8c83a0cf03faa70ccb08d74b8d9",
+      "artifact_bundle_digest": "92da04743ad339fe42a2ce9e48ba20d88f0bc171e1ca4e6cc5ca8507a7dcc50e",
+      "exports": [
+        {
+          "length_bucket": "tiny",
+          "export_name": "distance_tiny",
+          "exact_outputs": [
+            5
+          ],
+          "module_trace_steps": 5,
+          "cpu_reference_cost_units": 25,
+          "exactness_bps": 10000
+        },
+        {
+          "length_bucket": "small",
+          "export_name": "distance_small",
+          "exact_outputs": [
+            11
+          ],
+          "module_trace_steps": 13,
+          "cpu_reference_cost_units": 169,
+          "exactness_bps": 10000
+        }
+      ]
+    }
+  ],
+  "trajectory_comparisons": [
+    {
+      "algorithm_family": "shortest_path",
+      "length_bucket": "tiny",
+      "sequential_case_id": "clrs_shortest_path_sequential",
+      "alternative_case_id": "clrs_shortest_path_wavefront",
+      "output_exact_match": true,
+      "sequential_trace_steps": 13,
+      "alternative_trace_steps": 5,
+      "trajectory_step_delta": -8,
+      "sequential_cpu_reference_cost_units": 169,
+      "alternative_cpu_reference_cost_units": 25,
+      "cpu_reference_cost_delta": -144
+    },
+    {
+      "algorithm_family": "shortest_path",
+      "length_bucket": "small",
+      "sequential_case_id": "clrs_shortest_path_sequential",
+      "alternative_case_id": "clrs_shortest_path_wavefront",
+      "output_exact_match": true,
+      "sequential_trace_steps": 19,
+      "alternative_trace_steps": 13,
+      "trajectory_step_delta": -6,
+      "sequential_cpu_reference_cost_units": 361,
+      "alternative_cpu_reference_cost_units": 169,
+      "cpu_reference_cost_delta": -192
+    }
+  ],
+  "length_generalization_matrix": [
+    {
+      "algorithm_family": "shortest_path",
+      "trajectory_family": "sequential_relaxation",
+      "length_bucket": "tiny",
+      "exactness_bps": 10000,
+      "module_trace_steps": 13,
+      "cpu_reference_cost_units": 169
+    },
+    {
+      "algorithm_family": "shortest_path",
+      "trajectory_family": "sequential_relaxation",
+      "length_bucket": "small",
+      "exactness_bps": 10000,
+      "module_trace_steps": 19,
+      "cpu_reference_cost_units": 361
+    },
+    {
+      "algorithm_family": "shortest_path",
+      "trajectory_family": "wavefront_relaxation",
+      "length_bucket": "tiny",
+      "exactness_bps": 10000,
+      "module_trace_steps": 5,
+      "cpu_reference_cost_units": 25
+    },
+    {
+      "algorithm_family": "shortest_path",
+      "trajectory_family": "wavefront_relaxation",
+      "length_bucket": "small",
+      "exactness_bps": 10000,
+      "module_trace_steps": 13,
+      "cpu_reference_cost_units": 169
+    }
+  ],
+  "generated_from_refs": [
+    "fixtures/tassadar/sources/tassadar_clrs_shortest_path_sequential.wat",
+    "fixtures/tassadar/sources/tassadar_clrs_shortest_path_wavefront.wat"
+  ],
+  "claim_boundary": "this report freezes one benchmark-bound CLRS-to-Wasm bridge over fixed shortest-path witnesses compiled into the current bounded Wasm lane, with sequential versus wavefront trajectory families and tiny versus small length buckets kept explicit. It does not claim full CLRS coverage, arbitrary Wasm closure, or learned transfer by itself",
+  "report_digest": "ced8cfdf1a6656a984f2a2f5e722b7d96d34ad31203f858c909bc7b15f1352f5"
+}

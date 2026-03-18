@@ -821,6 +821,19 @@ The current scope is:
   lane keeps masked access bounded and refuses broader address regimes instead
   of implying compiled exactness, arbitrary pointer arithmetic, or arbitrary
   Wasm closure
+- landed CLRS-to-Wasm bridge follow-on: `psionic-data` now owns a public
+  `TassadarClrsWasmBridgeContract` for a benchmark-bound CLRS shortest-path
+  bridge with explicit sequential-versus-wavefront trajectory families and
+  tiny-versus-small length buckets, `psionic-environments` now binds that
+  bridge into the public Tassadar environment bundle as an optional
+  `TassadarClrsWasmBridgeBinding`, `psionic-compiler` now publishes
+  deterministic CLRS bridge case specs plus a repo-facing WAT -> Wasm ->
+  bounded-artifact helper over the committed shortest-path fixtures, and
+  `psionic-eval` now freezes the committed report at
+  `fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json`; the lane
+  is a literature-facing benchmark bridge over fixed shortest-path witnesses,
+  not a claim of full CLRS coverage, arbitrary Wasm closure, or learned
+  transfer
 - landed Phase 9D bar: typed learned-plus-compiled and learned-circuit
   research in `psionic-research`, with explicit research-line,
   instruction-set, execution-proxy, claim-boundary, and proof-expectation

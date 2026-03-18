@@ -969,6 +969,7 @@ fn build_tassadar_compiled_kernel_suite_environment_bundle(
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
         module_scale_workload_suite_binding: None,
+        clrs_wasm_bridge_binding: None,
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/compiled_kernel_suite/eval/verification"),

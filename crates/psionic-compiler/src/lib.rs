@@ -1,5 +1,6 @@
 //! Lowering and scheduling boundaries for Psionic.
 
+mod tassadar_clrs_wasm_bridge;
 mod tassadar_sparse_rule_audit;
 mod tassadar_symbolic;
 mod tassadar_structured_control;
@@ -27,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+pub use tassadar_clrs_wasm_bridge::*;
 pub use tassadar_sparse_rule_audit::*;
 pub use tassadar_symbolic::*;
 pub use tassadar_structured_control::*;

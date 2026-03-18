@@ -1690,6 +1690,7 @@ fn build_tassadar_environment_bundle(
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
         module_scale_workload_suite_binding: None,
+        clrs_wasm_bridge_binding: None,
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/eval/verification"),
@@ -1918,6 +1919,7 @@ fn build_tassadar_article_class_environment_bundle(
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
         module_scale_workload_suite_binding: None,
+        clrs_wasm_bridge_binding: None,
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/article_class/eval/verification"),
@@ -2165,6 +2167,7 @@ fn build_tassadar_sudoku_9x9_environment_bundle(
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
         module_scale_workload_suite_binding: None,
+        clrs_wasm_bridge_binding: None,
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/sudoku_9x9/eval/verification"),
@@ -2401,6 +2404,7 @@ fn build_tassadar_hungarian_v0_environment_bundle(
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
         module_scale_workload_suite_binding: None,
+        clrs_wasm_bridge_binding: None,
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/hungarian_v0/eval/verification"),
@@ -2638,6 +2642,7 @@ fn build_tassadar_hungarian_10x10_environment_bundle(
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
         module_scale_workload_suite_binding: None,
+        clrs_wasm_bridge_binding: None,
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/hungarian_10x10/eval/verification"),

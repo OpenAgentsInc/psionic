@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use psionic_datastream::{DatastreamEncoding, DatastreamManifest, DatastreamSubjectKind};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -25,6 +25,8 @@ pub const TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION: &str =
     "psionic.tassadar.numeric_opcode_ladder.v1";
 /// Stable ABI version for Tassadar trace-family-set contracts.
 pub const TASSADAR_TRACE_FAMILY_SET_ABI_VERSION: &str = "psionic.tassadar.trace_family_set.v1";
+/// Stable ABI version for CLRS-to-Wasm bridge contracts.
+pub const TASSADAR_CLRS_WASM_BRIDGE_ABI_VERSION: &str = "psionic.tassadar.clrs_wasm_bridge.v1";
 
 /// Benchmark-family taxonomy for the public Tassadar package set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -52,6 +54,34 @@ pub enum TassadarBenchmarkAxis {
     LengthGeneralization,
     /// Whether the family is useful for planner or route selection rather than only systems work.
     PlannerUsefulness,
+}
+
+/// CLRS algorithm family carried by the public CLRS-to-Wasm bridge.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarClrsAlgorithmFamily {
+    /// Bounded shortest-path witnesses rooted in the current seeded CLRS lane.
+    ShortestPath,
+}
+
+/// Trajectory family used by one CLRS-to-Wasm bridge case.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarClrsTrajectoryFamily {
+    /// Textbook-style sequential relaxation over one fixed witness graph.
+    SequentialRelaxation,
+    /// Wavefront-style aggregate relaxation over the same fixed witness graph.
+    WavefrontRelaxation,
+}
+
+/// Length bucket surfaced by one CLRS-to-Wasm bridge export.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarClrsLengthBucket {
+    /// Tiny fixed witness graph.
+    Tiny,
+    /// Small fixed witness graph.
+    Small,
 }
 
 /// Module-scale deterministic Wasm workload family tracked by the public suite.
@@ -715,7 +745,9 @@ pub enum TassadarBenchmarkPackageSetError {
         family: TassadarBenchmarkFamily,
     },
     /// Family has no packages.
-    #[error("Tassadar benchmark family `{family:?}` must reference at least one benchmark package")]
+    #[error(
+        "Tassadar benchmark family `{family:?}` must reference at least one benchmark package"
+    )]
     MissingBenchmarkPackages {
         /// Benchmark family.
         family: TassadarBenchmarkFamily,
@@ -1012,6 +1044,427 @@ pub enum TassadarModuleScaleWorkloadSuiteError {
         case_id: String,
         /// Undeclared family.
         family: TassadarModuleScaleWorkloadFamily,
+    },
+}
+
+/// One length-bucket export carried by a CLRS-to-Wasm bridge case.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarClrsWasmBridgeExportContract {
+    /// Stable length bucket.
+    pub length_bucket: TassadarClrsLengthBucket,
+    /// Export symbol implementing the bucket.
+    pub export_name: String,
+}
+
+impl TassadarClrsWasmBridgeExportContract {
+    fn validate(&self, case_id: &str) -> Result<(), TassadarClrsWasmBridgeError> {
+        if self.export_name.trim().is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingExportName {
+                case_id: String::from(case_id),
+                length_bucket: self.length_bucket,
+            });
+        }
+        Ok(())
+    }
+}
+
+/// One public CLRS-to-Wasm bridge case.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarClrsWasmBridgeCaseContract {
+    /// Stable case identifier.
+    pub case_id: String,
+    /// CLRS algorithm family.
+    pub algorithm_family: TassadarClrsAlgorithmFamily,
+    /// Trajectory family represented by the module.
+    pub trajectory_family: TassadarClrsTrajectoryFamily,
+    /// Human-readable case summary.
+    pub summary: String,
+    /// Repo-relative source ref for the module.
+    pub source_ref: String,
+    /// Length-bucket exports implemented by the module.
+    pub export_bindings: Vec<TassadarClrsWasmBridgeExportContract>,
+}
+
+impl TassadarClrsWasmBridgeCaseContract {
+    fn validate(
+        &self,
+        supported_algorithms: &BTreeSet<TassadarClrsAlgorithmFamily>,
+        supported_trajectories: &BTreeSet<TassadarClrsTrajectoryFamily>,
+        supported_length_buckets: &BTreeSet<TassadarClrsLengthBucket>,
+    ) -> Result<(), TassadarClrsWasmBridgeError> {
+        if self.case_id.trim().is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingCaseId);
+        }
+        if self.summary.trim().is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingCaseSummary {
+                case_id: self.case_id.clone(),
+            });
+        }
+        if self.source_ref.trim().is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingCaseSourceRef {
+                case_id: self.case_id.clone(),
+            });
+        }
+        if !supported_algorithms.contains(&self.algorithm_family) {
+            return Err(TassadarClrsWasmBridgeError::CaseAlgorithmNotDeclared {
+                case_id: self.case_id.clone(),
+                algorithm_family: self.algorithm_family,
+            });
+        }
+        if !supported_trajectories.contains(&self.trajectory_family) {
+            return Err(TassadarClrsWasmBridgeError::CaseTrajectoryNotDeclared {
+                case_id: self.case_id.clone(),
+                trajectory_family: self.trajectory_family,
+            });
+        }
+        if self.export_bindings.is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingCaseExports {
+                case_id: self.case_id.clone(),
+            });
+        }
+
+        let mut seen_length_buckets = BTreeSet::new();
+        for export in &self.export_bindings {
+            if !supported_length_buckets.contains(&export.length_bucket) {
+                return Err(TassadarClrsWasmBridgeError::ExportLengthBucketNotDeclared {
+                    case_id: self.case_id.clone(),
+                    length_bucket: export.length_bucket,
+                });
+            }
+            export.validate(self.case_id.as_str())?;
+            if !seen_length_buckets.insert(export.length_bucket) {
+                return Err(
+                    TassadarClrsWasmBridgeError::DuplicateCaseExportLengthBucket {
+                        case_id: self.case_id.clone(),
+                        length_bucket: export.length_bucket,
+                    },
+                );
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Public contract for the literature-facing CLRS-to-Wasm bridge.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarClrsWasmBridgeContract {
+    /// Stable ABI version.
+    pub abi_version: String,
+    /// Stable bridge reference.
+    pub bridge_ref: String,
+    /// Immutable bridge version.
+    pub version: String,
+    /// Stable benchmark reference bound to the bridge.
+    pub benchmark_ref: String,
+    /// Stable benchmark environment reference bound to the bridge.
+    pub environment_ref: String,
+    /// CLRS algorithm families currently represented.
+    pub supported_algorithms: Vec<TassadarClrsAlgorithmFamily>,
+    /// Trajectory families currently represented.
+    pub trajectory_families: Vec<TassadarClrsTrajectoryFamily>,
+    /// Length buckets currently represented.
+    pub length_buckets: Vec<TassadarClrsLengthBucket>,
+    /// Evaluation axes published by the committed report.
+    pub evaluation_axes: Vec<String>,
+    /// Explicit bridge cases.
+    pub cases: Vec<TassadarClrsWasmBridgeCaseContract>,
+    /// Canonical machine-readable report ref for the bridge.
+    pub report_ref: String,
+}
+
+impl TassadarClrsWasmBridgeContract {
+    /// Creates and validates a CLRS-to-Wasm bridge contract.
+    pub fn new(
+        bridge_ref: impl Into<String>,
+        version: impl Into<String>,
+        benchmark_ref: impl Into<String>,
+        environment_ref: impl Into<String>,
+        supported_algorithms: Vec<TassadarClrsAlgorithmFamily>,
+        trajectory_families: Vec<TassadarClrsTrajectoryFamily>,
+        length_buckets: Vec<TassadarClrsLengthBucket>,
+        evaluation_axes: Vec<String>,
+        cases: Vec<TassadarClrsWasmBridgeCaseContract>,
+        report_ref: impl Into<String>,
+    ) -> Result<Self, TassadarClrsWasmBridgeError> {
+        let contract = Self {
+            abi_version: String::from(TASSADAR_CLRS_WASM_BRIDGE_ABI_VERSION),
+            bridge_ref: bridge_ref.into(),
+            version: version.into(),
+            benchmark_ref: benchmark_ref.into(),
+            environment_ref: environment_ref.into(),
+            supported_algorithms,
+            trajectory_families,
+            length_buckets,
+            evaluation_axes,
+            cases,
+            report_ref: report_ref.into(),
+        };
+        contract.validate()?;
+        Ok(contract)
+    }
+
+    /// Validates the bridge contract.
+    pub fn validate(&self) -> Result<(), TassadarClrsWasmBridgeError> {
+        if self.abi_version != TASSADAR_CLRS_WASM_BRIDGE_ABI_VERSION {
+            return Err(TassadarClrsWasmBridgeError::UnsupportedAbiVersion {
+                abi_version: self.abi_version.clone(),
+            });
+        }
+        if self.bridge_ref.trim().is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingBridgeRef);
+        }
+        if self.version.trim().is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingBridgeVersion);
+        }
+        if self.benchmark_ref.trim().is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingBenchmarkRef);
+        }
+        if self.environment_ref.trim().is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingEnvironmentRef);
+        }
+        if self.supported_algorithms.is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingAlgorithms);
+        }
+        if self.trajectory_families.is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingTrajectoryFamilies);
+        }
+        if self.length_buckets.is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingLengthBuckets);
+        }
+        if self.evaluation_axes.is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingEvaluationAxes);
+        }
+        if self.cases.is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingCases);
+        }
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarClrsWasmBridgeError::MissingReportRef);
+        }
+
+        let mut seen_algorithms = BTreeSet::new();
+        for algorithm in &self.supported_algorithms {
+            if !seen_algorithms.insert(*algorithm) {
+                return Err(TassadarClrsWasmBridgeError::DuplicateAlgorithm {
+                    algorithm_family: *algorithm,
+                });
+            }
+        }
+        let mut seen_trajectories = BTreeSet::new();
+        for trajectory in &self.trajectory_families {
+            if !seen_trajectories.insert(*trajectory) {
+                return Err(TassadarClrsWasmBridgeError::DuplicateTrajectoryFamily {
+                    trajectory_family: *trajectory,
+                });
+            }
+        }
+        let mut seen_length_buckets = BTreeSet::new();
+        for length_bucket in &self.length_buckets {
+            if !seen_length_buckets.insert(*length_bucket) {
+                return Err(TassadarClrsWasmBridgeError::DuplicateLengthBucket {
+                    length_bucket: *length_bucket,
+                });
+            }
+        }
+        let mut seen_axes = BTreeSet::new();
+        for axis in &self.evaluation_axes {
+            if axis.trim().is_empty() {
+                return Err(TassadarClrsWasmBridgeError::MissingEvaluationAxis);
+            }
+            if !seen_axes.insert(axis.clone()) {
+                return Err(TassadarClrsWasmBridgeError::DuplicateEvaluationAxis {
+                    axis: axis.clone(),
+                });
+            }
+        }
+
+        let supported_algorithms = self.supported_algorithms.iter().copied().collect();
+        let supported_trajectories = self.trajectory_families.iter().copied().collect();
+        let supported_length_buckets = self.length_buckets.iter().copied().collect();
+        let mut seen_case_ids = BTreeSet::new();
+        let mut seen_algorithm_trajectories = BTreeSet::new();
+        for case in &self.cases {
+            case.validate(
+                &supported_algorithms,
+                &supported_trajectories,
+                &supported_length_buckets,
+            )?;
+            if !seen_case_ids.insert(case.case_id.clone()) {
+                return Err(TassadarClrsWasmBridgeError::DuplicateCaseId {
+                    case_id: case.case_id.clone(),
+                });
+            }
+            if !seen_algorithm_trajectories.insert((case.algorithm_family, case.trajectory_family))
+            {
+                return Err(TassadarClrsWasmBridgeError::DuplicateCaseTrajectory {
+                    algorithm_family: case.algorithm_family,
+                    trajectory_family: case.trajectory_family,
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Returns a stable digest over the contract.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        stable_digest(b"psionic_tassadar_clrs_wasm_bridge_contract|", self)
+    }
+}
+
+/// CLRS-to-Wasm bridge validation failure.
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum TassadarClrsWasmBridgeError {
+    /// Unsupported ABI version.
+    #[error("unsupported Tassadar CLRS-to-Wasm bridge ABI version `{abi_version}`")]
+    UnsupportedAbiVersion {
+        /// Observed ABI version.
+        abi_version: String,
+    },
+    /// Missing bridge ref.
+    #[error("Tassadar CLRS-to-Wasm bridge is missing `bridge_ref`")]
+    MissingBridgeRef,
+    /// Missing bridge version.
+    #[error("Tassadar CLRS-to-Wasm bridge is missing `version`")]
+    MissingBridgeVersion,
+    /// Missing benchmark ref.
+    #[error("Tassadar CLRS-to-Wasm bridge is missing `benchmark_ref`")]
+    MissingBenchmarkRef,
+    /// Missing environment ref.
+    #[error("Tassadar CLRS-to-Wasm bridge is missing `environment_ref`")]
+    MissingEnvironmentRef,
+    /// Missing algorithms.
+    #[error("Tassadar CLRS-to-Wasm bridge must declare at least one algorithm family")]
+    MissingAlgorithms,
+    /// Missing trajectory families.
+    #[error("Tassadar CLRS-to-Wasm bridge must declare at least one trajectory family")]
+    MissingTrajectoryFamilies,
+    /// Missing length buckets.
+    #[error("Tassadar CLRS-to-Wasm bridge must declare at least one length bucket")]
+    MissingLengthBuckets,
+    /// Missing evaluation axes.
+    #[error("Tassadar CLRS-to-Wasm bridge must declare evaluation axes")]
+    MissingEvaluationAxes,
+    /// One evaluation axis was empty.
+    #[error("Tassadar CLRS-to-Wasm bridge contains an empty evaluation axis")]
+    MissingEvaluationAxis,
+    /// Missing cases.
+    #[error("Tassadar CLRS-to-Wasm bridge must declare at least one case")]
+    MissingCases,
+    /// Missing report ref.
+    #[error("Tassadar CLRS-to-Wasm bridge is missing `report_ref`")]
+    MissingReportRef,
+    /// One algorithm repeated.
+    #[error("Tassadar CLRS-to-Wasm bridge repeated algorithm family `{algorithm_family:?}`")]
+    DuplicateAlgorithm {
+        /// Repeated algorithm family.
+        algorithm_family: TassadarClrsAlgorithmFamily,
+    },
+    /// One trajectory family repeated.
+    #[error("Tassadar CLRS-to-Wasm bridge repeated trajectory family `{trajectory_family:?}`")]
+    DuplicateTrajectoryFamily {
+        /// Repeated trajectory family.
+        trajectory_family: TassadarClrsTrajectoryFamily,
+    },
+    /// One length bucket repeated.
+    #[error("Tassadar CLRS-to-Wasm bridge repeated length bucket `{length_bucket:?}`")]
+    DuplicateLengthBucket {
+        /// Repeated length bucket.
+        length_bucket: TassadarClrsLengthBucket,
+    },
+    /// One evaluation axis repeated.
+    #[error("Tassadar CLRS-to-Wasm bridge repeated evaluation axis `{axis}`")]
+    DuplicateEvaluationAxis {
+        /// Repeated evaluation axis.
+        axis: String,
+    },
+    /// Missing case identifier.
+    #[error("Tassadar CLRS-to-Wasm bridge case is missing `case_id`")]
+    MissingCaseId,
+    /// Missing case summary.
+    #[error("Tassadar CLRS-to-Wasm bridge case `{case_id}` is missing `summary`")]
+    MissingCaseSummary {
+        /// Case identifier.
+        case_id: String,
+    },
+    /// Missing case source ref.
+    #[error("Tassadar CLRS-to-Wasm bridge case `{case_id}` is missing `source_ref`")]
+    MissingCaseSourceRef {
+        /// Case identifier.
+        case_id: String,
+    },
+    /// Missing case exports.
+    #[error("Tassadar CLRS-to-Wasm bridge case `{case_id}` must declare exports")]
+    MissingCaseExports {
+        /// Case identifier.
+        case_id: String,
+    },
+    /// One case algorithm was not declared globally.
+    #[error(
+        "Tassadar CLRS-to-Wasm bridge case `{case_id}` uses undeclared algorithm family `{algorithm_family:?}`"
+    )]
+    CaseAlgorithmNotDeclared {
+        /// Case identifier.
+        case_id: String,
+        /// Undeclared algorithm family.
+        algorithm_family: TassadarClrsAlgorithmFamily,
+    },
+    /// One case trajectory was not declared globally.
+    #[error(
+        "Tassadar CLRS-to-Wasm bridge case `{case_id}` uses undeclared trajectory family `{trajectory_family:?}`"
+    )]
+    CaseTrajectoryNotDeclared {
+        /// Case identifier.
+        case_id: String,
+        /// Undeclared trajectory family.
+        trajectory_family: TassadarClrsTrajectoryFamily,
+    },
+    /// One export length bucket was not declared globally.
+    #[error(
+        "Tassadar CLRS-to-Wasm bridge case `{case_id}` uses undeclared length bucket `{length_bucket:?}`"
+    )]
+    ExportLengthBucketNotDeclared {
+        /// Case identifier.
+        case_id: String,
+        /// Undeclared length bucket.
+        length_bucket: TassadarClrsLengthBucket,
+    },
+    /// One export name was missing.
+    #[error(
+        "Tassadar CLRS-to-Wasm bridge case `{case_id}` is missing export name for length bucket `{length_bucket:?}`"
+    )]
+    MissingExportName {
+        /// Case identifier.
+        case_id: String,
+        /// Length bucket.
+        length_bucket: TassadarClrsLengthBucket,
+    },
+    /// One case identifier repeated.
+    #[error("Tassadar CLRS-to-Wasm bridge repeated case `{case_id}`")]
+    DuplicateCaseId {
+        /// Repeated case identifier.
+        case_id: String,
+    },
+    /// One algorithm/trajectory pair repeated.
+    #[error(
+        "Tassadar CLRS-to-Wasm bridge repeated case trajectory `{algorithm_family:?}` / `{trajectory_family:?}`"
+    )]
+    DuplicateCaseTrajectory {
+        /// Algorithm family.
+        algorithm_family: TassadarClrsAlgorithmFamily,
+        /// Trajectory family.
+        trajectory_family: TassadarClrsTrajectoryFamily,
+    },
+    /// One case repeated a length bucket.
+    #[error(
+        "Tassadar CLRS-to-Wasm bridge case `{case_id}` repeated length bucket `{length_bucket:?}`"
+    )]
+    DuplicateCaseExportLengthBucket {
+        /// Case identifier.
+        case_id: String,
+        /// Repeated length bucket.
+        length_bucket: TassadarClrsLengthBucket,
     },
 }
 
@@ -1492,12 +1945,10 @@ impl TassadarSequenceDatasetContract {
 
             manifest.metadata.insert(
                 format!("tassadar.{}.sequence_ids", split_name),
-                json!(
-                    split_examples
-                        .iter()
-                        .map(|example| example.sequence_id.clone())
-                        .collect::<Vec<_>>()
-                ),
+                json!(split_examples
+                    .iter()
+                    .map(|example| example.sequence_id.clone())
+                    .collect::<Vec<_>>()),
             );
         }
 
@@ -1774,19 +2225,22 @@ mod tests {
     use serde_json::Value;
 
     use super::{
-        TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION,
-        TASSADAR_MODULE_SCALE_WORKLOAD_SUITE_ABI_VERSION,
-        TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION, TASSADAR_SEQUENCE_DATASET_ABI_VERSION,
-        TASSADAR_TRACE_FAMILY_SET_ABI_VERSION, TassadarBenchmarkAxis, TassadarBenchmarkFamily,
+        tassadar_numeric_opcode_ladder_contract, TassadarBenchmarkAxis, TassadarBenchmarkFamily,
         TassadarBenchmarkFamilyContract, TassadarBenchmarkPackageBinding,
-        TassadarBenchmarkPackageSetContract, TassadarModuleScaleWorkloadCaseContract,
-        TassadarModuleScaleWorkloadFamily, TassadarModuleScaleWorkloadStatus,
-        TassadarModuleScaleWorkloadSuiteContract, TassadarNumericOpcodeFamily,
-        TassadarNumericOpcodeFamilyStatus, TassadarNumericOpcodeLadderContract,
-        TassadarSequenceDatasetContract, TassadarSequenceExample, TassadarSequenceExampleMetadata,
-        TassadarSequenceSplit, TassadarTraceFamilyAuthorityScope, TassadarTraceFamilyContract,
+        TassadarBenchmarkPackageSetContract, TassadarClrsAlgorithmFamily, TassadarClrsLengthBucket,
+        TassadarClrsTrajectoryFamily, TassadarClrsWasmBridgeCaseContract,
+        TassadarClrsWasmBridgeContract, TassadarClrsWasmBridgeExportContract,
+        TassadarModuleScaleWorkloadCaseContract, TassadarModuleScaleWorkloadFamily,
+        TassadarModuleScaleWorkloadStatus, TassadarModuleScaleWorkloadSuiteContract,
+        TassadarNumericOpcodeFamily, TassadarNumericOpcodeFamilyStatus,
+        TassadarNumericOpcodeLadderContract, TassadarSequenceDatasetContract,
+        TassadarSequenceExample, TassadarSequenceExampleMetadata, TassadarSequenceSplit,
+        TassadarTraceFamilyAuthorityScope, TassadarTraceFamilyContract,
         TassadarTraceFamilySetContract, TassadarTraceFamilyTopology,
-        TassadarTraceFamilyWorkloadBinding, tassadar_numeric_opcode_ladder_contract,
+        TassadarTraceFamilyWorkloadBinding, TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION,
+        TASSADAR_CLRS_WASM_BRIDGE_ABI_VERSION, TASSADAR_MODULE_SCALE_WORKLOAD_SUITE_ABI_VERSION,
+        TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION, TASSADAR_SEQUENCE_DATASET_ABI_VERSION,
+        TASSADAR_TRACE_FAMILY_SET_ABI_VERSION,
     };
     use crate::{DatasetKey, TokenizerDigest, TokenizerFamily};
 
@@ -1925,6 +2379,81 @@ mod tests {
             TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION
         );
         assert_eq!(contract.families.len(), 2);
+        assert!(!contract.stable_digest().is_empty());
+    }
+
+    #[test]
+    fn clrs_wasm_bridge_contract_is_machine_legible() {
+        let contract = TassadarClrsWasmBridgeContract::new(
+            "benchmark-bridge://openagents/tassadar/clrs_wasm",
+            "2026.03.18",
+            "benchmark://openagents/tassadar/clrs_wasm_bridge/reference_fixture",
+            "env.openagents.tassadar.clrs_wasm_bridge.benchmark",
+            vec![TassadarClrsAlgorithmFamily::ShortestPath],
+            vec![
+                TassadarClrsTrajectoryFamily::SequentialRelaxation,
+                TassadarClrsTrajectoryFamily::WavefrontRelaxation,
+            ],
+            vec![
+                TassadarClrsLengthBucket::Tiny,
+                TassadarClrsLengthBucket::Small,
+            ],
+            vec![
+                String::from("exactness_bps"),
+                String::from("module_trace_steps"),
+                String::from("cpu_reference_cost_units"),
+                String::from("trajectory_step_delta"),
+            ],
+            vec![
+                TassadarClrsWasmBridgeCaseContract {
+                    case_id: String::from("clrs_shortest_path_sequential"),
+                    algorithm_family: TassadarClrsAlgorithmFamily::ShortestPath,
+                    trajectory_family: TassadarClrsTrajectoryFamily::SequentialRelaxation,
+                    summary: String::from(
+                        "fixed shortest-path witness compiled as sequential relaxation",
+                    ),
+                    source_ref: String::from(
+                        "fixtures/tassadar/sources/tassadar_clrs_shortest_path_sequential.wat",
+                    ),
+                    export_bindings: vec![
+                        TassadarClrsWasmBridgeExportContract {
+                            length_bucket: TassadarClrsLengthBucket::Tiny,
+                            export_name: String::from("distance_tiny"),
+                        },
+                        TassadarClrsWasmBridgeExportContract {
+                            length_bucket: TassadarClrsLengthBucket::Small,
+                            export_name: String::from("distance_small"),
+                        },
+                    ],
+                },
+                TassadarClrsWasmBridgeCaseContract {
+                    case_id: String::from("clrs_shortest_path_wavefront"),
+                    algorithm_family: TassadarClrsAlgorithmFamily::ShortestPath,
+                    trajectory_family: TassadarClrsTrajectoryFamily::WavefrontRelaxation,
+                    summary: String::from(
+                        "fixed shortest-path witness compiled as wavefront relaxation",
+                    ),
+                    source_ref: String::from(
+                        "fixtures/tassadar/sources/tassadar_clrs_shortest_path_wavefront.wat",
+                    ),
+                    export_bindings: vec![
+                        TassadarClrsWasmBridgeExportContract {
+                            length_bucket: TassadarClrsLengthBucket::Tiny,
+                            export_name: String::from("distance_tiny"),
+                        },
+                        TassadarClrsWasmBridgeExportContract {
+                            length_bucket: TassadarClrsLengthBucket::Small,
+                            export_name: String::from("distance_small"),
+                        },
+                    ],
+                },
+            ],
+            "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+        )
+        .expect("bridge contract should build");
+
+        assert_eq!(contract.abi_version, TASSADAR_CLRS_WASM_BRIDGE_ABI_VERSION);
+        assert_eq!(contract.cases.len(), 2);
         assert!(!contract.stable_digest().is_empty());
     }
 
