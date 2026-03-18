@@ -1,0 +1,345 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.composite_accepted_outcome_template.report.v1",
+  "composite_routing_receipt": {
+    "report_id": "tassadar.composite_routing.report.v1",
+    "case_count": 4,
+    "composite_preferred_case_count": 3,
+    "single_lane_preferred_case_count": 1,
+    "fallback_case_count": 1,
+    "challenge_path_case_count": 3,
+    "composite_evidence_lift_bps_vs_best_single_lane": 75,
+    "composite_cost_delta_milliunits_vs_best_single_lane": -2150,
+    "composite_latency_delta_ms_vs_best_single_lane": -63,
+    "generated_from_ref_count": 4,
+    "detail": "composite routing `tassadar.composite_routing.report.v1` covers 4 cases with composite_preferred=3, single_lane_preferred=1, fallback_cases=1, challenge_path_cases=3, evidence_lift_bps=75, cost_delta_milliunits=-2150, latency_delta_ms=-63"
+  },
+  "accepted_outcome_binding_receipt": {
+    "report_id": "tassadar.accepted_outcome_binding.report.v1",
+    "accepted_case_count": 1,
+    "candidate_only_case_count": 1,
+    "refused_case_count": 3,
+    "settlement_gated_refusal_count": 1,
+    "detail": "accepted-outcome binding `tassadar.accepted_outcome_binding.report.v1` freezes accepted=1, candidate_only=1, refused=3, settlement_gated_refusals=1"
+  },
+  "simulation_cases": [
+    {
+      "case_id": "accepted.composite.patch_validator_bridge",
+      "template": {
+        "template_id": "accepted_outcome.template.composite.patch_validator_bridge",
+        "route_case_id": "composite.patch_validator_bridge",
+        "workload_family": "patch_apply_internal_exact",
+        "world_mount_policy_ref": "world-mounts.policy.mount.patch.validator.v1",
+        "kernel_policy_template_ref": "kernel-policy.accepted-outcome.composite.patch_apply.v1",
+        "nexus_template_ref": "nexus.accepted-outcome.composite.patch_apply.v1",
+        "compute_market_product_ref": "compute-market.hybrid_exact_compute.patch_apply.v1",
+        "lane_obligations": [
+          {
+            "lane_id": "planner",
+            "lane_kind": "planner",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_planner_language_compute_policy_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_patch_validator_bridge.planner.v1",
+            "note": "planner selects a hybrid path instead of a single-lane winner"
+          },
+          {
+            "lane_id": "module_executor",
+            "lane_kind": "module_executor",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_execution_unit_registration_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_patch_validator_bridge.module_executor.v1",
+            "note": "module executor handles the exact patch core under benchmark-gated posture"
+          },
+          {
+            "lane_id": "cpu_reference",
+            "lane_kind": "cpu_reference",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_patch_validator_bridge.cpu_reference.v1",
+            "note": "cpu reference certifies exactness on the bounded patch family"
+          },
+          {
+            "lane_id": "validator",
+            "lane_kind": "validator",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_accepted_outcome_binding_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_patch_validator_bridge.validator.v1",
+            "note": "validator closes the evidence gap for accepted-outcome-ready patch work"
+          }
+        ],
+        "note": "patch-validator bridge requires planner, exact-compute, CPU-reference, and validator evidence under one stitched template"
+      },
+      "candidate_outcome_id": "candidate.composite.patch_validator_bridge.v1",
+      "accepted_outcome_id": "accepted.composite.patch_validator_bridge.v1",
+      "stitched_receipt_ids": [
+        "stitched_receipt.composite_patch_validator_bridge.planner.v1",
+        "stitched_receipt.composite_patch_validator_bridge.module_executor.v1",
+        "stitched_receipt.composite_patch_validator_bridge.cpu_reference.v1",
+        "stitched_receipt.composite_patch_validator_bridge.validator.v1"
+      ],
+      "challenge_window_open": false,
+      "settlement_dependencies_satisfied": true,
+      "status": "accepted",
+      "note": "hybrid patch work reaches accepted-outcome readiness only because every lane carries explicit evidence and the stitched receipts line up"
+    },
+    {
+      "case_id": "candidate.composite.long_loop_sandbox_fallback",
+      "template": {
+        "template_id": "accepted_outcome.template.composite.long_loop_sandbox_fallback",
+        "route_case_id": "composite.long_loop_sandbox_fallback",
+        "workload_family": "long_loop_validator_heavy",
+        "world_mount_policy_ref": "world-mounts.policy.mount.long_loop.validator.v1",
+        "kernel_policy_template_ref": "kernel-policy.accepted-outcome.composite.long_loop.v1",
+        "nexus_template_ref": "nexus.accepted-outcome.composite.long_loop.v1",
+        "compute_market_product_ref": "compute-market.hybrid_exact_compute.long_loop.v1",
+        "lane_obligations": [
+          {
+            "lane_id": "planner",
+            "lane_kind": "planner",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_planner_language_compute_policy_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_long_loop_sandbox_fallback.planner.v1",
+            "note": "planner starts with an internal exact-compute attempt but keeps fallback explicit"
+          },
+          {
+            "lane_id": "module_executor",
+            "lane_kind": "module_executor",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_execution_unit_registration_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_long_loop_sandbox_fallback.module_executor.v1",
+            "note": "module executor handles the bounded fast path before the fallback fires"
+          },
+          {
+            "lane_id": "sandbox_fallback",
+            "lane_kind": "sandbox",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_long_loop_sandbox_fallback.sandbox_fallback.v1",
+            "note": "sandbox delegation remains explicit once the long-loop path exceeds the internal lane's honest closure"
+          },
+          {
+            "lane_id": "validator",
+            "lane_kind": "validator",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_accepted_outcome_binding_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_long_loop_sandbox_fallback.validator.v1",
+            "note": "validator stays attached across the fallback rather than being silently dropped"
+          }
+        ],
+        "note": "long-loop hybrid routes keep fallback, sandbox, and validator receipts explicit while challenge posture remains open"
+      },
+      "candidate_outcome_id": "candidate.composite.long_loop_sandbox_fallback.v1",
+      "stitched_receipt_ids": [
+        "stitched_receipt.composite_long_loop_sandbox_fallback.planner.v1",
+        "stitched_receipt.composite_long_loop_sandbox_fallback.module_executor.v1",
+        "stitched_receipt.composite_long_loop_sandbox_fallback.sandbox_fallback.v1",
+        "stitched_receipt.composite_long_loop_sandbox_fallback.validator.v1"
+      ],
+      "challenge_window_open": true,
+      "settlement_dependencies_satisfied": true,
+      "status": "candidate_only",
+      "refusal_reason": "challenge_window_open",
+      "note": "candidate and accepted outcomes stay distinct while the long-loop fallback route remains challengeable"
+    },
+    {
+      "case_id": "refused.composite.gpu_cluster_article.missing_lane_evidence",
+      "template": {
+        "template_id": "accepted_outcome.template.composite.gpu_cluster_article",
+        "route_case_id": "composite.gpu_cluster_article",
+        "workload_family": "article_hybrid_workflow",
+        "world_mount_policy_ref": "world-mounts.policy.mount.article.hybrid.v1",
+        "kernel_policy_template_ref": "kernel-policy.accepted-outcome.composite.article_hybrid.v1",
+        "nexus_template_ref": "nexus.accepted-outcome.composite.article_hybrid.v1",
+        "compute_market_product_ref": "compute-market.hybrid_exact_compute.article.v1",
+        "lane_obligations": [
+          {
+            "lane_id": "planner",
+            "lane_kind": "planner",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_article_hybrid_workflow_artifact.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_gpu_cluster_article.planner.v1",
+            "note": "planner opens a GPU plus cluster path for the article workload"
+          },
+          {
+            "lane_id": "gpu_executor",
+            "lane_kind": "gpu_executor",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_execution_unit_registration_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_gpu_cluster_article.gpu_executor.v1",
+            "note": "GPU executor handles the dense article path efficiently"
+          },
+          {
+            "lane_id": "cluster_fanout",
+            "lane_kind": "cluster",
+            "required_evidence_refs": [
+              "docs/ARCHITECTURE_EXPLAINER_CLUSTER_BRINGUP_RUNBOOK.md"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_gpu_cluster_article.cluster_fanout.v1",
+            "note": "cluster fanout keeps multi-host work explicit rather than hidden in the executor lane"
+          },
+          {
+            "lane_id": "cpu_reference",
+            "lane_kind": "cpu_reference",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_trace_abi_decision_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_gpu_cluster_article.cpu_reference.v1",
+            "note": "CPU reference closes the replayable trace identity for the composite route"
+          }
+        ],
+        "note": "GPU plus cluster article routes require stitched lane evidence before any authority-facing outcome can be accepted"
+      },
+      "candidate_outcome_id": "candidate.composite.gpu_cluster_article.missing_lane_evidence.v1",
+      "stitched_receipt_ids": [
+        "stitched_receipt.composite_gpu_cluster_article.planner.v1",
+        "stitched_receipt.composite_gpu_cluster_article.gpu_executor.v1",
+        "stitched_receipt.composite_gpu_cluster_article.cpu_reference.v1"
+      ],
+      "missing_evidence_lane_ids": [
+        "cluster_fanout"
+      ],
+      "challenge_window_open": false,
+      "settlement_dependencies_satisfied": true,
+      "status": "refused",
+      "refusal_reason": "missing_lane_evidence",
+      "note": "cluster fanout evidence is required for the hybrid article route, so missing that lane's evidence must refuse instead of collapsing to composite success"
+    },
+    {
+      "case_id": "refused.single_lane.module_parity.missing_receipt_stitch",
+      "template": {
+        "template_id": "accepted_outcome.template.single_lane.module_parity",
+        "route_case_id": "single_lane.module_parity",
+        "workload_family": "parity_short_bounded",
+        "world_mount_policy_ref": "world-mounts.policy.mount.parity.short.v1",
+        "kernel_policy_template_ref": "kernel-policy.accepted-outcome.composite.parity.v1",
+        "nexus_template_ref": "nexus.accepted-outcome.composite.parity.v1",
+        "compute_market_product_ref": "compute-market.hybrid_exact_compute.parity.v1",
+        "lane_obligations": [
+          {
+            "lane_id": "planner",
+            "lane_kind": "planner",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_planner_language_compute_policy_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.single_lane_module_parity.planner.v1",
+            "note": "planner considers a module plus validator composite path for parity work"
+          },
+          {
+            "lane_id": "module_executor",
+            "lane_kind": "module_executor",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_execution_unit_registration_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.single_lane_module_parity.module_executor.v1",
+            "note": "module executor is already exact on the short bounded parity workload"
+          },
+          {
+            "lane_id": "validator",
+            "lane_kind": "validator",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_accepted_outcome_binding_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.single_lane_module_parity.validator.v1",
+            "note": "optional validator attachment adds cost without meaningful evidence lift on this bounded case"
+          }
+        ],
+        "note": "short bounded parity can still be modeled as a composite template, but missing stitched receipts must refuse instead of silently collapsing to one success bit"
+      },
+      "candidate_outcome_id": "candidate.single_lane.module_parity.missing_receipt_stitch.v1",
+      "stitched_receipt_ids": [
+        "stitched_receipt.single_lane_module_parity.planner.v1",
+        "stitched_receipt.single_lane_module_parity.module_executor.v1"
+      ],
+      "challenge_window_open": false,
+      "settlement_dependencies_satisfied": true,
+      "status": "refused",
+      "refusal_reason": "missing_receipt_stitch",
+      "note": "the optional validator lane cannot disappear inside receipt stitching; if one stitched receipt is missing, the hybrid template must refuse"
+    },
+    {
+      "case_id": "refused.composite.patch_validator_bridge.settlement_missing",
+      "template": {
+        "template_id": "accepted_outcome.template.composite.patch_validator_bridge",
+        "route_case_id": "composite.patch_validator_bridge",
+        "workload_family": "patch_apply_internal_exact",
+        "world_mount_policy_ref": "world-mounts.policy.mount.patch.validator.v1",
+        "kernel_policy_template_ref": "kernel-policy.accepted-outcome.composite.patch_apply.v2",
+        "nexus_template_ref": "nexus.accepted-outcome.composite.patch_apply.v2",
+        "compute_market_product_ref": "compute-market.hybrid_exact_compute.patch_apply.v2",
+        "lane_obligations": [
+          {
+            "lane_id": "planner",
+            "lane_kind": "planner",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_planner_language_compute_policy_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_patch_validator_bridge.planner.v1",
+            "note": "planner selects a hybrid path instead of a single-lane winner"
+          },
+          {
+            "lane_id": "module_executor",
+            "lane_kind": "module_executor",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_execution_unit_registration_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_patch_validator_bridge.module_executor.v1",
+            "note": "module executor handles the exact patch core under benchmark-gated posture"
+          },
+          {
+            "lane_id": "cpu_reference",
+            "lane_kind": "cpu_reference",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_patch_validator_bridge.cpu_reference.v1",
+            "note": "cpu reference certifies exactness on the bounded patch family"
+          },
+          {
+            "lane_id": "validator",
+            "lane_kind": "validator",
+            "required_evidence_refs": [
+              "fixtures/tassadar/reports/tassadar_accepted_outcome_binding_report.json"
+            ],
+            "stitched_receipt_id": "stitched_receipt.composite_patch_validator_bridge.validator.v1",
+            "note": "validator closes the evidence gap for accepted-outcome-ready patch work"
+          }
+        ],
+        "note": "settlement-facing patch template keeps per-lane evidence satisfied while still refusing if the settlement bridge has not closed"
+      },
+      "candidate_outcome_id": "candidate.composite.patch_validator_bridge.settlement_missing.v1",
+      "stitched_receipt_ids": [
+        "stitched_receipt.composite_patch_validator_bridge.planner.v1",
+        "stitched_receipt.composite_patch_validator_bridge.module_executor.v1",
+        "stitched_receipt.composite_patch_validator_bridge.cpu_reference.v1",
+        "stitched_receipt.composite_patch_validator_bridge.validator.v1"
+      ],
+      "challenge_window_open": false,
+      "settlement_dependencies_satisfied": false,
+      "status": "refused",
+      "refusal_reason": "settlement_dependency_missing",
+      "note": "all lane receipts can be present while settlement-facing dependencies still refuse the accepted outcome"
+    }
+  ],
+  "accepted_case_count": 1,
+  "candidate_only_case_count": 1,
+  "refused_case_count": 3,
+  "missing_evidence_refusal_count": 1,
+  "missing_receipt_stitch_refusal_count": 1,
+  "nexus_dependency_marker": "nexus remains the owner of canonical accepted-outcome issuance, dispute closure, and settlement transition authority outside standalone psionic",
+  "kernel_policy_dependency_marker": "kernel-policy remains the owner of canonical accepted-outcome template approval and settlement-qualified policy closure outside standalone psionic",
+  "world_mount_dependency_marker": "world-mounts remain the owner of canonical task-scoped mount policy and hybrid-lane admissibility outside standalone psionic",
+  "compute_market_dependency_marker": "compute-market remains the owner of canonical hybrid product, quote, and settlement-facing economic posture outside standalone psionic",
+  "claim_boundary": "this provider report keeps hybrid lane evidence obligations, receipt stitching, candidate outcomes, accepted outcomes, and settlement posture explicit for composite routes. It does not treat runtime success or stitched provider receipts as accepted-outcome or settlement authority",
+  "summary": "Composite accepted-outcome templates cover 5 cases with accepted=1, candidate_only=1, refused=3, missing_evidence_refusals=1, and missing_receipt_stitch_refusals=1.",
+  "report_digest": "04ed5c3a5033f87577f09d803c3268ea1c979b1e8766f4292ac9e00bc88d5c0c"
+}

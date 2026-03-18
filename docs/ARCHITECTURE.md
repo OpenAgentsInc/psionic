@@ -554,6 +554,16 @@ The current scope is:
   objects with separate unsupported-envelope refusals. This lane keeps product
   identity, quote identity, receipt identity, and settlement posture explicit
   instead of flattening executor work into raw hardware or token-count pricing
+- landed composite-accepted-outcome-template follow-on: `psionic-provider` now
+  publishes the hybrid accepted-outcome template report at
+  `fixtures/tassadar/reports/tassadar_composite_accepted_outcome_template_report.json`,
+  freezing composite templates over planner, exact-compute, CPU-reference,
+  validator, sandbox, GPU, and cluster lane obligations with explicit
+  per-lane evidence refs, stitched provider receipts, candidate-versus-
+  accepted outcome separation, missing-evidence refusals, missing-receipt-
+  stitch refusals, and settlement-gated refusals. This lane keeps hybrid
+  execution truth, accepted-outcome truth, and settlement posture bridged but
+  distinct instead of collapsing them into one composite success bit
 - landed cost-per-correct-job follow-on: `psionic-eval` now publishes the
   benchmark-bound economics report at
   `fixtures/tassadar/reports/tassadar_cost_per_correct_job_report.json`,

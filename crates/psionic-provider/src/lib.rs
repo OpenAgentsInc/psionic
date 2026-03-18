@@ -6,6 +6,7 @@
 )]
 
 mod tassadar_accepted_outcome_binding;
+mod tassadar_composite_accepted_outcome_template;
 mod tassadar_composite_routing;
 mod tassadar_cost_per_correct_job;
 mod tassadar_delegation_benchmark;
@@ -36,6 +37,7 @@ use ed25519_dalek::SigningKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use tassadar_accepted_outcome_binding::*;
+pub use tassadar_composite_accepted_outcome_template::*;
 pub use tassadar_composite_routing::*;
 pub use tassadar_cost_per_correct_job::*;
 pub use tassadar_delegation_benchmark::*;
