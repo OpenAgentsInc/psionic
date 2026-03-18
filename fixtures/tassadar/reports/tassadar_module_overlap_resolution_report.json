@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.module_overlap_resolution.report.v1",
+  "selected_case_count": 2,
+  "refused_case_count": 1,
+  "mount_override_case_count": 1,
+  "case_reports": [
+    {
+      "case_id": "overlap.default.verifier_search.v1",
+      "mount_id": "mount-default",
+      "capability_label": "bounded_search",
+      "workload_family": "verifier_search",
+      "candidate_cases": [
+        {
+          "module_ref": "candidate_select_core@1.1.0",
+          "cost_score_bps": 3600,
+          "evidence_score_bps": 9200,
+          "compatibility_score_bps": 9000
+        },
+        {
+          "module_ref": "checkpoint_backtrack_core@1.0.0",
+          "cost_score_bps": 3400,
+          "evidence_score_bps": 8500,
+          "compatibility_score_bps": 8800
+        }
+      ],
+      "outcome": "selected",
+      "selected_module_ref": "candidate_select_core@1.1.0",
+      "note": "default verifier_search resolution prefers candidate_select_core because evidence and compatibility outweigh the slight cost delta"
+    },
+    {
+      "case_id": "overlap.mount_override.verifier_search.v1",
+      "mount_id": "mount-checkpoint-only",
+      "capability_label": "bounded_search",
+      "workload_family": "verifier_search",
+      "candidate_cases": [
+        {
+          "module_ref": "candidate_select_core@1.1.0",
+          "cost_score_bps": 3600,
+          "evidence_score_bps": 9200,
+          "compatibility_score_bps": 9000
+        },
+        {
+          "module_ref": "checkpoint_backtrack_core@1.0.0",
+          "cost_score_bps": 3400,
+          "evidence_score_bps": 8500,
+          "compatibility_score_bps": 8800
+        }
+      ],
+      "outcome": "selected",
+      "selected_module_ref": "checkpoint_backtrack_core@1.0.0",
+      "note": "mount-specific allowlist and preference override route verifier_search to checkpoint_backtrack_core without hiding the policy decision"
+    },
+    {
+      "case_id": "overlap.tie.verifier_search.v1",
+      "mount_id": "mount-ambiguous",
+      "capability_label": "bounded_search",
+      "workload_family": "verifier_search",
+      "candidate_cases": [
+        {
+          "module_ref": "candidate_select_core@1.1.0",
+          "cost_score_bps": 3500,
+          "evidence_score_bps": 9000,
+          "compatibility_score_bps": 9000
+        },
+        {
+          "module_ref": "checkpoint_backtrack_core@1.0.0",
+          "cost_score_bps": 3500,
+          "evidence_score_bps": 9000,
+          "compatibility_score_bps": 9000
+        }
+      ],
+      "outcome": "refused",
+      "refusal_reason": {
+        "kind": "ambiguous_eligible_candidate",
+        "policy_id": "mount.tie.verifier_search",
+        "module_refs": [
+          "candidate_select_core@1.1.0",
+          "checkpoint_backtrack_core@1.0.0"
+        ]
+      },
+      "note": "the mount refuses when overlapping candidates tie under the explicit resolver policy instead of silently drifting to one hidden default"
+    }
+  ],
+  "claim_boundary": "this router report freezes overlapping-capability selection, mount-specific override, and ambiguity refusal for the bounded module catalog lane. It does not claim implicit world-mount closure; named world-mount integration remains an explicit dependency marker outside standalone psionic",
+  "summary": "Module-overlap resolution report now freezes 2 selected cases, 1 refused cases, and 1 mount-override cases.",
+  "report_digest": "46cfb0dee63fbd4932f0b193f5f2ae7b0adfe5ca9c3d447dea37bf48a1bb72da"
+}

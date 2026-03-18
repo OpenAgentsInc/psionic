@@ -3,6 +3,7 @@
 mod tassadar_clrs_wasm_bridge;
 mod tassadar_internal_module_library;
 mod tassadar_module_catalog;
+mod tassadar_module_overlap_resolution;
 mod tassadar_locality_scratchpad;
 mod tassadar_module_linker;
 mod tassadar_module_manifest;
@@ -36,6 +37,7 @@ use thiserror::Error;
 pub use tassadar_clrs_wasm_bridge::*;
 pub use tassadar_internal_module_library::*;
 pub use tassadar_module_catalog::*;
+pub use tassadar_module_overlap_resolution::*;
 pub use tassadar_locality_scratchpad::*;
 pub use tassadar_module_linker::*;
 pub use tassadar_module_manifest::*;

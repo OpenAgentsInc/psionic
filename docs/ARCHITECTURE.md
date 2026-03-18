@@ -446,6 +446,17 @@ The current scope is:
   the same served truth into a provider-facing `TassadarModuleCatalogReceipt`.
   This lane keeps reusable primitive discovery measurable rather than anecdotal
   and does not widen served capability by implication from catalog membership
+- landed overlap-resolution follow-on: `psionic-compiler` now publishes
+  deterministic `TassadarModuleResolverPolicy` and overlap-candidate resolution
+  semantics keyed by trust, evidence, compatibility, cost, and explicit
+  preference ordering; `psionic-router` now freezes the mount-aware A/B report
+  at `fixtures/tassadar/reports/tassadar_module_overlap_resolution_report.json`
+  with default selection, mount-specific override, and ambiguity refusal kept
+  explicit; and `psionic-provider` now projects that report into a
+  provider-facing `TassadarModuleOverlapResolutionReceipt`. This lane keeps
+  overlapping capability resolution honest instead of hiding selector drift
+  behind defaults, while named `world-mounts` follow-ons remain explicit
+  dependency markers outside standalone `psionic`
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the
