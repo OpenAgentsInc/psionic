@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.locality_envelope.report.v1",
+  "publication": {
+    "schema_version": 1,
+    "publication_id": "tassadar.locality_envelope.publication.v1",
+    "status": "implemented",
+    "claim_class": "research_only_fast_path_substrate",
+    "model": {
+      "model_id": "tassadar-locality-envelope-v0",
+      "family": "tassadar_locality_envelope",
+      "revision": "v0"
+    },
+    "variant_families": [
+      "dense_reference_linear",
+      "sparse_top_k_validated",
+      "linear_attention_proxy",
+      "recurrent_state_runtime",
+      "locality_scratchpadized"
+    ],
+    "workload_families": [
+      "arithmetic_multi_operand",
+      "clrs_shortest_path",
+      "sudoku_backtracking_search",
+      "module_scale_wasm_loop"
+    ],
+    "exact_case_count": 9,
+    "degraded_case_count": 8,
+    "refused_case_count": 3,
+    "target_surfaces": [
+      "crates/psionic-runtime",
+      "crates/psionic-models",
+      "crates/psionic-eval",
+      "crates/psionic-research"
+    ],
+    "validation_refs": [
+      "fixtures/tassadar/reports/tassadar_locality_envelope_runtime_report.json",
+      "fixtures/tassadar/reports/tassadar_locality_envelope_report.json",
+      "fixtures/tassadar/reports/tassadar_locality_envelope_summary.json"
+    ],
+    "support_boundaries": [
+      "the publication is a benchmark-bound locality map over seeded workload families and dense, sparse, linear, recurrent, and scratchpadized variants; it does not promote any one variant into a served capability by itself",
+      "linear_attention_proxy remains an analytical comparison row even where it is cheap; degraded and refused posture must stay explicit instead of being smoothed into one locality score",
+      "module-scale Wasm and search-heavy workloads still carry downgrade or refusal boundaries; locality wins here do not imply arbitrary Wasm, broad host-import, or broad learned-compute closure"
+    ],
+    "publication_digest": "bbf5a5de7de2ae2c7fe9d18a20660dcb3d233bb31fa18eb2d53fe749469c5bdf"
+  },
+  "workload_summaries": [
+    {
+      "workload_family": "arithmetic_multi_operand",
+      "exact_variant_count": 4,
+      "degraded_variant_count": 1,
+      "refused_variant_count": 0,
+      "strongest_exact_variant": "locality_scratchpadized",
+      "lowest_lookback_exact_variant": "locality_scratchpadized",
+      "lowest_cost_non_refused_variant": "locality_scratchpadized",
+      "refusal_variants": [],
+      "average_non_refused_exactness_score_bps": 9820,
+      "average_non_refused_cost_score_bps": 5840,
+      "note": "arithmetic stays the cleanest locality win surface, with scratchpad and recurrent variants both remaining exact"
+    },
+    {
+      "workload_family": "clrs_shortest_path",
+      "exact_variant_count": 2,
+      "degraded_variant_count": 3,
+      "refused_variant_count": 0,
+      "strongest_exact_variant": "locality_scratchpadized",
+      "lowest_lookback_exact_variant": "locality_scratchpadized",
+      "lowest_cost_non_refused_variant": "recurrent_state_runtime",
+      "refusal_variants": [],
+      "average_non_refused_exactness_score_bps": 8820,
+      "average_non_refused_cost_score_bps": 6200,
+      "note": "CLRS remains exact only when frontier-state publication stays explicit; lower-cost variants still degrade under bounded bridge export"
+    },
+    {
+      "workload_family": "sudoku_backtracking_search",
+      "exact_variant_count": 2,
+      "degraded_variant_count": 1,
+      "refused_variant_count": 2,
+      "strongest_exact_variant": "locality_scratchpadized",
+      "lowest_lookback_exact_variant": "locality_scratchpadized",
+      "lowest_cost_non_refused_variant": "locality_scratchpadized",
+      "refusal_variants": [
+        "linear_attention_proxy",
+        "recurrent_state_runtime"
+      ],
+      "average_non_refused_exactness_score_bps": 9133,
+      "average_non_refused_cost_score_bps": 6933,
+      "note": "search-heavy Sudoku is the clearest refusal-first workload family for linear and recurrent shortcuts"
+    },
+    {
+      "workload_family": "module_scale_wasm_loop",
+      "exact_variant_count": 1,
+      "degraded_variant_count": 3,
+      "refused_variant_count": 1,
+      "strongest_exact_variant": "dense_reference_linear",
+      "lowest_lookback_exact_variant": "dense_reference_linear",
+      "lowest_cost_non_refused_variant": "recurrent_state_runtime",
+      "refusal_variants": [
+        "linear_attention_proxy"
+      ],
+      "average_non_refused_exactness_score_bps": 8250,
+      "average_non_refused_cost_score_bps": 6825,
+      "note": "module-scale Wasm still has one exact dense baseline, but every lower-footprint alternative either degrades or refuses today"
+    }
+  ],
+  "exact_case_count": 9,
+  "degraded_case_count": 8,
+  "refused_case_count": 3,
+  "exact_winner_counts": {
+    "dense_reference_linear": 1,
+    "locality_scratchpadized": 3
+  },
+  "generated_from_refs": [
+    "fixtures/tassadar/reports/tassadar_locality_envelope_runtime_report.json"
+  ],
+  "claim_boundary": "this eval report keeps locality envelopes benchmark-bound and refusal-bounded. It compares dense, sparse, linear, recurrent, and scratchpadized variants on shared workloads without widening served capability, arbitrary Wasm closure, or broad learned exactness claims",
+  "summary": "Locality-envelope eval covers 4 workload families with exact winner counts {\"dense_reference_linear\": 1, \"locality_scratchpadized\": 3}, plus 8 degraded and 3 refused variant cells kept explicit.",
+  "report_digest": "af77406dd2dd3578c6d93dacf2e3d4beb51cee75321df47e44cde6de726d810c"
+}

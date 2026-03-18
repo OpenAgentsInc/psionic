@@ -68,6 +68,8 @@ mod tassadar_kernel_module_scaling;
 mod tassadar_latency_evidence_tradeoff;
 #[path = "tassadar_learnability_gap.rs"]
 mod tassadar_learnability_gap;
+#[path = "tassadar_locality_envelope.rs"]
+mod tassadar_locality_envelope;
 #[path = "tassadar_locality_scratchpad.rs"]
 mod tassadar_locality_scratchpad;
 #[path = "tassadar_memory_abi_v2.rs"]
@@ -171,6 +173,7 @@ pub use tassadar_installed_module_evidence::*;
 pub use tassadar_kernel_module_scaling::*;
 pub use tassadar_latency_evidence_tradeoff::*;
 pub use tassadar_learnability_gap::*;
+pub use tassadar_locality_envelope::*;
 pub use tassadar_locality_scratchpad::*;
 pub use tassadar_memory_abi_v2::*;
 pub use tassadar_mixed_trajectory::*;

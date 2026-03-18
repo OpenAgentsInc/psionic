@@ -599,6 +599,20 @@ The current scope is:
   `fixtures/tassadar/reports/tassadar_supervision_density_summary.json`. This
   lane keeps supervision-limited and architecture-limited failures explicit
   across CLRS, arithmetic, search, and module-scale Wasm families
+- landed locality-envelope follow-on: `psionic-runtime` now publishes the
+  runtime report at
+  `fixtures/tassadar/reports/tassadar_locality_envelope_runtime_report.json`
+  with explicit max useful lookback, active memory footprint, branch
+  locality, call-frame locality, exactness, cost, downgrade, and refusal
+  posture across dense, sparse, linear, recurrent, and scratchpadized
+  variants; `psionic-models` now publishes the corresponding
+  `TassadarLocalityEnvelopePublication`; `psionic-eval` now publishes the
+  report at `fixtures/tassadar/reports/tassadar_locality_envelope_report.json`;
+  and `psionic-research` now publishes the summary at
+  `fixtures/tassadar/reports/tassadar_locality_envelope_summary.json`. This
+  lane keeps locality wins, downgrade boundaries, and refusal-first workload
+  families explicit instead of treating one fast-path or state design as a
+  generic long-context answer
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the

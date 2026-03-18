@@ -1,0 +1,36 @@
+{
+  "summary_id": "tassadar.locality_envelope.summary.v1",
+  "report_id": "tassadar.locality_envelope.report.v1",
+  "exact_winner_counts": {
+    "dense_reference_linear": 1,
+    "locality_scratchpadized": 3
+  },
+  "lowest_lookback_exact_winners": [
+    [
+      "arithmetic_multi_operand",
+      "locality_scratchpadized"
+    ],
+    [
+      "clrs_shortest_path",
+      "locality_scratchpadized"
+    ],
+    [
+      "sudoku_backtracking_search",
+      "locality_scratchpadized"
+    ],
+    [
+      "module_scale_wasm_loop",
+      "dense_reference_linear"
+    ]
+  ],
+  "refusal_sensitive_workloads": [
+    "sudoku_backtracking_search",
+    "module_scale_wasm_loop"
+  ],
+  "degrade_sensitive_workloads": [
+    "clrs_shortest_path",
+    "module_scale_wasm_loop"
+  ],
+  "claim_boundary": "this summary remains a research-only locality analysis over shared workloads. It identifies where locality envelopes support exact fast paths, where downgrade remains bounded, and where the system must refuse rather than silently degrade",
+  "summary_digest": "078794a72b54998818ec2800372f4e21589ae5221c285bc06ed92c23f4992947"
+}

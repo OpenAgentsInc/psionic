@@ -1,0 +1,354 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.locality_envelope.runtime_report.v1",
+  "claim_class": "research_only_fast_path_substrate",
+  "exact_case_count": 9,
+  "degraded_case_count": 8,
+  "refused_case_count": 3,
+  "average_non_refused_useful_lookback_tokens": 65,
+  "average_non_refused_active_memory_tokens": 48,
+  "average_non_refused_exactness_score_bps": 9035,
+  "average_non_refused_cost_score_bps": 6370,
+  "receipts": [
+    {
+      "receipt_id": "tassadar.locality_envelope.arithmetic_multi_operand.dense_reference_linear.v1",
+      "workload_family": "arithmetic_multi_operand",
+      "variant_family": "dense_reference_linear",
+      "max_useful_lookback_tokens": 52,
+      "active_memory_footprint_tokens": 40,
+      "branch_locality_bps": 9600,
+      "call_frame_locality_bps": 9800,
+      "exactness_score_bps": 10000,
+      "cost_score_bps": 8400,
+      "posture": "exact",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_approximate_attention_closure_runtime_report.json"
+      ],
+      "note": "dense replay remains exact on arithmetic but pays a visibly wider lookback and cost envelope than more local variants"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.arithmetic_multi_operand.sparse_top_k_validated.v1",
+      "workload_family": "arithmetic_multi_operand",
+      "variant_family": "sparse_top_k_validated",
+      "max_useful_lookback_tokens": 36,
+      "active_memory_footprint_tokens": 28,
+      "branch_locality_bps": 9700,
+      "call_frame_locality_bps": 9800,
+      "exactness_score_bps": 10000,
+      "cost_score_bps": 6400,
+      "posture": "exact",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_approximate_attention_closure_runtime_report.json"
+      ],
+      "note": "validated sparse attention narrows the arithmetic envelope while preserving exactness on the seeded local workload family"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.arithmetic_multi_operand.linear_attention_proxy.v1",
+      "workload_family": "arithmetic_multi_operand",
+      "variant_family": "linear_attention_proxy",
+      "max_useful_lookback_tokens": 34,
+      "active_memory_footprint_tokens": 24,
+      "branch_locality_bps": 9100,
+      "call_frame_locality_bps": 9000,
+      "exactness_score_bps": 9100,
+      "cost_score_bps": 5600,
+      "posture": "degraded_but_bounded",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_approximate_attention_closure_matrix.json"
+      ],
+      "note": "linear proxy stays cheap on arithmetic but still loses enough intermediate precision to remain degraded rather than exact"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.arithmetic_multi_operand.recurrent_state_runtime.v1",
+      "workload_family": "arithmetic_multi_operand",
+      "variant_family": "recurrent_state_runtime",
+      "max_useful_lookback_tokens": 22,
+      "active_memory_footprint_tokens": 18,
+      "branch_locality_bps": 9600,
+      "call_frame_locality_bps": 9400,
+      "exactness_score_bps": 10000,
+      "cost_score_bps": 4700,
+      "posture": "exact",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json"
+      ],
+      "note": "recurrent carry is currently exact on the bounded arithmetic family because the carried state stays small and stable"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.arithmetic_multi_operand.locality_scratchpadized.v1",
+      "workload_family": "arithmetic_multi_operand",
+      "variant_family": "locality_scratchpadized",
+      "max_useful_lookback_tokens": 18,
+      "active_memory_footprint_tokens": 20,
+      "branch_locality_bps": 9900,
+      "call_frame_locality_bps": 9950,
+      "exactness_score_bps": 10000,
+      "cost_score_bps": 4100,
+      "posture": "exact",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_locality_scratchpad_report.json",
+        "fixtures/tassadar/reports/tassadar_state_design_runtime_report.json"
+      ],
+      "note": "scratchpadization makes arithmetic the clearest bounded-local problem in the current workload pack"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.clrs_shortest_path.dense_reference_linear.v1",
+      "workload_family": "clrs_shortest_path",
+      "variant_family": "dense_reference_linear",
+      "max_useful_lookback_tokens": 88,
+      "active_memory_footprint_tokens": 72,
+      "branch_locality_bps": 8500,
+      "call_frame_locality_bps": 7900,
+      "exactness_score_bps": 10000,
+      "cost_score_bps": 8900,
+      "posture": "exact",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+      ],
+      "note": "dense replay stays exact on the seeded CLRS bridge family but keeps both lookback and memory footprints materially high"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.clrs_shortest_path.sparse_top_k_validated.v1",
+      "workload_family": "clrs_shortest_path",
+      "variant_family": "sparse_top_k_validated",
+      "max_useful_lookback_tokens": 54,
+      "active_memory_footprint_tokens": 46,
+      "branch_locality_bps": 7600,
+      "call_frame_locality_bps": 6800,
+      "exactness_score_bps": 8400,
+      "cost_score_bps": 6500,
+      "posture": "degraded_but_bounded",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+        "fixtures/tassadar/reports/tassadar_approximate_attention_closure_runtime_report.json"
+      ],
+      "note": "sparse routing cuts the CLRS footprint but still drops too much frontier state to claim exact closure"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.clrs_shortest_path.linear_attention_proxy.v1",
+      "workload_family": "clrs_shortest_path",
+      "variant_family": "linear_attention_proxy",
+      "max_useful_lookback_tokens": 48,
+      "active_memory_footprint_tokens": 38,
+      "branch_locality_bps": 7100,
+      "call_frame_locality_bps": 6500,
+      "exactness_score_bps": 8100,
+      "cost_score_bps": 5700,
+      "posture": "degraded_but_bounded",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+        "fixtures/tassadar/reports/tassadar_approximate_attention_closure_matrix.json"
+      ],
+      "note": "linear proxy keeps the CLRS bridge cheaper than dense replay, but path-relaxation state still degrades under the current bounded export"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.clrs_shortest_path.recurrent_state_runtime.v1",
+      "workload_family": "clrs_shortest_path",
+      "variant_family": "recurrent_state_runtime",
+      "max_useful_lookback_tokens": 42,
+      "active_memory_footprint_tokens": 30,
+      "branch_locality_bps": 6900,
+      "call_frame_locality_bps": 6200,
+      "exactness_score_bps": 7600,
+      "cost_score_bps": 4800,
+      "posture": "degraded_but_bounded",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+        "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json"
+      ],
+      "note": "recurrent carry reduces the CLRS state footprint but still smooths over enough graph-frontier structure to stay degraded"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.clrs_shortest_path.locality_scratchpadized.v1",
+      "workload_family": "clrs_shortest_path",
+      "variant_family": "locality_scratchpadized",
+      "max_useful_lookback_tokens": 40,
+      "active_memory_footprint_tokens": 34,
+      "branch_locality_bps": 9200,
+      "call_frame_locality_bps": 8800,
+      "exactness_score_bps": 10000,
+      "cost_score_bps": 5100,
+      "posture": "exact",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+        "fixtures/tassadar/reports/tassadar_locality_scratchpad_report.json"
+      ],
+      "note": "scratchpadized CLRS traces preserve the frontier state while lowering the useful lookback enough to stay exact on the seeded bridge family"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.sudoku_backtracking_search.dense_reference_linear.v1",
+      "workload_family": "sudoku_backtracking_search",
+      "variant_family": "dense_reference_linear",
+      "max_useful_lookback_tokens": 128,
+      "active_memory_footprint_tokens": 84,
+      "branch_locality_bps": 8200,
+      "call_frame_locality_bps": 7600,
+      "exactness_score_bps": 10000,
+      "cost_score_bps": 9300,
+      "posture": "exact",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+      ],
+      "note": "dense replay remains the safe baseline for bounded Sudoku search, but it is both high-lookback and high-cost"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.sudoku_backtracking_search.sparse_top_k_validated.v1",
+      "workload_family": "sudoku_backtracking_search",
+      "variant_family": "sparse_top_k_validated",
+      "max_useful_lookback_tokens": 80,
+      "active_memory_footprint_tokens": 56,
+      "branch_locality_bps": 6700,
+      "call_frame_locality_bps": 6000,
+      "exactness_score_bps": 7400,
+      "cost_score_bps": 6100,
+      "posture": "degraded_but_bounded",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+        "fixtures/tassadar/reports/tassadar_approximate_attention_closure_runtime_report.json"
+      ],
+      "note": "sparse routing helps cost on Sudoku search but still drops contradictory-branch state often enough to remain degraded"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.sudoku_backtracking_search.linear_attention_proxy.v1",
+      "workload_family": "sudoku_backtracking_search",
+      "variant_family": "linear_attention_proxy",
+      "max_useful_lookback_tokens": 58,
+      "active_memory_footprint_tokens": 44,
+      "branch_locality_bps": 4100,
+      "call_frame_locality_bps": 3900,
+      "exactness_score_bps": 0,
+      "cost_score_bps": 4700,
+      "posture": "refused",
+      "refusal_reason": "branch_dispersion_exceeded",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+        "fixtures/tassadar/reports/tassadar_approximate_attention_closure_matrix.json"
+      ],
+      "note": "the current linear proxy does not preserve enough branch discrimination for verifier-guided Sudoku backtracking and must refuse"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.sudoku_backtracking_search.recurrent_state_runtime.v1",
+      "workload_family": "sudoku_backtracking_search",
+      "variant_family": "recurrent_state_runtime",
+      "max_useful_lookback_tokens": 46,
+      "active_memory_footprint_tokens": 32,
+      "branch_locality_bps": 4800,
+      "call_frame_locality_bps": 3600,
+      "exactness_score_bps": 0,
+      "cost_score_bps": 4300,
+      "posture": "refused",
+      "refusal_reason": "call_frame_surface_insufficient",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+        "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json"
+      ],
+      "note": "bounded recurrent carry cannot yet expose the explicit guess, contradiction, and backtrack frames required by the search trace family"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.sudoku_backtracking_search.locality_scratchpadized.v1",
+      "workload_family": "sudoku_backtracking_search",
+      "variant_family": "locality_scratchpadized",
+      "max_useful_lookback_tokens": 62,
+      "active_memory_footprint_tokens": 44,
+      "branch_locality_bps": 9100,
+      "call_frame_locality_bps": 9000,
+      "exactness_score_bps": 10000,
+      "cost_score_bps": 5400,
+      "posture": "exact",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+        "fixtures/tassadar/reports/tassadar_locality_scratchpad_report.json"
+      ],
+      "note": "scratchpadized search traces preserve explicit search events while materially shrinking the useful-lookback window"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.module_scale_wasm_loop.dense_reference_linear.v1",
+      "workload_family": "module_scale_wasm_loop",
+      "variant_family": "dense_reference_linear",
+      "max_useful_lookback_tokens": 144,
+      "active_memory_footprint_tokens": 108,
+      "branch_locality_bps": 7800,
+      "call_frame_locality_bps": 7200,
+      "exactness_score_bps": 10000,
+      "cost_score_bps": 9600,
+      "posture": "exact",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+      ],
+      "note": "dense replay stays exact on the bounded module-scale suite, but it preserves the widest active footprint in the comparison"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.module_scale_wasm_loop.sparse_top_k_validated.v1",
+      "workload_family": "module_scale_wasm_loop",
+      "variant_family": "sparse_top_k_validated",
+      "max_useful_lookback_tokens": 96,
+      "active_memory_footprint_tokens": 72,
+      "branch_locality_bps": 7000,
+      "call_frame_locality_bps": 6500,
+      "exactness_score_bps": 7700,
+      "cost_score_bps": 6800,
+      "posture": "degraded_but_bounded",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+        "fixtures/tassadar/reports/tassadar_approximate_attention_closure_runtime_report.json"
+      ],
+      "note": "sparse routing lowers module-scale cost but still drops enough memory-update context to stay degraded"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.module_scale_wasm_loop.linear_attention_proxy.v1",
+      "workload_family": "module_scale_wasm_loop",
+      "variant_family": "linear_attention_proxy",
+      "max_useful_lookback_tokens": 70,
+      "active_memory_footprint_tokens": 52,
+      "branch_locality_bps": 4900,
+      "call_frame_locality_bps": 4300,
+      "exactness_score_bps": 0,
+      "cost_score_bps": 4900,
+      "posture": "refused",
+      "refusal_reason": "mutable_memory_alias_risk",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+        "fixtures/tassadar/reports/tassadar_approximate_attention_closure_matrix.json"
+      ],
+      "note": "the current linear proxy cannot keep byte-addressed mutation and alias boundaries honest on the module-scale Wasm loop family"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.module_scale_wasm_loop.recurrent_state_runtime.v1",
+      "workload_family": "module_scale_wasm_loop",
+      "variant_family": "recurrent_state_runtime",
+      "max_useful_lookback_tokens": 74,
+      "active_memory_footprint_tokens": 58,
+      "branch_locality_bps": 6600,
+      "call_frame_locality_bps": 6100,
+      "exactness_score_bps": 7000,
+      "cost_score_bps": 5300,
+      "posture": "degraded_but_bounded",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+        "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json"
+      ],
+      "note": "recurrent carry lowers module-scale memory cost but still smooths over too much mutable-address state to remain exact"
+    },
+    {
+      "receipt_id": "tassadar.locality_envelope.module_scale_wasm_loop.locality_scratchpadized.v1",
+      "workload_family": "module_scale_wasm_loop",
+      "variant_family": "locality_scratchpadized",
+      "max_useful_lookback_tokens": 90,
+      "active_memory_footprint_tokens": 60,
+      "branch_locality_bps": 8600,
+      "call_frame_locality_bps": 8400,
+      "exactness_score_bps": 8300,
+      "cost_score_bps": 5600,
+      "posture": "degraded_but_bounded",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+        "fixtures/tassadar/reports/tassadar_locality_scratchpad_report.json",
+        "fixtures/tassadar/reports/tassadar_state_design_runtime_report.json"
+      ],
+      "note": "scratchpadization narrows the module-scale lookback envelope but still remains degraded while mutable memory and call-frame state stay coupled"
+    }
+  ],
+  "claim_boundary": "this runtime report is a benchmark-bound locality analysis over seeded workload families and dense, sparse, linear, recurrent, and scratchpadized variants. It keeps exact, degraded-but-bounded, and refused posture explicit instead of widening served capability, arbitrary Wasm closure, or broad learned exactness claims",
+  "summary": "Locality-envelope runtime report covers 20 receipts with 9 exact, 8 degraded, and 3 refused cases; non-refused averages are 65 useful-lookback tokens, 48 active-memory tokens, 9035 bps exactness, and 6370 bps cost.",
+  "report_digest": "40700d32069cd14e8b8c8d086c1ba09895fb84d081114d6859c921f9fd5d1ee6"
+}
