@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.internal_external_delegation.benchmark_report.v1",
+  "suite_id": "tassadar.delegation_benchmark_suite.v1",
+  "sandbox_baseline_id": "tassadar.external_delegation_baseline.v1",
+  "route_matrix_ref": "fixtures/tassadar/reports/tassadar_internal_external_delegation_route_matrix.json",
+  "internal_win_count": 2,
+  "cpu_reference_win_count": 2,
+  "external_sandbox_win_count": 1,
+  "hybrid_only_count": 1,
+  "internal_average_evidence_completeness_bps": 8116,
+  "cpu_reference_average_evidence_completeness_bps": 10000,
+  "external_sandbox_average_evidence_completeness_bps": 9325,
+  "internal_refusal_or_degraded_count": 4,
+  "cpu_reference_refusal_or_degraded_count": 0,
+  "external_sandbox_refusal_or_degraded_count": 0,
+  "claim_boundary": "this report is a benchmark-bound comparison across matched workloads. It keeps internal exact-compute, cpu-reference, external sandbox, and hybrid-only honest postures explicit instead of collapsing route rankings into product or authority claims",
+  "summary": "Delegation benchmark report covers 6 matched cases with wins internal=2, cpu_reference=2, external_sandbox=1, hybrid=1, and evidence completeness internal/cpu/external = 8116/10000/9325 bps.",
+  "report_digest": "91e8aeaa34c9a048a4d761437faf7810337227506bf476591abb6a488fe971de"
+}

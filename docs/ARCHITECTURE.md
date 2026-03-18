@@ -1184,6 +1184,22 @@ The current scope is:
   `fixtures/tassadar/reports/tassadar_negative_invocation_report.json`; the
   lane remains research-only planner learning and does not imply served
   promotion, accepted-outcome authority, or settlement closure
+- landed matched internal-vs-external delegation benchmark follow-on:
+  `psionic-environments` now publishes a public
+  `TassadarDelegationBenchmarkSuite` over matched arithmetic, memory-heavy,
+  long-loop, Sudoku, branch-heavy, and CLRS bridge workload rows,
+  `psionic-sandbox` now publishes the explicit external-tool foil as
+  `TassadarExternalDelegationBaseline`, `psionic-router` now freezes the
+  matched route matrix at
+  `fixtures/tassadar/reports/tassadar_internal_external_delegation_route_matrix.json`
+  with explicit `internal_exact_compute`, `cpu_reference`,
+  `external_sandbox`, and `hybrid` winners, `psionic-eval` now freezes the
+  joined report at
+  `fixtures/tassadar/reports/tassadar_internal_external_delegation_benchmark_report.json`,
+  and `psionic-provider` now projects the same matrix into a
+  provider-facing `TassadarInternalExternalDelegationReceipt`; the lane
+  remains a benchmark-bound comparison surface and does not imply product
+  promotion, accepted-outcome authority, or settlement closure
 - the final article-parity closeout audit now exists at
   `docs/audits/2026-03-17-tassadar-article-parity-closeout-audit.md`; it is
   explicitly subordinate to `fixtures/tassadar/reports/tassadar_acceptance_report.json`

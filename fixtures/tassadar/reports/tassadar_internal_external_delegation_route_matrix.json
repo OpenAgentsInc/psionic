@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "matrix_id": "tassadar.internal_external_delegation.route_matrix.v1",
+  "suite_id": "tassadar.delegation_benchmark_suite.v1",
+  "sandbox_baseline_id": "tassadar.external_delegation_baseline.v1",
+  "cases": [
+    {
+      "case_id": "arithmetic_microprogram_exact_transform",
+      "workload_class": "arithmetic_microprogram",
+      "lane_measurements": [
+        {
+          "lane": "cpu_reference",
+          "expected_correctness_bps": 10000,
+          "evidence_completeness_bps": 10000,
+          "estimated_latency_millis": 620,
+          "estimated_cost_milliunits": 1400,
+          "refusal_posture": "exact",
+          "note": "cpu-reference stays exact and authoritative but slower and costlier"
+        },
+        {
+          "lane": "external_sandbox",
+          "expected_correctness_bps": 10000,
+          "evidence_completeness_bps": 9500,
+          "estimated_latency_millis": 780,
+          "estimated_cost_milliunits": 3100,
+          "refusal_posture": "exact",
+          "note": "external sandbox is exact but expensive for this small bounded row"
+        },
+        {
+          "lane": "internal_exact_compute",
+          "expected_correctness_bps": 9900,
+          "evidence_completeness_bps": 8900,
+          "estimated_latency_millis": 180,
+          "estimated_cost_milliunits": 900,
+          "refusal_posture": "exact",
+          "note": "internal exact-compute is fastest while staying exact enough on this bounded arithmetic row"
+        }
+      ],
+      "honest_winner": "internal_exact_compute",
+      "note": "internal execution wins honestly on small exact arithmetic workloads"
+    },
+    {
+      "case_id": "memory_heavy_kernel_patch",
+      "workload_class": "memory_heavy_kernel",
+      "lane_measurements": [
+        {
+          "lane": "cpu_reference",
+          "expected_correctness_bps": 10000,
+          "evidence_completeness_bps": 10000,
+          "estimated_latency_millis": 780,
+          "estimated_cost_milliunits": 2500,
+          "refusal_posture": "exact",
+          "note": "cpu-reference remains strongest on evidence completeness but costs more"
+        },
+        {
+          "lane": "external_sandbox",
+          "expected_correctness_bps": 9950,
+          "evidence_completeness_bps": 9400,
+          "estimated_latency_millis": 900,
+          "estimated_cost_milliunits": 4200,
+          "refusal_posture": "exact",
+          "note": "external sandbox stays exact but is not the best current tradeoff"
+        },
+        {
+          "lane": "internal_exact_compute",
+          "expected_correctness_bps": 9880,
+          "evidence_completeness_bps": 9100,
+          "estimated_latency_millis": 320,
+          "estimated_cost_milliunits": 1900,
+          "refusal_posture": "exact",
+          "note": "internal lane keeps the best cost-latency profile on this bounded memory-heavy kernel"
+        }
+      ],
+      "honest_winner": "internal_exact_compute",
+      "note": "internal execution remains the honest winner on the public bounded memory-heavy lane"
+    },
+    {
+      "case_id": "long_loop_kernel_robust",
+      "workload_class": "long_loop_kernel",
+      "lane_measurements": [
+        {
+          "lane": "cpu_reference",
+          "expected_correctness_bps": 10000,
+          "evidence_completeness_bps": 10000,
+          "estimated_latency_millis": 1450,
+          "estimated_cost_milliunits": 3200,
+          "refusal_posture": "exact",
+          "note": "cpu-reference stays exact but slower than the current sandbox baseline"
+        },
+        {
+          "lane": "external_sandbox",
+          "expected_correctness_bps": 9950,
+          "evidence_completeness_bps": 9300,
+          "estimated_latency_millis": 980,
+          "estimated_cost_milliunits": 2700,
+          "refusal_posture": "exact",
+          "note": "external sandbox is the strongest robust public baseline on the long-loop row"
+        },
+        {
+          "lane": "internal_exact_compute",
+          "expected_correctness_bps": 9100,
+          "evidence_completeness_bps": 7200,
+          "estimated_latency_millis": 640,
+          "estimated_cost_milliunits": 3600,
+          "refusal_posture": "degraded",
+          "note": "internal lane remains faster than sandbox but still degrades through fallback churn"
+        }
+      ],
+      "honest_winner": "external_sandbox",
+      "note": "external sandbox wins when the public internal lane still degrades on long-loop robustness"
+    },
+    {
+      "case_id": "sudoku_candidate_check",
+      "workload_class": "sudoku_class",
+      "lane_measurements": [
+        {
+          "lane": "cpu_reference",
+          "expected_correctness_bps": 10000,
+          "evidence_completeness_bps": 10000,
+          "estimated_latency_millis": 730,
+          "estimated_cost_milliunits": 2200,
+          "refusal_posture": "exact",
+          "note": "cpu-reference remains the honest exact authority on the seeded Sudoku row"
+        },
+        {
+          "lane": "external_sandbox",
+          "expected_correctness_bps": 9900,
+          "evidence_completeness_bps": 9300,
+          "estimated_latency_millis": 1020,
+          "estimated_cost_milliunits": 4900,
+          "refusal_posture": "exact",
+          "note": "external sandbox stays exact but costlier than CPU-reference here"
+        },
+        {
+          "lane": "internal_exact_compute",
+          "expected_correctness_bps": 9250,
+          "evidence_completeness_bps": 7800,
+          "estimated_latency_millis": 410,
+          "estimated_cost_milliunits": 2950,
+          "refusal_posture": "degraded",
+          "note": "internal lane is strong but not the cleanest current exact authority for this search row"
+        }
+      ],
+      "honest_winner": "cpu_reference",
+      "note": "cpu-reference remains the cleanest exact winner on the public Sudoku benchmark row"
+    },
+    {
+      "case_id": "branch_heavy_control_repair",
+      "workload_class": "branch_heavy_kernel",
+      "lane_measurements": [
+        {
+          "lane": "cpu_reference",
+          "expected_correctness_bps": 10000,
+          "evidence_completeness_bps": 10000,
+          "estimated_latency_millis": 1150,
+          "estimated_cost_milliunits": 2700,
+          "refusal_posture": "exact",
+          "note": "cpu-reference is exact but too slow to be the only honest operational path here"
+        },
+        {
+          "lane": "external_sandbox",
+          "expected_correctness_bps": 9920,
+          "evidence_completeness_bps": 9100,
+          "estimated_latency_millis": 1040,
+          "estimated_cost_milliunits": 4600,
+          "refusal_posture": "exact",
+          "note": "external sandbox is exact but still costlier than the hybrid validation posture"
+        },
+        {
+          "lane": "internal_exact_compute",
+          "expected_correctness_bps": 9780,
+          "evidence_completeness_bps": 8100,
+          "estimated_latency_millis": 300,
+          "estimated_cost_milliunits": 2200,
+          "refusal_posture": "degraded",
+          "note": "internal lane is attractive on speed but not sufficient alone for the current evidence bar"
+        }
+      ],
+      "honest_winner": "hybrid",
+      "note": "hybrid routing is the only honest posture on this row: internal speed plus CPU-reference validation"
+    },
+    {
+      "case_id": "clrs_shortest_path_verification",
+      "workload_class": "clrs_shortest_path",
+      "lane_measurements": [
+        {
+          "lane": "cpu_reference",
+          "expected_correctness_bps": 10000,
+          "evidence_completeness_bps": 10000,
+          "estimated_latency_millis": 810,
+          "estimated_cost_milliunits": 2100,
+          "refusal_posture": "exact",
+          "note": "cpu-reference remains the exact authority for the CLRS bridge row"
+        },
+        {
+          "lane": "external_sandbox",
+          "expected_correctness_bps": 9950,
+          "evidence_completeness_bps": 9350,
+          "estimated_latency_millis": 1100,
+          "estimated_cost_milliunits": 4300,
+          "refusal_posture": "exact",
+          "note": "external sandbox is viable but does not beat CPU-reference on this bridge workload"
+        },
+        {
+          "lane": "internal_exact_compute",
+          "expected_correctness_bps": 8900,
+          "evidence_completeness_bps": 7600,
+          "estimated_latency_millis": 360,
+          "estimated_cost_milliunits": 2400,
+          "refusal_posture": "degraded",
+          "note": "internal CLRS bridge remains benchmarked but not yet the strongest public exact path"
+        }
+      ],
+      "honest_winner": "cpu_reference",
+      "note": "cpu-reference wins where the internal CLRS bridge is still only partially closed publicly"
+    }
+  ],
+  "internal_win_count": 2,
+  "cpu_reference_win_count": 2,
+  "external_sandbox_win_count": 1,
+  "hybrid_only_count": 1,
+  "internal_cost_per_correct_job_milliunits": 1400,
+  "cpu_reference_cost_per_correct_job_milliunits": 2350,
+  "external_sandbox_cost_per_correct_job_milliunits": 3966,
+  "claim_boundary": "this matrix is a benchmark-bound route-comparison surface over matched workloads. It keeps internal exact-compute, cpu-reference, external sandbox, and hybrid postures explicit instead of promoting one lane into general closure",
+  "summary": "Delegation route matrix covers 6 matched cases with wins internal=2, cpu_reference=2, external_sandbox=1, hybrid=1.",
+  "matrix_digest": "6219befd9795bdfec9fb06b5c1f515e156fd39f594825f58452c028649500584"
+}

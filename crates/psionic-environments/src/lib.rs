@@ -7,6 +7,7 @@
 
 mod apple_adapter;
 mod tassadar;
+mod tassadar_delegation_benchmark;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -19,6 +20,7 @@ use thiserror::Error;
 
 pub use apple_adapter::*;
 pub use tassadar::*;
+pub use tassadar_delegation_benchmark::*;
 
 /// Human-readable crate ownership summary.
 pub const CRATE_ROLE: &str = "environment package ABI and runtime contract";

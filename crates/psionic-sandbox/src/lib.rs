@@ -12,5 +12,8 @@ pub use jobs::*;
 mod pool;
 pub use pool::*;
 
+mod tassadar_external_delegation;
+pub use tassadar_external_delegation::*;
+
 mod tassadar_import_boundary;
 pub use tassadar_import_boundary::*;

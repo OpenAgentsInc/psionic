@@ -56,6 +56,8 @@ mod tassadar_executor_hull_benchmark;
 mod tassadar_hungarian_10x10_compiled_executor;
 #[path = "tassadar_hungarian_compiled_executor.rs"]
 mod tassadar_hungarian_compiled_executor;
+#[path = "tassadar_internal_external_delegation.rs"]
+mod tassadar_internal_external_delegation;
 #[path = "tassadar_kernel_module_scaling.rs"]
 mod tassadar_kernel_module_scaling;
 #[path = "tassadar_learnability_gap.rs"]
@@ -147,6 +149,7 @@ pub use tassadar_executor_eval::*;
 pub use tassadar_executor_hull_benchmark::*;
 pub use tassadar_hungarian_10x10_compiled_executor::*;
 pub use tassadar_hungarian_compiled_executor::*;
+pub use tassadar_internal_external_delegation::*;
 pub use tassadar_kernel_module_scaling::*;
 pub use tassadar_learnability_gap::*;
 pub use tassadar_locality_scratchpad::*;

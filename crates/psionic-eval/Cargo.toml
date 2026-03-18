@@ -26,6 +26,7 @@ full = [
     "dep:psionic-models",
     "dep:psionic-router",
     "dep:psionic-runtime",
+    "dep:psionic-sandbox",
 ]
 
 [dependencies]
@@ -40,6 +41,7 @@ psionic-ir = { path = "../psionic-ir", optional = true }
 psionic-models = { path = "../psionic-models", optional = true }
 psionic-router = { path = "../psionic-router", optional = true }
 psionic-runtime = { path = "../psionic-runtime", optional = true }
+psionic-sandbox = { path = "../psionic-sandbox", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

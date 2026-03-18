@@ -3537,6 +3537,7 @@ version = "0.1.1"
 dependencies = [
  "hex",
  "psionic-data",
+ "psionic-models",
  "serde",
  "serde_json",
  "sha2",
@@ -3558,6 +3559,7 @@ dependencies = [
  "psionic-models",
  "psionic-router",
  "psionic-runtime",
+ "psionic-sandbox",
  "serde",
  "serde_json",
  "sha2",
@@ -3830,8 +3832,10 @@ name = "psionic-router"
 version = "0.1.1"
 dependencies = [
  "hex",
+ "psionic-environments",
  "psionic-models",
  "psionic-runtime",
+ "psionic-sandbox",
  "serde",
  "serde_json",
  "sha2",
@@ -3864,6 +3868,7 @@ version = "0.1.1"
 dependencies = [
  "hex",
  "psionic-core",
+ "psionic-models",
  "psionic-runtime",
  "serde",
  "serde_json",
