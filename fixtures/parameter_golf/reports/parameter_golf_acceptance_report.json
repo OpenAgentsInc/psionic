@@ -61,8 +61,8 @@
         "PGOLF-303/#171"
       ],
       "green_definition": "Psionic has one explicit 8xH100 execution path with topology, timing, memory, and artifact receipts that support the declared challenge bar.",
-      "current_repo_truth": "psionic-eval plus psionic-train now ship a dedicated Parameter Golf benchmark package and receipt lane covering local-reference score, wallclock, memory, artifact-size, and train or eval bundle-root review artifacts, but there is still no real distributed 8xH100 trainer lane or widened CUDA training surface behind those receipts yet.",
-      "boundary_note": "Treat the landed receipt lane as bookkeeping substrate only until the actual distributed path exists."
+      "current_repo_truth": "psionic-train plus psionic-eval now ship an exact 8xH100 DDP-style receipt lane aligned to the current train_gpt.py posture, including explicit CUDA-device admission gates, replicated topology, NCCL-style all-reduce communication stages, measured wallclock receipts, and analytic distributed memory planning, but the CUDA decoder-kernel and runtime widening needed for full challenge-speed closure are still open.",
+      "boundary_note": "Treat this as explicit distributed execution truth with honest refusal posture, not as proof that the remaining CUDA kernel gaps are closed."
     },
     {
       "category_id": "packaging-readiness",
@@ -89,5 +89,5 @@
       "boundary_note": "Treat this as blocked by both in-repo implementation work and the need for an explicit public accounting interpretation."
     }
   ],
-  "report_digest": "097de249a9b83cfeece4261f3cbd68aae395d7597c8e2a5eef277b8406b70896"
+  "report_digest": "1853c39cc6b365a73c6870023840318c234b11958ca9bb37eb3a3e391fde3d01"
 }

@@ -74,6 +74,18 @@ impl ParameterGolfBatchGeometry {
         }
     }
 
+    /// Returns the current public `8xH100` challenge defaults from `train_gpt.py`.
+    #[must_use]
+    pub const fn challenge_distributed_8xh100_defaults() -> Self {
+        Self {
+            world_size: 8,
+            train_batch_tokens: 524_288,
+            validation_batch_tokens: 524_288,
+            train_sequence_length: 1024,
+            grad_accum_steps: 1,
+        }
+    }
+
     /// Returns the per-rank, per-microbatch train-token count.
     #[must_use]
     pub const fn local_train_batch_tokens(&self) -> usize {

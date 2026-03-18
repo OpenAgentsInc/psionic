@@ -28,9 +28,11 @@ The canonical current Psionic claim posture is:
 
 That is the only honest posture on 2026-03-18 because:
 
-- exact challenge-oracle parity is not landed
-- the baseline single-device trainer is not landed
-- the `8xH100` distributed lane is not landed
+- exact challenge-oracle parity is landed, but that alone is not a submission
+  claim
+- the baseline single-device trainer is landed only as a bounded reference path
+- the `8xH100` distributed receipt lane is landed, but distributed-throughput
+  closure is still not green
 - no challenge-ready record-folder output contract is landed
 - no counted-code story exists yet for a Psionic-owned runtime submission
 

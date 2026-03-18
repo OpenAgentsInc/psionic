@@ -331,7 +331,7 @@ Turn single-device parity into honest `8xH100` throughput closure.
 | ID | Status | Proposed GitHub issue title | Description |
 | --- | --- | --- | --- |
 | `PGOLF-301` / [#169](https://github.com/OpenAgentsInc/psionic/issues/169) | done (2026-03-18) | `Psionic Parameter Golf: add challenge benchmark packages, eval receipts, and leaderboard-facing reports` | `psionic-eval` now ships a dedicated Parameter Golf benchmark package plus score, wallclock, memory, artifact-size, and bundle-root receipt contracts, and `psionic-train` now ships a bounded local-reference benchmark bundle builder that emits those review artifacts from the Psionic-owned trainer instead of relying on ad hoc logs. |
-| `PGOLF-302` / [#170](https://github.com/OpenAgentsInc/psionic/issues/170) | open | `Psionic Parameter Golf: add the real distributed 8xH100 training lane and throughput receipts` | Decide and implement the actual distributed execution posture for the challenge run, then emit explicit topology, communication, timing, and memory receipts for that path. The target is measured closure, not assumed DDP equivalence. |
+| `PGOLF-302` / [#170](https://github.com/OpenAgentsInc/psionic/issues/170) | done (2026-03-18) | `Psionic Parameter Golf: add the real distributed 8xH100 training lane and throughput receipts` | `psionic-train` plus `psionic-eval` now ship an exact `8xH100` DDP-style receipt lane aligned to the public `train_gpt.py` posture, including explicit H100 admission gates, replicated topology, NCCL-style all-reduce communication stages, measured wallclock receipts, analytic memory planning, and typed refusal when the lane cannot honestly clear the declared challenge bar. |
 | `PGOLF-303` / [#171](https://github.com/OpenAgentsInc/psionic/issues/171) | open | `Psionic Parameter Golf: widen CUDA runtime and kernel coverage required by the challenge baseline` | Close the gap between today's bounded public array surface and the kernels or runtime path needed for competitive small-decoder training. This includes any train-time RoPE, RMSNorm, attention, residual, optimizer, or quantization kernels that must be widened for the chosen `8xH100` path. |
 
 ## Epic 4: Packaging, Submission, And Research Widening
@@ -379,7 +379,7 @@ research without losing the oracle.
 ### Phase 4: close measured 8xH100 execution truth
 
 - `PGOLF-301` -> landed local-reference benchmark package, challenge score report, wallclock or memory or artifact-size receipts, and train or eval bundle roots for later leaderboard-facing review
-- `PGOLF-302`
+- `PGOLF-302` -> landed exact `8xH100` DDP-style topology, NCCL-style collective receipts, analytic memory planning, and measured-or-refused challenge-bar outcomes
 - `PGOLF-303`
 
 ### Phase 5: package the lane honestly, then widen research
