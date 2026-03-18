@@ -15,6 +15,7 @@ mod tassadar_module_execution;
 mod tassadar_module_specialization;
 mod tassadar_module_trace_abi_v2;
 mod tassadar_structured_control;
+mod tassadar_verifier_guided_search;
 mod tassadar_wasm_conformance;
 mod validation;
 
@@ -45,6 +46,7 @@ pub use tassadar_module_execution::*;
 pub use tassadar_module_specialization::*;
 pub use tassadar_module_trace_abi_v2::*;
 pub use tassadar_structured_control::*;
+pub use tassadar_verifier_guided_search::*;
 pub use tassadar_wasm_conformance::*;
 use thiserror::Error;
 pub use validation::*;

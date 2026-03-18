@@ -78,6 +78,7 @@ mod tassadar_scratchpad_framework_comparison;
 mod tassadar_sequence;
 mod tassadar_subroutine_supervision;
 mod tassadar_trace_family_comparison;
+mod tassadar_verifier_guided_search_trace_family;
 mod worker_protocol;
 
 pub use adapter_aggregation::*;
@@ -138,6 +139,7 @@ pub use tassadar_scratchpad_framework_comparison::*;
 pub use tassadar_sequence::*;
 pub use tassadar_subroutine_supervision::*;
 pub use tassadar_trace_family_comparison::*;
+pub use tassadar_verifier_guided_search_trace_family::*;
 pub use worker_protocol::*;
 
 /// Human-readable crate ownership summary.

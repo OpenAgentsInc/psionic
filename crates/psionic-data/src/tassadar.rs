@@ -27,6 +27,17 @@ pub const TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION: &str =
 pub const TASSADAR_TRACE_FAMILY_SET_ABI_VERSION: &str = "psionic.tassadar.trace_family_set.v1";
 /// Stable ABI version for CLRS-to-Wasm bridge contracts.
 pub const TASSADAR_CLRS_WASM_BRIDGE_ABI_VERSION: &str = "psionic.tassadar.clrs_wasm_bridge.v1";
+/// Stable ABI version for verifier-guided search trace-family contracts.
+pub const TASSADAR_VERIFIER_GUIDED_SEARCH_TRACE_FAMILY_ABI_VERSION: &str =
+    "psionic.tassadar.verifier_guided_search_trace_family.v1";
+/// Stable public family reference for the verifier-guided search trace lane.
+pub const TASSADAR_VERIFIER_GUIDED_SEARCH_TRACE_FAMILY_REF: &str =
+    "trace-family://openagents/tassadar/verifier_guided_search";
+/// Shared version used by the seeded verifier-guided search lane.
+pub const TASSADAR_VERIFIER_GUIDED_SEARCH_TRACE_FAMILY_VERSION: &str = "2026.03.18";
+/// Canonical machine-readable report ref for the verifier-guided search lane.
+pub const TASSADAR_VERIFIER_GUIDED_SEARCH_TRACE_FAMILY_REPORT_REF: &str =
+    "fixtures/tassadar/runs/tassadar_verifier_guided_search_trace_family_v1/search_trace_family_report.json";
 
 /// Benchmark-family taxonomy for the public Tassadar package set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -82,6 +93,32 @@ pub enum TassadarClrsLengthBucket {
     Tiny,
     /// Small fixed witness graph.
     Small,
+}
+
+/// Search workload family surfaced by the verifier-guided trace lane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarVerifierGuidedSearchWorkloadFamily {
+    /// Sudoku-class bounded backtracking search.
+    SudokuBacktracking,
+    /// Synthetic kernel-style bounded search.
+    SearchKernel,
+}
+
+/// Event kind carried by the verifier-guided search trace lane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarVerifierGuidedSearchEventKind {
+    /// One explicit guess action.
+    Guess,
+    /// One verifier-accepted candidate or partial state.
+    Verify,
+    /// One contradiction certificate.
+    Contradiction,
+    /// One explicit backtrack action.
+    Backtrack,
+    /// One final committed solved state.
+    Commit,
 }
 
 /// Module-scale deterministic Wasm workload family tracked by the public suite.
@@ -1468,6 +1505,334 @@ pub enum TassadarClrsWasmBridgeError {
     },
 }
 
+/// One seeded case in the verifier-guided search trace family.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarVerifierGuidedSearchTraceCaseContract {
+    /// Stable case identifier.
+    pub case_id: String,
+    /// Search workload family.
+    pub workload_family: TassadarVerifierGuidedSearchWorkloadFamily,
+    /// Human-readable case summary.
+    pub summary: String,
+    /// Explicit maximum guess count admitted by the seeded case.
+    pub max_guess_budget: u32,
+    /// Explicit maximum backtrack count admitted by the seeded case.
+    pub max_backtrack_budget: u32,
+}
+
+impl TassadarVerifierGuidedSearchTraceCaseContract {
+    fn validate(
+        &self,
+        supported_workload_families: &BTreeSet<TassadarVerifierGuidedSearchWorkloadFamily>,
+    ) -> Result<(), TassadarVerifierGuidedSearchTraceFamilyError> {
+        if self.case_id.trim().is_empty() {
+            return Err(TassadarVerifierGuidedSearchTraceFamilyError::MissingCaseId);
+        }
+        if self.summary.trim().is_empty() {
+            return Err(TassadarVerifierGuidedSearchTraceFamilyError::MissingCaseSummary {
+                case_id: self.case_id.clone(),
+            });
+        }
+        if !supported_workload_families.contains(&self.workload_family) {
+            return Err(
+                TassadarVerifierGuidedSearchTraceFamilyError::CaseWorkloadFamilyNotDeclared {
+                    case_id: self.case_id.clone(),
+                    workload_family: self.workload_family,
+                },
+            );
+        }
+        if self.max_guess_budget == 0 {
+            return Err(
+                TassadarVerifierGuidedSearchTraceFamilyError::InvalidCaseGuessBudget {
+                    case_id: self.case_id.clone(),
+                },
+            );
+        }
+        if self.max_backtrack_budget == 0 {
+            return Err(
+                TassadarVerifierGuidedSearchTraceFamilyError::InvalidCaseBacktrackBudget {
+                    case_id: self.case_id.clone(),
+                },
+            );
+        }
+        Ok(())
+    }
+}
+
+/// Public contract for the verifier-guided search trace family.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarVerifierGuidedSearchTraceFamilyContract {
+    /// Stable ABI version.
+    pub abi_version: String,
+    /// Stable family reference.
+    pub family_ref: String,
+    /// Immutable family version.
+    pub version: String,
+    /// Supported search workload families.
+    pub supported_workload_families: Vec<TassadarVerifierGuidedSearchWorkloadFamily>,
+    /// Supported event kinds in the trace lane.
+    pub event_kinds: Vec<TassadarVerifierGuidedSearchEventKind>,
+    /// Evaluation axes surfaced by the committed reports.
+    pub evaluation_axes: Vec<String>,
+    /// Seeded benchmark-bound cases.
+    pub cases: Vec<TassadarVerifierGuidedSearchTraceCaseContract>,
+    /// Canonical machine-readable report ref for the lane.
+    pub report_ref: String,
+}
+
+impl TassadarVerifierGuidedSearchTraceFamilyContract {
+    /// Creates and validates the search trace-family contract.
+    pub fn new(
+        family_ref: impl Into<String>,
+        version: impl Into<String>,
+        supported_workload_families: Vec<TassadarVerifierGuidedSearchWorkloadFamily>,
+        event_kinds: Vec<TassadarVerifierGuidedSearchEventKind>,
+        evaluation_axes: Vec<String>,
+        cases: Vec<TassadarVerifierGuidedSearchTraceCaseContract>,
+        report_ref: impl Into<String>,
+    ) -> Result<Self, TassadarVerifierGuidedSearchTraceFamilyError> {
+        let contract = Self {
+            abi_version: String::from(TASSADAR_VERIFIER_GUIDED_SEARCH_TRACE_FAMILY_ABI_VERSION),
+            family_ref: family_ref.into(),
+            version: version.into(),
+            supported_workload_families,
+            event_kinds,
+            evaluation_axes,
+            cases,
+            report_ref: report_ref.into(),
+        };
+        contract.validate()?;
+        Ok(contract)
+    }
+
+    /// Validates the contract.
+    pub fn validate(&self) -> Result<(), TassadarVerifierGuidedSearchTraceFamilyError> {
+        if self.abi_version != TASSADAR_VERIFIER_GUIDED_SEARCH_TRACE_FAMILY_ABI_VERSION {
+            return Err(
+                TassadarVerifierGuidedSearchTraceFamilyError::UnsupportedAbiVersion {
+                    abi_version: self.abi_version.clone(),
+                },
+            );
+        }
+        if self.family_ref.trim().is_empty() {
+            return Err(TassadarVerifierGuidedSearchTraceFamilyError::MissingFamilyRef);
+        }
+        if self.version.trim().is_empty() {
+            return Err(TassadarVerifierGuidedSearchTraceFamilyError::MissingVersion);
+        }
+        if self.supported_workload_families.is_empty() {
+            return Err(TassadarVerifierGuidedSearchTraceFamilyError::MissingWorkloadFamilies);
+        }
+        if self.event_kinds.is_empty() {
+            return Err(TassadarVerifierGuidedSearchTraceFamilyError::MissingEventKinds);
+        }
+        if self.evaluation_axes.is_empty() {
+            return Err(TassadarVerifierGuidedSearchTraceFamilyError::MissingEvaluationAxes);
+        }
+        if self.cases.is_empty() {
+            return Err(TassadarVerifierGuidedSearchTraceFamilyError::MissingCases);
+        }
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarVerifierGuidedSearchTraceFamilyError::MissingReportRef);
+        }
+
+        let mut seen_workload_families = BTreeSet::new();
+        for workload_family in &self.supported_workload_families {
+            if !seen_workload_families.insert(*workload_family) {
+                return Err(
+                    TassadarVerifierGuidedSearchTraceFamilyError::DuplicateWorkloadFamily {
+                        workload_family: *workload_family,
+                    },
+                );
+            }
+        }
+        let mut seen_event_kinds = BTreeSet::new();
+        for event_kind in &self.event_kinds {
+            if !seen_event_kinds.insert(*event_kind) {
+                return Err(TassadarVerifierGuidedSearchTraceFamilyError::DuplicateEventKind {
+                    event_kind: *event_kind,
+                });
+            }
+        }
+        let mut seen_axes = BTreeSet::new();
+        for axis in &self.evaluation_axes {
+            if axis.trim().is_empty() {
+                return Err(TassadarVerifierGuidedSearchTraceFamilyError::MissingEvaluationAxis);
+            }
+            if !seen_axes.insert(axis.clone()) {
+                return Err(
+                    TassadarVerifierGuidedSearchTraceFamilyError::DuplicateEvaluationAxis {
+                        axis: axis.clone(),
+                    },
+                );
+            }
+        }
+
+        let supported_workload_families = self.supported_workload_families.iter().copied().collect();
+        let mut seen_case_ids = BTreeSet::new();
+        for case in &self.cases {
+            case.validate(&supported_workload_families)?;
+            if !seen_case_ids.insert(case.case_id.clone()) {
+                return Err(TassadarVerifierGuidedSearchTraceFamilyError::DuplicateCaseId {
+                    case_id: case.case_id.clone(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Returns a stable digest over the contract.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        stable_digest(
+            b"psionic_tassadar_verifier_guided_search_trace_family_contract|",
+            self,
+        )
+    }
+}
+
+/// Returns the current public verifier-guided search trace-family contract.
+#[must_use]
+pub fn tassadar_verifier_guided_search_trace_family_contract(
+) -> TassadarVerifierGuidedSearchTraceFamilyContract {
+    TassadarVerifierGuidedSearchTraceFamilyContract::new(
+        TASSADAR_VERIFIER_GUIDED_SEARCH_TRACE_FAMILY_REF,
+        TASSADAR_VERIFIER_GUIDED_SEARCH_TRACE_FAMILY_VERSION,
+        vec![
+            TassadarVerifierGuidedSearchWorkloadFamily::SudokuBacktracking,
+            TassadarVerifierGuidedSearchWorkloadFamily::SearchKernel,
+        ],
+        vec![
+            TassadarVerifierGuidedSearchEventKind::Guess,
+            TassadarVerifierGuidedSearchEventKind::Verify,
+            TassadarVerifierGuidedSearchEventKind::Contradiction,
+            TassadarVerifierGuidedSearchEventKind::Backtrack,
+            TassadarVerifierGuidedSearchEventKind::Commit,
+        ],
+        vec![
+            String::from("backtrack_exactness_bps"),
+            String::from("verifier_certificate_accuracy_bps"),
+            String::from("guess_count"),
+            String::from("recovery_quality_bps"),
+        ],
+        vec![
+            TassadarVerifierGuidedSearchTraceCaseContract {
+                case_id: String::from("sudoku_v0_train_a"),
+                workload_family: TassadarVerifierGuidedSearchWorkloadFamily::SudokuBacktracking,
+                summary: String::from(
+                    "real Sudoku-v0 search case with one contradiction certificate and one bounded backtrack",
+                ),
+                max_guess_budget: 3,
+                max_backtrack_budget: 2,
+            },
+            TassadarVerifierGuidedSearchTraceCaseContract {
+                case_id: String::from("search_kernel_two_branch_recovery"),
+                workload_family: TassadarVerifierGuidedSearchWorkloadFamily::SearchKernel,
+                summary: String::from(
+                    "synthetic two-branch recovery kernel with one dead-end contradiction and one successful fallback branch",
+                ),
+                max_guess_budget: 2,
+                max_backtrack_budget: 1,
+            },
+        ],
+        TASSADAR_VERIFIER_GUIDED_SEARCH_TRACE_FAMILY_REPORT_REF,
+    )
+    .expect("current verifier-guided search trace-family contract should stay valid")
+}
+
+/// Search trace-family validation failure.
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum TassadarVerifierGuidedSearchTraceFamilyError {
+    /// Unsupported ABI version.
+    #[error("unsupported verifier-guided search trace-family ABI version `{abi_version}`")]
+    UnsupportedAbiVersion {
+        /// Observed ABI version.
+        abi_version: String,
+    },
+    /// Missing family ref.
+    #[error("verifier-guided search trace family is missing `family_ref`")]
+    MissingFamilyRef,
+    /// Missing version.
+    #[error("verifier-guided search trace family is missing `version`")]
+    MissingVersion,
+    /// Missing workload families.
+    #[error("verifier-guided search trace family must declare workload families")]
+    MissingWorkloadFamilies,
+    /// Missing event kinds.
+    #[error("verifier-guided search trace family must declare event kinds")]
+    MissingEventKinds,
+    /// Missing evaluation axes.
+    #[error("verifier-guided search trace family must declare evaluation axes")]
+    MissingEvaluationAxes,
+    /// One evaluation axis was empty.
+    #[error("verifier-guided search trace family contains an empty evaluation axis")]
+    MissingEvaluationAxis,
+    /// Missing cases.
+    #[error("verifier-guided search trace family must declare cases")]
+    MissingCases,
+    /// Missing report ref.
+    #[error("verifier-guided search trace family is missing `report_ref`")]
+    MissingReportRef,
+    /// One workload family repeated.
+    #[error("verifier-guided search trace family repeated workload family `{workload_family:?}`")]
+    DuplicateWorkloadFamily {
+        /// Repeated workload family.
+        workload_family: TassadarVerifierGuidedSearchWorkloadFamily,
+    },
+    /// One event kind repeated.
+    #[error("verifier-guided search trace family repeated event kind `{event_kind:?}`")]
+    DuplicateEventKind {
+        /// Repeated event kind.
+        event_kind: TassadarVerifierGuidedSearchEventKind,
+    },
+    /// One evaluation axis repeated.
+    #[error("verifier-guided search trace family repeated evaluation axis `{axis}`")]
+    DuplicateEvaluationAxis {
+        /// Repeated axis.
+        axis: String,
+    },
+    /// Missing case id.
+    #[error("verifier-guided search trace family contains a case without `case_id`")]
+    MissingCaseId,
+    /// Missing case summary.
+    #[error("verifier-guided search trace case `{case_id}` is missing `summary`")]
+    MissingCaseSummary {
+        /// Case identifier.
+        case_id: String,
+    },
+    /// One case referenced an undeclared workload family.
+    #[error(
+        "verifier-guided search trace case `{case_id}` references undeclared workload family `{workload_family:?}`"
+    )]
+    CaseWorkloadFamilyNotDeclared {
+        /// Case identifier.
+        case_id: String,
+        /// Undeclared workload family.
+        workload_family: TassadarVerifierGuidedSearchWorkloadFamily,
+    },
+    /// One case declared an invalid guess budget.
+    #[error("verifier-guided search trace case `{case_id}` has invalid `max_guess_budget=0`")]
+    InvalidCaseGuessBudget {
+        /// Case identifier.
+        case_id: String,
+    },
+    /// One case declared an invalid backtrack budget.
+    #[error(
+        "verifier-guided search trace case `{case_id}` has invalid `max_backtrack_budget=0`"
+    )]
+    InvalidCaseBacktrackBudget {
+        /// Case identifier.
+        case_id: String,
+    },
+    /// One case id repeated.
+    #[error("verifier-guided search trace family repeated case `{case_id}`")]
+    DuplicateCaseId {
+        /// Repeated case identifier.
+        case_id: String,
+    },
+}
+
 /// Topology classification for one public Tassadar trace family.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -2225,22 +2590,23 @@ mod tests {
     use serde_json::Value;
 
     use super::{
-        tassadar_numeric_opcode_ladder_contract, TassadarBenchmarkAxis, TassadarBenchmarkFamily,
-        TassadarBenchmarkFamilyContract, TassadarBenchmarkPackageBinding,
-        TassadarBenchmarkPackageSetContract, TassadarClrsAlgorithmFamily, TassadarClrsLengthBucket,
-        TassadarClrsTrajectoryFamily, TassadarClrsWasmBridgeCaseContract,
-        TassadarClrsWasmBridgeContract, TassadarClrsWasmBridgeExportContract,
-        TassadarModuleScaleWorkloadCaseContract, TassadarModuleScaleWorkloadFamily,
-        TassadarModuleScaleWorkloadStatus, TassadarModuleScaleWorkloadSuiteContract,
-        TassadarNumericOpcodeFamily, TassadarNumericOpcodeFamilyStatus,
-        TassadarNumericOpcodeLadderContract, TassadarSequenceDatasetContract,
-        TassadarSequenceExample, TassadarSequenceExampleMetadata, TassadarSequenceSplit,
-        TassadarTraceFamilyAuthorityScope, TassadarTraceFamilyContract,
+        tassadar_numeric_opcode_ladder_contract, tassadar_verifier_guided_search_trace_family_contract,
+        TassadarBenchmarkAxis, TassadarBenchmarkFamily, TassadarBenchmarkFamilyContract,
+        TassadarBenchmarkPackageBinding, TassadarBenchmarkPackageSetContract,
+        TassadarClrsAlgorithmFamily, TassadarClrsLengthBucket, TassadarClrsTrajectoryFamily,
+        TassadarClrsWasmBridgeCaseContract, TassadarClrsWasmBridgeContract,
+        TassadarClrsWasmBridgeExportContract, TassadarModuleScaleWorkloadCaseContract,
+        TassadarModuleScaleWorkloadFamily, TassadarModuleScaleWorkloadStatus,
+        TassadarModuleScaleWorkloadSuiteContract, TassadarNumericOpcodeFamily,
+        TassadarNumericOpcodeFamilyStatus, TassadarNumericOpcodeLadderContract,
+        TassadarSequenceDatasetContract, TassadarSequenceExample, TassadarSequenceExampleMetadata,
+        TassadarSequenceSplit, TassadarTraceFamilyAuthorityScope, TassadarTraceFamilyContract,
         TassadarTraceFamilySetContract, TassadarTraceFamilyTopology,
         TassadarTraceFamilyWorkloadBinding, TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION,
         TASSADAR_CLRS_WASM_BRIDGE_ABI_VERSION, TASSADAR_MODULE_SCALE_WORKLOAD_SUITE_ABI_VERSION,
         TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION, TASSADAR_SEQUENCE_DATASET_ABI_VERSION,
         TASSADAR_TRACE_FAMILY_SET_ABI_VERSION,
+        TASSADAR_VERIFIER_GUIDED_SEARCH_TRACE_FAMILY_ABI_VERSION,
     };
     use crate::{DatasetKey, TokenizerDigest, TokenizerFamily};
 
@@ -2453,6 +2819,19 @@ mod tests {
         .expect("bridge contract should build");
 
         assert_eq!(contract.abi_version, TASSADAR_CLRS_WASM_BRIDGE_ABI_VERSION);
+        assert_eq!(contract.cases.len(), 2);
+        assert!(!contract.stable_digest().is_empty());
+    }
+
+    #[test]
+    fn verifier_guided_search_trace_family_contract_is_machine_legible() {
+        let contract = tassadar_verifier_guided_search_trace_family_contract();
+        assert_eq!(
+            contract.abi_version,
+            TASSADAR_VERIFIER_GUIDED_SEARCH_TRACE_FAMILY_ABI_VERSION
+        );
+        assert_eq!(contract.supported_workload_families.len(), 2);
+        assert_eq!(contract.event_kinds.len(), 5);
         assert_eq!(contract.cases.len(), 2);
         assert!(!contract.stable_digest().is_empty());
     }

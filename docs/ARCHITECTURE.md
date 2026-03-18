@@ -834,6 +834,21 @@ The current scope is:
   is a literature-facing benchmark bridge over fixed shortest-path witnesses,
   not a claim of full CLRS coverage, arbitrary Wasm closure, or learned
   transfer
+- landed verifier-guided search trace-family follow-on: `psionic-data` now
+  owns a public `TassadarVerifierGuidedSearchTraceFamilyContract` with
+  explicit guess, verify, contradiction, and backtrack events plus bounded
+  search-budget metadata, `psionic-runtime` now publishes the corresponding
+  machine-legible search trace artifacts over one real Sudoku-v0 case and one
+  bounded search-kernel recovery case, `psionic-train` now materializes the
+  committed run artifact at
+  `fixtures/tassadar/runs/tassadar_verifier_guided_search_trace_family_v1/search_trace_family_report.json`,
+  `psionic-eval` now freezes the committed report at
+  `fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json`,
+  and `psionic-research` now freezes the companion architecture summary at
+  `fixtures/tassadar/reports/tassadar_verifier_guided_search_architecture_report.json`;
+  the lane is explicitly research-only verifier-guided search evidence rather
+  than compiled correctness, general combinatorial closure, or served
+  promotion
 - landed Phase 9D bar: typed learned-plus-compiled and learned-circuit
   research in `psionic-research`, with explicit research-line,
   instruction-set, execution-proxy, claim-boundary, and proof-expectation

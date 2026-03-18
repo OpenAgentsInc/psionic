@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.verifier_guided_search.architecture_report.v1",
+  "report_ref": "fixtures/tassadar/reports/tassadar_verifier_guided_search_architecture_report.json",
+  "regeneration_commands": [
+    "cargo run -p psionic-research --example tassadar_verifier_guided_search_architecture_report",
+    "cargo test -p psionic-research verifier_guided_search_architecture_report_matches_committed_truth -- --nocapture"
+  ],
+  "source_report_ref": "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+  "source_report_digest": "dd6efcc3cefe1f62729c519b7cc54b80c3327098ffb2f9f5a6cbb765f8ce6f1d",
+  "family_summaries": [
+    {
+      "workload_family": "sudoku_backtracking",
+      "trainability_summary": "family=SudokuBacktracking, mean_guesses=3, mean_backtracks=1, verifier_accuracy=10000bps, backtrack_exactness=10000bps, recovery_quality=10000bps",
+      "claim_boundary": "research-only verifier-guided search trace family; explicit guess, contradiction, and recovery steps are surfaced for trainability study and do not imply compiled correctness or a general solver"
+    },
+    {
+      "workload_family": "search_kernel",
+      "trainability_summary": "family=SearchKernel, mean_guesses=2, mean_backtracks=1, verifier_accuracy=10000bps, backtrack_exactness=10000bps, recovery_quality=10000bps",
+      "claim_boundary": "research-only verifier-guided search trace family; explicit guess, contradiction, and recovery steps are surfaced for trainability study and do not imply compiled correctness or a general solver"
+    }
+  ],
+  "claim_boundary": "this report freezes one research-only verifier-guided search architecture summary over seeded Sudoku backtracking and bounded search-kernel traces. It does not imply compiled correctness, general combinatorial closure, or served promotion",
+  "summary": "Verifier-guided search architecture summary now freezes the seeded Sudoku backtracking and search-kernel families under explicit guess, verify, contradiction, and backtrack semantics. The lane remains research-only and separate from deterministic compiled executor claims",
+  "report_digest": "cc05c9be0e7ae4551f7f006acb0fc86411a547b0e2105b4dc4e309551ad352bc"
+}

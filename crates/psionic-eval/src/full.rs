@@ -68,6 +68,8 @@ mod tassadar_sparse_rule_compiler_audit;
 mod tassadar_structured_control;
 #[path = "tassadar_sudoku_9x9_compiled_executor.rs"]
 mod tassadar_sudoku_9x9_compiled_executor;
+#[path = "tassadar_verifier_guided_search_report.rs"]
+mod tassadar_verifier_guided_search_report;
 #[path = "tassadar_wasm_module_ingress.rs"]
 mod tassadar_wasm_module_ingress;
 
@@ -115,6 +117,7 @@ pub use tassadar_sequence::*;
 pub use tassadar_sparse_rule_compiler_audit::*;
 pub use tassadar_structured_control::*;
 pub use tassadar_sudoku_9x9_compiled_executor::*;
+pub use tassadar_verifier_guided_search_report::*;
 pub use tassadar_wasm_module_ingress::*;
 
 /// Human-readable crate ownership summary.

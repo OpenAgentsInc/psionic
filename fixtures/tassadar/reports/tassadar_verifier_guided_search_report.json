@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.verifier_guided_search.report.v1",
+  "family_contract": {
+    "abi_version": "psionic.tassadar.verifier_guided_search_trace_family.v1",
+    "family_ref": "trace-family://openagents/tassadar/verifier_guided_search",
+    "version": "2026.03.18",
+    "supported_workload_families": [
+      "sudoku_backtracking",
+      "search_kernel"
+    ],
+    "event_kinds": [
+      "guess",
+      "verify",
+      "contradiction",
+      "backtrack",
+      "commit"
+    ],
+    "evaluation_axes": [
+      "backtrack_exactness_bps",
+      "verifier_certificate_accuracy_bps",
+      "guess_count",
+      "recovery_quality_bps"
+    ],
+    "cases": [
+      {
+        "case_id": "sudoku_v0_train_a",
+        "workload_family": "sudoku_backtracking",
+        "summary": "real Sudoku-v0 search case with one contradiction certificate and one bounded backtrack",
+        "max_guess_budget": 3,
+        "max_backtrack_budget": 2
+      },
+      {
+        "case_id": "search_kernel_two_branch_recovery",
+        "workload_family": "search_kernel",
+        "summary": "synthetic two-branch recovery kernel with one dead-end contradiction and one successful fallback branch",
+        "max_guess_budget": 2,
+        "max_backtrack_budget": 1
+      }
+    ],
+    "report_ref": "fixtures/tassadar/runs/tassadar_verifier_guided_search_trace_family_v1/search_trace_family_report.json"
+  },
+  "trace_family_run_ref": "fixtures/tassadar/runs/tassadar_verifier_guided_search_trace_family_v1/search_trace_family_report.json",
+  "runtime_traces": [
+    {
+      "trace_id": "tassadar.verifier_guided_search.sudoku_v0_train_a.v1",
+      "case_id": "sudoku_v0_train_a",
+      "workload_family": "sudoku_backtracking",
+      "budget": {
+        "max_guesses": 3,
+        "max_backtracks": 2,
+        "max_search_steps": 8
+      },
+      "events": [
+        {
+          "step_index": 0,
+          "event_kind": "guess",
+          "depth": 1,
+          "guess_label": "cell_r1_c2",
+          "guess_value": 2,
+          "remaining_guess_budget": 2,
+          "remaining_backtrack_budget": 2
+        },
+        {
+          "step_index": 1,
+          "event_kind": "verify",
+          "depth": 1,
+          "certificate": {
+            "certificate_id": "cert.sudoku_v0_train_a.row1.ok",
+            "verifier_rule": "sudoku_row_column_block_consistency",
+            "subject_ref": "cell_r1_c2",
+            "contradiction_detected": false
+          },
+          "remaining_guess_budget": 2,
+          "remaining_backtrack_budget": 2
+        },
+        {
+          "step_index": 2,
+          "event_kind": "guess",
+          "depth": 2,
+          "guess_label": "cell_r2_c4",
+          "guess_value": 1,
+          "remaining_guess_budget": 1,
+          "remaining_backtrack_budget": 2
+        },
+        {
+          "step_index": 3,
+          "event_kind": "contradiction",
+          "depth": 2,
+          "certificate": {
+            "certificate_id": "cert.sudoku_v0_train_a.col4.contradiction",
+            "verifier_rule": "sudoku_row_column_block_consistency",
+            "subject_ref": "cell_r2_c4",
+            "contradiction_detected": true
+          },
+          "remaining_guess_budget": 1,
+          "remaining_backtrack_budget": 2
+        },
+        {
+          "step_index": 4,
+          "event_kind": "backtrack",
+          "depth": 1,
+          "backtrack_to_depth": 1,
+          "remaining_guess_budget": 1,
+          "remaining_backtrack_budget": 1
+        },
+        {
+          "step_index": 5,
+          "event_kind": "guess",
+          "depth": 2,
+          "guess_label": "cell_r2_c4",
+          "guess_value": 3,
+          "remaining_guess_budget": 0,
+          "remaining_backtrack_budget": 1
+        },
+        {
+          "step_index": 6,
+          "event_kind": "verify",
+          "depth": 2,
+          "certificate": {
+            "certificate_id": "cert.sudoku_v0_train_a.col4.ok",
+            "verifier_rule": "sudoku_row_column_block_consistency",
+            "subject_ref": "cell_r2_c4",
+            "contradiction_detected": false
+          },
+          "remaining_guess_budget": 0,
+          "remaining_backtrack_budget": 1
+        },
+        {
+          "step_index": 7,
+          "event_kind": "commit",
+          "depth": 2,
+          "certificate": {
+            "certificate_id": "cert.sudoku_v0_train_a.solution.commit",
+            "verifier_rule": "sudoku_solution_complete",
+            "subject_ref": "grid",
+            "contradiction_detected": false
+          },
+          "remaining_guess_budget": 0,
+          "remaining_backtrack_budget": 1
+        }
+      ],
+      "final_outputs": [
+        1,
+        2,
+        3,
+        4,
+        3,
+        4,
+        1,
+        2,
+        2,
+        1,
+        4,
+        3,
+        4,
+        3,
+        2,
+        1
+      ],
+      "claim_boundary": "research-only verifier-guided search trace over one real Sudoku-v0 search case; explicit guess, contradiction, and backtrack events are machine-legible, but this is not compiled correctness or a general solver claim",
+      "trace_digest": "d6696eb191118112fc147893974e26a1c83b32cd32b71989d4c39f965c5d36a0"
+    },
+    {
+      "trace_id": "tassadar.verifier_guided_search.kernel_two_branch_recovery.v1",
+      "case_id": "search_kernel_two_branch_recovery",
+      "workload_family": "search_kernel",
+      "budget": {
+        "max_guesses": 2,
+        "max_backtracks": 1,
+        "max_search_steps": 5
+      },
+      "events": [
+        {
+          "step_index": 0,
+          "event_kind": "guess",
+          "depth": 1,
+          "guess_label": "branch_a",
+          "guess_value": 0,
+          "remaining_guess_budget": 1,
+          "remaining_backtrack_budget": 1
+        },
+        {
+          "step_index": 1,
+          "event_kind": "contradiction",
+          "depth": 1,
+          "certificate": {
+            "certificate_id": "cert.kernel.branch_a.dead_end",
+            "verifier_rule": "kernel_consistency_check",
+            "subject_ref": "branch_a",
+            "contradiction_detected": true
+          },
+          "remaining_guess_budget": 1,
+          "remaining_backtrack_budget": 1
+        },
+        {
+          "step_index": 2,
+          "event_kind": "backtrack",
+          "depth": 0,
+          "backtrack_to_depth": 0,
+          "remaining_guess_budget": 1,
+          "remaining_backtrack_budget": 0
+        },
+        {
+          "step_index": 3,
+          "event_kind": "guess",
+          "depth": 1,
+          "guess_label": "branch_b",
+          "guess_value": 1,
+          "remaining_guess_budget": 0,
+          "remaining_backtrack_budget": 0
+        },
+        {
+          "step_index": 4,
+          "event_kind": "commit",
+          "depth": 1,
+          "certificate": {
+            "certificate_id": "cert.kernel.branch_b.solution",
+            "verifier_rule": "kernel_solution_complete",
+            "subject_ref": "branch_b",
+            "contradiction_detected": false
+          },
+          "remaining_guess_budget": 0,
+          "remaining_backtrack_budget": 0
+        }
+      ],
+      "final_outputs": [
+        42
+      ],
+      "claim_boundary": "research-only verifier-guided search trace over one synthetic branch-recovery kernel; it keeps guess, contradiction, and recovery steps explicit without implying a general learned or compiled search solver",
+      "trace_digest": "e5d6468f3e8bd1b71957a8a532772e90193142c076c60b8c28d832c9a858f68f"
+    }
+  ],
+  "case_reports": [
+    {
+      "case_id": "sudoku_v0_train_a",
+      "workload_family": "sudoku_backtracking",
+      "trace_id": "tassadar.verifier_guided_search.sudoku_v0_train_a.v1",
+      "trace_digest": "d6696eb191118112fc147893974e26a1c83b32cd32b71989d4c39f965c5d36a0",
+      "guess_count": 3,
+      "backtrack_count": 1,
+      "contradiction_count": 1,
+      "verifier_certificate_accuracy_bps": 10000,
+      "backtrack_exactness_bps": 10000,
+      "recovery_quality_bps": 10000,
+      "claim_boundary": "research-only verifier-guided search trace over one real Sudoku-v0 search case; explicit guess, contradiction, and backtrack events are machine-legible, but this is not compiled correctness or a general solver claim"
+    },
+    {
+      "case_id": "search_kernel_two_branch_recovery",
+      "workload_family": "search_kernel",
+      "trace_id": "tassadar.verifier_guided_search.kernel_two_branch_recovery.v1",
+      "trace_digest": "e5d6468f3e8bd1b71957a8a532772e90193142c076c60b8c28d832c9a858f68f",
+      "guess_count": 2,
+      "backtrack_count": 1,
+      "contradiction_count": 1,
+      "verifier_certificate_accuracy_bps": 10000,
+      "backtrack_exactness_bps": 10000,
+      "recovery_quality_bps": 10000,
+      "claim_boundary": "research-only verifier-guided search trace over one synthetic branch-recovery kernel; it keeps guess, contradiction, and recovery steps explicit without implying a general learned or compiled search solver"
+    }
+  ],
+  "family_summaries": [
+    {
+      "workload_family": "sudoku_backtracking",
+      "case_count": 1,
+      "mean_guess_count": 3,
+      "mean_backtrack_count": 1,
+      "verifier_certificate_accuracy_bps": 10000,
+      "backtrack_exactness_bps": 10000,
+      "recovery_quality_bps": 10000
+    },
+    {
+      "workload_family": "search_kernel",
+      "case_count": 1,
+      "mean_guess_count": 2,
+      "mean_backtrack_count": 1,
+      "verifier_certificate_accuracy_bps": 10000,
+      "backtrack_exactness_bps": 10000,
+      "recovery_quality_bps": 10000
+    }
+  ],
+  "claim_boundary": "this report summarizes the research-only verifier-guided search trace lane with explicit guess, verifier, contradiction, and backtrack events over one real Sudoku-v0 case and one bounded search kernel. It does not imply compiled correctness, general solver closure, or served promotion",
+  "report_digest": "dd6efcc3cefe1f62729c519b7cc54b80c3327098ffb2f9f5a6cbb765f8ce6f1d"
+}
