@@ -235,6 +235,17 @@ The current scope is:
   long-loop and 4x4 Sudoku article workloads, but the widened class remains
   research-only until decode-mode identity and runtime closure bars are
   promoted explicitly
+- landed memory ABI v2 bar: `psionic-runtime` now owns a public
+  byte-addressed linear-memory contract with explicit i8/i16/i32 load-store
+  widths, sign extension, `memory.size`, `memory.grow`, and delta-oriented
+  memory tracing; `psionic-models` now publishes the same lane as an explicit
+  repo-facing memory-ABI publication; `psionic-train` now materializes a
+  training-facing supervision suite over width-parity, sign-extension,
+  growth, and memcpy-style trace-regression cases; and `psionic-eval` now
+  freezes the current evidence at
+  `fixtures/tassadar/reports/tassadar_memory_abi_v2_report.json` instead of
+  pretending the old fixed-slot memory ABI was already truthful enough for
+  module-scale Wasm work
 - landed exactness/refusal evidence bar: `psionic-runtime` now owns a shared
   `TassadarExactnessRefusalReport` contract that records exact, mismatch, and
   refused posture above current selection diagnostics and trace/output/halt

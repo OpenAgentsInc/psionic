@@ -161,6 +161,13 @@ Current posture:
   hierarchical-hull candidate; the candidate stays direct and exact on
   long-loop and 4x4 Sudoku article workloads, but that widened class remains
   explicitly unpromoted until runtime closure bars are landed
+- its byte-addressed linear-memory ABI v2 lane now also exists across
+  `psionic-runtime`, `psionic-models`, `psionic-train`, and `psionic-eval`,
+  with a public runtime-owned memory ABI contract, exact i8/i16/i32 width and
+  sign-extension behavior, explicit `memory.size` / `memory.grow` execution,
+  delta-oriented memory tracing, a training-facing supervision suite, and the
+  committed report at
+  `fixtures/tassadar/reports/tassadar_memory_abi_v2_report.json`
 - the repo now also carries a standardized exactness/refusal evidence surface
   across `psionic-runtime`, `psionic-provider`, and `psionic-eval`, with a
   shared runtime report schema for exact direct, exact fallback, mismatch, and

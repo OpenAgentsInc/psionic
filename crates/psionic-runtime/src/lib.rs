@@ -8,6 +8,7 @@ mod parity;
 mod proof;
 mod structured_output;
 mod tassadar;
+mod tassadar_memory_abi_v2;
 mod validation;
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -30,6 +31,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use structured_output::*;
 pub use tassadar::*;
+pub use tassadar_memory_abi_v2::*;
 use thiserror::Error;
 pub use validation::*;
 
