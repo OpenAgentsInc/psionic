@@ -42,14 +42,14 @@
     },
     {
       "category_id": "single-device-trainer-parity",
-      "matrix_status": "planned",
+      "matrix_status": "partial",
       "issue_refs": [
         "PGOLF-201/#166",
         "PGOLF-202/#167",
         "PGOLF-203/#168"
       ],
       "green_definition": "A Psionic-owned baseline decoder can train, validate, export, reload, and re-evaluate on a single device while matching the public baseline architecture and optimizer behavior.",
-      "current_repo_truth": "No compact challenge decoder family, Muon parity, or single-device reference trainer exists yet in psionic-models or psionic-train.",
+      "current_repo_truth": "psionic-models now ships the compact Parameter Golf decoder family with stable tensor naming, baseline parameter accounting, and a frozen train_gpt.py parity fixture at the public 9x512 shape, but psionic-train still lacks the challenge optimizer grouping, Muon parity, and single-device trainer or export lane above it.",
       "boundary_note": "A promising architecture sketch or one-off local run is not enough."
     },
     {
@@ -89,5 +89,5 @@
       "boundary_note": "Treat this as blocked by both in-repo implementation work and the need for an explicit public accounting interpretation."
     }
   ],
-  "report_digest": "021d24a4e47f7e800c0975eeb7c2dfbebc1af431983cdb67447741a930e34fa3"
+  "report_digest": "e17538cdddb533c25ea973c3c54748d5e01a668fdb12f024ec857e8c22083b25"
 }

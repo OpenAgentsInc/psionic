@@ -3,6 +3,7 @@
 mod attnres;
 mod fixtures;
 mod harmony;
+mod parameter_golf;
 mod runtime_tokenizer;
 mod sharding;
 mod tassadar;
@@ -64,6 +65,7 @@ use thiserror::Error;
 pub use attnres::*;
 pub use fixtures::*;
 pub use harmony::*;
+pub use parameter_golf::*;
 pub use runtime_tokenizer::*;
 pub use sharding::*;
 pub use tassadar::*;

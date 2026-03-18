@@ -212,7 +212,7 @@ Psionic does not yet ship the challenge lane itself:
 
 - no benchmark-package or eval-receipt lane for the challenge oracle outside the new `psionic-data` fixture parity path yet
 - no Parameter Golf benchmark package or eval receipts
-- no compact challenge decoder family matching the public baseline
+- no optimizer or trainer lane wired above the landed compact challenge decoder family yet
 - no Muon optimizer or challenge-matching optimizer grouping in Psionic
 - no single-device trainer that exports the challenge int8 plus zlib artifact
 - no transport-backed `8xH100` train lane proved at challenge throughput
@@ -223,7 +223,7 @@ Psionic does not yet ship the challenge lane itself:
 | Area | Current posture | Required Parameter Golf work |
 | --- | --- | --- |
 | `psionic-data` | `implemented_early` generic manifests, tokenizer digests, iteration, packing, and distributed feed planning, plus a landed Parameter Golf shard loader, local-dir manifest builder, deterministic token-stream contract, SentencePiece byte-accounting LUT oracle, and frozen parity fixtures for shard loading, validation slicing, `val_loss`, and `val_bpb` parity against the public Python and MLX scripts | wire the data and tokenizer contracts into exact eval receipts and trainer ingestion |
-| `psionic-models` | `implemented` model metadata plus bounded model families and runtime tokenizers | add the compact challenge decoder family with tied embeddings, GQA, RoPE, RMSNorm, residual mixing, and explicit parameter-count or byte-accounting facts |
+| `psionic-models` | `implemented_early` model metadata plus bounded model families and runtime tokenizers, now including a landed Parameter Golf reference decoder with tied embeddings, GQA, RoPE, RMSNorm-without-weight, learned residual mixing, skip weights, tanh logit softcap, stable tensor naming, baseline parameter accounting, and a frozen `train_gpt.py` parity fixture at the public `9x512` shape | wire the landed family into trainer execution, optimizer grouping, and export or eval receipts |
 | `psionic-nn` | `implemented` reusable layers, losses, optimizer shells, and eval-only quantization wrappers | widen or compose the current layer set into a reusable causal-decoder path and add any missing train-time primitive support the lane needs |
 | `psionic-train` | `implemented_early` fixed-budget training core, optimizer math, mixed precision, model IO, checkpoint, and replay truth | add challenge-specific train loop, optimizer grouping, Muon support, grad accumulation, wallclock budgeting, and int8+zlib roundtrip export |
 | `psionic-eval` | `implemented` benchmark and eval contracts, with a tracking-only lane acceptance checker but not a dedicated Parameter Golf oracle receipt lane yet | add exact Parameter Golf `val_loss` plus `val_bpb` eval reports and challenge acceptance reporting tied to real lane receipts |
@@ -313,7 +313,7 @@ Port the current public baseline exactly before searching for better models.
 
 | ID | Status | Proposed GitHub issue title | Description |
 | --- | --- | --- | --- |
-| `PGOLF-201` / [#166](https://github.com/OpenAgentsInc/psionic/issues/166) | open | `Psionic Parameter Golf: add the compact challenge decoder family in psionic-models` | Add the first Parameter Golf model family with tied embeddings, GQA, RoPE, RMSNorm, learned residual mixing, skip weights, and the current tanh logit softcap. The first closure bar is parity with the public 9x512 baseline, not novelty. |
+| `PGOLF-201` / [#166](https://github.com/OpenAgentsInc/psionic/issues/166) | done (2026-03-18) | `Psionic Parameter Golf: add the compact challenge decoder family in psionic-models` | `psionic-models` now ships a dedicated Parameter Golf reference family with the public `9x512` baseline config, stable tensor naming and parameter accounting, a CPU-reference forward path covering tied embeddings, GQA, RoPE, RMSNorm-without-weight, learned residual mixing, skip weights, and tanh logit softcap, plus a frozen `train_gpt.py` parity fixture and generator that prove baseline parameter-count, tensor-layout, logits, and loss parity under a deterministic weight recipe. |
 | `PGOLF-202` / [#167](https://github.com/OpenAgentsInc/psionic/issues/167) | open | `Psionic Parameter Golf: add challenge optimizer grouping and Muon parity in psionic-train` | Rebuild the current optimizer split, including token-embedding Adam, scalar or control Adam groups, and Muon for matrix-shaped transformer parameters. Do not silently substitute an existing optimizer just because it is already in-tree. |
 | `PGOLF-203` / [#168](https://github.com/OpenAgentsInc/psionic/issues/168) | open | `Psionic Parameter Golf: add a single-device reference trainer with int8+zlib roundtrip validation` | Add one end-to-end trainer path in `psionic-train` plus `psionic-eval` that runs the baseline family, enforces the challenge batch geometry, exports the raw artifact plus the roundtripped int8+zlib artifact, reloads it, and re-runs eval under Psionic ownership. |
 
@@ -375,7 +375,7 @@ research without losing the oracle.
 
 ### Phase 3: port the public baseline exactly
 
-- `PGOLF-201`
+- `PGOLF-201` -> landed compact decoder family, stable tensor layout, baseline parameter accounting, and frozen `train_gpt.py` logits/loss parity fixture at the public `9x512` shape
 - `PGOLF-202`
 - `PGOLF-203`
 
