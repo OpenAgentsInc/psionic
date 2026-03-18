@@ -8,6 +8,7 @@
 
 mod apple_adapter;
 mod apple_adapter_curation;
+mod parameter_golf;
 mod tassadar;
 mod tassadar_compiled_distillation;
 mod tassadar_error_regime_catalog;
@@ -34,6 +35,7 @@ use thiserror::Error;
 
 pub use apple_adapter::*;
 pub use apple_adapter_curation::*;
+pub use parameter_golf::*;
 pub use tassadar::*;
 pub use tassadar_compiled_distillation::*;
 pub use tassadar_error_regime_catalog::*;
@@ -185,6 +187,8 @@ pub enum DatasetRecordEncoding {
     JsonlText,
     /// JSONL conversation turns or messages.
     JsonlConversation,
+    /// Token IDs streamed as little-endian `u16`.
+    TokenIdsLeU16,
     /// Token IDs streamed as little-endian `u32`.
     TokenIdsLeU32,
     /// Preference or ranking pairs in JSONL.
@@ -445,6 +449,13 @@ impl DatasetManifest {
     #[must_use]
     pub fn with_splits(mut self, splits: Vec<DatasetSplitDeclaration>) -> Self {
         self.splits = splits;
+        self
+    }
+
+    /// Attaches extension metadata.
+    #[must_use]
+    pub fn with_metadata(mut self, metadata: BTreeMap<String, Value>) -> Self {
+        self.metadata = metadata;
         self
     }
 
@@ -1552,6 +1563,7 @@ fn dataset_record_encoding_label(record_encoding: DatasetRecordEncoding) -> &'st
     match record_encoding {
         DatasetRecordEncoding::JsonlText => b"jsonl_text",
         DatasetRecordEncoding::JsonlConversation => b"jsonl_conversation",
+        DatasetRecordEncoding::TokenIdsLeU16 => b"token_ids_le_u16",
         DatasetRecordEncoding::TokenIdsLeU32 => b"token_ids_le_u32",
         DatasetRecordEncoding::PreferenceJsonl => b"preference_jsonl",
         DatasetRecordEncoding::Binary => b"binary",

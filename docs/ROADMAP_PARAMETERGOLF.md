@@ -210,7 +210,7 @@ Psionic already has real substrate this lane can reuse:
 
 Psionic does not yet ship the challenge lane itself:
 
-- no FineWeb Parameter Golf dataset manifest or shard-loader family
+- no exact challenge-eval oracle above the new FineWeb shard contract and token-stream substrate
 - no exact SentencePiece byte-accounting oracle for challenge `val_bpb`
 - no Parameter Golf benchmark package or eval receipts
 - no compact challenge decoder family matching the public baseline
@@ -223,7 +223,7 @@ Psionic does not yet ship the challenge lane itself:
 
 | Area | Current posture | Required Parameter Golf work |
 | --- | --- | --- |
-| `psionic-data` | `implemented` generic manifests, tokenizer digests, iteration, packing, and distributed feed planning | add FineWeb shard contract, challenge dataset manifest, fixed validation split identity, SP-1024 tokenizer artifact binding, and token-byte lookup generation |
+| `psionic-data` | `implemented_early` generic manifests, tokenizer digests, iteration, packing, and distributed feed planning, plus a landed Parameter Golf shard loader, local-dir manifest builder, and deterministic token-stream contract | add challenge tokenizer byte lookup generation and wire the data contract into exact eval receipts and trainer ingestion |
 | `psionic-models` | `implemented` model metadata plus bounded model families and runtime tokenizers | add the compact challenge decoder family with tied embeddings, GQA, RoPE, RMSNorm, residual mixing, and explicit parameter-count or byte-accounting facts |
 | `psionic-nn` | `implemented` reusable layers, losses, optimizer shells, and eval-only quantization wrappers | widen or compose the current layer set into a reusable causal-decoder path and add any missing train-time primitive support the lane needs |
 | `psionic-train` | `implemented_early` fixed-budget training core, optimizer math, mixed precision, model IO, checkpoint, and replay truth | add challenge-specific train loop, optimizer grouping, Muon support, grad accumulation, wallclock budgeting, and int8+zlib roundtrip export |
@@ -294,7 +294,7 @@ Rebuild the challenge oracle in Psionic before model work.
 
 | ID | Status | Proposed GitHub issue title | Description |
 | --- | --- | --- | --- |
-| `PGOLF-101` / [#163](https://github.com/OpenAgentsInc/psionic/issues/163) | open | `Psionic Parameter Golf: add FineWeb challenge manifests, shard loading, and deterministic token streaming` | Add a dedicated Parameter Golf data contract in `psionic-data` for the current binary shard format, the fixed validation split, deterministic shard-prefix training order, and challenge-facing datastream bindings rather than relying on generic dataset notes. |
+| `PGOLF-101` / [#163](https://github.com/OpenAgentsInc/psionic/issues/163) | done (2026-03-18) | `Psionic Parameter Golf: add FineWeb challenge manifests, shard loading, and deterministic token streaming` | `psionic-data` now exposes a dedicated Parameter Golf shard ABI, exact `u16` shard loading, a local-dir bundle builder that produces train-prefix plus fixed-validation manifests with challenge metadata and datastream bindings, and a replay-safe token-stream contract that matches the public contiguous shard order. |
 | `PGOLF-102` / [#164](https://github.com/OpenAgentsInc/psionic/issues/164) | open | `Psionic Parameter Golf: add SentencePiece byte-accounting and exact val_bpb reproduction` | Rebuild the current `build_sentencepiece_luts(...)` and leading-space byte-accounting logic in Psionic so the lane can compute the same tokenizer-agnostic `val_bpb` as `train_gpt.py` and `train_gpt_mlx.py` on the same tokens and logits. |
 | `PGOLF-103` / [#165](https://github.com/OpenAgentsInc/psionic/issues/165) | open | `Psionic Parameter Golf: add frozen parity fixtures against train_gpt.py and train_gpt_mlx.py` | Add fixture-level parity tests that compare shard loading, validation token slicing, `val_loss`, and `val_bpb` against the current Python and MLX oracles. The lane must prove metric parity before any architecture or throughput claims widen. |
 
@@ -370,7 +370,7 @@ research without losing the oracle.
 
 ### Phase 2: rebuild the challenge oracle
 
-- `PGOLF-101`
+- `PGOLF-101` -> landed FineWeb shard ABI, manifest builder, and deterministic token-stream contract
 - `PGOLF-102`
 - `PGOLF-103`
 

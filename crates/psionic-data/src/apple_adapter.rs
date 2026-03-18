@@ -1658,6 +1658,7 @@ fn dataset_record_encoding_label(record_encoding: DatasetRecordEncoding) -> &'st
     match record_encoding {
         DatasetRecordEncoding::JsonlText => b"jsonl_text",
         DatasetRecordEncoding::JsonlConversation => b"jsonl_conversation",
+        DatasetRecordEncoding::TokenIdsLeU16 => b"token_ids_le_u16",
         DatasetRecordEncoding::TokenIdsLeU32 => b"token_ids_le_u32",
         DatasetRecordEncoding::PreferenceJsonl => b"preference_jsonl",
         DatasetRecordEncoding::Binary => b"binary",

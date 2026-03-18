@@ -52,6 +52,8 @@ pub enum DatastreamEncoding {
     RawBinary,
     /// JSONL records.
     Jsonl,
+    /// Little-endian token ID stream encoded as `u16`.
+    TokenIdsLeU16,
     /// Little-endian token ID stream.
     TokenIdsLeU32,
     /// Safetensors payload.
@@ -67,6 +69,7 @@ impl DatastreamEncoding {
         match self {
             Self::RawBinary => "raw_binary",
             Self::Jsonl => "jsonl",
+            Self::TokenIdsLeU16 => "token_ids_le_u16",
             Self::TokenIdsLeU32 => "token_ids_le_u32",
             Self::Safetensors => "safetensors",
             Self::TarArchive => "tar_archive",
