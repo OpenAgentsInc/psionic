@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.hungarian_10x10.article_reproducer.v1",
+  "workload_family_id": "tassadar.wasm.hungarian_10x10_matching.v1.compiled_executor",
+  "source_ref": "fixtures/tassadar/sources/tassadar_hungarian_10x10_article.rs",
+  "source_digest": "f3a89c7c1baf3c9706188edffae9042e14bf5c526b4f4184632e1edaf8221b3e",
+  "source_receipt_digest": "d8e42a3dc5c78d4ada31815077a84873d7babec39c462069d7178686b124bfeb",
+  "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_hungarian_10x10_article.wasm",
+  "wasm_binary_digest": "cc3c404da600f45d1173bf214e1c253703cded63fba33d05b80368417bfaee31",
+  "canonical_run_bundle_ref": "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json",
+  "exactness_report_ref": "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_exactness_report.json",
+  "reproducer_bundle_ref": "fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1/reproducer_bundle.json",
+  "canonical_case_id": "hungarian_10x10_test_a",
+  "canonical_case_split": "test",
+  "canonical_case_optimal_cost": 341,
+  "canonical_case_assignment": [
+    7,
+    1,
+    5,
+    8,
+    3,
+    6,
+    9,
+    4,
+    0,
+    2
+  ],
+  "exact_trace_match": true,
+  "final_output_match": true,
+  "halt_match": true,
+  "reproducer_bundle_digest": "6071c5dea934babbc4f9d39a62b3d6f56e55d5752519052539ccb40d9e3098c7",
+  "direct_execution_posture": {
+    "requested_decode_mode": "tassadar.decode.reference_linear.v1",
+    "effective_decode_mode": "tassadar.decode.reference_linear.v1",
+    "fallback_observed": false,
+    "external_tool_surface_observed": false,
+    "runtime_backend": "cpu",
+    "compiled_backend_features": [
+      "tassadar_executor",
+      "tassadar.decode.reference_linear.v1",
+      "tassadar.wasm.hungarian_10x10_matching.v1"
+    ],
+    "detail": "the canonical Hungarian reproducer stays on the direct compiled executor lane with reference-linear decode parity, no observed fallback, and no external-tool feature markers in the runtime identity"
+  },
+  "claim_boundary": "this report closes one canonical Rust-only Hungarian-10x10 article reproducer by binding the committed Rust source canon receipt to one exact compiled deployment with readable log, compact token trace, compile lineage, runtime proof lineage, and explicit direct/no-fallback posture. It closes this one matching workload only and does not by itself imply hard-Sudoku closure, million-step closure, or arbitrary-program closure.",
+  "report_digest": "4127ddd6bd9f2cfa5629fa9608ae2b1b3231d1f7cf92f824669a8bdce23205b1"
+}

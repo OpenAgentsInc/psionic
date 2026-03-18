@@ -22,6 +22,7 @@ This runbook covers the current repo-owned bounded Wasm flow only:
 - Rust-only article frontend canon
 - Rust-to-Wasm article profile completeness matrix
 - bounded Rust-only article ABI closure
+- canonical Rust-only Hungarian-10x10 article reproducer
 - canonical C-to-Wasm compile receipt
 - source-to-Wasm-to-Tassadar compile-pipeline matrix
 - normalized Wasm-module ingress
@@ -120,6 +121,30 @@ Expected outcome:
 - this is the current honest direct-ABI closure lane; it does not imply that
   the generic Wasm-text or generic normalized-module lowering path now admits
   arbitrary parameterized exports
+
+### 3A. Hungarian-10x10 Rust-only article reproducer
+
+```bash
+cargo run -p psionic-research --example tassadar_hungarian_10x10_article_reproducer
+```
+
+Read:
+
+- `fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1/reproducer_bundle.json`
+- `fixtures/tassadar/reports/tassadar_hungarian_10x10_article_reproducer_report.json`
+
+Expected outcome:
+
+- one canonical Rust-only Hungarian-10x10 article root exists for
+  `hungarian_10x10_test_a`
+- the root binds the committed Rust source canon receipt to exact compiled
+  deployment artifacts, readable log, compact token trace, compile evidence,
+  runtime execution proof, and runtime trace proof
+- the report keeps direct execution posture explicit:
+  `reference_linear -> reference_linear`, `fallback_observed=false`, and
+  `external_tool_surface_observed=false`
+- this closes one concrete matching workload only; it does not yet imply
+  hard-Sudoku or multi-million-step article closure
 
 ### 4. Optional historical C-to-Wasm compile receipt
 

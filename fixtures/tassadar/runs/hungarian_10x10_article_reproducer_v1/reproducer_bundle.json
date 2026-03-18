@@ -1,0 +1,38 @@
+{
+  "bundle_id": "tassadar.hungarian_10x10.article_reproducer_bundle.v1",
+  "root_ref": "fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1",
+  "case_id": "hungarian_10x10_test_a",
+  "compile_evidence_bundle": {
+    "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1/compile_evidence_bundle.json",
+    "artifact_digest": "94003fc1e277f64535315576d9947acaba9d02df19915c9378727a767b7a378e"
+  },
+  "program_artifact": {
+    "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1/program_artifact.json",
+    "artifact_digest": "e6d188ce7fd70f0ad74f8dc33eb4813ac610181c3a156d309c2294e8d0a031ea"
+  },
+  "compiled_weight_artifact": {
+    "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1/compiled_weight_artifact.json",
+    "artifact_digest": "89ec4c72bf01e2be41d98c61597077bec5c19709d2076693e4e896dc1ae6da59"
+  },
+  "model_descriptor": {
+    "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1/model_descriptor.json",
+    "artifact_digest": "0c18ee9fcefa92a2ec756341887549beddb2b62b61ae0c061302637628ccf509"
+  },
+  "runtime_execution_proof_bundle": {
+    "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1/runtime_execution_proof_bundle.json",
+    "artifact_digest": "9999ec17edbe8c1806a00adb37647e311e77aab74034f90fe051f2f657b6df75"
+  },
+  "runtime_trace_proof": {
+    "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1/runtime_trace_proof.json",
+    "artifact_digest": "a8e6fc759d92a7c2c797f32a1bc85d2cab78a79fc0f087e62dc647bc11497c79"
+  },
+  "token_trace_summary": {
+    "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1/token_trace_summary.json",
+    "artifact_digest": "d110c0efbafbe0755f8358c9f8daae0f183a9b375be7dec9dfd23e436ea9128d"
+  },
+  "readable_log": {
+    "artifact_ref": "fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1/readable_log.txt",
+    "artifact_digest": "04b76ebe8dfc698a7c0e20bfb41e46e57df9e2c6c71b00438121b569a00d2ca1"
+  },
+  "bundle_digest": "6071c5dea934babbc4f9d39a62b3d6f56e55d5752519052539ccb40d9e3098c7"
+}

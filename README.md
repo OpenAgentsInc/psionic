@@ -643,6 +643,18 @@ Current posture:
   `param_abi_fixture` and `heap_sum_article` Rust sources, while keeping
   floating-point params, multi-result returns, and general host ABI closure as
   explicit refusals instead of over-reading the generic Wasm-lowering path
+- the repo now also carries one canonical Rust-only Hungarian-10x10 article
+  reproducer root at
+  `fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1` plus the
+  machine-readable report
+  `fixtures/tassadar/reports/tassadar_hungarian_10x10_article_reproducer_report.json`,
+  both emitted by
+  `cargo run -p psionic-research --example tassadar_hungarian_10x10_article_reproducer`;
+  they bind the committed Rust source canon receipt to one exact compiled
+  `hungarian_10x10_test_a` deployment with readable log, compact token trace,
+  compile lineage, runtime proof lineage, and explicit direct/no-fallback
+  posture without widening the claim to Sudoku, million-step, or arbitrary
+  program closure
 - the repo now also carries one canonical Tassadar C-to-Wasm compile receipt at
   `fixtures/tassadar/reports/tassadar_c_to_wasm_compile_receipt.json`, emitted
   by `cargo run -p psionic-runtime --example tassadar_c_to_wasm_compile_receipt`;
