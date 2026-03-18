@@ -17,6 +17,9 @@ pub const TASSADAR_SEQUENCE_DATASET_ABI_VERSION: &str = "psionic.tassadar.sequen
 /// Stable ABI version for Tassadar benchmark-package-set contracts.
 pub const TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION: &str =
     "psionic.tassadar.benchmark_package_set.v1";
+/// Stable ABI version for module-scale Wasm workload-suite contracts.
+pub const TASSADAR_MODULE_SCALE_WORKLOAD_SUITE_ABI_VERSION: &str =
+    "psionic.tassadar.module_scale_workload_suite.v1";
 /// Stable ABI version for Tassadar numeric-opcode ladder contracts.
 pub const TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION: &str =
     "psionic.tassadar.numeric_opcode_ladder.v1";
@@ -49,6 +52,32 @@ pub enum TassadarBenchmarkAxis {
     LengthGeneralization,
     /// Whether the family is useful for planner or route selection rather than only systems work.
     PlannerUsefulness,
+}
+
+/// Module-scale deterministic Wasm workload family tracked by the public suite.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarModuleScaleWorkloadFamily {
+    /// Fixed-span copy and state-movement modules.
+    Memcpy,
+    /// Fixed-token parse and decode modules.
+    Parsing,
+    /// Fixed-span checksum and accumulation modules.
+    Checksum,
+    /// Multi-export dispatch or VM-style handler modules.
+    VmStyle,
+}
+
+/// Expected status for one module-scale workload case in the public suite.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarModuleScaleWorkloadStatus {
+    /// The current lane should lower and execute the case exactly.
+    LoweredExact,
+    /// The current lane should refuse lowering explicitly.
+    LoweringRefused,
+    /// The current lane should refuse before lowering.
+    CompileRefused,
 }
 
 /// Numeric-opcode family tracked by the public Tassadar widening ladder.
@@ -732,6 +761,257 @@ pub enum TassadarBenchmarkPackageSetError {
         family: TassadarBenchmarkFamily,
         /// Repeated case id.
         case_id: String,
+    },
+}
+
+/// One deterministic Wasm source case in the public module-scale workload suite.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarModuleScaleWorkloadCaseContract {
+    /// Stable case identifier.
+    pub case_id: String,
+    /// Stable workload family.
+    pub family: TassadarModuleScaleWorkloadFamily,
+    /// Human-readable case summary.
+    pub summary: String,
+    /// Repo-relative source ref.
+    pub source_ref: String,
+    /// Expected status under the current bounded lane.
+    pub expected_status: TassadarModuleScaleWorkloadStatus,
+}
+
+impl TassadarModuleScaleWorkloadCaseContract {
+    fn validate(&self) -> Result<(), TassadarModuleScaleWorkloadSuiteError> {
+        if self.case_id.trim().is_empty() {
+            return Err(TassadarModuleScaleWorkloadSuiteError::MissingCaseId);
+        }
+        if self.summary.trim().is_empty() {
+            return Err(TassadarModuleScaleWorkloadSuiteError::MissingCaseSummary {
+                case_id: self.case_id.clone(),
+            });
+        }
+        if self.source_ref.trim().is_empty() {
+            return Err(TassadarModuleScaleWorkloadSuiteError::MissingSourceRef {
+                case_id: self.case_id.clone(),
+            });
+        }
+        Ok(())
+    }
+}
+
+/// Public workload-package contract for deterministic module-scale Wasm programs.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarModuleScaleWorkloadSuiteContract {
+    /// Stable ABI version.
+    pub abi_version: String,
+    /// Stable suite reference.
+    pub suite_ref: String,
+    /// Immutable suite version.
+    pub version: String,
+    /// Stable benchmark reference bound to the suite.
+    pub benchmark_ref: String,
+    /// Stable environment reference bound to the suite.
+    pub environment_ref: String,
+    /// Workload families covered by the suite.
+    pub supported_families: Vec<TassadarModuleScaleWorkloadFamily>,
+    /// Evaluation axes emitted by the suite report.
+    pub evaluation_axes: Vec<String>,
+    /// Ordered deterministic Wasm cases in the suite.
+    pub cases: Vec<TassadarModuleScaleWorkloadCaseContract>,
+    /// Canonical machine-readable report ref for the suite.
+    pub report_ref: String,
+}
+
+impl TassadarModuleScaleWorkloadSuiteContract {
+    /// Creates and validates a module-scale workload suite contract.
+    pub fn new(
+        suite_ref: impl Into<String>,
+        version: impl Into<String>,
+        benchmark_ref: impl Into<String>,
+        environment_ref: impl Into<String>,
+        supported_families: Vec<TassadarModuleScaleWorkloadFamily>,
+        evaluation_axes: Vec<String>,
+        cases: Vec<TassadarModuleScaleWorkloadCaseContract>,
+        report_ref: impl Into<String>,
+    ) -> Result<Self, TassadarModuleScaleWorkloadSuiteError> {
+        let contract = Self {
+            abi_version: String::from(TASSADAR_MODULE_SCALE_WORKLOAD_SUITE_ABI_VERSION),
+            suite_ref: suite_ref.into(),
+            version: version.into(),
+            benchmark_ref: benchmark_ref.into(),
+            environment_ref: environment_ref.into(),
+            supported_families,
+            evaluation_axes,
+            cases,
+            report_ref: report_ref.into(),
+        };
+        contract.validate()?;
+        Ok(contract)
+    }
+
+    /// Validates the suite contract.
+    pub fn validate(&self) -> Result<(), TassadarModuleScaleWorkloadSuiteError> {
+        if self.abi_version != TASSADAR_MODULE_SCALE_WORKLOAD_SUITE_ABI_VERSION {
+            return Err(
+                TassadarModuleScaleWorkloadSuiteError::UnsupportedAbiVersion {
+                    abi_version: self.abi_version.clone(),
+                },
+            );
+        }
+        if self.suite_ref.trim().is_empty() {
+            return Err(TassadarModuleScaleWorkloadSuiteError::MissingSuiteRef);
+        }
+        if self.version.trim().is_empty() {
+            return Err(TassadarModuleScaleWorkloadSuiteError::MissingSuiteVersion);
+        }
+        if self.benchmark_ref.trim().is_empty() {
+            return Err(TassadarModuleScaleWorkloadSuiteError::MissingBenchmarkRef);
+        }
+        if self.environment_ref.trim().is_empty() {
+            return Err(TassadarModuleScaleWorkloadSuiteError::MissingEnvironmentRef);
+        }
+        if self.supported_families.is_empty() {
+            return Err(TassadarModuleScaleWorkloadSuiteError::MissingFamilies);
+        }
+        if self.evaluation_axes.is_empty() {
+            return Err(TassadarModuleScaleWorkloadSuiteError::MissingEvaluationAxes);
+        }
+        if self.cases.is_empty() {
+            return Err(TassadarModuleScaleWorkloadSuiteError::MissingCases);
+        }
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarModuleScaleWorkloadSuiteError::MissingReportRef);
+        }
+
+        let mut seen_families = BTreeSet::new();
+        for family in &self.supported_families {
+            if !seen_families.insert(*family) {
+                return Err(TassadarModuleScaleWorkloadSuiteError::DuplicateFamily {
+                    family: *family,
+                });
+            }
+        }
+
+        let mut seen_axes = BTreeSet::new();
+        for axis in &self.evaluation_axes {
+            if axis.trim().is_empty() {
+                return Err(TassadarModuleScaleWorkloadSuiteError::MissingEvaluationAxis);
+            }
+            if !seen_axes.insert(axis.clone()) {
+                return Err(
+                    TassadarModuleScaleWorkloadSuiteError::DuplicateEvaluationAxis {
+                        axis: axis.clone(),
+                    },
+                );
+            }
+        }
+
+        let mut seen_case_ids = BTreeSet::new();
+        for case in &self.cases {
+            case.validate()?;
+            if !seen_families.contains(&case.family) {
+                return Err(
+                    TassadarModuleScaleWorkloadSuiteError::CaseFamilyNotDeclared {
+                        case_id: case.case_id.clone(),
+                        family: case.family,
+                    },
+                );
+            }
+            if !seen_case_ids.insert(case.case_id.clone()) {
+                return Err(TassadarModuleScaleWorkloadSuiteError::DuplicateCaseId {
+                    case_id: case.case_id.clone(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Returns a stable digest over the suite contract.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        stable_digest(
+            b"psionic_tassadar_module_scale_workload_suite_contract|",
+            self,
+        )
+    }
+}
+
+/// Module-scale workload-suite validation failure.
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum TassadarModuleScaleWorkloadSuiteError {
+    /// Unsupported ABI version.
+    #[error("unsupported module-scale workload suite ABI version `{abi_version}`")]
+    UnsupportedAbiVersion {
+        /// Observed ABI version.
+        abi_version: String,
+    },
+    /// Missing suite ref.
+    #[error("module-scale workload suite is missing `suite_ref`")]
+    MissingSuiteRef,
+    /// Missing suite version.
+    #[error("module-scale workload suite is missing `version`")]
+    MissingSuiteVersion,
+    /// Missing benchmark ref.
+    #[error("module-scale workload suite is missing `benchmark_ref`")]
+    MissingBenchmarkRef,
+    /// Missing environment ref.
+    #[error("module-scale workload suite is missing `environment_ref`")]
+    MissingEnvironmentRef,
+    /// Missing families.
+    #[error("module-scale workload suite must declare at least one workload family")]
+    MissingFamilies,
+    /// Duplicate family.
+    #[error("module-scale workload suite repeated family `{family:?}`")]
+    DuplicateFamily {
+        /// Repeated family.
+        family: TassadarModuleScaleWorkloadFamily,
+    },
+    /// Missing evaluation axes.
+    #[error("module-scale workload suite must declare evaluation axes")]
+    MissingEvaluationAxes,
+    /// One evaluation axis was empty.
+    #[error("module-scale workload suite includes an empty evaluation axis")]
+    MissingEvaluationAxis,
+    /// One evaluation axis repeated.
+    #[error("module-scale workload suite repeated evaluation axis `{axis}`")]
+    DuplicateEvaluationAxis {
+        /// Repeated axis.
+        axis: String,
+    },
+    /// Missing cases.
+    #[error("module-scale workload suite must declare at least one case")]
+    MissingCases,
+    /// Missing report ref.
+    #[error("module-scale workload suite is missing `report_ref`")]
+    MissingReportRef,
+    /// Missing case id.
+    #[error("module-scale workload suite contains a case without `case_id`")]
+    MissingCaseId,
+    /// Missing case summary.
+    #[error("module-scale workload case `{case_id}` is missing `summary`")]
+    MissingCaseSummary {
+        /// Case identifier.
+        case_id: String,
+    },
+    /// Missing source ref.
+    #[error("module-scale workload case `{case_id}` is missing `source_ref`")]
+    MissingSourceRef {
+        /// Case identifier.
+        case_id: String,
+    },
+    /// Repeated case id.
+    #[error("module-scale workload suite repeated case `{case_id}`")]
+    DuplicateCaseId {
+        /// Repeated case identifier.
+        case_id: String,
+    },
+    /// Case family was not declared in the suite header.
+    #[error("module-scale workload case `{case_id}` references undeclared family `{family:?}`")]
+    CaseFamilyNotDeclared {
+        /// Case identifier.
+        case_id: String,
+        /// Undeclared family.
+        family: TassadarModuleScaleWorkloadFamily,
     },
 }
 
@@ -1494,14 +1774,17 @@ mod tests {
     use serde_json::Value;
 
     use super::{
-        TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION, TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION,
-        TASSADAR_SEQUENCE_DATASET_ABI_VERSION, TASSADAR_TRACE_FAMILY_SET_ABI_VERSION,
-        TassadarBenchmarkAxis, TassadarBenchmarkFamily, TassadarBenchmarkFamilyContract,
-        TassadarBenchmarkPackageBinding, TassadarBenchmarkPackageSetContract,
-        TassadarNumericOpcodeFamily, TassadarNumericOpcodeFamilyStatus,
-        TassadarNumericOpcodeLadderContract, TassadarSequenceDatasetContract,
-        TassadarSequenceExample, TassadarSequenceExampleMetadata, TassadarSequenceSplit,
-        TassadarTraceFamilyAuthorityScope, TassadarTraceFamilyContract,
+        TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION,
+        TASSADAR_MODULE_SCALE_WORKLOAD_SUITE_ABI_VERSION,
+        TASSADAR_NUMERIC_OPCODE_LADDER_ABI_VERSION, TASSADAR_SEQUENCE_DATASET_ABI_VERSION,
+        TASSADAR_TRACE_FAMILY_SET_ABI_VERSION, TassadarBenchmarkAxis, TassadarBenchmarkFamily,
+        TassadarBenchmarkFamilyContract, TassadarBenchmarkPackageBinding,
+        TassadarBenchmarkPackageSetContract, TassadarModuleScaleWorkloadCaseContract,
+        TassadarModuleScaleWorkloadFamily, TassadarModuleScaleWorkloadStatus,
+        TassadarModuleScaleWorkloadSuiteContract, TassadarNumericOpcodeFamily,
+        TassadarNumericOpcodeFamilyStatus, TassadarNumericOpcodeLadderContract,
+        TassadarSequenceDatasetContract, TassadarSequenceExample, TassadarSequenceExampleMetadata,
+        TassadarSequenceSplit, TassadarTraceFamilyAuthorityScope, TassadarTraceFamilyContract,
         TassadarTraceFamilySetContract, TassadarTraceFamilyTopology,
         TassadarTraceFamilyWorkloadBinding, tassadar_numeric_opcode_ladder_contract,
     };
@@ -1642,6 +1925,58 @@ mod tests {
             TASSADAR_BENCHMARK_PACKAGE_SET_ABI_VERSION
         );
         assert_eq!(contract.families.len(), 2);
+        assert!(!contract.stable_digest().is_empty());
+    }
+
+    #[test]
+    fn module_scale_workload_suite_contract_is_machine_legible() {
+        let contract = TassadarModuleScaleWorkloadSuiteContract::new(
+            "benchmark-suite://openagents/tassadar/module_scale",
+            "2026.03.17",
+            "benchmark://openagents/tassadar/module_scale/reference_fixture",
+            "env.openagents.tassadar.module_scale.benchmark",
+            vec![
+                TassadarModuleScaleWorkloadFamily::Memcpy,
+                TassadarModuleScaleWorkloadFamily::Parsing,
+                TassadarModuleScaleWorkloadFamily::Checksum,
+                TassadarModuleScaleWorkloadFamily::VmStyle,
+            ],
+            vec![
+                String::from("exactness_bps"),
+                String::from("total_trace_steps"),
+                String::from("cpu_reference_cost_units"),
+                String::from("refusal_kind"),
+            ],
+            vec![
+                TassadarModuleScaleWorkloadCaseContract {
+                    case_id: String::from("memcpy_fixed_span_exact"),
+                    family: TassadarModuleScaleWorkloadFamily::Memcpy,
+                    summary: String::from("fixed-span copy kernel lowered exactly"),
+                    source_ref: String::from(
+                        "fixtures/tassadar/sources/tassadar_module_memcpy_suite.wat",
+                    ),
+                    expected_status: TassadarModuleScaleWorkloadStatus::LoweredExact,
+                },
+                TassadarModuleScaleWorkloadCaseContract {
+                    case_id: String::from("vm_style_param_refusal"),
+                    family: TassadarModuleScaleWorkloadFamily::VmStyle,
+                    summary: String::from("vm-style param dispatch still refuses explicitly"),
+                    source_ref: String::from(
+                        "fixtures/tassadar/sources/tassadar_module_vm_style_param_refusal.wat",
+                    ),
+                    expected_status: TassadarModuleScaleWorkloadStatus::LoweringRefused,
+                },
+            ],
+            "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+        )
+        .expect("suite contract should build");
+
+        assert_eq!(
+            contract.abi_version,
+            TASSADAR_MODULE_SCALE_WORKLOAD_SUITE_ABI_VERSION
+        );
+        assert_eq!(contract.supported_families.len(), 4);
+        assert_eq!(contract.cases.len(), 2);
         assert!(!contract.stable_digest().is_empty());
     }
 

@@ -787,7 +787,11 @@ fn reformer_proxy_policy(workload_target: TassadarWorkloadTarget) -> ReformerPro
         TassadarWorkloadTarget::ArithmeticMicroprogram
         | TassadarWorkloadTarget::ClrsShortestPath
         | TassadarWorkloadTarget::MemoryLookupMicroprogram
-        | TassadarWorkloadTarget::BranchControlFlowMicroprogram => ReformerProxyPolicy::Direct,
+        | TassadarWorkloadTarget::BranchControlFlowMicroprogram
+        | TassadarWorkloadTarget::ModuleMemcpy
+        | TassadarWorkloadTarget::ModuleParsing
+        | TassadarWorkloadTarget::ModuleChecksum
+        | TassadarWorkloadTarget::ModuleVmStyle => ReformerProxyPolicy::Direct,
     }
 }
 

@@ -1,0 +1,1092 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.module_scale_workload_suite.report.v1",
+  "suite": {
+    "abi_version": "psionic.tassadar.module_scale_workload_suite.v1",
+    "suite_ref": "benchmark-suite://openagents/tassadar/module_scale",
+    "version": "2026.03.17",
+    "benchmark_ref": "benchmark://openagents/tassadar/module_scale/reference_fixture",
+    "environment_ref": "env.openagents.tassadar.module_scale.benchmark",
+    "supported_families": [
+      "memcpy",
+      "parsing",
+      "checksum",
+      "vm_style"
+    ],
+    "evaluation_axes": [
+      "exactness_bps",
+      "total_trace_steps",
+      "cpu_reference_cost_units",
+      "refusal_kind"
+    ],
+    "cases": [
+      {
+        "case_id": "memcpy_fixed_span_exact",
+        "family": "memcpy",
+        "summary": "fixed-span memcpy-style module with explicit load/store replay",
+        "source_ref": "fixtures/tassadar/sources/tassadar_module_memcpy_suite.wat",
+        "expected_status": "lowered_exact"
+      },
+      {
+        "case_id": "checksum_fixed_span_exact",
+        "family": "checksum",
+        "summary": "fixed-span checksum-style module with additive and weighted exports",
+        "source_ref": "fixtures/tassadar/sources/tassadar_module_checksum_suite.wat",
+        "expected_status": "lowered_exact"
+      },
+      {
+        "case_id": "parsing_token_triplet_exact",
+        "family": "parsing",
+        "summary": "fixed-token parse module that reconstructs one three-token value exactly",
+        "source_ref": "fixtures/tassadar/sources/tassadar_module_parsing_suite.wat",
+        "expected_status": "lowered_exact"
+      },
+      {
+        "case_id": "vm_style_dispatch_exact",
+        "family": "vm_style",
+        "summary": "multi-export VM-style dispatch module over deterministic fixed operands",
+        "source_ref": "fixtures/tassadar/sources/tassadar_module_vm_style_suite.wat",
+        "expected_status": "lowered_exact"
+      },
+      {
+        "case_id": "vm_style_param_refusal",
+        "family": "vm_style",
+        "summary": "parameter-ABI VM-style module that still refuses lowering explicitly",
+        "source_ref": "fixtures/tassadar/sources/tassadar_module_vm_style_param_refusal.wat",
+        "expected_status": "lowering_refused"
+      }
+    ],
+    "report_ref": "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+  },
+  "environment_bundle": {
+    "eval_package": {
+      "abi_version": "psionic.environment.v1",
+      "key": {
+        "environment_ref": "env.openagents.tassadar.module_scale.eval",
+        "version": "2026.03.17"
+      },
+      "family": "evaluation",
+      "display_name": "Tassadar Module-Scale Wasm Workload Suite Eval",
+      "execution": {
+        "runtime_family": "evaluator",
+        "entrypoint": "tassadar_eval::run",
+        "args": [
+          "runtime://tassadar/module_scale/eval"
+        ],
+        "max_turns": 1,
+        "state_mode": "stateless",
+        "time_budget_ms": 15000
+      },
+      "supported_workloads": [
+        "online_eval",
+        "offline_eval"
+      ],
+      "datasets": [
+        {
+          "dataset": {
+            "dataset_ref": "dataset://openagents/tassadar/module_scale_suite",
+            "version": "2026.03.17"
+          },
+          "split": "validation",
+          "mount_path": "/datasets/tassadar/module_scale/validation",
+          "required": true
+        }
+      ],
+      "rubric_hooks": [
+        {
+          "rubric_ref": "tassadar://rubric/exactness/final_output_exactness",
+          "hook_name": "score_final_output_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        },
+        {
+          "rubric_ref": "tassadar://rubric/exactness/step_exactness",
+          "hook_name": "score_step_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        },
+        {
+          "rubric_ref": "tassadar://rubric/exactness/halt_exactness",
+          "hook_name": "score_halt_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        }
+      ],
+      "expected_artifacts": [
+        {
+          "artifact_kind": "tassadar_program_artifact.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/program_artifact"
+        },
+        {
+          "artifact_kind": "tassadar_trace.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/trace"
+        },
+        {
+          "artifact_kind": "tassadar_eval_report.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/eval_report"
+        }
+      ],
+      "policy_references": [
+        {
+          "kind": "verification",
+          "policy_ref": "policy://tassadar/module_scale/eval/verification",
+          "required": true
+        }
+      ],
+      "metadata": {
+        "tassadar.abi_version": "psionic.tassadar_environment.v1",
+        "tassadar.benchmark_package_set": {
+          "package_set_ref": "benchmark-set://openagents/tassadar/public",
+          "package_set_version": "2026.03.17",
+          "supported_families": [
+            "arithmetic",
+            "trace_length_stress"
+          ],
+          "axis_coverage": [
+            "exactness",
+            "length_generalization",
+            "planner_usefulness"
+          ],
+          "summary_report_ref": "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json"
+        },
+        "tassadar.compile_pipeline_matrix": {
+          "report_ref": "fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json",
+          "report_id": "tassadar.compile_pipeline_matrix_report.v1",
+          "source_family_ids": [
+            "wasm_text.multi_export_arithmetic",
+            "wasm_text.memory_lookup",
+            "wasm_text.param_abi",
+            "c_source.toolchain_unavailable"
+          ]
+        },
+        "tassadar.current_workload_targets": [
+          "module_memcpy",
+          "module_parsing",
+          "module_checksum",
+          "module_vm_style"
+        ],
+        "tassadar.exactness_contract": {
+          "require_final_output_exactness": true,
+          "require_step_exactness": true,
+          "require_halt_exactness": true,
+          "timeout_budget_ms": 15000,
+          "trace_budget_steps": 256,
+          "require_cpu_reference_baseline": true,
+          "require_reference_linear_baseline": true
+        },
+        "tassadar.io_contract": {
+          "input_family": "no_external_input",
+          "output_family": "i32_sequence",
+          "output_element_type": "i32",
+          "deterministic_outputs": true
+        },
+        "tassadar.module_scale_workload_suite": {
+          "suite_ref": "benchmark-suite://openagents/tassadar/module_scale",
+          "suite_version": "2026.03.17",
+          "supported_families": [
+            "memcpy",
+            "parsing",
+            "checksum",
+            "vm_style"
+          ],
+          "evaluation_axes": [
+            "exactness_bps",
+            "total_trace_steps",
+            "cpu_reference_cost_units",
+            "refusal_kind"
+          ],
+          "report_ref": "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+        },
+        "tassadar.package_refs": {
+          "group_ref": "group.tassadar.module_scale",
+          "eval_pin_alias": "tassadar_module_scale_eval",
+          "benchmark_pin_alias": "tassadar_module_scale_benchmark",
+          "eval_member_ref": "tassadar_module_scale_eval_member",
+          "benchmark_member_ref": "tassadar_module_scale_benchmark_member",
+          "program_corpus_ref": "tassadar://corpus/module_scale.validation",
+          "io_contract_ref": "tassadar://io/exact_i32_sequence",
+          "rubric_binding_ref": "tassadar://rubric/exactness",
+          "eval_runtime_profile_ref": "runtime://tassadar/module_scale/eval",
+          "benchmark_profile_ref": "benchmark://openagents/tassadar/module_scale/reference_fixture",
+          "benchmark_runtime_profile_ref": "runtime://tassadar/module_scale/benchmark"
+        },
+        "tassadar.planned_workload_targets": [],
+        "tassadar.program_binding": {
+          "dataset": {
+            "dataset_ref": "dataset://openagents/tassadar/module_scale_suite",
+            "version": "2026.03.17"
+          },
+          "program_corpus_ref": "tassadar://corpus/module_scale.validation",
+          "corpus_digest": "7e395283faed27e438acddb67baf51c56508980bae6b1c4e14f9195e2082c0a1",
+          "wasm_profile_id": "tassadar.wasm.article_i32_compute.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "opcode_vocabulary_digest": "b458516f694c301a7b209bb6e710dfc4b7c2756a107738dd38a8fdc8b2dcd64c",
+          "artifact_digests": [
+            "48f8747fcdaf189a1707554e0252c2eef70cab5dbe932bd457110e542a2d136f",
+            "af9877532c9d9011a4e2808e8b518b490e58609d29958a3b4791738211befac6",
+            "99d101fa193d27195b2f8008661478fb09a7f9d343fcdc3580e2f687f1d1eb9b",
+            "92d7bf513c3ec167c0bb7825eb20da4ffb1027eab4b1de1ba793b760530de61d",
+            "a969ebf93b7552e1aaaa6537cb39e40dc6804716163d29443d53ac5b505f8ce3",
+            "58494273540529e9474c9b2e4ab251dcc7b9a94d2c25637f9094e27c5646cfac",
+            "605c20240bfbd0d6808778341838e8e84c0ca4f2d5d3b01474d05e93067590b3",
+            "9df19eb988464485ce034ab3ad9e91c3eec498c6d29f2d9ea99c2da3d20f6380"
+          ]
+        },
+        "tassadar.surface": "eval",
+        "tassadar.wasm_conformance": {
+          "report_ref": "fixtures/tassadar/reports/tassadar_wasm_conformance_report.json",
+          "report_id": "tassadar.wasm_conformance.report.v1",
+          "reference_authority_id": "wasmi.reference.v1",
+          "case_family_ids": [
+            "curated.global_state",
+            "curated.call_indirect",
+            "curated.deterministic_import",
+            "curated.call_indirect_trap",
+            "curated.unsupported_host_import",
+            "generated.call_indirect",
+            "generated.call_indirect_trap",
+            "generated.global_state"
+          ]
+        }
+      }
+    },
+    "benchmark_package": {
+      "abi_version": "psionic.environment.v1",
+      "key": {
+        "environment_ref": "env.openagents.tassadar.module_scale.benchmark",
+        "version": "2026.03.17"
+      },
+      "family": "evaluation",
+      "display_name": "Tassadar Module-Scale Wasm Workload Suite Benchmark",
+      "execution": {
+        "runtime_family": "evaluator",
+        "entrypoint": "tassadar_benchmark::run",
+        "args": [
+          "runtime://tassadar/module_scale/benchmark"
+        ],
+        "max_turns": 1,
+        "state_mode": "turn_scoped",
+        "time_budget_ms": 15000
+      },
+      "supported_workloads": [
+        "offline_eval",
+        "validator_benchmark"
+      ],
+      "datasets": [
+        {
+          "dataset": {
+            "dataset_ref": "dataset://openagents/tassadar/module_scale_suite",
+            "version": "2026.03.17"
+          },
+          "split": "benchmark",
+          "mount_path": "/datasets/tassadar/module_scale/benchmark",
+          "required": true
+        }
+      ],
+      "rubric_hooks": [
+        {
+          "rubric_ref": "tassadar://rubric/exactness/final_output_exactness",
+          "hook_name": "score_final_output_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        },
+        {
+          "rubric_ref": "tassadar://rubric/exactness/step_exactness",
+          "hook_name": "score_step_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        },
+        {
+          "rubric_ref": "tassadar://rubric/exactness/halt_exactness",
+          "hook_name": "score_halt_exactness",
+          "score_kind": "binary",
+          "pass_threshold": 10000
+        }
+      ],
+      "expected_artifacts": [
+        {
+          "artifact_kind": "tassadar_program_artifact.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/program_artifact"
+        },
+        {
+          "artifact_kind": "tassadar_trace.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/trace"
+        },
+        {
+          "artifact_kind": "tassadar_eval_report.json",
+          "required": true,
+          "verification_policy_ref": "policy://tassadar/eval_report"
+        }
+      ],
+      "policy_references": [
+        {
+          "kind": "benchmark",
+          "policy_ref": "policy://tassadar/module_scale/benchmark",
+          "required": true
+        },
+        {
+          "kind": "verification",
+          "policy_ref": "policy://tassadar/module_scale/benchmark/verification",
+          "required": true
+        }
+      ],
+      "benchmark_profiles": [
+        {
+          "benchmark_profile_ref": "benchmark://openagents/tassadar/module_scale/reference_fixture",
+          "runtime_profile_ref": "runtime://tassadar/module_scale/benchmark",
+          "verification_posture": "validator_required",
+          "expected_execution_strategy": "tassadar_reference_fixture"
+        }
+      ],
+      "metadata": {
+        "tassadar.abi_version": "psionic.tassadar_environment.v1",
+        "tassadar.benchmark_package_set": {
+          "package_set_ref": "benchmark-set://openagents/tassadar/public",
+          "package_set_version": "2026.03.17",
+          "supported_families": [
+            "arithmetic",
+            "trace_length_stress"
+          ],
+          "axis_coverage": [
+            "exactness",
+            "length_generalization",
+            "planner_usefulness"
+          ],
+          "summary_report_ref": "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json"
+        },
+        "tassadar.compile_pipeline_matrix": {
+          "report_ref": "fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json",
+          "report_id": "tassadar.compile_pipeline_matrix_report.v1",
+          "source_family_ids": [
+            "wasm_text.multi_export_arithmetic",
+            "wasm_text.memory_lookup",
+            "wasm_text.param_abi",
+            "c_source.toolchain_unavailable"
+          ]
+        },
+        "tassadar.current_workload_targets": [
+          "module_memcpy",
+          "module_parsing",
+          "module_checksum",
+          "module_vm_style"
+        ],
+        "tassadar.exactness_contract": {
+          "require_final_output_exactness": true,
+          "require_step_exactness": true,
+          "require_halt_exactness": true,
+          "timeout_budget_ms": 15000,
+          "trace_budget_steps": 256,
+          "require_cpu_reference_baseline": true,
+          "require_reference_linear_baseline": true
+        },
+        "tassadar.io_contract": {
+          "input_family": "no_external_input",
+          "output_family": "i32_sequence",
+          "output_element_type": "i32",
+          "deterministic_outputs": true
+        },
+        "tassadar.module_scale_workload_suite": {
+          "suite_ref": "benchmark-suite://openagents/tassadar/module_scale",
+          "suite_version": "2026.03.17",
+          "supported_families": [
+            "memcpy",
+            "parsing",
+            "checksum",
+            "vm_style"
+          ],
+          "evaluation_axes": [
+            "exactness_bps",
+            "total_trace_steps",
+            "cpu_reference_cost_units",
+            "refusal_kind"
+          ],
+          "report_ref": "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+        },
+        "tassadar.package_refs": {
+          "group_ref": "group.tassadar.module_scale",
+          "eval_pin_alias": "tassadar_module_scale_eval",
+          "benchmark_pin_alias": "tassadar_module_scale_benchmark",
+          "eval_member_ref": "tassadar_module_scale_eval_member",
+          "benchmark_member_ref": "tassadar_module_scale_benchmark_member",
+          "program_corpus_ref": "tassadar://corpus/module_scale.validation",
+          "io_contract_ref": "tassadar://io/exact_i32_sequence",
+          "rubric_binding_ref": "tassadar://rubric/exactness",
+          "eval_runtime_profile_ref": "runtime://tassadar/module_scale/eval",
+          "benchmark_profile_ref": "benchmark://openagents/tassadar/module_scale/reference_fixture",
+          "benchmark_runtime_profile_ref": "runtime://tassadar/module_scale/benchmark"
+        },
+        "tassadar.planned_workload_targets": [],
+        "tassadar.program_binding": {
+          "dataset": {
+            "dataset_ref": "dataset://openagents/tassadar/module_scale_suite",
+            "version": "2026.03.17"
+          },
+          "program_corpus_ref": "tassadar://corpus/module_scale.validation",
+          "corpus_digest": "7e395283faed27e438acddb67baf51c56508980bae6b1c4e14f9195e2082c0a1",
+          "wasm_profile_id": "tassadar.wasm.article_i32_compute.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "opcode_vocabulary_digest": "b458516f694c301a7b209bb6e710dfc4b7c2756a107738dd38a8fdc8b2dcd64c",
+          "artifact_digests": [
+            "48f8747fcdaf189a1707554e0252c2eef70cab5dbe932bd457110e542a2d136f",
+            "af9877532c9d9011a4e2808e8b518b490e58609d29958a3b4791738211befac6",
+            "99d101fa193d27195b2f8008661478fb09a7f9d343fcdc3580e2f687f1d1eb9b",
+            "92d7bf513c3ec167c0bb7825eb20da4ffb1027eab4b1de1ba793b760530de61d",
+            "a969ebf93b7552e1aaaa6537cb39e40dc6804716163d29443d53ac5b505f8ce3",
+            "58494273540529e9474c9b2e4ab251dcc7b9a94d2c25637f9094e27c5646cfac",
+            "605c20240bfbd0d6808778341838e8e84c0ca4f2d5d3b01474d05e93067590b3",
+            "9df19eb988464485ce034ab3ad9e91c3eec498c6d29f2d9ea99c2da3d20f6380"
+          ]
+        },
+        "tassadar.surface": "benchmark",
+        "tassadar.wasm_conformance": {
+          "report_ref": "fixtures/tassadar/reports/tassadar_wasm_conformance_report.json",
+          "report_id": "tassadar.wasm_conformance.report.v1",
+          "reference_authority_id": "wasmi.reference.v1",
+          "case_family_ids": [
+            "curated.global_state",
+            "curated.call_indirect",
+            "curated.deterministic_import",
+            "curated.call_indirect_trap",
+            "curated.unsupported_host_import",
+            "generated.call_indirect",
+            "generated.call_indirect_trap",
+            "generated.global_state"
+          ]
+        }
+      }
+    },
+    "group": {
+      "group_ref": "group.tassadar.module_scale",
+      "display_name": "Tassadar Module-Scale Wasm Workload Suite",
+      "members": [
+        {
+          "member_ref": "tassadar_module_scale_eval_member",
+          "pin_alias": "tassadar_module_scale_eval",
+          "surfaces": [
+            "eval"
+          ],
+          "required_workloads": [
+            "online_eval",
+            "offline_eval"
+          ]
+        },
+        {
+          "member_ref": "tassadar_module_scale_benchmark_member",
+          "pin_alias": "tassadar_module_scale_benchmark",
+          "surfaces": [
+            "benchmark"
+          ],
+          "required_workloads": [
+            "validator_benchmark"
+          ],
+          "required_benchmark_profiles": [
+            "benchmark://openagents/tassadar/module_scale/reference_fixture"
+          ]
+        }
+      ]
+    },
+    "eval_resolution": {
+      "group_ref": "group.tassadar.module_scale",
+      "surface": "eval",
+      "members": [
+        {
+          "member_ref": "tassadar_module_scale_eval_member",
+          "surface": "eval",
+          "package": {
+            "alias": "tassadar_module_scale_eval",
+            "package_key": {
+              "environment_ref": "env.openagents.tassadar.module_scale.eval",
+              "version": "2026.03.17"
+            },
+            "package_digest": "e1df0efe8a965705a0d7d2cd035e45a393f862e21872988f0c9249f73c76a450",
+            "supported_workloads": [
+              "online_eval",
+              "offline_eval"
+            ]
+          }
+        }
+      ],
+      "resolution_digest": "8dbc1d2e812c6b92a57cb3402f1dafccecce7f1676febdf53e2d4255cd286996"
+    },
+    "benchmark_resolution": {
+      "group_ref": "group.tassadar.module_scale",
+      "surface": "benchmark",
+      "members": [
+        {
+          "member_ref": "tassadar_module_scale_benchmark_member",
+          "surface": "benchmark",
+          "package": {
+            "alias": "tassadar_module_scale_benchmark",
+            "package_key": {
+              "environment_ref": "env.openagents.tassadar.module_scale.benchmark",
+              "version": "2026.03.17"
+            },
+            "package_digest": "6ce1b202ca57cc029f32c8c577ec033daa60deb6ec76d155324150f3abe0aeb0",
+            "dependencies": [
+              {
+                "environment_ref": "env.openagents.tassadar.module_scale.eval",
+                "version": "2026.03.17"
+              }
+            ],
+            "supported_workloads": [
+              "offline_eval",
+              "validator_benchmark"
+            ]
+          },
+          "benchmark_profiles": [
+            "benchmark://openagents/tassadar/module_scale/reference_fixture"
+          ]
+        }
+      ],
+      "resolution_digest": "ffef77f6720b03dff85abe2de1d5ddf776304e8f0b1a3ae891309f285aca3a5c"
+    },
+    "package_refs": {
+      "group_ref": "group.tassadar.module_scale",
+      "eval_pin_alias": "tassadar_module_scale_eval",
+      "benchmark_pin_alias": "tassadar_module_scale_benchmark",
+      "eval_member_ref": "tassadar_module_scale_eval_member",
+      "benchmark_member_ref": "tassadar_module_scale_benchmark_member",
+      "program_corpus_ref": "tassadar://corpus/module_scale.validation",
+      "io_contract_ref": "tassadar://io/exact_i32_sequence",
+      "rubric_binding_ref": "tassadar://rubric/exactness",
+      "eval_runtime_profile_ref": "runtime://tassadar/module_scale/eval",
+      "benchmark_profile_ref": "benchmark://openagents/tassadar/module_scale/reference_fixture",
+      "benchmark_runtime_profile_ref": "runtime://tassadar/module_scale/benchmark"
+    },
+    "program_binding": {
+      "dataset": {
+        "dataset_ref": "dataset://openagents/tassadar/module_scale_suite",
+        "version": "2026.03.17"
+      },
+      "program_corpus_ref": "tassadar://corpus/module_scale.validation",
+      "corpus_digest": "7e395283faed27e438acddb67baf51c56508980bae6b1c4e14f9195e2082c0a1",
+      "wasm_profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "trace_abi_id": "tassadar.trace.v1",
+      "trace_abi_version": 1,
+      "opcode_vocabulary_digest": "b458516f694c301a7b209bb6e710dfc4b7c2756a107738dd38a8fdc8b2dcd64c",
+      "artifact_digests": [
+        "48f8747fcdaf189a1707554e0252c2eef70cab5dbe932bd457110e542a2d136f",
+        "af9877532c9d9011a4e2808e8b518b490e58609d29958a3b4791738211befac6",
+        "99d101fa193d27195b2f8008661478fb09a7f9d343fcdc3580e2f687f1d1eb9b",
+        "92d7bf513c3ec167c0bb7825eb20da4ffb1027eab4b1de1ba793b760530de61d",
+        "a969ebf93b7552e1aaaa6537cb39e40dc6804716163d29443d53ac5b505f8ce3",
+        "58494273540529e9474c9b2e4ab251dcc7b9a94d2c25637f9094e27c5646cfac",
+        "605c20240bfbd0d6808778341838e8e84c0ca4f2d5d3b01474d05e93067590b3",
+        "9df19eb988464485ce034ab3ad9e91c3eec498c6d29f2d9ea99c2da3d20f6380"
+      ]
+    },
+    "io_contract": {
+      "input_family": "no_external_input",
+      "output_family": "i32_sequence",
+      "output_element_type": "i32",
+      "deterministic_outputs": true
+    },
+    "exactness_contract": {
+      "require_final_output_exactness": true,
+      "require_step_exactness": true,
+      "require_halt_exactness": true,
+      "timeout_budget_ms": 15000,
+      "trace_budget_steps": 256,
+      "require_cpu_reference_baseline": true,
+      "require_reference_linear_baseline": true
+    },
+    "benchmark_package_set_binding": {
+      "package_set_ref": "benchmark-set://openagents/tassadar/public",
+      "package_set_version": "2026.03.17",
+      "supported_families": [
+        "arithmetic",
+        "trace_length_stress"
+      ],
+      "axis_coverage": [
+        "exactness",
+        "length_generalization",
+        "planner_usefulness"
+      ],
+      "summary_report_ref": "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json"
+    },
+    "compile_pipeline_matrix_binding": {
+      "report_ref": "fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json",
+      "report_id": "tassadar.compile_pipeline_matrix_report.v1",
+      "source_family_ids": [
+        "wasm_text.multi_export_arithmetic",
+        "wasm_text.memory_lookup",
+        "wasm_text.param_abi",
+        "c_source.toolchain_unavailable"
+      ]
+    },
+    "wasm_conformance_binding": {
+      "report_ref": "fixtures/tassadar/reports/tassadar_wasm_conformance_report.json",
+      "report_id": "tassadar.wasm_conformance.report.v1",
+      "reference_authority_id": "wasmi.reference.v1",
+      "case_family_ids": [
+        "curated.global_state",
+        "curated.call_indirect",
+        "curated.deterministic_import",
+        "curated.call_indirect_trap",
+        "curated.unsupported_host_import",
+        "generated.call_indirect",
+        "generated.call_indirect_trap",
+        "generated.global_state"
+      ]
+    },
+    "module_scale_workload_suite_binding": {
+      "suite_ref": "benchmark-suite://openagents/tassadar/module_scale",
+      "suite_version": "2026.03.17",
+      "supported_families": [
+        "memcpy",
+        "parsing",
+        "checksum",
+        "vm_style"
+      ],
+      "evaluation_axes": [
+        "exactness_bps",
+        "total_trace_steps",
+        "cpu_reference_cost_units",
+        "refusal_kind"
+      ],
+      "report_ref": "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+    },
+    "current_workload_targets": [
+      "module_memcpy",
+      "module_parsing",
+      "module_checksum",
+      "module_vm_style"
+    ],
+    "planned_workload_targets": []
+  },
+  "benchmark_package": {
+    "abi_version": "psionic.benchmark.v1",
+    "key": {
+      "benchmark_ref": "benchmark://openagents/tassadar/module_scale/reference_fixture",
+      "version": "2026.03.17"
+    },
+    "display_name": "Tassadar Module-Scale Wasm Workload Suite",
+    "environment": {
+      "environment_ref": "env.openagents.tassadar.module_scale.benchmark",
+      "version": "2026.03.17"
+    },
+    "dataset": {
+      "dataset_ref": "dataset://openagents/tassadar/module_scale_suite",
+      "version": "2026.03.17"
+    },
+    "split": "benchmark",
+    "repeat_count": 1,
+    "aggregation": "median_score",
+    "verification_policy": {
+      "require_timer_integrity": true,
+      "require_token_accounting": false,
+      "require_final_state_capture": true,
+      "require_execution_strategy": true
+    },
+    "cases": [
+      {
+        "case_id": "memcpy_fixed_span_exact",
+        "ordinal": 0,
+        "input_ref": "tassadar://input/memcpy_fixed_span_exact/none",
+        "expected_output_ref": "tassadar://expected_output/memcpy_fixed_span_exact",
+        "metadata": {
+          "summary": "fixed-span memcpy-style module with explicit load/store replay",
+          "family": "memcpy",
+          "workload_target": "module_memcpy",
+          "source_ref": "fixtures/tassadar/sources/tassadar_module_memcpy_suite.wat",
+          "status": "lowered_exact",
+          "compile_receipt_digest": "5c73854cbee2aaa2acb38d135e326ecf9fb167314baab98295d4759659f05293",
+          "artifact_bundle_digest": "d7fbd735ad706001504e2268620366a892f192ec3d40d0b9ffec9378a4f225b5",
+          "lowered_export_names": [
+            "copy_sum",
+            "copy_tail"
+          ],
+          "exact_outputs_by_export": {
+            "copy_sum": [
+              6
+            ],
+            "copy_tail": [
+              3
+            ]
+          },
+          "exactness_bps": 10000,
+          "total_trace_steps": 18,
+          "max_trace_steps": 13,
+          "cpu_reference_cost_units": 194,
+          "refusal_kind": null,
+          "trace_budget_steps": 256,
+          "timeout_budget_ms": 15000
+        }
+      },
+      {
+        "case_id": "checksum_fixed_span_exact",
+        "ordinal": 1,
+        "input_ref": "tassadar://input/checksum_fixed_span_exact/none",
+        "expected_output_ref": "tassadar://expected_output/checksum_fixed_span_exact",
+        "metadata": {
+          "summary": "fixed-span checksum-style module with additive and weighted exports",
+          "family": "checksum",
+          "workload_target": "module_checksum",
+          "source_ref": "fixtures/tassadar/sources/tassadar_module_checksum_suite.wat",
+          "status": "lowered_exact",
+          "compile_receipt_digest": "9610e92cd515624cbf1594bd2a7bc24eb4c1a4518cab202989d7bea38d66963f",
+          "artifact_bundle_digest": "1d193ffce5eee3717e104e9293e156572bc92ac5f0fb7d1a1b636a99f287d635",
+          "lowered_export_names": [
+            "checksum_sum",
+            "checksum_weighted"
+          ],
+          "exact_outputs_by_export": {
+            "checksum_sum": [
+              22
+            ],
+            "checksum_weighted": [
+              19
+            ]
+          },
+          "exactness_bps": 10000,
+          "total_trace_steps": 18,
+          "max_trace_steps": 9,
+          "cpu_reference_cost_units": 162,
+          "refusal_kind": null,
+          "trace_budget_steps": 256,
+          "timeout_budget_ms": 15000
+        }
+      },
+      {
+        "case_id": "parsing_token_triplet_exact",
+        "ordinal": 2,
+        "input_ref": "tassadar://input/parsing_token_triplet_exact/none",
+        "expected_output_ref": "tassadar://expected_output/parsing_token_triplet_exact",
+        "metadata": {
+          "summary": "fixed-token parse module that reconstructs one three-token value exactly",
+          "family": "parsing",
+          "workload_target": "module_parsing",
+          "source_ref": "fixtures/tassadar/sources/tassadar_module_parsing_suite.wat",
+          "status": "lowered_exact",
+          "compile_receipt_digest": "da44f268211284116cda332a8c663503b7c4a2505ea6834d05173d23251b1e96",
+          "artifact_bundle_digest": "6414ad36fea8255f8c6f202fca18abbba426a26ca5e14ac9993f88156b0b8ebb",
+          "lowered_export_names": [
+            "parse_triplet",
+            "parse_gap"
+          ],
+          "exact_outputs_by_export": {
+            "parse_gap": [
+              1
+            ],
+            "parse_triplet": [
+              314
+            ]
+          },
+          "exactness_bps": 10000,
+          "total_trace_steps": 16,
+          "max_trace_steps": 11,
+          "cpu_reference_cost_units": 146,
+          "refusal_kind": null,
+          "trace_budget_steps": 256,
+          "timeout_budget_ms": 15000
+        }
+      },
+      {
+        "case_id": "vm_style_dispatch_exact",
+        "ordinal": 3,
+        "input_ref": "tassadar://input/vm_style_dispatch_exact/none",
+        "expected_output_ref": "tassadar://expected_output/vm_style_dispatch_exact",
+        "metadata": {
+          "summary": "multi-export VM-style dispatch module over deterministic fixed operands",
+          "family": "vm_style",
+          "workload_target": "module_vm_style",
+          "source_ref": "fixtures/tassadar/sources/tassadar_module_vm_style_suite.wat",
+          "status": "lowered_exact",
+          "compile_receipt_digest": "3d4c2f6423c6ac917859e03a00dcaf5c4786f3d51324dc290fde737204cda588",
+          "artifact_bundle_digest": "9b3dfbdb7d43a749dc11ae30735d0207fd6298a799e7dfb8f7bac786a23c2c7a",
+          "lowered_export_names": [
+            "dispatch_add",
+            "dispatch_mul_add"
+          ],
+          "exact_outputs_by_export": {
+            "dispatch_add": [
+              11
+            ],
+            "dispatch_mul_add": [
+              10
+            ]
+          },
+          "exactness_bps": 10000,
+          "total_trace_steps": 12,
+          "max_trace_steps": 7,
+          "cpu_reference_cost_units": 74,
+          "refusal_kind": null,
+          "trace_budget_steps": 256,
+          "timeout_budget_ms": 15000
+        }
+      },
+      {
+        "case_id": "vm_style_param_refusal",
+        "ordinal": 4,
+        "input_ref": "tassadar://input/vm_style_param_refusal/none",
+        "expected_output_ref": "tassadar://expected_output/vm_style_param_refusal",
+        "metadata": {
+          "summary": "parameter-ABI VM-style module that still refuses lowering explicitly",
+          "family": "vm_style",
+          "workload_target": "module_vm_style",
+          "source_ref": "fixtures/tassadar/sources/tassadar_module_vm_style_param_refusal.wat",
+          "status": "lowering_refused",
+          "compile_receipt_digest": "a192a28e3f6ea37a1001e37a2547ad604acf0a4eac85138127bd69a34b253e84",
+          "artifact_bundle_digest": null,
+          "lowered_export_names": [],
+          "exact_outputs_by_export": {},
+          "exactness_bps": null,
+          "total_trace_steps": null,
+          "max_trace_steps": null,
+          "cpu_reference_cost_units": null,
+          "refusal_kind": "unsupported_param_count",
+          "trace_budget_steps": 256,
+          "timeout_budget_ms": 15000
+        }
+      }
+    ],
+    "metadata": {
+      "tassadar.corpus_digest": "7e395283faed27e438acddb67baf51c56508980bae6b1c4e14f9195e2082c0a1",
+      "tassadar.current_workload_targets": [
+        "module_memcpy",
+        "module_parsing",
+        "module_checksum",
+        "module_vm_style"
+      ],
+      "tassadar.module_scale_suite_ref": "benchmark-suite://openagents/tassadar/module_scale"
+    }
+  },
+  "cases": [
+    {
+      "case_id": "memcpy_fixed_span_exact",
+      "family": "memcpy",
+      "workload_target": "module_memcpy",
+      "summary": "fixed-span memcpy-style module with explicit load/store replay",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_memcpy_suite.wat",
+      "status": "lowered_exact",
+      "source_kind": "wasm_text",
+      "source_digest": "833ba596e002429357830cab5ba43b0ab7391fdacd99462760c78a603ce0a484",
+      "compile_config_digest": "49f7ed1092b3685edae915f88d9633bbb3e0e1f80b5f979480060436b3634112",
+      "compile_receipt_digest": "5c73854cbee2aaa2acb38d135e326ecf9fb167314baab98295d4759659f05293",
+      "toolchain_digest": "bbd9042032fe5ef2ed3dec5af6641a9a0987377468933a0fe6469659f7b54b29",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_module_memcpy_suite.wasm",
+      "wasm_binary_digest": "4409d65b6de7f17e162f40003f40df9516de64d9936cbb001beced9786ab19e9",
+      "wasm_binary_summary": {
+        "byte_len": 142,
+        "exported_functions": [
+          "copy_sum",
+          "copy_tail"
+        ],
+        "function_count": 2,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": []
+      },
+      "normalized_module_digest": "2e6f49d129777e9a88d8d4ec011a13b5ce18e87f78a81e730982444f539b5221",
+      "artifact_bundle_digest": "d7fbd735ad706001504e2268620366a892f192ec3d40d0b9ffec9378a4f225b5",
+      "lowered_export_names": [
+        "copy_sum",
+        "copy_tail"
+      ],
+      "lowered_artifact_digests": [
+        "48f8747fcdaf189a1707554e0252c2eef70cab5dbe932bd457110e542a2d136f",
+        "af9877532c9d9011a4e2808e8b518b490e58609d29958a3b4791738211befac6"
+      ],
+      "exact_outputs_by_export": {
+        "copy_sum": [
+          6
+        ],
+        "copy_tail": [
+          3
+        ]
+      },
+      "total_trace_steps": 18,
+      "max_trace_steps": 13,
+      "exactness_bps": 10000,
+      "cpu_reference_cost_units": 194
+    },
+    {
+      "case_id": "checksum_fixed_span_exact",
+      "family": "checksum",
+      "workload_target": "module_checksum",
+      "summary": "fixed-span checksum-style module with additive and weighted exports",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_checksum_suite.wat",
+      "status": "lowered_exact",
+      "source_kind": "wasm_text",
+      "source_digest": "1dd944216c2c304e95f40b20b91c656a72fb42a8e158632eaab5812a8a402368",
+      "compile_config_digest": "b74e13eba400395b879b72fa408f45b52a4423cfbf41d4d55b10f6e472f7bf35",
+      "compile_receipt_digest": "9610e92cd515624cbf1594bd2a7bc24eb4c1a4518cab202989d7bea38d66963f",
+      "toolchain_digest": "7f4f55444349d869163ea40d731991128b516598f9a26186a459c7918ded35c6",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_module_checksum_suite.wasm",
+      "wasm_binary_digest": "c1ecf5c00d88b7fc3f03e1fbb691037244a9eb621570e6656415232018022598",
+      "wasm_binary_summary": {
+        "byte_len": 139,
+        "exported_functions": [
+          "checksum_sum",
+          "checksum_weighted"
+        ],
+        "function_count": 2,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": []
+      },
+      "normalized_module_digest": "dc5156acea7569b4aaffc88f43edbfd567b36931b308d778ced1e1771342f3ca",
+      "artifact_bundle_digest": "1d193ffce5eee3717e104e9293e156572bc92ac5f0fb7d1a1b636a99f287d635",
+      "lowered_export_names": [
+        "checksum_sum",
+        "checksum_weighted"
+      ],
+      "lowered_artifact_digests": [
+        "99d101fa193d27195b2f8008661478fb09a7f9d343fcdc3580e2f687f1d1eb9b",
+        "92d7bf513c3ec167c0bb7825eb20da4ffb1027eab4b1de1ba793b760530de61d"
+      ],
+      "exact_outputs_by_export": {
+        "checksum_sum": [
+          22
+        ],
+        "checksum_weighted": [
+          19
+        ]
+      },
+      "total_trace_steps": 18,
+      "max_trace_steps": 9,
+      "exactness_bps": 10000,
+      "cpu_reference_cost_units": 162
+    },
+    {
+      "case_id": "parsing_token_triplet_exact",
+      "family": "parsing",
+      "workload_target": "module_parsing",
+      "summary": "fixed-token parse module that reconstructs one three-token value exactly",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_parsing_suite.wat",
+      "status": "lowered_exact",
+      "source_kind": "wasm_text",
+      "source_digest": "3336b97ad0ba0f87065c43a17882d89cbb5f79c72f6a07d7090d572541b0679a",
+      "compile_config_digest": "3bb02ab3e0a8028add06f327fae64626148263cfe29e04204d223b92ee6d5d0f",
+      "compile_receipt_digest": "da44f268211284116cda332a8c663503b7c4a2505ea6834d05173d23251b1e96",
+      "toolchain_digest": "8642e9080bfdb702d3eac036576a9f03dce8f41d317da05b2e21cef965e6e675",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_module_parsing_suite.wasm",
+      "wasm_binary_digest": "32b23bcb757d2114c40cb0fd63278afc09409f0c19f75fbc987d0c063ae69dc7",
+      "wasm_binary_summary": {
+        "byte_len": 120,
+        "exported_functions": [
+          "parse_gap",
+          "parse_triplet"
+        ],
+        "function_count": 2,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": []
+      },
+      "normalized_module_digest": "988bae37e678983ca39c718978fd7d2238f3b4bde807b3673c50cfa4a64c7a41",
+      "artifact_bundle_digest": "6414ad36fea8255f8c6f202fca18abbba426a26ca5e14ac9993f88156b0b8ebb",
+      "lowered_export_names": [
+        "parse_triplet",
+        "parse_gap"
+      ],
+      "lowered_artifact_digests": [
+        "a969ebf93b7552e1aaaa6537cb39e40dc6804716163d29443d53ac5b505f8ce3",
+        "58494273540529e9474c9b2e4ab251dcc7b9a94d2c25637f9094e27c5646cfac"
+      ],
+      "exact_outputs_by_export": {
+        "parse_gap": [
+          1
+        ],
+        "parse_triplet": [
+          314
+        ]
+      },
+      "total_trace_steps": 16,
+      "max_trace_steps": 11,
+      "exactness_bps": 10000,
+      "cpu_reference_cost_units": 146
+    },
+    {
+      "case_id": "vm_style_dispatch_exact",
+      "family": "vm_style",
+      "workload_target": "module_vm_style",
+      "summary": "multi-export VM-style dispatch module over deterministic fixed operands",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_vm_style_suite.wat",
+      "status": "lowered_exact",
+      "source_kind": "wasm_text",
+      "source_digest": "0e783398fa019783092591a7f88b55f4e262e2c18f99bf9b9de918d8a700f1b7",
+      "compile_config_digest": "56741cf651d2664e19f4bebf05d49ae06f08efc26a29fc44608029407ae487c3",
+      "compile_receipt_digest": "3d4c2f6423c6ac917859e03a00dcaf5c4786f3d51324dc290fde737204cda588",
+      "toolchain_digest": "8a8b44f1d02310af400cdbc6112f30322baa04700753f3974ace29b6b3cc2f2e",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_module_vm_style_suite.wasm",
+      "wasm_binary_digest": "f5eda135d3494d2f99dcc70020491898d9ad91af68323765cae34ca9d9b8c63c",
+      "wasm_binary_summary": {
+        "byte_len": 131,
+        "exported_functions": [
+          "dispatch_add",
+          "dispatch_mul_add"
+        ],
+        "function_count": 2,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": []
+      },
+      "normalized_module_digest": "201360014234160c7dc0998f812553d2ce6a8de60873be3aa9ad088c9057341a",
+      "artifact_bundle_digest": "9b3dfbdb7d43a749dc11ae30735d0207fd6298a799e7dfb8f7bac786a23c2c7a",
+      "lowered_export_names": [
+        "dispatch_add",
+        "dispatch_mul_add"
+      ],
+      "lowered_artifact_digests": [
+        "605c20240bfbd0d6808778341838e8e84c0ca4f2d5d3b01474d05e93067590b3",
+        "9df19eb988464485ce034ab3ad9e91c3eec498c6d29f2d9ea99c2da3d20f6380"
+      ],
+      "exact_outputs_by_export": {
+        "dispatch_add": [
+          11
+        ],
+        "dispatch_mul_add": [
+          10
+        ]
+      },
+      "total_trace_steps": 12,
+      "max_trace_steps": 7,
+      "exactness_bps": 10000,
+      "cpu_reference_cost_units": 74
+    },
+    {
+      "case_id": "vm_style_param_refusal",
+      "family": "vm_style",
+      "workload_target": "module_vm_style",
+      "summary": "parameter-ABI VM-style module that still refuses lowering explicitly",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_vm_style_param_refusal.wat",
+      "status": "lowering_refused",
+      "source_kind": "wasm_text",
+      "source_digest": "e98dd57400c237c0dfca5378e53d29f8eaa2fa5d156baf0797fceeaf29699fb3",
+      "compile_config_digest": "5cc5deabf4332e26082bbff9a3074181e3aa38bfc4549394c477b0a107cd8a6a",
+      "compile_receipt_digest": "a192a28e3f6ea37a1001e37a2547ad604acf0a4eac85138127bd69a34b253e84",
+      "toolchain_digest": "27496ab5cef185eaff75d514453ee72c3359c2c2446ad0dff9b05fcc9a555d4d",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_module_vm_style_param_refusal.wasm",
+      "wasm_binary_digest": "b2b163feef461ae7b5c2c1345e4c70c6ec7cab238a43289e35ef81a5ed88e1a3",
+      "wasm_binary_summary": {
+        "byte_len": 51,
+        "exported_functions": [
+          "dispatch_param"
+        ],
+        "function_count": 1,
+        "imported_function_count": 0,
+        "memory_count": 0,
+        "custom_sections": []
+      },
+      "normalized_module_digest": "9990a9aa608b451c2d72ea72654f418845788e525fa4e020f1530254907ef311",
+      "refusal_kind": "unsupported_param_count",
+      "refusal_detail": "export `dispatch_param` function 0 declares 1 params, but the bounded runtime lane only admits zero-parameter module exports today"
+    }
+  ],
+  "generated_from_refs": [
+    "fixtures/tassadar/sources/tassadar_module_memcpy_suite.wat",
+    "fixtures/tassadar/sources/tassadar_module_checksum_suite.wat",
+    "fixtures/tassadar/sources/tassadar_module_parsing_suite.wat",
+    "fixtures/tassadar/sources/tassadar_module_vm_style_suite.wat",
+    "fixtures/tassadar/sources/tassadar_module_vm_style_param_refusal.wat"
+  ],
+  "claim_boundary": "this report freezes one public module-scale Wasm workload suite over deterministic fixed-span memcpy, parsing, checksum, and VM-style module fixtures plus one explicit parameter-ABI refusal case. Exactness, trace-length, cost, and refusal remain explicit per source module under the current bounded Wasm-text-to-Tassadar lowering lane; this is not arbitrary Wasm closure or a served capability claim",
+  "report_digest": "fab7c59ea549058a6daf63d168be14adaa7e43873f73e61f0ae67180a10b24b5"
+}

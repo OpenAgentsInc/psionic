@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use psionic_data::{DatasetKey, TassadarBenchmarkAxis, TassadarBenchmarkFamily};
+use psionic_data::{
+    DatasetKey, TassadarBenchmarkAxis, TassadarBenchmarkFamily, TassadarModuleScaleWorkloadFamily,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Digest;
@@ -26,6 +28,8 @@ const TASSADAR_METADATA_PLANNED_TARGETS_KEY: &str = "tassadar.planned_workload_t
 const TASSADAR_METADATA_BENCHMARK_PACKAGE_SET_KEY: &str = "tassadar.benchmark_package_set";
 const TASSADAR_METADATA_COMPILE_PIPELINE_MATRIX_KEY: &str = "tassadar.compile_pipeline_matrix";
 const TASSADAR_METADATA_WASM_CONFORMANCE_KEY: &str = "tassadar.wasm_conformance";
+const TASSADAR_METADATA_MODULE_SCALE_WORKLOAD_SUITE_KEY: &str =
+    "tassadar.module_scale_workload_suite";
 const TASSADAR_METADATA_ABI_VERSION_KEY: &str = "tassadar.abi_version";
 const TASSADAR_EVAL_METADATA_SURFACE: &str = "eval";
 const TASSADAR_BENCHMARK_METADATA_SURFACE: &str = "benchmark";
@@ -57,6 +61,14 @@ pub enum TassadarWorkloadTarget {
     SudokuClass,
     /// Hungarian or min-cost-matching style workloads.
     HungarianMatching,
+    /// Fixed-span module-scale memcpy-style workloads.
+    ModuleMemcpy,
+    /// Fixed-token module-scale parsing workloads.
+    ModuleParsing,
+    /// Fixed-span module-scale checksum workloads.
+    ModuleChecksum,
+    /// Multi-export module-scale VM-style dispatch workloads.
+    ModuleVmStyle,
 }
 
 /// Stable package refs that the Tassadar eval and benchmark surfaces reuse.
@@ -218,6 +230,59 @@ impl TassadarWasmConformanceBinding {
             .any(|case_family_id| case_family_id.trim().is_empty())
         {
             return Err(TassadarEnvironmentError::InvalidWasmConformanceCaseFamilyId);
+        }
+        Ok(())
+    }
+}
+
+/// Public module-scale workload-suite binding reused by Tassadar environment bundles.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarModuleScaleWorkloadSuiteBinding {
+    /// Stable module-scale suite reference.
+    pub suite_ref: String,
+    /// Immutable module-scale suite version.
+    pub suite_version: String,
+    /// Module-scale workload families surfaced by this environment bundle.
+    pub supported_families: Vec<TassadarModuleScaleWorkloadFamily>,
+    /// Evaluation axes surfaced by the committed report.
+    pub evaluation_axes: Vec<String>,
+    /// Canonical machine-readable report ref for the suite.
+    pub report_ref: String,
+}
+
+impl TassadarModuleScaleWorkloadSuiteBinding {
+    /// Returns a stable digest over the binding.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let encoded = serde_json::to_vec(self)
+            .expect("Tassadar module-scale workload-suite binding should serialize");
+        let digest = sha2::Sha256::digest(encoded.as_slice());
+        hex::encode(digest)
+    }
+
+    /// Validates that the binding is explicit.
+    pub fn validate(&self) -> Result<(), TassadarEnvironmentError> {
+        if self.suite_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingModuleScaleSuiteRef);
+        }
+        if self.suite_version.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingModuleScaleSuiteVersion);
+        }
+        if self.supported_families.is_empty() {
+            return Err(TassadarEnvironmentError::MissingModuleScaleFamilies);
+        }
+        if self.evaluation_axes.is_empty() {
+            return Err(TassadarEnvironmentError::MissingModuleScaleEvaluationAxes);
+        }
+        if self
+            .evaluation_axes
+            .iter()
+            .any(|evaluation_axis| evaluation_axis.trim().is_empty())
+        {
+            return Err(TassadarEnvironmentError::InvalidModuleScaleEvaluationAxis);
+        }
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingModuleScaleReportRef);
         }
         Ok(())
     }
@@ -477,6 +542,9 @@ pub struct TassadarEnvironmentSpec {
     pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
     /// Public Wasm conformance binding.
     pub wasm_conformance_binding: TassadarWasmConformanceBinding,
+    /// Optional public module-scale workload-suite binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub module_scale_workload_suite_binding: Option<TassadarModuleScaleWorkloadSuiteBinding>,
     /// Policy refs for the eval package.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub eval_policy_references: Vec<EnvironmentPolicyReference>,
@@ -564,6 +632,7 @@ impl TassadarEnvironmentSpec {
             benchmark_package_set_binding: self.benchmark_package_set_binding.clone(),
             compile_pipeline_matrix_binding: self.compile_pipeline_matrix_binding.clone(),
             wasm_conformance_binding: self.wasm_conformance_binding.clone(),
+            module_scale_workload_suite_binding: self.module_scale_workload_suite_binding.clone(),
             current_workload_targets: self.current_workload_targets.clone(),
             planned_workload_targets: self.planned_workload_targets.clone(),
         })
@@ -598,6 +667,9 @@ impl TassadarEnvironmentSpec {
         self.benchmark_package_set_binding.validate()?;
         self.compile_pipeline_matrix_binding.validate()?;
         self.wasm_conformance_binding.validate()?;
+        if let Some(binding) = &self.module_scale_workload_suite_binding {
+            binding.validate()?;
+        }
         if self.current_workload_targets.is_empty() {
             return Err(TassadarEnvironmentError::MissingCurrentWorkloadTargets);
         }
@@ -778,6 +850,12 @@ impl TassadarEnvironmentSpec {
             String::from(TASSADAR_METADATA_WASM_CONFORMANCE_KEY),
             serde_json::to_value(&self.wasm_conformance_binding).unwrap_or(Value::Null),
         );
+        if let Some(binding) = &self.module_scale_workload_suite_binding {
+            metadata.insert(
+                String::from(TASSADAR_METADATA_MODULE_SCALE_WORKLOAD_SUITE_KEY),
+                serde_json::to_value(binding).unwrap_or(Value::Null),
+            );
+        }
         metadata.insert(
             String::from(TASSADAR_METADATA_CURRENT_TARGETS_KEY),
             serde_json::to_value(&self.current_workload_targets).unwrap_or(Value::Null),
@@ -845,6 +923,9 @@ pub struct TassadarEnvironmentBundle {
     pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
     /// Wasm conformance binding.
     pub wasm_conformance_binding: TassadarWasmConformanceBinding,
+    /// Optional module-scale workload-suite binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub module_scale_workload_suite_binding: Option<TassadarModuleScaleWorkloadSuiteBinding>,
     /// Current workload targets implemented now.
     pub current_workload_targets: Vec<TassadarWorkloadTarget>,
     /// Planned workload targets still to widen later.
@@ -923,6 +1004,28 @@ pub enum TassadarEnvironmentError {
     /// Invalid Wasm conformance case family id.
     #[error("Tassadar environment spec includes an empty Wasm conformance case family id")]
     InvalidWasmConformanceCaseFamilyId,
+    /// Missing module-scale suite ref.
+    #[error("Tassadar environment spec is missing `module_scale_workload_suite_binding.suite_ref`")]
+    MissingModuleScaleSuiteRef,
+    /// Missing module-scale suite version.
+    #[error(
+        "Tassadar environment spec is missing `module_scale_workload_suite_binding.suite_version`"
+    )]
+    MissingModuleScaleSuiteVersion,
+    /// Missing module-scale families.
+    #[error("Tassadar environment spec must declare module-scale workload families")]
+    MissingModuleScaleFamilies,
+    /// Missing module-scale evaluation axes.
+    #[error("Tassadar environment spec must declare module-scale evaluation axes")]
+    MissingModuleScaleEvaluationAxes,
+    /// Invalid module-scale evaluation axis.
+    #[error("Tassadar environment spec includes an empty module-scale evaluation axis")]
+    InvalidModuleScaleEvaluationAxis,
+    /// Missing module-scale report ref.
+    #[error(
+        "Tassadar environment spec is missing `module_scale_workload_suite_binding.report_ref`"
+    )]
+    MissingModuleScaleReportRef,
     /// Missing group ref.
     #[error("Tassadar environment refs are missing `group_ref`")]
     MissingGroupRef,
@@ -1149,6 +1252,7 @@ mod tests {
                     String::from("generated.global_state"),
                 ],
             },
+            module_scale_workload_suite_binding: None,
             eval_policy_references: vec![EnvironmentPolicyReference {
                 kind: EnvironmentPolicyKind::Verification,
                 policy_ref: String::from("policy://tassadar/eval/verification"),
@@ -1245,6 +1349,50 @@ mod tests {
                 TassadarWorkloadTarget::MemoryLookupMicroprogram,
                 TassadarWorkloadTarget::BranchControlFlowMicroprogram,
             ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn tassadar_environment_bundle_carries_optional_module_scale_suite_binding()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut spec = sample_spec();
+        spec.module_scale_workload_suite_binding = Some(TassadarModuleScaleWorkloadSuiteBinding {
+            suite_ref: String::from("benchmark-suite://openagents/tassadar/module_scale"),
+            suite_version: String::from("2026.03.17"),
+            supported_families: vec![
+                TassadarModuleScaleWorkloadFamily::Memcpy,
+                TassadarModuleScaleWorkloadFamily::Parsing,
+                TassadarModuleScaleWorkloadFamily::Checksum,
+                TassadarModuleScaleWorkloadFamily::VmStyle,
+            ],
+            evaluation_axes: vec![
+                String::from("exactness_bps"),
+                String::from("total_trace_steps"),
+                String::from("cpu_reference_cost_units"),
+                String::from("refusal_kind"),
+            ],
+            report_ref: String::from(
+                "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+            ),
+        });
+
+        let bundle = spec.build_bundle()?;
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
+                .get(TASSADAR_METADATA_MODULE_SCALE_WORKLOAD_SUITE_KEY)
+                .and_then(|value| value.get("report_ref"))
+                .and_then(Value::as_str),
+            Some("fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json")
+        );
+        assert_eq!(
+            bundle
+                .module_scale_workload_suite_binding
+                .as_ref()
+                .map(|binding| binding.supported_families.len()),
+            Some(4)
         );
         Ok(())
     }

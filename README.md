@@ -175,6 +175,15 @@ Current posture:
   training-facing supervision suite over global-state, call-indirect, and
   deterministic-import cases, and the committed report at
   `fixtures/tassadar/reports/tassadar_module_trace_abi_v2_report.json`
+- its module-scale Wasm workload suite now also exists across `psionic-data`,
+  `psionic-environments`, and `psionic-eval`, with a public deterministic
+  workload-suite contract over memcpy, parsing, checksum, and VM-style module
+  families, environment-bundle metadata that binds the same suite into the
+  repo-facing Tassadar benchmark surface, committed source plus compiled Wasm
+  fixtures, and the committed report at
+  `fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json`
+  that keeps exactness, trace-length, deterministic CPU-reference cost, and
+  typed refusal explicit per module case
 - its structured-control closure lane now also exists across
   `psionic-compiler`, `psionic-runtime`, and `psionic-eval`, with compiler
   lowering from bounded zero-parameter Wasm functions into validated executor

@@ -255,6 +255,16 @@ The current scope is:
   call-indirect, and deterministic-import cases; and `psionic-eval` now
   freezes the current evidence at
   `fixtures/tassadar/reports/tassadar_module_trace_abi_v2_report.json`
+- landed module-scale Wasm workload-suite bar: `psionic-data` now publishes a
+  public `TassadarModuleScaleWorkloadSuiteContract` for deterministic memcpy,
+  parsing, checksum, and VM-style module families plus explicit refusal cases;
+  `psionic-environments` now binds the same suite into the repo-facing
+  Tassadar environment bundle; and `psionic-eval` now freezes the current
+  evidence at
+  `fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json`
+  over committed source and compiled Wasm fixtures, keeping exactness,
+  trace-length, deterministic CPU-reference cost, and typed refusal explicit
+  instead of implying arbitrary module closure
 - landed structured-control closure bar: `psionic-compiler` now lowers one
   bounded zero-parameter i32-only Wasm subset with empty block types into
   validated executor-ready structured programs covering `block`, `loop`, `if`,
