@@ -212,6 +212,11 @@ pub struct ParameterGolfDistributedThroughputReceipt {
     pub topology: ParameterGolfDistributedTopologyReceipt,
     /// Stable communication facts.
     pub communication: ParameterGolfDistributedCommunicationReceipt,
+    /// Stable digest of the aligned CUDA training capability report.
+    pub training_capability_report_digest: String,
+    /// Stable blocker case identifiers for remaining CUDA train-path gaps.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub challenge_kernel_blockers: Vec<String>,
     /// Final receipt disposition.
     pub disposition: ParameterGolfDistributedLaneDisposition,
     /// Timing facts when they exist.
@@ -352,6 +357,11 @@ mod tests {
                     },
                 ],
             },
+            training_capability_report_digest: String::from("cuda-coverage-digest"),
+            challenge_kernel_blockers: vec![
+                String::from("cuda_bf16_train_precision_contract"),
+                String::from("cuda_rope_gqa_attention_block"),
+            ],
             disposition: ParameterGolfDistributedLaneDisposition::Measured,
             timing: Some(ParameterGolfDistributedTimingReceipt {
                 measurement_posture: String::from("observed_step_wallclock"),

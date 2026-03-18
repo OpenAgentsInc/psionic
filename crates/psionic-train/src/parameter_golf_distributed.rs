@@ -14,6 +14,7 @@ use psionic_eval::{
     ParameterGolfDistributedThroughputReceipt, ParameterGolfDistributedTimingReceipt,
     ParameterGolfDistributedTopologyReceipt,
 };
+use psionic_ir::GraphError;
 use psionic_models::ParameterGolfModelDescriptor;
 use psionic_runtime::{
     BackendSelection, ClusterCommunicationClass, ClusterExecutionCapabilityProfile,
@@ -36,7 +37,7 @@ use crate::{
     TrainingOptimizerStateShardKind, TrainingOptimizerStateShardLayout, TrainingParameterGroupState,
     TrainingParameterShardKind, TrainingParameterShardLayout,
     TrainingPrecisionPolicy, TrainingShardPlacement, TrainingShardRange, TrainingTensorBuffer,
-    parameter_golf_optimizer_plan,
+    builtin_parameter_golf_cuda_training_capability_report, parameter_golf_optimizer_plan,
 };
 
 /// Stable version identifier for the distributed `8xH100` receipt lane.
@@ -149,6 +150,8 @@ pub enum ParameterGolfDistributedLaneError {
     #[error("distributed parameter golf step observation is invalid: {message}")]
     InvalidStepObservation { message: String },
     #[error(transparent)]
+    Graph(#[from] GraphError),
+    #[error(transparent)]
     CollectivePlanning(#[from] psionic_collectives::CollectivePlanningError),
     #[error(transparent)]
     DistributedOptimizer(#[from] DistributedOptimizerError),
@@ -170,6 +173,7 @@ pub fn benchmark_parameter_golf_distributed_8xh100(
     let optimizer_plan = parameter_golf_optimizer_plan(descriptor, hyperparameters)?;
     let optimizer_plan_digest =
         stable_digest(b"psionic_parameter_golf_optimizer_plan|", &optimizer_plan);
+    let cuda_coverage_report = builtin_parameter_golf_cuda_training_capability_report()?;
     let (backend_selection, all_devices_match_required_model, inventory_refusal) =
         distributed_backend_selection(devices, capability_profile, &config.thresholds);
     let topology_digest = backend_selection
@@ -224,17 +228,15 @@ pub fn benchmark_parameter_golf_distributed_8xh100(
         total_parameter_count,
     )?;
     let timing = build_timing_receipt(config);
-    let boundary_notes = vec![
+    let mut boundary_notes = vec![
         String::from(
             "This receipt mirrors the public train_gpt.py 8xH100 posture: replicated DDP, WORLD_SIZE=8, grad_accum_steps=1, NCCL-style all-reduce for training and validation.",
         ),
-        String::from(
-            "CUDA decoder-kernel and runtime widening for challenge-ready execution remains tracked separately under PGOLF-303 / #171.",
-        ),
-        String::from(
-            "The memory receipt is an analytic upper bound over the distributed optimizer contract; it is not a direct CUDA allocator trace.",
-        ),
     ];
+    boundary_notes.extend(cuda_coverage_report.boundary_notes());
+    boundary_notes.push(String::from(
+        "The memory receipt is an analytic upper bound over the distributed optimizer contract; it is not a direct CUDA allocator trace.",
+    ));
 
     let refusal = inventory_refusal
         .or_else(|| {
@@ -291,6 +293,8 @@ pub fn benchmark_parameter_golf_distributed_8xh100(
         thresholds: config.thresholds.clone(),
         topology,
         communication,
+        training_capability_report_digest: cuda_coverage_report.report_digest.clone(),
+        challenge_kernel_blockers: cuda_coverage_report.challenge_kernel_blockers().to_vec(),
         disposition: if refusal.is_some() {
             ParameterGolfDistributedLaneDisposition::Refused
         } else {
@@ -945,6 +949,14 @@ mod tests {
             receipt.communication.stages[1].stage_id,
             "muon_matrix_update_all_reduce"
         );
+        assert!(!receipt.training_capability_report_digest.is_empty());
+        assert!(receipt
+            .challenge_kernel_blockers
+            .contains(&String::from("cuda_bf16_train_precision_contract")));
+        assert!(receipt.boundary_notes.iter().any(|note| {
+            note.contains("cuda_rope_gqa_attention_block")
+                || note.contains("cuda_bf16_train_precision_contract")
+        }));
         assert!(receipt.timing.as_ref().is_some_and(|timing| timing.within_wallclock_cap));
         assert!(receipt.memory.as_ref().is_some_and(|memory| memory.within_device_budget));
         assert!(receipt.refusal.is_none());

@@ -33,6 +33,9 @@ Psionic now encodes that exact posture explicitly instead of treating
 - `psionic-eval` now exposes
   `ParameterGolfDistributedThroughputReceipt` plus the supporting topology,
   communication, timing, memory, threshold, and refusal types
+- the distributed receipt now also preserves the aligned
+  `training_capability_report_digest`, ordered `challenge_kernel_blockers`,
+  and derived CUDA boundary notes from the typed `PGOLF-303` coverage report
 - the lane now emits either a measured receipt or an explicit refusal with the
   local-reference benchmark preserved as the fallback review lane
 
@@ -104,13 +107,15 @@ What is now explicit:
 - the DDP or Muon communication posture
 - measured-or-refused timing receipts
 - measured-or-refused memory receipts
+- the digest and blocker list for the current CUDA train-path coverage report
 
 What is still separate work:
 
-- CUDA decoder-kernel widening
-- any remaining train-time runtime surfaces needed for challenge-speed decoder
-  execution
+- retiring the explicit blocker list carried by the CUDA training coverage
+  report
+- widening the public CUDA train path until the decoder-block, precision, and
+  optimizer surfaces no longer need those blockers
 - broader proof that the public array surface owns every required train-time
-  kernel
+  kernel directly rather than through partial IR or semantic evidence
 
 That remaining closure stays with `PGOLF-303` / `#171`.
