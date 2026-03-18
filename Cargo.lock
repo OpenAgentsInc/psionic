@@ -3556,6 +3556,7 @@ dependencies = [
  "psionic-environments",
  "psionic-ir",
  "psionic-models",
+ "psionic-router",
  "psionic-runtime",
  "serde",
  "serde_json",

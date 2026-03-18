@@ -24,6 +24,7 @@ full = [
     "dep:psionic-environments",
     "dep:psionic-ir",
     "dep:psionic-models",
+    "dep:psionic-router",
     "dep:psionic-runtime",
 ]
 
@@ -37,6 +38,7 @@ psionic-datastream = { path = "../psionic-datastream", optional = true }
 psionic-environments = { path = "../psionic-environments", optional = true }
 psionic-ir = { path = "../psionic-ir", optional = true }
 psionic-models = { path = "../psionic-models", optional = true }
+psionic-router = { path = "../psionic-router", optional = true }
 psionic-runtime = { path = "../psionic-runtime", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

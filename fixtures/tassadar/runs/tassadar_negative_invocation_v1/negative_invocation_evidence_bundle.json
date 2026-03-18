@@ -1,0 +1,316 @@
+{
+  "publication": {
+    "schema_version": 1,
+    "publication_id": "tassadar.negative_invocation.publication.v1",
+    "status": "implemented",
+    "claim_class": "research_only_architecture_routing_surface",
+    "route_families": [
+      "external_tool",
+      "internal_exact_compute",
+      "language_only"
+    ],
+    "penalty_weights": [
+      {
+        "penalty_kind": "evidence_quality_regression",
+        "weight_bps": 2100,
+        "note": "a route that worsens evidence quality should be treated as a planner failure even when it still returns a locally correct answer"
+      },
+      {
+        "penalty_kind": "fallback_churn",
+        "weight_bps": 2600,
+        "note": "fallback churn should stay visible because repeated internal retries are not a success metric and often destroy cost or latency posture"
+      },
+      {
+        "penalty_kind": "refusal_when_better_lane_exists",
+        "weight_bps": 1900,
+        "note": "the planner should be penalized when it selects a route likely to refuse even though a better admissible lane already exists"
+      },
+      {
+        "penalty_kind": "unnecessary_internal_invocation",
+        "weight_bps": 3400,
+        "note": "planners should pay an explicit penalty when the internal executor is invoked even though language-only or external delegation is the honest better lane"
+      }
+    ],
+    "benchmarked_workload_classes": [
+      "arithmetic_microprogram",
+      "branch_heavy_kernel",
+      "long_loop_kernel",
+      "memory_heavy_kernel",
+      "memory_lookup_microprogram",
+      "sudoku_class"
+    ],
+    "target_surfaces": [
+      "crates/psionic-models",
+      "crates/psionic-train",
+      "crates/psionic-router",
+      "crates/psionic-eval"
+    ],
+    "validation_refs": [
+      "fixtures/tassadar/runs/tassadar_negative_invocation_v1/negative_invocation_evidence_bundle.json",
+      "fixtures/tassadar/reports/tassadar_negative_invocation_route_audit.json",
+      "fixtures/tassadar/reports/tassadar_negative_invocation_report.json",
+      "fixtures/tassadar/reports/tassadar_planner_language_compute_policy_report.json"
+    ],
+    "support_boundaries": [
+      "this publication defines a benchmark-bound negative-invocation vocabulary for planner learning and route auditing; it does not widen served capability or imply accepted-outcome authority",
+      "higher executor utilization is not treated as a success metric; unnecessary internal calls, fallback churn, evidence regressions, and route-quality failures stay explicit",
+      "the lane compares language-only, internal exact-compute, and external-tool routes on matched seeded cases; it does not claim global planner optimality"
+    ],
+    "publication_digest": "36aaa8abd268d5014330195dcc1f77cf989e407525e276304a1bbf5f81c34cee"
+  },
+  "cases": [
+    {
+      "case_id": "open_ended_article_math_explanation",
+      "workload_class": "arithmetic_microprogram",
+      "baseline_route_family": "internal_exact_compute",
+      "preferred_route_family": "language_only",
+      "route_outcomes": [
+        {
+          "route_family": "language_only",
+          "expected_correctness_bps": 8900,
+          "estimated_cost_milliunits": 600,
+          "estimated_latency_millis": 180,
+          "evidence_quality_bps": 9400,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "language-only route stays cheaper and clearer for explanatory output"
+        },
+        {
+          "route_family": "internal_exact_compute",
+          "expected_correctness_bps": 9850,
+          "estimated_cost_milliunits": 2000,
+          "estimated_latency_millis": 430,
+          "evidence_quality_bps": 7800,
+          "fallback_churn_count": 1,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "internal exact-compute call is unnecessary and adds retry churn for a task that should stay in language"
+        },
+        {
+          "route_family": "external_tool",
+          "expected_correctness_bps": 9650,
+          "estimated_cost_milliunits": 4300,
+          "estimated_latency_millis": 740,
+          "evidence_quality_bps": 7300,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "external tool route is exact but unnecessary for an explanatory answer"
+        }
+      ],
+      "unnecessary_internal_invocation": true,
+      "evidence_quality_regression_bps": 1600,
+      "note": "baseline planner over-calls the executor for an explanatory task"
+    },
+    {
+      "case_id": "memory_lookup_result_narration",
+      "workload_class": "memory_lookup_microprogram",
+      "baseline_route_family": "internal_exact_compute",
+      "preferred_route_family": "language_only",
+      "route_outcomes": [
+        {
+          "route_family": "language_only",
+          "expected_correctness_bps": 8700,
+          "estimated_cost_milliunits": 640,
+          "estimated_latency_millis": 190,
+          "evidence_quality_bps": 9100,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "language-only route is sufficient for narrating a known lookup result"
+        },
+        {
+          "route_family": "internal_exact_compute",
+          "expected_correctness_bps": 9700,
+          "estimated_cost_milliunits": 1950,
+          "estimated_latency_millis": 420,
+          "evidence_quality_bps": 7600,
+          "fallback_churn_count": 1,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "executor call is unnecessary and adds avoidable cost and fallback churn"
+        },
+        {
+          "route_family": "external_tool",
+          "expected_correctness_bps": 9550,
+          "estimated_cost_milliunits": 4100,
+          "estimated_latency_millis": 720,
+          "evidence_quality_bps": 7200,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "external tool route is also unnecessary for this narrative task"
+        }
+      ],
+      "unnecessary_internal_invocation": true,
+      "evidence_quality_regression_bps": 1500,
+      "note": "negative labels should teach the planner not to invoke compute just because it is available"
+    },
+    {
+      "case_id": "accepted_outcome_exact_patch",
+      "workload_class": "memory_heavy_kernel",
+      "baseline_route_family": "internal_exact_compute",
+      "preferred_route_family": "internal_exact_compute",
+      "route_outcomes": [
+        {
+          "route_family": "language_only",
+          "expected_correctness_bps": 5400,
+          "estimated_cost_milliunits": 690,
+          "estimated_latency_millis": 170,
+          "evidence_quality_bps": 4800,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": true,
+          "note": "language-only route is under-specified for exact accepted-outcome work"
+        },
+        {
+          "route_family": "internal_exact_compute",
+          "expected_correctness_bps": 9900,
+          "estimated_cost_milliunits": 2500,
+          "estimated_latency_millis": 390,
+          "evidence_quality_bps": 9300,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "internal exact-compute remains the honest winning lane here"
+        },
+        {
+          "route_family": "external_tool",
+          "expected_correctness_bps": 9820,
+          "estimated_cost_milliunits": 4700,
+          "estimated_latency_millis": 690,
+          "evidence_quality_bps": 9100,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "external tool route is viable but costlier than the current bounded internal lane"
+        }
+      ],
+      "unnecessary_internal_invocation": false,
+      "evidence_quality_regression_bps": 0,
+      "note": "negative-invocation training should not teach the planner to avoid the executor when it is actually the best lane"
+    },
+    {
+      "case_id": "long_loop_robust_execution_plan",
+      "workload_class": "long_loop_kernel",
+      "baseline_route_family": "internal_exact_compute",
+      "preferred_route_family": "external_tool",
+      "route_outcomes": [
+        {
+          "route_family": "language_only",
+          "expected_correctness_bps": 3900,
+          "estimated_cost_milliunits": 700,
+          "estimated_latency_millis": 210,
+          "evidence_quality_bps": 4900,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": true,
+          "note": "language-only route is too brittle for long-loop robust execution"
+        },
+        {
+          "route_family": "internal_exact_compute",
+          "expected_correctness_bps": 9650,
+          "estimated_cost_milliunits": 3650,
+          "estimated_latency_millis": 620,
+          "evidence_quality_bps": 7200,
+          "fallback_churn_count": 2,
+          "would_refuse_when_better_lane_exists": true,
+          "note": "internal exact-compute looks attractive but the retry-heavy path is costlier, slower, and still refusal-prone on this long-loop case"
+        },
+        {
+          "route_family": "external_tool",
+          "expected_correctness_bps": 9840,
+          "estimated_cost_milliunits": 4350,
+          "estimated_latency_millis": 760,
+          "evidence_quality_bps": 9200,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "external tool route remains the robust exact baseline"
+        }
+      ],
+      "unnecessary_internal_invocation": true,
+      "evidence_quality_regression_bps": 2000,
+      "note": "counterfactual route outcomes should teach the planner to delegate externally here instead of churning through internal retries"
+    },
+    {
+      "case_id": "sudoku_exact_candidate_check",
+      "workload_class": "sudoku_class",
+      "baseline_route_family": "internal_exact_compute",
+      "preferred_route_family": "internal_exact_compute",
+      "route_outcomes": [
+        {
+          "route_family": "language_only",
+          "expected_correctness_bps": 4500,
+          "estimated_cost_milliunits": 710,
+          "estimated_latency_millis": 195,
+          "evidence_quality_bps": 5100,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": true,
+          "note": "language-only route is too weak for exact candidate checking"
+        },
+        {
+          "route_family": "internal_exact_compute",
+          "expected_correctness_bps": 9700,
+          "estimated_cost_milliunits": 2950,
+          "estimated_latency_millis": 410,
+          "evidence_quality_bps": 8900,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "internal search lane remains the honest bounded winner on this case"
+        },
+        {
+          "route_family": "external_tool",
+          "expected_correctness_bps": 9620,
+          "estimated_cost_milliunits": 5050,
+          "estimated_latency_millis": 790,
+          "evidence_quality_bps": 8600,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "external tool route is correct but too expensive to prefer by default"
+        }
+      ],
+      "unnecessary_internal_invocation": false,
+      "evidence_quality_regression_bps": 0,
+      "note": "the penalty surface should preserve necessary internal exact-compute wins"
+    },
+    {
+      "case_id": "validator_heavy_search_mount",
+      "workload_class": "branch_heavy_kernel",
+      "baseline_route_family": "internal_exact_compute",
+      "preferred_route_family": "external_tool",
+      "route_outcomes": [
+        {
+          "route_family": "language_only",
+          "expected_correctness_bps": 4100,
+          "estimated_cost_milliunits": 720,
+          "estimated_latency_millis": 220,
+          "evidence_quality_bps": 4700,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": true,
+          "note": "language-only route is not acceptable for validator-heavy exact work"
+        },
+        {
+          "route_family": "internal_exact_compute",
+          "expected_correctness_bps": 9680,
+          "estimated_cost_milliunits": 3250,
+          "estimated_latency_millis": 580,
+          "evidence_quality_bps": 7400,
+          "fallback_churn_count": 1,
+          "would_refuse_when_better_lane_exists": true,
+          "note": "internal route still triggers avoidable fallback, extra cost, and slower delivery compared with the validator-backed external lane"
+        },
+        {
+          "route_family": "external_tool",
+          "expected_correctness_bps": 9780,
+          "estimated_cost_milliunits": 4900,
+          "estimated_latency_millis": 770,
+          "evidence_quality_bps": 9250,
+          "fallback_churn_count": 0,
+          "would_refuse_when_better_lane_exists": false,
+          "note": "external tool route is slower but better on evidence quality and refusal posture"
+        }
+      ],
+      "unnecessary_internal_invocation": true,
+      "evidence_quality_regression_bps": 1850,
+      "note": "negative invocation should steer the planner away from needless internal calls on validator-heavy work"
+    }
+  ],
+  "unnecessary_internal_invocation_rate_bps": 6666,
+  "baseline_fallback_churn_total": 5,
+  "preferred_fallback_churn_total": 0,
+  "baseline_average_evidence_quality_bps": 8033,
+  "preferred_average_evidence_quality_bps": 9191,
+  "summary": "Negative-invocation bundle now freezes 6 seeded planner cases from `fixtures/tassadar/runs/tassadar_negative_invocation_v1/negative_invocation_evidence_bundle.json` with unnecessary_internal_invocation=6666bps, fallback_churn 5->0 and evidence_quality 8033->9191 bps.",
+  "bundle_digest": "7a7cb8b61bdb3f1b99f482b1aa39d1c9a8820f1e34974157121bde9a26a56f23"
+}

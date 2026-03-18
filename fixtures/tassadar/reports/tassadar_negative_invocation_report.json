@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.negative_invocation.report.v1",
+  "publication_id": "tassadar.negative_invocation.publication.v1",
+  "evidence_bundle_ref": "fixtures/tassadar/runs/tassadar_negative_invocation_v1/negative_invocation_evidence_bundle.json",
+  "route_audit_ref": "fixtures/tassadar/reports/tassadar_negative_invocation_route_audit.json",
+  "unnecessary_internal_invocation_before_bps": 6666,
+  "unnecessary_internal_invocation_after_bps": 0,
+  "fallback_churn_before_total": 5,
+  "fallback_churn_after_total": 0,
+  "baseline_average_cost_milliunits": 2716,
+  "preferred_average_cost_milliunits": 2656,
+  "baseline_average_latency_millis": 475,
+  "preferred_average_latency_millis": 450,
+  "baseline_average_evidence_quality_bps": 8033,
+  "preferred_average_evidence_quality_bps": 9191,
+  "preferred_language_only_case_count": 2,
+  "preferred_internal_exact_compute_case_count": 2,
+  "preferred_external_tool_case_count": 2,
+  "claim_boundary": "this report is a benchmark-bound research surface over seeded planner cases. It compares baseline and preferred routing on cost, latency, evidence quality, churn, and unnecessary invocation without promoting any lane or implying accepted-outcome closure",
+  "summary": "Negative-invocation report covers 6 seeded cases with unnecessary_internal_invocation 6666->0 bps, cost 2716->2656, latency 475->450, and evidence_quality 8033->9191 bps.",
+  "report_digest": "113ea4b777498d84512497330ef6bef3a6858cdd14fab60d00bec0616cfae8da"
+}

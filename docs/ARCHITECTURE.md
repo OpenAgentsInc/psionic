@@ -1170,6 +1170,20 @@ The current scope is:
   provider-facing `TassadarEvidenceCalibratedRoutingReceipt`; the lane remains
   policy-bound routing research and does not imply accepted-outcome authority,
   settlement truth, or served capability widening
+- landed negative-invocation planner-learning follow-on: `psionic-models` now
+  publishes a public `TassadarNegativeInvocationPublication` over explicit
+  unnecessary-internal-invocation, fallback-churn,
+  evidence-quality-regression, and refusal-when-better-lane-exists penalties,
+  `psionic-train` now freezes the committed evidence bundle at
+  `fixtures/tassadar/runs/tassadar_negative_invocation_v1/negative_invocation_evidence_bundle.json`
+  with matched baseline-versus-preferred route outcomes across seeded hybrid
+  cases, `psionic-router` now freezes the before/after route audit at
+  `fixtures/tassadar/reports/tassadar_negative_invocation_route_audit.json`,
+  and `psionic-eval` now freezes the joined cost-latency-quality tradeoff
+  report at
+  `fixtures/tassadar/reports/tassadar_negative_invocation_report.json`; the
+  lane remains research-only planner learning and does not imply served
+  promotion, accepted-outcome authority, or settlement closure
 - the final article-parity closeout audit now exists at
   `docs/audits/2026-03-17-tassadar-article-parity-closeout-audit.md`; it is
   explicitly subordinate to `fixtures/tassadar/reports/tassadar_acceptance_report.json`
