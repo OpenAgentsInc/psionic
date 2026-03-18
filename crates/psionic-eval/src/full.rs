@@ -22,6 +22,8 @@ mod tassadar_benchmark_package_set;
 mod tassadar_clrs_wasm_bridge;
 #[path = "tassadar_call_frames.rs"]
 mod tassadar_call_frames;
+#[path = "tassadar_compiled_distillation.rs"]
+mod tassadar_compiled_distillation;
 #[path = "tassadar_compile_pipeline_matrix.rs"]
 mod tassadar_compile_pipeline_matrix;
 #[path = "tassadar_wasm_conformance.rs"]
@@ -108,6 +110,7 @@ pub use tassadar::*;
 pub use tassadar_benchmark_package_set::*;
 pub use tassadar_clrs_wasm_bridge::*;
 pub use tassadar_call_frames::*;
+pub use tassadar_compiled_distillation::*;
 pub use tassadar_compile_pipeline_matrix::*;
 pub use tassadar_wasm_conformance::*;
 pub use tassadar_conditional_masking_report::*;

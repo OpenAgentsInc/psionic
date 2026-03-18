@@ -1,0 +1,300 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.compiled_distillation.training_evidence_bundle.v1",
+  "contract_digest": "0e34cf3705952af3e286ceb6905da9abeab3a12db3db6ec1b78107ca750e3d15",
+  "target_bundle_digest": "1bb4780c04324845b8cb126e6204dd10389ba1f230e3a89c97f8e4627d1f8f91",
+  "regime_evidence": [
+    {
+      "workload_family": "kernel_arithmetic",
+      "regime": "full_trace",
+      "final_output_exactness_bps": 9600,
+      "later_window_exactness_bps": 9500,
+      "held_out_family_exactness_bps": 9300,
+      "support_posture": "supported",
+      "authority_case_id": "kernel_arithmetic_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json"
+      ],
+      "detail": "Full-trace supervision stays the upper bound on the bounded kernel family."
+    },
+    {
+      "workload_family": "kernel_arithmetic",
+      "regime": "io_only",
+      "final_output_exactness_bps": 8200,
+      "later_window_exactness_bps": 7800,
+      "held_out_family_exactness_bps": 7600,
+      "support_posture": "supported",
+      "authority_case_id": "kernel_arithmetic_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_exactness_refusal_report.json"
+      ],
+      "detail": "IO-only distillation keeps final outputs but loses later-window structure on the kernel family."
+    },
+    {
+      "workload_family": "kernel_arithmetic",
+      "regime": "partial_state",
+      "final_output_exactness_bps": 8900,
+      "later_window_exactness_bps": 8600,
+      "held_out_family_exactness_bps": 8400,
+      "support_posture": "supported",
+      "authority_case_id": "kernel_arithmetic_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_exactness_refusal_report.json"
+      ],
+      "detail": "Partial-state targets recover much of the kernel later-window structure without full lockstep."
+    },
+    {
+      "workload_family": "kernel_arithmetic",
+      "regime": "invariance_class",
+      "final_output_exactness_bps": 8700,
+      "later_window_exactness_bps": 8400,
+      "held_out_family_exactness_bps": 8200,
+      "support_posture": "supported",
+      "authority_case_id": "kernel_arithmetic_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_exactness_refusal_report.json"
+      ],
+      "detail": "Invariance-only supervision preserves core kernel properties but does not fully replace state targets."
+    },
+    {
+      "workload_family": "kernel_arithmetic",
+      "regime": "mixed_distillation",
+      "final_output_exactness_bps": 9400,
+      "later_window_exactness_bps": 9200,
+      "held_out_family_exactness_bps": 9000,
+      "support_posture": "supported",
+      "authority_case_id": "kernel_arithmetic_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_exactness_refusal_report.json"
+      ],
+      "detail": "Mixed distillation approaches the full-trace ceiling on the bounded kernel family."
+    },
+    {
+      "workload_family": "clrs_wasm_shortest_path",
+      "regime": "full_trace",
+      "final_output_exactness_bps": 9000,
+      "later_window_exactness_bps": 8600,
+      "held_out_family_exactness_bps": 8200,
+      "support_posture": "supported",
+      "authority_case_id": "clrs_wasm_shortest_path_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+      ],
+      "detail": "Full-trace supervision remains the strongest learned baseline on the CLRS-to-Wasm bridge."
+    },
+    {
+      "workload_family": "clrs_wasm_shortest_path",
+      "regime": "io_only",
+      "final_output_exactness_bps": 7200,
+      "later_window_exactness_bps": 6500,
+      "held_out_family_exactness_bps": 6100,
+      "support_posture": "supported",
+      "authority_case_id": "clrs_wasm_shortest_path_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+      ],
+      "detail": "IO-only supervision degrades bridge later-window stability materially."
+    },
+    {
+      "workload_family": "clrs_wasm_shortest_path",
+      "regime": "partial_state",
+      "final_output_exactness_bps": 8100,
+      "later_window_exactness_bps": 7600,
+      "held_out_family_exactness_bps": 7200,
+      "support_posture": "supported",
+      "authority_case_id": "clrs_wasm_shortest_path_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+      ],
+      "detail": "Partial-state targets recover bridge structure better than IO-only targets alone."
+    },
+    {
+      "workload_family": "clrs_wasm_shortest_path",
+      "regime": "invariance_class",
+      "final_output_exactness_bps": 7900,
+      "later_window_exactness_bps": 7400,
+      "held_out_family_exactness_bps": 7000,
+      "support_posture": "supported",
+      "authority_case_id": "clrs_wasm_shortest_path_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+      ],
+      "detail": "Invariance classes help bridge generalization but remain weaker than partial-state or mixed supervision."
+    },
+    {
+      "workload_family": "clrs_wasm_shortest_path",
+      "regime": "mixed_distillation",
+      "final_output_exactness_bps": 8700,
+      "later_window_exactness_bps": 8200,
+      "held_out_family_exactness_bps": 7900,
+      "support_posture": "supported",
+      "authority_case_id": "clrs_wasm_shortest_path_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+      ],
+      "detail": "Mixed distillation closes most of the bridge gap without requiring full trace lockstep."
+    },
+    {
+      "workload_family": "hungarian_matching",
+      "regime": "full_trace",
+      "final_output_exactness_bps": 8600,
+      "later_window_exactness_bps": 8100,
+      "held_out_family_exactness_bps": 7600,
+      "support_posture": "supported",
+      "authority_case_id": "hungarian_matching_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json"
+      ],
+      "detail": "Full-trace supervision still best preserves matching later-window state."
+    },
+    {
+      "workload_family": "hungarian_matching",
+      "regime": "io_only",
+      "final_output_exactness_bps": 6500,
+      "later_window_exactness_bps": 5800,
+      "held_out_family_exactness_bps": 5400,
+      "support_posture": "refuse",
+      "authority_case_id": "hungarian_matching_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_exactness_refusal_report.json"
+      ],
+      "detail": "IO-only supervision is too weak to support honest Hungarian learned execution on the current bounded family and must refuse."
+    },
+    {
+      "workload_family": "hungarian_matching",
+      "regime": "partial_state",
+      "final_output_exactness_bps": 7600,
+      "later_window_exactness_bps": 7000,
+      "held_out_family_exactness_bps": 6500,
+      "support_posture": "supported",
+      "authority_case_id": "hungarian_matching_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json"
+      ],
+      "detail": "Partial-state supervision restores most matching-family structure without full lockstep."
+    },
+    {
+      "workload_family": "hungarian_matching",
+      "regime": "invariance_class",
+      "final_output_exactness_bps": 7400,
+      "later_window_exactness_bps": 6900,
+      "held_out_family_exactness_bps": 6300,
+      "support_posture": "supported",
+      "authority_case_id": "hungarian_matching_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json"
+      ],
+      "detail": "Invariance-only supervision helps assignment stability but still trails partial-state or mixed supervision."
+    },
+    {
+      "workload_family": "hungarian_matching",
+      "regime": "mixed_distillation",
+      "final_output_exactness_bps": 8200,
+      "later_window_exactness_bps": 7700,
+      "held_out_family_exactness_bps": 7300,
+      "support_posture": "supported",
+      "authority_case_id": "hungarian_matching_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json"
+      ],
+      "detail": "Mixed distillation recovers most Hungarian-family performance while remaining below the full-trace ceiling."
+    },
+    {
+      "workload_family": "sudoku_search",
+      "regime": "full_trace",
+      "final_output_exactness_bps": 8200,
+      "later_window_exactness_bps": 7600,
+      "held_out_family_exactness_bps": 7000,
+      "support_posture": "supported",
+      "authority_case_id": "sudoku_search_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+      ],
+      "detail": "Full-trace supervision remains the strongest bounded learned baseline for Sudoku search."
+    },
+    {
+      "workload_family": "sudoku_search",
+      "regime": "io_only",
+      "final_output_exactness_bps": 6000,
+      "later_window_exactness_bps": 5200,
+      "held_out_family_exactness_bps": 4800,
+      "support_posture": "refuse",
+      "authority_case_id": "sudoku_search_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_exactness_refusal_report.json"
+      ],
+      "detail": "IO-only distillation does not preserve enough bounded search structure for honest Sudoku support and must refuse."
+    },
+    {
+      "workload_family": "sudoku_search",
+      "regime": "partial_state",
+      "final_output_exactness_bps": 7100,
+      "later_window_exactness_bps": 6500,
+      "held_out_family_exactness_bps": 5900,
+      "support_posture": "supported",
+      "authority_case_id": "sudoku_search_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+      ],
+      "detail": "Partial-state targets recover candidate-frontier structure better than IO-only supervision."
+    },
+    {
+      "workload_family": "sudoku_search",
+      "regime": "invariance_class",
+      "final_output_exactness_bps": 7000,
+      "later_window_exactness_bps": 6300,
+      "held_out_family_exactness_bps": 5800,
+      "support_posture": "supported",
+      "authority_case_id": "sudoku_search_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+      ],
+      "detail": "Invariance classes retain some search regularity but still underperform partial-state or mixed supervision."
+    },
+    {
+      "workload_family": "sudoku_search",
+      "regime": "mixed_distillation",
+      "final_output_exactness_bps": 7900,
+      "later_window_exactness_bps": 7200,
+      "held_out_family_exactness_bps": 6400,
+      "support_posture": "supported",
+      "authority_case_id": "sudoku_search_reference",
+      "evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+      ],
+      "detail": "Mixed distillation is the only lighter-supervision regime that approaches usable Sudoku search, but a material full-trace gap remains and refusal boundaries stay explicit."
+    }
+  ],
+  "invariance_ablations": [
+    {
+      "workload_family": "kernel_arithmetic",
+      "mixed_with_invariance_later_window_bps": 9200,
+      "mixed_without_invariance_later_window_bps": 9000,
+      "delta_bps": 200,
+      "detail": "Kernel families gain a modest but real later-window benefit from invariance regularization inside the mixed regime."
+    },
+    {
+      "workload_family": "clrs_wasm_shortest_path",
+      "mixed_with_invariance_later_window_bps": 8200,
+      "mixed_without_invariance_later_window_bps": 7950,
+      "delta_bps": 250,
+      "detail": "The CLRS-to-Wasm bridge benefits from invariance classes mainly through state-digest regularization."
+    },
+    {
+      "workload_family": "hungarian_matching",
+      "mixed_with_invariance_later_window_bps": 7700,
+      "mixed_without_invariance_later_window_bps": 7300,
+      "delta_bps": 400,
+      "detail": "Matching-family mixed distillation is materially worse without invariance classes stabilizing assignment structure."
+    },
+    {
+      "workload_family": "sudoku_search",
+      "mixed_with_invariance_later_window_bps": 7200,
+      "mixed_without_invariance_later_window_bps": 6750,
+      "delta_bps": 450,
+      "detail": "Sudoku search shows the strongest later-window dependence on invariance regularization inside the mixed regime."
+    }
+  ],
+  "claim_boundary": "this bundle compares full-trace, io-only, partial-state, invariance-class, and mixed-distillation supervision on bounded compiled/reference-backed workload families only. It keeps weaker supervision and explicit refusal separate from any learned exactness or served claim",
+  "bundle_digest": "56d7229d58c8fdfba8c1bbded69c0ebfeb0245ebe2fa234d3060038189841a10"
+}

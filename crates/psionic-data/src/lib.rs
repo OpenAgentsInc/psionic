@@ -8,6 +8,7 @@
 
 mod apple_adapter;
 mod apple_adapter_curation;
+mod tassadar_compiled_distillation;
 mod tassadar;
 mod tassadar_shared_primitive_transfer;
 
@@ -25,6 +26,7 @@ use thiserror::Error;
 
 pub use apple_adapter::*;
 pub use apple_adapter_curation::*;
+pub use tassadar_compiled_distillation::*;
 pub use tassadar::*;
 pub use tassadar_shared_primitive_transfer::*;
 

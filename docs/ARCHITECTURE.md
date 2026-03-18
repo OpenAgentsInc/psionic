@@ -249,6 +249,23 @@ The current scope is:
   The lane keeps foundational primitives, primitive-layer bottlenecks, and
   composition bottlenecks explicit instead of overstating shared primitive reuse
   as broad executor closure
+- landed compiled-distillation follow-on: `psionic-data` now publishes a
+  public `TassadarCompiledDistillationContract` over explicit `full_trace`,
+  `io_only`, `partial_state`, `invariance_class`, and `mixed_distillation`
+  supervision regimes plus bounded kernel, CLRS-to-Wasm, Hungarian, and Sudoku
+  workload families; `psionic-runtime` now freezes the compiled/reference
+  authority targets at
+  `fixtures/tassadar/runs/tassadar_compiled_distillation_targets_v1/compiled_distillation_target_bundle.json`;
+  `psionic-train` now freezes the lighter-supervision evidence bundle at
+  `fixtures/tassadar/runs/tassadar_compiled_distillation_v1/compiled_distillation_training_evidence_bundle.json`
+  with explicit later-window, held-out-family, invariance-ablation, and
+  refusal facts; `psionic-eval` now freezes the joined comparison report at
+  `fixtures/tassadar/reports/tassadar_compiled_distillation_report.json`; and
+  `psionic-research` now freezes the companion summary at
+  `fixtures/tassadar/reports/tassadar_compiled_distillation_summary.json`.
+  This lane keeps weaker supervision, mixed-distillation rescue, and
+  full-trace dependency explicit instead of overstating lighter supervision as
+  broad learned executor closure
 - landed route-contract follow-on: `psionic-router` now also owns a routeable
   Wasm capability matrix for `psionic.planner_executor_route`, with explicit
   module-class rows, opcode-family facts, import posture, module-class-specific

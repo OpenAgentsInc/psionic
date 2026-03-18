@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.compiled_distillation.target_bundle.v1",
+  "cases": [
+    {
+      "case_id": "kernel_arithmetic_reference",
+      "workload_family": "kernel_arithmetic",
+      "trace_abi_profile_id": "tassadar.wasm.core_i32.v2",
+      "final_output_targets": [
+        "register.r0=exact",
+        "memory.delta.digest=stable"
+      ],
+      "partial_state_targets": [
+        "alu.window.step_digest",
+        "branch_guard.stability"
+      ],
+      "invariance_classes": [
+        "output_equivalence",
+        "progress_monotonicity"
+      ],
+      "compiled_authority_refs": [
+        "fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json",
+        "fixtures/tassadar/reports/tassadar_exactness_refusal_report.json"
+      ],
+      "claim_boundary": "kernel arithmetic remains a bounded compiled/reference source of distillation targets only"
+    },
+    {
+      "case_id": "clrs_wasm_shortest_path_reference",
+      "workload_family": "clrs_wasm_shortest_path",
+      "trace_abi_profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "final_output_targets": [
+        "distance_table.digest",
+        "predecessor_table.digest"
+      ],
+      "partial_state_targets": [
+        "frontier.digest",
+        "relaxation_commit.sequence"
+      ],
+      "invariance_classes": [
+        "output_equivalence",
+        "state_digest_equivalence",
+        "progress_monotonicity"
+      ],
+      "compiled_authority_refs": [
+        "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+      ],
+      "claim_boundary": "the CLRS-to-Wasm bridge remains a bounded compiled/reference authority surface for distillation targets only"
+    },
+    {
+      "case_id": "hungarian_matching_reference",
+      "workload_family": "hungarian_matching",
+      "trace_abi_profile_id": "tassadar.wasm.hungarian_v0_matching.v1",
+      "final_output_targets": [
+        "matching.assignment.digest",
+        "cost.total=exact"
+      ],
+      "partial_state_targets": [
+        "row_selection.state",
+        "column_commit.digest"
+      ],
+      "invariance_classes": [
+        "output_equivalence",
+        "selection_stability",
+        "state_digest_equivalence"
+      ],
+      "compiled_authority_refs": [
+        "fixtures/tassadar/reports/tassadar_compiled_article_closure_report.json"
+      ],
+      "claim_boundary": "Hungarian matching remains a bounded compiled/reference source of distillation targets over the current witnesses only"
+    },
+    {
+      "case_id": "sudoku_search_reference",
+      "workload_family": "sudoku_search",
+      "trace_abi_profile_id": "tassadar.wasm.sudoku_v0_search.v1",
+      "final_output_targets": [
+        "board.solution.digest",
+        "contradiction_count=exact"
+      ],
+      "partial_state_targets": [
+        "candidate_frontier.digest",
+        "backtrack_checkpoint.digest"
+      ],
+      "invariance_classes": [
+        "output_equivalence",
+        "progress_monotonicity",
+        "selection_stability"
+      ],
+      "compiled_authority_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+        "fixtures/tassadar/reports/tassadar_exactness_refusal_report.json"
+      ],
+      "claim_boundary": "Sudoku search distillation targets stay bounded to the published compiled/reference search lane and do not imply broad learned search closure"
+    }
+  ],
+  "claim_boundary": "this bundle emits compiled/reference final-output, partial-state, and invariance-class targets for bounded Tassadar workload families only. It is an authority surface for distillation targets, not a learned executor claim",
+  "summary": "Compiled distillation target bundle now freezes 4 bounded authority cases across kernel, CLRS-to-Wasm, Hungarian, and Sudoku families.",
+  "bundle_digest": "1bb4780c04324845b8cb126e6204dd10389ba1f230e3a89c97f8e4627d1f8f91"
+}
