@@ -1473,6 +1473,7 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
 - **[docs/FM_BRIDGE_CONSIDERATIONS.md](docs/FM_BRIDGE_CONSIDERATIONS.md)** — Apple Foundation Models bridge: architecture, binary discovery, build, run, test, shipping, and user requirements in full detail.
 - **[docs/ACTIVATION_FINGERPRINT_PROOFS.md](docs/ACTIVATION_FINGERPRINT_PROOFS.md)** — activation-fingerprint proof posture, embeddings-first artifact generation, and benchmark semantics.
 - **[docs/ROADMAP_FM.md](docs/ROADMAP_FM.md)** — Apple FM lane roadmap and API coverage.
+- **[docs/ROADMAP_PARAMETERGOLF.md](docs/ROADMAP_PARAMETERGOLF.md)** — Parameter Golf lane roadmap for challenge-oracle parity, compact decoder training, artifact accounting, and submission packaging inside Psionic.
 - **[docs/ROADMAP_TASSADAR.md](docs/ROADMAP_TASSADAR.md)** — Tassadar lane roadmap from the current bounded executor substrate to article-grade WebAssembly in-model compute.
 - **[docs/ROADMAP_TASSADAR_INDEX.md](docs/ROADMAP_TASSADAR_INDEX.md)** — compact Tassadar phase-to-artifact index for canonical bundle roots, audits, validators, and current claim boundaries.
 - `scripts/check-tassadar-acceptance.sh` and

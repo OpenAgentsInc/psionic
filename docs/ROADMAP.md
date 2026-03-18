@@ -7,7 +7,9 @@
 > `docs/TRAIN_SYSTEM.md`,
 > `docs/ROADMAP_CLUSTER.md`,
 > `docs/ROADMAP_FM.md`,
-> `docs/ROADMAP_METAL.md`, and the recent audits:
+> `docs/ROADMAP_METAL.md`,
+> `docs/ROADMAP_MLX.md`,
+> `docs/ROADMAP_PARAMETERGOLF.md`, and the recent audits:
 > `docs/audits/2026-03-14-tinygrad-parity-target-for-psionic-audit.md`,
 > `docs/audits/2026-03-15-tinygrad-test-suite-port-audit.md`,
 > `docs/audits/2026-03-15-pytorch-test-suite-port-audit.md`,
@@ -17,9 +19,10 @@
 > `docs/audits/2026-03-15-psionic-tinygrad-philosophy-pytorch-drop-in-audit.md`.
 >
 > This is now the canonical full-library roadmap for `crates/psionic-*`.
-> `ROADMAP_CLUSTER.md`, `ROADMAP_FM.md`, `ROADMAP_METAL.md`, and
-> `ROADMAP_MLX.md` remain useful lane-specific references, but they are no
-> longer the canonical answer to "what is the Psionic program overall?"
+> `ROADMAP_CLUSTER.md`, `ROADMAP_FM.md`, `ROADMAP_METAL.md`,
+> `ROADMAP_MLX.md`, and `ROADMAP_PARAMETERGOLF.md` remain useful
+> lane-specific references, but they are no longer the canonical answer to
+> "what is the Psionic program overall?"
 
 ## Executive Summary
 
