@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.pointer_memory_scratchpad.report.v1",
+  "publication": {
+    "schema_version": 1,
+    "publication_id": "tassadar.pointer_memory_scratchpad.publication.v1",
+    "status": "implemented",
+    "claim_class": "research_only_architecture / learned_bounded_success",
+    "model": {
+      "model_id": "tassadar-pointer-memory-scratchpad-v0",
+      "family": "tassadar_pointer_memory_scratchpad",
+      "revision": "v0"
+    },
+    "study_axes": [
+      "pointer_prediction",
+      "mutable_memory_access",
+      "scratchpad_local_reasoning",
+      "combined_reference"
+    ],
+    "workload_families": [
+      "clrs_shortest_path",
+      "arithmetic_multi_operand",
+      "sudoku_backtracking_search",
+      "module_scale_wasm_loop"
+    ],
+    "target_surfaces": [
+      "crates/psionic-models",
+      "crates/psionic-train",
+      "crates/psionic-runtime",
+      "crates/psionic-eval",
+      "crates/psionic-research"
+    ],
+    "validation_refs": [
+      "fixtures/tassadar/runs/tassadar_pointer_memory_scratchpad_study_v1/pointer_memory_scratchpad_ablation_bundle.json",
+      "fixtures/tassadar/reports/tassadar_pointer_memory_scratchpad_runtime_report.json",
+      "fixtures/tassadar/reports/tassadar_pointer_memory_scratchpad_report.json",
+      "fixtures/tassadar/reports/tassadar_pointer_memory_scratchpad_summary.json"
+    ],
+    "support_boundaries": [
+      "the study is a benchmark-bound analytic separation of pointer prediction, mutable memory access, and scratchpad-local reasoning over shared workloads; it does not promote any one mechanism into served capability by itself",
+      "failure-mode labels stay workload-specific and refusal-bounded instead of being flattened into one blended loss curve",
+      "combined_reference rows reuse real landed mechanisms and do not imply arbitrary Wasm closure or broad learned exactness"
+    ],
+    "publication_digest": "16d50559932fff4ea82cf494801172617044d28312ca12a42b31ec1cff22ba5c"
+  },
+  "runtime_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.pointer_memory_scratchpad.runtime_report.v1",
+    "claim_class": "research_only_architecture / learned_bounded_success",
+    "workload_receipts": [
+      {
+        "workload_family": "clrs_shortest_path",
+        "pointer_quality_bps": 7100,
+        "memory_access_quality_bps": 7900,
+        "scratchpad_local_reasoning_quality_bps": 6800,
+        "locality_score_bps": 7500,
+        "address_selection_error_count": 9,
+        "memory_error_count": 5,
+        "representation_error_count": 7,
+        "primary_limit": "address_selection_limit",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_conditional_masking_report.json",
+          "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+        ],
+        "note": "graph frontier updates remain dominated by address-selection limits before memory or representation limits"
+      },
+      {
+        "workload_family": "arithmetic_multi_operand",
+        "pointer_quality_bps": 4200,
+        "memory_access_quality_bps": 5100,
+        "scratchpad_local_reasoning_quality_bps": 9300,
+        "locality_score_bps": 9400,
+        "address_selection_error_count": 3,
+        "memory_error_count": 2,
+        "representation_error_count": 11,
+        "primary_limit": "representation_limit",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_locality_scratchpad_report.json",
+          "fixtures/tassadar/reports/tassadar_trace_state_ablation_report.json"
+        ],
+        "note": "arithmetic failures are mostly representation-limited once scratchpad-local reasoning is isolated"
+      },
+      {
+        "workload_family": "sudoku_backtracking_search",
+        "pointer_quality_bps": 7600,
+        "memory_access_quality_bps": 5800,
+        "scratchpad_local_reasoning_quality_bps": 6400,
+        "locality_score_bps": 7000,
+        "address_selection_error_count": 6,
+        "memory_error_count": 10,
+        "representation_error_count": 7,
+        "primary_limit": "memory_limit",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+          "fixtures/tassadar/reports/tassadar_working_memory_tier_eval_report.json"
+        ],
+        "note": "search-heavy Sudoku still loses backtrack and candidate state before it loses pointer prediction"
+      },
+      {
+        "workload_family": "module_scale_wasm_loop",
+        "pointer_quality_bps": 6900,
+        "memory_access_quality_bps": 5400,
+        "scratchpad_local_reasoning_quality_bps": 7200,
+        "locality_score_bps": 6800,
+        "address_selection_error_count": 5,
+        "memory_error_count": 12,
+        "representation_error_count": 6,
+        "primary_limit": "memory_limit",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+          "fixtures/tassadar/reports/tassadar_working_memory_tier_eval_report.json"
+        ],
+        "note": "module-scale Wasm remains dominated by mutable-memory pressure even after scratchpad formatting gains"
+      }
+    ],
+    "claim_boundary": "this runtime report is a benchmark-bound separation study over pointer prediction, mutable memory access, and scratchpad-local reasoning. It keeps address-selection, memory, and representation limits explicit instead of flattening them into one executor failure mode",
+    "summary": "Pointer/memory/scratchpad runtime report covers 4 workload receipts with explicit address-selection, memory, and representation limits.",
+    "report_digest": "fc498f643e4a4982bb1f81246089914414240dec35290ec1d6f79a142ab9f927"
+  },
+  "budget_bundle_ref": "fixtures/tassadar/runs/tassadar_pointer_memory_scratchpad_study_v1/pointer_memory_scratchpad_ablation_bundle.json",
+  "workload_summaries": [
+    {
+      "workload_family": "clrs_shortest_path",
+      "pointer_quality_bps": 7100,
+      "memory_access_quality_bps": 7900,
+      "scratchpad_local_reasoning_quality_bps": 6800,
+      "locality_score_bps": 7500,
+      "primary_limit": "address_selection_limit",
+      "strongest_axis": "mutable_memory_access",
+      "note": "graph frontier updates remain dominated by address-selection limits before memory or representation limits"
+    },
+    {
+      "workload_family": "arithmetic_multi_operand",
+      "pointer_quality_bps": 4200,
+      "memory_access_quality_bps": 5100,
+      "scratchpad_local_reasoning_quality_bps": 9300,
+      "locality_score_bps": 9400,
+      "primary_limit": "representation_limit",
+      "strongest_axis": "scratchpad_local_reasoning",
+      "note": "arithmetic failures are mostly representation-limited once scratchpad-local reasoning is isolated"
+    },
+    {
+      "workload_family": "sudoku_backtracking_search",
+      "pointer_quality_bps": 7600,
+      "memory_access_quality_bps": 5800,
+      "scratchpad_local_reasoning_quality_bps": 6400,
+      "locality_score_bps": 7000,
+      "primary_limit": "memory_limit",
+      "strongest_axis": "pointer_prediction",
+      "note": "search-heavy Sudoku still loses backtrack and candidate state before it loses pointer prediction"
+    },
+    {
+      "workload_family": "module_scale_wasm_loop",
+      "pointer_quality_bps": 6900,
+      "memory_access_quality_bps": 5400,
+      "scratchpad_local_reasoning_quality_bps": 7200,
+      "locality_score_bps": 6800,
+      "primary_limit": "memory_limit",
+      "strongest_axis": "scratchpad_local_reasoning",
+      "note": "module-scale Wasm remains dominated by mutable-memory pressure even after scratchpad formatting gains"
+    }
+  ],
+  "limit_counts": {
+    "address_selection_limit": 1,
+    "memory_limit": 2,
+    "representation_limit": 1
+  },
+  "generated_from_refs": [
+    "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+    "fixtures/tassadar/reports/tassadar_conditional_masking_report.json",
+    "fixtures/tassadar/reports/tassadar_locality_scratchpad_report.json",
+    "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+    "fixtures/tassadar/reports/tassadar_pointer_memory_scratchpad_runtime_report.json",
+    "fixtures/tassadar/reports/tassadar_trace_state_ablation_report.json",
+    "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+    "fixtures/tassadar/reports/tassadar_working_memory_tier_eval_report.json",
+    "fixtures/tassadar/runs/tassadar_pointer_memory_scratchpad_study_v1/pointer_memory_scratchpad_ablation_bundle.json"
+  ],
+  "claim_boundary": "this report is a benchmark-bound separation study over pointer prediction, mutable memory access, and scratchpad-local reasoning on shared workloads. It keeps address-selection, memory, and representation limits explicit instead of treating them as one blended learned-executor loss curve",
+  "summary": "Pointer/memory/scratchpad report covers 4 workloads with primary limit counts {\"address_selection_limit\": 1, \"memory_limit\": 2, \"representation_limit\": 1}.",
+  "report_digest": "cf63aab2f16575b4afed59388a2093c0c36db0ef94cf15edf5a2727b4e83c9f1"
+}

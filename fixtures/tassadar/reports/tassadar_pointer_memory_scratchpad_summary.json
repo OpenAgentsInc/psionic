@@ -1,0 +1,45 @@
+{
+  "summary_id": "tassadar.pointer_memory_scratchpad.summary.v1",
+  "report_id": "tassadar.pointer_memory_scratchpad.report.v1",
+  "workloads_by_primary_limit": [
+    [
+      "address_selection_limit",
+      [
+        "clrs_shortest_path"
+      ]
+    ],
+    [
+      "memory_limit",
+      [
+        "sudoku_backtracking_search",
+        "module_scale_wasm_loop"
+      ]
+    ],
+    [
+      "representation_limit",
+      [
+        "arithmetic_multi_operand"
+      ]
+    ]
+  ],
+  "strongest_axis_by_workload": [
+    [
+      "clrs_shortest_path",
+      "mutable_memory_access"
+    ],
+    [
+      "arithmetic_multi_operand",
+      "scratchpad_local_reasoning"
+    ],
+    [
+      "sudoku_backtracking_search",
+      "pointer_prediction"
+    ],
+    [
+      "module_scale_wasm_loop",
+      "scratchpad_local_reasoning"
+    ]
+  ],
+  "claim_boundary": "this summary remains a research-only analytic separation over shared workloads. It keeps address-selection, memory, and representation limits explicit and does not widen served capability or broad learned-compute claims by itself",
+  "summary_digest": "6571c4fd3022dff91bc33e8dcc97f6590e2113139c30629f855bf666b900caae"
+}

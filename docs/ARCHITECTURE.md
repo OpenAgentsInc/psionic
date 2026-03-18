@@ -638,6 +638,20 @@ The current scope is:
   This lane keeps workload-family ownership, cost, stability, and refusal
   posture explicit instead of treating whichever learned architecture landed
   first as the default frontier owner
+- landed pointer-memory-scratchpad separation follow-on: `psionic-models` now
+  publishes the public `TassadarPointerMemoryScratchpadPublication`;
+  `psionic-train` now freezes the same-budget ablation bundle at
+  `fixtures/tassadar/runs/tassadar_pointer_memory_scratchpad_study_v1/pointer_memory_scratchpad_ablation_bundle.json`;
+  `psionic-runtime` now publishes the runtime report at
+  `fixtures/tassadar/reports/tassadar_pointer_memory_scratchpad_runtime_report.json`;
+  `psionic-eval` now publishes the joined report at
+  `fixtures/tassadar/reports/tassadar_pointer_memory_scratchpad_report.json`;
+  and `psionic-research` now publishes the summary at
+  `fixtures/tassadar/reports/tassadar_pointer_memory_scratchpad_summary.json`.
+  This lane keeps address-selection limits, mutable-memory limits, and
+  representation limits explicit across graph, arithmetic, search, and
+  module-scale Wasm workloads instead of flattening them into one blended
+  learned-executor failure mode
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.pointer_memory_scratchpad.ablation_bundle.v1",
+  "publication_id": "tassadar.pointer_memory_scratchpad.publication.v1",
+  "workload_families": [
+    "clrs_shortest_path",
+    "arithmetic_multi_operand",
+    "sudoku_backtracking_search",
+    "module_scale_wasm_loop"
+  ],
+  "budget_rows": [
+    {
+      "study_axis": "pointer_prediction",
+      "train_budget_tokens": 900000,
+      "eval_case_budget": 24,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_conditional_masking_report.json"
+      ],
+      "note": "pointer prediction ablations stay on the shared budget and reuse the landed conditional-masking lane"
+    },
+    {
+      "study_axis": "mutable_memory_access",
+      "train_budget_tokens": 900000,
+      "eval_case_budget": 24,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_working_memory_tier_eval_report.json"
+      ],
+      "note": "mutable memory access ablations stay on the shared budget and reuse the landed working-memory lane"
+    },
+    {
+      "study_axis": "scratchpad_local_reasoning",
+      "train_budget_tokens": 900000,
+      "eval_case_budget": 24,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_locality_scratchpad_report.json"
+      ],
+      "note": "scratchpad-local reasoning ablations stay on the shared budget and reuse the landed locality-scratchpad lane"
+    },
+    {
+      "study_axis": "combined_reference",
+      "train_budget_tokens": 900000,
+      "eval_case_budget": 24,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_locality_envelope_report.json"
+      ],
+      "note": "combined-reference rows stay on the same budget and only combine already-landed mechanisms"
+    }
+  ],
+  "claim_boundary": "this bundle freezes one same-budget separation study over pointer prediction, mutable memory access, scratchpad-local reasoning, and a combined reference row. It does not promote any one axis into a broad architectural claim by itself",
+  "summary": "Pointer/memory/scratchpad ablation bundle freezes 4 study axes over 4 shared workload families at one common budget.",
+  "bundle_digest": "c82e4bbf2fa806cc82b61888f20c435beb1b8bd7544d0a77e685050a7fdc653a"
+}
