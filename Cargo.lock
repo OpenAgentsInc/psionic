@@ -3791,6 +3791,7 @@ dependencies = [
  "hex",
  "psionic-cluster",
  "psionic-core",
+ "psionic-ir",
  "psionic-models",
  "psionic-research",
  "psionic-router",

@@ -397,6 +397,18 @@ The current scope is:
   This lane keeps reuse, rollback, and refusal explicit instead of treating a
   versioned module library as unrestricted self-extension or arbitrary install
   closure
+- landed module-manifest follow-on: `psionic-ir` now owns a public
+  `TassadarComputationalModuleManifest` ABI and manifest schema with typed
+  imports, exports, state fields, claim class, trust posture, capability
+  summary, benchmark lineage, and required evidence refs; `psionic-compiler`
+  now validates those manifests and publishes deterministic compatibility
+  receipts instead of letting module identity silently widen capability; and
+  `psionic-provider` now projects the same manifest into a provider-facing
+  `TassadarModuleManifestReceipt`. This lane stays bounded to manifest and
+  compatibility truth only; later linker, catalog, and install flows consume
+  this schema instead of inventing a second module story, and named
+  `kernel-objects` follow-ons remain explicit dependency markers rather than
+  backfilled behavior inside standalone `psionic`
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the

@@ -3,6 +3,7 @@
 mod autodiff;
 mod tassadar_locality_scratchpad;
 mod tassadar_mixed_trajectory;
+mod tassadar_module_manifest;
 mod tassadar_numeric_encoding;
 mod tassadar_scratchpad;
 mod tassadar_sparse_rule;
@@ -24,6 +25,7 @@ use thiserror::Error;
 pub use autodiff::*;
 pub use tassadar_locality_scratchpad::*;
 pub use tassadar_mixed_trajectory::*;
+pub use tassadar_module_manifest::*;
 pub use tassadar_numeric_encoding::*;
 pub use tassadar_scratchpad::*;
 pub use tassadar_sparse_rule::*;
