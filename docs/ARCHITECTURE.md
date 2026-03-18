@@ -255,6 +255,16 @@ The current scope is:
   `fixtures/tassadar/reports/tassadar_structured_control_report.json`,
   including branch-table parity and malformed-label refusal, without claiming
   calls, memories, block-result closure, or arbitrary Wasm support
+- landed call-frame execution bar: `psionic-runtime` now owns one bounded
+  direct-call multi-function lane with function-local state, real frame-stack
+  execution, replayable frame-stack trace snapshots, and explicit
+  bounded-recursion refusal; `psionic-models` now publishes the same lane as a
+  repo-facing call-frame publication; `psionic-train` now materializes a
+  training-facing suite over direct-call parity, multi-function replay, and
+  recursion refusal; and `psionic-eval` now freezes the current evidence at
+  `fixtures/tassadar/reports/tassadar_call_frame_report.json` instead of
+  keeping multi-function execution trapped behind the old single-frame
+  boundary
 - landed exactness/refusal evidence bar: `psionic-runtime` now owns a shared
   `TassadarExactnessRefusalReport` contract that records exact, mismatch, and
   refused posture above current selection diagnostics and trace/output/halt

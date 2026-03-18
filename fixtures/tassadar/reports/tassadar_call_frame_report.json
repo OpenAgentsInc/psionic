@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.call_frames.report.v1",
+  "publication": {
+    "schema_version": 1,
+    "publication_id": "tassadar.call_frames.publication.v1",
+    "status": "implemented",
+    "claim_class": "execution_truth_compiled_bounded_exactness",
+    "supports_direct_calls": true,
+    "traces_include_frame_stack": true,
+    "max_call_depth": 8,
+    "target_surfaces": [
+      "crates/psionic-runtime",
+      "crates/psionic-models",
+      "crates/psionic-train",
+      "crates/psionic-eval"
+    ],
+    "validation_refs": [
+      "fixtures/tassadar/reports/tassadar_call_frame_report.json"
+    ],
+    "support_boundaries": [
+      "supports direct function calls with 0 or 1 return values under one bounded frame stack; call_indirect and import boundaries remain separate work",
+      "recursion is bounded by explicit max_call_depth and refuses once that cap would be exceeded",
+      "this publication does not claim arbitrary Wasm closure, tail calls, host imports, or learned-lane generalization"
+    ],
+    "publication_digest": "356f77134cc932474aa5b3c864d8d8e8ecc4fdb7ef7ff7abaa7ccf6a24826346"
+  },
+  "cases": [
+    {
+      "case_id": "direct_call_parity",
+      "status": "exact",
+      "program_id": "tassadar.call_frames.direct_call.v1",
+      "returned_value": 9,
+      "halt_reason": "returned",
+      "trace_step_count": 12,
+      "max_frame_depth": 2,
+      "execution_digest": "4f225f268adbfd59035a2a53b1b492f09f7c5fa7acdda5e501a0cdbbbe8b2da1",
+      "frame_presence_counts": {
+        "add_one": 8,
+        "entry": 11
+      }
+    },
+    {
+      "case_id": "multi_function_replay",
+      "status": "exact",
+      "program_id": "tassadar.call_frames.multi_function.v1",
+      "returned_value": 25,
+      "halt_reason": "returned",
+      "trace_step_count": 18,
+      "max_frame_depth": 3,
+      "execution_digest": "69cc1297574d8c89d11cb42258d93c12834e2832583c51d31349ce1e17d55405",
+      "frame_presence_counts": {
+        "entry": 17,
+        "square": 8,
+        "sum_of_squares": 14
+      }
+    },
+    {
+      "case_id": "bounded_recursion_refusal",
+      "status": "refused",
+      "program_id": "tassadar.call_frames.recursion_refusal.v1",
+      "trace_step_count": 0,
+      "max_frame_depth": 0,
+      "refusal_kind": "recursion_depth_exceeded",
+      "refusal_detail": "bounded recursion refusal: calling function 1 would exceed max_call_depth 3"
+    }
+  ],
+  "claim_boundary": "this report proves one bounded direct-call multi-function lane with explicit frame-stack traces, exact direct-call replay, multi-function execution, and bounded-recursion refusal; it does not claim call_indirect, imports, host calls, tail calls, or arbitrary Wasm closure",
+  "report_digest": "1439180d5a7436954a0d3ed478b04251ced76f2e60ba2b06eda3e051956db5e3"
+}

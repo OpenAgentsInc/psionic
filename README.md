@@ -175,6 +175,11 @@ Current posture:
   runtime-owned exact execution and branch traces for that nested control
   surface, and the committed report at
   `fixtures/tassadar/reports/tassadar_structured_control_report.json`
+- its bounded call-frame lane now also exists across `psionic-runtime`,
+  `psionic-models`, `psionic-train`, and `psionic-eval`, with a real direct
+  call-frame model, multi-function execution, replayable frame-stack traces,
+  bounded-recursion refusal, and the committed report at
+  `fixtures/tassadar/reports/tassadar_call_frame_report.json`
 - the repo now also carries a standardized exactness/refusal evidence surface
   across `psionic-runtime`, `psionic-provider`, and `psionic-eval`, with a
   shared runtime report schema for exact direct, exact fallback, mismatch, and

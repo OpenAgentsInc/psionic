@@ -18,6 +18,8 @@ mod attnres_training;
 mod tassadar;
 #[path = "tassadar_benchmark_package_set.rs"]
 mod tassadar_benchmark_package_set;
+#[path = "tassadar_call_frames.rs"]
+mod tassadar_call_frames;
 #[path = "tassadar_compiled_executor.rs"]
 mod tassadar_compiled_executor;
 #[path = "tassadar_compiled_kernel_suite.rs"]
@@ -70,6 +72,7 @@ pub use attnres::*;
 pub use attnres_training::*;
 pub use tassadar::*;
 pub use tassadar_benchmark_package_set::*;
+pub use tassadar_call_frames::*;
 pub use tassadar_compiled_executor::*;
 pub use tassadar_compiled_kernel_suite::*;
 pub use tassadar_efficient_attention_baseline_matrix::*;
