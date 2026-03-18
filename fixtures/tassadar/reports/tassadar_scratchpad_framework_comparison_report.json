@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "report_ref": "fixtures/tassadar/reports/tassadar_scratchpad_framework_comparison_report.json",
+  "regeneration_commands": [
+    "cargo run -p psionic-train --example tassadar_scratchpad_framework_comparison",
+    "cargo test -p psionic-train scratchpad_framework_report_matches_committed_truth -- --nocapture"
+  ],
+  "variants": [
+    {
+      "variant_id": "arithmetic_segment_reset_scratchpad",
+      "workload_family": "arithmetic",
+      "baseline_framework_id": "tassadar.scratchpad.arithmetic.flat.absolute.v0",
+      "candidate_framework_id": "tassadar.scratchpad.arithmetic.segment_reset.v0",
+      "baseline_framework_digest": "ab56e1fabfe5303f54a00227c88bfcd8bbdfb120437ac4f2b2d25ed161b10a37",
+      "candidate_framework_digest": "26102f3ef0d689722e6a2472b6399b4f75dba3a6965151effada7314c232ffbc",
+      "case_count": 5,
+      "case_reports": [
+        {
+          "case_id": "addition_pair",
+          "prompt_token_count": 2,
+          "target_token_count": 4,
+          "baseline_token_count": 6,
+          "candidate_token_count": 13,
+          "baseline_max_output_local_position_index": 5,
+          "candidate_max_output_local_position_index": 3,
+          "locality_gain_bps": 4000,
+          "scratchpad_overhead_bps": 11666,
+          "final_output_tokens_preserved": true
+        },
+        {
+          "case_id": "parity_two_bits",
+          "prompt_token_count": 2,
+          "target_token_count": 13,
+          "baseline_token_count": 15,
+          "candidate_token_count": 40,
+          "baseline_max_output_local_position_index": 14,
+          "candidate_max_output_local_position_index": 3,
+          "locality_gain_bps": 7857,
+          "scratchpad_overhead_bps": 16666,
+          "final_output_tokens_preserved": true
+        },
+        {
+          "case_id": "memory_accumulator",
+          "prompt_token_count": 2,
+          "target_token_count": 6,
+          "baseline_token_count": 8,
+          "candidate_token_count": 20,
+          "baseline_max_output_local_position_index": 7,
+          "candidate_max_output_local_position_index": 3,
+          "locality_gain_bps": 5714,
+          "scratchpad_overhead_bps": 15000,
+          "final_output_tokens_preserved": true
+        },
+        {
+          "case_id": "finite_state_counter",
+          "prompt_token_count": 2,
+          "target_token_count": 9,
+          "baseline_token_count": 11,
+          "candidate_token_count": 29,
+          "baseline_max_output_local_position_index": 10,
+          "candidate_max_output_local_position_index": 3,
+          "locality_gain_bps": 7000,
+          "scratchpad_overhead_bps": 16363,
+          "final_output_tokens_preserved": true
+        },
+        {
+          "case_id": "stack_machine_add_step",
+          "prompt_token_count": 2,
+          "target_token_count": 13,
+          "baseline_token_count": 15,
+          "candidate_token_count": 40,
+          "baseline_max_output_local_position_index": 14,
+          "candidate_max_output_local_position_index": 3,
+          "locality_gain_bps": 7857,
+          "scratchpad_overhead_bps": 16666,
+          "final_output_tokens_preserved": true
+        }
+      ],
+      "mean_locality_gain_bps": 6485,
+      "max_candidate_output_local_position_index": 3,
+      "max_scratchpad_overhead_bps": 16666,
+      "output_exact_case_count": 5,
+      "position_reset_count_total": 33,
+      "locality_note": "framework=tassadar.scratchpad.arithmetic.segment_reset.v0 mean_locality_gain_bps=6485 max_candidate_output_local_position_index=3 position_resets=33"
+    },
+    {
+      "variant_id": "algorithmic_trace_schema_scratchpad",
+      "workload_family": "algorithmic",
+      "baseline_framework_id": "tassadar.scratchpad.algorithmic.flat.absolute.v0",
+      "candidate_framework_id": "tassadar.scratchpad.algorithmic.trace_schema.v0",
+      "baseline_framework_digest": "65be74cc1cb1d3a2dbf68434d506620320cc22c1a32b484ba52ec8f41d4adbce",
+      "candidate_framework_digest": "538c67a9122389c15c515aeb21ea466ccd3fc551407c27aff841afac42f9271d",
+      "case_count": 6,
+      "case_reports": [
+        {
+          "case_id": "sort_train_a",
+          "prompt_token_count": 4,
+          "target_token_count": 4,
+          "baseline_token_count": 8,
+          "candidate_token_count": 15,
+          "baseline_max_output_local_position_index": 7,
+          "candidate_max_output_local_position_index": 3,
+          "locality_gain_bps": 5714,
+          "scratchpad_overhead_bps": 8750,
+          "final_output_tokens_preserved": true
+        },
+        {
+          "case_id": "sort_validation_a",
+          "prompt_token_count": 5,
+          "target_token_count": 4,
+          "baseline_token_count": 9,
+          "candidate_token_count": 16,
+          "baseline_max_output_local_position_index": 8,
+          "candidate_max_output_local_position_index": 3,
+          "locality_gain_bps": 6250,
+          "scratchpad_overhead_bps": 7777,
+          "final_output_tokens_preserved": true
+        },
+        {
+          "case_id": "shortest_path_train_a",
+          "prompt_token_count": 7,
+          "target_token_count": 4,
+          "baseline_token_count": 11,
+          "candidate_token_count": 18,
+          "baseline_max_output_local_position_index": 10,
+          "candidate_max_output_local_position_index": 3,
+          "locality_gain_bps": 7000,
+          "scratchpad_overhead_bps": 6363,
+          "final_output_tokens_preserved": true
+        },
+        {
+          "case_id": "shortest_path_test_a",
+          "prompt_token_count": 4,
+          "target_token_count": 4,
+          "baseline_token_count": 8,
+          "candidate_token_count": 15,
+          "baseline_max_output_local_position_index": 7,
+          "candidate_max_output_local_position_index": 3,
+          "locality_gain_bps": 5714,
+          "scratchpad_overhead_bps": 8750,
+          "final_output_tokens_preserved": true
+        },
+        {
+          "case_id": "sudoku_train_a",
+          "prompt_token_count": 8,
+          "target_token_count": 4,
+          "baseline_token_count": 12,
+          "candidate_token_count": 19,
+          "baseline_max_output_local_position_index": 11,
+          "candidate_max_output_local_position_index": 3,
+          "locality_gain_bps": 7272,
+          "scratchpad_overhead_bps": 5833,
+          "final_output_tokens_preserved": true
+        },
+        {
+          "case_id": "sudoku_validation_a",
+          "prompt_token_count": 6,
+          "target_token_count": 4,
+          "baseline_token_count": 10,
+          "candidate_token_count": 17,
+          "baseline_max_output_local_position_index": 9,
+          "candidate_max_output_local_position_index": 3,
+          "locality_gain_bps": 6666,
+          "scratchpad_overhead_bps": 7000,
+          "final_output_tokens_preserved": true
+        }
+      ],
+      "mean_locality_gain_bps": 6436,
+      "max_candidate_output_local_position_index": 3,
+      "max_scratchpad_overhead_bps": 8750,
+      "output_exact_case_count": 6,
+      "position_reset_count_total": 18,
+      "locality_note": "framework=tassadar.scratchpad.algorithmic.trace_schema.v0 mean_locality_gain_bps=6436 max_candidate_output_local_position_index=3 position_resets=18"
+    }
+  ],
+  "claim_class": "learned_bounded_success",
+  "claim_boundary": "this report only compares bounded scratchpad formatting and controlled position-ID schemes on seeded arithmetic symbolic traces and seeded algorithmic target sequences; it preserves final output tokens but does not claim trained exactness or served-lane promotion",
+  "summary": "Public scratchpad/position framework report now freezes arithmetic and algorithmic sequence comparisons: the arithmetic segment-reset variant cuts max output local position from 14 to 3, and the algorithmic trace-schema variant cuts it from 11 to 3; both preserve final output tokens exactly while surfacing explicit scratchpad overhead and reset counts.",
+  "report_digest": "307e15c92c8ad12d8b02893a426f1b407f283d1d4618b4d01c22d8adb27b3cf5"
+}

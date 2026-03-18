@@ -508,6 +508,20 @@ That now includes one intentionally narrow executor-training answer:
   full-hint traces to `5000` on output-only no-hint and `8000` on no-hint
   plus self-supervised regularizers, while reusable subroutine hints remain
   the upper bound at `8333`, and served promotion is still explicitly refused
+- the first public scratchpad / controlled-position executor framework
+  comparison now also exists beside that same bounded lane:
+  `psionic-ir` now owns bounded `flat_trace` and
+  `delimited_chunk_scratchpad` formatting plus `absolute_monotonic`,
+  `segment_reset`, and `trace_schema_buckets` controlled position-ID schemes,
+  `psionic-models` now exposes public framework descriptors plus locality
+  evidence inspection, and `psionic-train` now freezes the resulting
+  arithmetic symbolic and algorithmic comparison at
+  `fixtures/tassadar/reports/tassadar_scratchpad_framework_comparison_report.json`;
+  the report keeps the lane explicitly `learned_bounded_success`, cuts
+  arithmetic max output local position from `14` to `3`, cuts algorithmic max
+  output local position from `11` to `3`, preserves final output tokens
+  exactly, and keeps scratchpad overhead plus reset counts explicit instead of
+  hiding them behind one aggregate score
 - the learned-structure supervision follow-on now also exists beside that same
   bounded lane: `psionic-models` now derives structural target families for
   instruction pointer, branch outcome, stack delta, memory diff, and

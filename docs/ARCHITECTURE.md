@@ -441,6 +441,18 @@ The current scope is:
   traces to `5000` on output-only no-hint and `8000` on no-hint plus
   self-supervised regularizers, while reusable subroutine hints remain at
   `8333`, and the entire lane stays explicitly refused for served promotion
+- landed scratchpad / controlled-position executor framework comparison:
+  `psionic-ir` now owns bounded `flat_trace` and
+  `delimited_chunk_scratchpad` formatting plus `absolute_monotonic`,
+  `segment_reset`, and `trace_schema_buckets` controlled position-ID schemes,
+  `psionic-models` now exposes public framework descriptors plus locality
+  evidence inspection, and `psionic-train` now freezes the resulting
+  arithmetic symbolic and algorithmic same-lane comparison at
+  `fixtures/tassadar/reports/tassadar_scratchpad_framework_comparison_report.json`;
+  the report keeps the claim boundary at `learned_bounded_success`, cuts
+  arithmetic max output local position from `14` to `3`, cuts algorithmic max
+  output local position from `11` to `3`, preserves final output tokens
+  exactly, and keeps scratchpad overhead plus reset counts explicit
 - landed trained-executor Phase 15B follow-on bar: the same executor-attention
   family now also carries a bounded relative-target output-bias adapter in
   `psionic-models`, the preserved destructive boundary-first output-head

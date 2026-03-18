@@ -28,6 +28,7 @@ psionic-data = { path = "../psionic-data" }
 psionic-datastream = { path = "../psionic-datastream" }
 psionic-environments = { path = "../psionic-environments" }
 psionic-eval = { path = "../psionic-eval" }
+psionic-ir = { path = "../psionic-ir" }
 psionic-models = { path = "../psionic-models" }
 psionic-runtime = { path = "../psionic-runtime" }
 psionic-sandbox = { path = "../psionic-sandbox" }
@@ -38,5 +39,4 @@ sha2 = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-psionic-ir = { path = "../psionic-ir" }
 tempfile = "3"

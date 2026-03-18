@@ -372,6 +372,19 @@ Current posture:
   `5000` on output-only no-hint and `8000` on no-hint plus self-supervised
   regularizers, while reusable subroutine hints stay the upper bound at `8333`
   and served promotion remains explicitly refused
+- the first public scratchpad / controlled-position executor framework report
+  now also exists at
+  `fixtures/tassadar/reports/tassadar_scratchpad_framework_comparison_report.json`;
+  `psionic-ir` now owns bounded `flat_trace` and
+  `delimited_chunk_scratchpad` formatting plus `absolute_monotonic`,
+  `segment_reset`, and `trace_schema_buckets` controlled position-ID schemes,
+  `psionic-models` now exposes framework descriptors plus locality evidence,
+  and `psionic-train` now freezes arithmetic symbolic and algorithmic same-lane
+  comparisons under the explicit `learned_bounded_success` claim boundary; the
+  arithmetic segment-reset variant cuts max output local position from `14` to
+  `3`, the algorithmic trace-schema variant cuts it from `11` to `3`, and both
+  preserve final output tokens exactly while surfacing scratchpad overhead and
+  reset counts
 - the post-Phase-15 boundary-adapter follow-on now also exists in
   `psionic-models`, `psionic-eval`, `psionic-research`, `docs/audits/`, and
   nine preserved bounded artifact roots at
