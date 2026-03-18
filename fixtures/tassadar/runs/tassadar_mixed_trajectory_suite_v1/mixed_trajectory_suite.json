@@ -1,0 +1,418 @@
+{
+  "contract": {
+    "abi_version": "psionic.tassadar.mixed_trajectory.v1",
+    "contract_ref": "dataset://openagents/tassadar/mixed_trajectory_suite",
+    "version": "2026.03.18",
+    "cases": [
+      {
+        "case_id": "article_hybrid_compute",
+        "workload_family": "article_hybrid_compute",
+        "required_lanes": [
+          "language_reasoning",
+          "internal_exact_compute"
+        ],
+        "expected_handoffs": [
+          "language_to_internal_compute",
+          "internal_compute_to_language"
+        ],
+        "expected_receipt_boundaries": [
+          "planner_policy_receipt",
+          "executor_evidence_bundle",
+          "final_outcome_receipt"
+        ],
+        "trajectory": {
+          "schema_version": 1,
+          "trajectory_id": "tassadar.mixed_trajectory.article_hybrid_compute.v1",
+          "case_id": "article_hybrid_compute",
+          "entries": [
+            {
+              "entry_id": "entry-0",
+              "entry_index": 0,
+              "entry_kind": "language_span",
+              "lane_kind": "language_reasoning",
+              "content_summary": "language_reasoning",
+              "language_text": "need exact checksum before drafting the answer",
+              "token_count": 18
+            },
+            {
+              "entry_id": "entry-1",
+              "entry_index": 1,
+              "entry_kind": "receipt_boundary",
+              "lane_kind": "language_reasoning",
+              "content_summary": "receipt_boundary",
+              "receipt_boundary": {
+                "boundary_kind": "planner_policy_receipt",
+                "receipt_ref": "fixtures/tassadar/reports/tassadar_planner_language_compute_policy_report.json",
+                "note": "planner selected the internal exact-compute lane"
+              }
+            },
+            {
+              "entry_id": "entry-2",
+              "entry_index": 2,
+              "entry_kind": "exact_compute_span",
+              "lane_kind": "internal_exact_compute",
+              "handoff_from_previous": "language_to_internal_compute",
+              "content_summary": "execute exact checksum kernel",
+              "step_count": 24,
+              "span_outputs": [
+                42
+              ]
+            },
+            {
+              "entry_id": "entry-3",
+              "entry_index": 3,
+              "entry_kind": "receipt_boundary",
+              "lane_kind": "internal_exact_compute",
+              "content_summary": "receipt_boundary",
+              "receipt_boundary": {
+                "boundary_kind": "executor_evidence_bundle",
+                "receipt_ref": "fixtures/tassadar/reports/tassadar_article_hybrid_workflow_artifact.json",
+                "note": "executor receipt stays explicit between exact compute and language narration"
+              }
+            },
+            {
+              "entry_id": "entry-4",
+              "entry_index": 4,
+              "entry_kind": "language_span",
+              "lane_kind": "language_reasoning",
+              "handoff_from_previous": "internal_compute_to_language",
+              "content_summary": "language_reasoning",
+              "language_text": "executor returned checksum 42; continue with the article answer",
+              "token_count": 18
+            },
+            {
+              "entry_id": "entry-5",
+              "entry_index": 5,
+              "entry_kind": "receipt_boundary",
+              "lane_kind": "language_reasoning",
+              "content_summary": "receipt_boundary",
+              "receipt_boundary": {
+                "boundary_kind": "final_outcome_receipt",
+                "receipt_ref": "fixtures/tassadar/reports/tassadar_article_hybrid_workflow_artifact.json",
+                "note": "final response boundary stays explicit and does not imply accepted-outcome closure"
+              }
+            }
+          ],
+          "final_outputs": [
+            42
+          ],
+          "claim_class": "execution_truth_learned_substrate",
+          "claim_boundary": "mixed article workflow remains at execution-truth scope with explicit planner, executor, and response boundaries",
+          "trajectory_digest": "73ab7aadc27d48ea4e6ec58562edf52a4a5462c8a939eb9f86e595747cd16209"
+        },
+        "expected_final_outputs": [
+          42
+        ],
+        "note": "article-class hybrid case keeps planner intent, internal exact compute, executor receipt, and final language answer as distinct typed trajectory entries"
+      },
+      {
+        "case_id": "verifier_attached_search",
+        "workload_family": "verifier_attached_search",
+        "required_lanes": [
+          "language_reasoning",
+          "internal_exact_compute",
+          "verifier_search"
+        ],
+        "expected_handoffs": [
+          "language_to_internal_compute",
+          "internal_compute_to_verifier",
+          "verifier_to_language"
+        ],
+        "expected_receipt_boundaries": [
+          "planner_policy_receipt",
+          "executor_evidence_bundle",
+          "verifier_certificate",
+          "final_outcome_receipt"
+        ],
+        "trajectory": {
+          "schema_version": 1,
+          "trajectory_id": "tassadar.mixed_trajectory.verifier_attached_search.v1",
+          "case_id": "verifier_attached_search",
+          "entries": [
+            {
+              "entry_id": "entry-0",
+              "entry_index": 0,
+              "entry_kind": "language_span",
+              "lane_kind": "language_reasoning",
+              "content_summary": "language_reasoning",
+              "language_text": "check the candidate board exactly before answering",
+              "token_count": 18
+            },
+            {
+              "entry_id": "entry-1",
+              "entry_index": 1,
+              "entry_kind": "receipt_boundary",
+              "lane_kind": "language_reasoning",
+              "content_summary": "receipt_boundary",
+              "receipt_boundary": {
+                "boundary_kind": "planner_policy_receipt",
+                "receipt_ref": "fixtures/tassadar/reports/tassadar_planner_language_compute_policy_report.json",
+                "note": "planner selected internal exact compute plus verifier follow-up"
+              }
+            },
+            {
+              "entry_id": "entry-2",
+              "entry_index": 2,
+              "entry_kind": "exact_compute_span",
+              "lane_kind": "internal_exact_compute",
+              "handoff_from_previous": "language_to_internal_compute",
+              "content_summary": "execute bounded candidate-check program",
+              "step_count": 31,
+              "span_outputs": [
+                4,
+                3,
+                2,
+                1
+              ]
+            },
+            {
+              "entry_id": "entry-3",
+              "entry_index": 3,
+              "entry_kind": "receipt_boundary",
+              "lane_kind": "internal_exact_compute",
+              "content_summary": "receipt_boundary",
+              "receipt_boundary": {
+                "boundary_kind": "executor_evidence_bundle",
+                "receipt_ref": "fixtures/tassadar/reports/tassadar_exactness_refusal_report.json",
+                "note": "executor evidence stays separate from the later verifier certificate"
+              }
+            },
+            {
+              "entry_id": "entry-4",
+              "entry_index": 4,
+              "entry_kind": "verifier_event_span",
+              "lane_kind": "verifier_search",
+              "handoff_from_previous": "internal_compute_to_verifier",
+              "content_summary": "verifier confirms the candidate state and rejects one branch",
+              "step_count": 4,
+              "verifier_event_kind": "verify"
+            },
+            {
+              "entry_id": "entry-5",
+              "entry_index": 5,
+              "entry_kind": "receipt_boundary",
+              "lane_kind": "verifier_search",
+              "content_summary": "receipt_boundary",
+              "receipt_boundary": {
+                "boundary_kind": "verifier_certificate",
+                "receipt_ref": "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+                "note": "verifier certificate closes the bounded search event without flattening it into the compute trace"
+              }
+            },
+            {
+              "entry_id": "entry-6",
+              "entry_index": 6,
+              "entry_kind": "language_span",
+              "lane_kind": "language_reasoning",
+              "handoff_from_previous": "verifier_to_language",
+              "content_summary": "language_reasoning",
+              "language_text": "verifier accepted the candidate state; answer with the checked result",
+              "token_count": 18
+            },
+            {
+              "entry_id": "entry-7",
+              "entry_index": 7,
+              "entry_kind": "receipt_boundary",
+              "lane_kind": "language_reasoning",
+              "content_summary": "receipt_boundary",
+              "receipt_boundary": {
+                "boundary_kind": "final_outcome_receipt",
+                "receipt_ref": "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+                "note": "final answer boundary remains explicit after the verifier-assisted path"
+              }
+            }
+          ],
+          "final_outputs": [
+            4,
+            3,
+            2,
+            1
+          ],
+          "claim_class": "execution_truth_learned_substrate",
+          "claim_boundary": "verifier-attached mixed trajectories keep compute, verifier, and answer spans separate with explicit receipt boundaries",
+          "trajectory_digest": "f9aa8c2650099e3da3e0a7a4d149ce2ed9595fb72f99eff2faf5e85b997207a3"
+        },
+        "expected_final_outputs": [
+          4,
+          3,
+          2,
+          1
+        ],
+        "note": "verifier-attached search case keeps planner, compute, verifier, and final response boundaries explicit instead of flattening search into one opaque span"
+      },
+      {
+        "case_id": "external_tool_long_loop",
+        "workload_family": "external_tool_long_loop",
+        "required_lanes": [
+          "language_reasoning",
+          "external_tool"
+        ],
+        "expected_handoffs": [
+          "language_to_external_tool",
+          "external_tool_to_language"
+        ],
+        "expected_receipt_boundaries": [
+          "planner_policy_receipt",
+          "sandbox_execution_receipt",
+          "final_outcome_receipt"
+        ],
+        "trajectory": {
+          "schema_version": 1,
+          "trajectory_id": "tassadar.mixed_trajectory.external_tool_long_loop.v1",
+          "case_id": "external_tool_long_loop",
+          "entries": [
+            {
+              "entry_id": "entry-0",
+              "entry_index": 0,
+              "entry_kind": "language_span",
+              "lane_kind": "language_reasoning",
+              "content_summary": "language_reasoning",
+              "language_text": "long loop exceeds the current internal exact route; delegate safely",
+              "token_count": 18
+            },
+            {
+              "entry_id": "entry-1",
+              "entry_index": 1,
+              "entry_kind": "receipt_boundary",
+              "lane_kind": "language_reasoning",
+              "content_summary": "receipt_boundary",
+              "receipt_boundary": {
+                "boundary_kind": "planner_policy_receipt",
+                "receipt_ref": "fixtures/tassadar/reports/tassadar_planner_language_compute_policy_report.json",
+                "note": "planner selected external tool fallback for the long-horizon case"
+              }
+            },
+            {
+              "entry_id": "entry-2",
+              "entry_index": 2,
+              "entry_kind": "external_tool_span",
+              "lane_kind": "external_tool",
+              "handoff_from_previous": "language_to_external_tool",
+              "content_summary": "run long-loop kernel in bounded sandbox",
+              "step_count": 96,
+              "tool_name": "sandbox_loop_runner",
+              "span_outputs": [
+                7
+              ]
+            },
+            {
+              "entry_id": "entry-3",
+              "entry_index": 3,
+              "entry_kind": "receipt_boundary",
+              "lane_kind": "external_tool",
+              "content_summary": "receipt_boundary",
+              "receipt_boundary": {
+                "boundary_kind": "sandbox_execution_receipt",
+                "receipt_ref": "psionic.sandbox_execution",
+                "note": "sandbox receipt keeps the delegated execution boundary explicit"
+              }
+            },
+            {
+              "entry_id": "entry-4",
+              "entry_index": 4,
+              "entry_kind": "language_span",
+              "lane_kind": "language_reasoning",
+              "handoff_from_previous": "external_tool_to_language",
+              "content_summary": "language_reasoning",
+              "language_text": "sandbox returned result 7; continue with the response",
+              "token_count": 18
+            },
+            {
+              "entry_id": "entry-5",
+              "entry_index": 5,
+              "entry_kind": "receipt_boundary",
+              "lane_kind": "language_reasoning",
+              "content_summary": "receipt_boundary",
+              "receipt_boundary": {
+                "boundary_kind": "final_outcome_receipt",
+                "receipt_ref": "psionic.sandbox_execution",
+                "note": "final answer boundary remains explicit after external delegation"
+              }
+            }
+          ],
+          "final_outputs": [
+            7
+          ],
+          "claim_class": "execution_truth_learned_substrate",
+          "claim_boundary": "external-tool mixed trajectories keep delegated execution and its receipt separate from surrounding language spans",
+          "trajectory_digest": "60995029f784df66ec69bd428985baef1822406746bc05d8480a33dab4bae6bd"
+        },
+        "expected_final_outputs": [
+          7
+        ],
+        "note": "external-tool fallback case keeps explicit planner-to-tool delegation and sandbox receipt boundaries separate from the surrounding language spans"
+      }
+    ],
+    "evaluation_axes": [
+      "schema_roundtrip_ok",
+      "lane_handoff_correct",
+      "receipt_boundary_count",
+      "trajectory_to_outcome_parity"
+    ],
+    "suite_ref": "fixtures/tassadar/runs/tassadar_mixed_trajectory_suite_v1/mixed_trajectory_suite.json",
+    "report_ref": "fixtures/tassadar/reports/tassadar_mixed_trajectory_report.json",
+    "contract_digest": "671e17310d91305edd2c3e4d587a35af83a8cc0aa0d2bfd401e81e919f589dc7"
+  },
+  "case_reports": [
+    {
+      "case_id": "article_hybrid_compute",
+      "workload_family": "article_hybrid_compute",
+      "lane_sequence": [
+        "language_reasoning",
+        "internal_exact_compute",
+        "language_reasoning"
+      ],
+      "language_span_count": 2,
+      "exact_compute_span_count": 1,
+      "verifier_span_count": 0,
+      "external_tool_span_count": 0,
+      "receipt_boundary_count": 3,
+      "handoff_count": 2,
+      "schema_roundtrip_ok": true,
+      "lane_handoff_correct": true,
+      "trajectory_to_outcome_parity": true,
+      "note": "article-class hybrid case keeps planner intent, internal exact compute, executor receipt, and final language answer as distinct typed trajectory entries"
+    },
+    {
+      "case_id": "verifier_attached_search",
+      "workload_family": "verifier_attached_search",
+      "lane_sequence": [
+        "language_reasoning",
+        "internal_exact_compute",
+        "verifier_search",
+        "language_reasoning"
+      ],
+      "language_span_count": 2,
+      "exact_compute_span_count": 1,
+      "verifier_span_count": 1,
+      "external_tool_span_count": 0,
+      "receipt_boundary_count": 4,
+      "handoff_count": 3,
+      "schema_roundtrip_ok": true,
+      "lane_handoff_correct": true,
+      "trajectory_to_outcome_parity": true,
+      "note": "verifier-attached search case keeps planner, compute, verifier, and final response boundaries explicit instead of flattening search into one opaque span"
+    },
+    {
+      "case_id": "external_tool_long_loop",
+      "workload_family": "external_tool_long_loop",
+      "lane_sequence": [
+        "language_reasoning",
+        "external_tool",
+        "language_reasoning"
+      ],
+      "language_span_count": 2,
+      "exact_compute_span_count": 0,
+      "verifier_span_count": 0,
+      "external_tool_span_count": 1,
+      "receipt_boundary_count": 3,
+      "handoff_count": 2,
+      "schema_roundtrip_ok": true,
+      "lane_handoff_correct": true,
+      "trajectory_to_outcome_parity": true,
+      "note": "external-tool fallback case keeps explicit planner-to-tool delegation and sandbox receipt boundaries separate from the surrounding language spans"
+    }
+  ],
+  "summary": "Mixed trajectory suite now freezes 3 seeded hybrid cases from `dataset://openagents/tassadar/mixed_trajectory_suite` with 3 schema-roundtrip passes and 3 trajectory-to-outcome parity passes.",
+  "report_digest": "ae1f067b355e91933eb8e65111cf63ee8818f605b7449a102f6033ba182c3d3e"
+}

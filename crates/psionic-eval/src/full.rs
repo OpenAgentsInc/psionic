@@ -16,28 +16,26 @@ mod attnres;
 mod attnres_training;
 #[path = "tassadar.rs"]
 mod tassadar;
-#[path = "tassadar_benchmark_package_set.rs"]
-mod tassadar_benchmark_package_set;
-#[path = "tassadar_clrs_wasm_bridge.rs"]
-mod tassadar_clrs_wasm_bridge;
-#[path = "tassadar_call_frames.rs"]
-mod tassadar_call_frames;
-#[path = "tassadar_compiled_distillation.rs"]
-mod tassadar_compiled_distillation;
-#[path = "tassadar_compile_pipeline_matrix.rs"]
-mod tassadar_compile_pipeline_matrix;
 #[path = "tassadar_approximate_attention_closure_matrix.rs"]
 mod tassadar_approximate_attention_closure_matrix;
-#[path = "tassadar_wasm_conformance.rs"]
-mod tassadar_wasm_conformance;
-#[path = "tassadar_conditional_masking_report.rs"]
-mod tassadar_conditional_masking_report;
-#[path = "tassadar_decompilation_fidelity.rs"]
-mod tassadar_decompilation_fidelity;
+#[path = "tassadar_benchmark_package_set.rs"]
+mod tassadar_benchmark_package_set;
+#[path = "tassadar_call_frames.rs"]
+mod tassadar_call_frames;
+#[path = "tassadar_clrs_wasm_bridge.rs"]
+mod tassadar_clrs_wasm_bridge;
+#[path = "tassadar_compile_pipeline_matrix.rs"]
+mod tassadar_compile_pipeline_matrix;
+#[path = "tassadar_compiled_distillation.rs"]
+mod tassadar_compiled_distillation;
 #[path = "tassadar_compiled_executor.rs"]
 mod tassadar_compiled_executor;
 #[path = "tassadar_compiled_kernel_suite.rs"]
 mod tassadar_compiled_kernel_suite;
+#[path = "tassadar_conditional_masking_report.rs"]
+mod tassadar_conditional_masking_report;
+#[path = "tassadar_decompilation_fidelity.rs"]
+mod tassadar_decompilation_fidelity;
 #[path = "tassadar_efficient_attention_baseline_matrix.rs"]
 mod tassadar_efficient_attention_baseline_matrix;
 #[path = "tassadar_error_regime_catalog.rs"]
@@ -48,10 +46,6 @@ mod tassadar_exactness_refusal_report;
 mod tassadar_executor_architecture_comparison;
 #[path = "tassadar_executor_baseline_comparison.rs"]
 mod tassadar_executor_baseline_comparison;
-#[path = "tassadar_locality_scratchpad.rs"]
-mod tassadar_locality_scratchpad;
-#[path = "tassadar_learnability_gap.rs"]
-mod tassadar_learnability_gap;
 #[path = "tassadar_executor_benchmark.rs"]
 mod tassadar_executor_benchmark;
 #[path = "tassadar_executor_eval.rs"]
@@ -64,8 +58,14 @@ mod tassadar_hungarian_10x10_compiled_executor;
 mod tassadar_hungarian_compiled_executor;
 #[path = "tassadar_kernel_module_scaling.rs"]
 mod tassadar_kernel_module_scaling;
+#[path = "tassadar_learnability_gap.rs"]
+mod tassadar_learnability_gap;
+#[path = "tassadar_locality_scratchpad.rs"]
+mod tassadar_locality_scratchpad;
 #[path = "tassadar_memory_abi_v2.rs"]
 mod tassadar_memory_abi_v2;
+#[path = "tassadar_mixed_trajectory.rs"]
+mod tassadar_mixed_trajectory;
 #[path = "tassadar_module_installation_staging.rs"]
 mod tassadar_module_installation_staging;
 #[path = "tassadar_module_scale_workload_suite.rs"]
@@ -80,30 +80,32 @@ mod tassadar_numeric_opcode_ladder;
 mod tassadar_precision_attention_robustness_audit;
 #[path = "tassadar_quantization_truth_envelope.rs"]
 mod tassadar_quantization_truth_envelope;
-#[path = "tassadar_shared_primitive_transfer.rs"]
-mod tassadar_shared_primitive_transfer;
-#[path = "tassadar_shared_depth_halting_calibration.rs"]
-mod tassadar_shared_depth_halting_calibration;
 #[path = "tassadar_sequence.rs"]
 mod tassadar_sequence;
-#[path = "tassadar_state_design_study_report.rs"]
-mod tassadar_state_design_study_report;
+#[path = "tassadar_shared_depth_halting_calibration.rs"]
+mod tassadar_shared_depth_halting_calibration;
+#[path = "tassadar_shared_primitive_transfer.rs"]
+mod tassadar_shared_primitive_transfer;
 #[path = "tassadar_sparse_rule_compiler_audit.rs"]
 mod tassadar_sparse_rule_compiler_audit;
+#[path = "tassadar_state_design_study_report.rs"]
+mod tassadar_state_design_study_report;
 #[path = "tassadar_structured_control.rs"]
 mod tassadar_structured_control;
 #[path = "tassadar_sudoku_9x9_compiled_executor.rs"]
 mod tassadar_sudoku_9x9_compiled_executor;
 #[path = "tassadar_verifier_guided_search_report.rs"]
 mod tassadar_verifier_guided_search_report;
+#[path = "tassadar_wasm_conformance.rs"]
+mod tassadar_wasm_conformance;
 #[path = "tassadar_wasm_module_ingress.rs"]
 mod tassadar_wasm_module_ingress;
+#[path = "tassadar_weak_supervision_executor.rs"]
+mod tassadar_weak_supervision_executor;
 #[path = "tassadar_working_memory_tier.rs"]
 mod tassadar_working_memory_tier;
 #[path = "tassadar_workload_capability_frontier.rs"]
 mod tassadar_workload_capability_frontier;
-#[path = "tassadar_weak_supervision_executor.rs"]
-mod tassadar_weak_supervision_executor;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -123,31 +125,31 @@ pub use apple_adapter_benchmark::*;
 pub use attnres::*;
 pub use attnres_training::*;
 pub use tassadar::*;
-pub use tassadar_benchmark_package_set::*;
-pub use tassadar_clrs_wasm_bridge::*;
-pub use tassadar_call_frames::*;
-pub use tassadar_compiled_distillation::*;
-pub use tassadar_compile_pipeline_matrix::*;
 pub use tassadar_approximate_attention_closure_matrix::*;
-pub use tassadar_wasm_conformance::*;
-pub use tassadar_conditional_masking_report::*;
-pub use tassadar_decompilation_fidelity::*;
+pub use tassadar_benchmark_package_set::*;
+pub use tassadar_call_frames::*;
+pub use tassadar_clrs_wasm_bridge::*;
+pub use tassadar_compile_pipeline_matrix::*;
+pub use tassadar_compiled_distillation::*;
 pub use tassadar_compiled_executor::*;
 pub use tassadar_compiled_kernel_suite::*;
+pub use tassadar_conditional_masking_report::*;
+pub use tassadar_decompilation_fidelity::*;
 pub use tassadar_efficient_attention_baseline_matrix::*;
 pub use tassadar_error_regime_catalog::*;
 pub use tassadar_exactness_refusal_report::*;
 pub use tassadar_executor_architecture_comparison::*;
 pub use tassadar_executor_baseline_comparison::*;
-pub use tassadar_locality_scratchpad::*;
-pub use tassadar_learnability_gap::*;
 pub use tassadar_executor_benchmark::*;
 pub use tassadar_executor_eval::*;
 pub use tassadar_executor_hull_benchmark::*;
 pub use tassadar_hungarian_10x10_compiled_executor::*;
 pub use tassadar_hungarian_compiled_executor::*;
 pub use tassadar_kernel_module_scaling::*;
+pub use tassadar_learnability_gap::*;
+pub use tassadar_locality_scratchpad::*;
 pub use tassadar_memory_abi_v2::*;
+pub use tassadar_mixed_trajectory::*;
 pub use tassadar_module_installation_staging::*;
 pub use tassadar_module_scale_workload_suite::*;
 pub use tassadar_module_trace_abi_v2::*;
@@ -155,18 +157,19 @@ pub use tassadar_numeric_encoding::*;
 pub use tassadar_numeric_opcode_ladder::*;
 pub use tassadar_precision_attention_robustness_audit::*;
 pub use tassadar_quantization_truth_envelope::*;
-pub use tassadar_shared_primitive_transfer::*;
-pub use tassadar_shared_depth_halting_calibration::*;
 pub use tassadar_sequence::*;
-pub use tassadar_state_design_study_report::*;
+pub use tassadar_shared_depth_halting_calibration::*;
+pub use tassadar_shared_primitive_transfer::*;
 pub use tassadar_sparse_rule_compiler_audit::*;
+pub use tassadar_state_design_study_report::*;
 pub use tassadar_structured_control::*;
 pub use tassadar_sudoku_9x9_compiled_executor::*;
 pub use tassadar_verifier_guided_search_report::*;
+pub use tassadar_wasm_conformance::*;
 pub use tassadar_wasm_module_ingress::*;
+pub use tassadar_weak_supervision_executor::*;
 pub use tassadar_working_memory_tier::*;
 pub use tassadar_workload_capability_frontier::*;
-pub use tassadar_weak_supervision_executor::*;
 
 /// Human-readable crate ownership summary.
 pub const CRATE_ROLE: &str = "held-out eval, benchmark packages, and rubric runtime for Psionic";

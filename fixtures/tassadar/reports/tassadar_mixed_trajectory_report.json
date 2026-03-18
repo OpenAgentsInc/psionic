@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.mixed_trajectory.report.v1",
+  "contract_ref": "dataset://openagents/tassadar/mixed_trajectory_suite",
+  "contract_digest": "671e17310d91305edd2c3e4d587a35af83a8cc0aa0d2bfd401e81e919f589dc7",
+  "suite_ref": "fixtures/tassadar/runs/tassadar_mixed_trajectory_suite_v1/mixed_trajectory_suite.json",
+  "suite_digest": "ae1f067b355e91933eb8e65111cf63ee8818f605b7449a102f6033ba182c3d3e",
+  "case_summaries": [
+    {
+      "workload_family": "article_hybrid_compute",
+      "handoff_count": 2,
+      "receipt_boundary_count": 3,
+      "schema_roundtrip_ok": true,
+      "lane_handoff_correct": true,
+      "trajectory_to_outcome_parity": true,
+      "lane_sequence": [
+        "language_reasoning",
+        "internal_exact_compute",
+        "language_reasoning"
+      ],
+      "note": "article-class hybrid case keeps planner intent, internal exact compute, executor receipt, and final language answer as distinct typed trajectory entries"
+    },
+    {
+      "workload_family": "verifier_attached_search",
+      "handoff_count": 3,
+      "receipt_boundary_count": 4,
+      "schema_roundtrip_ok": true,
+      "lane_handoff_correct": true,
+      "trajectory_to_outcome_parity": true,
+      "lane_sequence": [
+        "language_reasoning",
+        "internal_exact_compute",
+        "verifier_search",
+        "language_reasoning"
+      ],
+      "note": "verifier-attached search case keeps planner, compute, verifier, and final response boundaries explicit instead of flattening search into one opaque span"
+    },
+    {
+      "workload_family": "external_tool_long_loop",
+      "handoff_count": 2,
+      "receipt_boundary_count": 3,
+      "schema_roundtrip_ok": true,
+      "lane_handoff_correct": true,
+      "trajectory_to_outcome_parity": true,
+      "lane_sequence": [
+        "language_reasoning",
+        "external_tool",
+        "language_reasoning"
+      ],
+      "note": "external-tool fallback case keeps explicit planner-to-tool delegation and sandbox receipt boundaries separate from the surrounding language spans"
+    }
+  ],
+  "schema_roundtrip_rate_bps": 10000,
+  "lane_handoff_correctness_bps": 10000,
+  "trajectory_to_outcome_parity_bps": 10000,
+  "claim_boundary": "this report checks schema roundtrip, lane handoff correctness, receipt-boundary explicitness, and outcome parity over the seeded mixed trajectory suite. It remains an execution-truth artifact family and does not imply accepted-outcome closure or market settlement",
+  "summary": "Mixed trajectory report now covers 3 seeded hybrid cases with schema_roundtrip=10000bps, lane_handoff_correctness=10000bps, and trajectory_to_outcome_parity=10000bps.",
+  "report_digest": "b162bc45f9725cd66bba01d8a346b225f5c9f5668730ee35c199210349c75812"
+}

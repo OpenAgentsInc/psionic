@@ -1144,6 +1144,21 @@ The current scope is:
   into a provider-facing `TassadarPlannerLanguageComputePolicyReceipt`; the
   lane remains benchmark-bound routing research and does not widen served
   capability, accepted-outcome closure, or market authority
+- landed mixed language-and-compute trajectory follow-on: `psionic-ir` now
+  owns a public `TassadarMixedTrajectory` schema with typed language spans,
+  exact-compute spans, verifier spans, external-tool spans, explicit lane
+  handoffs, and receipt boundaries, `psionic-data` now publishes a public
+  `TassadarMixedTrajectoryContract` with seeded article-hybrid,
+  verifier-attached-search, and external-tool-long-loop cases, `psionic-runtime`
+  now projects those trajectories into bounded replay receipts with explicit
+  lane-sequence, handoff-count, receipt-boundary-count, schema-roundtrip, and
+  outcome-parity facts, `psionic-train` now freezes the committed suite
+  artifact at
+  `fixtures/tassadar/runs/tassadar_mixed_trajectory_suite_v1/mixed_trajectory_suite.json`,
+  and `psionic-eval` now freezes the joined report at
+  `fixtures/tassadar/reports/tassadar_mixed_trajectory_report.json`; the lane
+  remains execution-truth substrate for hybrid replay and training and does
+  not imply accepted-outcome closure or settlement authority
 - the final article-parity closeout audit now exists at
   `docs/audits/2026-03-17-tassadar-article-parity-closeout-audit.md`; it is
   explicitly subordinate to `fixtures/tassadar/reports/tassadar_acceptance_report.json`
