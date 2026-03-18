@@ -200,6 +200,22 @@ The current scope is:
   `TassadarExecutorCapabilityPublication` above that schema, and
   `psionic-provider` now wraps the same publication into a provider-facing
   `TassadarCapabilityEnvelope` instead of inventing a second capability story
+- landed workload-hardness taxonomy and capability-frontier follow-on:
+  `psionic-models` now publishes a public
+  `TassadarWorkloadHardnessTaxonomyPublication` that names retrieval-like,
+  parallelizable, search-heavy, memory-heavy, and control-heavy workload
+  families plus explicit depth/width/recurrent/extra-trace-space budgets;
+  `psionic-eval` now freezes the current frontier map at
+  `fixtures/tassadar/reports/tassadar_workload_capability_frontier_report.json`
+  by joining the workload matrix, module-scale Wasm suite, CLRS bridge,
+  verifier-guided search, recurrent fast-path, and shared-depth artifacts
+  instead of inventing a second benchmark universe; `psionic-research` now
+  freezes the companion summary at
+  `fixtures/tassadar/reports/tassadar_workload_capability_frontier_summary.json`;
+  and `psionic-provider` now projects that research summary into a
+  provider-facing `TassadarWorkloadCapabilityFrontierReceipt`. The frontier
+  keeps preferred-lane recommendations, refusal-first regions, and under-mapped
+  families explicit instead of widening any served capability claim
 - landed route-contract follow-on: `psionic-router` now also owns a routeable
   Wasm capability matrix for `psionic.planner_executor_route`, with explicit
   module-class rows, opcode-family facts, import posture, module-class-specific

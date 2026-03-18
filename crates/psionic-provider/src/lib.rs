@@ -5,6 +5,8 @@
     allow(clippy::expect_used, clippy::panic, clippy::panic_in_result_fn)
 )]
 
+use std::collections::BTreeMap;
+
 use ed25519_dalek::SigningKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -12,7 +14,7 @@ use sha2::{Digest, Sha256};
 use psionic_research::{
     TassadarDecompilationArtifactSummary,
     TassadarPromotionChecklistGateKind, TassadarPromotionPolicyReport,
-    TassadarPromotionPolicyStatus,
+    TassadarPromotionPolicyStatus, TassadarWorkloadCapabilityFrontierSummaryReport,
 };
 use psionic_router::{
     TASSADAR_PLANNER_EXECUTOR_ROUTE_PRODUCT_ID, TassadarPlannerExecutorRouteCandidate,
@@ -241,6 +243,46 @@ impl TassadarPromotionPolicyReceipt {
                 )
             },
             failed_gates,
+        }
+    }
+}
+
+/// Provider-facing receipt for the current workload capability frontier summary.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarWorkloadCapabilityFrontierReceipt {
+    /// Stable research summary identifier.
+    pub report_id: String,
+    /// Number of workload families covered by the frontier.
+    pub workload_family_count: u32,
+    /// Count of preferred-lane recommendations by lane label.
+    pub preferred_lane_counts: BTreeMap<String, u32>,
+    /// Count of observation postures by posture label.
+    pub observation_posture_counts: BTreeMap<String, u32>,
+    /// Workload families with at least one under-mapped preferred lane.
+    pub under_mapped_workload_family_ids: Vec<String>,
+    /// Workload families still carrying refusal-first posture.
+    pub refusal_first_workload_family_ids: Vec<String>,
+    /// Plain-language receipt detail.
+    pub detail: String,
+}
+
+impl TassadarWorkloadCapabilityFrontierReceipt {
+    /// Builds a provider-facing receipt from the shared workload-frontier summary.
+    #[must_use]
+    pub fn from_summary(report: &TassadarWorkloadCapabilityFrontierSummaryReport) -> Self {
+        Self {
+            report_id: report.report_id.clone(),
+            workload_family_count: report.frontier_report.frontier_rows.len() as u32,
+            preferred_lane_counts: report.preferred_lane_counts.clone(),
+            observation_posture_counts: report.observation_posture_counts.clone(),
+            under_mapped_workload_family_ids: report.under_mapped_workload_family_ids.clone(),
+            refusal_first_workload_family_ids: report.refusal_first_workload_family_ids.clone(),
+            detail: format!(
+                "workload frontier currently covers {} families, with {} under-mapped families and {} refusal-first families kept explicit",
+                report.frontier_report.frontier_rows.len(),
+                report.under_mapped_workload_family_ids.len(),
+                report.refusal_first_workload_family_ids.len(),
+            ),
         }
     }
 }
@@ -3160,6 +3202,7 @@ mod tests {
     use psionic_models::{TassadarExecutorFixture, TassadarWorkloadClass};
     use psionic_research::{
         build_tassadar_decompilable_executor_artifacts_report,
+        build_tassadar_workload_capability_frontier_summary_report,
         TassadarPromotionChecklistGateKind, TassadarPromotionPolicyStatus,
         build_tassadar_promotion_policy_report,
     };
@@ -3225,6 +3268,7 @@ mod tests {
         TassadarExactnessRefusalReceipt,
         TassadarPlannerRouteCapabilityEnvelope, TassadarPlannerRouteCapabilityEnvelopeError,
         TassadarPromotionPolicyReceipt, TassadarTraceArtifactReceipt, TassadarTraceDiffReceipt,
+        TassadarWorkloadCapabilityFrontierReceipt,
         TextGenerationCapabilityEnvelope, TextGenerationReceipt, WeightBundleEvidence,
         cache_invalidation_policy, compute_market_supply_refusal_diagnostic,
         default_compute_market_supply_policy, digest_embedding_request, digest_generation_request,
@@ -8378,6 +8422,25 @@ mod tests {
             err,
             TassadarCapabilityEnvelopeError::UnpublishableWorkloadMatrix { .. }
         ));
+    }
+
+    #[test]
+    fn tassadar_workload_capability_frontier_receipt_projects_research_summary() {
+        let summary =
+            build_tassadar_workload_capability_frontier_summary_report().expect("frontier summary");
+        let receipt = TassadarWorkloadCapabilityFrontierReceipt::from_summary(&summary);
+
+        assert_eq!(receipt.report_id, summary.report_id);
+        assert_eq!(
+            receipt.workload_family_count,
+            summary.frontier_report.frontier_rows.len() as u32
+        );
+        assert!(receipt
+            .under_mapped_workload_family_ids
+            .contains(&String::from("micro_wasm_kernel")));
+        assert!(receipt
+            .refusal_first_workload_family_ids
+            .contains(&String::from("sudoku_class")));
     }
 
     #[test]

@@ -24,6 +24,7 @@ mod tassadar_scratchpad;
 mod tassadar_sequence;
 mod tassadar_subroutine;
 mod tassadar_symbolic;
+mod tassadar_workload_frontier;
 
 use std::{
     borrow::Cow,
@@ -68,6 +69,7 @@ pub use tassadar_scratchpad::*;
 pub use tassadar_sequence::*;
 pub use tassadar_subroutine::*;
 pub use tassadar_symbolic::*;
+pub use tassadar_workload_frontier::*;
 
 /// Human-readable crate ownership summary.
 pub const CRATE_ROLE: &str = "reusable model definitions and metadata";

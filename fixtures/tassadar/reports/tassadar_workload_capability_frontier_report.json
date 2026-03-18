@@ -1,0 +1,751 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.workload_capability_frontier.report.v1",
+  "taxonomy_publication": {
+    "schema_version": 1,
+    "publication_id": "tassadar.workload_hardness_taxonomy.publication.v1",
+    "status": "implemented",
+    "claim_class": "research_only_capability_truth",
+    "rows": [
+      {
+        "workload_family_id": "micro_wasm_kernel",
+        "benchmark_workload_target": "micro_wasm_kernel",
+        "hardness_classes": [
+          "retrieval_like",
+          "memory_heavy"
+        ],
+        "budget_descriptor": {
+          "depth_budget": "low",
+          "width_budget": "low",
+          "recurrent_budget": "low",
+          "extra_trace_space_budget": "low"
+        },
+        "preferred_lanes": [
+          "compiled_exact",
+          "runtime_recurrent_baseline"
+        ],
+        "refusal_boundary": "micro kernels should refuse only when bounded opcode or memory support is missing rather than silently degrading into unrelated learned behavior",
+        "note": "bounded micro-kernel family where compiled exactness and recurrent runtime baselines are both meaningful frontier anchors"
+      },
+      {
+        "workload_family_id": "branch_heavy_kernel",
+        "benchmark_workload_target": "branch_heavy_kernel",
+        "hardness_classes": [
+          "control_heavy"
+        ],
+        "budget_descriptor": {
+          "depth_budget": "medium",
+          "width_budget": "low",
+          "recurrent_budget": "medium",
+          "extra_trace_space_budget": "low"
+        },
+        "preferred_lanes": [
+          "compiled_exact",
+          "runtime_recurrent_baseline"
+        ],
+        "refusal_boundary": "branch-heavy kernels should refuse when control-flow support falls outside the explicit bounded runtime family instead of silently flattening into dense replay",
+        "note": "control-heavy kernel family used to separate bounded control-flow pressure from open-ended search"
+      },
+      {
+        "workload_family_id": "memory_heavy_kernel",
+        "benchmark_workload_target": "memory_heavy_kernel",
+        "hardness_classes": [
+          "memory_heavy"
+        ],
+        "budget_descriptor": {
+          "depth_budget": "low",
+          "width_budget": "medium",
+          "recurrent_budget": "low",
+          "extra_trace_space_budget": "medium"
+        },
+        "preferred_lanes": [
+          "compiled_exact",
+          "runtime_recurrent_baseline"
+        ],
+        "refusal_boundary": "memory-heavy kernels should refuse when bounded state or address support is exceeded rather than hiding that pressure behind aggregate exactness",
+        "note": "dense load/store kernel family that exposes memory pressure separately from search pressure"
+      },
+      {
+        "workload_family_id": "long_loop_kernel",
+        "benchmark_workload_target": "long_loop_kernel",
+        "hardness_classes": [
+          "control_heavy"
+        ],
+        "budget_descriptor": {
+          "depth_budget": "low",
+          "width_budget": "low",
+          "recurrent_budget": "high",
+          "extra_trace_space_budget": "low"
+        },
+        "preferred_lanes": [
+          "runtime_recurrent_baseline",
+          "compiled_exact",
+          "learned_shared_depth"
+        ],
+        "refusal_boundary": "long-loop kernels should refuse when recurrent or halting budgets are exhausted instead of silently treating long horizons as small-prefix work",
+        "note": "loop-heavy kernel family used to anchor recurrent-budget frontier questions"
+      },
+      {
+        "workload_family_id": "clrs_shortest_path",
+        "benchmark_workload_target": "clrs_shortest_path",
+        "hardness_classes": [
+          "parallelizable",
+          "memory_heavy"
+        ],
+        "budget_descriptor": {
+          "depth_budget": "medium",
+          "width_budget": "medium",
+          "recurrent_budget": "medium",
+          "extra_trace_space_budget": "medium"
+        },
+        "preferred_lanes": [
+          "compiled_exact",
+          "refuse_instead_of_degrade"
+        ],
+        "refusal_boundary": "CLRS bridge workloads should refuse broad promotion until the bridge stays explicit about trajectory family, length bucket, and exact bounded export coverage",
+        "note": "shared shortest-path bridge family that keeps CLRS-style trajectory work legible without claiming full algorithm-benchmark closure"
+      },
+      {
+        "workload_family_id": "sudoku_class",
+        "benchmark_workload_target": "sudoku_class",
+        "hardness_classes": [
+          "search_heavy",
+          "control_heavy"
+        ],
+        "budget_descriptor": {
+          "depth_budget": "high",
+          "width_budget": "low",
+          "recurrent_budget": "medium",
+          "extra_trace_space_budget": "high"
+        },
+        "preferred_lanes": [
+          "search_specific_trace",
+          "compiled_exact",
+          "refuse_instead_of_degrade"
+        ],
+        "refusal_boundary": "search-heavy Sudoku workloads should refuse rather than degrade when verifier/search traces or exact compiled support are unavailable",
+        "note": "real search family where search-specific traces and exact compiled closure matter more than flat dense replay"
+      },
+      {
+        "workload_family_id": "hungarian_matching",
+        "benchmark_workload_target": "hungarian_matching",
+        "hardness_classes": [
+          "parallelizable",
+          "search_heavy"
+        ],
+        "budget_descriptor": {
+          "depth_budget": "medium",
+          "width_budget": "medium",
+          "recurrent_budget": "low",
+          "extra_trace_space_budget": "medium"
+        },
+        "preferred_lanes": [
+          "compiled_exact",
+          "refuse_instead_of_degrade"
+        ],
+        "refusal_boundary": "matching workloads should refuse when bounded exact search or compiled support is missing rather than pretending parallel frontier traces imply full executor closure",
+        "note": "matching family that mixes parallelizable frontier structure with exact combinatorial search pressure"
+      },
+      {
+        "workload_family_id": "module_memcpy",
+        "benchmark_workload_target": "module_memcpy",
+        "hardness_classes": [
+          "retrieval_like",
+          "parallelizable"
+        ],
+        "budget_descriptor": {
+          "depth_budget": "low",
+          "width_budget": "medium",
+          "recurrent_budget": "low",
+          "extra_trace_space_budget": "low"
+        },
+        "preferred_lanes": [
+          "compiled_exact",
+          "learned_shared_depth"
+        ],
+        "refusal_boundary": "module memcpy workloads should refuse when module-scale lowering or export coverage is missing instead of being collapsed into kernel-only exactness",
+        "note": "module-scale copy family used to anchor low-depth but non-kernel module execution"
+      },
+      {
+        "workload_family_id": "module_parsing",
+        "benchmark_workload_target": "module_parsing",
+        "hardness_classes": [
+          "control_heavy",
+          "memory_heavy"
+        ],
+        "budget_descriptor": {
+          "depth_budget": "medium",
+          "width_budget": "medium",
+          "recurrent_budget": "medium",
+          "extra_trace_space_budget": "low"
+        },
+        "preferred_lanes": [
+          "compiled_exact",
+          "learned_shared_depth",
+          "refuse_instead_of_degrade"
+        ],
+        "refusal_boundary": "module parsing workloads should refuse when bounded control-flow or state channels are missing instead of being over-read from memcpy-style wins",
+        "note": "module parsing family used to separate nested control and state pressure from flat copy kernels"
+      },
+      {
+        "workload_family_id": "module_checksum",
+        "benchmark_workload_target": "module_checksum",
+        "hardness_classes": [
+          "memory_heavy",
+          "parallelizable"
+        ],
+        "budget_descriptor": {
+          "depth_budget": "low",
+          "width_budget": "low",
+          "recurrent_budget": "low",
+          "extra_trace_space_budget": "low"
+        },
+        "preferred_lanes": [
+          "compiled_exact",
+          "learned_shared_depth"
+        ],
+        "refusal_boundary": "module checksum workloads should refuse once bounded memory-span assumptions break instead of silently widening module exactness",
+        "note": "module checksum family that remains low-depth but nontrivial at module scale"
+      },
+      {
+        "workload_family_id": "module_vm_style",
+        "benchmark_workload_target": "module_vm_style",
+        "hardness_classes": [
+          "control_heavy",
+          "memory_heavy"
+        ],
+        "budget_descriptor": {
+          "depth_budget": "high",
+          "width_budget": "medium",
+          "recurrent_budget": "high",
+          "extra_trace_space_budget": "medium"
+        },
+        "preferred_lanes": [
+          "compiled_exact",
+          "learned_shared_depth",
+          "refuse_instead_of_degrade"
+        ],
+        "refusal_boundary": "vm-style module workloads should refuse when dispatch or call-frame support leaves the bounded family instead of being treated like flat parsing or checksum cases",
+        "note": "module-scale dispatch family with the highest current module-control pressure in the public suite"
+      }
+    ],
+    "target_surfaces": [
+      "crates/psionic-models",
+      "crates/psionic-eval",
+      "crates/psionic-research",
+      "crates/psionic-provider"
+    ],
+    "validation_refs": [
+      "fixtures/tassadar/reports/tassadar_workload_capability_frontier_report.json",
+      "fixtures/tassadar/reports/tassadar_workload_capability_frontier_summary.json"
+    ],
+    "support_boundaries": [
+      "the taxonomy is a research-only workload-classification and frontier vocabulary over the current benchmark pack; it does not promote served capability or flatten compiled, learned, search, and fast-path work into one generic score",
+      "budget descriptors are regime labels for the current workload families, not a proof that every workload with the same label is solved or benchmarked",
+      "preferred lanes remain refusal-first guidance; unsupported or under-mapped regions must stay explicit instead of being smoothed into aggregate capability claims"
+    ],
+    "publication_digest": "1fea119610c84dec161cb142c90714462b89e8d8ca01263f936b9917eee23d60"
+  },
+  "frontier_rows": [
+    {
+      "workload_family_id": "micro_wasm_kernel",
+      "benchmark_workload_target": "micro_wasm_kernel",
+      "hardness_classes": [
+        "retrieval_like",
+        "memory_heavy"
+      ],
+      "budget_descriptor": {
+        "depth_budget": "low",
+        "width_budget": "low",
+        "recurrent_budget": "low",
+        "extra_trace_space_budget": "low"
+      },
+      "preferred_lanes": [
+        "compiled_exact",
+        "runtime_recurrent_baseline"
+      ],
+      "observed_lanes": [
+        {
+          "lane_kind": "compiled_exact",
+          "posture": "under_mapped",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_workload_capability_matrix.json"
+          ],
+          "note": "no proof-backed compiled exact row is currently published for this family; the frontier keeps that absence explicit"
+        },
+        {
+          "lane_kind": "runtime_recurrent_baseline",
+          "posture": "exact",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json"
+          ],
+          "note": "the artifact-backed recurrent fast-path runtime currently executes this family directly and exactly"
+        }
+      ],
+      "under_mapped_lane_count": 1,
+      "refusal_first": false,
+      "summary": "frontier row `micro_wasm_kernel` keeps 2 preferred lanes explicit, with 1 currently grounded and 1 under-mapped"
+    },
+    {
+      "workload_family_id": "branch_heavy_kernel",
+      "benchmark_workload_target": "branch_heavy_kernel",
+      "hardness_classes": [
+        "control_heavy"
+      ],
+      "budget_descriptor": {
+        "depth_budget": "medium",
+        "width_budget": "low",
+        "recurrent_budget": "medium",
+        "extra_trace_space_budget": "low"
+      },
+      "preferred_lanes": [
+        "compiled_exact",
+        "runtime_recurrent_baseline"
+      ],
+      "observed_lanes": [
+        {
+          "lane_kind": "compiled_exact",
+          "posture": "under_mapped",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_workload_capability_matrix.json"
+          ],
+          "note": "no proof-backed compiled exact row is currently published for this family; the frontier keeps that absence explicit"
+        },
+        {
+          "lane_kind": "runtime_recurrent_baseline",
+          "posture": "exact",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json"
+          ],
+          "note": "the artifact-backed recurrent fast-path runtime currently executes this family directly and exactly"
+        }
+      ],
+      "under_mapped_lane_count": 1,
+      "refusal_first": false,
+      "summary": "frontier row `branch_heavy_kernel` keeps 2 preferred lanes explicit, with 1 currently grounded and 1 under-mapped"
+    },
+    {
+      "workload_family_id": "memory_heavy_kernel",
+      "benchmark_workload_target": "memory_heavy_kernel",
+      "hardness_classes": [
+        "memory_heavy"
+      ],
+      "budget_descriptor": {
+        "depth_budget": "low",
+        "width_budget": "medium",
+        "recurrent_budget": "low",
+        "extra_trace_space_budget": "medium"
+      },
+      "preferred_lanes": [
+        "compiled_exact",
+        "runtime_recurrent_baseline"
+      ],
+      "observed_lanes": [
+        {
+          "lane_kind": "compiled_exact",
+          "posture": "under_mapped",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_workload_capability_matrix.json"
+          ],
+          "note": "no proof-backed compiled exact row is currently published for this family; the frontier keeps that absence explicit"
+        },
+        {
+          "lane_kind": "runtime_recurrent_baseline",
+          "posture": "exact",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json"
+          ],
+          "note": "the artifact-backed recurrent fast-path runtime currently executes this family directly and exactly"
+        }
+      ],
+      "under_mapped_lane_count": 1,
+      "refusal_first": false,
+      "summary": "frontier row `memory_heavy_kernel` keeps 2 preferred lanes explicit, with 1 currently grounded and 1 under-mapped"
+    },
+    {
+      "workload_family_id": "long_loop_kernel",
+      "benchmark_workload_target": "long_loop_kernel",
+      "hardness_classes": [
+        "control_heavy"
+      ],
+      "budget_descriptor": {
+        "depth_budget": "low",
+        "width_budget": "low",
+        "recurrent_budget": "high",
+        "extra_trace_space_budget": "low"
+      },
+      "preferred_lanes": [
+        "runtime_recurrent_baseline",
+        "compiled_exact",
+        "learned_shared_depth"
+      ],
+      "observed_lanes": [
+        {
+          "lane_kind": "runtime_recurrent_baseline",
+          "posture": "exact",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json"
+          ],
+          "note": "the artifact-backed recurrent fast-path runtime currently executes this family directly and exactly"
+        },
+        {
+          "lane_kind": "compiled_exact",
+          "posture": "exact",
+          "artifact_refs": [
+            "fixtures/tassadar/runs/compiled_kernel_suite_v0/run_bundle.json"
+          ],
+          "note": "compiled exactness is grounded by the proof-backed long-loop kernel row in the workload matrix"
+        },
+        {
+          "lane_kind": "learned_shared_depth",
+          "posture": "research_only",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_shared_depth_architecture_report.json"
+          ],
+          "note": "research-only shared-depth dynamic halting currently reports later_window_exactness_bps=8300 and budget_exhaustion_rate_bps=400 for this family"
+        }
+      ],
+      "under_mapped_lane_count": 0,
+      "refusal_first": false,
+      "summary": "frontier row `long_loop_kernel` keeps 3 preferred lanes explicit, with 3 currently grounded and 0 under-mapped"
+    },
+    {
+      "workload_family_id": "clrs_shortest_path",
+      "benchmark_workload_target": "clrs_shortest_path",
+      "hardness_classes": [
+        "parallelizable",
+        "memory_heavy"
+      ],
+      "budget_descriptor": {
+        "depth_budget": "medium",
+        "width_budget": "medium",
+        "recurrent_budget": "medium",
+        "extra_trace_space_budget": "medium"
+      },
+      "preferred_lanes": [
+        "compiled_exact",
+        "refuse_instead_of_degrade"
+      ],
+      "observed_lanes": [
+        {
+          "lane_kind": "compiled_exact",
+          "posture": "exact",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+          ],
+          "note": "CLRS shortest-path bridge keeps sequential and wavefront trajectory families explicit across 2 comparison rows"
+        },
+        {
+          "lane_kind": "refuse_instead_of_degrade",
+          "posture": "refuse_first",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json"
+          ],
+          "note": "CLRS bridge workloads should refuse broad promotion until the bridge stays explicit about trajectory family, length bucket, and exact bounded export coverage"
+        }
+      ],
+      "under_mapped_lane_count": 0,
+      "refusal_first": true,
+      "summary": "frontier row `clrs_shortest_path` keeps 2 preferred lanes explicit, with 2 currently grounded and 0 under-mapped"
+    },
+    {
+      "workload_family_id": "sudoku_class",
+      "benchmark_workload_target": "sudoku_class",
+      "hardness_classes": [
+        "search_heavy",
+        "control_heavy"
+      ],
+      "budget_descriptor": {
+        "depth_budget": "high",
+        "width_budget": "low",
+        "recurrent_budget": "medium",
+        "extra_trace_space_budget": "high"
+      },
+      "preferred_lanes": [
+        "search_specific_trace",
+        "compiled_exact",
+        "refuse_instead_of_degrade"
+      ],
+      "observed_lanes": [
+        {
+          "lane_kind": "search_specific_trace",
+          "posture": "research_only",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+          ],
+          "note": "research-only verifier-guided search currently anchors Sudoku with 1 seeded cases, verifier_certificate_accuracy_bps=10000, and recovery_quality_bps=10000"
+        },
+        {
+          "lane_kind": "compiled_exact",
+          "posture": "exact",
+          "artifact_refs": [
+            "fixtures/tassadar/runs/sudoku_v0_compiled_executor_v0/run_bundle.json",
+            "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/run_bundle.json"
+          ],
+          "note": "compiled exactness is grounded by the 4x4 and 9x9 Sudoku compiled rows in the workload matrix"
+        },
+        {
+          "lane_kind": "refuse_instead_of_degrade",
+          "posture": "refuse_first",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_workload_capability_matrix.json",
+            "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+          ],
+          "note": "search-heavy Sudoku workloads should refuse rather than degrade when verifier/search traces or exact compiled support are unavailable"
+        }
+      ],
+      "under_mapped_lane_count": 0,
+      "refusal_first": true,
+      "summary": "frontier row `sudoku_class` keeps 3 preferred lanes explicit, with 3 currently grounded and 0 under-mapped"
+    },
+    {
+      "workload_family_id": "hungarian_matching",
+      "benchmark_workload_target": "hungarian_matching",
+      "hardness_classes": [
+        "parallelizable",
+        "search_heavy"
+      ],
+      "budget_descriptor": {
+        "depth_budget": "medium",
+        "width_budget": "medium",
+        "recurrent_budget": "low",
+        "extra_trace_space_budget": "medium"
+      },
+      "preferred_lanes": [
+        "compiled_exact",
+        "refuse_instead_of_degrade"
+      ],
+      "observed_lanes": [
+        {
+          "lane_kind": "compiled_exact",
+          "posture": "exact",
+          "artifact_refs": [
+            "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/run_bundle.json",
+            "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json"
+          ],
+          "note": "compiled exactness is grounded by the 4x4 and 10x10 Hungarian compiled rows in the workload matrix"
+        },
+        {
+          "lane_kind": "refuse_instead_of_degrade",
+          "posture": "refuse_first",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_workload_capability_matrix.json",
+            "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+          ],
+          "note": "matching workloads should refuse when bounded exact search or compiled support is missing rather than pretending parallel frontier traces imply full executor closure"
+        }
+      ],
+      "under_mapped_lane_count": 0,
+      "refusal_first": true,
+      "summary": "frontier row `hungarian_matching` keeps 2 preferred lanes explicit, with 2 currently grounded and 0 under-mapped"
+    },
+    {
+      "workload_family_id": "module_memcpy",
+      "benchmark_workload_target": "module_memcpy",
+      "hardness_classes": [
+        "retrieval_like",
+        "parallelizable"
+      ],
+      "budget_descriptor": {
+        "depth_budget": "low",
+        "width_budget": "medium",
+        "recurrent_budget": "low",
+        "extra_trace_space_budget": "low"
+      },
+      "preferred_lanes": [
+        "compiled_exact",
+        "learned_shared_depth"
+      ],
+      "observed_lanes": [
+        {
+          "lane_kind": "compiled_exact",
+          "posture": "exact",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+          ],
+          "note": "module-scale memcpy stays exact under the current bounded lowering lane; exact_case_count=1"
+        },
+        {
+          "lane_kind": "learned_shared_depth",
+          "posture": "under_mapped",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_shared_depth_architecture_report.json"
+          ],
+          "note": "the current shared-depth lane only publishes loop-heavy-kernel and call-heavy-module families"
+        }
+      ],
+      "under_mapped_lane_count": 1,
+      "refusal_first": false,
+      "summary": "frontier row `module_memcpy` keeps 2 preferred lanes explicit, with 1 currently grounded and 1 under-mapped"
+    },
+    {
+      "workload_family_id": "module_parsing",
+      "benchmark_workload_target": "module_parsing",
+      "hardness_classes": [
+        "control_heavy",
+        "memory_heavy"
+      ],
+      "budget_descriptor": {
+        "depth_budget": "medium",
+        "width_budget": "medium",
+        "recurrent_budget": "medium",
+        "extra_trace_space_budget": "low"
+      },
+      "preferred_lanes": [
+        "compiled_exact",
+        "learned_shared_depth",
+        "refuse_instead_of_degrade"
+      ],
+      "observed_lanes": [
+        {
+          "lane_kind": "compiled_exact",
+          "posture": "exact",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+          ],
+          "note": "module-scale parsing stays exact under the current bounded lowering lane; exact_case_count=1"
+        },
+        {
+          "lane_kind": "learned_shared_depth",
+          "posture": "under_mapped",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_shared_depth_architecture_report.json"
+          ],
+          "note": "the current shared-depth lane only publishes loop-heavy-kernel and call-heavy-module families"
+        },
+        {
+          "lane_kind": "refuse_instead_of_degrade",
+          "posture": "refuse_first",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+          ],
+          "note": "module parsing workloads should refuse when bounded control-flow or state channels are missing instead of being over-read from memcpy-style wins"
+        }
+      ],
+      "under_mapped_lane_count": 1,
+      "refusal_first": true,
+      "summary": "frontier row `module_parsing` keeps 3 preferred lanes explicit, with 2 currently grounded and 1 under-mapped"
+    },
+    {
+      "workload_family_id": "module_checksum",
+      "benchmark_workload_target": "module_checksum",
+      "hardness_classes": [
+        "memory_heavy",
+        "parallelizable"
+      ],
+      "budget_descriptor": {
+        "depth_budget": "low",
+        "width_budget": "low",
+        "recurrent_budget": "low",
+        "extra_trace_space_budget": "low"
+      },
+      "preferred_lanes": [
+        "compiled_exact",
+        "learned_shared_depth"
+      ],
+      "observed_lanes": [
+        {
+          "lane_kind": "compiled_exact",
+          "posture": "exact",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+          ],
+          "note": "module-scale checksum stays exact under the current bounded lowering lane; exact_case_count=1"
+        },
+        {
+          "lane_kind": "learned_shared_depth",
+          "posture": "under_mapped",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_shared_depth_architecture_report.json"
+          ],
+          "note": "the current shared-depth lane only publishes loop-heavy-kernel and call-heavy-module families"
+        }
+      ],
+      "under_mapped_lane_count": 1,
+      "refusal_first": false,
+      "summary": "frontier row `module_checksum` keeps 2 preferred lanes explicit, with 1 currently grounded and 1 under-mapped"
+    },
+    {
+      "workload_family_id": "module_vm_style",
+      "benchmark_workload_target": "module_vm_style",
+      "hardness_classes": [
+        "control_heavy",
+        "memory_heavy"
+      ],
+      "budget_descriptor": {
+        "depth_budget": "high",
+        "width_budget": "medium",
+        "recurrent_budget": "high",
+        "extra_trace_space_budget": "medium"
+      },
+      "preferred_lanes": [
+        "compiled_exact",
+        "learned_shared_depth",
+        "refuse_instead_of_degrade"
+      ],
+      "observed_lanes": [
+        {
+          "lane_kind": "compiled_exact",
+          "posture": "under_mapped",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+          ],
+          "note": "module-scale VM-style dispatch stays exact under the current bounded lowering lane; exact_case_count=2"
+        },
+        {
+          "lane_kind": "learned_shared_depth",
+          "posture": "research_only",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_shared_depth_architecture_report.json"
+          ],
+          "note": "research-only shared-depth dynamic halting currently reports later_window_exactness_bps=7900 and budget_exhaustion_rate_bps=700 for this family"
+        },
+        {
+          "lane_kind": "refuse_instead_of_degrade",
+          "posture": "refuse_first",
+          "artifact_refs": [
+            "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+          ],
+          "note": "vm-style module workloads should refuse when dispatch or call-frame support leaves the bounded family instead of being treated like flat parsing or checksum cases"
+        }
+      ],
+      "under_mapped_lane_count": 1,
+      "refusal_first": true,
+      "summary": "frontier row `module_vm_style` keeps 3 preferred lanes explicit, with 2 currently grounded and 1 under-mapped"
+    }
+  ],
+  "preferred_lane_counts": {
+    "compiled_exact": 11,
+    "learned_shared_depth": 5,
+    "refuse_instead_of_degrade": 5,
+    "runtime_recurrent_baseline": 4,
+    "search_specific_trace": 1
+  },
+  "under_mapped_workload_family_ids": [
+    "micro_wasm_kernel",
+    "branch_heavy_kernel",
+    "memory_heavy_kernel",
+    "module_memcpy",
+    "module_parsing",
+    "module_checksum",
+    "module_vm_style"
+  ],
+  "refusal_first_workload_family_ids": [
+    "clrs_shortest_path",
+    "sudoku_class",
+    "hungarian_matching",
+    "module_parsing",
+    "module_vm_style"
+  ],
+  "generated_from_refs": [
+    "fixtures/tassadar/reports/tassadar_clrs_wasm_bridge_report.json",
+    "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+    "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+    "fixtures/tassadar/reports/tassadar_shared_depth_architecture_report.json",
+    "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json",
+    "fixtures/tassadar/reports/tassadar_workload_capability_matrix.json"
+  ],
+  "claim_boundary": "this report is a research-only capability-frontier map over the current workload taxonomy and committed Tassadar artifacts. It keeps compiled exactness, recurrent runtime closure, verifier-guided search, and learned shared-depth architecture distinct, and it keeps under-mapped or refusal-first regions explicit instead of flattening them into one generic executor score",
+  "summary": "Current workload frontier covers 11 families and 26 preferred-lane observations, with 7 under-mapped preferred lanes across 7 workload families and 5 refusal-first workload families kept explicit.",
+  "report_digest": "c4f541014b4446026f2865a7f359adcdc154b5ccd730af6898b09407ba1632c6"
+}
