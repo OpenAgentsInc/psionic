@@ -3,8 +3,9 @@ use std::{collections::BTreeMap, time::Instant};
 use psionic_data::{DatasetKey, TassadarBenchmarkAxis, TassadarBenchmarkFamily};
 use psionic_environments::{
     EnvironmentDatasetBinding, EnvironmentPolicyKind, EnvironmentPolicyReference,
-    TassadarBenchmarkPackageSetBinding, TassadarEnvironmentBundle, TassadarEnvironmentSpec,
-    TassadarExactnessContract, TassadarIoContract, TassadarProgramBinding, TassadarWorkloadTarget,
+    TassadarBenchmarkPackageSetBinding, TassadarCompilePipelineMatrixBinding,
+    TassadarEnvironmentBundle, TassadarEnvironmentSpec, TassadarExactnessContract,
+    TassadarIoContract, TassadarProgramBinding, TassadarWorkloadTarget,
 };
 use psionic_models::{
     TassadarCompiledProgramError, TassadarCompiledProgramExecution,
@@ -25,6 +26,7 @@ use crate::{
     BenchmarkAggregationKind, BenchmarkCase, BenchmarkPackage, BenchmarkPackageKey,
     BenchmarkVerificationPolicy, TassadarBenchmarkError, TassadarReferenceFixtureSuite,
     TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF,
+    TASSADAR_COMPILE_PIPELINE_MATRIX_REPORT_REF,
 };
 
 /// Stable environment ref for the compiled kernel-suite eval package.
@@ -45,6 +47,19 @@ pub const TASSADAR_COMPILED_KERNEL_SUITE_WORKLOAD_FAMILY_ID: &str =
 /// Stable compiled throughput metric id for the kernel suite.
 pub const TASSADAR_COMPILED_KERNEL_SUITE_METRIC_ID: &str =
     "tassadar.compiled_kernel_suite_steps_per_second";
+
+fn standard_compile_pipeline_matrix_binding() -> TassadarCompilePipelineMatrixBinding {
+    TassadarCompilePipelineMatrixBinding {
+        report_ref: String::from(TASSADAR_COMPILE_PIPELINE_MATRIX_REPORT_REF),
+        report_id: String::from("tassadar.compile_pipeline_matrix_report.v1"),
+        source_family_ids: vec![
+            String::from("wasm_text.multi_export_arithmetic"),
+            String::from("wasm_text.memory_lookup"),
+            String::from("wasm_text.param_abi"),
+            String::from("c_source.toolchain_unavailable"),
+        ],
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -931,6 +946,7 @@ fn build_tassadar_compiled_kernel_suite_environment_bundle(
             ],
             summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
         },
+        compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/compiled_kernel_suite/eval/verification"),

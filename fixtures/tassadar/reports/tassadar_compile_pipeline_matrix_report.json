@@ -1,0 +1,227 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.compile_pipeline_matrix_report.v1",
+  "source_family_ids": [
+    "wasm_text.multi_export_arithmetic",
+    "wasm_text.memory_lookup",
+    "wasm_text.param_abi",
+    "c_source.toolchain_unavailable"
+  ],
+  "generated_from_refs": [
+    "fixtures/tassadar/sources/tassadar_multi_export_kernel.wat",
+    "fixtures/tassadar/sources/tassadar_memory_lookup_kernel.wat",
+    "fixtures/tassadar/sources/tassadar_param_abi_kernel.wat",
+    "fixtures/tassadar/sources/tassadar_micro_wasm_kernel.c"
+  ],
+  "cases": [
+    {
+      "case_id": "wasm_text_multi_export_arithmetic_exact",
+      "source_family_id": "wasm_text.multi_export_arithmetic",
+      "source_kind": "wasm_text",
+      "source_ref": "fixtures/tassadar/sources/tassadar_multi_export_kernel.wat",
+      "source_digest": "4a0ed380a077311b6b7a66301225144e40707cbc39c298a67aacf354b4b4692a",
+      "target_wasm_profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "target_trace_abi_id": "tassadar.trace.v1",
+      "target_trace_abi_version": 1,
+      "compile_surface_id": "wasm_text",
+      "compile_config_digest": "66e324d0aeb95ecf0d5af4183e79602095212e78cdbdccdbc229073c0ce8b1f0",
+      "compile_pipeline_features": [
+        "compiler:wat",
+        "export:local_double",
+        "export:pair_sum",
+        "syntax:wat",
+        "target:wasm32-unknown-unknown"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "tassadar_wasm_text_parse",
+        "compiler_version": "v1",
+        "target": "wasm32-unknown-unknown",
+        "pipeline_features": [
+          "compiler:wat",
+          "export:local_double",
+          "export:pair_sum",
+          "syntax:wat",
+          "target:wasm32-unknown-unknown"
+        ]
+      },
+      "toolchain_digest": "d8bfd8eab214d6d8df63a9ceb904cfb0bdf5c3efe153e3f10dbbecadee969b18",
+      "compile_receipt_digest": "d133bf4c37ea8fe2ca60cfc0f7bd35a1a577ded3a1408a6247925406b9686013",
+      "status": "lowered_exact",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_multi_export_kernel.wasm",
+      "wasm_binary_digest": "2a3a25472cecdd07ff76571df1f15d6191ab1acf7ec26994b674d3ff441ddf3f",
+      "wasm_binary_summary": {
+        "byte_len": 74,
+        "exported_functions": [
+          "local_double",
+          "pair_sum"
+        ],
+        "function_count": 2,
+        "imported_function_count": 0,
+        "memory_count": 0,
+        "custom_sections": []
+      },
+      "normalized_module_digest": "f29ab26a73372a0f116a028c33bd79a14d15ad6e32637b07573f559644d83c8f",
+      "artifact_bundle_digest": "97610a8955bd5a2f92a19844bd950e94cc214e2885c01f34b8862cdcaa179168",
+      "lowered_export_names": [
+        "pair_sum",
+        "local_double"
+      ],
+      "lowered_artifact_digests": [
+        "123986a9d1463dc3cd99005dc54a8956330020619c688503bf23c53a01282430",
+        "60fc276f3224266952f064ecfb0109410d9f91abb987fd23a840b4b2dbbf5b09"
+      ],
+      "exact_outputs_by_export": {
+        "local_double": [
+          14
+        ],
+        "pair_sum": [
+          5
+        ]
+      }
+    },
+    {
+      "case_id": "wasm_text_memory_lookup_exact",
+      "source_family_id": "wasm_text.memory_lookup",
+      "source_kind": "wasm_text",
+      "source_ref": "fixtures/tassadar/sources/tassadar_memory_lookup_kernel.wat",
+      "source_digest": "a2b2642cdfe651f02840c975e61276a7974452f0ceac5975ef8cce176688c801",
+      "target_wasm_profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "target_trace_abi_id": "tassadar.trace.v1",
+      "target_trace_abi_version": 1,
+      "compile_surface_id": "wasm_text",
+      "compile_config_digest": "796d2132cb9d550542a0a9168e171d5075f90fc2ddba180fc2eeb3167de25ece",
+      "compile_pipeline_features": [
+        "compiler:wat",
+        "export:load_edge_sum",
+        "export:load_middle",
+        "syntax:wat",
+        "target:wasm32-unknown-unknown"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "tassadar_wasm_text_parse",
+        "compiler_version": "v1",
+        "target": "wasm32-unknown-unknown",
+        "pipeline_features": [
+          "compiler:wat",
+          "export:load_edge_sum",
+          "export:load_middle",
+          "syntax:wat",
+          "target:wasm32-unknown-unknown"
+        ]
+      },
+      "toolchain_digest": "044eeab256f2eb5f60629b0190d2bccb12f86e56341d62f3876f5d9314869e5d",
+      "compile_receipt_digest": "5b8fdaa254fbc650faefc2430f699b1a258c01af26b767e933bc0bd5d6e30326",
+      "status": "lowered_exact",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_memory_lookup_kernel.wasm",
+      "wasm_binary_digest": "e2592fa9539661cb171a5b4327928ac81495c29e856114d403607447125122cb",
+      "wasm_binary_summary": {
+        "byte_len": 103,
+        "exported_functions": [
+          "load_edge_sum",
+          "load_middle"
+        ],
+        "function_count": 2,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": []
+      },
+      "normalized_module_digest": "66a8c510ed9a575bd2ac0ca7ac8cefdc3f49f140b5511c8a38892650f8edd130",
+      "artifact_bundle_digest": "6cb9881cced957a370ce641cfe4eb5379918a84e57e022e364b9d86c55d55f98",
+      "lowered_export_names": [
+        "load_middle",
+        "load_edge_sum"
+      ],
+      "lowered_artifact_digests": [
+        "8ac30aca963cc9111ea752fd069fead5f255a9e89a386fe58641e3fb4c5fc157",
+        "172a8450edeb17417183b3141672ffb02179e7bd5e186e1b50875c53ed2d728b"
+      ],
+      "exact_outputs_by_export": {
+        "load_edge_sum": [
+          34
+        ],
+        "load_middle": [
+          19
+        ]
+      }
+    },
+    {
+      "case_id": "wasm_text_param_abi_lowering_refusal",
+      "source_family_id": "wasm_text.param_abi",
+      "source_kind": "wasm_text",
+      "source_ref": "fixtures/tassadar/sources/tassadar_param_abi_kernel.wat",
+      "source_digest": "fc1ea40d7d7206ca8c1b899cf0f9334334e4e38b7187f8b9edbf8d988b09df85",
+      "target_wasm_profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "target_trace_abi_id": "tassadar.trace.v1",
+      "target_trace_abi_version": 1,
+      "compile_surface_id": "wasm_text",
+      "compile_config_digest": "47132cbbf5b322d693ee1129684978449085fe02713955462f86a382b2082341",
+      "compile_pipeline_features": [
+        "compiler:wat",
+        "export:add_one",
+        "syntax:wat",
+        "target:wasm32-unknown-unknown"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "tassadar_wasm_text_parse",
+        "compiler_version": "v1",
+        "target": "wasm32-unknown-unknown",
+        "pipeline_features": [
+          "compiler:wat",
+          "export:add_one",
+          "syntax:wat",
+          "target:wasm32-unknown-unknown"
+        ]
+      },
+      "toolchain_digest": "293cb6fe96f9bdc439959d313b41d6a80c90b195a9b451a2cea785df6bce6a7f",
+      "compile_receipt_digest": "36660e9b1c67483b8a7d98198ced79b8ba78e440028738758451d1ef01091452",
+      "status": "lowering_refused",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_param_abi_kernel.wasm",
+      "wasm_binary_digest": "8f581f8899890a7479c20494f53cc5d60156a4d42e39d6a587a9f3089f198fe0",
+      "wasm_binary_summary": {
+        "byte_len": 44,
+        "exported_functions": [
+          "add_one"
+        ],
+        "function_count": 1,
+        "imported_function_count": 0,
+        "memory_count": 0,
+        "custom_sections": []
+      },
+      "normalized_module_digest": "ef9d2c16f785f20d862528672d94af6fd1e635ca5d37d6b71c2f381c7c483dd1",
+      "lowering_refusal_kind": "unsupported_param_count",
+      "lowering_refusal_detail": "export `add_one` function 0 declares 1 params, but the bounded runtime lane only admits zero-parameter module exports today"
+    },
+    {
+      "case_id": "c_missing_toolchain_refusal",
+      "source_family_id": "c_source.toolchain_unavailable",
+      "source_kind": "c_source",
+      "source_ref": "fixtures/tassadar/sources/tassadar_micro_wasm_kernel.c",
+      "source_digest": "d2456975673ef639803ff773bcf4aa4d269a2683c5af7517b5d3084793bad058",
+      "target_wasm_profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "target_trace_abi_id": "tassadar.trace.v1",
+      "target_trace_abi_version": 1,
+      "compile_surface_id": "c_source",
+      "compile_config_digest": "5e899ba8fb2e4a3d456987ff21e890a01a3bdca74e57ea4f0e46bbbe05e7c4fd",
+      "compile_pipeline_features": [
+        "compiler_binary:clang-not-installed-for-tassadar",
+        "export:micro_wasm_kernel",
+        "language_standard:c11",
+        "no_entry",
+        "nostdlib",
+        "optimization:O3"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "clang-not-installed-for-tassadar",
+        "compiler_version": "unavailable",
+        "target": "wasm32-unknown-unknown"
+      },
+      "toolchain_digest": "0f0eae8d88d36067b7ee27624bb9a94e07d76bfeee1d4c85fe3f8d8504e1881c",
+      "compile_receipt_digest": "5a1ed47c0e023b66163c9b7e471b67bebe9bea19af9feee7ec10ef00c51ff741",
+      "status": "compile_refused",
+      "compile_refusal_kind": "toolchain_unavailable",
+      "compile_refusal_detail": "compiler binary `clang-not-installed-for-tassadar` was unavailable"
+    }
+  ],
+  "claim_boundary": "this report records a small real compile-pipeline matrix through the current bounded Tassadar Wasm-module lane: exact Wasm-text multi-export arithmetic and memory-lookup fixtures, one explicit Wasm-text parameter-ABI lowering refusal, and one typed missing-toolchain refusal on the existing C-source path; it does not imply arbitrary frontend closure, arbitrary Wasm lowering, or general module execution completeness",
+  "report_digest": "4bdc791f4bddadd6318ba3abb084c947be7d75bb52d7a211998a95ced03ee84a"
+}

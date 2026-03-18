@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::{convert::TryFrom, path::Path};
 
 use psionic_ir::{
     TassadarNormalizedWasmConstExpr, TassadarNormalizedWasmDataMode,
@@ -7,10 +7,13 @@ use psionic_ir::{
     encode_tassadar_normalized_wasm_module, parse_tassadar_normalized_wasm_module,
 };
 use psionic_runtime::{
+    TassadarCToWasmCompileConfig, TassadarCToWasmCompileReceipt, TassadarCompileRefusal,
     TassadarCompilerToolchainIdentity, TassadarCpuReferenceRunner, TassadarExecutionRefusal,
     TassadarInstruction, TassadarProgram, TassadarProgramArtifact, TassadarProgramArtifactError,
-    TassadarProgramSourceIdentity, TassadarProgramSourceKind, TassadarTraceAbi,
-    TassadarWasmProfile, tassadar_trace_abi_for_profile_id,
+    TassadarProgramSourceIdentity, TassadarProgramSourceKind, TassadarRustToWasmCompileConfig,
+    TassadarRustToWasmCompileReceipt, TassadarTraceAbi, TassadarWasmProfile,
+    compile_tassadar_c_source_to_wasm_receipt, compile_tassadar_rust_source_to_wasm_receipt,
+    summarize_tassadar_wasm_binary, tassadar_trace_abi_for_profile_id,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -19,6 +22,8 @@ use thiserror::Error;
 const TASSADAR_WASM_MODULE_ARTIFACT_BUNDLE_SCHEMA_VERSION: u16 = 1;
 const TASSADAR_WASM_MODULE_COMPILER_FAMILY: &str = "tassadar_wasm_module_lowering";
 const TASSADAR_WASM_MODULE_COMPILER_VERSION: &str = "v1";
+const TASSADAR_WASM_TEXT_COMPILER_FAMILY: &str = "tassadar_wasm_text_parse";
+const TASSADAR_WASM_TEXT_COMPILER_VERSION: &str = "v1";
 const TASSADAR_WASM_MODULE_BUNDLE_CLAIM_BOUNDARY: &str = "bounded normalized Wasm module lowering compiles exported zero-parameter functions from the current straight-line core module slice into runnable Tassadar program artifacts; calls, structured control flow, dynamic memory addresses, multi-memory, byte-addressed memory ABI closure, and arbitrary Wasm remain out of scope";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -123,6 +128,202 @@ impl TassadarWasmModuleArtifactBundle {
         bundle.bundle_digest = stable_digest(b"tassadar_wasm_module_artifact_bundle|", &bundle);
         bundle
     }
+}
+
+/// Full C-source to Wasm-module to Tassadar-artifact bundle pipeline result.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarCSourceArtifactBundlePipeline {
+    /// Machine-readable compile receipt for the source-to-Wasm step.
+    pub compile_receipt: TassadarCToWasmCompileReceipt,
+    /// Digest-bound Wasm-module lowering result.
+    pub artifact_bundle: TassadarWasmModuleArtifactBundle,
+}
+
+/// Full Rust-source to Wasm-module to Tassadar-artifact bundle pipeline result.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarRustSourceArtifactBundlePipeline {
+    /// Machine-readable compile receipt for the source-to-Wasm step.
+    pub compile_receipt: TassadarRustToWasmCompileReceipt,
+    /// Digest-bound Wasm-module lowering result.
+    pub artifact_bundle: TassadarWasmModuleArtifactBundle,
+}
+
+/// Explicit compile configuration for one Wasm-text source fixture.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarWasmTextCompileConfig {
+    /// Exported symbols that must survive parse and binary encoding.
+    pub export_symbols: Vec<String>,
+}
+
+impl TassadarWasmTextCompileConfig {
+    /// Returns the canonical config for the exact multi-export Wasm-text fixture.
+    #[must_use]
+    pub fn canonical_multi_export_kernel() -> Self {
+        Self::new(["pair_sum", "local_double"])
+    }
+
+    /// Returns the canonical config for the exact memory-lookup Wasm-text fixture.
+    #[must_use]
+    pub fn canonical_memory_lookup_kernel() -> Self {
+        Self::new(["load_middle", "load_edge_sum"])
+    }
+
+    /// Returns the canonical config for the parameter-ABI Wasm-text fixture.
+    #[must_use]
+    pub fn canonical_param_abi_kernel() -> Self {
+        Self::new(["add_one"])
+    }
+
+    fn new(export_symbols: impl IntoIterator<Item = &'static str>) -> Self {
+        Self {
+            export_symbols: export_symbols.into_iter().map(String::from).collect(),
+        }
+    }
+
+    /// Returns a stable digest over the compile configuration.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        stable_digest(b"tassadar_wasm_text_compile_config|", self)
+    }
+
+    /// Returns the stable feature list declared by the compile configuration.
+    #[must_use]
+    pub fn pipeline_features(&self) -> Vec<String> {
+        let mut features = vec![
+            String::from("compiler:wat"),
+            String::from("syntax:wat"),
+            String::from("target:wasm32-unknown-unknown"),
+        ];
+        for export in &self.export_symbols {
+            features.push(format!("export:{export}"));
+        }
+        features.sort();
+        features.dedup();
+        features
+    }
+}
+
+/// Outcome of one Wasm-text to Wasm compile attempt.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum TassadarWasmTextCompileOutcome {
+    /// The source parsed successfully and produced one Wasm binary.
+    Succeeded {
+        /// Repo-relative Wasm binary ref.
+        wasm_binary_ref: String,
+        /// Stable digest over the encoded Wasm binary.
+        wasm_binary_digest: String,
+        /// Structural summary over the encoded Wasm binary.
+        wasm_binary_summary: psionic_runtime::TassadarWasmBinarySummary,
+    },
+    /// The source refused with a typed machine-readable reason.
+    Refused {
+        /// Typed refusal record.
+        refusal: TassadarCompileRefusal,
+    },
+}
+
+/// Machine-readable receipt for one Wasm-text to Wasm compile attempt.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarWasmTextCompileReceipt {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable source-identity facts.
+    pub source_identity: TassadarProgramSourceIdentity,
+    /// Stable compiler/toolchain identity.
+    pub toolchain_identity: TassadarCompilerToolchainIdentity,
+    /// Stable compile configuration.
+    pub compile_config: TassadarWasmTextCompileConfig,
+    /// Successful output or typed refusal.
+    pub outcome: TassadarWasmTextCompileOutcome,
+    /// Plain-language claim boundary.
+    pub claim_boundary: String,
+    /// Stable digest over the full receipt.
+    pub receipt_digest: String,
+}
+
+impl TassadarWasmTextCompileReceipt {
+    fn new(
+        source_identity: TassadarProgramSourceIdentity,
+        toolchain_identity: TassadarCompilerToolchainIdentity,
+        compile_config: TassadarWasmTextCompileConfig,
+        outcome: TassadarWasmTextCompileOutcome,
+    ) -> Self {
+        let mut receipt = Self {
+            schema_version: 1,
+            source_identity,
+            toolchain_identity,
+            compile_config,
+            outcome,
+            claim_boundary: String::from(
+                "Wasm-text source to Wasm receipt only; proves explicit source/toolchain/config/output digests for the current bounded Wasm-text matrix fixtures and typed refusal on invalid text input, not arbitrary frontend closure or arbitrary Wasm lowering",
+            ),
+            receipt_digest: String::new(),
+        };
+        receipt.receipt_digest = stable_digest(b"tassadar_wasm_text_compile_receipt|", &receipt);
+        receipt
+    }
+
+    /// Returns whether the compile succeeded.
+    #[must_use]
+    pub fn succeeded(&self) -> bool {
+        matches!(
+            self.outcome,
+            TassadarWasmTextCompileOutcome::Succeeded { .. }
+        )
+    }
+
+    /// Returns the compiled Wasm ref when present.
+    #[must_use]
+    pub fn wasm_binary_ref(&self) -> Option<&str> {
+        match &self.outcome {
+            TassadarWasmTextCompileOutcome::Succeeded {
+                wasm_binary_ref, ..
+            } => Some(wasm_binary_ref.as_str()),
+            TassadarWasmTextCompileOutcome::Refused { .. } => None,
+        }
+    }
+
+    /// Returns the compiled Wasm digest when present.
+    #[must_use]
+    pub fn wasm_binary_digest(&self) -> Option<&str> {
+        match &self.outcome {
+            TassadarWasmTextCompileOutcome::Succeeded {
+                wasm_binary_digest, ..
+            } => Some(wasm_binary_digest.as_str()),
+            TassadarWasmTextCompileOutcome::Refused { .. } => None,
+        }
+    }
+
+    /// Returns the compiled Wasm summary when present.
+    #[must_use]
+    pub fn wasm_binary_summary(&self) -> Option<&psionic_runtime::TassadarWasmBinarySummary> {
+        match &self.outcome {
+            TassadarWasmTextCompileOutcome::Succeeded {
+                wasm_binary_summary,
+                ..
+            } => Some(wasm_binary_summary),
+            TassadarWasmTextCompileOutcome::Refused { .. } => None,
+        }
+    }
+
+    /// Returns the typed refusal when the compile refused.
+    #[must_use]
+    pub fn refusal(&self) -> Option<&TassadarCompileRefusal> {
+        match &self.outcome {
+            TassadarWasmTextCompileOutcome::Succeeded { .. } => None,
+            TassadarWasmTextCompileOutcome::Refused { refusal } => Some(refusal),
+        }
+    }
+}
+
+/// Full Wasm-text to Wasm-module to Tassadar-artifact bundle pipeline result.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarWasmTextArtifactBundlePipeline {
+    /// Machine-readable compile receipt for the source-to-Wasm step.
+    pub compile_receipt: TassadarWasmTextCompileReceipt,
+    /// Digest-bound Wasm-module lowering result.
+    pub artifact_bundle: TassadarWasmModuleArtifactBundle,
 }
 
 /// Failure while lowering one normalized Wasm module into runnable runtime
@@ -296,6 +497,137 @@ pub enum TassadarWasmModuleArtifactBundleError {
     ProgramArtifact(#[from] TassadarProgramArtifactError),
 }
 
+impl TassadarWasmModuleArtifactBundleError {
+    /// Returns the stable machine-readable refusal kind for this lowering error.
+    #[must_use]
+    pub fn kind_slug(&self) -> &'static str {
+        match self {
+            Self::Module(_) => "module",
+            Self::UnsupportedTraceAbi { .. } => "unsupported_trace_abi",
+            Self::NoFunctionExports { .. } => "no_function_exports",
+            Self::ExportedImportUnsupported { .. } => "exported_import_unsupported",
+            Self::UnsupportedParamCount { .. } => "unsupported_param_count",
+            Self::UnsupportedResultTypes { .. } => "unsupported_result_types",
+            Self::UnsupportedLocalType { .. } => "unsupported_local_type",
+            Self::UnsupportedLocalIndex { .. } => "unsupported_local_index",
+            Self::UnsupportedMemoryShape { .. } => "unsupported_memory_shape",
+            Self::UnsupportedDataSegment { .. } => "unsupported_data_segment",
+            Self::UnsupportedDynamicMemoryAddress { .. } => "unsupported_dynamic_memory_address",
+            Self::UnsupportedMemoryImmediate { .. } => "unsupported_memory_immediate",
+            Self::UnsupportedCall { .. } => "unsupported_call",
+            Self::UnsupportedInstruction { .. } => "unsupported_instruction",
+            Self::UnsupportedDrop { .. } => "unsupported_drop",
+            Self::InvalidStackState { .. } => "invalid_stack_state",
+            Self::Execution(_) => "execution",
+            Self::ProgramArtifact(_) => "program_artifact",
+        }
+    }
+}
+
+/// Failure while compiling a C source all the way into a runnable Tassadar
+/// artifact bundle.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum TassadarCSourceArtifactBundlePipelineError {
+    /// The source-to-Wasm compile refused before lowering.
+    #[error("C-to-Wasm compile refused: {refusal}")]
+    CompileRefused {
+        /// Compile receipt preserving the full refusal record.
+        compile_receipt: TassadarCToWasmCompileReceipt,
+        /// Typed refusal fact for the source-to-Wasm step.
+        refusal: TassadarCompileRefusal,
+    },
+    /// The compiled Wasm output could not be read back for lowering.
+    #[error("failed to read compiled Wasm `{path}`: {message}")]
+    ReadCompiledWasm {
+        /// Compile receipt that produced the output ref.
+        compile_receipt: TassadarCToWasmCompileReceipt,
+        /// Wasm output path.
+        path: String,
+        /// IO failure summary.
+        message: String,
+    },
+    /// The C source compiled to Wasm, but lowering into the current Tassadar
+    /// lane refused explicitly.
+    #[error("Wasm-module lowering refused after compile receipt `{receipt_digest}`: {error}")]
+    LoweringRefused {
+        /// Compile receipt proving the source-to-Wasm step succeeded.
+        compile_receipt: TassadarCToWasmCompileReceipt,
+        /// Stable digest of the compile receipt.
+        receipt_digest: String,
+        /// Typed lowering refusal.
+        error: TassadarWasmModuleArtifactBundleError,
+    },
+}
+
+/// Failure while compiling a Rust source all the way into a runnable Tassadar
+/// artifact bundle.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum TassadarRustSourceArtifactBundlePipelineError {
+    /// The source-to-Wasm compile refused before lowering.
+    #[error("Rust-to-Wasm compile refused: {refusal}")]
+    CompileRefused {
+        /// Compile receipt preserving the full refusal record.
+        compile_receipt: TassadarRustToWasmCompileReceipt,
+        /// Typed refusal fact for the source-to-Wasm step.
+        refusal: TassadarCompileRefusal,
+    },
+    /// The compiled Wasm output could not be read back for lowering.
+    #[error("failed to read compiled Wasm `{path}`: {message}")]
+    ReadCompiledWasm {
+        /// Compile receipt that produced the output ref.
+        compile_receipt: TassadarRustToWasmCompileReceipt,
+        /// Wasm output path.
+        path: String,
+        /// IO failure summary.
+        message: String,
+    },
+    /// The Rust source compiled to Wasm, but lowering into the current
+    /// Tassadar lane refused explicitly.
+    #[error("Wasm-module lowering refused after compile receipt `{receipt_digest}`: {error}")]
+    LoweringRefused {
+        /// Compile receipt proving the source-to-Wasm step succeeded.
+        compile_receipt: TassadarRustToWasmCompileReceipt,
+        /// Stable digest of the compile receipt.
+        receipt_digest: String,
+        /// Typed lowering refusal.
+        error: TassadarWasmModuleArtifactBundleError,
+    },
+}
+
+/// Failure while compiling one Wasm-text source all the way into a runnable
+/// Tassadar artifact bundle.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum TassadarWasmTextArtifactBundlePipelineError {
+    /// The source-to-Wasm compile refused before lowering.
+    #[error("Wasm-text compile refused: {refusal}")]
+    CompileRefused {
+        /// Compile receipt preserving the full refusal record.
+        compile_receipt: TassadarWasmTextCompileReceipt,
+        /// Typed refusal fact for the source-to-Wasm step.
+        refusal: TassadarCompileRefusal,
+    },
+    /// The compiled Wasm output could not be written for lowering.
+    #[error("failed to write compiled Wasm `{path}`: {message}")]
+    WriteCompiledWasm {
+        /// Compile receipt that produced the output ref.
+        compile_receipt: TassadarWasmTextCompileReceipt,
+        /// Wasm output path.
+        path: String,
+        /// IO failure summary.
+        message: String,
+    },
+    /// The Wasm-text source compiled to Wasm, but lowering refused explicitly.
+    #[error("Wasm-module lowering refused after compile receipt `{receipt_digest}`: {error}")]
+    LoweringRefused {
+        /// Compile receipt proving the source-to-Wasm step succeeded.
+        compile_receipt: TassadarWasmTextCompileReceipt,
+        /// Stable digest of the compile receipt.
+        receipt_digest: String,
+        /// Typed lowering refusal.
+        error: TassadarWasmModuleArtifactBundleError,
+    },
+}
+
 /// Parses one Wasm binary and lowers its exported bounded module functions into
 /// runnable runtime artifacts.
 pub fn compile_tassadar_wasm_binary_module_to_artifact_bundle(
@@ -310,6 +642,259 @@ pub fn compile_tassadar_wasm_binary_module_to_artifact_bundle(
         normalized_module,
         profile,
     )
+}
+
+/// Compiles one C source through the runtime-owned source-to-Wasm lane and then
+/// lowers the compiled Wasm output into the bounded Tassadar artifact lane.
+pub fn compile_tassadar_c_source_to_artifact_bundle(
+    source_name: impl Into<String>,
+    source_bytes: &[u8],
+    output_wasm_path: impl AsRef<Path>,
+    compile_config: &TassadarCToWasmCompileConfig,
+    profile: &TassadarWasmProfile,
+) -> Result<TassadarCSourceArtifactBundlePipeline, TassadarCSourceArtifactBundlePipelineError> {
+    let source_name = source_name.into();
+    let output_wasm_path = output_wasm_path.as_ref();
+    let compile_receipt = compile_tassadar_c_source_to_wasm_receipt(
+        source_name.clone(),
+        source_bytes,
+        output_wasm_path,
+        compile_config,
+    );
+    if let Some(refusal) = compile_receipt.refusal().cloned() {
+        return Err(TassadarCSourceArtifactBundlePipelineError::CompileRefused {
+            compile_receipt,
+            refusal,
+        });
+    }
+
+    let wasm_bytes = std::fs::read(output_wasm_path).map_err(|error| {
+        TassadarCSourceArtifactBundlePipelineError::ReadCompiledWasm {
+            compile_receipt: compile_receipt.clone(),
+            path: output_wasm_path.display().to_string(),
+            message: error.to_string(),
+        }
+    })?;
+    let artifact_bundle =
+        compile_tassadar_wasm_binary_module_to_artifact_bundle(source_name, &wasm_bytes, profile)
+            .map_err(
+            |error| TassadarCSourceArtifactBundlePipelineError::LoweringRefused {
+                compile_receipt: compile_receipt.clone(),
+                receipt_digest: compile_receipt.receipt_digest.clone(),
+                error,
+            },
+        )?;
+    Ok(TassadarCSourceArtifactBundlePipeline {
+        compile_receipt,
+        artifact_bundle,
+    })
+}
+
+/// Compiles one Rust source through the runtime-owned source-to-Wasm lane and
+/// then lowers the compiled Wasm output into the bounded Tassadar artifact lane.
+pub fn compile_tassadar_rust_source_to_artifact_bundle(
+    source_name: impl Into<String>,
+    source_bytes: &[u8],
+    output_wasm_path: impl AsRef<Path>,
+    compile_config: &TassadarRustToWasmCompileConfig,
+    profile: &TassadarWasmProfile,
+) -> Result<TassadarRustSourceArtifactBundlePipeline, TassadarRustSourceArtifactBundlePipelineError>
+{
+    let source_name = source_name.into();
+    let output_wasm_path = output_wasm_path.as_ref();
+    let compile_receipt = compile_tassadar_rust_source_to_wasm_receipt(
+        source_name.clone(),
+        source_bytes,
+        output_wasm_path,
+        compile_config,
+    );
+    if let Some(refusal) = compile_receipt.refusal().cloned() {
+        return Err(
+            TassadarRustSourceArtifactBundlePipelineError::CompileRefused {
+                compile_receipt,
+                refusal,
+            },
+        );
+    }
+
+    let wasm_bytes = std::fs::read(output_wasm_path).map_err(|error| {
+        TassadarRustSourceArtifactBundlePipelineError::ReadCompiledWasm {
+            compile_receipt: compile_receipt.clone(),
+            path: output_wasm_path.display().to_string(),
+            message: error.to_string(),
+        }
+    })?;
+    let artifact_bundle =
+        compile_tassadar_wasm_binary_module_to_artifact_bundle(source_name, &wasm_bytes, profile)
+            .map_err(
+            |error| TassadarRustSourceArtifactBundlePipelineError::LoweringRefused {
+                compile_receipt: compile_receipt.clone(),
+                receipt_digest: compile_receipt.receipt_digest.clone(),
+                error,
+            },
+        )?;
+    Ok(TassadarRustSourceArtifactBundlePipeline {
+        compile_receipt,
+        artifact_bundle,
+    })
+}
+
+/// Compiles one Wasm-text source into a Wasm binary and then lowers it into the
+/// bounded Tassadar artifact lane.
+pub fn compile_tassadar_wasm_text_to_artifact_bundle(
+    source_name: impl Into<String>,
+    source_text: &str,
+    output_wasm_path: impl AsRef<Path>,
+    compile_config: &TassadarWasmTextCompileConfig,
+    profile: &TassadarWasmProfile,
+) -> Result<TassadarWasmTextArtifactBundlePipeline, TassadarWasmTextArtifactBundlePipelineError> {
+    let source_name = source_name.into();
+    let source_identity = TassadarProgramSourceIdentity::new(
+        TassadarProgramSourceKind::WasmText,
+        source_name.clone(),
+        stable_bytes_digest(source_text.as_bytes()),
+    );
+    let toolchain_identity = TassadarCompilerToolchainIdentity::new(
+        TASSADAR_WASM_TEXT_COMPILER_FAMILY,
+        TASSADAR_WASM_TEXT_COMPILER_VERSION,
+        "wasm32-unknown-unknown",
+    )
+    .with_pipeline_features(compile_config.pipeline_features());
+    let output_wasm_path = output_wasm_path.as_ref();
+
+    let encoded_wasm = match wat::parse_str(source_text) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            let compile_receipt = TassadarWasmTextCompileReceipt::new(
+                source_identity,
+                toolchain_identity,
+                compile_config.clone(),
+                TassadarWasmTextCompileOutcome::Refused {
+                    refusal: TassadarCompileRefusal::InvalidWasmOutput {
+                        message: error.to_string(),
+                    },
+                },
+            );
+            return Err(
+                TassadarWasmTextArtifactBundlePipelineError::CompileRefused {
+                    refusal: compile_receipt
+                        .refusal()
+                        .expect("refused receipt should carry refusal")
+                        .clone(),
+                    compile_receipt,
+                },
+            );
+        }
+    };
+    let wasm_binary_summary = match summarize_tassadar_wasm_binary(&encoded_wasm) {
+        Ok(summary) => summary,
+        Err(message) => {
+            let compile_receipt = TassadarWasmTextCompileReceipt::new(
+                source_identity,
+                toolchain_identity,
+                compile_config.clone(),
+                TassadarWasmTextCompileOutcome::Refused {
+                    refusal: TassadarCompileRefusal::InvalidWasmOutput { message },
+                },
+            );
+            return Err(
+                TassadarWasmTextArtifactBundlePipelineError::CompileRefused {
+                    refusal: compile_receipt
+                        .refusal()
+                        .expect("refused receipt should carry refusal")
+                        .clone(),
+                    compile_receipt,
+                },
+            );
+        }
+    };
+    for expected_export in &compile_config.export_symbols {
+        if !wasm_binary_summary
+            .exported_functions
+            .contains(expected_export)
+        {
+            let compile_receipt = TassadarWasmTextCompileReceipt::new(
+                source_identity,
+                toolchain_identity,
+                compile_config.clone(),
+                TassadarWasmTextCompileOutcome::Refused {
+                    refusal: TassadarCompileRefusal::MissingExpectedExport {
+                        expected: expected_export.clone(),
+                        actual: wasm_binary_summary.exported_functions.clone(),
+                    },
+                },
+            );
+            return Err(
+                TassadarWasmTextArtifactBundlePipelineError::CompileRefused {
+                    refusal: compile_receipt
+                        .refusal()
+                        .expect("refused receipt should carry refusal")
+                        .clone(),
+                    compile_receipt,
+                },
+            );
+        }
+    }
+    if let Some(parent) = output_wasm_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| {
+            let compile_receipt = TassadarWasmTextCompileReceipt::new(
+                source_identity.clone(),
+                toolchain_identity.clone(),
+                compile_config.clone(),
+                TassadarWasmTextCompileOutcome::Succeeded {
+                    wasm_binary_ref: canonical_repo_relative_path(output_wasm_path),
+                    wasm_binary_digest: stable_bytes_digest(&encoded_wasm),
+                    wasm_binary_summary: wasm_binary_summary.clone(),
+                },
+            );
+            TassadarWasmTextArtifactBundlePipelineError::WriteCompiledWasm {
+                compile_receipt,
+                path: parent.display().to_string(),
+                message: error.to_string(),
+            }
+        })?;
+    }
+    std::fs::write(output_wasm_path, &encoded_wasm).map_err(|error| {
+        let compile_receipt = TassadarWasmTextCompileReceipt::new(
+            source_identity.clone(),
+            toolchain_identity.clone(),
+            compile_config.clone(),
+            TassadarWasmTextCompileOutcome::Succeeded {
+                wasm_binary_ref: canonical_repo_relative_path(output_wasm_path),
+                wasm_binary_digest: stable_bytes_digest(&encoded_wasm),
+                wasm_binary_summary: wasm_binary_summary.clone(),
+            },
+        );
+        TassadarWasmTextArtifactBundlePipelineError::WriteCompiledWasm {
+            compile_receipt,
+            path: output_wasm_path.display().to_string(),
+            message: error.to_string(),
+        }
+    })?;
+
+    let compile_receipt = TassadarWasmTextCompileReceipt::new(
+        source_identity,
+        toolchain_identity,
+        compile_config.clone(),
+        TassadarWasmTextCompileOutcome::Succeeded {
+            wasm_binary_ref: canonical_repo_relative_path(output_wasm_path),
+            wasm_binary_digest: stable_bytes_digest(&encoded_wasm),
+            wasm_binary_summary,
+        },
+    );
+    let artifact_bundle =
+        compile_tassadar_wasm_binary_module_to_artifact_bundle(source_name, &encoded_wasm, profile)
+            .map_err(
+                |error| TassadarWasmTextArtifactBundlePipelineError::LoweringRefused {
+                    receipt_digest: compile_receipt.receipt_digest.clone(),
+                    compile_receipt: compile_receipt.clone(),
+                    error,
+                },
+            )?;
+    Ok(TassadarWasmTextArtifactBundlePipeline {
+        compile_receipt,
+        artifact_bundle,
+    })
 }
 
 /// Lowers one normalized Wasm module into runnable runtime artifacts.
@@ -1021,19 +1606,39 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
     hex::encode(hasher.finalize())
 }
 
+fn canonical_repo_relative_path(path: &Path) -> String {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .canonicalize()
+        .expect("repo root should resolve from psionic-compiler crate dir");
+    let canonical_path = path.canonicalize().unwrap_or_else(|_| repo_root.join(path));
+    canonical_path
+        .strip_prefix(&repo_root)
+        .unwrap_or(&canonical_path)
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use psionic_ir::{
         encode_tassadar_normalized_wasm_module, tassadar_seeded_multi_function_module,
     };
     use psionic_runtime::{
-        TassadarCpuReferenceRunner, TassadarWasmProfile, tassadar_canonical_wasm_binary_path,
+        TassadarCToWasmCompileConfig, TassadarCompileRefusal, TassadarCpuReferenceRunner,
+        TassadarWasmProfile, tassadar_canonical_c_source_path, tassadar_canonical_wasm_binary_path,
     };
 
     use super::{
-        TassadarWasmModuleArtifactBundleError,
+        TassadarCSourceArtifactBundlePipelineError, TassadarWasmModuleArtifactBundle,
+        TassadarWasmModuleArtifactBundleError, TassadarWasmTextArtifactBundlePipelineError,
+        TassadarWasmTextCompileConfig, compile_tassadar_c_source_to_artifact_bundle,
         compile_tassadar_normalized_wasm_module_to_artifact_bundle,
         compile_tassadar_wasm_binary_module_to_artifact_bundle,
+        compile_tassadar_wasm_text_to_artifact_bundle,
     };
 
     #[test]
@@ -1111,5 +1716,145 @@ mod tests {
             bundle.normalized_module.exported_function_names(),
             vec![String::from("pair_sum"), String::from("local_double")]
         );
+    }
+
+    #[test]
+    fn wasm_text_pipeline_lowers_multi_export_fixture_exactly() {
+        let source_path = fixture_source_path("tassadar_multi_export_kernel.wat");
+        let source_bytes = std::fs::read(&source_path).expect("multi-export fixture should exist");
+        let source_text =
+            std::str::from_utf8(&source_bytes).expect("Wasm-text fixture should be valid UTF-8");
+        let pipeline = compile_tassadar_wasm_text_to_artifact_bundle(
+            source_path.display().to_string(),
+            source_text,
+            temp_test_wasm_path("multi-export"),
+            &TassadarWasmTextCompileConfig::canonical_multi_export_kernel(),
+            &TassadarWasmProfile::article_i32_compute_v1(),
+        )
+        .expect("multi-export Wasm-text fixture should lower exactly");
+        assert_eq!(
+            exact_outputs_by_export(&pipeline.artifact_bundle),
+            std::collections::BTreeMap::from([("local_double", vec![14]), ("pair_sum", vec![5]),])
+        );
+        assert_eq!(
+            pipeline
+                .compile_receipt
+                .wasm_binary_summary()
+                .expect("successful compile should publish a Wasm summary")
+                .exported_functions,
+            vec![String::from("local_double"), String::from("pair_sum")]
+        );
+    }
+
+    #[test]
+    fn wasm_text_pipeline_lowers_memory_lookup_fixture_exactly() {
+        let source_path = fixture_source_path("tassadar_memory_lookup_kernel.wat");
+        let source_bytes = std::fs::read(&source_path).expect("memory-lookup fixture should exist");
+        let source_text =
+            std::str::from_utf8(&source_bytes).expect("Wasm-text fixture should be valid UTF-8");
+        let pipeline = compile_tassadar_wasm_text_to_artifact_bundle(
+            source_path.display().to_string(),
+            source_text,
+            temp_test_wasm_path("memory-lookup"),
+            &TassadarWasmTextCompileConfig::canonical_memory_lookup_kernel(),
+            &TassadarWasmProfile::article_i32_compute_v1(),
+        )
+        .expect("memory-lookup Wasm-text fixture should lower exactly");
+        assert_eq!(
+            exact_outputs_by_export(&pipeline.artifact_bundle),
+            std::collections::BTreeMap::from([
+                ("load_edge_sum", vec![34]),
+                ("load_middle", vec![19]),
+            ])
+        );
+        assert_eq!(
+            pipeline
+                .compile_receipt
+                .wasm_binary_summary()
+                .expect("successful compile should publish a Wasm summary")
+                .memory_count,
+            1
+        );
+    }
+
+    #[test]
+    fn wasm_text_pipeline_refuses_param_abi_fixture_explicitly() {
+        let source_path = fixture_source_path("tassadar_param_abi_kernel.wat");
+        let source_bytes = std::fs::read(&source_path).expect("param-ABI fixture should exist");
+        let source_text =
+            std::str::from_utf8(&source_bytes).expect("Wasm-text fixture should be valid UTF-8");
+        let error = compile_tassadar_wasm_text_to_artifact_bundle(
+            source_path.display().to_string(),
+            source_text,
+            temp_test_wasm_path("param-abi"),
+            &TassadarWasmTextCompileConfig::canonical_param_abi_kernel(),
+            &TassadarWasmProfile::article_i32_compute_v1(),
+        )
+        .expect_err("parameterized Wasm-text fixture should refuse current lowering");
+        assert!(matches!(
+            error,
+            TassadarWasmTextArtifactBundlePipelineError::LoweringRefused {
+                error: TassadarWasmModuleArtifactBundleError::UnsupportedParamCount { .. },
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn c_source_pipeline_surfaces_toolchain_unavailable_receipt() {
+        let source_path = tassadar_canonical_c_source_path();
+        let source_bytes = std::fs::read(&source_path).expect("multi-export fixture should exist");
+        let mut config = TassadarCToWasmCompileConfig::canonical_micro_wasm_kernel();
+        config.compiler_binary = String::from("clang-not-installed-for-tassadar");
+        let error = compile_tassadar_c_source_to_artifact_bundle(
+            source_path.display().to_string(),
+            &source_bytes,
+            temp_test_wasm_path("missing-toolchain"),
+            &config,
+            &TassadarWasmProfile::article_i32_compute_v1(),
+        )
+        .expect_err("missing toolchain should refuse before lowering");
+        assert!(matches!(
+            error,
+            TassadarCSourceArtifactBundlePipelineError::CompileRefused {
+                refusal: TassadarCompileRefusal::ToolchainUnavailable { .. },
+                ..
+            }
+        ));
+    }
+
+    fn exact_outputs_by_export(
+        bundle: &TassadarWasmModuleArtifactBundle,
+    ) -> std::collections::BTreeMap<&str, Vec<i32>> {
+        bundle
+            .lowered_exports
+            .iter()
+            .map(|artifact| {
+                let execution = TassadarCpuReferenceRunner::for_program(
+                    &artifact.program_artifact.validated_program,
+                )
+                .expect("lowered program should select a runner")
+                .execute(&artifact.program_artifact.validated_program)
+                .expect("lowered program should execute exactly");
+                (artifact.export_name.as_str(), execution.outputs)
+            })
+            .collect()
+    }
+
+    fn temp_test_wasm_path(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "psionic-tassadar-compiler-{label}-{}.wasm",
+            std::process::id()
+        ))
+    }
+
+    fn fixture_source_path(file_name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("fixtures")
+            .join("tassadar")
+            .join("sources")
+            .join(file_name)
     }
 }

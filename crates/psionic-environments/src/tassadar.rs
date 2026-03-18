@@ -24,6 +24,7 @@ const TASSADAR_METADATA_EXACTNESS_CONTRACT_KEY: &str = "tassadar.exactness_contr
 const TASSADAR_METADATA_CURRENT_TARGETS_KEY: &str = "tassadar.current_workload_targets";
 const TASSADAR_METADATA_PLANNED_TARGETS_KEY: &str = "tassadar.planned_workload_targets";
 const TASSADAR_METADATA_BENCHMARK_PACKAGE_SET_KEY: &str = "tassadar.benchmark_package_set";
+const TASSADAR_METADATA_COMPILE_PIPELINE_MATRIX_KEY: &str = "tassadar.compile_pipeline_matrix";
 const TASSADAR_METADATA_ABI_VERSION_KEY: &str = "tassadar.abi_version";
 const TASSADAR_EVAL_METADATA_SURFACE: &str = "eval";
 const TASSADAR_BENCHMARK_METADATA_SURFACE: &str = "benchmark";
@@ -125,6 +126,49 @@ impl TassadarBenchmarkPackageSetBinding {
         }
         if self.summary_report_ref.trim().is_empty() {
             return Err(TassadarEnvironmentError::MissingBenchmarkSummaryReportRef);
+        }
+        Ok(())
+    }
+}
+
+/// Public compile-pipeline matrix binding reused by Tassadar environment bundles.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarCompilePipelineMatrixBinding {
+    /// Stable compile-pipeline report reference.
+    pub report_ref: String,
+    /// Stable compile-pipeline report identifier.
+    pub report_id: String,
+    /// Source families covered by the committed report.
+    pub source_family_ids: Vec<String>,
+}
+
+impl TassadarCompilePipelineMatrixBinding {
+    /// Returns a stable digest over the binding.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let encoded = serde_json::to_vec(self)
+            .expect("Tassadar compile-pipeline matrix binding should serialize");
+        let digest = sha2::Sha256::digest(encoded.as_slice());
+        hex::encode(digest)
+    }
+
+    /// Validates that the binding is explicit.
+    pub fn validate(&self) -> Result<(), TassadarEnvironmentError> {
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingCompilePipelineMatrixReportRef);
+        }
+        if self.report_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingCompilePipelineMatrixReportId);
+        }
+        if self.source_family_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingCompilePipelineSourceFamilies);
+        }
+        if self
+            .source_family_ids
+            .iter()
+            .any(|source_family_id| source_family_id.trim().is_empty())
+        {
+            return Err(TassadarEnvironmentError::InvalidCompilePipelineSourceFamilyId);
         }
         Ok(())
     }
@@ -380,6 +424,8 @@ pub struct TassadarEnvironmentSpec {
     pub exactness_contract: TassadarExactnessContract,
     /// Public benchmark-package-set binding.
     pub benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding,
+    /// Public compile-pipeline matrix binding.
+    pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
     /// Policy refs for the eval package.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub eval_policy_references: Vec<EnvironmentPolicyReference>,
@@ -465,6 +511,7 @@ impl TassadarEnvironmentSpec {
             io_contract: self.io_contract.clone(),
             exactness_contract: self.exactness_contract.clone(),
             benchmark_package_set_binding: self.benchmark_package_set_binding.clone(),
+            compile_pipeline_matrix_binding: self.compile_pipeline_matrix_binding.clone(),
             current_workload_targets: self.current_workload_targets.clone(),
             planned_workload_targets: self.planned_workload_targets.clone(),
         })
@@ -497,6 +544,7 @@ impl TassadarEnvironmentSpec {
         self.io_contract.validate()?;
         self.exactness_contract.validate()?;
         self.benchmark_package_set_binding.validate()?;
+        self.compile_pipeline_matrix_binding.validate()?;
         if self.current_workload_targets.is_empty() {
             return Err(TassadarEnvironmentError::MissingCurrentWorkloadTargets);
         }
@@ -670,6 +718,10 @@ impl TassadarEnvironmentSpec {
             serde_json::to_value(&self.benchmark_package_set_binding).unwrap_or(Value::Null),
         );
         metadata.insert(
+            String::from(TASSADAR_METADATA_COMPILE_PIPELINE_MATRIX_KEY),
+            serde_json::to_value(&self.compile_pipeline_matrix_binding).unwrap_or(Value::Null),
+        );
+        metadata.insert(
             String::from(TASSADAR_METADATA_CURRENT_TARGETS_KEY),
             serde_json::to_value(&self.current_workload_targets).unwrap_or(Value::Null),
         );
@@ -700,10 +752,9 @@ impl TassadarEnvironmentSpec {
                     pin_alias: self.package_refs.benchmark_pin_alias.clone(),
                     surfaces: vec![EnvironmentUsageSurface::Benchmark],
                     required_workloads: vec![EnvironmentWorkloadClass::ValidatorBenchmark],
-                    required_benchmark_profiles: vec![self
-                        .package_refs
-                        .benchmark_profile_ref
-                        .clone()],
+                    required_benchmark_profiles: vec![
+                        self.package_refs.benchmark_profile_ref.clone(),
+                    ],
                 },
             ],
         }
@@ -733,6 +784,8 @@ pub struct TassadarEnvironmentBundle {
     pub exactness_contract: TassadarExactnessContract,
     /// Benchmark-package-set binding.
     pub benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding,
+    /// Compile-pipeline matrix binding.
+    pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
     /// Current workload targets implemented now.
     pub current_workload_targets: Vec<TassadarWorkloadTarget>,
     /// Planned workload targets still to widen later.
@@ -764,9 +817,7 @@ pub enum TassadarEnvironmentError {
     #[error("Tassadar environment spec is missing the benchmark dataset binding")]
     MissingBenchmarkDataset,
     /// Missing benchmark package-set ref.
-    #[error(
-        "Tassadar environment spec is missing `benchmark_package_set_binding.package_set_ref`"
-    )]
+    #[error("Tassadar environment spec is missing `benchmark_package_set_binding.package_set_ref`")]
     MissingBenchmarkPackageSetRef,
     /// Missing benchmark package-set version.
     #[error(
@@ -784,6 +835,18 @@ pub enum TassadarEnvironmentError {
         "Tassadar environment spec is missing `benchmark_package_set_binding.summary_report_ref`"
     )]
     MissingBenchmarkSummaryReportRef,
+    /// Missing compile-pipeline matrix report ref.
+    #[error("Tassadar environment spec is missing `compile_pipeline_matrix_binding.report_ref`")]
+    MissingCompilePipelineMatrixReportRef,
+    /// Missing compile-pipeline matrix report id.
+    #[error("Tassadar environment spec is missing `compile_pipeline_matrix_binding.report_id`")]
+    MissingCompilePipelineMatrixReportId,
+    /// Missing compile-pipeline matrix source families.
+    #[error("Tassadar environment spec must declare compile-pipeline source families")]
+    MissingCompilePipelineSourceFamilies,
+    /// Invalid compile-pipeline matrix source family id.
+    #[error("Tassadar environment spec includes an empty compile-pipeline source family id")]
+    InvalidCompilePipelineSourceFamilyId,
     /// Missing group ref.
     #[error("Tassadar environment refs are missing `group_ref`")]
     MissingGroupRef,
@@ -981,6 +1044,18 @@ mod tests {
                     "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json",
                 ),
             },
+            compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding {
+                report_ref: String::from(
+                    "fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json",
+                ),
+                report_id: String::from("tassadar.compile_pipeline_matrix_report.v1"),
+                source_family_ids: vec![
+                    String::from("wasm_text.multi_export_arithmetic"),
+                    String::from("wasm_text.memory_lookup"),
+                    String::from("wasm_text.param_abi"),
+                    String::from("c_source.toolchain_unavailable"),
+                ],
+            },
             eval_policy_references: vec![EnvironmentPolicyReference {
                 kind: EnvironmentPolicyKind::Verification,
                 policy_ref: String::from("policy://tassadar/eval/verification"),
@@ -1050,6 +1125,15 @@ mod tests {
                 .and_then(|value| value.get("summary_report_ref"))
                 .and_then(Value::as_str),
             Some("fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json")
+        );
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
+                .get(TASSADAR_METADATA_COMPILE_PIPELINE_MATRIX_KEY)
+                .and_then(|value| value.get("report_ref"))
+                .and_then(Value::as_str),
+            Some("fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json")
         );
         assert_eq!(
             bundle.current_workload_targets,

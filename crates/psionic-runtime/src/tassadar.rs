@@ -7,6 +7,7 @@ use crate::{
     RuntimeManifestArtifactBinding, RuntimeManifestArtifactKind,
     RuntimeManifestStaticConfigBinding, ValidationMatrixReference,
 };
+use psionic_ir::{encode_tassadar_normalized_wasm_module, parse_tassadar_normalized_wasm_module};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -2707,6 +2708,24 @@ pub const TASSADAR_CANONICAL_C_SOURCE_REF: &str =
 /// Canonical repo-relative Wasm binary emitted by the compile-receipt example.
 pub const TASSADAR_CANONICAL_WASM_BINARY_REF: &str =
     "fixtures/tassadar/wasm/tassadar_micro_wasm_kernel.wasm";
+/// Repo-relative Rust source for the exact multi-export arithmetic fixture.
+pub const TASSADAR_MULTI_EXPORT_RUST_SOURCE_REF: &str =
+    "fixtures/tassadar/sources/tassadar_multi_export_kernel.rs";
+/// Repo-relative Wasm binary emitted for the exact multi-export Rust fixture.
+pub const TASSADAR_MULTI_EXPORT_RUST_WASM_BINARY_REF: &str =
+    "fixtures/tassadar/wasm/tassadar_multi_export_kernel.wasm";
+/// Repo-relative Rust source for the exact memory-lookup fixture.
+pub const TASSADAR_MEMORY_LOOKUP_RUST_SOURCE_REF: &str =
+    "fixtures/tassadar/sources/tassadar_memory_lookup_kernel.rs";
+/// Repo-relative Wasm binary emitted for the exact memory-lookup Rust fixture.
+pub const TASSADAR_MEMORY_LOOKUP_RUST_WASM_BINARY_REF: &str =
+    "fixtures/tassadar/wasm/tassadar_memory_lookup_kernel.wasm";
+/// Repo-relative Rust source for the unsupported parameter-ABI fixture.
+pub const TASSADAR_PARAM_ABI_RUST_SOURCE_REF: &str =
+    "fixtures/tassadar/sources/tassadar_param_abi_kernel.rs";
+/// Repo-relative Wasm binary emitted for the unsupported parameter-ABI Rust fixture.
+pub const TASSADAR_PARAM_ABI_RUST_WASM_BINARY_REF: &str =
+    "fixtures/tassadar/wasm/tassadar_param_abi_kernel.wasm";
 /// Canonical repo-relative compile-receipt artifact for the canonical C source.
 pub const TASSADAR_C_TO_WASM_COMPILE_RECEIPT_REF: &str =
     "fixtures/tassadar/reports/tassadar_c_to_wasm_compile_receipt.json";
@@ -2714,6 +2733,7 @@ pub const TASSADAR_C_TO_WASM_COMPILE_RECEIPT_REF: &str =
 pub const TASSADAR_CANONICAL_C_PROGRAM_ARTIFACT_ID: &str =
     "tassadar.micro_wasm_kernel.c_compile.artifact.v1";
 const TASSADAR_C_TO_WASM_COMPILE_SCHEMA_VERSION: u16 = 1;
+const TASSADAR_RUST_TO_WASM_COMPILE_SCHEMA_VERSION: u16 = 1;
 
 /// Explicit compile configuration for the canonical C-to-Wasm receipt path.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -2740,12 +2760,18 @@ impl TassadarCToWasmCompileConfig {
     /// Returns the canonical config for the micro Wasm kernel fixture.
     #[must_use]
     pub fn canonical_micro_wasm_kernel() -> Self {
+        Self::canonical_without_standard_library(["micro_wasm_kernel"])
+    }
+
+    fn canonical_without_standard_library(
+        export_symbols: impl IntoIterator<Item = &'static str>,
+    ) -> Self {
         Self {
             compiler_binary: String::from("clang"),
             target: String::from("wasm32-unknown-unknown"),
             language_standard: String::from("c11"),
             optimization_level: String::from("O3"),
-            export_symbols: vec![String::from("micro_wasm_kernel")],
+            export_symbols: export_symbols.into_iter().map(String::from).collect(),
             no_standard_library: true,
             no_entry: true,
             allow_undefined: false,
@@ -2786,7 +2812,9 @@ impl TassadarCToWasmCompileConfig {
         args
     }
 
-    fn pipeline_features(&self) -> Vec<String> {
+    /// Returns the stable feature set declared by this compile configuration.
+    #[must_use]
+    pub fn pipeline_features(&self) -> Vec<String> {
         let mut features = vec![
             format!("language_standard:{}", self.language_standard),
             format!("optimization:{}", self.optimization_level),
@@ -2813,6 +2841,124 @@ impl TassadarCToWasmCompileConfig {
 impl Default for TassadarCToWasmCompileConfig {
     fn default() -> Self {
         Self::canonical_micro_wasm_kernel()
+    }
+}
+
+/// Explicit compile configuration for the repo-owned Rust-to-Wasm matrix path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarRustToWasmCompileConfig {
+    /// Compiler driver binary used for the compile.
+    pub compiler_binary: String,
+    /// Lowering target triple.
+    pub target: String,
+    /// Stable crate name used for the compile.
+    pub crate_name: String,
+    /// Rust edition used for the fixture.
+    pub edition: String,
+    /// Crate type emitted for the Wasm binary.
+    pub crate_type: String,
+    /// Optimization level.
+    pub optimization_level: String,
+    /// Panic strategy.
+    pub panic_strategy: String,
+    /// Stable metadata tag used to keep repeated builds reproducible.
+    pub metadata_tag: String,
+    /// Exported symbols that must survive the link.
+    pub export_symbols: Vec<String>,
+}
+
+impl TassadarRustToWasmCompileConfig {
+    /// Returns the canonical config for the exact multi-export Rust fixture.
+    #[must_use]
+    pub fn canonical_multi_export_kernel() -> Self {
+        Self::canonical("tassadar_multi_export_kernel", ["pair_sum", "local_double"])
+    }
+
+    /// Returns the canonical config for the exact memory-lookup Rust fixture.
+    #[must_use]
+    pub fn canonical_memory_lookup_kernel() -> Self {
+        Self::canonical(
+            "tassadar_memory_lookup_kernel",
+            ["load_middle", "load_edge_sum"],
+        )
+    }
+
+    /// Returns the canonical config for the parameter-ABI Rust fixture.
+    #[must_use]
+    pub fn canonical_param_abi_kernel() -> Self {
+        Self::canonical("tassadar_param_abi_kernel", ["add_one"])
+    }
+
+    fn canonical(
+        crate_name: &'static str,
+        export_symbols: impl IntoIterator<Item = &'static str>,
+    ) -> Self {
+        Self {
+            compiler_binary: String::from("rustc"),
+            target: String::from("wasm32-unknown-unknown"),
+            crate_name: String::from(crate_name),
+            edition: String::from("2024"),
+            crate_type: String::from("cdylib"),
+            optimization_level: String::from("3"),
+            panic_strategy: String::from("abort"),
+            metadata_tag: String::from(crate_name),
+            export_symbols: export_symbols.into_iter().map(String::from).collect(),
+        }
+    }
+
+    /// Returns a stable digest over the compile configuration.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        stable_serialized_digest(b"tassadar_rust_to_wasm_compile_config|", self)
+    }
+
+    /// Returns the stable feature set declared by this compile configuration.
+    #[must_use]
+    pub fn pipeline_features(&self) -> Vec<String> {
+        let mut features = vec![
+            format!("compiler_binary:{}", self.compiler_binary),
+            format!("crate_type:{}", self.crate_type),
+            format!("crate_name:{}", self.crate_name),
+            format!("edition:{}", self.edition),
+            format!("metadata:{}", self.metadata_tag),
+            format!("optimization:{}", self.optimization_level),
+            format!("panic:{}", self.panic_strategy),
+            format!("target:{}", self.target),
+        ];
+        for export in &self.export_symbols {
+            features.push(format!("export:{export}"));
+        }
+        features.sort();
+        features.dedup();
+        features
+    }
+
+    fn command_line(
+        &self,
+        source_path: &std::path::Path,
+        output_path: &std::path::Path,
+    ) -> Vec<String> {
+        vec![
+            String::from("--target"),
+            self.target.clone(),
+            String::from("--crate-name"),
+            self.crate_name.clone(),
+            String::from("--edition"),
+            self.edition.clone(),
+            String::from("-C"),
+            format!("metadata={}", self.metadata_tag),
+            String::from("-C"),
+            format!("opt-level={}", self.optimization_level),
+            String::from("-C"),
+            String::from("debuginfo=0"),
+            String::from("-C"),
+            format!("panic={}", self.panic_strategy),
+            String::from("--crate-type"),
+            self.crate_type.clone(),
+            source_path.display().to_string(),
+            String::from("-o"),
+            output_path.display().to_string(),
+        ]
     }
 }
 
@@ -2914,6 +3060,24 @@ pub enum TassadarCompileRefusal {
         /// Projection failure summary.
         message: String,
     },
+}
+
+impl TassadarCompileRefusal {
+    /// Returns the stable machine-readable refusal kind.
+    #[must_use]
+    pub fn kind_slug(&self) -> &'static str {
+        match self {
+            Self::SourceReadFailed { .. } => "source_read_failed",
+            Self::CompileWorkspaceFailed { .. } => "compile_workspace_failed",
+            Self::ToolchainUnavailable { .. } => "toolchain_unavailable",
+            Self::ToolchainProbeFailed { .. } => "toolchain_probe_failed",
+            Self::ToolchainFailure { .. } => "toolchain_failure",
+            Self::OutputReadFailed { .. } => "output_read_failed",
+            Self::InvalidWasmOutput { .. } => "invalid_wasm_output",
+            Self::MissingExpectedExport { .. } => "missing_expected_export",
+            Self::ExecutorArtifactProjectionFailed { .. } => "executor_artifact_projection_failed",
+        }
+    }
 }
 
 /// Source-to-Wasm-to-artifact lineage facts for one canonical compile receipt.
@@ -3020,6 +3184,29 @@ impl TassadarCToWasmCompileReceipt {
         }
     }
 
+    /// Returns the compiled Wasm ref when the compile succeeded.
+    #[must_use]
+    pub fn wasm_binary_ref(&self) -> Option<&str> {
+        match &self.outcome {
+            TassadarCToWasmCompileOutcome::Succeeded {
+                wasm_binary_ref, ..
+            } => Some(wasm_binary_ref.as_str()),
+            TassadarCToWasmCompileOutcome::Refused { .. } => None,
+        }
+    }
+
+    /// Returns the structural summary for the compiled Wasm output when present.
+    #[must_use]
+    pub fn wasm_binary_summary(&self) -> Option<&TassadarWasmBinarySummary> {
+        match &self.outcome {
+            TassadarCToWasmCompileOutcome::Succeeded {
+                wasm_binary_summary,
+                ..
+            } => Some(wasm_binary_summary),
+            TassadarCToWasmCompileOutcome::Refused { .. } => None,
+        }
+    }
+
     /// Returns the canonical artifact lineage when the compile succeeded.
     #[must_use]
     pub fn lineage_contract(&self) -> Option<&TassadarCompileArtifactLineage> {
@@ -3037,6 +3224,121 @@ impl TassadarCToWasmCompileReceipt {
         match &self.outcome {
             TassadarCToWasmCompileOutcome::Succeeded { .. } => None,
             TassadarCToWasmCompileOutcome::Refused { refusal } => Some(refusal),
+        }
+    }
+}
+
+/// Outcome of one Rust-source to Wasm compile attempt.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum TassadarRustToWasmCompileOutcome {
+    /// The source compiled successfully and produced a Wasm binary.
+    Succeeded {
+        /// Repo-relative Wasm binary ref when the binary is written inside the repo.
+        wasm_binary_ref: String,
+        /// Stable digest over the compiled Wasm binary.
+        wasm_binary_digest: String,
+        /// Structural summary of the compiled Wasm module.
+        wasm_binary_summary: TassadarWasmBinarySummary,
+    },
+    /// The compile refused with a typed machine-readable reason.
+    Refused {
+        /// Typed refusal record.
+        refusal: TassadarCompileRefusal,
+    },
+}
+
+/// Machine-readable receipt for one Rust-source to Wasm compile attempt.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarRustToWasmCompileReceipt {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable source-identity facts.
+    pub source_identity: TassadarProgramSourceIdentity,
+    /// Stable compiler/toolchain identity.
+    pub toolchain_identity: TassadarCompilerToolchainIdentity,
+    /// Stable compile configuration.
+    pub compile_config: TassadarRustToWasmCompileConfig,
+    /// Successful output or typed refusal.
+    pub outcome: TassadarRustToWasmCompileOutcome,
+    /// Plain-language boundary statement for the receipt.
+    pub claim_boundary: String,
+    /// Stable digest over the full receipt.
+    pub receipt_digest: String,
+}
+
+impl TassadarRustToWasmCompileReceipt {
+    fn new(
+        source_identity: TassadarProgramSourceIdentity,
+        toolchain_identity: TassadarCompilerToolchainIdentity,
+        compile_config: TassadarRustToWasmCompileConfig,
+        outcome: TassadarRustToWasmCompileOutcome,
+    ) -> Self {
+        let mut receipt = Self {
+            schema_version: TASSADAR_RUST_TO_WASM_COMPILE_SCHEMA_VERSION,
+            source_identity,
+            toolchain_identity,
+            compile_config,
+            outcome,
+            claim_boundary: String::from(
+                "repo-owned Rust-source to Wasm receipt only; proves explicit source/toolchain/config/output digests for the current bounded matrix fixtures and typed refusal when the host toolchain cannot satisfy that path, not arbitrary Rust frontend closure or general Wasm lowering",
+            ),
+            receipt_digest: String::new(),
+        };
+        receipt.receipt_digest =
+            stable_serialized_digest(b"tassadar_rust_to_wasm_compile_receipt|", &receipt);
+        receipt
+    }
+
+    /// Returns whether the compile succeeded.
+    #[must_use]
+    pub fn succeeded(&self) -> bool {
+        matches!(
+            self.outcome,
+            TassadarRustToWasmCompileOutcome::Succeeded { .. }
+        )
+    }
+
+    /// Returns the compiled Wasm ref when the compile succeeded.
+    #[must_use]
+    pub fn wasm_binary_ref(&self) -> Option<&str> {
+        match &self.outcome {
+            TassadarRustToWasmCompileOutcome::Succeeded {
+                wasm_binary_ref, ..
+            } => Some(wasm_binary_ref.as_str()),
+            TassadarRustToWasmCompileOutcome::Refused { .. } => None,
+        }
+    }
+
+    /// Returns the compiled Wasm digest when the compile succeeded.
+    #[must_use]
+    pub fn wasm_binary_digest(&self) -> Option<&str> {
+        match &self.outcome {
+            TassadarRustToWasmCompileOutcome::Succeeded {
+                wasm_binary_digest, ..
+            } => Some(wasm_binary_digest.as_str()),
+            TassadarRustToWasmCompileOutcome::Refused { .. } => None,
+        }
+    }
+
+    /// Returns the structural Wasm summary when the compile succeeded.
+    #[must_use]
+    pub fn wasm_binary_summary(&self) -> Option<&TassadarWasmBinarySummary> {
+        match &self.outcome {
+            TassadarRustToWasmCompileOutcome::Succeeded {
+                wasm_binary_summary,
+                ..
+            } => Some(wasm_binary_summary),
+            TassadarRustToWasmCompileOutcome::Refused { .. } => None,
+        }
+    }
+
+    /// Returns the typed refusal when the compile did not succeed.
+    #[must_use]
+    pub fn refusal(&self) -> Option<&TassadarCompileRefusal> {
+        match &self.outcome {
+            TassadarRustToWasmCompileOutcome::Succeeded { .. } => None,
+            TassadarRustToWasmCompileOutcome::Refused { refusal } => Some(refusal),
         }
     }
 }
@@ -3066,6 +3368,42 @@ pub fn tassadar_canonical_c_source_path() -> std::path::PathBuf {
 #[must_use]
 pub fn tassadar_canonical_wasm_binary_path() -> std::path::PathBuf {
     runtime_repo_root().join(TASSADAR_CANONICAL_WASM_BINARY_REF)
+}
+
+/// Returns the canonical absolute path for the exact multi-export Rust source.
+#[must_use]
+pub fn tassadar_multi_export_rust_source_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_MULTI_EXPORT_RUST_SOURCE_REF)
+}
+
+/// Returns the canonical absolute path for the exact multi-export Rust Wasm output.
+#[must_use]
+pub fn tassadar_multi_export_rust_wasm_binary_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_MULTI_EXPORT_RUST_WASM_BINARY_REF)
+}
+
+/// Returns the canonical absolute path for the exact memory-lookup Rust source.
+#[must_use]
+pub fn tassadar_memory_lookup_rust_source_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_MEMORY_LOOKUP_RUST_SOURCE_REF)
+}
+
+/// Returns the canonical absolute path for the exact memory-lookup Rust Wasm output.
+#[must_use]
+pub fn tassadar_memory_lookup_rust_wasm_binary_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_MEMORY_LOOKUP_RUST_WASM_BINARY_REF)
+}
+
+/// Returns the canonical absolute path for the unsupported parameter-ABI Rust source.
+#[must_use]
+pub fn tassadar_param_abi_rust_source_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_PARAM_ABI_RUST_SOURCE_REF)
+}
+
+/// Returns the canonical absolute path for the unsupported parameter-ABI Rust Wasm output.
+#[must_use]
+pub fn tassadar_param_abi_rust_wasm_binary_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_PARAM_ABI_RUST_WASM_BINARY_REF)
 }
 
 /// Returns the canonical absolute path for the C-to-Wasm compile receipt.
@@ -3185,8 +3523,9 @@ pub fn compile_tassadar_c_source_to_wasm_receipt(
         );
     }
 
+    let raw_output_wasm_path = workspace_root.join("compile_output_raw.wasm");
     let compile_output = match std::process::Command::new(&compile_config.compiler_binary)
-        .args(compile_config.command_line(&source_path, &output_wasm_path))
+        .args(compile_config.command_line(&source_path, &raw_output_wasm_path))
         .output()
     {
         Ok(output) => output,
@@ -3370,6 +3709,247 @@ pub fn write_tassadar_c_to_wasm_compile_receipt(
     Ok(receipt)
 }
 
+/// Compiles one Rust source payload into a Wasm module and emits a machine-readable receipt.
+#[must_use]
+pub fn compile_tassadar_rust_source_to_wasm_receipt(
+    source_name: impl Into<String>,
+    source_bytes: &[u8],
+    output_wasm_path: impl AsRef<std::path::Path>,
+    compile_config: &TassadarRustToWasmCompileConfig,
+) -> TassadarRustToWasmCompileReceipt {
+    let source_name = source_name.into();
+    let source_identity = TassadarProgramSourceIdentity::new(
+        TassadarProgramSourceKind::RustSource,
+        source_name.clone(),
+        stable_bytes_digest(source_bytes),
+    );
+    let compiler_binary = compile_config.compiler_binary.clone();
+    let toolchain_identity = match discover_rust_compile_toolchain_identity(compile_config) {
+        Ok(toolchain_identity) => toolchain_identity,
+        Err(refusal) => {
+            return TassadarRustToWasmCompileReceipt::new(
+                source_identity,
+                TassadarCompilerToolchainIdentity::new(
+                    compiler_family_for_binary(compiler_binary.as_str()),
+                    String::from("unavailable"),
+                    compile_config.target.clone(),
+                ),
+                compile_config.clone(),
+                TassadarRustToWasmCompileOutcome::Refused { refusal },
+            );
+        }
+    };
+
+    let output_wasm_path = output_wasm_path.as_ref().to_path_buf();
+    if let Some(parent) = output_wasm_path.parent() {
+        if let Err(error) = std::fs::create_dir_all(parent) {
+            return TassadarRustToWasmCompileReceipt::new(
+                source_identity,
+                toolchain_identity,
+                compile_config.clone(),
+                TassadarRustToWasmCompileOutcome::Refused {
+                    refusal: TassadarCompileRefusal::CompileWorkspaceFailed {
+                        path: parent.display().to_string(),
+                        message: error.to_string(),
+                    },
+                },
+            );
+        }
+    }
+
+    let workspace_root = std::env::temp_dir().join(format!(
+        "psionic-tassadar-rust-compile-{}-{}",
+        std::process::id(),
+        stable_bytes_digest(source_bytes)
+    ));
+    if let Err(error) = std::fs::create_dir_all(&workspace_root) {
+        return TassadarRustToWasmCompileReceipt::new(
+            source_identity,
+            toolchain_identity,
+            compile_config.clone(),
+            TassadarRustToWasmCompileOutcome::Refused {
+                refusal: TassadarCompileRefusal::CompileWorkspaceFailed {
+                    path: workspace_root.display().to_string(),
+                    message: error.to_string(),
+                },
+            },
+        );
+    }
+
+    let source_path = workspace_root.join("compile_input.rs");
+    if let Err(error) = std::fs::write(&source_path, source_bytes) {
+        return TassadarRustToWasmCompileReceipt::new(
+            source_identity,
+            toolchain_identity,
+            compile_config.clone(),
+            TassadarRustToWasmCompileOutcome::Refused {
+                refusal: TassadarCompileRefusal::CompileWorkspaceFailed {
+                    path: source_path.display().to_string(),
+                    message: error.to_string(),
+                },
+            },
+        );
+    }
+
+    let raw_output_wasm_path = workspace_root.join("compile_output_raw.wasm");
+    let compile_output = match std::process::Command::new(&compile_config.compiler_binary)
+        .args(compile_config.command_line(&source_path, &raw_output_wasm_path))
+        .output()
+    {
+        Ok(output) => output,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return TassadarRustToWasmCompileReceipt::new(
+                source_identity,
+                toolchain_identity,
+                compile_config.clone(),
+                TassadarRustToWasmCompileOutcome::Refused {
+                    refusal: TassadarCompileRefusal::ToolchainUnavailable {
+                        binary: compile_config.compiler_binary.clone(),
+                    },
+                },
+            );
+        }
+        Err(error) => {
+            return TassadarRustToWasmCompileReceipt::new(
+                source_identity,
+                toolchain_identity,
+                compile_config.clone(),
+                TassadarRustToWasmCompileOutcome::Refused {
+                    refusal: TassadarCompileRefusal::CompileWorkspaceFailed {
+                        path: output_wasm_path.display().to_string(),
+                        message: error.to_string(),
+                    },
+                },
+            );
+        }
+    };
+    if !compile_output.status.success() {
+        let stderr_digest = stable_bytes_digest(&compile_output.stderr);
+        let stderr_excerpt = String::from_utf8_lossy(&compile_output.stderr)
+            .trim()
+            .lines()
+            .take(3)
+            .collect::<Vec<_>>()
+            .join(" | ");
+        return TassadarRustToWasmCompileReceipt::new(
+            source_identity,
+            toolchain_identity,
+            compile_config.clone(),
+            TassadarRustToWasmCompileOutcome::Refused {
+                refusal: TassadarCompileRefusal::ToolchainFailure {
+                    compiler_binary: compile_config.compiler_binary.clone(),
+                    exit_code: compile_output.status.code(),
+                    stderr_digest,
+                    stderr_excerpt,
+                },
+            },
+        );
+    }
+
+    let raw_wasm_bytes = match std::fs::read(&raw_output_wasm_path) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            return TassadarRustToWasmCompileReceipt::new(
+                source_identity,
+                toolchain_identity,
+                compile_config.clone(),
+                TassadarRustToWasmCompileOutcome::Refused {
+                    refusal: TassadarCompileRefusal::OutputReadFailed {
+                        path: raw_output_wasm_path.display().to_string(),
+                        message: error.to_string(),
+                    },
+                },
+            );
+        }
+    };
+    let normalized_module = match parse_tassadar_normalized_wasm_module(&raw_wasm_bytes) {
+        Ok(module) => module,
+        Err(error) => {
+            return TassadarRustToWasmCompileReceipt::new(
+                source_identity,
+                toolchain_identity,
+                compile_config.clone(),
+                TassadarRustToWasmCompileOutcome::Refused {
+                    refusal: TassadarCompileRefusal::InvalidWasmOutput {
+                        message: error.to_string(),
+                    },
+                },
+            );
+        }
+    };
+    let wasm_bytes = match encode_tassadar_normalized_wasm_module(&normalized_module) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            return TassadarRustToWasmCompileReceipt::new(
+                source_identity,
+                toolchain_identity,
+                compile_config.clone(),
+                TassadarRustToWasmCompileOutcome::Refused {
+                    refusal: TassadarCompileRefusal::InvalidWasmOutput {
+                        message: error.to_string(),
+                    },
+                },
+            );
+        }
+    };
+    if let Err(error) = std::fs::write(&output_wasm_path, &wasm_bytes) {
+        return TassadarRustToWasmCompileReceipt::new(
+            source_identity,
+            toolchain_identity,
+            compile_config.clone(),
+            TassadarRustToWasmCompileOutcome::Refused {
+                refusal: TassadarCompileRefusal::OutputReadFailed {
+                    path: output_wasm_path.display().to_string(),
+                    message: error.to_string(),
+                },
+            },
+        );
+    }
+    let wasm_binary_digest = stable_bytes_digest(&wasm_bytes);
+    let wasm_binary_summary = match summarize_tassadar_wasm_binary(&wasm_bytes) {
+        Ok(summary) => summary,
+        Err(message) => {
+            return TassadarRustToWasmCompileReceipt::new(
+                source_identity,
+                toolchain_identity,
+                compile_config.clone(),
+                TassadarRustToWasmCompileOutcome::Refused {
+                    refusal: TassadarCompileRefusal::InvalidWasmOutput { message },
+                },
+            );
+        }
+    };
+    for expected_export in &compile_config.export_symbols {
+        if !wasm_binary_summary
+            .exported_functions
+            .contains(expected_export)
+        {
+            return TassadarRustToWasmCompileReceipt::new(
+                source_identity,
+                toolchain_identity,
+                compile_config.clone(),
+                TassadarRustToWasmCompileOutcome::Refused {
+                    refusal: TassadarCompileRefusal::MissingExpectedExport {
+                        expected: expected_export.clone(),
+                        actual: wasm_binary_summary.exported_functions.clone(),
+                    },
+                },
+            );
+        }
+    }
+
+    TassadarRustToWasmCompileReceipt::new(
+        source_identity,
+        toolchain_identity,
+        compile_config.clone(),
+        TassadarRustToWasmCompileOutcome::Succeeded {
+            wasm_binary_ref: canonical_repo_relative_path(&output_wasm_path),
+            wasm_binary_digest,
+            wasm_binary_summary,
+        },
+    )
+}
+
 fn compiler_family_for_binary(binary: &str) -> String {
     std::path::Path::new(binary).file_name().map_or_else(
         || String::from(binary),
@@ -3416,6 +3996,44 @@ fn discover_c_compile_toolchain_identity(
     Ok(TassadarCompilerToolchainIdentity::new(
         compiler_family_for_binary(compile_config.compiler_binary.as_str()),
         compiler_version,
+        compile_config.target.clone(),
+    )
+    .with_pipeline_features(compile_config.pipeline_features()))
+}
+
+fn discover_rust_compile_toolchain_identity(
+    compile_config: &TassadarRustToWasmCompileConfig,
+) -> Result<TassadarCompilerToolchainIdentity, TassadarCompileRefusal> {
+    let output = std::process::Command::new(&compile_config.compiler_binary)
+        .arg("--version")
+        .output()
+        .map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                TassadarCompileRefusal::ToolchainUnavailable {
+                    binary: compile_config.compiler_binary.clone(),
+                }
+            } else {
+                TassadarCompileRefusal::ToolchainProbeFailed {
+                    binary: compile_config.compiler_binary.clone(),
+                    exit_code: None,
+                    stderr_digest: stable_bytes_digest(error.to_string().as_bytes()),
+                }
+            }
+        })?;
+    if !output.status.success() {
+        return Err(TassadarCompileRefusal::ToolchainProbeFailed {
+            binary: compile_config.compiler_binary.clone(),
+            exit_code: output.status.code(),
+            stderr_digest: stable_bytes_digest(&output.stderr),
+        });
+    }
+    let first_line = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .next()
+        .map_or_else(String::new, std::borrow::ToOwned::to_owned);
+    Ok(TassadarCompilerToolchainIdentity::new(
+        compiler_family_for_binary(compile_config.compiler_binary.as_str()),
+        first_line,
         compile_config.target.clone(),
     )
     .with_pipeline_features(compile_config.pipeline_features()))
@@ -9596,30 +10214,35 @@ mod tests {
         TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF, TASSADAR_C_TO_WASM_COMPILE_RECEIPT_REF,
         TASSADAR_CANONICAL_C_PROGRAM_ARTIFACT_ID, TASSADAR_CANONICAL_C_SOURCE_REF,
         TASSADAR_FIXTURE_RUNNER_ID, TASSADAR_LONG_HORIZON_TRACE_EVIDENCE_BUNDLE_FILE,
-        TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF, TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE,
-        TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF, TASSADAR_RUNTIME_BACKEND_ID,
-        TASSADAR_TRACE_ABI_DECISION_REPORT_REF, TASSADAR_WASM_INSTRUCTION_COVERAGE_REPORT_REF,
-        TassadarCToWasmCompileConfig, TassadarCToWasmCompileReceipt, TassadarCompileRefusal,
-        TassadarCompilerToolchainIdentity, TassadarCpuReferenceRunner, TassadarExactnessPosture,
-        TassadarExactnessRefusalReport, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
-        TassadarExecutorSelectionReason, TassadarExecutorSelectionState, TassadarFixtureRunner,
-        TassadarHullCacheRunner, TassadarInstruction, TassadarMillionStepDecodeBenchmarkBundle,
+        TASSADAR_LONG_HORIZON_TRACE_FIXTURE_ROOT_REF, TASSADAR_MEMORY_LOOKUP_RUST_SOURCE_REF,
+        TASSADAR_MILLION_STEP_BENCHMARK_BUNDLE_FILE, TASSADAR_MILLION_STEP_BENCHMARK_ROOT_REF,
+        TASSADAR_MULTI_EXPORT_RUST_SOURCE_REF, TASSADAR_PARAM_ABI_RUST_SOURCE_REF,
+        TASSADAR_RUNTIME_BACKEND_ID, TASSADAR_TRACE_ABI_DECISION_REPORT_REF,
+        TASSADAR_WASM_INSTRUCTION_COVERAGE_REPORT_REF, TassadarCToWasmCompileConfig,
+        TassadarCToWasmCompileReceipt, TassadarCompileRefusal, TassadarCompilerToolchainIdentity,
+        TassadarCpuReferenceRunner, TassadarExactnessPosture, TassadarExactnessRefusalReport,
+        TassadarExecutionRefusal, TassadarExecutorDecodeMode, TassadarExecutorSelectionReason,
+        TassadarExecutorSelectionState, TassadarFixtureRunner, TassadarHullCacheRunner,
+        TassadarInstruction, TassadarMillionStepDecodeBenchmarkBundle,
         TassadarMillionStepMeasurementPosture, TassadarMismatchClass, TassadarProgram,
         TassadarProgramArtifact, TassadarProgramArtifactError, TassadarProgramSourceIdentity,
-        TassadarProgramSourceKind, TassadarSparseTopKRunner, TassadarSudokuV0CorpusSplit,
-        TassadarTraceAbi, TassadarTraceAbiDecisionReport, TassadarTraceArtifact,
-        TassadarTraceDiffKind, TassadarTraceDiffReport, TassadarTraceEvent,
+        TassadarProgramSourceKind, TassadarRustToWasmCompileConfig, TassadarSparseTopKRunner,
+        TassadarSudokuV0CorpusSplit, TassadarTraceAbi, TassadarTraceAbiDecisionReport,
+        TassadarTraceArtifact, TassadarTraceDiffKind, TassadarTraceDiffReport, TassadarTraceEvent,
         TassadarWasmInstructionCoverageReport, TassadarWasmProfile, TassadarWasmProfileId,
         build_tassadar_execution_evidence_bundle,
         build_tassadar_long_horizon_trace_evidence_bundle,
         build_tassadar_million_step_decode_benchmark_bundle,
         build_tassadar_trace_abi_decision_report, compile_tassadar_c_source_to_wasm_receipt,
-        diagnose_tassadar_executor_request, execute_tassadar_executor_request,
-        replay_tassadar_execution, run_tassadar_exact_equivalence, run_tassadar_exact_parity,
-        stable_bytes_digest, summarize_tassadar_wasm_binary, tassadar_article_class_corpus,
+        compile_tassadar_rust_source_to_wasm_receipt, diagnose_tassadar_executor_request,
+        execute_tassadar_executor_request, replay_tassadar_execution,
+        run_tassadar_exact_equivalence, run_tassadar_exact_parity, stable_bytes_digest,
+        summarize_tassadar_wasm_binary, tassadar_article_class_corpus,
         tassadar_canonical_c_source_path, tassadar_canonical_wasm_binary_path,
-        tassadar_program_artifact_from_compile_receipt, tassadar_runtime_capability_report,
-        tassadar_sudoku_9x9_corpus, tassadar_sudoku_9x9_search_program, tassadar_sudoku_v0_corpus,
+        tassadar_memory_lookup_rust_source_path, tassadar_multi_export_rust_source_path,
+        tassadar_param_abi_rust_source_path, tassadar_program_artifact_from_compile_receipt,
+        tassadar_runtime_capability_report, tassadar_sudoku_9x9_corpus,
+        tassadar_sudoku_9x9_search_program, tassadar_sudoku_v0_corpus,
         tassadar_sudoku_v0_search_program, tassadar_supported_wasm_profiles,
         tassadar_validation_corpus, tassadar_wasm_instruction_coverage_report,
         write_tassadar_c_to_wasm_compile_receipt,
@@ -10212,18 +10835,113 @@ mod tests {
             temp_dir.join("b.wasm"),
             &compile_config,
         );
-        assert!(receipt_a.succeeded());
-        assert!(receipt_b.succeeded());
         assert_eq!(receipt_a.source_identity, receipt_b.source_identity);
         assert_eq!(receipt_a.toolchain_identity, receipt_b.toolchain_identity);
         assert_eq!(receipt_a.compile_config, receipt_b.compile_config);
-        assert_eq!(
-            receipt_a.wasm_binary_digest(),
-            receipt_b.wasm_binary_digest()
+        if receipt_a.succeeded() && receipt_b.succeeded() {
+            assert_eq!(
+                receipt_a.wasm_binary_digest(),
+                receipt_b.wasm_binary_digest()
+            );
+            assert_eq!(receipt_a.lineage_contract(), receipt_b.lineage_contract());
+        } else {
+            assert_eq!(receipt_a.refusal(), receipt_b.refusal());
+        }
+        for path in [temp_dir.join("a.wasm"), temp_dir.join("b.wasm")] {
+            if path.exists() {
+                std::fs::remove_file(path).expect("temp wasm should be removable");
+            }
+        }
+        std::fs::remove_dir(&temp_dir).expect("temp dir should be removable");
+    }
+
+    #[test]
+    fn multi_export_rust_to_wasm_compile_receipt_rebuild_is_stable() {
+        let source_bytes = std::fs::read(tassadar_multi_export_rust_source_path())
+            .expect("multi-export Rust source");
+        let compile_config = TassadarRustToWasmCompileConfig::canonical_multi_export_kernel();
+        let temp_dir = temp_test_dir("rust-to-wasm-multi-export");
+        std::fs::create_dir_all(&temp_dir).expect("temp dir should create");
+        let receipt_a = compile_tassadar_rust_source_to_wasm_receipt(
+            TASSADAR_MULTI_EXPORT_RUST_SOURCE_REF,
+            &source_bytes,
+            temp_dir.join("a.wasm"),
+            &compile_config,
         );
-        assert_eq!(receipt_a.lineage_contract(), receipt_b.lineage_contract());
-        std::fs::remove_file(temp_dir.join("a.wasm")).expect("temp wasm a should be removable");
-        std::fs::remove_file(temp_dir.join("b.wasm")).expect("temp wasm b should be removable");
+        let receipt_b = compile_tassadar_rust_source_to_wasm_receipt(
+            TASSADAR_MULTI_EXPORT_RUST_SOURCE_REF,
+            &source_bytes,
+            temp_dir.join("b.wasm"),
+            &compile_config,
+        );
+        assert_eq!(receipt_a.source_identity, receipt_b.source_identity);
+        assert_eq!(receipt_a.toolchain_identity, receipt_b.toolchain_identity);
+        assert_eq!(receipt_a.compile_config, receipt_b.compile_config);
+        if receipt_a.succeeded() && receipt_b.succeeded() {
+            assert_eq!(
+                receipt_a.wasm_binary_digest(),
+                receipt_b.wasm_binary_digest()
+            );
+            assert_eq!(
+                receipt_a
+                    .wasm_binary_summary()
+                    .expect("successful compile should carry a summary")
+                    .exported_functions,
+                vec![String::from("local_double"), String::from("pair_sum")]
+            );
+        } else {
+            assert_eq!(receipt_a.refusal(), receipt_b.refusal());
+        }
+        for path in [temp_dir.join("a.wasm"), temp_dir.join("b.wasm")] {
+            if path.exists() {
+                std::fs::remove_file(path).expect("temp wasm should be removable");
+            }
+        }
+        std::fs::remove_dir(&temp_dir).expect("temp dir should be removable");
+    }
+
+    #[test]
+    fn memory_lookup_rust_to_wasm_compile_receipt_rebuild_is_stable() {
+        let source_bytes = std::fs::read(tassadar_memory_lookup_rust_source_path())
+            .expect("memory-lookup Rust source");
+        let compile_config = TassadarRustToWasmCompileConfig::canonical_memory_lookup_kernel();
+        let temp_dir = temp_test_dir("rust-to-wasm-memory-lookup");
+        std::fs::create_dir_all(&temp_dir).expect("temp dir should create");
+        let receipt_a = compile_tassadar_rust_source_to_wasm_receipt(
+            TASSADAR_MEMORY_LOOKUP_RUST_SOURCE_REF,
+            &source_bytes,
+            temp_dir.join("a.wasm"),
+            &compile_config,
+        );
+        let receipt_b = compile_tassadar_rust_source_to_wasm_receipt(
+            TASSADAR_MEMORY_LOOKUP_RUST_SOURCE_REF,
+            &source_bytes,
+            temp_dir.join("b.wasm"),
+            &compile_config,
+        );
+        assert_eq!(receipt_a.source_identity, receipt_b.source_identity);
+        assert_eq!(receipt_a.toolchain_identity, receipt_b.toolchain_identity);
+        assert_eq!(receipt_a.compile_config, receipt_b.compile_config);
+        if receipt_a.succeeded() && receipt_b.succeeded() {
+            assert_eq!(
+                receipt_a.wasm_binary_digest(),
+                receipt_b.wasm_binary_digest()
+            );
+            assert_eq!(
+                receipt_a
+                    .wasm_binary_summary()
+                    .expect("successful compile should carry a summary")
+                    .memory_count,
+                1
+            );
+        } else {
+            assert_eq!(receipt_a.refusal(), receipt_b.refusal());
+        }
+        for path in [temp_dir.join("a.wasm"), temp_dir.join("b.wasm")] {
+            if path.exists() {
+                std::fs::remove_file(path).expect("temp wasm should be removable");
+            }
+        }
         std::fs::remove_dir(&temp_dir).expect("temp dir should be removable");
     }
 
@@ -10243,6 +10961,35 @@ mod tests {
                 binary: String::from("missing-clang-for-tassadar"),
             })
         );
+    }
+
+    #[test]
+    fn param_abi_rust_compile_receipt_exposes_successful_wasm_before_lowering_refusal() {
+        let source_bytes =
+            std::fs::read(tassadar_param_abi_rust_source_path()).expect("param-ABI Rust source");
+        let receipt = compile_tassadar_rust_source_to_wasm_receipt(
+            TASSADAR_PARAM_ABI_RUST_SOURCE_REF,
+            &source_bytes,
+            temp_test_dir("rust-to-wasm-param-abi").join("param.wasm"),
+            &TassadarRustToWasmCompileConfig::canonical_param_abi_kernel(),
+        );
+        if receipt.succeeded() {
+            assert!(
+                receipt
+                    .wasm_binary_ref()
+                    .expect("successful compile should publish an output ref")
+                    .ends_with("param.wasm")
+            );
+            assert_eq!(
+                receipt
+                    .wasm_binary_summary()
+                    .expect("successful compile should publish a Wasm summary")
+                    .exported_functions,
+                vec![String::from("add_one")]
+            );
+        } else {
+            assert!(receipt.refusal().is_some());
+        }
     }
 
     #[test]

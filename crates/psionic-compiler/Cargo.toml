@@ -24,5 +24,6 @@ sha2 = { workspace = true }
 thiserror = { workspace = true }
 wasm-encoder = "0.244.0"
 wasmparser = "0.244.0"
+wat = "1"
 
 [dev-dependencies]

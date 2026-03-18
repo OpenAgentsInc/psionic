@@ -597,6 +597,14 @@ Current posture:
   source/toolchain/config/output digests, projects that success into one
   canonical `TassadarProgramArtifact` lineage contract, and surfaces typed
   compile refusals instead of hiding toolchain failure behind ad hoc scripts
+- the repo now also carries one real Tassadar compile-pipeline matrix at
+  `fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json`,
+  emitted by `cargo run -p psionic-eval --example tassadar_compile_pipeline_matrix_report`;
+  it binds exact Wasm-text multi-export arithmetic and memory-lookup fixtures,
+  an explicit Wasm-text parameter-ABI lowering refusal, and a typed
+  missing-toolchain refusal on the C-source path to compile-receipt digests,
+  Wasm-module digests, exact lowered export outputs, and typed refusal posture
+  for the current bounded source-to-Wasm-to-Tassadar lane
 - the repo now also carries one bounded Wasm-module ingress artifact at
   `fixtures/tassadar/reports/tassadar_wasm_module_ingress_report.json`, emitted
   by `cargo run -p psionic-eval --example tassadar_wasm_module_ingress_report`;
@@ -1433,6 +1441,14 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
   `fixtures/tassadar/wasm/tassadar_micro_wasm_kernel.wasm` are the canonical
   Tassadar source/toolchain/output lineage artifacts for the repo-owned
   C-to-Wasm compile path.
+- `fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json`,
+  `fixtures/tassadar/sources/tassadar_multi_export_kernel.wat`,
+  `fixtures/tassadar/sources/tassadar_memory_lookup_kernel.wat`,
+  `fixtures/tassadar/sources/tassadar_param_abi_kernel.wat`,
+  `fixtures/tassadar/sources/tassadar_micro_wasm_kernel.c`, and the
+  corresponding `fixtures/tassadar/wasm/*.wasm` outputs are the canonical
+  repo-owned real compile-pipeline matrix artifacts for the current bounded
+  Wasm-text exact lane plus typed C-toolchain-refusal ingress check.
 - `fixtures/tassadar/reports/tassadar_wasm_module_ingress_report.json` is the
   canonical machine-readable artifact for bounded normalized Wasm-module
   ingress, section-level round-trip truth, and current exact-vs-refused export
