@@ -488,6 +488,14 @@ The current scope is:
   challengeability explicit instead of treating one benchmark pass as permanent
   closure, while named `nexus` and `kernel-policy` follow-ons remain explicit
   dependency markers outside standalone `psionic`
+- landed disclosure-flow follow-on: repo governance now owns a public
+  decomposition checklist in `docs/TASSADAR_PUBLIC_DISCLOSURE_FLOW.md`, a
+  machine-readable review artifact at
+  `fixtures/tassadar/reports/tassadar_public_disclosure_release_review.json`,
+  and a runnable checker at `scripts/check-tassadar-public-disclosure.sh`. This
+  lane keeps private naming, private product framing, and over-broad public
+  claims from leaking into `psionic`, and requires explicit refusal when
+  private-only language survives review
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the

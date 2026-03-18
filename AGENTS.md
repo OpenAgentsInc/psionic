@@ -143,6 +143,25 @@
 - Do not pull code or docs back from `openagents` by default. Restore or copy
   material only when the user explicitly asks for it.
 
+## Disclosure-Safe Release Flow
+
+- When private or alpha-only material informs public `psionic` work, decompose
+  it before landing anything here: strip private naming, private product
+  framing, speculative capability language, and any unannounced roadmap nouns.
+- Public docs, issue bodies, report summaries, and benchmark notes must use
+  bounded public claim language only. Do not copy private roadmap wording or
+  internal shorthand forward into public repo surfaces.
+- Preserve dependency markers honestly. If a capability still depends on
+  `kernel-policy`, `world-mounts`, `nexus`, or `openagents`, say so explicitly
+  instead of backfilling placeholder behavior into `psionic`.
+- If private-only framing survives review, refuse publication in this repo and
+  make that refusal explicit in the review artifact instead of silently
+  weakening the boundary.
+- The canonical public checklist and checker live at
+  `docs/TASSADAR_PUBLIC_DISCLOSURE_FLOW.md`,
+  `fixtures/tassadar/reports/tassadar_public_disclosure_release_review.json`,
+  and `scripts/check-tassadar-public-disclosure.sh`.
+
 ## Validation
 
 - Prefer targeted validation first: `cargo test -p <crate>` or the specific

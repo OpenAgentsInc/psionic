@@ -1,0 +1,30 @@
+{
+  "review_id": "tassadar.public_disclosure_release_review.v1",
+  "status": "approved",
+  "review_scope": [
+    "AGENTS.md",
+    "docs/TASSADAR_PUBLIC_DISCLOSURE_FLOW.md",
+    "scripts/check-tassadar-public-disclosure.sh"
+  ],
+  "source_private_refs": [
+    "~/code/alpha/spec/system-spec.md",
+    "~/code/alpha/tassadar/can-llms-be-computers/notes.md"
+  ],
+  "public_surface_refs": [
+    "AGENTS.md",
+    "docs/TASSADAR_PUBLIC_DISCLOSURE_FLOW.md",
+    "fixtures/tassadar/reports/tassadar_public_disclosure_release_review.json",
+    "scripts/check-tassadar-public-disclosure.sh"
+  ],
+  "checklist": {
+    "private_naming_removed": true,
+    "private_product_framing_removed": true,
+    "benchmark_claims_bounded": true,
+    "dependency_markers_preserved": true,
+    "private_language_refused": true,
+    "public_only_claim_language_used": true
+  },
+  "red_team_findings": [],
+  "claim_boundary": "this review flow keeps private naming, private product framing, and over-broad capability language out of public psionic surfaces. It does not claim openagents or alpha-private material as public repo truth by implication.",
+  "review_note": "Public repo wording stays limited to committed evidence, explicit dependency markers, and refusal-backed capability language."
+}
