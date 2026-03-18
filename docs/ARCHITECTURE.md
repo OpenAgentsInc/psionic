@@ -507,6 +507,15 @@ The current scope is:
   implying unrestricted self-modification, while named `kernel-policy` and
   `nexus` follow-ons remain explicit dependency markers outside standalone
   `psionic`
+- landed execution-unit-registration follow-on: `psionic-serve` now publishes
+  the executor-family registration report at
+  `fixtures/tassadar/reports/tassadar_execution_unit_registration_report.json`,
+  freezing execution-unit identity, topology compatibility, capability profile,
+  refusal taxonomy, benchmark lineage, and indicative pricing posture for the
+  served executor family; and `psionic-provider` now projects that report into a
+  provider-facing `TassadarExecutionUnitRegistrationReceipt`. This lane keeps
+  execution-unit registration distinct from accepted-outcome truth or market
+  eligibility instead of letting runtime success imply settlement posture
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the

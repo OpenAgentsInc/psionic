@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.execution_unit_registration.report.v1",
+  "descriptor": {
+    "registration_id": "tassadar.execution_unit_registration.tassadar-executor-fixture-v0.v1",
+    "unit_id": "execution-unit:tassadar:tassadar-executor-fixture-v0",
+    "family_id": "tassadar_executor_family",
+    "product_id": "psionic.executor_trace",
+    "model_id": "tassadar-executor-fixture-v0",
+    "runtime_backend": "cpu",
+    "topology_compatibility": [
+      "runtime_backend:cpu",
+      "tassadar.wasm.article_i32_compute.v1",
+      "tassadar.wasm.core_i32.v1",
+      "tassadar.wasm.core_i32.v2",
+      "tassadar.wasm.hungarian_10x10_matching.v1",
+      "tassadar.wasm.hungarian_v0_matching.v1",
+      "tassadar.wasm.sudoku_9x9_search.v1",
+      "tassadar.wasm.sudoku_v0_search.v1"
+    ],
+    "capability_profile": [
+      "capability:bounded_module_execution",
+      "capability:executor_trace",
+      "decode:tassadar.decode.hull_cache.v1",
+      "decode:tassadar.decode.reference_linear.v1",
+      "decode:tassadar.decode.sparse_top_k.v1"
+    ],
+    "supported_workload_classes": [
+      "arithmetic_microprogram",
+      "branch_control_flow_microprogram",
+      "clrs_shortest_path",
+      "memory_lookup_microprogram"
+    ],
+    "refusal_taxonomy": [
+      "module_execution:unsupported_host_import",
+      "workload:workload_class_out_of_scope"
+    ],
+    "benchmark_lineage_refs": [
+      "benchmark://openagents/tassadar/reference_fixture/validation_corpus",
+      "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json"
+    ],
+    "pricing": {
+      "pricing_posture": "benchmark_calibrated_indicative",
+      "indicative_cost_per_correct_job_milliunits": 240,
+      "settlement_eligible": false,
+      "note": "pricing is indicative and benchmark-calibrated only; later accepted-outcome and market bridges remain separate"
+    },
+    "claim_boundary": "registration is benchmark-gated execution-unit truth for the current executor family and does not imply accepted-outcome or market closure",
+    "descriptor_digest": "39161db1ef0e1be5fd801f57a9e107cc14c5357e840209e98ee85af2cee2c63c"
+  },
+  "publishable_workload_class_count": 4,
+  "refusal_taxonomy_count": 2,
+  "claim_boundary": "this serve report registers the executor family as a first-class execution unit with identity, topology compatibility, capability profile, refusal taxonomy, benchmark lineage, and pricing posture. It does not imply settlement or market eligibility",
+  "summary": "Execution-unit registration report now freezes 4 publishable workload classes with 2 refusal-taxonomy entries.",
+  "report_digest": "6a3e46ed02caa21e68746c6b8c608ee8065c54ea70abe9cc302da1e30f62961b"
+}

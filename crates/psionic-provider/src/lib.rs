@@ -7,6 +7,7 @@
 
 mod tassadar_delegation_benchmark;
 mod tassadar_evidence_routing;
+mod tassadar_execution_unit_registration;
 mod tassadar_import_policy_matrix;
 mod tassadar_installed_module_evidence;
 mod tassadar_module_catalog;
@@ -29,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use tassadar_delegation_benchmark::*;
 pub use tassadar_evidence_routing::*;
+pub use tassadar_execution_unit_registration::*;
 pub use tassadar_import_policy_matrix::*;
 pub use tassadar_installed_module_evidence::*;
 pub use tassadar_module_catalog::*;
