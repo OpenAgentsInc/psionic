@@ -15,6 +15,7 @@ mod tassadar_kernel_module_scaling;
 mod tassadar_mixed_trajectory;
 mod tassadar_shared_primitive_transfer;
 mod tassadar_state_design_study;
+mod tassadar_trace_state_ablation;
 mod tassadar_weak_supervision;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -38,6 +39,7 @@ pub use tassadar_kernel_module_scaling::*;
 pub use tassadar_mixed_trajectory::*;
 pub use tassadar_shared_primitive_transfer::*;
 pub use tassadar_state_design_study::*;
+pub use tassadar_trace_state_ablation::*;
 pub use tassadar_weak_supervision::*;
 
 /// Human-readable crate ownership summary.

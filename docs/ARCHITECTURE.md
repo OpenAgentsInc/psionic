@@ -582,6 +582,15 @@ The current scope is:
   freezing latency/correctness/evidence fronts, validator cost, challenge rate,
   and threshold-crossing cases without treating low latency as a win once
   evidence posture becomes invalid
+- landed trace-state-ablation follow-on: `psionic-data` now publishes the fixed
+  trace/state ablation canon across CLRS, arithmetic, Sudoku-search, and
+  module-scale Wasm workloads; `psionic-models` now publishes the corresponding
+  research-only ablation publication; `psionic-eval` now publishes the report
+  at `fixtures/tassadar/reports/tassadar_trace_state_ablation_report.json`; and
+  `psionic-research` now publishes the summary at
+  `fixtures/tassadar/reports/tassadar_trace_state_ablation_summary.json`. This
+  lane keeps representation-limited failures explicit instead of treating one
+  state surface as privileged by default
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the

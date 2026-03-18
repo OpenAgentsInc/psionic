@@ -1,0 +1,29 @@
+{
+  "summary_id": "tassadar.trace_state_ablation.summary.v1",
+  "report_id": "tassadar.trace_state_ablation.report.v1",
+  "representation_limited_workloads": [
+    "arithmetic_multi_operand",
+    "sudoku_backtracking_search",
+    "module_scale_wasm_loop"
+  ],
+  "strongest_representation_by_workload": [
+    [
+      "clrs_shortest_path",
+      "full_append_only_trace"
+    ],
+    [
+      "arithmetic_multi_operand",
+      "delta_trace"
+    ],
+    [
+      "sudoku_backtracking_search",
+      "locality_scratchpad"
+    ],
+    [
+      "module_scale_wasm_loop",
+      "full_append_only_trace"
+    ]
+  ],
+  "claim_boundary": "this summary remains a research-only representation analysis over shared workloads and does not widen served capability or broad learned-compute claims",
+  "summary_digest": "76310c9dea07776a44e01d633ff5df03e7547d8f21200a17e7b7e0626c0fefe0"
+}

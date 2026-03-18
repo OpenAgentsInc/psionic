@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.trace_state_ablation.report.v1",
+  "canon_id": "psionic.tassadar_trace_state_ablation_canon.v1",
+  "case_results": [
+    {
+      "workload_family": "clrs_shortest_path",
+      "representation": "full_append_only_trace",
+      "exactness_bps": 10000,
+      "replayability_bps": 10000,
+      "trainability_bps": 8500,
+      "representation_limited": false,
+      "note": "full traces remain exact and replayable but train less efficiently"
+    },
+    {
+      "workload_family": "clrs_shortest_path",
+      "representation": "locality_scratchpad",
+      "exactness_bps": 9900,
+      "replayability_bps": 9100,
+      "trainability_bps": 9200,
+      "representation_limited": false,
+      "note": "scratchpad preserves most exactness while improving trainability"
+    },
+    {
+      "workload_family": "arithmetic_multi_operand",
+      "representation": "delta_trace",
+      "exactness_bps": 9800,
+      "replayability_bps": 9300,
+      "trainability_bps": 9400,
+      "representation_limited": false,
+      "note": "delta traces compress arithmetic state without major loss"
+    },
+    {
+      "workload_family": "arithmetic_multi_operand",
+      "representation": "recurrent_state",
+      "exactness_bps": 9300,
+      "replayability_bps": 8200,
+      "trainability_bps": 9100,
+      "representation_limited": true,
+      "note": "recurrent state starts dropping replay detail on arithmetic carry structure"
+    },
+    {
+      "workload_family": "sudoku_backtracking_search",
+      "representation": "locality_scratchpad",
+      "exactness_bps": 9200,
+      "replayability_bps": 8800,
+      "trainability_bps": 8900,
+      "representation_limited": false,
+      "note": "scratchpads help on local search branching but still preserve useful replay"
+    },
+    {
+      "workload_family": "sudoku_backtracking_search",
+      "representation": "working_memory_tier",
+      "exactness_bps": 8700,
+      "replayability_bps": 7900,
+      "trainability_bps": 9000,
+      "representation_limited": true,
+      "note": "working-memory tiers lose too much search replay detail on branch-heavy search"
+    },
+    {
+      "workload_family": "module_scale_wasm_loop",
+      "representation": "full_append_only_trace",
+      "exactness_bps": 9900,
+      "replayability_bps": 10000,
+      "trainability_bps": 7800,
+      "representation_limited": false,
+      "note": "full traces remain the replay floor for module-scale Wasm"
+    },
+    {
+      "workload_family": "module_scale_wasm_loop",
+      "representation": "delta_trace",
+      "exactness_bps": 9400,
+      "replayability_bps": 8900,
+      "trainability_bps": 8400,
+      "representation_limited": true,
+      "note": "delta traces hit replay and exactness limits once Wasm control flow gets denser"
+    }
+  ],
+  "representation_limited_case_count": 3,
+  "architecture_limited_case_count": 2,
+  "generated_from_refs": [
+    "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+    "fixtures/tassadar/reports/tassadar_state_design_study_report.json"
+  ],
+  "claim_boundary": "this eval report is a research-only state-representation ablation canon over shared workloads. It stays benchmark-bound and refusal-bounded instead of widening served capability or broad learned-compute claims",
+  "summary": "Trace/state ablation report covers 8 case results with 3 representation-limited cases and 2 architecture-limited cases.",
+  "report_digest": "7c4b3e32a7d4ec9bd6373a6eddbfef26a83f07f000770e697e4d856018872571"
+}

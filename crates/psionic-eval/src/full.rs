@@ -106,6 +106,8 @@ mod tassadar_sparse_rule_compiler_audit;
 mod tassadar_state_design_study_report;
 #[path = "tassadar_structured_control.rs"]
 mod tassadar_structured_control;
+#[path = "tassadar_trace_state_ablation.rs"]
+mod tassadar_trace_state_ablation;
 #[path = "tassadar_sudoku_9x9_compiled_executor.rs"]
 mod tassadar_sudoku_9x9_compiled_executor;
 #[path = "tassadar_verifier_guided_search_report.rs"]
@@ -186,6 +188,7 @@ pub use tassadar_shared_primitive_transfer::*;
 pub use tassadar_sparse_rule_compiler_audit::*;
 pub use tassadar_state_design_study_report::*;
 pub use tassadar_structured_control::*;
+pub use tassadar_trace_state_ablation::*;
 pub use tassadar_sudoku_9x9_compiled_executor::*;
 pub use tassadar_verifier_guided_search_report::*;
 pub use tassadar_wasm_conformance::*;
