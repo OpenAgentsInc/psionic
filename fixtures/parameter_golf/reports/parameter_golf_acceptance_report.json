@@ -4,7 +4,7 @@
   "runner": "scripts/check-parameter-golf-acceptance.sh",
   "report_posture": "tracking_only",
   "claim_vocabulary_version": "2026-03-18",
-  "current_claim_posture": "research",
+  "current_claim_posture": "non_record_submission",
   "accounting_posture": {
     "artifact_cap_bytes": 16000000,
     "artifact_cap_unit": "decimal_bytes",
@@ -66,14 +66,14 @@
     },
     {
       "category_id": "packaging-readiness",
-      "matrix_status": "partial",
+      "matrix_status": "implemented",
       "issue_refs": [
         "PGOLF-002/#161",
         "PGOLF-401/#172"
       ],
       "green_definition": "Psionic can emit one self-contained submission folder with explicit artifact-byte accounting, runnable entrypoint shape, record metadata, and preserved receipts.",
-      "current_repo_truth": "Claim language and accounting posture are now explicit in docs/PARAMETER_GOLF_ACCOUNTING.md, but no runnable submission wrapper, submission.json generator, README generator, or record-folder output contract is landed yet.",
-      "boundary_note": "This category is only green at the governance level today; the actual package is still missing."
+      "current_repo_truth": "psionic-train now ships a typed non-record submission package builder that emits README.md, submission.json, train.log, a runnable train_gpt.py review wrapper, the counted int8+zlib model artifact, preserved benchmark receipts, and a machine-readable counted-byte accounting receipt, plus a writer that materializes the folder contract to disk.",
+      "boundary_note": "This closes the first honest non-record package only; it does not imply record-track runtime closure or 8xH100 record readiness."
     },
     {
       "category_id": "record-track-readiness",
@@ -85,9 +85,9 @@
         "PGOLF-403/#174"
       ],
       "green_definition": "Psionic can defend a record-track submission under the published challenge rules, including counted code, self-contained evaluation, and reproducible 8xH100 execution.",
-      "current_repo_truth": "The public challenge language still centers train_gpt.py and counted script bytes, while Psionic has not yet landed either the technical lane or the final counted-runtime story.",
-      "boundary_note": "Treat this as blocked by both in-repo implementation work and the need for an explicit public accounting interpretation."
+      "current_repo_truth": "Psionic now has a first honest non-record package and explicit counted-byte accounting, but the public challenge language still centers a defended train_gpt.py runtime story and reproducible record-track 8xH100 execution, neither of which is closed yet.",
+      "boundary_note": "Treat this as blocked by the remaining record-track runtime story plus the need for reproducible challenge-speed execution truth."
     }
   ],
-  "report_digest": "4bb168727dcf1bf550b0112c7eebe35082f5df138ee90c16c3b104ad92fe8532"
+  "report_digest": "1da386b4b47b63566d507cf9aa6945300bcdbc989616ae4a489c4ea1c4b7dc51"
 }

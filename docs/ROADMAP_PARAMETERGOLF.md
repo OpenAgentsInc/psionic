@@ -216,7 +216,9 @@ Psionic does not yet ship the challenge lane itself:
   communication, wallclock, memory, and explicit refusal truth, but the public
   CUDA train path still carries typed blocker notes for decoder-kernel and
   runtime widening
-- no challenge wrapper or record-folder output contract for record-track review
+- a first honest non-record wrapper and record-folder output contract now
+  exist, but record-track packaging is still blocked on counted-runtime and
+  reproducible `8xH100` execution closure
 
 ## Gap Map
 
@@ -229,7 +231,7 @@ Psionic does not yet ship the challenge lane itself:
 | `psionic-eval` | `implemented_early` benchmark and eval contracts, with a tracking-only lane acceptance checker, a landed Parameter Golf validation eval report used by the local-reference trainer and roundtrip checks, and now a dedicated Parameter Golf benchmark package plus challenge score and receipt contracts | connect the landed receipt lane to real distributed runs, benchmark-package bundles, and leaderboard-facing review without overclaiming local-reference measurements |
 | `psionic-distributed` | `implemented_early` public distributed helpers with reference-emulated public collectives | add the real multi-GPU training path we intend to use for `8xH100`, plus honest topology, communication, and refusal receipts |
 | `psionic-array` and backends | `implemented_early` bounded CPU/Metal/CUDA public surface, with wider CUDA backend kernels below it, and now a landed Parameter Golf CUDA training coverage report that keeps BF16, RoPE or GQA attention, RMSNorm, residual-mix, Muon, and quantized-export requirement families explicit with a stable blocker list | retire the remaining CUDA train-time blockers by widening the public runtime or kernel path needed for competitive small-decoder throughput without overclaiming the public array surface |
-| packaging and compatibility | `planned` for this lane | define the non-record versus record-track wrapper, code-byte accounting posture, record-folder output, and submission metadata path |
+| packaging and compatibility | `implemented_early` for the non-record lane | keep the landed non-record wrapper, counted-byte receipt, record-folder output, and submission metadata path honest while leaving record-track runtime closure explicit and blocked |
 
 ## Strategy
 
@@ -355,7 +357,7 @@ research without losing the oracle.
 
 | ID | Status | Proposed GitHub issue title | Description |
 | --- | --- | --- | --- |
-| `PGOLF-401` / [#172](https://github.com/OpenAgentsInc/psionic/issues/172) | open | `Psionic Parameter Golf: add a non-record submission wrapper and record-folder output contract` | Build the first packaging answer as a clearly labeled non-record lane if needed, including wrapper shape, README generation, `submission.json`, train log preservation, and artifact-byte accounting that does not pretend the Rust runtime is free. |
+| `PGOLF-401` / [#172](https://github.com/OpenAgentsInc/psionic/issues/172) | done (2026-03-18) | `Psionic Parameter Golf: add a non-record submission wrapper and record-folder output contract` | `psionic-train` now ships a typed non-record submission package builder plus folder writer that emit `README.md`, `submission.json`, `train.log`, a runnable `train_gpt.py` review wrapper, preserved benchmark artifacts, and a machine-readable counted-byte accounting receipt without pretending a hidden Rust runtime is free. |
 | `PGOLF-402` / [#173](https://github.com/OpenAgentsInc/psionic/issues/173) | open | `Psionic Parameter Golf: add a research harness for post-parity architecture and compression variants` | After parity is real, add a controlled harness for recurrent/shared-depth variants, stronger parameter tying, better quantization, and compression experiments under the same oracle and artifact-accounting rules. |
 | `PGOLF-403` / [#174](https://github.com/OpenAgentsInc/psionic/issues/174) | open | `Psionic Parameter Golf: add a record-track submission contract once public accounting is explicit` | Only after the public wrapper and code-size story is clear should the repo claim record-track readiness. This issue owns the final record-submission path, not the earlier research or non-record lane. |
 
@@ -387,7 +389,7 @@ research without losing the oracle.
 
 ### Phase 5: package the lane honestly, then widen research
 
-- `PGOLF-401`
+- `PGOLF-401` -> landed the first honest non-record submission package, counted-byte accounting receipt, review-wrapper entrypoint, and record-folder writer
 - `PGOLF-402`
 - `PGOLF-403`
 
@@ -405,6 +407,9 @@ precise about what is true on 2026-03-18:
 - Psionic now owns the challenge oracle, the public baseline path, and the
   bounded local-reference plus distributed receipt lanes, but it still keeps
   the remaining CUDA train-path blockers explicit
+- Psionic now also has a first honest non-record submission package, but
+  record-track packaging remains blocked on counted-runtime and `8xH100`
+  closure
 - the first truthful result should be parity against `train_gpt.py`, not a new
   architecture
 - record-track claims stay blocked until the actual counted-runtime submission

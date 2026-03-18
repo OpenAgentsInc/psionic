@@ -24,17 +24,19 @@ record-ready.
 
 The canonical current Psionic claim posture is:
 
-- `research`
+- `non_record_submission`
 
-That is the only honest posture on 2026-03-18 because:
+That is the honest posture on 2026-03-18 because:
 
-- exact challenge-oracle parity is landed, but that alone is not a submission
-  claim
-- the baseline single-device trainer is landed only as a bounded reference path
+- exact challenge-oracle parity is landed
+- the repo now has a real non-record submission-folder output contract with
+  `README.md`, `submission.json`, `train.log`, a `train_gpt.py`-shaped wrapper,
+  and explicit counted-byte accounting
+- the baseline single-device trainer is still only a bounded reference path
 - the `8xH100` distributed receipt lane is landed, but distributed-throughput
   closure is still not green
-- no challenge-ready record-folder output contract is landed
-- no counted-code story exists yet for a Psionic-owned runtime submission
+- the counted-runtime story for a record-track Psionic-owned submission is
+  still not defensible
 
 ## Claim Vocabulary
 
@@ -118,7 +120,7 @@ of the following:
 - how the result stays self-contained under the public challenge rules
 
 Absent that answer, the strongest allowed language is either
-`research`, `non_record_submission`, or
+`non_record_submission`, `research`, or
 `record_candidate_blocked_on_accounting`, depending on the acceptance matrix.
 
 ## Claim-To-Matrix Mapping

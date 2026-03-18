@@ -41,15 +41,15 @@ The report schema lives at
 
 The initial machine-readable matrix posture is `tracking_only`.
 
-The current lane claim posture is `research`.
+The current lane claim posture is `non_record_submission`.
 
 That means:
 
 - the acceptance contract is now canonical and runnable
 - claim language is now frozen by `docs/PARAMETER_GOLF_ACCOUNTING.md`
-- later implementation work must close named categories instead of using
-  free-form benchmark claims
-- most technical categories are still honestly red today
+- the first honest non-record submission package is now landed
+- record-track and distributed-throughput closure are still honestly partial
+  today
 
 ## Claim Split
 
@@ -77,8 +77,8 @@ that issue is wrong by definition and should update this document first.
 | `challenge-oracle-parity` | `implemented` | Psionic reproduces the current FineWeb shard contract, fixed validation split, exact `val_loss`, and exact `val_bpb` accounting against frozen challenge fixtures. | `psionic-data` now owns the shard ABI, validation token loader, SentencePiece byte-accounting LUT oracle, a committed parity fixture, and a frozen test that matches the current `train_gpt.py` and `train_gpt_mlx.py` reference paths for shard loading, validation slicing, `val_loss`, and `val_bpb`. | `PGOLF-101` / `#163`, `PGOLF-102` / `#164`, `PGOLF-103` / `#165` | Do not claim comparable Parameter Golf scores until this category is green. |
 | `single-device-trainer-parity` | `implemented_early` | A Psionic-owned baseline decoder can train, validate, export, reload, and re-evaluate on a single device while matching the public baseline architecture and optimizer behavior. | `psionic-models` now ships the compact Parameter Golf decoder family with stable tensor naming, baseline parameter accounting, a frozen `train_gpt.py` parity fixture at the public `9x512` shape, and named-parameter export helpers, while `psionic-train` plus `psionic-eval` now ship a bounded local-reference trainer with explicit single-device challenge batch geometry, grad accumulation, checkpoint and restart state, raw safetensors export, int8+zlib roundtrip restore, and validation re-eval under Psionic ownership. This is real single-device lane ownership, but it is still a bounded CPU-reference path rather than measured challenge-scale throughput closure. | `PGOLF-201` / `#166`, `PGOLF-202` / `#167`, `PGOLF-203` / `#168` | Treat this as stronger than sketches or one-off runs, but not as `8xH100` closure or leaderboard-ready throughput. |
 | `distributed-throughput-closure` | `partial` | Psionic has one explicit `8xH100` execution path with topology, timing, memory, and artifact receipts that support the declared challenge bar. | `psionic-train` plus `psionic-eval` now ship an exact `8xH100` DDP-style receipt lane aligned to the current `train_gpt.py` posture, including explicit CUDA-device admission gates, replicated topology, NCCL-style all-reduce communication stages, measured wallclock receipts, analytic distributed memory planning, and a machine-readable CUDA training coverage report digest plus blocker list carried on the same receipt seam. Full challenge-speed decoder-kernel and runtime widening are still honestly open. | `PGOLF-301` / `#169`, `PGOLF-302` / `#170`, `PGOLF-303` / `#171` | Treat this as explicit distributed execution truth with honest refusal posture and explicit CUDA blocker tracking, not as proof that the remaining CUDA kernel gaps are closed. |
-| `packaging-readiness` | `partial` | Psionic can emit one self-contained submission folder with explicit artifact-byte accounting, runnable entrypoint shape, record metadata, and preserved receipts. | Claim language and accounting posture are now explicit in `docs/PARAMETER_GOLF_ACCOUNTING.md`, but no runnable submission wrapper, `submission.json` generator, README generator, or record-folder output contract is landed yet. | `PGOLF-002` / `#161`, `PGOLF-401` / `#172` | This category is intentionally ahead of technical closure only at the governance level; the actual package is still missing. |
-| `record-track-readiness` | `partial_outside_psionic` | Psionic can defend a record-track submission under the published challenge rules, including counted code, self-contained evaluation, and reproducible `8xH100` execution. | The public challenge language still centers `train_gpt.py` and counted script bytes, while Psionic has not yet landed either the technical lane or the final counted-runtime story. | `PGOLF-002` / `#161`, `PGOLF-302` / `#170`, `PGOLF-401` / `#172`, `PGOLF-403` / `#174` | Treat this as blocked by both in-repo implementation work and the need for an explicit public accounting interpretation. |
+| `packaging-readiness` | `implemented` | Psionic can emit one self-contained submission folder with explicit artifact-byte accounting, runnable entrypoint shape, record metadata, and preserved receipts. | `psionic-train` now ships a typed non-record submission package builder that emits `README.md`, `submission.json`, `train.log`, a runnable `train_gpt.py` review wrapper, the counted int8+zlib model artifact, preserved benchmark receipts, and a machine-readable counted-byte accounting receipt, plus a writer that materializes the folder contract to disk. | `PGOLF-002` / `#161`, `PGOLF-401` / `#172` | This closes the first honest non-record package only; it does not imply record-track runtime closure or `8xH100` record readiness. |
+| `record-track-readiness` | `partial_outside_psionic` | Psionic can defend a record-track submission under the published challenge rules, including counted code, self-contained evaluation, and reproducible `8xH100` execution. | Psionic now has a first honest non-record package and explicit counted-byte accounting, but the public challenge language still centers a defended `train_gpt.py` runtime story and reproducible record-track `8xH100` execution, neither of which is closed yet. | `PGOLF-002` / `#161`, `PGOLF-302` / `#170`, `PGOLF-401` / `#172`, `PGOLF-403` / `#174` | Treat this as blocked by the remaining record-track runtime story plus the need for reproducible challenge-speed execution truth. |
 
 ## Why This Matters
 
