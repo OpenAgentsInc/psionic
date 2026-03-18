@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.module_link_runtime.report.v1",
+  "exact_case_count": 1,
+  "rollback_case_count": 1,
+  "refused_case_count": 1,
+  "dependency_edge_count": 1,
+  "case_reports": [
+    {
+      "case_id": "link.verifier_search.exact.v1",
+      "consumer_family": "verifier_search",
+      "requested_module_refs": [
+        "candidate_select_core@1.1.0",
+        "checkpoint_backtrack_core@1.0.0"
+      ],
+      "selected_module_refs": [
+        "candidate_select_core@1.1.0",
+        "checkpoint_backtrack_core@1.0.0"
+      ],
+      "dependency_edges": [
+        {
+          "importer_module_ref": "checkpoint_backtrack_core@1.0.0",
+          "import_symbol": "candidate_select_step",
+          "provider_module_ref": "candidate_select_core@1.1.0"
+        }
+      ],
+      "posture": "exact",
+      "exact_outputs_preserved": true,
+      "exact_trace_match": true,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+      ],
+      "dependency_graph_digest": "f1bfe605f81a300da51e89079a44296540094e0c0ea9ce0dc5033d9f88f2b365",
+      "note": "verifier_search links the candidate selector and checkpoint core directly, preserving one explicit internal dependency edge and exact parity on the seeded witness"
+    },
+    {
+      "case_id": "link.hungarian_matching.rollback.v1",
+      "consumer_family": "hungarian_matching",
+      "requested_module_refs": [
+        "candidate_select_core@1.2.0"
+      ],
+      "selected_module_refs": [
+        "candidate_select_core@1.1.0"
+      ],
+      "dependency_edges": [],
+      "posture": "rolled_back",
+      "rollback_detail": "candidate_select_core@1.2.0 rolled back to candidate_select_core@1.1.0 under the explicit replacement plan because the candidate build is not published as active",
+      "exact_outputs_preserved": true,
+      "exact_trace_match": true,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_internal_module_library_report.json"
+      ],
+      "note": "hungarian_matching preserves linked-program parity by selecting the explicit rollback target rather than silently drifting across candidate versions"
+    },
+    {
+      "case_id": "link.hungarian_matching.conflict.v1",
+      "consumer_family": "hungarian_matching",
+      "requested_module_refs": [
+        "candidate_select_core@1.1.0",
+        "candidate_select_core@1.2.0"
+      ],
+      "selected_module_refs": [],
+      "dependency_edges": [],
+      "posture": "refused",
+      "refusal_reason": "conflicting_version",
+      "exact_outputs_preserved": false,
+      "exact_trace_match": false,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_internal_module_library_report.json"
+      ],
+      "note": "hungarian_matching refuses when conflicting candidate_select_core versions are requested in the same bounded link set"
+    }
+  ],
+  "claim_boundary": "this runtime report freezes bounded module-link resolution, dependency edges, rollback paths, and refusal posture for the current internal module lane. It does not claim arbitrary install closure or unrestricted software growth inside the model",
+  "summary": "Module-link runtime report now freezes 3 link cases with 1 exact cases, 1 rollback cases, 1 refused cases, and 1 preserved dependency edges.",
+  "report_digest": "a01bfcc834fca45f56fff59f3d6172be6e6a63c7eea218b384d11eb8a13b3555"
+}

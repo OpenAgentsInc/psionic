@@ -435,14 +435,24 @@ pub fn seeded_tassadar_computational_module_manifests() -> Vec<TassadarComputati
             "tassadar.module.abi.v1",
             "compiled bounded exactness / promotion discipline",
             TassadarModuleTrustPosture::BenchmarkGatedInternal,
-            vec![TassadarComputationalModuleImport {
-                symbol: String::from("evidence.checkpoint_budget"),
-                import_class: TassadarModuleImportClass::EvidenceFeed,
-                required: true,
-                claim_boundary: String::from(
-                    "checkpoint_backtrack_core requires explicit checkpoint-budget evidence and does not assume unbounded search allowance",
-                ),
-            }],
+            vec![
+                TassadarComputationalModuleImport {
+                    symbol: String::from("candidate_select_step"),
+                    import_class: TassadarModuleImportClass::InternalModuleAbi,
+                    required: true,
+                    claim_boundary: String::from(
+                        "checkpoint_backtrack_core only composes through the bounded candidate-select ABI and does not assume hidden planner control",
+                    ),
+                },
+                TassadarComputationalModuleImport {
+                    symbol: String::from("evidence.checkpoint_budget"),
+                    import_class: TassadarModuleImportClass::EvidenceFeed,
+                    required: true,
+                    claim_boundary: String::from(
+                        "checkpoint_backtrack_core requires explicit checkpoint-budget evidence and does not assume unbounded search allowance",
+                    ),
+                },
+            ],
             vec![TassadarComputationalModuleExport {
                 symbol: String::from("checkpoint_push"),
                 abi_version: 1,

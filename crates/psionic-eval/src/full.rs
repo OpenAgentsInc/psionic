@@ -68,6 +68,8 @@ mod tassadar_locality_scratchpad;
 mod tassadar_memory_abi_v2;
 #[path = "tassadar_mixed_trajectory.rs"]
 mod tassadar_mixed_trajectory;
+#[path = "tassadar_module_linker.rs"]
+mod tassadar_module_linker;
 #[path = "tassadar_negative_invocation.rs"]
 mod tassadar_negative_invocation;
 #[path = "tassadar_module_installation_staging.rs"]
@@ -155,6 +157,7 @@ pub use tassadar_learnability_gap::*;
 pub use tassadar_locality_scratchpad::*;
 pub use tassadar_memory_abi_v2::*;
 pub use tassadar_mixed_trajectory::*;
+pub use tassadar_module_linker::*;
 pub use tassadar_negative_invocation::*;
 pub use tassadar_module_installation_staging::*;
 pub use tassadar_module_scale_workload_suite::*;

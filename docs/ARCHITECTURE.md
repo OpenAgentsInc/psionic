@@ -409,6 +409,19 @@ The current scope is:
   this schema instead of inventing a second module story, and named
   `kernel-objects` follow-ons remain explicit dependency markers rather than
   backfilled behavior inside standalone `psionic`
+- landed module-linker follow-on: `psionic-compiler` now resolves bounded
+  module-link requests into deterministic dependency graphs with explicit
+  version-conflict refusal, rollback selection, trust and claim-class
+  compatibility checks, and internal-module import resolution; `psionic-runtime`
+  now freezes the linked-program runtime witness at
+  `fixtures/tassadar/reports/tassadar_module_link_runtime_report.json` with
+  exact, rollback, and refused cases plus preserved dependency edges and parity
+  facts; `psionic-eval` now freezes the joined summary at
+  `fixtures/tassadar/reports/tassadar_module_link_eval_report.json`; and
+  `psionic-provider` now projects that runtime truth into a provider-facing
+  `TassadarModuleLinkReceipt`. This lane keeps dependency graphs, rollback
+  paths, and refusal posture machine-legible instead of hiding module
+  composition behind heuristic resolution or silent semantic drift
 - landed module-installation-staging follow-on: `psionic-serve` now publishes a
   bounded staged-install surface with explicit session-mount versus worker-mount
   scope, challenge windows, activation, rollback, and refusal receipts over the

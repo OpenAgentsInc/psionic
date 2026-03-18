@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.module_link_eval.report.v1",
+  "exact_case_count": 1,
+  "rollback_case_count": 1,
+  "refused_case_count": 1,
+  "dependency_edge_count": 1,
+  "exact_output_parity_case_count": 2,
+  "exact_trace_parity_case_count": 2,
+  "benchmark_refs": [
+    "fixtures/tassadar/reports/tassadar_internal_module_library_report.json",
+    "fixtures/tassadar/reports/tassadar_verifier_guided_search_report.json"
+  ],
+  "claim_boundary": "this eval summary freezes bounded module-link exact, rollback, and refusal posture over the current internal module lane. It does not widen module composition into arbitrary install or unrestricted software growth claims",
+  "summary": "Module-link eval report now freezes 1 exact cases, 1 rollback cases, 1 refused cases, 1 preserved dependency edges, 2 output-parity cases, and 2 trace-parity cases.",
+  "report_digest": "d662b0a720bd566d75bf595b27d7d97f036326ea66fd1c70fdd8f9566b5216c6"
+}

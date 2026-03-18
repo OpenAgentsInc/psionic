@@ -3,6 +3,7 @@
 mod tassadar_clrs_wasm_bridge;
 mod tassadar_internal_module_library;
 mod tassadar_locality_scratchpad;
+mod tassadar_module_linker;
 mod tassadar_module_manifest;
 mod tassadar_sparse_rule_audit;
 mod tassadar_structured_control;
@@ -34,6 +35,7 @@ use thiserror::Error;
 pub use tassadar_clrs_wasm_bridge::*;
 pub use tassadar_internal_module_library::*;
 pub use tassadar_locality_scratchpad::*;
+pub use tassadar_module_linker::*;
 pub use tassadar_module_manifest::*;
 pub use tassadar_sparse_rule_audit::*;
 pub use tassadar_structured_control::*;

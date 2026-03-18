@@ -7,6 +7,7 @@
 
 mod tassadar_delegation_benchmark;
 mod tassadar_evidence_routing;
+mod tassadar_module_linker;
 mod tassadar_module_installation;
 mod tassadar_module_library;
 mod tassadar_module_manifest;
@@ -21,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use tassadar_delegation_benchmark::*;
 pub use tassadar_evidence_routing::*;
+pub use tassadar_module_linker::*;
 pub use tassadar_module_installation::*;
 pub use tassadar_module_library::*;
 pub use tassadar_module_manifest::*;
