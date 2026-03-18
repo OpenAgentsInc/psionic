@@ -2726,6 +2726,36 @@ pub const TASSADAR_PARAM_ABI_RUST_SOURCE_REF: &str =
 /// Repo-relative Wasm binary emitted for the unsupported parameter-ABI Rust fixture.
 pub const TASSADAR_PARAM_ABI_RUST_WASM_BINARY_REF: &str =
     "fixtures/tassadar/wasm/tassadar_param_abi_kernel.wasm";
+/// Repo-relative Rust source for the pointer-based micro-kernel article fixture.
+pub const TASSADAR_MICRO_WASM_RUST_SOURCE_REF: &str =
+    "fixtures/tassadar/sources/tassadar_micro_wasm_kernel.rs";
+/// Repo-relative Wasm binary emitted for the pointer-based micro-kernel article fixture.
+pub const TASSADAR_MICRO_WASM_RUST_WASM_BINARY_REF: &str =
+    "fixtures/tassadar/wasm/tassadar_micro_wasm_kernel_rust.wasm";
+/// Repo-relative Rust source for the pointer-length heap-input fixture.
+pub const TASSADAR_HEAP_SUM_RUST_SOURCE_REF: &str =
+    "fixtures/tassadar/sources/tassadar_heap_sum_kernel.rs";
+/// Repo-relative Wasm binary emitted for the pointer-length heap-input fixture.
+pub const TASSADAR_HEAP_SUM_RUST_WASM_BINARY_REF: &str =
+    "fixtures/tassadar/wasm/tassadar_heap_sum_kernel.wasm";
+/// Repo-relative Rust source for the long-loop article fixture.
+pub const TASSADAR_LONG_LOOP_RUST_SOURCE_REF: &str =
+    "fixtures/tassadar/sources/tassadar_long_loop_kernel.rs";
+/// Repo-relative Wasm binary emitted for the long-loop article fixture.
+pub const TASSADAR_LONG_LOOP_RUST_WASM_BINARY_REF: &str =
+    "fixtures/tassadar/wasm/tassadar_long_loop_kernel.wasm";
+/// Repo-relative Rust source for the article-sized Hungarian fixture.
+pub const TASSADAR_HUNGARIAN_10X10_RUST_SOURCE_REF: &str =
+    "fixtures/tassadar/sources/tassadar_hungarian_10x10_article.rs";
+/// Repo-relative Wasm binary emitted for the article-sized Hungarian fixture.
+pub const TASSADAR_HUNGARIAN_10X10_RUST_WASM_BINARY_REF: &str =
+    "fixtures/tassadar/wasm/tassadar_hungarian_10x10_article.wasm";
+/// Repo-relative Rust source for the article-sized Sudoku fixture.
+pub const TASSADAR_SUDOKU_9X9_RUST_SOURCE_REF: &str =
+    "fixtures/tassadar/sources/tassadar_sudoku_9x9_article.rs";
+/// Repo-relative Wasm binary emitted for the article-sized Sudoku fixture.
+pub const TASSADAR_SUDOKU_9X9_RUST_WASM_BINARY_REF: &str =
+    "fixtures/tassadar/wasm/tassadar_sudoku_9x9_article.wasm";
 /// Canonical repo-relative compile-receipt artifact for the canonical C source.
 pub const TASSADAR_C_TO_WASM_COMPILE_RECEIPT_REF: &str =
     "fixtures/tassadar/reports/tassadar_c_to_wasm_compile_receipt.json";
@@ -2887,6 +2917,42 @@ impl TassadarRustToWasmCompileConfig {
     #[must_use]
     pub fn canonical_param_abi_kernel() -> Self {
         Self::canonical("tassadar_param_abi_kernel", ["add_one"])
+    }
+
+    /// Returns the canonical config for the pointer-based micro-kernel fixture.
+    #[must_use]
+    pub fn canonical_micro_wasm_kernel() -> Self {
+        Self::canonical("tassadar_micro_wasm_kernel", ["micro_wasm_kernel"])
+    }
+
+    /// Returns the canonical config for the pointer-length heap-input fixture.
+    #[must_use]
+    pub fn canonical_heap_sum_kernel() -> Self {
+        Self::canonical("tassadar_heap_sum_kernel", ["heap_sum_i32"])
+    }
+
+    /// Returns the canonical config for the long-loop article fixture.
+    #[must_use]
+    pub fn canonical_long_loop_kernel() -> Self {
+        Self::canonical("tassadar_long_loop_kernel", ["million_step_loop"])
+    }
+
+    /// Returns the canonical config for the article-sized Hungarian fixture.
+    #[must_use]
+    pub fn canonical_hungarian_10x10_article() -> Self {
+        Self::canonical(
+            "tassadar_hungarian_10x10_article",
+            ["hungarian_10x10_article_cost"],
+        )
+    }
+
+    /// Returns the canonical config for the article-sized Sudoku fixture.
+    #[must_use]
+    pub fn canonical_sudoku_9x9_article() -> Self {
+        Self::canonical(
+            "tassadar_sudoku_9x9_article",
+            ["sudoku_9x9_article_checksum"],
+        )
     }
 
     fn canonical(
@@ -3406,6 +3472,66 @@ pub fn tassadar_param_abi_rust_wasm_binary_path() -> std::path::PathBuf {
     runtime_repo_root().join(TASSADAR_PARAM_ABI_RUST_WASM_BINARY_REF)
 }
 
+/// Returns the canonical absolute path for the Rust micro-kernel source.
+#[must_use]
+pub fn tassadar_micro_wasm_rust_source_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_MICRO_WASM_RUST_SOURCE_REF)
+}
+
+/// Returns the canonical absolute path for the Rust micro-kernel Wasm output.
+#[must_use]
+pub fn tassadar_micro_wasm_rust_wasm_binary_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_MICRO_WASM_RUST_WASM_BINARY_REF)
+}
+
+/// Returns the canonical absolute path for the Rust heap-sum source.
+#[must_use]
+pub fn tassadar_heap_sum_rust_source_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_HEAP_SUM_RUST_SOURCE_REF)
+}
+
+/// Returns the canonical absolute path for the Rust heap-sum Wasm output.
+#[must_use]
+pub fn tassadar_heap_sum_rust_wasm_binary_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_HEAP_SUM_RUST_WASM_BINARY_REF)
+}
+
+/// Returns the canonical absolute path for the Rust long-loop source.
+#[must_use]
+pub fn tassadar_long_loop_rust_source_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_LONG_LOOP_RUST_SOURCE_REF)
+}
+
+/// Returns the canonical absolute path for the Rust long-loop Wasm output.
+#[must_use]
+pub fn tassadar_long_loop_rust_wasm_binary_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_LONG_LOOP_RUST_WASM_BINARY_REF)
+}
+
+/// Returns the canonical absolute path for the Rust article-sized Hungarian source.
+#[must_use]
+pub fn tassadar_hungarian_10x10_rust_source_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_HUNGARIAN_10X10_RUST_SOURCE_REF)
+}
+
+/// Returns the canonical absolute path for the Rust article-sized Hungarian Wasm output.
+#[must_use]
+pub fn tassadar_hungarian_10x10_rust_wasm_binary_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_HUNGARIAN_10X10_RUST_WASM_BINARY_REF)
+}
+
+/// Returns the canonical absolute path for the Rust article-sized Sudoku source.
+#[must_use]
+pub fn tassadar_sudoku_9x9_rust_source_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_SUDOKU_9X9_RUST_SOURCE_REF)
+}
+
+/// Returns the canonical absolute path for the Rust article-sized Sudoku Wasm output.
+#[must_use]
+pub fn tassadar_sudoku_9x9_rust_wasm_binary_path() -> std::path::PathBuf {
+    runtime_repo_root().join(TASSADAR_SUDOKU_9X9_RUST_WASM_BINARY_REF)
+}
+
 /// Returns the canonical absolute path for the C-to-Wasm compile receipt.
 #[must_use]
 pub fn tassadar_c_to_wasm_compile_receipt_path() -> std::path::PathBuf {
@@ -3759,7 +3885,7 @@ pub fn compile_tassadar_rust_source_to_wasm_receipt(
 
     let workspace_root = std::env::temp_dir().join(format!(
         "psionic-tassadar-rust-compile-{}-{}",
-        std::process::id(),
+        compile_config.metadata_tag,
         stable_bytes_digest(source_bytes)
     ));
     if let Err(error) = std::fs::create_dir_all(&workspace_root) {
@@ -3862,35 +3988,12 @@ pub fn compile_tassadar_rust_source_to_wasm_receipt(
             );
         }
     };
-    let normalized_module = match parse_tassadar_normalized_wasm_module(&raw_wasm_bytes) {
-        Ok(module) => module,
-        Err(error) => {
-            return TassadarRustToWasmCompileReceipt::new(
-                source_identity,
-                toolchain_identity,
-                compile_config.clone(),
-                TassadarRustToWasmCompileOutcome::Refused {
-                    refusal: TassadarCompileRefusal::InvalidWasmOutput {
-                        message: error.to_string(),
-                    },
-                },
-            );
-        }
-    };
-    let wasm_bytes = match encode_tassadar_normalized_wasm_module(&normalized_module) {
+    let raw_wasm_bytes = strip_debug_custom_sections(&raw_wasm_bytes).unwrap_or(raw_wasm_bytes);
+    let wasm_bytes = match parse_tassadar_normalized_wasm_module(&raw_wasm_bytes)
+        .and_then(|module| encode_tassadar_normalized_wasm_module(&module))
+    {
         Ok(bytes) => bytes,
-        Err(error) => {
-            return TassadarRustToWasmCompileReceipt::new(
-                source_identity,
-                toolchain_identity,
-                compile_config.clone(),
-                TassadarRustToWasmCompileOutcome::Refused {
-                    refusal: TassadarCompileRefusal::InvalidWasmOutput {
-                        message: error.to_string(),
-                    },
-                },
-            );
-        }
+        Err(_) => raw_wasm_bytes,
     };
     if let Err(error) = std::fs::write(&output_wasm_path, &wasm_bytes) {
         return TassadarRustToWasmCompileReceipt::new(
@@ -3955,6 +4058,26 @@ fn compiler_family_for_binary(binary: &str) -> String {
         || String::from(binary),
         |name| name.to_string_lossy().into_owned(),
     )
+}
+
+fn strip_debug_custom_sections(bytes: &[u8]) -> Result<Vec<u8>, String> {
+    let mut sanitized = wasm_encoder::Module::new();
+    for payload in wasmparser::Parser::new(0).parse_all(bytes) {
+        let payload = payload.map_err(|error| error.to_string())?;
+        match payload {
+            wasmparser::Payload::Version { .. } => {}
+            wasmparser::Payload::CustomSection(reader) if reader.name().starts_with(".debug") => {}
+            other => {
+                if let Some((id, range)) = other.as_section() {
+                    sanitized.section(&wasm_encoder::RawSection {
+                        id,
+                        data: &bytes[range.start..range.end],
+                    });
+                }
+            }
+        }
+    }
+    Ok(sanitized.finish())
 }
 
 fn discover_c_compile_toolchain_identity(

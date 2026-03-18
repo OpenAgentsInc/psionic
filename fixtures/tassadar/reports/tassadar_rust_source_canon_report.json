@@ -1,0 +1,458 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.rust_source_canon.report.v1",
+  "source_family_ids": [
+    "rust.multi_export_kernel",
+    "rust.memory_lookup_kernel",
+    "rust.param_abi_kernel",
+    "rust.micro_wasm_article",
+    "rust.heap_sum_article",
+    "rust.long_loop_article",
+    "rust.hungarian_10x10_article",
+    "rust.sudoku_9x9_article"
+  ],
+  "generated_from_refs": [
+    "fixtures/tassadar/sources/tassadar_multi_export_kernel.rs",
+    "fixtures/tassadar/sources/tassadar_memory_lookup_kernel.rs",
+    "fixtures/tassadar/sources/tassadar_param_abi_kernel.rs",
+    "fixtures/tassadar/sources/tassadar_micro_wasm_kernel.rs",
+    "fixtures/tassadar/sources/tassadar_heap_sum_kernel.rs",
+    "fixtures/tassadar/sources/tassadar_long_loop_kernel.rs",
+    "fixtures/tassadar/sources/tassadar_hungarian_10x10_article.rs",
+    "fixtures/tassadar/sources/tassadar_sudoku_9x9_article.rs"
+  ],
+  "cases": [
+    {
+      "case_id": "multi_export_exact",
+      "workload_family_id": "rust.multi_export_kernel",
+      "source_ref": "fixtures/tassadar/sources/tassadar_multi_export_kernel.rs",
+      "source_digest": "47ea087de354da4c2b3691454eb8cfb7c08731c227957f5c95a869117c8505a0",
+      "compile_config_digest": "97ba9d7535b17bb5cabb68a233bf506ffd63f64a097407e002f04a129975aff9",
+      "compile_pipeline_features": [
+        "compiler_binary:rustc",
+        "crate_name:tassadar_multi_export_kernel",
+        "crate_type:cdylib",
+        "edition:2024",
+        "export:local_double",
+        "export:pair_sum",
+        "metadata:tassadar_multi_export_kernel",
+        "optimization:3",
+        "panic:abort",
+        "target:wasm32-unknown-unknown"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "rustc",
+        "compiler_version": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+        "target": "wasm32-unknown-unknown",
+        "pipeline_features": [
+          "compiler_binary:rustc",
+          "crate_name:tassadar_multi_export_kernel",
+          "crate_type:cdylib",
+          "edition:2024",
+          "export:local_double",
+          "export:pair_sum",
+          "metadata:tassadar_multi_export_kernel",
+          "optimization:3",
+          "panic:abort",
+          "target:wasm32-unknown-unknown"
+        ]
+      },
+      "toolchain_digest": "edfee4d2d6114c05be15b68cbbe02f207c6ceddb557009700539aa1351cb4b27",
+      "receipt_digest": "814ad6ae28f53fc97c1113508ba29b9d48a6c17c83b1c9ef48f6c7b869038d39",
+      "status": "compiled",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_multi_export_kernel.wasm",
+      "wasm_binary_digest": "af9f82749e29eca1da7c86f0bfd14253a80bd96818354e802eba2ee525bcec84",
+      "wasm_binary_summary": {
+        "byte_len": 424,
+        "exported_functions": [
+          "local_double",
+          "pair_sum"
+        ],
+        "function_count": 2,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": [
+          "name",
+          "producers",
+          "target_features"
+        ]
+      }
+    },
+    {
+      "case_id": "memory_lookup_exact",
+      "workload_family_id": "rust.memory_lookup_kernel",
+      "source_ref": "fixtures/tassadar/sources/tassadar_memory_lookup_kernel.rs",
+      "source_digest": "70d2652567d542e340b2f537efef82548eb274fb84900de133b954b102f271a1",
+      "compile_config_digest": "1771115d5c9540be32ba96e88fa40e2173c53debdc45f44df3349e6f9c53915f",
+      "compile_pipeline_features": [
+        "compiler_binary:rustc",
+        "crate_name:tassadar_memory_lookup_kernel",
+        "crate_type:cdylib",
+        "edition:2024",
+        "export:load_edge_sum",
+        "export:load_middle",
+        "metadata:tassadar_memory_lookup_kernel",
+        "optimization:3",
+        "panic:abort",
+        "target:wasm32-unknown-unknown"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "rustc",
+        "compiler_version": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+        "target": "wasm32-unknown-unknown",
+        "pipeline_features": [
+          "compiler_binary:rustc",
+          "crate_name:tassadar_memory_lookup_kernel",
+          "crate_type:cdylib",
+          "edition:2024",
+          "export:load_edge_sum",
+          "export:load_middle",
+          "metadata:tassadar_memory_lookup_kernel",
+          "optimization:3",
+          "panic:abort",
+          "target:wasm32-unknown-unknown"
+        ]
+      },
+      "toolchain_digest": "8209375312e38ecd62b1c69fe9aa86bea93d2e4de60f7ead88ec5aec49d2cb88",
+      "receipt_digest": "60eede9bf5020703a53ec9dfd1f5391812cbbaad99b4d19e52c3db329e8cfbfd",
+      "status": "compiled",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_memory_lookup_kernel.wasm",
+      "wasm_binary_digest": "ca9d981e65b648d0e01062fc14a42b263bf0cf35d0953a91a211165e97b7c4e2",
+      "wasm_binary_summary": {
+        "byte_len": 432,
+        "exported_functions": [
+          "load_edge_sum",
+          "load_middle"
+        ],
+        "function_count": 2,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": [
+          "name",
+          "producers",
+          "target_features"
+        ]
+      }
+    },
+    {
+      "case_id": "param_abi_fixture",
+      "workload_family_id": "rust.param_abi_kernel",
+      "source_ref": "fixtures/tassadar/sources/tassadar_param_abi_kernel.rs",
+      "source_digest": "05ab4311617d98fa2b3ff7c731dbadc8e3e375e7c830df70acddfcf2a599a14f",
+      "compile_config_digest": "90bf9c40d30e9343c1272b1b5cde442d4619e288bff3104bc304f715c5e42be3",
+      "compile_pipeline_features": [
+        "compiler_binary:rustc",
+        "crate_name:tassadar_param_abi_kernel",
+        "crate_type:cdylib",
+        "edition:2024",
+        "export:add_one",
+        "metadata:tassadar_param_abi_kernel",
+        "optimization:3",
+        "panic:abort",
+        "target:wasm32-unknown-unknown"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "rustc",
+        "compiler_version": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+        "target": "wasm32-unknown-unknown",
+        "pipeline_features": [
+          "compiler_binary:rustc",
+          "crate_name:tassadar_param_abi_kernel",
+          "crate_type:cdylib",
+          "edition:2024",
+          "export:add_one",
+          "metadata:tassadar_param_abi_kernel",
+          "optimization:3",
+          "panic:abort",
+          "target:wasm32-unknown-unknown"
+        ]
+      },
+      "toolchain_digest": "504b61d96001f8c9ff327ba47c6a47cc647776239d2befafdbe9ab7bad9dbefc",
+      "receipt_digest": "a3369320750f4c5f6d619f8949d9126191c87445bffcbae3d594e489bb408871",
+      "status": "compiled",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_param_abi_kernel.wasm",
+      "wasm_binary_digest": "e2d90115284bde4482b1f71d316d82b78f65496498db6d165fc55ce55df11bdf",
+      "wasm_binary_summary": {
+        "byte_len": 391,
+        "exported_functions": [
+          "add_one"
+        ],
+        "function_count": 1,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": [
+          "name",
+          "producers",
+          "target_features"
+        ]
+      }
+    },
+    {
+      "case_id": "micro_wasm_article",
+      "workload_family_id": "rust.micro_wasm_article",
+      "source_ref": "fixtures/tassadar/sources/tassadar_micro_wasm_kernel.rs",
+      "source_digest": "f7b52899ade2375f3e0b12351e2aa18927c763b3e529f189bb5c323eae090f13",
+      "compile_config_digest": "bdfc8c7a0e89f17d60bbd357399e6dae135e67aca0a86b196d58724a012a0217",
+      "compile_pipeline_features": [
+        "compiler_binary:rustc",
+        "crate_name:tassadar_micro_wasm_kernel",
+        "crate_type:cdylib",
+        "edition:2024",
+        "export:micro_wasm_kernel",
+        "metadata:tassadar_micro_wasm_kernel",
+        "optimization:3",
+        "panic:abort",
+        "target:wasm32-unknown-unknown"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "rustc",
+        "compiler_version": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+        "target": "wasm32-unknown-unknown",
+        "pipeline_features": [
+          "compiler_binary:rustc",
+          "crate_name:tassadar_micro_wasm_kernel",
+          "crate_type:cdylib",
+          "edition:2024",
+          "export:micro_wasm_kernel",
+          "metadata:tassadar_micro_wasm_kernel",
+          "optimization:3",
+          "panic:abort",
+          "target:wasm32-unknown-unknown"
+        ]
+      },
+      "toolchain_digest": "5ca816716412cb5dfa54338cbf105783d37850fa4087075d63ed6ba508bfd690",
+      "receipt_digest": "2354abb24aedaa57203d8b4fe57b0d876d4a4b0d03a35c2f0f4cc1c97545a778",
+      "status": "compiled",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_micro_wasm_kernel_rust.wasm",
+      "wasm_binary_digest": "a149d0b282f66a9f18de65498442fb2aef43ea727bb7ead18a22788d3155e887",
+      "wasm_binary_summary": {
+        "byte_len": 438,
+        "exported_functions": [
+          "micro_wasm_kernel"
+        ],
+        "function_count": 1,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": [
+          "name",
+          "producers",
+          "target_features"
+        ]
+      }
+    },
+    {
+      "case_id": "heap_sum_article",
+      "workload_family_id": "rust.heap_sum_article",
+      "source_ref": "fixtures/tassadar/sources/tassadar_heap_sum_kernel.rs",
+      "source_digest": "f52e128b41230086fd643bf6e17ef302deed93d74562c419525d5db9c3618c1a",
+      "compile_config_digest": "afef7c37f0ae9bc779690adb1e0da1a95d168f5a364a9e64e60e0b01d5b4ca7e",
+      "compile_pipeline_features": [
+        "compiler_binary:rustc",
+        "crate_name:tassadar_heap_sum_kernel",
+        "crate_type:cdylib",
+        "edition:2024",
+        "export:heap_sum_i32",
+        "metadata:tassadar_heap_sum_kernel",
+        "optimization:3",
+        "panic:abort",
+        "target:wasm32-unknown-unknown"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "rustc",
+        "compiler_version": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+        "target": "wasm32-unknown-unknown",
+        "pipeline_features": [
+          "compiler_binary:rustc",
+          "crate_name:tassadar_heap_sum_kernel",
+          "crate_type:cdylib",
+          "edition:2024",
+          "export:heap_sum_i32",
+          "metadata:tassadar_heap_sum_kernel",
+          "optimization:3",
+          "panic:abort",
+          "target:wasm32-unknown-unknown"
+        ]
+      },
+      "toolchain_digest": "c2c789acb63ab77a1114b67533da65921df394b9cf3589047abcae5e27541bcb",
+      "receipt_digest": "7f79aa371610c9a02d4752844fb930a922131bbf66b143f15d0e996e1928ed93",
+      "status": "compiled",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_heap_sum_kernel.wasm",
+      "wasm_binary_digest": "8e72168f9b445db5b8d61961c95972bd743a5806ff48462ccfe2a68f82668a11",
+      "wasm_binary_summary": {
+        "byte_len": 575,
+        "exported_functions": [
+          "heap_sum_i32"
+        ],
+        "function_count": 1,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": [
+          "name",
+          "producers",
+          "target_features"
+        ]
+      }
+    },
+    {
+      "case_id": "long_loop_article",
+      "workload_family_id": "rust.long_loop_article",
+      "source_ref": "fixtures/tassadar/sources/tassadar_long_loop_kernel.rs",
+      "source_digest": "94b18f5c1fcfb6450953a5d518d752f89253cb2b4e1af96646d123e9595f7057",
+      "compile_config_digest": "b31ec18bb3f44440c344bc4a0cd3f0bf1cb3c671c3512016c36a35a98f304608",
+      "compile_pipeline_features": [
+        "compiler_binary:rustc",
+        "crate_name:tassadar_long_loop_kernel",
+        "crate_type:cdylib",
+        "edition:2024",
+        "export:million_step_loop",
+        "metadata:tassadar_long_loop_kernel",
+        "optimization:3",
+        "panic:abort",
+        "target:wasm32-unknown-unknown"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "rustc",
+        "compiler_version": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+        "target": "wasm32-unknown-unknown",
+        "pipeline_features": [
+          "compiler_binary:rustc",
+          "crate_name:tassadar_long_loop_kernel",
+          "crate_type:cdylib",
+          "edition:2024",
+          "export:million_step_loop",
+          "metadata:tassadar_long_loop_kernel",
+          "optimization:3",
+          "panic:abort",
+          "target:wasm32-unknown-unknown"
+        ]
+      },
+      "toolchain_digest": "7c147955150f899cd2c1e96683bf4985958189b05c1d02865814c7053edd3773",
+      "receipt_digest": "093777366248fcd0b756703908014e7616f1ebcba1d0d0b3bddf36bd52c15593",
+      "status": "compiled",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_long_loop_kernel.wasm",
+      "wasm_binary_digest": "5d2280153e03ca76c16316cb88490a0ab3aebf95c27d0b9710c2eb16ccf2f35f",
+      "wasm_binary_summary": {
+        "byte_len": 407,
+        "exported_functions": [
+          "million_step_loop"
+        ],
+        "function_count": 1,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": [
+          "name",
+          "producers",
+          "target_features"
+        ]
+      }
+    },
+    {
+      "case_id": "hungarian_10x10_article",
+      "workload_family_id": "rust.hungarian_10x10_article",
+      "source_ref": "fixtures/tassadar/sources/tassadar_hungarian_10x10_article.rs",
+      "source_digest": "f3a89c7c1baf3c9706188edffae9042e14bf5c526b4f4184632e1edaf8221b3e",
+      "compile_config_digest": "d1629c79f07cf91c73860c767fe8e42dd4f8678710e674a5d394750dea3a46bf",
+      "compile_pipeline_features": [
+        "compiler_binary:rustc",
+        "crate_name:tassadar_hungarian_10x10_article",
+        "crate_type:cdylib",
+        "edition:2024",
+        "export:hungarian_10x10_article_cost",
+        "metadata:tassadar_hungarian_10x10_article",
+        "optimization:3",
+        "panic:abort",
+        "target:wasm32-unknown-unknown"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "rustc",
+        "compiler_version": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+        "target": "wasm32-unknown-unknown",
+        "pipeline_features": [
+          "compiler_binary:rustc",
+          "crate_name:tassadar_hungarian_10x10_article",
+          "crate_type:cdylib",
+          "edition:2024",
+          "export:hungarian_10x10_article_cost",
+          "metadata:tassadar_hungarian_10x10_article",
+          "optimization:3",
+          "panic:abort",
+          "target:wasm32-unknown-unknown"
+        ]
+      },
+      "toolchain_digest": "7e6290dd272d3ddf08ccb9c7721298219331df5daaa690eabc1923aaa4ba5411",
+      "receipt_digest": "d8e42a3dc5c78d4ada31815077a84873d7babec39c462069d7178686b124bfeb",
+      "status": "compiled",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_hungarian_10x10_article.wasm",
+      "wasm_binary_digest": "cc3c404da600f45d1173bf214e1c253703cded63fba33d05b80368417bfaee31",
+      "wasm_binary_summary": {
+        "byte_len": 1689,
+        "exported_functions": [
+          "hungarian_10x10_article_cost"
+        ],
+        "function_count": 2,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": [
+          "name",
+          "producers",
+          "target_features"
+        ]
+      }
+    },
+    {
+      "case_id": "sudoku_9x9_article",
+      "workload_family_id": "rust.sudoku_9x9_article",
+      "source_ref": "fixtures/tassadar/sources/tassadar_sudoku_9x9_article.rs",
+      "source_digest": "8a8d943d3c073db5157cd841db7b2e582a96d5299116ca004db292d8c1508c8e",
+      "compile_config_digest": "dd71bf6270a38ebe9c5d3e57f67b9f81b816f1eb8c065bd078e9d3c0392e477a",
+      "compile_pipeline_features": [
+        "compiler_binary:rustc",
+        "crate_name:tassadar_sudoku_9x9_article",
+        "crate_type:cdylib",
+        "edition:2024",
+        "export:sudoku_9x9_article_checksum",
+        "metadata:tassadar_sudoku_9x9_article",
+        "optimization:3",
+        "panic:abort",
+        "target:wasm32-unknown-unknown"
+      ],
+      "toolchain_identity": {
+        "compiler_family": "rustc",
+        "compiler_version": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+        "target": "wasm32-unknown-unknown",
+        "pipeline_features": [
+          "compiler_binary:rustc",
+          "crate_name:tassadar_sudoku_9x9_article",
+          "crate_type:cdylib",
+          "edition:2024",
+          "export:sudoku_9x9_article_checksum",
+          "metadata:tassadar_sudoku_9x9_article",
+          "optimization:3",
+          "panic:abort",
+          "target:wasm32-unknown-unknown"
+        ]
+      },
+      "toolchain_digest": "6419c7609135a0329fbaff277ea906f95fa17a181a66f3551633542284a6bdae",
+      "receipt_digest": "ebfe4a69b5384864a8bc27bb0911e44ef2f0425b999d5d2c58012bab1cd04ac5",
+      "status": "compiled",
+      "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_sudoku_9x9_article.wasm",
+      "wasm_binary_digest": "4b53432aed5c47fab80f745b581cf08a6f3f8bf1a332e8466462be7c4549f1ef",
+      "wasm_binary_summary": {
+        "byte_len": 5357,
+        "exported_functions": [
+          "sudoku_9x9_article_checksum"
+        ],
+        "function_count": 9,
+        "imported_function_count": 0,
+        "memory_count": 1,
+        "custom_sections": [
+          "name",
+          "producers",
+          "target_features"
+        ]
+      }
+    }
+  ],
+  "claim_boundary": "this report freezes the Rust-only frontend canon for the Tassadar article-closure path. It proves explicit Rust-source, toolchain, compile-config, and Wasm-output lineage for the committed kernel, heap-input, long-loop, Hungarian, and Sudoku fixtures, and it excludes the older C-source receipt from the article-closure path. It does not by itself imply generic Rust frontend closure, bounded-lane lowering coverage, or arbitrary Wasm execution support.",
+  "report_digest": "9d0b3a54ff8fa8833d7b55d4e9943f0dbdae9c3c71a40fe9a1ead956b5dcc94b"
+}

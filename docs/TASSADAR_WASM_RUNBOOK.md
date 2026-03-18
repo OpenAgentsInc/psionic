@@ -19,6 +19,7 @@ It exists to answer a narrow question:
 
 This runbook covers the current repo-owned bounded Wasm flow only:
 
+- Rust-only article frontend canon
 - canonical C-to-Wasm compile receipt
 - source-to-Wasm-to-Tassadar compile-pipeline matrix
 - normalized Wasm-module ingress
@@ -49,7 +50,7 @@ Required local baseline:
 Optional local baseline:
 
 - `clang` with a working `wasm32-unknown-unknown` target if you want the
-  canonical C-source compile receipt to succeed locally
+  historical C-source compile receipt to succeed locally
 
 If that target is missing, the compile-receipt step should refuse with a typed
 `toolchain_failure`. That is a local toolchain prerequisite failure, not proof
@@ -57,7 +58,26 @@ that the bounded Wasm lane regressed.
 
 ## Canonical Flow
 
-### 1. Canonical C-to-Wasm compile receipt
+### 1. Rust-only article frontend canon
+
+```bash
+cargo run -p psionic-eval --example tassadar_rust_source_canon_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_rust_source_canon_report.json`
+
+Expected outcome:
+
+- all canonical frontend cases are rooted in committed `.rs` fixtures
+- the multi-export, memory-lookup, parameter-ABI, micro-kernel, heap-input,
+  long-loop, Hungarian, and Sudoku Rust fixtures all compile successfully to
+  committed Wasm outputs with stable source/toolchain/config/output lineage
+- this report is the article-closure frontend anchor; it does not by itself
+  imply arbitrary Rust closure or arbitrary Wasm lowering
+
+### 2. Optional historical C-to-Wasm compile receipt
 
 ```bash
 cargo run -p psionic-runtime --example tassadar_c_to_wasm_compile_receipt
@@ -73,8 +93,9 @@ Expected outcome:
   `fixtures/tassadar/sources/tassadar_micro_wasm_kernel.c`
 - or a typed refusal if the local `clang` cannot target
   `wasm32-unknown-unknown`
+- this step is not required for the Rust-only article-closure path
 
-### 2. Compile-pipeline matrix
+### 3. Compile-pipeline matrix
 
 ```bash
 cargo run -p psionic-eval --example tassadar_compile_pipeline_matrix_report
@@ -91,7 +112,7 @@ Expected outcome:
 - explicit toolchain refusal for the C-source path when the local toolchain is
   unavailable or incomplete
 
-### 3. Wasm-module ingress
+### 4. Wasm-module ingress
 
 ```bash
 cargo run -p psionic-eval --example tassadar_wasm_module_ingress_report
@@ -107,7 +128,7 @@ Expected outcome:
   refuses lowering because the exported function takes one parameter
 - the seeded synthetic multi-function module lowers and executes exactly
 
-### 4. Differential Wasm conformance
+### 5. Differential Wasm conformance
 
 ```bash
 cargo run -p psionic-eval --example tassadar_wasm_conformance_report
@@ -123,7 +144,7 @@ Expected outcome:
 - exact trap parity on the seeded trap cases
 - explicit boundary refusal on the unsupported host-import case
 
-### 5. Module-scale Wasm workloads
+### 6. Module-scale Wasm workloads
 
 ```bash
 cargo run -p psionic-eval --example tassadar_module_scale_workload_suite_report
@@ -138,7 +159,7 @@ Expected outcome:
 - exact lowering for fixed-span memcpy, checksum, parsing, and VM-style cases
 - explicit parameter-ABI refusal on the VM-style parameter case
 
-### 6. Trap and exception parity
+### 7. Trap and exception parity
 
 ```bash
 cargo run -p psionic-eval --example tassadar_trap_exception_report

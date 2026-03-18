@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -23,24 +23,21 @@ const BOUNDED_HUNGARIAN_RUN_BUNDLE_REF: &str =
     "fixtures/tassadar/runs/hungarian_v0_compiled_executor_v0/run_bundle.json";
 const ARTICLE_SUDOKU_RUN_BUNDLE_REF: &str =
     "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/run_bundle.json";
-const ARTICLE_SUDOKU_EXACTNESS_REPORT_REF: &str =
-    "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/compiled_executor_exactness_report.json";
-const ARTICLE_SUDOKU_COMPATIBILITY_REPORT_REF: &str =
-    "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/compiled_executor_compatibility_report.json";
+const ARTICLE_SUDOKU_EXACTNESS_REPORT_REF: &str = "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/compiled_executor_exactness_report.json";
+const ARTICLE_SUDOKU_COMPATIBILITY_REPORT_REF: &str = "fixtures/tassadar/runs/sudoku_9x9_v0_compiled_executor_v0/compiled_executor_compatibility_report.json";
 const ARTICLE_HUNGARIAN_RUN_BUNDLE_REF: &str =
     "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/run_bundle.json";
-const ARTICLE_HUNGARIAN_EXACTNESS_REPORT_REF: &str =
-    "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_exactness_report.json";
-const ARTICLE_HUNGARIAN_COMPATIBILITY_REPORT_REF: &str =
-    "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_compatibility_report.json";
+const ARTICLE_HUNGARIAN_EXACTNESS_REPORT_REF: &str = "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_exactness_report.json";
+const ARTICLE_HUNGARIAN_COMPATIBILITY_REPORT_REF: &str = "fixtures/tassadar/runs/hungarian_10x10_v0_compiled_executor_v0/compiled_executor_compatibility_report.json";
 const KERNEL_SUITE_RUN_BUNDLE_REF: &str =
     "fixtures/tassadar/runs/compiled_kernel_suite_v0/run_bundle.json";
 const KERNEL_SUITE_EXACTNESS_REPORT_REF: &str =
     "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_exactness_report.json";
-const KERNEL_SUITE_COMPATIBILITY_REPORT_REF: &str =
-    "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_compatibility_report.json";
+const KERNEL_SUITE_COMPATIBILITY_REPORT_REF: &str = "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_compatibility_report.json";
 const KERNEL_SUITE_SCALING_REPORT_REF: &str =
     "fixtures/tassadar/runs/compiled_kernel_suite_v0/compiled_kernel_suite_scaling_report.json";
+const RUST_SOURCE_CANON_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_rust_source_canon_report.json";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TassadarCompiledArticleClosureRequirement {
@@ -100,8 +97,10 @@ impl TassadarCompiledArticleClosureReport {
             missing_requirements,
             report_digest: String::new(),
         };
-        report.report_digest =
-            stable_digest(b"psionic_tassadar_compiled_article_closure_report|", &report);
+        report.report_digest = stable_digest(
+            b"psionic_tassadar_compiled_article_closure_report|",
+            &report,
+        );
         report
     }
 }
@@ -126,6 +125,10 @@ struct CompiledArticleClosureSnapshot {
     kernel_suite_deployments: usize,
     kernel_suite_has_benchmark_and_environment: bool,
     kernel_suite_family_ids: BTreeSet<String>,
+    rust_source_canon_case_count: usize,
+    rust_source_canon_compiled_case_count: usize,
+    rust_source_canon_all_sources_are_rust: bool,
+    rust_source_canon_article_cases_compiled: bool,
 }
 
 #[derive(Debug, Error)]
@@ -154,10 +157,12 @@ pub fn tassadar_compiled_article_closure_report_path() -> PathBuf {
     repo_root().join(tassadar_compiled_article_closure_report_ref())
 }
 
-pub fn build_tassadar_compiled_article_closure_report(
-) -> Result<TassadarCompiledArticleClosureReport, TassadarCompiledArticleClosureError> {
-    let bounded_sudoku_bundle: Value =
-        read_repo_json(BOUNDED_SUDOKU_RUN_BUNDLE_REF, "tassadar_compiled_executor_run_bundle")?;
+pub fn build_tassadar_compiled_article_closure_report()
+-> Result<TassadarCompiledArticleClosureReport, TassadarCompiledArticleClosureError> {
+    let bounded_sudoku_bundle: Value = read_repo_json(
+        BOUNDED_SUDOKU_RUN_BUNDLE_REF,
+        "tassadar_compiled_executor_run_bundle",
+    )?;
     let bounded_hungarian_bundle: Value = read_repo_json(
         BOUNDED_HUNGARIAN_RUN_BUNDLE_REF,
         "tassadar_hungarian_compiled_executor_run_bundle",
@@ -186,8 +191,10 @@ pub fn build_tassadar_compiled_article_closure_report(
         ARTICLE_HUNGARIAN_COMPATIBILITY_REPORT_REF,
         "tassadar_hungarian_10x10_compiled_executor_compatibility_report",
     )?;
-    let kernel_suite_bundle: Value =
-        read_repo_json(KERNEL_SUITE_RUN_BUNDLE_REF, "tassadar_compiled_kernel_suite_run_bundle")?;
+    let kernel_suite_bundle: Value = read_repo_json(
+        KERNEL_SUITE_RUN_BUNDLE_REF,
+        "tassadar_compiled_kernel_suite_run_bundle",
+    )?;
     let kernel_suite_exactness: Value = read_repo_json(
         KERNEL_SUITE_EXACTNESS_REPORT_REF,
         "tassadar_compiled_kernel_suite_exactness_report",
@@ -200,12 +207,19 @@ pub fn build_tassadar_compiled_article_closure_report(
         KERNEL_SUITE_SCALING_REPORT_REF,
         "tassadar_compiled_kernel_suite_scaling_report",
     )?;
+    let rust_source_canon: Value = read_repo_json(
+        RUST_SOURCE_CANON_REPORT_REF,
+        "tassadar_rust_source_canon_report",
+    )?;
 
     let snapshot = CompiledArticleClosureSnapshot {
         bounded_sudoku_claim_class: json_str(&bounded_sudoku_bundle, "claim_class"),
         bounded_hungarian_claim_class: json_str(&bounded_hungarian_bundle, "claim_class"),
         article_sudoku_claim_class: json_str(&article_sudoku_bundle, "claim_class"),
-        article_sudoku_exact_trace_rate_bps: json_u32(&article_sudoku_exactness, "exact_trace_rate_bps"),
+        article_sudoku_exact_trace_rate_bps: json_u32(
+            &article_sudoku_exactness,
+            "exact_trace_rate_bps",
+        ),
         article_sudoku_refusal_rate_bps: json_u32(
             &article_sudoku_compatibility,
             "matched_refusal_rate_bps",
@@ -214,7 +228,10 @@ pub fn build_tassadar_compiled_article_closure_report(
         article_sudoku_has_benchmark_and_environment: has_nonempty_string(
             &article_sudoku_bundle,
             "benchmark_package_digest",
-        ) && has_nonempty_string(&article_sudoku_bundle, "environment_bundle_digest"),
+        ) && has_nonempty_string(
+            &article_sudoku_bundle,
+            "environment_bundle_digest",
+        ),
         article_hungarian_claim_class: json_str(&article_hungarian_bundle, "claim_class"),
         article_hungarian_exact_trace_rate_bps: json_u32(
             &article_hungarian_exactness,
@@ -228,9 +245,15 @@ pub fn build_tassadar_compiled_article_closure_report(
         article_hungarian_has_benchmark_and_environment: has_nonempty_string(
             &article_hungarian_bundle,
             "benchmark_package_digest",
-        ) && has_nonempty_string(&article_hungarian_bundle, "environment_bundle_digest"),
+        ) && has_nonempty_string(
+            &article_hungarian_bundle,
+            "environment_bundle_digest",
+        ),
         kernel_suite_claim_class: json_str(&kernel_suite_bundle, "claim_class"),
-        kernel_suite_exact_trace_rate_bps: json_u32(&kernel_suite_exactness, "exact_trace_rate_bps"),
+        kernel_suite_exact_trace_rate_bps: json_u32(
+            &kernel_suite_exactness,
+            "exact_trace_rate_bps",
+        ),
         kernel_suite_refusal_rate_bps: json_u32(
             &kernel_suite_compatibility,
             "matched_refusal_rate_bps",
@@ -239,13 +262,42 @@ pub fn build_tassadar_compiled_article_closure_report(
         kernel_suite_has_benchmark_and_environment: has_nonempty_string(
             &kernel_suite_bundle,
             "benchmark_package_digest",
-        ) && has_nonempty_string(&kernel_suite_bundle, "environment_bundle_digest"),
+        ) && has_nonempty_string(
+            &kernel_suite_bundle,
+            "environment_bundle_digest",
+        ),
         kernel_suite_family_ids: kernel_suite_scaling["family_reports"]
             .as_array()
             .into_iter()
             .flatten()
             .filter_map(|family| family["family_id"].as_str().map(String::from))
             .collect(),
+        rust_source_canon_case_count: json_array_len(&rust_source_canon, "cases"),
+        rust_source_canon_compiled_case_count: rust_source_canon["cases"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|case| case["status"].as_str() == Some("compiled"))
+            .count(),
+        rust_source_canon_all_sources_are_rust: rust_source_canon["generated_from_refs"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .all(|source_ref| {
+                source_ref
+                    .as_str()
+                    .is_some_and(|source_ref| source_ref.ends_with(".rs"))
+            }),
+        rust_source_canon_article_cases_compiled: rust_source_canon["cases"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|case| {
+                case["case_id"]
+                    .as_str()
+                    .is_some_and(|case_id| case_id.contains("article"))
+            })
+            .all(|case| case["status"].as_str() == Some("compiled")),
     };
     Ok(report_from_snapshot(&snapshot))
 }
@@ -304,8 +356,27 @@ fn report_from_snapshot(
         && sudoku_9x9_passed
         && hungarian_10x10_passed
         && kernel_suite_passed;
+    let rust_source_canon_passed = snapshot.rust_source_canon_case_count >= 8
+        && snapshot.rust_source_canon_case_count == snapshot.rust_source_canon_compiled_case_count
+        && snapshot.rust_source_canon_all_sources_are_rust
+        && snapshot.rust_source_canon_article_cases_compiled;
 
     let requirements = vec![
+        TassadarCompiledArticleClosureRequirement {
+            requirement_id: String::from("rust_only_frontend_canon"),
+            label: String::from(
+                "Rust-only source canon binds the article frontend path to committed Rust fixtures",
+            ),
+            artifact_refs: vec![String::from(RUST_SOURCE_CANON_REPORT_REF)],
+            passed: rust_source_canon_passed,
+            detail: format!(
+                "case_count={}; compiled_case_count={}; all_sources_are_rust={}; article_cases_compiled={}",
+                snapshot.rust_source_canon_case_count,
+                snapshot.rust_source_canon_compiled_case_count,
+                snapshot.rust_source_canon_all_sources_are_rust,
+                snapshot.rust_source_canon_article_cases_compiled
+            ),
+        },
         TassadarCompiledArticleClosureRequirement {
             requirement_id: String::from("compiled_article_sudoku_9x9"),
             label: String::from(
@@ -399,11 +470,11 @@ fn report_from_snapshot(
     let passed = missing_requirements.is_empty();
     let detail = if passed {
         String::from(
-            "Compiled article-closure checker is green: exact compiled article-sized Sudoku-9x9, Hungarian-10x10, and generic arithmetic/memory/branch/loop kernel evidence all exist with benchmark and proof artifacts, and the older 4x4 proxies are no longer the strongest exact compiled results in-tree.",
+            "Compiled article-closure checker is green: the Rust-only frontend canon is bound to committed Rust fixtures, exact compiled article-sized Sudoku-9x9 and Hungarian-10x10 bundles plus the generic arithmetic/memory/branch/loop kernel suite all exist with benchmark and proof artifacts, and the older 4x4 proxies are no longer the strongest exact compiled results in-tree.",
         )
     } else {
         String::from(
-            "Compiled article-closure checker is red: the exact compiled article-sized workload set is incomplete or the older 4x4 proxies are still the strongest exact compiled evidence in-tree.",
+            "Compiled article-closure checker is red: the Rust-only frontend canon is incomplete, the exact compiled article-sized workload set is incomplete, or the older 4x4 proxies are still the strongest exact compiled evidence in-tree.",
         )
     };
     TassadarCompiledArticleClosureReport::new(requirements, passed, detail, missing_requirements)
@@ -469,9 +540,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        build_tassadar_compiled_article_closure_report, report_from_snapshot,
-        tassadar_compiled_article_closure_report_ref, write_tassadar_compiled_article_closure_report,
         CompiledArticleClosureSnapshot, TassadarCompiledArticleClosureReport,
+        build_tassadar_compiled_article_closure_report, report_from_snapshot,
+        tassadar_compiled_article_closure_report_ref,
+        write_tassadar_compiled_article_closure_report,
     };
     use std::collections::BTreeSet;
     use tempfile::tempdir;
@@ -504,30 +576,35 @@ mod tests {
             ]
             .into_iter()
             .collect::<BTreeSet<_>>(),
+            rust_source_canon_case_count: 0,
+            rust_source_canon_compiled_case_count: 0,
+            rust_source_canon_all_sources_are_rust: false,
+            rust_source_canon_article_cases_compiled: false,
         });
         assert!(!report.passed);
         assert!(!report.missing_requirements.is_empty());
     }
 
     #[test]
-    fn compiled_article_closure_report_matches_committed_truth(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn compiled_article_closure_report_matches_committed_truth()
+    -> Result<(), Box<dyn std::error::Error>> {
         let report = build_tassadar_compiled_article_closure_report()?;
-        let persisted: TassadarCompiledArticleClosureReport =
-            super::read_repo_json(
-                tassadar_compiled_article_closure_report_ref(),
-                "tassadar_compiled_article_closure_report",
-            )?;
+        let persisted: TassadarCompiledArticleClosureReport = super::read_repo_json(
+            tassadar_compiled_article_closure_report_ref(),
+            "tassadar_compiled_article_closure_report",
+        )?;
         assert_eq!(persisted, report);
         assert!(report.passed);
         Ok(())
     }
 
     #[test]
-    fn write_compiled_article_closure_report_persists_current_truth(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn write_compiled_article_closure_report_persists_current_truth()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempdir()?;
-        let report_path = temp_dir.path().join("tassadar_compiled_article_closure_report.json");
+        let report_path = temp_dir
+            .path()
+            .join("tassadar_compiled_article_closure_report.json");
         let report = write_tassadar_compiled_article_closure_report(&report_path)?;
         let bytes = std::fs::read(&report_path)?;
         let persisted: TassadarCompiledArticleClosureReport = serde_json::from_slice(&bytes)?;

@@ -21,6 +21,15 @@
   ],
   "requirements": [
     {
+      "requirement_id": "rust_only_frontend_canon",
+      "label": "Rust-only source canon binds the article frontend path to committed Rust fixtures",
+      "artifact_refs": [
+        "fixtures/tassadar/reports/tassadar_rust_source_canon_report.json"
+      ],
+      "passed": true,
+      "detail": "case_count=8; compiled_case_count=8; all_sources_are_rust=true; article_cases_compiled=true"
+    },
+    {
       "requirement_id": "compiled_article_sudoku_9x9",
       "label": "Article-sized compiled Sudoku-9x9 bundle exists with benchmark, proof, and exact refusal truth",
       "artifact_refs": [
@@ -69,7 +78,7 @@
     }
   ],
   "passed": true,
-  "detail": "Compiled article-closure checker is green: exact compiled article-sized Sudoku-9x9, Hungarian-10x10, and generic arithmetic/memory/branch/loop kernel evidence all exist with benchmark and proof artifacts, and the older 4x4 proxies are no longer the strongest exact compiled results in-tree.",
+  "detail": "Compiled article-closure checker is green: the Rust-only frontend canon is bound to committed Rust fixtures, exact compiled article-sized Sudoku-9x9 and Hungarian-10x10 bundles plus the generic arithmetic/memory/branch/loop kernel suite all exist with benchmark and proof artifacts, and the older 4x4 proxies are no longer the strongest exact compiled results in-tree.",
   "missing_requirements": [],
-  "report_digest": "64a128df2d28f3835208876167a88888d9687b400555f69bb4cc821c88a9c3e1"
+  "report_digest": "5f3156b320c43599687ca248a2e65a4f3f62468a5169b047bca76ee0619f145b"
 }
