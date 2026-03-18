@@ -7,7 +7,8 @@ use std::{
 use psionic_environments::TassadarWorkloadTarget;
 use psionic_runtime::{
     TassadarClaimClass, TassadarExecutorSelectionReason, TassadarExecutorSelectionState,
-    TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
+    TassadarRecurrentFastPathRuntimeBaselineReport, TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
+    TASSADAR_RECURRENT_FAST_PATH_RUNTIME_BASELINE_REPORT_REF,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -19,7 +20,6 @@ use crate::{
 };
 
 const REPORT_SCHEMA_VERSION: u16 = 1;
-const LINEAR_RECURRENT_DIRECT_CPU_CEILING: f64 = 0.97;
 const REFORMER_DIRECT_CPU_CEILING: f64 = 0.92;
 
 pub const TASSADAR_EFFICIENT_ATTENTION_BASELINE_MATRIX_REPORT_REF: &str =
@@ -30,7 +30,7 @@ pub const TASSADAR_EFFICIENT_ATTENTION_BASELINE_MATRIX_REPORT_REF: &str =
 pub enum TassadarEfficientAttentionBaselineFamilyKind {
     DenseReferenceLinear,
     SparseTopKValidated,
-    LinearRecurrentProxy,
+    LinearRecurrentRuntime,
     ReformerChunkedProxy,
     HullCacheRuntime,
     HierarchicalHullResearch,
@@ -42,7 +42,7 @@ impl TassadarEfficientAttentionBaselineFamilyKind {
         match self {
             Self::DenseReferenceLinear => "dense_reference_linear",
             Self::SparseTopKValidated => "sparse_top_k_validated",
-            Self::LinearRecurrentProxy => "linear_recurrent_proxy",
+            Self::LinearRecurrentRuntime => "linear_recurrent_runtime",
             Self::ReformerChunkedProxy => "reformer_chunked_proxy",
             Self::HullCacheRuntime => "hull_cache_runtime",
             Self::HierarchicalHullResearch => "hierarchical_hull_research",
@@ -144,6 +144,8 @@ pub fn build_tassadar_efficient_attention_baseline_matrix_report() -> Result<
 > {
     let benchmark_report: ArticleBenchmarkReportSnapshot =
         read_repo_json(TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF)?;
+    let recurrent_runtime_report: TassadarRecurrentFastPathRuntimeBaselineReport =
+        read_repo_json(TASSADAR_RECURRENT_FAST_PATH_RUNTIME_BASELINE_REPORT_REF)?;
     let geometric_report: GeometricVariantReportSnapshot =
         read_repo_json(TASSADAR_GEOMETRIC_VARIANT_REPORT_REF)?;
 
@@ -165,8 +167,12 @@ pub fn build_tassadar_efficient_attention_baseline_matrix_report() -> Result<
         let dense = build_dense_reference_linear_cell(workload_target, &cases);
         let dense_steps = dense.average_steps_per_second;
         let sparse = build_sparse_top_k_cell(workload_target, &cases, dense_steps);
-        let linear_recurrent =
-            build_linear_recurrent_proxy_cell(workload_target, &cases, dense_steps);
+        let linear_recurrent = build_linear_recurrent_runtime_cell(
+            workload_target,
+            &cases,
+            &recurrent_runtime_report,
+            dense_steps,
+        )?;
         let reformer = build_reformer_chunked_proxy_cell(workload_target, &cases, dense_steps);
         let hull = build_hull_cache_runtime_cell(workload_target, &cases, dense_steps);
         let hierarchical_hull = build_hierarchical_hull_cell(
@@ -235,7 +241,7 @@ pub fn build_tassadar_efficient_attention_baseline_matrix_report() -> Result<
         .iter()
         .filter(|row| {
             row.fastest_family_kind
-                == TassadarEfficientAttentionBaselineFamilyKind::LinearRecurrentProxy
+                == TassadarEfficientAttentionBaselineFamilyKind::LinearRecurrentRuntime
         })
         .count();
 
@@ -244,14 +250,15 @@ pub fn build_tassadar_efficient_attention_baseline_matrix_report() -> Result<
         matrix_id: String::from("tassadar.efficient_attention_baseline_matrix.v0"),
         generated_from_artifacts: vec![
             String::from(TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF),
+            String::from(TASSADAR_RECURRENT_FAST_PATH_RUNTIME_BASELINE_REPORT_REF),
             String::from(TASSADAR_GEOMETRIC_VARIANT_REPORT_REF),
         ],
         rows,
         claim_boundary: String::from(
-            "this matrix keeps current runtime dense, hull-cache, and sparse-top-k execution evidence separate from research-only hierarchical-hull and proxy generic-attention baselines; the proxy rows are cost-model comparisons on the same article-class workload artifact, not promoted runtime or served capability claims",
+            "this matrix keeps current runtime dense, hull-cache, sparse-top-k, and recurrent-baseline execution evidence separate from research-only hierarchical-hull and Reformer-style proxy rows; the recurrent row is now artifact-backed runtime evidence, but it remains research-only and non-promoted",
         ),
         summary: format!(
-            "Public efficient-attention baseline matrix now freezes {} article-class workload rows under one shared artifact contract: current promoted HullCache is fastest on {} workloads, the research hierarchical-hull candidate is fastest on {}, and the generic linear/recurrent proxy is fastest on {}; sparse, reformer-style, and hull-family rows now carry explicit win/tie/lose/refuse posture against the dense reference floor instead of comparing only to naive dense headlines.",
+            "Public efficient-attention baseline matrix now freezes {} article-class workload rows under one shared artifact contract: current promoted HullCache is fastest on {} workloads, the research hierarchical-hull candidate is fastest on {}, and the recurrent runtime baseline is fastest on {}; sparse, Reformer-style, hull-family, and recurrent rows now carry explicit win/tie/lose/refuse posture against the dense reference floor instead of comparing only to naive dense headlines.",
             article_workload_targets().len(),
             hull_runtime_workload_wins,
             hierarchical_hull_workload_wins,
@@ -401,35 +408,55 @@ fn build_sparse_top_k_cell(
     }
 }
 
-fn build_linear_recurrent_proxy_cell(
+fn build_linear_recurrent_runtime_cell(
     workload_target: TassadarWorkloadTarget,
     cases: &[&TassadarBenchmarkCaseReport],
+    recurrent_runtime_report: &TassadarRecurrentFastPathRuntimeBaselineReport,
     dense_steps: f64,
-) -> TassadarEfficientAttentionBaselineCell {
-    let case_count = cases.len() as u32;
-    let average_steps_per_second = average(cases.iter().map(|case| {
-        let speedup = linear_recurrent_proxy_speedup(case.trace_steps);
-        (case.reference_linear_steps_per_second * speedup)
-            .min(case.cpu_reference_steps_per_second * LINEAR_RECURRENT_DIRECT_CPU_CEILING)
-    }));
-    let average_remaining_gap_vs_cpu_reference = average(cases.iter().map(|case| {
-        let speedup = linear_recurrent_proxy_speedup(case.trace_steps);
-        let candidate_steps = (case.reference_linear_steps_per_second * speedup)
-            .min(case.cpu_reference_steps_per_second * LINEAR_RECURRENT_DIRECT_CPU_CEILING);
-        case.cpu_reference_steps_per_second / candidate_steps.max(1e-9)
-    }));
+) -> Result<TassadarEfficientAttentionBaselineCell, TassadarEfficientAttentionBaselineMatrixError> {
+    let recurrent_cases = cases
+        .iter()
+        .map(|case| {
+            recurrent_runtime_report
+                .case_reports
+                .iter()
+                .find(|recurrent_case| recurrent_case.case_id == case.case_id)
+                .ok_or(
+                    TassadarEfficientAttentionBaselineMatrixError::MissingBenchmarkCases {
+                        workload: workload_target,
+                    },
+                )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let case_count = recurrent_cases.len() as u32;
+    let direct_case_count = recurrent_cases
+        .iter()
+        .filter(|case| case.selection_state == TassadarExecutorSelectionState::Direct)
+        .count() as u32;
+    let fallback_case_count = recurrent_cases
+        .iter()
+        .filter(|case| case.selection_state == TassadarExecutorSelectionState::Fallback)
+        .count() as u32;
+    let average_steps_per_second = average(
+        recurrent_cases
+            .iter()
+            .map(|case| case.recurrent_steps_per_second),
+    );
+    let average_remaining_gap_vs_cpu_reference = average(
+        recurrent_cases
+            .iter()
+            .map(|case| case.recurrent_remaining_gap_vs_cpu_reference),
+    );
 
-    TassadarEfficientAttentionBaselineCell {
-        family_kind: TassadarEfficientAttentionBaselineFamilyKind::LinearRecurrentProxy,
-        measurement_kind: TassadarEfficientAttentionMeasurementKind::ProxyCostModel,
+    Ok(TassadarEfficientAttentionBaselineCell {
+        family_kind: TassadarEfficientAttentionBaselineFamilyKind::LinearRecurrentRuntime,
+        measurement_kind: TassadarEfficientAttentionMeasurementKind::ArtifactBackedRuntime,
         claim_class: TassadarClaimClass::ResearchOnly,
-        claim_boundary: String::from(
-            "research-only proxy for a generic linear/recurrent attention family derived from the committed article-class trace lengths and CPU/reference-linear floor; not a landed runtime or served lane",
-        ),
+        claim_boundary: recurrent_runtime_report.claim_boundary.clone(),
         workload_target,
         case_count,
-        direct_case_count: case_count,
-        fallback_case_count: 0,
+        direct_case_count,
+        fallback_case_count,
         refused_case_count: 0,
         exact_case_count: case_count,
         average_steps_per_second: round_metric(average_steps_per_second),
@@ -444,12 +471,25 @@ fn build_linear_recurrent_proxy_cell(
             dense_steps,
             false,
         ),
-        selection_reason_counts: BTreeMap::new(),
-        artifact_ref: String::from(TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF),
+        selection_reason_counts: recurrent_cases
+            .iter()
+            .filter_map(|case| {
+                case.selection_reason.map(|reason| {
+                    serde_json::to_string(&reason)
+                        .unwrap_or_else(|_| String::from("\"unknown_selection_reason\""))
+                        .trim_matches('"')
+                        .to_string()
+                })
+            })
+            .fold(BTreeMap::new(), |mut counts, reason| {
+                *counts.entry(reason).or_insert(0) += 1;
+                counts
+            }),
+        artifact_ref: String::from(TASSADAR_RECURRENT_FAST_PATH_RUNTIME_BASELINE_REPORT_REF),
         note: String::from(
-            "research-only generic linear/recurrent floor that scales with trace length under the same workload harness so specialized wins are not measured only against naive dense replay",
+            "research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles",
         ),
-    }
+    })
 }
 
 fn build_reformer_chunked_proxy_cell(
@@ -654,11 +694,6 @@ fn build_hierarchical_hull_cell(
     })
 }
 
-fn linear_recurrent_proxy_speedup(trace_steps: u64) -> f64 {
-    let log_gain = (trace_steps.max(2) as f64).log2() / 4.0;
-    (1.0 + log_gain).clamp(1.2, 6.0)
-}
-
 fn reformer_proxy_speedup(trace_steps: u64) -> f64 {
     let log_gain = (trace_steps.max(2) as f64).log2() / 6.0;
     (1.0 + log_gain).clamp(1.15, 4.0)
@@ -856,10 +891,11 @@ mod tests {
             .iter()
             .find(|cell| {
                 cell.family_kind
-                    == TassadarEfficientAttentionBaselineFamilyKind::LinearRecurrentProxy
+                    == TassadarEfficientAttentionBaselineFamilyKind::LinearRecurrentRuntime
             })
-            .expect("linear recurrent proxy cell");
+            .expect("linear recurrent runtime cell");
         assert!(recurrent.average_speedup_over_dense_reference > 1.0);
+        assert!(recurrent.direct_case_count > 0);
         let reformer = long_loop
             .cells
             .iter()
@@ -883,6 +919,15 @@ mod tests {
             })
             .expect("hull runtime cell");
         assert!(hull.fallback_case_count > 0);
+        let recurrent = sudoku
+            .cells
+            .iter()
+            .find(|cell| {
+                cell.family_kind
+                    == TassadarEfficientAttentionBaselineFamilyKind::LinearRecurrentRuntime
+            })
+            .expect("recurrent runtime cell");
+        assert!(recurrent.fallback_case_count > 0);
         Ok(())
     }
 

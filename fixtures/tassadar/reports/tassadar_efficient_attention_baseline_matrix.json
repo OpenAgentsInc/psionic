@@ -3,6 +3,7 @@
   "matrix_id": "tassadar.efficient_attention_baseline_matrix.v0",
   "generated_from_artifacts": [
     "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+    "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
     "fixtures/tassadar/reports/tassadar_geometric_variant_report.json"
   ],
   "rows": [
@@ -51,23 +52,23 @@
           "note": "validated runtime sparse-top-k baseline on the same article-class cases; explicit fallback remains part of the surface rather than being hidden behind aggregate speedups"
         },
         {
-          "family_kind": "linear_recurrent_proxy",
-          "measurement_kind": "proxy_cost_model",
+          "family_kind": "linear_recurrent_runtime",
+          "measurement_kind": "artifact_backed_runtime",
           "claim_class": "research_only",
-          "claim_boundary": "research-only proxy for a generic linear/recurrent attention family derived from the committed article-class trace lengths and CPU/reference-linear floor; not a landed runtime or served lane",
+          "claim_boundary": "this report is a research-only runtime baseline over the committed article-class corpus; it compares a recurrent state-carry execution lane against exact reference-linear execution under the same benchmark contract, keeps explicit fallback on the current search and matching families, and does not promote served capability or approximate-attention closure by itself",
           "workload_target": "micro_wasm_kernel",
           "case_count": 1,
           "direct_case_count": 1,
           "fallback_case_count": 0,
           "refused_case_count": 0,
           "exact_case_count": 1,
-          "average_steps_per_second": 2850239.077489,
-          "average_speedup_over_dense_reference": 2.403677,
-          "average_remaining_gap_vs_cpu_reference": 3.811314,
+          "average_steps_per_second": 10863154.904744,
+          "average_speedup_over_dense_reference": 9.161169,
+          "average_remaining_gap_vs_cpu_reference": 1.0,
           "comparison_outcome_vs_dense_reference": "win",
           "selection_reason_counts": {},
-          "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
-          "note": "research-only generic linear/recurrent floor that scales with trace length under the same workload harness so specialized wins are not measured only against naive dense replay"
+          "artifact_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+          "note": "research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles"
         },
         {
           "family_kind": "reformer_chunked_proxy",
@@ -132,8 +133,8 @@
     {
       "workload_target": "branch_heavy_kernel",
       "dense_reference_steps_per_second": 937201.785565,
-      "fastest_family_kind": "hull_cache_runtime",
-      "fastest_family_steps_per_second": 10153259.575308,
+      "fastest_family_kind": "linear_recurrent_runtime",
+      "fastest_family_steps_per_second": 11963933.724792,
       "cells": [
         {
           "family_kind": "dense_reference_linear",
@@ -176,23 +177,23 @@
           "note": "validated runtime sparse-top-k baseline on the same article-class cases; explicit fallback remains part of the surface rather than being hidden behind aggregate speedups"
         },
         {
-          "family_kind": "linear_recurrent_proxy",
-          "measurement_kind": "proxy_cost_model",
+          "family_kind": "linear_recurrent_runtime",
+          "measurement_kind": "artifact_backed_runtime",
           "claim_class": "research_only",
-          "claim_boundary": "research-only proxy for a generic linear/recurrent attention family derived from the committed article-class trace lengths and CPU/reference-linear floor; not a landed runtime or served lane",
+          "claim_boundary": "this report is a research-only runtime baseline over the committed article-class corpus; it compares a recurrent state-carry execution lane against exact reference-linear execution under the same benchmark contract, keeps explicit fallback on the current search and matching families, and does not promote served capability or approximate-attention closure by itself",
           "workload_target": "branch_heavy_kernel",
           "case_count": 1,
           "direct_case_count": 1,
           "fallback_case_count": 0,
           "refused_case_count": 0,
           "exact_case_count": 1,
-          "average_steps_per_second": 2223945.417549,
-          "average_speedup_over_dense_reference": 2.372963,
-          "average_remaining_gap_vs_cpu_reference": 5.379599,
+          "average_steps_per_second": 11963933.724792,
+          "average_speedup_over_dense_reference": 12.76559,
+          "average_remaining_gap_vs_cpu_reference": 1.0,
           "comparison_outcome_vs_dense_reference": "win",
           "selection_reason_counts": {},
-          "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
-          "note": "research-only generic linear/recurrent floor that scales with trace length under the same workload harness so specialized wins are not measured only against naive dense replay"
+          "artifact_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+          "note": "research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles"
         },
         {
           "family_kind": "reformer_chunked_proxy",
@@ -254,13 +255,13 @@
           "note": "research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim"
         }
       ],
-      "summary": "same-harness efficient-attention matrix row for BranchHeavyKernel: fastest family is `hull_cache_runtime` at 10153259.575 steps/s vs dense 937201.786, with 2 family rows carrying explicit fallback or refusal posture"
+      "summary": "same-harness efficient-attention matrix row for BranchHeavyKernel: fastest family is `linear_recurrent_runtime` at 11963933.725 steps/s vs dense 937201.786, with 2 family rows carrying explicit fallback or refusal posture"
     },
     {
       "workload_target": "memory_heavy_kernel",
       "dense_reference_steps_per_second": 1386508.654751,
-      "fastest_family_kind": "hierarchical_hull_research",
-      "fastest_family_steps_per_second": 8072083.757081,
+      "fastest_family_kind": "linear_recurrent_runtime",
+      "fastest_family_steps_per_second": 10084728.909229,
       "cells": [
         {
           "family_kind": "dense_reference_linear",
@@ -301,23 +302,23 @@
           "note": "validated runtime sparse-top-k baseline on the same article-class cases; explicit fallback remains part of the surface rather than being hidden behind aggregate speedups"
         },
         {
-          "family_kind": "linear_recurrent_proxy",
-          "measurement_kind": "proxy_cost_model",
+          "family_kind": "linear_recurrent_runtime",
+          "measurement_kind": "artifact_backed_runtime",
           "claim_class": "research_only",
-          "claim_boundary": "research-only proxy for a generic linear/recurrent attention family derived from the committed article-class trace lengths and CPU/reference-linear floor; not a landed runtime or served lane",
+          "claim_boundary": "this report is a research-only runtime baseline over the committed article-class corpus; it compares a recurrent state-carry execution lane against exact reference-linear execution under the same benchmark contract, keeps explicit fallback on the current search and matching families, and does not promote served capability or approximate-attention closure by itself",
           "workload_target": "memory_heavy_kernel",
           "case_count": 1,
           "direct_case_count": 1,
           "fallback_case_count": 0,
           "refused_case_count": 0,
           "exact_case_count": 1,
-          "average_steps_per_second": 3103767.670172,
-          "average_speedup_over_dense_reference": 2.238549,
-          "average_remaining_gap_vs_cpu_reference": 3.249189,
+          "average_steps_per_second": 10084728.909229,
+          "average_speedup_over_dense_reference": 7.27347,
+          "average_remaining_gap_vs_cpu_reference": 1.0,
           "comparison_outcome_vs_dense_reference": "win",
           "selection_reason_counts": {},
-          "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
-          "note": "research-only generic linear/recurrent floor that scales with trace length under the same workload harness so specialized wins are not measured only against naive dense replay"
+          "artifact_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+          "note": "research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles"
         },
         {
           "family_kind": "reformer_chunked_proxy",
@@ -377,13 +378,13 @@
           "note": "research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim"
         }
       ],
-      "summary": "same-harness efficient-attention matrix row for MemoryHeavyKernel: fastest family is `hierarchical_hull_research` at 8072083.757 steps/s vs dense 1386508.655, with 0 family rows carrying explicit fallback or refusal posture"
+      "summary": "same-harness efficient-attention matrix row for MemoryHeavyKernel: fastest family is `linear_recurrent_runtime` at 10084728.909 steps/s vs dense 1386508.655, with 0 family rows carrying explicit fallback or refusal posture"
     },
     {
       "workload_target": "long_loop_kernel",
       "dense_reference_steps_per_second": 4787.434702,
-      "fastest_family_kind": "hierarchical_hull_research",
-      "fastest_family_steps_per_second": 13337300.287131,
+      "fastest_family_kind": "linear_recurrent_runtime",
+      "fastest_family_steps_per_second": 17259796.352058,
       "cells": [
         {
           "family_kind": "dense_reference_linear",
@@ -426,23 +427,23 @@
           "note": "validated runtime sparse-top-k baseline on the same article-class cases; explicit fallback remains part of the surface rather than being hidden behind aggregate speedups"
         },
         {
-          "family_kind": "linear_recurrent_proxy",
-          "measurement_kind": "proxy_cost_model",
+          "family_kind": "linear_recurrent_runtime",
+          "measurement_kind": "artifact_backed_runtime",
           "claim_class": "research_only",
-          "claim_boundary": "research-only proxy for a generic linear/recurrent attention family derived from the committed article-class trace lengths and CPU/reference-linear floor; not a landed runtime or served lane",
+          "claim_boundary": "this report is a research-only runtime baseline over the committed article-class corpus; it compares a recurrent state-carry execution lane against exact reference-linear execution under the same benchmark contract, keeps explicit fallback on the current search and matching families, and does not promote served capability or approximate-attention closure by itself",
           "workload_target": "long_loop_kernel",
           "case_count": 1,
           "direct_case_count": 1,
           "fallback_case_count": 0,
           "refused_case_count": 0,
           "exact_case_count": 1,
-          "average_steps_per_second": 21543.350765,
-          "average_speedup_over_dense_reference": 4.499978,
-          "average_remaining_gap_vs_cpu_reference": 801.165823,
+          "average_steps_per_second": 17259796.352058,
+          "average_speedup_over_dense_reference": 3605.228567,
+          "average_remaining_gap_vs_cpu_reference": 1.0,
           "comparison_outcome_vs_dense_reference": "win",
           "selection_reason_counts": {},
-          "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
-          "note": "research-only generic linear/recurrent floor that scales with trace length under the same workload harness so specialized wins are not measured only against naive dense replay"
+          "artifact_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+          "note": "research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles"
         },
         {
           "family_kind": "reformer_chunked_proxy",
@@ -506,7 +507,7 @@
           "note": "research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim"
         }
       ],
-      "summary": "same-harness efficient-attention matrix row for LongLoopKernel: fastest family is `hierarchical_hull_research` at 13337300.287 steps/s vs dense 4787.435, with 3 family rows carrying explicit fallback or refusal posture"
+      "summary": "same-harness efficient-attention matrix row for LongLoopKernel: fastest family is `linear_recurrent_runtime` at 17259796.352 steps/s vs dense 4787.435, with 3 family rows carrying explicit fallback or refusal posture"
     },
     {
       "workload_target": "sudoku_class",
@@ -555,23 +556,25 @@
           "note": "validated runtime sparse-top-k baseline on the same article-class cases; explicit fallback remains part of the surface rather than being hidden behind aggregate speedups"
         },
         {
-          "family_kind": "linear_recurrent_proxy",
-          "measurement_kind": "proxy_cost_model",
+          "family_kind": "linear_recurrent_runtime",
+          "measurement_kind": "artifact_backed_runtime",
           "claim_class": "research_only",
-          "claim_boundary": "research-only proxy for a generic linear/recurrent attention family derived from the committed article-class trace lengths and CPU/reference-linear floor; not a landed runtime or served lane",
+          "claim_boundary": "this report is a research-only runtime baseline over the committed article-class corpus; it compares a recurrent state-carry execution lane against exact reference-linear execution under the same benchmark contract, keeps explicit fallback on the current search and matching families, and does not promote served capability or approximate-attention closure by itself",
           "workload_target": "sudoku_class",
           "case_count": 8,
-          "direct_case_count": 8,
-          "fallback_case_count": 0,
+          "direct_case_count": 0,
+          "fallback_case_count": 8,
           "refused_case_count": 0,
           "exact_case_count": 8,
-          "average_steps_per_second": 321711.072994,
-          "average_speedup_over_dense_reference": 3.407438,
-          "average_remaining_gap_vs_cpu_reference": 44.2278,
-          "comparison_outcome_vs_dense_reference": "win",
-          "selection_reason_counts": {},
-          "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
-          "note": "research-only generic linear/recurrent floor that scales with trace length under the same workload harness so specialized wins are not measured only against naive dense replay"
+          "average_steps_per_second": 94414.364,
+          "average_speedup_over_dense_reference": 1.0,
+          "average_remaining_gap_vs_cpu_reference": 151.725058,
+          "comparison_outcome_vs_dense_reference": "tie",
+          "selection_reason_counts": {
+            "workload_family_outside_direct_closure": 8
+          },
+          "artifact_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+          "note": "research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles"
         },
         {
           "family_kind": "reformer_chunked_proxy",
@@ -635,7 +638,7 @@
           "note": "research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim"
         }
       ],
-      "summary": "same-harness efficient-attention matrix row for SudokuClass: fastest family is `hierarchical_hull_research` at 11259343.620 steps/s vs dense 94414.364, with 3 family rows carrying explicit fallback or refusal posture"
+      "summary": "same-harness efficient-attention matrix row for SudokuClass: fastest family is `hierarchical_hull_research` at 11259343.620 steps/s vs dense 94414.364, with 4 family rows carrying explicit fallback or refusal posture"
     },
     {
       "workload_target": "hungarian_matching",
@@ -682,23 +685,25 @@
           "note": "validated runtime sparse-top-k baseline on the same article-class cases; explicit fallback remains part of the surface rather than being hidden behind aggregate speedups"
         },
         {
-          "family_kind": "linear_recurrent_proxy",
-          "measurement_kind": "proxy_cost_model",
+          "family_kind": "linear_recurrent_runtime",
+          "measurement_kind": "artifact_backed_runtime",
           "claim_class": "research_only",
-          "claim_boundary": "research-only proxy for a generic linear/recurrent attention family derived from the committed article-class trace lengths and CPU/reference-linear floor; not a landed runtime or served lane",
+          "claim_boundary": "this report is a research-only runtime baseline over the committed article-class corpus; it compares a recurrent state-carry execution lane against exact reference-linear execution under the same benchmark contract, keeps explicit fallback on the current search and matching families, and does not promote served capability or approximate-attention closure by itself",
           "workload_target": "hungarian_matching",
           "case_count": 1,
-          "direct_case_count": 1,
-          "fallback_case_count": 0,
+          "direct_case_count": 0,
+          "fallback_case_count": 1,
           "refused_case_count": 0,
           "exact_case_count": 1,
-          "average_steps_per_second": 5102312.426486,
-          "average_speedup_over_dense_reference": 2.021866,
-          "average_remaining_gap_vs_cpu_reference": 2.00548,
-          "comparison_outcome_vs_dense_reference": "win",
-          "selection_reason_counts": {},
-          "artifact_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
-          "note": "research-only generic linear/recurrent floor that scales with trace length under the same workload harness so specialized wins are not measured only against naive dense replay"
+          "average_steps_per_second": 2523566.427019,
+          "average_speedup_over_dense_reference": 1.0,
+          "average_remaining_gap_vs_cpu_reference": 4.054812,
+          "comparison_outcome_vs_dense_reference": "tie",
+          "selection_reason_counts": {
+            "workload_family_outside_direct_closure": 1
+          },
+          "artifact_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+          "note": "research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles"
         },
         {
           "family_kind": "reformer_chunked_proxy",
@@ -758,10 +763,10 @@
           "note": "research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim"
         }
       ],
-      "summary": "same-harness efficient-attention matrix row for HungarianMatching: fastest family is `hull_cache_runtime` at 9494257.562 steps/s vs dense 2523566.427, with 0 family rows carrying explicit fallback or refusal posture"
+      "summary": "same-harness efficient-attention matrix row for HungarianMatching: fastest family is `hull_cache_runtime` at 9494257.562 steps/s vs dense 2523566.427, with 1 family rows carrying explicit fallback or refusal posture"
     }
   ],
-  "claim_boundary": "this matrix keeps current runtime dense, hull-cache, and sparse-top-k execution evidence separate from research-only hierarchical-hull and proxy generic-attention baselines; the proxy rows are cost-model comparisons on the same article-class workload artifact, not promoted runtime or served capability claims",
-  "summary": "Public efficient-attention baseline matrix now freezes 6 article-class workload rows under one shared artifact contract: current promoted HullCache is fastest on 2 workloads, the research hierarchical-hull candidate is fastest on 4, and the generic linear/recurrent proxy is fastest on 0; sparse, reformer-style, and hull-family rows now carry explicit win/tie/lose/refuse posture against the dense reference floor instead of comparing only to naive dense headlines.",
-  "report_digest": "9d20ce6c5345524916e4f3ebc891d570ed03193de6cacb95c5495a710141a4c4"
+  "claim_boundary": "this matrix keeps current runtime dense, hull-cache, sparse-top-k, and recurrent-baseline execution evidence separate from research-only hierarchical-hull and Reformer-style proxy rows; the recurrent row is now artifact-backed runtime evidence, but it remains research-only and non-promoted",
+  "summary": "Public efficient-attention baseline matrix now freezes 6 article-class workload rows under one shared artifact contract: current promoted HullCache is fastest on 1 workloads, the research hierarchical-hull candidate is fastest on 2, and the recurrent runtime baseline is fastest on 3; sparse, Reformer-style, hull-family, and recurrent rows now carry explicit win/tie/lose/refuse posture against the dense reference floor instead of comparing only to naive dense headlines.",
+  "report_digest": "562e3ea58c665f6950037f96d9a094d0c878a6688b1bc1eb75afc6df7b2d2634"
 }

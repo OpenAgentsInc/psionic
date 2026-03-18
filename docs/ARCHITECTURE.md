@@ -553,18 +553,20 @@ The current scope is:
   exactly, and keeps scratchpad overhead plus reset counts explicit
 - landed efficient-attention baseline matrix:
   `psionic-eval` now freezes dense reference-linear, validated SparseTopK,
-  linear/recurrent proxy, Reformer-style proxy, promoted HullCache, and
-  research hierarchical-hull rows on the same article-class workload artifact
-  at `fixtures/tassadar/reports/tassadar_efficient_attention_baseline_matrix.json`,
+  artifact-backed recurrent runtime baseline, Reformer-style proxy, promoted
+  HullCache, and research hierarchical-hull rows on the same article-class
+  workload artifact at
+  `fixtures/tassadar/reports/tassadar_efficient_attention_baseline_matrix.json`,
   and `psionic-research` now summarizes the resulting win/tie/lose/refuse
   posture at
   `fixtures/tassadar/reports/tassadar_efficient_attention_baseline_summary.json`;
   the committed matrix keeps the claim boundary explicitly research-only for
-  the proxy and hierarchical-hull rows, records promoted HullCache as fastest
-  on `2` workloads, records the research hierarchical-hull candidate as
-  fastest on `4`, and makes the Reformer-style proxy refuse the long-loop and
-  Sudoku rows instead of letting specialized fast paths compare only to naive
-  dense replay
+  the recurrent, Reformer-style, and hierarchical-hull rows, records promoted
+  HullCache as fastest on `1` workload, records the research
+  hierarchical-hull candidate as fastest on `2`, records the recurrent runtime
+  baseline as fastest on `3`, and makes the Reformer-style proxy refuse the
+  long-loop and Sudoku rows instead of letting specialized fast paths compare
+  only to naive dense replay
 - landed trained-executor Phase 15B follow-on bar: the same executor-attention
   family now also carries a bounded relative-target output-bias adapter in
   `psionic-models`, the preserved destructive boundary-first output-head

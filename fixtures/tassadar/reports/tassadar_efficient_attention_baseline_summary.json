@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "matrix_report_ref": "fixtures/tassadar/reports/tassadar_efficient_attention_baseline_matrix.json",
-  "matrix_report_digest": "9d20ce6c5345524916e4f3ebc891d570ed03193de6cacb95c5495a710141a4c4",
+  "matrix_report_digest": "562e3ea58c665f6950037f96d9a094d0c878a6688b1bc1eb75afc6df7b2d2634",
   "regeneration_commands": [
     "cargo run -p psionic-research --example tassadar_efficient_attention_baseline_summary",
     "cargo test -p psionic-research efficient_attention_baseline_summary_matches_committed_truth -- --nocapture"
@@ -26,13 +26,17 @@
       "note": "validated runtime sparse-top-k row with explicit fallback posture where the current ceiling ends"
     },
     {
-      "family_kind": "linear_recurrent_proxy",
-      "workload_win_count": 6,
-      "workload_tie_count": 0,
+      "family_kind": "linear_recurrent_runtime",
+      "workload_win_count": 4,
+      "workload_tie_count": 2,
       "workload_loss_count": 0,
       "workload_refuse_count": 0,
-      "fastest_workload_targets": [],
-      "note": "research-only generic linear/recurrent proxy row used to keep specialized claims honest against more than just naive dense replay"
+      "fastest_workload_targets": [
+        "branch_heavy_kernel",
+        "memory_heavy_kernel",
+        "long_loop_kernel"
+      ],
+      "note": "research-only artifact-backed recurrent runtime row used to keep specialized claims honest against a real state-carry baseline rather than only naive dense replay"
     },
     {
       "family_kind": "reformer_chunked_proxy",
@@ -50,7 +54,6 @@
       "workload_loss_count": 0,
       "workload_refuse_count": 0,
       "fastest_workload_targets": [
-        "branch_heavy_kernel",
         "hungarian_matching"
       ],
       "note": "promoted HullCache runtime row under the shared article-class benchmark contract"
@@ -63,8 +66,6 @@
       "workload_refuse_count": 0,
       "fastest_workload_targets": [
         "micro_wasm_kernel",
-        "memory_heavy_kernel",
-        "long_loop_kernel",
         "sudoku_class"
       ],
       "note": "research-only hierarchical-hull row that widens direct exact coverage but remains unpromoted"
@@ -81,27 +82,27 @@
     },
     {
       "workload_target": "branch_heavy_kernel",
-      "fastest_family_kind": "hull_cache_runtime",
-      "fastest_family_steps_per_second": 10153259.575308,
+      "fastest_family_kind": "linear_recurrent_runtime",
+      "fastest_family_steps_per_second": 11963933.724792,
       "dense_reference_steps_per_second": 937201.785565,
-      "fastest_family_speedup_over_dense_reference": 10.83359,
-      "note": "same-harness efficient-attention matrix row for BranchHeavyKernel: fastest family is `hull_cache_runtime` at 10153259.575 steps/s vs dense 937201.786, with 2 family rows carrying explicit fallback or refusal posture"
+      "fastest_family_speedup_over_dense_reference": 12.76559,
+      "note": "same-harness efficient-attention matrix row for BranchHeavyKernel: fastest family is `linear_recurrent_runtime` at 11963933.725 steps/s vs dense 937201.786, with 2 family rows carrying explicit fallback or refusal posture"
     },
     {
       "workload_target": "memory_heavy_kernel",
-      "fastest_family_kind": "hierarchical_hull_research",
-      "fastest_family_steps_per_second": 8072083.757081,
+      "fastest_family_kind": "linear_recurrent_runtime",
+      "fastest_family_steps_per_second": 10084728.909229,
       "dense_reference_steps_per_second": 1386508.654751,
-      "fastest_family_speedup_over_dense_reference": 5.821878,
-      "note": "same-harness efficient-attention matrix row for MemoryHeavyKernel: fastest family is `hierarchical_hull_research` at 8072083.757 steps/s vs dense 1386508.655, with 0 family rows carrying explicit fallback or refusal posture"
+      "fastest_family_speedup_over_dense_reference": 7.27347,
+      "note": "same-harness efficient-attention matrix row for MemoryHeavyKernel: fastest family is `linear_recurrent_runtime` at 10084728.909 steps/s vs dense 1386508.655, with 0 family rows carrying explicit fallback or refusal posture"
     },
     {
       "workload_target": "long_loop_kernel",
-      "fastest_family_kind": "hierarchical_hull_research",
-      "fastest_family_steps_per_second": 13337300.287131,
+      "fastest_family_kind": "linear_recurrent_runtime",
+      "fastest_family_steps_per_second": 17259796.352058,
       "dense_reference_steps_per_second": 4787.434702,
-      "fastest_family_speedup_over_dense_reference": 2785.897065,
-      "note": "same-harness efficient-attention matrix row for LongLoopKernel: fastest family is `hierarchical_hull_research` at 13337300.287 steps/s vs dense 4787.435, with 3 family rows carrying explicit fallback or refusal posture"
+      "fastest_family_speedup_over_dense_reference": 3605.228567,
+      "note": "same-harness efficient-attention matrix row for LongLoopKernel: fastest family is `linear_recurrent_runtime` at 17259796.352 steps/s vs dense 4787.435, with 3 family rows carrying explicit fallback or refusal posture"
     },
     {
       "workload_target": "sudoku_class",
@@ -109,7 +110,7 @@
       "fastest_family_steps_per_second": 11259343.619732,
       "dense_reference_steps_per_second": 94414.364,
       "fastest_family_speedup_over_dense_reference": 119.254562,
-      "note": "same-harness efficient-attention matrix row for SudokuClass: fastest family is `hierarchical_hull_research` at 11259343.620 steps/s vs dense 94414.364, with 3 family rows carrying explicit fallback or refusal posture"
+      "note": "same-harness efficient-attention matrix row for SudokuClass: fastest family is `hierarchical_hull_research` at 11259343.620 steps/s vs dense 94414.364, with 4 family rows carrying explicit fallback or refusal posture"
     },
     {
       "workload_target": "hungarian_matching",
@@ -117,11 +118,11 @@
       "fastest_family_steps_per_second": 9494257.561572,
       "dense_reference_steps_per_second": 2523566.427019,
       "fastest_family_speedup_over_dense_reference": 3.762238,
-      "note": "same-harness efficient-attention matrix row for HungarianMatching: fastest family is `hull_cache_runtime` at 9494257.562 steps/s vs dense 2523566.427, with 0 family rows carrying explicit fallback or refusal posture"
+      "note": "same-harness efficient-attention matrix row for HungarianMatching: fastest family is `hull_cache_runtime` at 9494257.562 steps/s vs dense 2523566.427, with 1 family rows carrying explicit fallback or refusal posture"
     }
   ],
   "claim_class": "research_only",
-  "claim_boundary": "this summary is a research-only aggregation over one same-harness efficient-attention matrix. Runtime dense, hull-cache, and sparse rows stay artifact-backed, but the generic linear/recurrent and reformer rows remain proxy baselines and the hierarchical-hull row remains unpromoted research evidence; none of that becomes served capability through this report alone",
-  "summary": "Public efficient-attention summary now freezes 6 same-harness workload winners from one shared matrix digest: promoted HullCache is still fastest on 2 workloads, the research hierarchical-hull candidate is fastest on 4, and the Reformer-style proxy now carries explicit refuse posture on 2 workloads instead of hiding unsupported locality assumptions behind dense-only comparisons.",
-  "report_digest": "eaf48a5cc41bda685bc7f2a8a0e97565514d1ce75e24edef23d88d30b9229344"
+  "claim_boundary": "this summary is a research-only aggregation over one same-harness efficient-attention matrix. Runtime dense, hull-cache, sparse, and recurrent rows stay artifact-backed, but the Reformer-style row remains a proxy baseline and the hierarchical-hull row remains unpromoted research evidence; none of that becomes served capability through this report alone",
+  "summary": "Public efficient-attention summary now freezes 6 same-harness workload winners from one shared matrix digest: promoted HullCache is still fastest on 1 workloads, the research hierarchical-hull candidate is fastest on 2, and the Reformer-style proxy now carries explicit refuse posture on 2 workloads while the recurrent row stays artifact-backed and research-only instead of dense-only hand-waving.",
+  "report_digest": "f4cc70819d8743188be62eeeb0a92627f68492c2b398a231d06dc018044919a2"
 }

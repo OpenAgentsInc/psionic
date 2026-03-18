@@ -77,7 +77,7 @@ pub fn build_tassadar_efficient_attention_baseline_summary_report() -> Result<
     let family_order = [
         TassadarEfficientAttentionBaselineFamilyKind::DenseReferenceLinear,
         TassadarEfficientAttentionBaselineFamilyKind::SparseTopKValidated,
-        TassadarEfficientAttentionBaselineFamilyKind::LinearRecurrentProxy,
+        TassadarEfficientAttentionBaselineFamilyKind::LinearRecurrentRuntime,
         TassadarEfficientAttentionBaselineFamilyKind::ReformerChunkedProxy,
         TassadarEfficientAttentionBaselineFamilyKind::HullCacheRuntime,
         TassadarEfficientAttentionBaselineFamilyKind::HierarchicalHullResearch,
@@ -188,10 +188,10 @@ pub fn build_tassadar_efficient_attention_baseline_summary_report() -> Result<
         workload_winners,
         claim_class: String::from("research_only"),
         claim_boundary: String::from(
-            "this summary is a research-only aggregation over one same-harness efficient-attention matrix. Runtime dense, hull-cache, and sparse rows stay artifact-backed, but the generic linear/recurrent and reformer rows remain proxy baselines and the hierarchical-hull row remains unpromoted research evidence; none of that becomes served capability through this report alone",
+            "this summary is a research-only aggregation over one same-harness efficient-attention matrix. Runtime dense, hull-cache, sparse, and recurrent rows stay artifact-backed, but the Reformer-style row remains a proxy baseline and the hierarchical-hull row remains unpromoted research evidence; none of that becomes served capability through this report alone",
         ),
         summary: format!(
-            "Public efficient-attention summary now freezes {} same-harness workload winners from one shared matrix digest: promoted HullCache is still fastest on {} workloads, the research hierarchical-hull candidate is fastest on {}, and the Reformer-style proxy now carries explicit refuse posture on {} workloads instead of hiding unsupported locality assumptions behind dense-only comparisons.",
+            "Public efficient-attention summary now freezes {} same-harness workload winners from one shared matrix digest: promoted HullCache is still fastest on {} workloads, the research hierarchical-hull candidate is fastest on {}, and the Reformer-style proxy now carries explicit refuse posture on {} workloads while the recurrent row stays artifact-backed and research-only instead of dense-only hand-waving.",
             matrix.rows.len(),
             hull_runtime_fastest_count,
             hierarchical_hull_fastest_count,
@@ -238,8 +238,8 @@ fn family_summary_note(family_kind: TassadarEfficientAttentionBaselineFamilyKind
         TassadarEfficientAttentionBaselineFamilyKind::SparseTopKValidated => String::from(
             "validated runtime sparse-top-k row with explicit fallback posture where the current ceiling ends",
         ),
-        TassadarEfficientAttentionBaselineFamilyKind::LinearRecurrentProxy => String::from(
-            "research-only generic linear/recurrent proxy row used to keep specialized claims honest against more than just naive dense replay",
+        TassadarEfficientAttentionBaselineFamilyKind::LinearRecurrentRuntime => String::from(
+            "research-only artifact-backed recurrent runtime row used to keep specialized claims honest against a real state-carry baseline rather than only naive dense replay",
         ),
         TassadarEfficientAttentionBaselineFamilyKind::ReformerChunkedProxy => String::from(
             "research-only chunked / Reformer-style proxy row with explicit fallback and refusal posture on locality-breaking workloads",
