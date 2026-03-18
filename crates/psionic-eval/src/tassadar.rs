@@ -6,7 +6,7 @@ use psionic_environments::{
     TassadarBenchmarkPackageSetBinding, TassadarCompilePipelineMatrixBinding,
     TassadarEnvironmentBundle, TassadarEnvironmentError, TassadarEnvironmentPackageRefs,
     TassadarEnvironmentSpec, TassadarExactnessContract, TassadarIoContract, TassadarProgramBinding,
-    TassadarWorkloadTarget,
+    TassadarWasmConformanceBinding, TassadarWorkloadTarget,
 };
 use psionic_models::{TassadarExecutorContractError, TassadarExecutorFixture};
 use psionic_runtime::{
@@ -34,6 +34,7 @@ use crate::{
     EvalFinalStateCapture, EvalMetric, EvalRunContract, EvalRunMode, EvalRunState,
     EvalRuntimeError, EvalSampleRecord, EvalSampleStatus, EvalTimerIntegrityFacts,
     EvalVerificationFacts, TASSADAR_COMPILE_PIPELINE_MATRIX_REPORT_REF,
+    TASSADAR_WASM_CONFORMANCE_REPORT_REF,
 };
 
 /// Stable environment ref for the Tassadar eval package.
@@ -125,6 +126,24 @@ fn standard_compile_pipeline_matrix_binding() -> TassadarCompilePipelineMatrixBi
             String::from("wasm_text.memory_lookup"),
             String::from("wasm_text.param_abi"),
             String::from("c_source.toolchain_unavailable"),
+        ],
+    }
+}
+
+fn standard_wasm_conformance_binding() -> TassadarWasmConformanceBinding {
+    TassadarWasmConformanceBinding {
+        report_ref: String::from(TASSADAR_WASM_CONFORMANCE_REPORT_REF),
+        report_id: String::from("tassadar.wasm_conformance.report.v1"),
+        reference_authority_id: String::from("wasmi.reference.v1"),
+        case_family_ids: vec![
+            String::from("curated.global_state"),
+            String::from("curated.call_indirect"),
+            String::from("curated.deterministic_import"),
+            String::from("curated.call_indirect_trap"),
+            String::from("curated.unsupported_host_import"),
+            String::from("generated.call_indirect"),
+            String::from("generated.call_indirect_trap"),
+            String::from("generated.global_state"),
         ],
     }
 }
@@ -1669,6 +1688,7 @@ fn build_tassadar_environment_bundle(
             summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
         },
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
+        wasm_conformance_binding: standard_wasm_conformance_binding(),
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/eval/verification"),
@@ -1895,6 +1915,7 @@ fn build_tassadar_article_class_environment_bundle(
             summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
         },
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
+        wasm_conformance_binding: standard_wasm_conformance_binding(),
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/article_class/eval/verification"),
@@ -2140,6 +2161,7 @@ fn build_tassadar_sudoku_9x9_environment_bundle(
             summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
         },
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
+        wasm_conformance_binding: standard_wasm_conformance_binding(),
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/sudoku_9x9/eval/verification"),
@@ -2374,6 +2396,7 @@ fn build_tassadar_hungarian_v0_environment_bundle(
             summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
         },
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
+        wasm_conformance_binding: standard_wasm_conformance_binding(),
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/hungarian_v0/eval/verification"),
@@ -2609,6 +2632,7 @@ fn build_tassadar_hungarian_10x10_environment_bundle(
             summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
         },
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
+        wasm_conformance_binding: standard_wasm_conformance_binding(),
         eval_policy_references: vec![EnvironmentPolicyReference {
             kind: EnvironmentPolicyKind::Verification,
             policy_ref: String::from("policy://tassadar/hungarian_10x10/eval/verification"),

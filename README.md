@@ -192,8 +192,10 @@ Current posture:
   and `psionic-sandbox`, with explicit i32 global and funcref-table runtime
   models, bounded `call_indirect`, deterministic import stubs, typed refusal
   for unsupported host calls, a model-facing module-capability publication,
-  served/provider capability-path projection, and a sandbox-facing import
-  boundary contract
+  served/provider capability-path projection, a sandbox-facing import
+  boundary contract, and now a real Wasm conformance/differential harness
+  against a reference authority over curated plus deterministically generated
+  bounded module cases
 - the repo now also carries a standardized exactness/refusal evidence surface
   across `psionic-runtime`, `psionic-provider`, and `psionic-eval`, with a
   shared runtime report schema for exact direct, exact fallback, mismatch, and
@@ -612,6 +614,13 @@ Current posture:
   multi-function module to runtime-visible module summaries, normalized-module
   digests, section-level round-trip digests, exact lowered export outputs, and
   typed refusal when the current runtime boundary still blocks lowering
+- the repo now also carries one bounded Tassadar Wasm conformance report at
+  `fixtures/tassadar/reports/tassadar_wasm_conformance_report.json`, emitted
+  by `cargo run -p psionic-eval --example tassadar_wasm_conformance_report`;
+  it differentially checks the current bounded module-execution lane against
+  `wasmi` over curated and deterministically generated module cases, keeping
+  exact success, trap parity, and explicit unsupported-host boundary refusal
+  separate instead of pretending the lane already closes arbitrary Wasm
 - its Phase 8A research family now exists in `psionic-research`, with a typed
   executor-variant family, benchmark/proof/lineage-backed bounded runs, and
   machine-readable sweep records for reproducible same-contract comparisons
@@ -1453,4 +1462,7 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
   canonical machine-readable artifact for bounded normalized Wasm-module
   ingress, section-level round-trip truth, and current exact-vs-refused export
   lowering posture.
+- `fixtures/tassadar/reports/tassadar_wasm_conformance_report.json` is the
+  canonical machine-readable artifact for bounded module-execution
+  differential checks against the current `wasmi` reference authority.
 - Other planning and reference docs live under `docs/`.

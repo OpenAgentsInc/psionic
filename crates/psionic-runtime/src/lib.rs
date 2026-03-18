@@ -12,6 +12,7 @@ mod tassadar;
 mod tassadar_memory_abi_v2;
 mod tassadar_module_execution;
 mod tassadar_structured_control;
+mod tassadar_wasm_conformance;
 mod validation;
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -38,6 +39,7 @@ pub use tassadar::*;
 pub use tassadar_memory_abi_v2::*;
 pub use tassadar_module_execution::*;
 pub use tassadar_structured_control::*;
+pub use tassadar_wasm_conformance::*;
 use thiserror::Error;
 pub use validation::*;
 

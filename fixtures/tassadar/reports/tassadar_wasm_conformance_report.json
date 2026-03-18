@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.wasm_conformance.report.v1",
+  "reference_authority_id": "wasmi.reference.v1",
+  "generator_seed": 23715724378780210,
+  "case_family_ids": [
+    "curated.call_indirect",
+    "curated.call_indirect_trap",
+    "curated.deterministic_import",
+    "curated.global_state",
+    "curated.unsupported_host_import",
+    "generated.call_indirect",
+    "generated.call_indirect_trap",
+    "generated.global_state"
+  ],
+  "cases": [
+    {
+      "case_id": "module_global_state_exact",
+      "family_id": "curated.global_state",
+      "origin": "curated",
+      "status": "exact_success",
+      "program_digest": "f75c01e1e5d63c203d5daaa8c9970b0724c8fd506e30979bd07b2bfba7f3e37e",
+      "reference_module_source_digest": "3a897fb3e940d28b2ca6709686c329f94467e74c217c4a88df91d3f842496e5b",
+      "runtime_terminal_kind": "returned",
+      "runtime_returned_value": 12,
+      "runtime_final_globals": [
+        12
+      ],
+      "runtime_execution_digest": "8cfc4931e1998b43c9d359d5472cea8f25874685bff19a85e9382b765becd30e",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "3a897fb3e940d28b2ca6709686c329f94467e74c217c4a88df91d3f842496e5b",
+        "terminal_kind": "returned",
+        "returned_value": 12,
+        "final_globals": [
+          12
+        ]
+      }
+    },
+    {
+      "case_id": "module_call_indirect_exact",
+      "family_id": "curated.call_indirect",
+      "origin": "curated",
+      "status": "exact_success",
+      "program_digest": "b9f4cd1f2e3fa63138e3badea0a3ac2768fd4a431656e5767a8c0e55770d1036",
+      "reference_module_source_digest": "87517a08b0c9e54fcf80fa4ceb08906fb226bb9decb922509f8d770a29b70fa9",
+      "runtime_terminal_kind": "returned",
+      "runtime_returned_value": 222,
+      "runtime_execution_digest": "9d65c7e46c5c6fe32085f916f24cb05c81989c3f342b642a5a7f7c64211bc9fa",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "87517a08b0c9e54fcf80fa4ceb08906fb226bb9decb922509f8d770a29b70fa9",
+        "terminal_kind": "returned",
+        "returned_value": 222,
+        "final_globals": []
+      }
+    },
+    {
+      "case_id": "module_deterministic_import_exact",
+      "family_id": "curated.deterministic_import",
+      "origin": "curated",
+      "status": "exact_success",
+      "program_digest": "16fe105094db94d53db0fbe457704c7887a1e71254d8de10952d19fe168ce337",
+      "reference_module_source_digest": "1eb94a3d41d3fe6d7700bb626b4aa11864791f2cba0ab56478491a5077d4188b",
+      "runtime_terminal_kind": "returned",
+      "runtime_returned_value": 42,
+      "runtime_execution_digest": "4acc91f0996ac6eaa6c6c75ed20e6ced0b73b3798a1785581ba533ccde937874",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "1eb94a3d41d3fe6d7700bb626b4aa11864791f2cba0ab56478491a5077d4188b",
+        "terminal_kind": "returned",
+        "returned_value": 42,
+        "final_globals": []
+      }
+    },
+    {
+      "case_id": "module_call_indirect_selector_trap",
+      "family_id": "curated.call_indirect_trap",
+      "origin": "curated",
+      "status": "exact_trap_parity",
+      "program_digest": "c8c7b15d02d5d5f64fcd49cffa513d444623996feb87d42b881b87d57057b9ba",
+      "reference_module_source_digest": "6d8e39467455ac413c7e410fee30e7720ff0694b23f8b5f0776d5afbcc05fdac",
+      "runtime_terminal_kind": "errored",
+      "runtime_error_kind": "table_selector_out_of_range",
+      "runtime_error_detail": "module-execution table 0 selector 2 is out of range (entry_count=2)",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "6d8e39467455ac413c7e410fee30e7720ff0694b23f8b5f0776d5afbcc05fdac",
+        "terminal_kind": "trapped",
+        "final_globals": [],
+        "detail": "undefined element: out of bounds table access"
+      }
+    },
+    {
+      "case_id": "module_unsupported_host_boundary",
+      "family_id": "curated.unsupported_host_import",
+      "origin": "curated",
+      "status": "boundary_refusal",
+      "program_digest": "e5716b7a7b3162c11c3024c3e289e13f0b912a6a321074268bf32f3c5c2fef35",
+      "reference_module_source_digest": "99c7b8fc1e6f7d6abe9c1d2b8a43c6f4c04e680eea2b6f528cacf55df9e6d7be",
+      "runtime_terminal_kind": "errored",
+      "runtime_error_kind": "unsupported_host_import",
+      "runtime_error_detail": "module-execution host import `host.fs_write` is unsupported: host calls outside deterministic stub admission remain unsupported",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "99c7b8fc1e6f7d6abe9c1d2b8a43c6f4c04e680eea2b6f528cacf55df9e6d7be",
+        "terminal_kind": "trapped",
+        "final_globals": [],
+        "detail": "wasm `unreachable` instruction executed"
+      }
+    },
+    {
+      "case_id": "generated_exact_0",
+      "family_id": "generated.call_indirect",
+      "origin": "generated",
+      "status": "exact_success",
+      "program_digest": "8a439a640fe8613ef026b58cb61ce674c9bae45df053d55b61cfb48762c27b8d",
+      "reference_module_source_digest": "21537bf6d275eb9862d639aa5d0ccb6aab747ca5ca2799cf88a65f696210bf4c",
+      "runtime_terminal_kind": "returned",
+      "runtime_returned_value": 143,
+      "runtime_execution_digest": "c6996b31e7a3edbcffd3ff1e01d4b6cfe1a6692f4f51f9e37903c7a0f956da27",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "21537bf6d275eb9862d639aa5d0ccb6aab747ca5ca2799cf88a65f696210bf4c",
+        "terminal_kind": "returned",
+        "returned_value": 143,
+        "final_globals": []
+      }
+    },
+    {
+      "case_id": "generated_exact_1",
+      "family_id": "generated.global_state",
+      "origin": "generated",
+      "status": "exact_success",
+      "program_digest": "e13c7891d917195f2777c9503882e00eec0c79fd7cc31c8afcbfc8262aebc4ce",
+      "reference_module_source_digest": "831fbf51eea628eec65bddb43fe9042ba2d98a51991e560de97a70118dd2fcc5",
+      "runtime_terminal_kind": "returned",
+      "runtime_returned_value": -20,
+      "runtime_final_globals": [
+        -20
+      ],
+      "runtime_execution_digest": "f7bd21be960814a0a8dad7d6e2f0fa320d4aac61822037078d3b5a17345faca5",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "831fbf51eea628eec65bddb43fe9042ba2d98a51991e560de97a70118dd2fcc5",
+        "terminal_kind": "returned",
+        "returned_value": -20,
+        "final_globals": [
+          -20
+        ]
+      }
+    },
+    {
+      "case_id": "generated_exact_2",
+      "family_id": "generated.global_state",
+      "origin": "generated",
+      "status": "exact_success",
+      "program_digest": "8d8f17e6bb62aae1a608a53a00c48bba94507e87321acd72bf9aa1ee9f1f2e7d",
+      "reference_module_source_digest": "9c4a23f10995ccf9acdf06b6c8739619a09833a2af110a052bda8539044ce957",
+      "runtime_terminal_kind": "returned",
+      "runtime_returned_value": 12,
+      "runtime_final_globals": [
+        12
+      ],
+      "runtime_execution_digest": "7d3683c3fa929141b412e337b5c3fda3d89e1adbda24eeecb93960d38d4873f3",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "9c4a23f10995ccf9acdf06b6c8739619a09833a2af110a052bda8539044ce957",
+        "terminal_kind": "returned",
+        "returned_value": 12,
+        "final_globals": [
+          12
+        ]
+      }
+    },
+    {
+      "case_id": "generated_exact_3",
+      "family_id": "generated.call_indirect",
+      "origin": "generated",
+      "status": "exact_success",
+      "program_digest": "e017e663090d32f315792e8611fcce58c89a5be5360f8eaaa31a115e1c585d3a",
+      "reference_module_source_digest": "3b8956d8dffd4029c5594b50bb8ac898ab9a5803afe1c8b511fb43fe9164f4a4",
+      "runtime_terminal_kind": "returned",
+      "runtime_returned_value": 122,
+      "runtime_execution_digest": "7e3cbbd4ce9b5c4471484e1cb97fb558b4f4c8fe3ae4dfbaae2459d09149a6fb",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "3b8956d8dffd4029c5594b50bb8ac898ab9a5803afe1c8b511fb43fe9164f4a4",
+        "terminal_kind": "returned",
+        "returned_value": 122,
+        "final_globals": []
+      }
+    },
+    {
+      "case_id": "generated_trap_0",
+      "family_id": "generated.call_indirect_trap",
+      "origin": "generated",
+      "status": "exact_trap_parity",
+      "program_digest": "2293da22ec2307c4a7c95db3c0542d2178f03695e650632627cbdccd962ac75d",
+      "reference_module_source_digest": "dc73361e6bc06ba9b26d8fa91c40016ead99b267b2daf5140089d5558bba5394",
+      "runtime_terminal_kind": "errored",
+      "runtime_error_kind": "table_selector_out_of_range",
+      "runtime_error_detail": "module-execution table 0 selector 2 is out of range (entry_count=2)",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "dc73361e6bc06ba9b26d8fa91c40016ead99b267b2daf5140089d5558bba5394",
+        "terminal_kind": "trapped",
+        "final_globals": [],
+        "detail": "undefined element: out of bounds table access"
+      }
+    },
+    {
+      "case_id": "generated_trap_1",
+      "family_id": "generated.call_indirect_trap",
+      "origin": "generated",
+      "status": "exact_trap_parity",
+      "program_digest": "79950ec921e3035abf93e2f91ee25b9d4c881b445e0097fcf6b19e980e312232",
+      "reference_module_source_digest": "9b334be1181933158fb843bccbf18988c1abb104b177d99f259a8905cfc11f69",
+      "runtime_terminal_kind": "errored",
+      "runtime_error_kind": "table_selector_out_of_range",
+      "runtime_error_detail": "module-execution table 0 selector 2 is out of range (entry_count=2)",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "9b334be1181933158fb843bccbf18988c1abb104b177d99f259a8905cfc11f69",
+        "terminal_kind": "trapped",
+        "final_globals": [],
+        "detail": "undefined element: out of bounds table access"
+      }
+    }
+  ],
+  "claim_boundary": "this report differentially checks the current bounded module-execution lane against a real Wasm reference authority over curated and deterministically generated cases; exact success and trap parity are only claimed for the current supported i32 global/table/call_indirect subset, while unsupported host-import behavior remains an explicit runtime refusal boundary instead of arbitrary Wasm closure",
+  "report_digest": "a96a2a68d730ffb8670264291a29f747b50e38ac9fda30a7e082635290f69d85"
+}

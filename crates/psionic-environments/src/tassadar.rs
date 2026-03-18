@@ -25,6 +25,7 @@ const TASSADAR_METADATA_CURRENT_TARGETS_KEY: &str = "tassadar.current_workload_t
 const TASSADAR_METADATA_PLANNED_TARGETS_KEY: &str = "tassadar.planned_workload_targets";
 const TASSADAR_METADATA_BENCHMARK_PACKAGE_SET_KEY: &str = "tassadar.benchmark_package_set";
 const TASSADAR_METADATA_COMPILE_PIPELINE_MATRIX_KEY: &str = "tassadar.compile_pipeline_matrix";
+const TASSADAR_METADATA_WASM_CONFORMANCE_KEY: &str = "tassadar.wasm_conformance";
 const TASSADAR_METADATA_ABI_VERSION_KEY: &str = "tassadar.abi_version";
 const TASSADAR_EVAL_METADATA_SURFACE: &str = "eval";
 const TASSADAR_BENCHMARK_METADATA_SURFACE: &str = "benchmark";
@@ -169,6 +170,54 @@ impl TassadarCompilePipelineMatrixBinding {
             .any(|source_family_id| source_family_id.trim().is_empty())
         {
             return Err(TassadarEnvironmentError::InvalidCompilePipelineSourceFamilyId);
+        }
+        Ok(())
+    }
+}
+
+/// Public Wasm conformance binding reused by Tassadar environment bundles.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarWasmConformanceBinding {
+    /// Stable Wasm conformance report reference.
+    pub report_ref: String,
+    /// Stable Wasm conformance report identifier.
+    pub report_id: String,
+    /// Stable reference-authority identifier.
+    pub reference_authority_id: String,
+    /// Case families covered by the committed report.
+    pub case_family_ids: Vec<String>,
+}
+
+impl TassadarWasmConformanceBinding {
+    /// Returns a stable digest over the binding.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let encoded =
+            serde_json::to_vec(self).expect("Tassadar Wasm conformance binding should serialize");
+        let digest = sha2::Sha256::digest(encoded.as_slice());
+        hex::encode(digest)
+    }
+
+    /// Validates that the binding is explicit.
+    pub fn validate(&self) -> Result<(), TassadarEnvironmentError> {
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceReportRef);
+        }
+        if self.report_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceReportId);
+        }
+        if self.reference_authority_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceAuthorityId);
+        }
+        if self.case_family_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceCaseFamilies);
+        }
+        if self
+            .case_family_ids
+            .iter()
+            .any(|case_family_id| case_family_id.trim().is_empty())
+        {
+            return Err(TassadarEnvironmentError::InvalidWasmConformanceCaseFamilyId);
         }
         Ok(())
     }
@@ -426,6 +475,8 @@ pub struct TassadarEnvironmentSpec {
     pub benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding,
     /// Public compile-pipeline matrix binding.
     pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
+    /// Public Wasm conformance binding.
+    pub wasm_conformance_binding: TassadarWasmConformanceBinding,
     /// Policy refs for the eval package.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub eval_policy_references: Vec<EnvironmentPolicyReference>,
@@ -512,6 +563,7 @@ impl TassadarEnvironmentSpec {
             exactness_contract: self.exactness_contract.clone(),
             benchmark_package_set_binding: self.benchmark_package_set_binding.clone(),
             compile_pipeline_matrix_binding: self.compile_pipeline_matrix_binding.clone(),
+            wasm_conformance_binding: self.wasm_conformance_binding.clone(),
             current_workload_targets: self.current_workload_targets.clone(),
             planned_workload_targets: self.planned_workload_targets.clone(),
         })
@@ -545,6 +597,7 @@ impl TassadarEnvironmentSpec {
         self.exactness_contract.validate()?;
         self.benchmark_package_set_binding.validate()?;
         self.compile_pipeline_matrix_binding.validate()?;
+        self.wasm_conformance_binding.validate()?;
         if self.current_workload_targets.is_empty() {
             return Err(TassadarEnvironmentError::MissingCurrentWorkloadTargets);
         }
@@ -722,6 +775,10 @@ impl TassadarEnvironmentSpec {
             serde_json::to_value(&self.compile_pipeline_matrix_binding).unwrap_or(Value::Null),
         );
         metadata.insert(
+            String::from(TASSADAR_METADATA_WASM_CONFORMANCE_KEY),
+            serde_json::to_value(&self.wasm_conformance_binding).unwrap_or(Value::Null),
+        );
+        metadata.insert(
             String::from(TASSADAR_METADATA_CURRENT_TARGETS_KEY),
             serde_json::to_value(&self.current_workload_targets).unwrap_or(Value::Null),
         );
@@ -786,6 +843,8 @@ pub struct TassadarEnvironmentBundle {
     pub benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding,
     /// Compile-pipeline matrix binding.
     pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
+    /// Wasm conformance binding.
+    pub wasm_conformance_binding: TassadarWasmConformanceBinding,
     /// Current workload targets implemented now.
     pub current_workload_targets: Vec<TassadarWorkloadTarget>,
     /// Planned workload targets still to widen later.
@@ -847,6 +906,23 @@ pub enum TassadarEnvironmentError {
     /// Invalid compile-pipeline matrix source family id.
     #[error("Tassadar environment spec includes an empty compile-pipeline source family id")]
     InvalidCompilePipelineSourceFamilyId,
+    /// Missing Wasm conformance report ref.
+    #[error("Tassadar environment spec is missing `wasm_conformance_binding.report_ref`")]
+    MissingWasmConformanceReportRef,
+    /// Missing Wasm conformance report id.
+    #[error("Tassadar environment spec is missing `wasm_conformance_binding.report_id`")]
+    MissingWasmConformanceReportId,
+    /// Missing Wasm conformance authority id.
+    #[error(
+        "Tassadar environment spec is missing `wasm_conformance_binding.reference_authority_id`"
+    )]
+    MissingWasmConformanceAuthorityId,
+    /// Missing Wasm conformance case families.
+    #[error("Tassadar environment spec must declare Wasm conformance case families")]
+    MissingWasmConformanceCaseFamilies,
+    /// Invalid Wasm conformance case family id.
+    #[error("Tassadar environment spec includes an empty Wasm conformance case family id")]
+    InvalidWasmConformanceCaseFamilyId,
     /// Missing group ref.
     #[error("Tassadar environment refs are missing `group_ref`")]
     MissingGroupRef,
@@ -1056,6 +1132,23 @@ mod tests {
                     String::from("c_source.toolchain_unavailable"),
                 ],
             },
+            wasm_conformance_binding: TassadarWasmConformanceBinding {
+                report_ref: String::from(
+                    "fixtures/tassadar/reports/tassadar_wasm_conformance_report.json",
+                ),
+                report_id: String::from("tassadar.wasm_conformance.report.v1"),
+                reference_authority_id: String::from("wasmi.reference.v1"),
+                case_family_ids: vec![
+                    String::from("curated.global_state"),
+                    String::from("curated.call_indirect"),
+                    String::from("curated.deterministic_import"),
+                    String::from("curated.call_indirect_trap"),
+                    String::from("curated.unsupported_host_import"),
+                    String::from("generated.call_indirect"),
+                    String::from("generated.call_indirect_trap"),
+                    String::from("generated.global_state"),
+                ],
+            },
             eval_policy_references: vec![EnvironmentPolicyReference {
                 kind: EnvironmentPolicyKind::Verification,
                 policy_ref: String::from("policy://tassadar/eval/verification"),
@@ -1134,6 +1227,15 @@ mod tests {
                 .and_then(|value| value.get("report_ref"))
                 .and_then(Value::as_str),
             Some("fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json")
+        );
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
+                .get(TASSADAR_METADATA_WASM_CONFORMANCE_KEY)
+                .and_then(|value| value.get("report_ref"))
+                .and_then(Value::as_str),
+            Some("fixtures/tassadar/reports/tassadar_wasm_conformance_report.json")
         );
         assert_eq!(
             bundle.current_workload_targets,
