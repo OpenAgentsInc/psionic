@@ -358,7 +358,7 @@ research without losing the oracle.
 | ID | Status | Proposed GitHub issue title | Description |
 | --- | --- | --- | --- |
 | `PGOLF-401` / [#172](https://github.com/OpenAgentsInc/psionic/issues/172) | done (2026-03-18) | `Psionic Parameter Golf: add a non-record submission wrapper and record-folder output contract` | `psionic-train` now ships a typed non-record submission package builder plus folder writer that emit `README.md`, `submission.json`, `train.log`, a runnable `train_gpt.py` review wrapper, preserved benchmark artifacts, and a machine-readable counted-byte accounting receipt without pretending a hidden Rust runtime is free. |
-| `PGOLF-402` / [#173](https://github.com/OpenAgentsInc/psionic/issues/173) | open | `Psionic Parameter Golf: add a research harness for post-parity architecture and compression variants` | After parity is real, add a controlled harness for recurrent/shared-depth variants, stronger parameter tying, better quantization, and compression experiments under the same oracle and artifact-accounting rules. |
+| `PGOLF-402` / [#173](https://github.com/OpenAgentsInc/psionic/issues/173) | done (2026-03-18) | `Psionic Parameter Golf: add a research harness for post-parity architecture and compression variants` | `psionic-research` now ships a committed Parameter Golf research-harness report that freezes one measured baseline control plus explicit shared-depth or recurrent, stronger parameter-tying, and compression or quantization candidate families against the same oracle digests, submission metric, and counted-byte vocabulary used by the landed non-record package. |
 | `PGOLF-403` / [#174](https://github.com/OpenAgentsInc/psionic/issues/174) | open | `Psionic Parameter Golf: add a record-track submission contract once public accounting is explicit` | Only after the public wrapper and code-size story is clear should the repo claim record-track readiness. This issue owns the final record-submission path, not the earlier research or non-record lane. |
 
 ## Current Execution Order
@@ -390,7 +390,7 @@ research without losing the oracle.
 ### Phase 5: package the lane honestly, then widen research
 
 - `PGOLF-401` -> landed the first honest non-record submission package, counted-byte accounting receipt, review-wrapper entrypoint, and record-folder writer
-- `PGOLF-402`
+- `PGOLF-402` -> landed the committed post-parity research harness report with one measured baseline control and three guarded candidate families on the same oracle and accounting surface
 - `PGOLF-403`
 
 ## Bottom Line
@@ -410,6 +410,9 @@ precise about what is true on 2026-03-18:
 - Psionic now also has a first honest non-record submission package, but
   record-track packaging remains blocked on counted-runtime and `8xH100`
   closure
+- post-parity architecture and compression work now has a committed research
+  harness, but those candidates remain explicitly research-only until new
+  results are measured
 - the first truthful result should be parity against `train_gpt.py`, not a new
   architecture
 - record-track claims stay blocked until the actual counted-runtime submission
