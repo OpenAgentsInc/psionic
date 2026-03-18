@@ -200,6 +200,15 @@ The current scope is:
   `TassadarExecutorCapabilityPublication` above that schema, and
   `psionic-provider` now wraps the same publication into a provider-facing
   `TassadarCapabilityEnvelope` instead of inventing a second capability story
+- landed route-contract follow-on: `psionic-router` now also owns a routeable
+  Wasm capability matrix for `psionic.planner_executor_route`, with explicit
+  module-class rows, opcode-family facts, import posture, module-class-specific
+  direct-vs-fallback decode truth, and typed refusal reasons for unsupported
+  module classes, opcode families, or import posture; `psionic-serve` now
+  derives that matrix directly from the served workload capability publication,
+  and `psionic-provider` now validates that served route descriptors keep the
+  routeable Wasm rows benchmark-gated instead of collapsing everything into one
+  coarse "supports Wasm" claim
 - landed Phase 8A bar: one widened HullCache closure report now exists in
   `psionic-eval` at
   `fixtures/tassadar/reports/tassadar_hull_cache_closure_report.json`,

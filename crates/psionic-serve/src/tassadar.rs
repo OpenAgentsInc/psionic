@@ -8,6 +8,7 @@ use psionic_models::{
     TassadarExecutorContractError, TassadarExecutorFixture, TassadarExecutorModelDescriptor,
     TassadarModuleExecutionCapabilityPublication, TassadarTraceTokenizer,
     TassadarWorkloadCapabilityMatrix, TassadarWorkloadCapabilityMatrixError,
+    TassadarWorkloadCapabilityRow, TassadarWorkloadSupportPosture,
 };
 use psionic_research::{
     TassadarAcceptanceReport, TassadarCompiledArticleClosureReport,
@@ -17,6 +18,8 @@ use psionic_research::{
 use psionic_router::{
     TassadarPlannerExecutorDecodeCapability, TassadarPlannerExecutorRouteDescriptor,
     TassadarPlannerExecutorRoutePosture, TassadarPlannerExecutorRouteRefusalReason,
+    TassadarPlannerExecutorWasmCapabilityMatrix, TassadarPlannerExecutorWasmCapabilityRow,
+    TassadarPlannerExecutorWasmImportPosture, TassadarPlannerExecutorWasmOpcodeFamily,
 };
 use psionic_runtime::{
     TASSADAR_ARTICLE_CLASS_BENCHMARK_ENVIRONMENT_REF, TASSADAR_ARTICLE_CLASS_BENCHMARK_REF,
@@ -1695,41 +1698,20 @@ impl LocalTassadarPlannerRouter {
                 },
             )?;
         let model_id = publication.model_descriptor.model.model_id.clone();
-        let decode_capabilities = publication
-            .model_descriptor
-            .compatibility
-            .supported_decode_modes
-            .iter()
-            .map(|mode| TassadarPlannerExecutorDecodeCapability {
-                requested_decode_mode: *mode,
-                route_posture: match mode {
-                    TassadarExecutorDecodeMode::ReferenceLinear => {
-                        TassadarPlannerExecutorRoutePosture::DirectGuaranteed
-                    }
-                    TassadarExecutorDecodeMode::HullCache
-                    | TassadarExecutorDecodeMode::SparseTopK => {
-                        TassadarPlannerExecutorRoutePosture::FallbackCapable
-                    }
-                },
-                benchmark_report_ref: String::from(TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF),
-                note: match mode {
-                    TassadarExecutorDecodeMode::ReferenceLinear => String::from(
-                        "benchmark-gated exact dense floor for planner-owned executor delegation",
-                    ),
-                    TassadarExecutorDecodeMode::HullCache => String::from(
-                        "benchmark-gated HullCache route posture; direct when current validation covers the workload and explicit fallback otherwise",
-                    ),
-                    TassadarExecutorDecodeMode::SparseTopK => String::from(
-                        "benchmark-gated SparseTopK route posture; direct when current validation covers the workload and explicit fallback otherwise",
-                    ),
-                },
-            })
-            .collect::<Vec<_>>();
+        let wasm_capability_matrix = routeable_wasm_capability_matrix(&publication);
+        let benchmark_report_ref =
+            route_benchmark_report_ref(&publication, &wasm_capability_matrix);
+        let decode_capabilities = aggregate_route_decode_capabilities(
+            &publication,
+            &wasm_capability_matrix,
+            &benchmark_report_ref,
+        );
         Ok(TassadarPlannerExecutorRouteDescriptor::new(
             format!("tassadar.planner_executor_route.{model_id}.v0"),
             model_id,
-            TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
+            benchmark_report_ref,
             publication.workload_capability_matrix.matrix_digest.clone(),
+            wasm_capability_matrix,
             decode_capabilities,
             vec![
                 TassadarPlannerExecutorRouteRefusalReason::UnsupportedProduct,
@@ -1739,8 +1721,11 @@ impl LocalTassadarPlannerRouter {
                 TassadarPlannerExecutorRouteRefusalReason::DecodeModeUnsupported,
                 TassadarPlannerExecutorRouteRefusalReason::RuntimeFallbackDisallowed,
                 TassadarPlannerExecutorRouteRefusalReason::DirectDecodeRequired,
+                TassadarPlannerExecutorRouteRefusalReason::WasmModuleClassUnsupported,
+                TassadarPlannerExecutorRouteRefusalReason::WasmOpcodeFamilyUnsupported,
+                TassadarPlannerExecutorRouteRefusalReason::WasmImportPostureUnsupported,
             ],
-            "benchmark-gated served planner / executor route descriptor above the current explicit executor-trace lane",
+            "benchmark-gated served planner / executor route descriptor above the current explicit executor-trace lane, with routeable Wasm module-class boundaries kept separate from the coarse lane-wide decode summary",
         ))
     }
 
@@ -2110,6 +2095,232 @@ impl LocalTassadarPlannerRouter {
                 }
             }
         }
+    }
+}
+
+fn routeable_wasm_capability_matrix(
+    publication: &TassadarExecutorCapabilityPublication,
+) -> TassadarPlannerExecutorWasmCapabilityMatrix {
+    let model_id = publication.model_descriptor.model.model_id.clone();
+    let rows = publication
+        .workload_capability_matrix
+        .rows
+        .iter()
+        .map(routeable_wasm_capability_row)
+        .collect::<Vec<_>>();
+    TassadarPlannerExecutorWasmCapabilityMatrix::new(
+        format!("tassadar.planner_executor_route.wasm_capability.{model_id}.v0"),
+        model_id,
+        rows,
+        format!(
+            "{} Route negotiation currently publishes only `{}` module classes above the served benchmark rows; {}",
+            publication.workload_capability_matrix.claim_boundary,
+            TassadarPlannerExecutorWasmImportPosture::NoImportsOnly.as_str(),
+            publication.module_execution_capability.claim_boundary
+        ),
+    )
+}
+
+fn routeable_wasm_capability_row(
+    workload_row: &TassadarWorkloadCapabilityRow,
+) -> TassadarPlannerExecutorWasmCapabilityRow {
+    let benchmark_report_ref = workload_row
+        .benchmark_gate
+        .as_ref()
+        .map(|gate| gate.evidence_ref.clone());
+    match workload_row.support_posture {
+        TassadarWorkloadSupportPosture::Exact => TassadarPlannerExecutorWasmCapabilityRow::new(
+            workload_row.workload_class,
+            workload_row.supported_decode_modes.clone(),
+            workload_row.supported_decode_modes.clone(),
+            None,
+            wasm_opcode_families_for_workload_class(workload_row.workload_class),
+            TassadarPlannerExecutorWasmImportPosture::NoImportsOnly,
+            benchmark_report_ref,
+            vec![
+                TassadarPlannerExecutorRouteRefusalReason::DecodeModeUnsupported,
+                TassadarPlannerExecutorRouteRefusalReason::WasmOpcodeFamilyUnsupported,
+                TassadarPlannerExecutorRouteRefusalReason::WasmImportPostureUnsupported,
+            ],
+            workload_row.detail.clone(),
+        ),
+        TassadarWorkloadSupportPosture::ExactFallbackOnly => {
+            TassadarPlannerExecutorWasmCapabilityRow::new(
+                workload_row.workload_class,
+                workload_row.supported_decode_modes.clone(),
+                workload_row
+                    .exact_fallback_decode_mode
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+                workload_row.exact_fallback_decode_mode,
+                wasm_opcode_families_for_workload_class(workload_row.workload_class),
+                TassadarPlannerExecutorWasmImportPosture::NoImportsOnly,
+                benchmark_report_ref,
+                vec![
+                    TassadarPlannerExecutorRouteRefusalReason::DecodeModeUnsupported,
+                    TassadarPlannerExecutorRouteRefusalReason::RuntimeFallbackDisallowed,
+                    TassadarPlannerExecutorRouteRefusalReason::DirectDecodeRequired,
+                    TassadarPlannerExecutorRouteRefusalReason::WasmOpcodeFamilyUnsupported,
+                    TassadarPlannerExecutorRouteRefusalReason::WasmImportPostureUnsupported,
+                ],
+                workload_row.detail.clone(),
+            )
+        }
+        TassadarWorkloadSupportPosture::Partial
+        | TassadarWorkloadSupportPosture::ResearchOnly
+        | TassadarWorkloadSupportPosture::Unsupported => {
+            TassadarPlannerExecutorWasmCapabilityRow::new(
+                workload_row.workload_class,
+                Vec::new(),
+                Vec::new(),
+                None,
+                wasm_opcode_families_for_workload_class(workload_row.workload_class),
+                TassadarPlannerExecutorWasmImportPosture::NoImportsOnly,
+                None,
+                vec![TassadarPlannerExecutorRouteRefusalReason::WasmModuleClassUnsupported],
+                workload_row.detail.clone(),
+            )
+        }
+    }
+}
+
+fn wasm_opcode_families_for_workload_class(
+    workload_class: psionic_models::TassadarWorkloadClass,
+) -> Vec<TassadarPlannerExecutorWasmOpcodeFamily> {
+    use psionic_models::TassadarWorkloadClass::{
+        ArithmeticMicroprogram, BranchControlFlowMicroprogram, BranchHeavyKernel, ClrsShortestPath,
+        HungarianMatching, LongLoopKernel, MemoryHeavyKernel, MemoryLookupMicroprogram,
+        MicroWasmKernel, SudokuClass,
+    };
+
+    match workload_class {
+        ArithmeticMicroprogram => vec![TassadarPlannerExecutorWasmOpcodeFamily::CoreI32Arithmetic],
+        ClrsShortestPath
+        | BranchControlFlowMicroprogram
+        | BranchHeavyKernel
+        | LongLoopKernel
+        | SudokuClass => vec![
+            TassadarPlannerExecutorWasmOpcodeFamily::CoreI32Arithmetic,
+            TassadarPlannerExecutorWasmOpcodeFamily::StructuredControl,
+        ],
+        MemoryLookupMicroprogram => vec![
+            TassadarPlannerExecutorWasmOpcodeFamily::CoreI32Arithmetic,
+            TassadarPlannerExecutorWasmOpcodeFamily::LinearMemoryV2,
+        ],
+        MicroWasmKernel => vec![
+            TassadarPlannerExecutorWasmOpcodeFamily::CoreI32Arithmetic,
+            TassadarPlannerExecutorWasmOpcodeFamily::StructuredControl,
+            TassadarPlannerExecutorWasmOpcodeFamily::LinearMemoryV2,
+            TassadarPlannerExecutorWasmOpcodeFamily::DirectCallFrames,
+        ],
+        MemoryHeavyKernel | HungarianMatching => vec![
+            TassadarPlannerExecutorWasmOpcodeFamily::CoreI32Arithmetic,
+            TassadarPlannerExecutorWasmOpcodeFamily::StructuredControl,
+            TassadarPlannerExecutorWasmOpcodeFamily::LinearMemoryV2,
+        ],
+    }
+}
+
+fn route_benchmark_report_ref(
+    publication: &TassadarExecutorCapabilityPublication,
+    wasm_capability_matrix: &TassadarPlannerExecutorWasmCapabilityMatrix,
+) -> String {
+    wasm_capability_matrix
+        .rows
+        .iter()
+        .find_map(|row| row.benchmark_report_ref.clone())
+        .unwrap_or_else(|| {
+            publication
+                .workload_capability_matrix
+                .rows
+                .iter()
+                .find_map(|row| {
+                    row.benchmark_gate
+                        .as_ref()
+                        .map(|gate| gate.evidence_ref.clone())
+                })
+                .unwrap_or_default()
+        })
+}
+
+fn aggregate_route_decode_capabilities(
+    publication: &TassadarExecutorCapabilityPublication,
+    wasm_capability_matrix: &TassadarPlannerExecutorWasmCapabilityMatrix,
+    benchmark_report_ref: &str,
+) -> Vec<TassadarPlannerExecutorDecodeCapability> {
+    publication
+        .model_descriptor
+        .compatibility
+        .supported_decode_modes
+        .iter()
+        .filter_map(|mode| {
+            let supporting_rows = wasm_capability_matrix
+                .rows
+                .iter()
+                .filter(|row| row.supported_decode_modes.contains(mode))
+                .collect::<Vec<_>>();
+            if supporting_rows.is_empty() {
+                return None;
+            }
+            let route_posture = if supporting_rows
+                .iter()
+                .all(|row| row.direct_decode_modes.contains(mode))
+            {
+                TassadarPlannerExecutorRoutePosture::DirectGuaranteed
+            } else {
+                TassadarPlannerExecutorRoutePosture::FallbackCapable
+            };
+            Some(TassadarPlannerExecutorDecodeCapability {
+                requested_decode_mode: *mode,
+                route_posture,
+                benchmark_report_ref: String::from(benchmark_report_ref),
+                note: aggregate_route_decode_note(*mode, route_posture),
+            })
+        })
+        .collect()
+}
+
+fn aggregate_route_decode_note(
+    mode: TassadarExecutorDecodeMode,
+    route_posture: TassadarPlannerExecutorRoutePosture,
+) -> String {
+    match (mode, route_posture) {
+        (
+            TassadarExecutorDecodeMode::ReferenceLinear,
+            TassadarPlannerExecutorRoutePosture::DirectGuaranteed,
+        ) => {
+            String::from("benchmark-gated exact dense floor for planner-owned executor delegation")
+        }
+        (
+            TassadarExecutorDecodeMode::HullCache,
+            TassadarPlannerExecutorRoutePosture::DirectGuaranteed,
+        ) => String::from(
+            "benchmark-gated HullCache route posture stays direct across the currently published Wasm module classes",
+        ),
+        (
+            TassadarExecutorDecodeMode::SparseTopK,
+            TassadarPlannerExecutorRoutePosture::DirectGuaranteed,
+        ) => String::from(
+            "benchmark-gated SparseTopK route posture stays direct across the currently published Wasm module classes",
+        ),
+        (
+            TassadarExecutorDecodeMode::HullCache,
+            TassadarPlannerExecutorRoutePosture::FallbackCapable,
+        ) => String::from(
+            "benchmark-gated HullCache route posture; routeable Wasm module classes keep exact direct versus explicit fallback boundaries separate",
+        ),
+        (
+            TassadarExecutorDecodeMode::SparseTopK,
+            TassadarPlannerExecutorRoutePosture::FallbackCapable,
+        ) => String::from(
+            "benchmark-gated SparseTopK route posture; routeable Wasm module classes keep exact direct versus explicit fallback boundaries separate",
+        ),
+        (
+            TassadarExecutorDecodeMode::ReferenceLinear,
+            TassadarPlannerExecutorRoutePosture::FallbackCapable,
+        ) => String::from(
+            "reference_linear remains the dense floor while routeable Wasm module classes may still force explicit slower-path selection details",
+        ),
     }
 }
 
@@ -4911,9 +5122,11 @@ mod tests {
         TassadarPlannerRoutingOutcome, TassadarPlannerRoutingPolicy, TassadarPlannerRoutingRequest,
         TassadarResearchPromotionError, require_tassadar_research_lane_promotion_ready,
     };
-    use psionic_models::TassadarExecutorFixture;
+    use psionic_models::{TassadarExecutorFixture, TassadarWorkloadClass};
     use psionic_research::TassadarPromotionChecklistGateKind;
-    use psionic_router::TassadarPlannerExecutorRoutePosture;
+    use psionic_router::{
+        TassadarPlannerExecutorRoutePosture, TassadarPlannerExecutorWasmImportPosture,
+    };
     use psionic_runtime::{
         TassadarExecutorDecodeMode, TassadarInstruction, TassadarProgram, TassadarProgramArtifact,
         TassadarTraceAbi, TassadarWasmProfile, tassadar_article_class_corpus,
@@ -5629,6 +5842,36 @@ mod tests {
         assert_eq!(
             hull_cache.benchmark_report_ref,
             TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF
+        );
+        let micro_kernel = descriptor
+            .wasm_capability_matrix
+            .rows
+            .iter()
+            .find(|row| row.module_class == TassadarWorkloadClass::MicroWasmKernel)
+            .expect("micro kernel row");
+        assert_eq!(
+            micro_kernel.import_posture,
+            TassadarPlannerExecutorWasmImportPosture::NoImportsOnly
+        );
+        assert!(
+            micro_kernel
+                .direct_decode_modes
+                .contains(&TassadarExecutorDecodeMode::HullCache)
+        );
+        let long_loop = descriptor
+            .wasm_capability_matrix
+            .rows
+            .iter()
+            .find(|row| row.module_class == TassadarWorkloadClass::LongLoopKernel)
+            .expect("long loop row");
+        assert_eq!(
+            long_loop.exact_fallback_decode_mode,
+            Some(TassadarExecutorDecodeMode::ReferenceLinear)
+        );
+        assert!(
+            !long_loop
+                .direct_decode_modes
+                .contains(&TassadarExecutorDecodeMode::HullCache)
         );
         assert!(!descriptor.descriptor_digest.is_empty());
     }

@@ -327,6 +327,38 @@ impl TassadarPlannerRouteCapabilityEnvelope {
                 },
             );
         }
+        if route_descriptor.wasm_capability_matrix.rows.is_empty() {
+            return Err(
+                TassadarPlannerRouteCapabilityEnvelopeError::UnpublishableWasmCapabilityMatrix {
+                    route_id: route_descriptor.route_id.clone(),
+                    detail: String::from(
+                        "route descriptor was missing routeable Wasm capability rows",
+                    ),
+                },
+            );
+        }
+        if let Some(row) = route_descriptor
+            .wasm_capability_matrix
+            .rows
+            .iter()
+            .find(|row| {
+                !row.supported_decode_modes.is_empty()
+                    && row
+                        .benchmark_report_ref
+                        .as_deref()
+                        .map_or(true, |value| value.trim().is_empty())
+            })
+        {
+            return Err(
+                TassadarPlannerRouteCapabilityEnvelopeError::UnpublishableWasmCapabilityMatrix {
+                    route_id: route_descriptor.route_id.clone(),
+                    detail: format!(
+                        "module class `{}` was missing a benchmark report ref",
+                        row.module_class.as_str()
+                    ),
+                },
+            );
+        }
         if route_descriptor.benchmark_report_ref.trim().is_empty() {
             return Err(
                 TassadarPlannerRouteCapabilityEnvelopeError::MissingBenchmarkGate {
@@ -377,6 +409,13 @@ pub enum TassadarPlannerRouteCapabilityEnvelopeError {
     MissingBenchmarkGate {
         /// Stable route identifier.
         route_id: String,
+    },
+    /// The route omitted the routeable Wasm capability matrix or published invalid served rows.
+    UnpublishableWasmCapabilityMatrix {
+        /// Stable route identifier.
+        route_id: String,
+        /// Plain-language validation detail.
+        detail: String,
     },
 }
 
@@ -3069,6 +3108,7 @@ mod tests {
         TassadarPlannerExecutorNegotiatedRouteState,
         TassadarPlannerExecutorRouteNegotiationOutcome,
         TassadarPlannerExecutorRouteNegotiationRequest, TassadarPlannerExecutorRouteRefusalReason,
+        TassadarPlannerExecutorWasmImportPosture, TassadarPlannerExecutorWasmOpcodeFamily,
         negotiate_tassadar_planner_executor_route,
     };
     use psionic_runtime::{
@@ -8301,9 +8341,10 @@ mod tests {
             &[envelope.as_route_candidate("provider-a", "worker-a")],
             &TassadarPlannerExecutorRouteNegotiationRequest::new(
                 "planner-route-request-direct",
-                psionic_runtime::TassadarExecutorDecodeMode::ReferenceLinear,
+                psionic_runtime::TassadarExecutorDecodeMode::HullCache,
             )
-            .with_requested_model_id(TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID),
+            .with_requested_model_id(TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID)
+            .with_requested_wasm_module_class(TassadarWorkloadClass::MicroWasmKernel),
         );
 
         match outcome {
@@ -8315,8 +8356,19 @@ mod tests {
                     TassadarPlannerExecutorNegotiatedRouteState::Direct
                 );
                 assert_eq!(
+                    selection.effective_decode_mode,
+                    psionic_runtime::TassadarExecutorDecodeMode::HullCache
+                );
+                assert_eq!(
                     selection.route_descriptor.model_id,
                     TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID
+                );
+                assert_eq!(
+                    selection
+                        .wasm_capability
+                        .expect("module-class-aware route selection")
+                        .module_class,
+                    TassadarWorkloadClass::MicroWasmKernel
                 );
             }
             other => panic!("expected direct planner route selection, got {other:?}"),
@@ -8348,6 +8400,7 @@ mod tests {
                 psionic_runtime::TassadarExecutorDecodeMode::HullCache,
             )
             .with_requested_model_id(TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID)
+            .with_requested_wasm_module_class(TassadarWorkloadClass::LongLoopKernel)
             .disallow_runtime_decode_fallback(),
         );
 
@@ -8384,6 +8437,81 @@ mod tests {
             err,
             TassadarPlannerRouteCapabilityEnvelopeError::MissingBenchmarkGate { .. }
         ));
+    }
+
+    #[test]
+    fn tassadar_planner_route_capability_envelope_rejects_missing_wasm_benchmark_row() {
+        let router = LocalTassadarPlannerRouter::new().with_executor_service(
+            LocalTassadarExecutorService::new()
+                .with_fixture(TassadarExecutorFixture::article_i32_compute_v1()),
+        );
+        let mut route_descriptor = router
+            .route_capability_descriptor(Some(
+                TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID,
+            ))
+            .expect("planner route descriptor should publish");
+        route_descriptor
+            .wasm_capability_matrix
+            .rows
+            .iter_mut()
+            .find(|row| row.module_class == TassadarWorkloadClass::MicroWasmKernel)
+            .expect("micro kernel route row")
+            .benchmark_report_ref = None;
+
+        let err = TassadarPlannerRouteCapabilityEnvelope::from_route_descriptor(
+            &route_descriptor,
+            ProviderReadiness::ready("planner route ready"),
+        )
+        .expect_err("provider route envelope should reject missing Wasm benchmark row");
+        assert!(matches!(
+            err,
+            TassadarPlannerRouteCapabilityEnvelopeError::UnpublishableWasmCapabilityMatrix { .. }
+        ));
+    }
+
+    #[test]
+    fn tassadar_planner_route_capability_envelope_refuses_unsupported_import_posture_by_module_class()
+     {
+        let router = LocalTassadarPlannerRouter::new().with_executor_service(
+            LocalTassadarExecutorService::new()
+                .with_fixture(TassadarExecutorFixture::article_i32_compute_v1()),
+        );
+        let route_descriptor = router
+            .route_capability_descriptor(Some(
+                TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID,
+            ))
+            .expect("planner route descriptor should publish");
+        let envelope = TassadarPlannerRouteCapabilityEnvelope::from_route_descriptor(
+            &route_descriptor,
+            ProviderReadiness::ready("planner route ready"),
+        )
+        .expect("provider route envelope should build");
+
+        let outcome = negotiate_tassadar_planner_executor_route(
+            &[envelope.as_route_candidate("provider-a", "worker-a")],
+            &TassadarPlannerExecutorRouteNegotiationRequest::new(
+                "planner-route-request-import-posture",
+                psionic_runtime::TassadarExecutorDecodeMode::ReferenceLinear,
+            )
+            .with_requested_model_id(TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID)
+            .with_requested_wasm_module_class(TassadarWorkloadClass::MicroWasmKernel)
+            .with_requested_wasm_import_posture(
+                TassadarPlannerExecutorWasmImportPosture::DeterministicStubImportsOnly,
+            )
+            .with_required_wasm_opcode_families(vec![
+                TassadarPlannerExecutorWasmOpcodeFamily::CoreI32Arithmetic,
+            ]),
+        );
+
+        match outcome {
+            TassadarPlannerExecutorRouteNegotiationOutcome::Refused { refusal } => {
+                assert_eq!(
+                    refusal.refusal_reason,
+                    TassadarPlannerExecutorRouteRefusalReason::WasmImportPostureUnsupported
+                );
+            }
+            other => panic!("expected import-posture refusal, got {other:?}"),
+        }
     }
 
     #[test]
