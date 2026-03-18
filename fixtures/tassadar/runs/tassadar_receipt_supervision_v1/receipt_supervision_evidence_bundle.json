@@ -1,0 +1,106 @@
+{
+  "publication": {
+    "schema_version": 1,
+    "publication_id": "tassadar.receipt_supervision.publication.v1",
+    "status": "implemented",
+    "claim_class": "research_only_architecture_policy_bound_routing",
+    "benchmarked_workload_classes": [
+      "branch_heavy_kernel",
+      "clrs_shortest_path",
+      "long_loop_kernel",
+      "memory_heavy_kernel",
+      "sudoku_class"
+    ],
+    "target_surfaces": [
+      "crates/psionic-models",
+      "crates/psionic-provider",
+      "crates/psionic-train"
+    ],
+    "validation_refs": [
+      "fixtures/tassadar/runs/tassadar_receipt_supervision_v1/receipt_supervision_evidence_bundle.json",
+      "fixtures/tassadar/reports/tassadar_receipt_supervision_report.json",
+      "fixtures/tassadar/reports/tassadar_evidence_calibrated_routing_report.json",
+      "fixtures/tassadar/reports/tassadar_negative_invocation_report.json"
+    ],
+    "support_boundaries": [
+      "accepted outcomes remain explicit supervision inputs and challengeable labels; publication here does not move authority closure into the planner",
+      "receipt-supervised planner learning is benchmark-bound and research-only; it does not widen served capability or settlement posture"
+    ],
+    "publication_digest": "bd0439e29961a6c94551b9e95f890ebee89fe8651aeeeb3daac3f7af1f1e2471"
+  },
+  "cases": [
+    {
+      "case_id": "accepted_outcome_exact_patch",
+      "workload_class": "memory_heavy_kernel",
+      "heuristic_route_family": "internal_exact_compute",
+      "receipt_supervised_route_family": "internal_exact_compute",
+      "validator_outcome": "pass",
+      "accepted_outcome_label": "accepted",
+      "receipt_sources": [
+        "fixtures/tassadar/reports/tassadar_evidence_calibrated_routing_report.json",
+        "fixtures/tassadar/reports/tassadar_negative_invocation_report.json"
+      ],
+      "note": "receipts and validator outcome confirm the heuristic internal route was already correct"
+    },
+    {
+      "case_id": "long_loop_validator_mount",
+      "workload_class": "long_loop_kernel",
+      "heuristic_route_family": "internal_exact_compute",
+      "receipt_supervised_route_family": "external_tool",
+      "validator_outcome": "challenge_required",
+      "accepted_outcome_label": "accepted_after_delegation",
+      "receipt_sources": [
+        "fixtures/tassadar/reports/tassadar_evidence_calibrated_routing_report.json",
+        "fixtures/tassadar/reports/tassadar_internal_external_delegation_benchmark_report.json"
+      ],
+      "note": "receipt-aware planner should learn that the heuristic internal route needed delegation to close cleanly"
+    },
+    {
+      "case_id": "served_search_validator_mount",
+      "workload_class": "sudoku_class",
+      "heuristic_route_family": "internal_exact_compute",
+      "receipt_supervised_route_family": "external_tool",
+      "validator_outcome": "fail",
+      "accepted_outcome_label": "rejected_for_evidence",
+      "receipt_sources": [
+        "fixtures/tassadar/reports/tassadar_evidence_calibrated_routing_report.json",
+        "fixtures/tassadar/reports/tassadar_internal_external_delegation_route_matrix.json"
+      ],
+      "note": "receipt bundle shows the heuristic route lacked the evidence bar and should have delegated externally"
+    },
+    {
+      "case_id": "branch_heavy_control_repair",
+      "workload_class": "branch_heavy_kernel",
+      "heuristic_route_family": "internal_exact_compute",
+      "receipt_supervised_route_family": "external_tool",
+      "validator_outcome": "challenge_required",
+      "accepted_outcome_label": "rejected_for_refusal_quality",
+      "receipt_sources": [
+        "fixtures/tassadar/reports/tassadar_internal_external_delegation_benchmark_report.json",
+        "fixtures/tassadar/reports/tassadar_negative_invocation_report.json"
+      ],
+      "note": "receipt-aware planner should learn that heuristic internal routing degraded refusal quality on this branch-heavy row"
+    },
+    {
+      "case_id": "clrs_shortest_path_verification",
+      "workload_class": "clrs_shortest_path",
+      "heuristic_route_family": "internal_exact_compute",
+      "receipt_supervised_route_family": "external_tool",
+      "validator_outcome": "pass",
+      "accepted_outcome_label": "accepted",
+      "receipt_sources": [
+        "fixtures/tassadar/reports/tassadar_internal_external_delegation_route_matrix.json",
+        "fixtures/tassadar/reports/tassadar_internal_external_delegation_benchmark_report.json"
+      ],
+      "note": "receipt-aware planner should route toward the externally validated authority path when the bridge lane remains partially open"
+    }
+  ],
+  "heuristic_route_quality_bps": 2000,
+  "receipt_supervised_route_quality_bps": 10000,
+  "heuristic_refusal_quality_bps": 8000,
+  "receipt_supervised_refusal_quality_bps": 10000,
+  "heuristic_accepted_outcome_quality_bps": 4000,
+  "receipt_supervised_accepted_outcome_quality_bps": 10000,
+  "summary": "Receipt-supervision bundle now freezes 5 seeded cases from `fixtures/tassadar/runs/tassadar_receipt_supervision_v1/receipt_supervision_evidence_bundle.json` with route_quality 2000->10000 bps, refusal_quality 8000->10000, and accepted_outcome_quality 4000->10000 bps.",
+  "bundle_digest": "daef57f167ffa8a3c9ffbec5b7c8bac919ef98745af45594ffa2cd6cf31e9d8f"
+}

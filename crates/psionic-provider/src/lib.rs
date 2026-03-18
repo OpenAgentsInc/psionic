@@ -11,6 +11,7 @@ mod tassadar_module_installation;
 mod tassadar_module_library;
 mod tassadar_planner_policy;
 mod tassadar_quantization_truth_envelope;
+mod tassadar_receipt_supervision;
 
 use std::collections::BTreeMap;
 
@@ -23,6 +24,7 @@ pub use tassadar_module_installation::*;
 pub use tassadar_module_library::*;
 pub use tassadar_planner_policy::*;
 pub use tassadar_quantization_truth_envelope::*;
+pub use tassadar_receipt_supervision::*;
 
 use psionic_research::{
     TassadarDecompilationArtifactSummary, TassadarKernelModuleScalingSummaryReport,

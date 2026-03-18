@@ -1,0 +1,17 @@
+{
+  "report_id": "tassadar.receipt_supervision.report.v1",
+  "bundle_ref": "fixtures/tassadar/runs/tassadar_receipt_supervision_v1/receipt_supervision_evidence_bundle.json",
+  "heuristic_route_quality_bps": 2000,
+  "receipt_supervised_route_quality_bps": 10000,
+  "heuristic_refusal_quality_bps": 8000,
+  "receipt_supervised_refusal_quality_bps": 10000,
+  "heuristic_accepted_outcome_quality_bps": 4000,
+  "receipt_supervised_accepted_outcome_quality_bps": 10000,
+  "accepted_count": 2,
+  "rejected_for_evidence_count": 1,
+  "rejected_for_refusal_quality_count": 1,
+  "accepted_after_delegation_count": 1,
+  "claim_boundary": "this report is a benchmark-bound planner-learning surface over explicit receipt bundles, validator outcomes, and accepted-outcome labels. It does not collapse planner quality into authority closure",
+  "summary": "Receipt-supervision report keeps route_quality 2000->10000 bps, refusal_quality 8000->10000, and accepted_outcome_quality 4000->10000 bps explicit across 2 accepted / 1 evidence rejections / 1 refusal-quality rejections / 1 delegated accepts.",
+  "report_digest": "872fcaec3dd94a20da80f7297100138b415803ae5747438bbc7ace724990b681"
+}

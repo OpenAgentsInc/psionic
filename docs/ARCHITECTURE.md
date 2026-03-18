@@ -1200,6 +1200,19 @@ The current scope is:
   provider-facing `TassadarInternalExternalDelegationReceipt`; the lane
   remains a benchmark-bound comparison surface and does not imply product
   promotion, accepted-outcome authority, or settlement closure
+- landed receipt-supervised planner-learning follow-on: `psionic-models` now
+  publishes a public `TassadarReceiptSupervisionPublication` over explicit
+  validator outcomes, accepted-outcome labels, and receipt-supervision refs,
+  `psionic-provider` now publishes the seeded
+  `TassadarReceiptSupervisionBundle` so receipt sources, heuristic routes,
+  receipt-aware routes, validator outcomes, and accepted-outcome labels stay
+  machine-legible and challengeable, and `psionic-train` now freezes the
+  committed evidence bundle at
+  `fixtures/tassadar/runs/tassadar_receipt_supervision_v1/receipt_supervision_evidence_bundle.json`
+  plus the joined route-quality / refusal-quality / accepted-outcome report at
+  `fixtures/tassadar/reports/tassadar_receipt_supervision_report.json`; the
+  lane remains research-only planner learning and does not move authority
+  closure or settlement truth into the planner
 - the final article-parity closeout audit now exists at
   `docs/audits/2026-03-17-tassadar-article-parity-closeout-audit.md`; it is
   explicitly subordinate to `fixtures/tassadar/reports/tassadar_acceptance_report.json`
