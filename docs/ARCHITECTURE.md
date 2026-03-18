@@ -785,6 +785,17 @@ The current scope is:
   and `psionic-models` now exposes the widened model-facing symbolic example
   suite under the explicit `compiled_bounded_exactness` claim class instead of
   leaving the "paper idea to runtime" gap implicit
+- landed sparse-rule/minimality audit follow-on: `psionic-ir` now owns a
+  public sparse-rule audit contract over the bounded symbolic lane, with
+  statement-projected transition rules plus seeded kernel and scan-style audit
+  cases, `psionic-compiler` now builds machine-legible sparse-rule compiler
+  audits with duplicate-signature clustering, dead-rule detection, and
+  final-state-versus-IO-only underconstraint facts, `psionic-eval` now
+  summarizes compile-size and minimality behavior across those workload groups,
+  and `psionic-research` now freezes the committed audit at
+  `fixtures/tassadar/reports/tassadar_sparse_rule_compiler_audit_report.json`;
+  the claim remains research-only compiled bounded exactness over the current
+  symbolic subset and does not imply arbitrary Wasm or learnability closure
 - landed Phase 9D bar: typed learned-plus-compiled and learned-circuit
   research in `psionic-research`, with explicit research-line,
   instruction-set, execution-proxy, claim-boundary, and proof-expectation

@@ -56,6 +56,8 @@ mod tassadar_module_trace_abi_v2;
 mod tassadar_numeric_opcode_ladder;
 #[path = "tassadar_sequence.rs"]
 mod tassadar_sequence;
+#[path = "tassadar_sparse_rule_compiler_audit.rs"]
+mod tassadar_sparse_rule_compiler_audit;
 #[path = "tassadar_structured_control.rs"]
 mod tassadar_structured_control;
 #[path = "tassadar_sudoku_9x9_compiled_executor.rs"]
@@ -101,6 +103,7 @@ pub use tassadar_module_scale_workload_suite::*;
 pub use tassadar_module_trace_abi_v2::*;
 pub use tassadar_numeric_opcode_ladder::*;
 pub use tassadar_sequence::*;
+pub use tassadar_sparse_rule_compiler_audit::*;
 pub use tassadar_structured_control::*;
 pub use tassadar_sudoku_9x9_compiled_executor::*;
 pub use tassadar_wasm_module_ingress::*;
