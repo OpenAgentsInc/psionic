@@ -28,6 +28,8 @@ mod tassadar_compile_pipeline_matrix;
 mod tassadar_wasm_conformance;
 #[path = "tassadar_conditional_masking_report.rs"]
 mod tassadar_conditional_masking_report;
+#[path = "tassadar_decompilation_fidelity.rs"]
+mod tassadar_decompilation_fidelity;
 #[path = "tassadar_compiled_executor.rs"]
 mod tassadar_compiled_executor;
 #[path = "tassadar_compiled_kernel_suite.rs"]
@@ -101,6 +103,7 @@ pub use tassadar_call_frames::*;
 pub use tassadar_compile_pipeline_matrix::*;
 pub use tassadar_wasm_conformance::*;
 pub use tassadar_conditional_masking_report::*;
+pub use tassadar_decompilation_fidelity::*;
 pub use tassadar_compiled_executor::*;
 pub use tassadar_compiled_kernel_suite::*;
 pub use tassadar_efficient_attention_baseline_matrix::*;

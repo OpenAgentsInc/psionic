@@ -1,0 +1,1470 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.decompilation_fidelity.report.v1",
+  "publication": {
+    "schema_version": 1,
+    "publication_id": "tassadar.decompilable_executor.publication.v1",
+    "status": "implemented_early",
+    "claim_class": "research_only_architecture",
+    "model": {
+      "model_id": "tassadar-decompilable-executor-candidate-v0",
+      "family": "tassadar_decompilable_executor",
+      "revision": "v0"
+    },
+    "baseline_family_refs": [
+      "model-family://openagents/tassadar/module_state_executor",
+      "model-family://openagents/tassadar/shared_depth_executor",
+      "artifact-suite://openagents/tassadar/symbolic_program_artifact_suite"
+    ],
+    "cases": [
+      {
+        "case_id": "addition_pair_decompilation_lane",
+        "source_case_id": "addition_pair",
+        "family": "symbolic_operator_lattice",
+        "summary": "bounded learned executor artifacts decompile into one readable operator-lattice symbolic program on the seeded symbolic lane",
+        "reference_program_id": "tassadar.symbolic.addition_pair.v1",
+        "reference_program_digest": "48a2baeec79814cbbd50579607ff5ca876e90f93d85c50fce7ceeabafb8b21ad",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_symbolic_program_artifact_suite.json",
+          "fixtures/tassadar/reports/tassadar_module_state_architecture_report.json"
+        ],
+        "retrains": [
+          {
+            "retrain_run_id": "addition_pair.retrain.7",
+            "retrain_seed": 7,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/addition_pair/checkpoint_seed_7.json",
+            "discretization_kind": "direct_symbolic_threshold",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.addition_pair.retrain_a.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 2,
+              "inputs": [
+                {
+                  "name": "lhs",
+                  "memory_slot": 0
+                },
+                {
+                  "name": "rhs",
+                  "memory_slot": 1
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "sum",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "lhs"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "rhs"
+                    }
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "sum"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "retrain_run_id": "addition_pair.retrain.13",
+            "retrain_seed": 13,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/addition_pair/checkpoint_seed_13.json",
+            "discretization_kind": "direct_symbolic_threshold",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.addition_pair.retrain_b.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 2,
+              "inputs": [
+                {
+                  "name": "left_value",
+                  "memory_slot": 0
+                },
+                {
+                  "name": "right_value",
+                  "memory_slot": 1
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "merged",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "left_value"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "right_value"
+                    }
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "merged"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "retrain_run_id": "addition_pair.retrain.29",
+            "retrain_seed": 29,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/addition_pair/checkpoint_seed_29.json",
+            "discretization_kind": "direct_symbolic_threshold",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.addition_pair.retrain_c.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 2,
+              "inputs": [
+                {
+                  "name": "x",
+                  "memory_slot": 0
+                },
+                {
+                  "name": "y",
+                  "memory_slot": 1
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "x_plus_y",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "x"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "y"
+                    }
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "x_plus_y"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "case_id": "parity_two_bits_decompilation_lane",
+        "source_case_id": "parity_two_bits",
+        "family": "symbolic_operator_lattice",
+        "summary": "bounded learned executor artifacts decompile into one readable operator-lattice symbolic program on the seeded symbolic lane",
+        "reference_program_id": "tassadar.symbolic.parity_two_bits.v1",
+        "reference_program_digest": "1abc88c24251d7881ea1c3ccc0fb1bf64d5c9e105e80d34b5bd3740613c61483",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_symbolic_program_artifact_suite.json",
+          "fixtures/tassadar/reports/tassadar_module_state_architecture_report.json"
+        ],
+        "retrains": [
+          {
+            "retrain_run_id": "parity_two_bits.retrain.5",
+            "retrain_seed": 5,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/parity_two_bits/checkpoint_seed_5.json",
+            "discretization_kind": "direct_symbolic_threshold",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.parity_two_bits.retrain_a.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 2,
+              "inputs": [
+                {
+                  "name": "bit0",
+                  "memory_slot": 0
+                },
+                {
+                  "name": "bit1",
+                  "memory_slot": 1
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "sum",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "bit0"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "bit1"
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "lt_two",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "lt",
+                    "left": {
+                      "kind": "name",
+                      "name": "sum"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "lt_one",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "lt",
+                    "left": {
+                      "kind": "name",
+                      "name": "sum"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "parity",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "sub",
+                    "left": {
+                      "kind": "name",
+                      "name": "lt_two"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "lt_one"
+                    }
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "parity"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "retrain_run_id": "parity_two_bits.retrain.17",
+            "retrain_seed": 17,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/parity_two_bits/checkpoint_seed_17.json",
+            "discretization_kind": "direct_symbolic_threshold",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.parity_two_bits.retrain_b.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 2,
+              "inputs": [
+                {
+                  "name": "a",
+                  "memory_slot": 0
+                },
+                {
+                  "name": "b",
+                  "memory_slot": 1
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "total",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "a"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "b"
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "below_two",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "lt",
+                    "left": {
+                      "kind": "name",
+                      "name": "total"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "below_one",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "lt",
+                    "left": {
+                      "kind": "name",
+                      "name": "total"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "odd_bit",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "sub",
+                    "left": {
+                      "kind": "name",
+                      "name": "below_two"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "below_one"
+                    }
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "odd_bit"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "retrain_run_id": "parity_two_bits.retrain.31",
+            "retrain_seed": 31,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/parity_two_bits/checkpoint_seed_31.json",
+            "discretization_kind": "direct_symbolic_threshold",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.parity_two_bits.retrain_c.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 2,
+              "inputs": [
+                {
+                  "name": "lhs_bit",
+                  "memory_slot": 0
+                },
+                {
+                  "name": "rhs_bit",
+                  "memory_slot": 1
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "pair_sum",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "lhs_bit"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "rhs_bit"
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "lt2",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "lt",
+                    "left": {
+                      "kind": "name",
+                      "name": "pair_sum"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "lt1",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "lt",
+                    "left": {
+                      "kind": "name",
+                      "name": "pair_sum"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "parity_flag",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "sub",
+                    "left": {
+                      "kind": "name",
+                      "name": "lt2"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "lt1"
+                    }
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "parity_flag"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "case_id": "memory_accumulator_decompilation_lane",
+        "source_case_id": "memory_accumulator",
+        "family": "state_delta_sketch",
+        "summary": "bounded learned executor artifacts decompile into one readable state-delta symbolic sketch on the seeded memory or stack-update lane",
+        "reference_program_id": "tassadar.symbolic.memory_accumulator.v1",
+        "reference_program_digest": "45de01e4e5cafde762fa1500e36ba7ea74795f4d3bf190d90dedb36e249ceb79",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_symbolic_program_artifact_suite.json",
+          "fixtures/tassadar/reports/tassadar_module_state_architecture_report.json"
+        ],
+        "retrains": [
+          {
+            "retrain_run_id": "memory_accumulator.retrain.11",
+            "retrain_seed": 11,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/memory_accumulator/checkpoint_seed_11.json",
+            "discretization_kind": "state_delta_projection",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.memory_accumulator.retrain_a.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 3,
+              "inputs": [
+                {
+                  "name": "value",
+                  "memory_slot": 0
+                }
+              ],
+              "initial_memory": [
+                {
+                  "slot": 2,
+                  "value": 10
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "total",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "value"
+                    },
+                    "right": {
+                      "kind": "memory_slot",
+                      "slot": 2
+                    }
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 2,
+                  "value": {
+                    "kind": "name",
+                    "name": "total"
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "total"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "retrain_run_id": "memory_accumulator.retrain.19",
+            "retrain_seed": 19,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/memory_accumulator/checkpoint_seed_19.json",
+            "discretization_kind": "state_delta_projection",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.memory_accumulator.retrain_b.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 3,
+              "inputs": [
+                {
+                  "name": "incoming",
+                  "memory_slot": 0
+                }
+              ],
+              "initial_memory": [
+                {
+                  "slot": 2,
+                  "value": 10
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "updated_total",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "incoming"
+                    },
+                    "right": {
+                      "kind": "memory_slot",
+                      "slot": 2
+                    }
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 2,
+                  "value": {
+                    "kind": "name",
+                    "name": "updated_total"
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "updated_total"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "retrain_run_id": "memory_accumulator.retrain.37",
+            "retrain_seed": 37,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/memory_accumulator/checkpoint_seed_37.json",
+            "discretization_kind": "state_delta_projection",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.memory_accumulator.retrain_c.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 3,
+              "inputs": [
+                {
+                  "name": "payload",
+                  "memory_slot": 0
+                }
+              ],
+              "initial_memory": [
+                {
+                  "slot": 2,
+                  "value": 10
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "new_accumulator",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "payload"
+                    },
+                    "right": {
+                      "kind": "memory_slot",
+                      "slot": 2
+                    }
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 2,
+                  "value": {
+                    "kind": "name",
+                    "name": "new_accumulator"
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "new_accumulator"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "case_id": "finite_state_counter_decompilation_lane",
+        "source_case_id": "finite_state_counter",
+        "family": "symbolic_operator_lattice",
+        "summary": "bounded learned executor artifacts decompile into one readable operator-lattice symbolic program on the seeded symbolic lane",
+        "reference_program_id": "tassadar.symbolic.finite_state_counter.v1",
+        "reference_program_digest": "e235dad215a3c6f6a50b0253ce1f997a1ec1e28d6c5e379196e0f608556e5962",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_symbolic_program_artifact_suite.json",
+          "fixtures/tassadar/reports/tassadar_module_state_architecture_report.json"
+        ],
+        "retrains": [
+          {
+            "retrain_run_id": "finite_state_counter.retrain.3",
+            "retrain_seed": 3,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/finite_state_counter/checkpoint_seed_3.json",
+            "discretization_kind": "direct_symbolic_threshold",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.finite_state_counter.retrain_a.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 1,
+              "inputs": [
+                {
+                  "name": "state",
+                  "memory_slot": 0
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "can_advance",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "lt",
+                    "left": {
+                      "kind": "name",
+                      "name": "state"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "next_state",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "state"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "can_advance"
+                    }
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 0,
+                  "value": {
+                    "kind": "name",
+                    "name": "next_state"
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "next_state"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "retrain_run_id": "finite_state_counter.retrain.23",
+            "retrain_seed": 23,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/finite_state_counter/checkpoint_seed_23.json",
+            "discretization_kind": "direct_symbolic_threshold",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.finite_state_counter.retrain_b.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 1,
+              "inputs": [
+                {
+                  "name": "current_state",
+                  "memory_slot": 0
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "advance_flag",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "lt",
+                    "left": {
+                      "kind": "name",
+                      "name": "current_state"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "successor_state",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "current_state"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "advance_flag"
+                    }
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 0,
+                  "value": {
+                    "kind": "name",
+                    "name": "successor_state"
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "successor_state"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "retrain_run_id": "finite_state_counter.retrain.41",
+            "retrain_seed": 41,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/finite_state_counter/checkpoint_seed_41.json",
+            "discretization_kind": "direct_symbolic_threshold",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.finite_state_counter.retrain_c.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 1,
+              "inputs": [
+                {
+                  "name": "s",
+                  "memory_slot": 0
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "gate",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "lt",
+                    "left": {
+                      "kind": "name",
+                      "name": "s"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 2
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "next",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "s"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "gate"
+                    }
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 0,
+                  "value": {
+                    "kind": "name",
+                    "name": "next"
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "next"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "case_id": "stack_machine_add_step_decompilation_lane",
+        "source_case_id": "stack_machine_add_step",
+        "family": "state_delta_sketch",
+        "summary": "bounded learned executor artifacts decompile into one readable state-delta symbolic sketch on the seeded memory or stack-update lane",
+        "reference_program_id": "tassadar.symbolic.stack_machine_add_step.v1",
+        "reference_program_digest": "45faa4321d4074c3a6df9cbcb443efe26bd8eb25d208ab37702d9f0893544f7b",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_symbolic_program_artifact_suite.json",
+          "fixtures/tassadar/reports/tassadar_module_state_architecture_report.json"
+        ],
+        "retrains": [
+          {
+            "retrain_run_id": "stack_machine_add_step.retrain.2",
+            "retrain_seed": 2,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/stack_machine_add_step/checkpoint_seed_2.json",
+            "discretization_kind": "state_delta_projection",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.stack_machine_add_step.retrain_a.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 3,
+              "inputs": [
+                {
+                  "name": "stack_top",
+                  "memory_slot": 0
+                },
+                {
+                  "name": "stack_next",
+                  "memory_slot": 1
+                },
+                {
+                  "name": "stack_pointer",
+                  "memory_slot": 2
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "summed",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "stack_top"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "stack_next"
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "next_stack_pointer",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "sub",
+                    "left": {
+                      "kind": "name",
+                      "name": "stack_pointer"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 0,
+                  "value": {
+                    "kind": "name",
+                    "name": "summed"
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 1,
+                  "value": {
+                    "kind": "const",
+                    "value": 0
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 2,
+                  "value": {
+                    "kind": "name",
+                    "name": "next_stack_pointer"
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "summed"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "retrain_run_id": "stack_machine_add_step.retrain.43",
+            "retrain_seed": 43,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/stack_machine_add_step/checkpoint_seed_43.json",
+            "discretization_kind": "state_delta_projection",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.stack_machine_add_step.retrain_b.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 3,
+              "inputs": [
+                {
+                  "name": "top",
+                  "memory_slot": 0
+                },
+                {
+                  "name": "below_top",
+                  "memory_slot": 1
+                },
+                {
+                  "name": "pointer",
+                  "memory_slot": 2
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "collapsed",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "top"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "below_top"
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "decremented_pointer",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "sub",
+                    "left": {
+                      "kind": "name",
+                      "name": "pointer"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 0,
+                  "value": {
+                    "kind": "name",
+                    "name": "collapsed"
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 1,
+                  "value": {
+                    "kind": "const",
+                    "value": 0
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 2,
+                  "value": {
+                    "kind": "name",
+                    "name": "decremented_pointer"
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "collapsed"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "retrain_run_id": "stack_machine_add_step.retrain.59",
+            "retrain_seed": 59,
+            "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/stack_machine_add_step/checkpoint_seed_59.json",
+            "discretization_kind": "state_delta_projection",
+            "decompiled_program": {
+              "schema_version": 1,
+              "language_id": "tassadar.symbolic_executor_ir.v1",
+              "program_id": "tassadar.decompiled.stack_machine_add_step.retrain_c.v1",
+              "profile_id": "tassadar.wasm.article_i32_compute.v1",
+              "memory_slots": 3,
+              "inputs": [
+                {
+                  "name": "lhs_stack",
+                  "memory_slot": 0
+                },
+                {
+                  "name": "rhs_stack",
+                  "memory_slot": 1
+                },
+                {
+                  "name": "sp",
+                  "memory_slot": 2
+                }
+              ],
+              "statements": [
+                {
+                  "kind": "let",
+                  "name": "merged_value",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "add",
+                    "left": {
+                      "kind": "name",
+                      "name": "lhs_stack"
+                    },
+                    "right": {
+                      "kind": "name",
+                      "name": "rhs_stack"
+                    }
+                  }
+                },
+                {
+                  "kind": "let",
+                  "name": "updated_sp",
+                  "expr": {
+                    "kind": "binary",
+                    "op": "sub",
+                    "left": {
+                      "kind": "name",
+                      "name": "sp"
+                    },
+                    "right": {
+                      "kind": "const",
+                      "value": 1
+                    }
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 0,
+                  "value": {
+                    "kind": "name",
+                    "name": "merged_value"
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 1,
+                  "value": {
+                    "kind": "const",
+                    "value": 0
+                  }
+                },
+                {
+                  "kind": "store",
+                  "slot": 2,
+                  "value": {
+                    "kind": "name",
+                    "name": "updated_sp"
+                  }
+                },
+                {
+                  "kind": "output",
+                  "value": {
+                    "kind": "name",
+                    "name": "merged_value"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "validation_refs": [
+      "fixtures/tassadar/reports/tassadar_decompilation_fidelity_report.json",
+      "fixtures/tassadar/reports/tassadar_decompilable_executor_artifacts_report.json"
+    ],
+    "support_boundaries": [
+      "the lane is intentionally constrained to decompilable learned artifacts over seeded bounded symbolic kernels; arbitrary Wasm, arbitrary module-scale learned execution, and served promotion remain out of scope",
+      "readable decompilation is subordinate to benchmark lineage, compiled-reference comparison, and retrain stability, and is not proof of broad learned exactness or deployment readiness",
+      "the seeded retrains are machine-legible research artifacts only; they do not widen provider or served capability on their own"
+    ],
+    "publication_digest": "01627a39843bfc0e495aafe6b5f2714a7bd22d7143b77358769ff436dec0c369"
+  },
+  "case_reports": [
+    {
+      "case_id": "addition_pair_decompilation_lane",
+      "source_case_id": "addition_pair",
+      "family": "symbolic_operator_lattice",
+      "reference_program_id": "tassadar.symbolic.addition_pair.v1",
+      "reference_program_digest": "48a2baeec79814cbbd50579607ff5ca876e90f93d85c50fce7ceeabafb8b21ad",
+      "reference_normalized_structure_digest": "7ddaf3cac86a315ca7a6f0ee3487913d91479aecd8113fd8e45aa722dd41ea00",
+      "retrain_count": 3,
+      "distinct_readable_program_count": 3,
+      "semantic_equivalence_bps": 10000,
+      "readable_equivalence_bps": 10000,
+      "retrain_structure_consensus_bps": 10000,
+      "stability_class": "stable_equivalent_forms",
+      "retrains": [
+        {
+          "retrain_run_id": "addition_pair.retrain.7",
+          "retrain_seed": 7,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/addition_pair/checkpoint_seed_7.json",
+          "discretization_kind": "direct_symbolic_threshold",
+          "decompiled_program_id": "tassadar.decompiled.addition_pair.retrain_a.v1",
+          "readable_program_digest": "1ed952bf8ee7c22dad03ed0c08e1b4b8605f67734a12982f00faf0e0e5e90967",
+          "normalized_structure_digest": "7ddaf3cac86a315ca7a6f0ee3487913d91479aecd8113fd8e45aa722dd41ea00",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 2
+        },
+        {
+          "retrain_run_id": "addition_pair.retrain.13",
+          "retrain_seed": 13,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/addition_pair/checkpoint_seed_13.json",
+          "discretization_kind": "direct_symbolic_threshold",
+          "decompiled_program_id": "tassadar.decompiled.addition_pair.retrain_b.v1",
+          "readable_program_digest": "f3e7f55a30079fe56f5003f60ae85cf454c5527c753f21f76647068319d02fd0",
+          "normalized_structure_digest": "7ddaf3cac86a315ca7a6f0ee3487913d91479aecd8113fd8e45aa722dd41ea00",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 2
+        },
+        {
+          "retrain_run_id": "addition_pair.retrain.29",
+          "retrain_seed": 29,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/addition_pair/checkpoint_seed_29.json",
+          "discretization_kind": "direct_symbolic_threshold",
+          "decompiled_program_id": "tassadar.decompiled.addition_pair.retrain_c.v1",
+          "readable_program_digest": "635d639744a32b61ae292ac53c5b3ebc2135cb109379cb636b1d903666271884",
+          "normalized_structure_digest": "7ddaf3cac86a315ca7a6f0ee3487913d91479aecd8113fd8e45aa722dd41ea00",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 2
+        }
+      ]
+    },
+    {
+      "case_id": "parity_two_bits_decompilation_lane",
+      "source_case_id": "parity_two_bits",
+      "family": "symbolic_operator_lattice",
+      "reference_program_id": "tassadar.symbolic.parity_two_bits.v1",
+      "reference_program_digest": "1abc88c24251d7881ea1c3ccc0fb1bf64d5c9e105e80d34b5bd3740613c61483",
+      "reference_normalized_structure_digest": "505436a57b4918a611bcdfa21cfb6fdff57f89fa65d0a9ea417bfc29f02b2adc",
+      "retrain_count": 3,
+      "distinct_readable_program_count": 3,
+      "semantic_equivalence_bps": 10000,
+      "readable_equivalence_bps": 10000,
+      "retrain_structure_consensus_bps": 10000,
+      "stability_class": "stable_equivalent_forms",
+      "retrains": [
+        {
+          "retrain_run_id": "parity_two_bits.retrain.5",
+          "retrain_seed": 5,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/parity_two_bits/checkpoint_seed_5.json",
+          "discretization_kind": "direct_symbolic_threshold",
+          "decompiled_program_id": "tassadar.decompiled.parity_two_bits.retrain_a.v1",
+          "readable_program_digest": "c2b6ab56ba9a986bd9ef54078b4c2cb67fe0befe4dff25c5c026304f5de3c353",
+          "normalized_structure_digest": "505436a57b4918a611bcdfa21cfb6fdff57f89fa65d0a9ea417bfc29f02b2adc",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 5
+        },
+        {
+          "retrain_run_id": "parity_two_bits.retrain.17",
+          "retrain_seed": 17,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/parity_two_bits/checkpoint_seed_17.json",
+          "discretization_kind": "direct_symbolic_threshold",
+          "decompiled_program_id": "tassadar.decompiled.parity_two_bits.retrain_b.v1",
+          "readable_program_digest": "f2a33b150025c2d65690c654a874c2f46177c1e27adb75894acd3db3d342b600",
+          "normalized_structure_digest": "505436a57b4918a611bcdfa21cfb6fdff57f89fa65d0a9ea417bfc29f02b2adc",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 5
+        },
+        {
+          "retrain_run_id": "parity_two_bits.retrain.31",
+          "retrain_seed": 31,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/parity_two_bits/checkpoint_seed_31.json",
+          "discretization_kind": "direct_symbolic_threshold",
+          "decompiled_program_id": "tassadar.decompiled.parity_two_bits.retrain_c.v1",
+          "readable_program_digest": "5a77f36a53a84ed19e7ef9885a4762522be739078547fb77ec623962ba2ef4ad",
+          "normalized_structure_digest": "505436a57b4918a611bcdfa21cfb6fdff57f89fa65d0a9ea417bfc29f02b2adc",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 5
+        }
+      ]
+    },
+    {
+      "case_id": "memory_accumulator_decompilation_lane",
+      "source_case_id": "memory_accumulator",
+      "family": "state_delta_sketch",
+      "reference_program_id": "tassadar.symbolic.memory_accumulator.v1",
+      "reference_program_digest": "45de01e4e5cafde762fa1500e36ba7ea74795f4d3bf190d90dedb36e249ceb79",
+      "reference_normalized_structure_digest": "2c5f97ff4a7b553874138793a5b71013504a025610bf5fb2f7b49159e1f56cbd",
+      "retrain_count": 3,
+      "distinct_readable_program_count": 3,
+      "semantic_equivalence_bps": 10000,
+      "readable_equivalence_bps": 10000,
+      "retrain_structure_consensus_bps": 10000,
+      "stability_class": "stable_equivalent_forms",
+      "retrains": [
+        {
+          "retrain_run_id": "memory_accumulator.retrain.11",
+          "retrain_seed": 11,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/memory_accumulator/checkpoint_seed_11.json",
+          "discretization_kind": "state_delta_projection",
+          "decompiled_program_id": "tassadar.decompiled.memory_accumulator.retrain_a.v1",
+          "readable_program_digest": "e6938667023736745282c3b3000fe6b4f26176e1e39fcfef90dbebf5a7e4fa19",
+          "normalized_structure_digest": "2c5f97ff4a7b553874138793a5b71013504a025610bf5fb2f7b49159e1f56cbd",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 3
+        },
+        {
+          "retrain_run_id": "memory_accumulator.retrain.19",
+          "retrain_seed": 19,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/memory_accumulator/checkpoint_seed_19.json",
+          "discretization_kind": "state_delta_projection",
+          "decompiled_program_id": "tassadar.decompiled.memory_accumulator.retrain_b.v1",
+          "readable_program_digest": "117e716b69c07cebc1f75a7df460ac0b0538e96ce5c74502dd5a3cd532338886",
+          "normalized_structure_digest": "2c5f97ff4a7b553874138793a5b71013504a025610bf5fb2f7b49159e1f56cbd",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 3
+        },
+        {
+          "retrain_run_id": "memory_accumulator.retrain.37",
+          "retrain_seed": 37,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/memory_accumulator/checkpoint_seed_37.json",
+          "discretization_kind": "state_delta_projection",
+          "decompiled_program_id": "tassadar.decompiled.memory_accumulator.retrain_c.v1",
+          "readable_program_digest": "2868b411b76fe5890920e8d94d23069d2c0dce3cc087e2e7701ab7e1b6b4f8cf",
+          "normalized_structure_digest": "2c5f97ff4a7b553874138793a5b71013504a025610bf5fb2f7b49159e1f56cbd",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 3
+        }
+      ]
+    },
+    {
+      "case_id": "finite_state_counter_decompilation_lane",
+      "source_case_id": "finite_state_counter",
+      "family": "symbolic_operator_lattice",
+      "reference_program_id": "tassadar.symbolic.finite_state_counter.v1",
+      "reference_program_digest": "e235dad215a3c6f6a50b0253ce1f997a1ec1e28d6c5e379196e0f608556e5962",
+      "reference_normalized_structure_digest": "4954f7cbe73c8204801913f3c77ac374105a9d9dd21fdcd43c6ee8d11ef69332",
+      "retrain_count": 3,
+      "distinct_readable_program_count": 3,
+      "semantic_equivalence_bps": 10000,
+      "readable_equivalence_bps": 10000,
+      "retrain_structure_consensus_bps": 10000,
+      "stability_class": "stable_equivalent_forms",
+      "retrains": [
+        {
+          "retrain_run_id": "finite_state_counter.retrain.3",
+          "retrain_seed": 3,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/finite_state_counter/checkpoint_seed_3.json",
+          "discretization_kind": "direct_symbolic_threshold",
+          "decompiled_program_id": "tassadar.decompiled.finite_state_counter.retrain_a.v1",
+          "readable_program_digest": "884e96e38d374d354ddbc1dabc92fccdd9e0aee32e1ea6ddf4355206f75cb50b",
+          "normalized_structure_digest": "4954f7cbe73c8204801913f3c77ac374105a9d9dd21fdcd43c6ee8d11ef69332",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 4
+        },
+        {
+          "retrain_run_id": "finite_state_counter.retrain.23",
+          "retrain_seed": 23,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/finite_state_counter/checkpoint_seed_23.json",
+          "discretization_kind": "direct_symbolic_threshold",
+          "decompiled_program_id": "tassadar.decompiled.finite_state_counter.retrain_b.v1",
+          "readable_program_digest": "b898206f857e8348bfaf64c78f1b9bd9cf303acccafb861675daa07d3cb2a159",
+          "normalized_structure_digest": "4954f7cbe73c8204801913f3c77ac374105a9d9dd21fdcd43c6ee8d11ef69332",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 4
+        },
+        {
+          "retrain_run_id": "finite_state_counter.retrain.41",
+          "retrain_seed": 41,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/finite_state_counter/checkpoint_seed_41.json",
+          "discretization_kind": "direct_symbolic_threshold",
+          "decompiled_program_id": "tassadar.decompiled.finite_state_counter.retrain_c.v1",
+          "readable_program_digest": "b61e7302e4a3bb66f78070717310a5afb7a0972f271536fb836fec7683fb46cc",
+          "normalized_structure_digest": "4954f7cbe73c8204801913f3c77ac374105a9d9dd21fdcd43c6ee8d11ef69332",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 4
+        }
+      ]
+    },
+    {
+      "case_id": "stack_machine_add_step_decompilation_lane",
+      "source_case_id": "stack_machine_add_step",
+      "family": "state_delta_sketch",
+      "reference_program_id": "tassadar.symbolic.stack_machine_add_step.v1",
+      "reference_program_digest": "45faa4321d4074c3a6df9cbcb443efe26bd8eb25d208ab37702d9f0893544f7b",
+      "reference_normalized_structure_digest": "d64e1d664bf6afd78bbc3027ed743d1645b18d329f2142c1eea22ecf7a5f37fd",
+      "retrain_count": 3,
+      "distinct_readable_program_count": 3,
+      "semantic_equivalence_bps": 10000,
+      "readable_equivalence_bps": 10000,
+      "retrain_structure_consensus_bps": 10000,
+      "stability_class": "stable_equivalent_forms",
+      "retrains": [
+        {
+          "retrain_run_id": "stack_machine_add_step.retrain.2",
+          "retrain_seed": 2,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/stack_machine_add_step/checkpoint_seed_2.json",
+          "discretization_kind": "state_delta_projection",
+          "decompiled_program_id": "tassadar.decompiled.stack_machine_add_step.retrain_a.v1",
+          "readable_program_digest": "cccd4da1df6a01aacbddc83d5ec7337ac28540a6ac84775f9bfd56a322d9acef",
+          "normalized_structure_digest": "d64e1d664bf6afd78bbc3027ed743d1645b18d329f2142c1eea22ecf7a5f37fd",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 6
+        },
+        {
+          "retrain_run_id": "stack_machine_add_step.retrain.43",
+          "retrain_seed": 43,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/stack_machine_add_step/checkpoint_seed_43.json",
+          "discretization_kind": "state_delta_projection",
+          "decompiled_program_id": "tassadar.decompiled.stack_machine_add_step.retrain_b.v1",
+          "readable_program_digest": "0f7838f05561b6c73816e20fe058cf470e9cd9ef0c71c65d8b92032995ede179",
+          "normalized_structure_digest": "d64e1d664bf6afd78bbc3027ed743d1645b18d329f2142c1eea22ecf7a5f37fd",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 6
+        },
+        {
+          "retrain_run_id": "stack_machine_add_step.retrain.59",
+          "retrain_seed": 59,
+          "checkpoint_ref": "fixtures/tassadar/runs/tassadar_decompilable_executor_v1/stack_machine_add_step/checkpoint_seed_59.json",
+          "discretization_kind": "state_delta_projection",
+          "decompiled_program_id": "tassadar.decompiled.stack_machine_add_step.retrain_c.v1",
+          "readable_program_digest": "4f42f89522afa6ce3f015d7d3f5333ee1e4920ee024522c4e3f063d697c2f0f5",
+          "normalized_structure_digest": "d64e1d664bf6afd78bbc3027ed743d1645b18d329f2142c1eea22ecf7a5f37fd",
+          "semantic_equivalence": true,
+          "readable_equivalence": true,
+          "statement_count": 6
+        }
+      ]
+    }
+  ],
+  "family_summaries": [
+    {
+      "family": "symbolic_operator_lattice",
+      "case_count": 3,
+      "mean_semantic_equivalence_bps": 10000,
+      "mean_readable_equivalence_bps": 10000,
+      "mean_retrain_structure_consensus_bps": 10000,
+      "all_cases_semantically_equivalent": true
+    },
+    {
+      "family": "state_delta_sketch",
+      "case_count": 2,
+      "mean_semantic_equivalence_bps": 10000,
+      "mean_readable_equivalence_bps": 10000,
+      "mean_retrain_structure_consensus_bps": 10000,
+      "all_cases_semantically_equivalent": true
+    }
+  ],
+  "claim_boundary": "this report compares seeded decompiled learned-executor artifacts against bounded symbolic compiled references only; it proves readable-structure preservation and retrain stability on the published symbolic and state-delta families, and does not imply broad learned exactness, arbitrary Wasm closure, or served readiness",
+  "report_digest": "b45589d5c87f9627d2f8a7186dbb34846dd0e43fa8321808557eac130a7fe20c"
+}

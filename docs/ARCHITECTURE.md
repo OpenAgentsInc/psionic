@@ -880,6 +880,20 @@ The current scope is:
   is explicitly bounded numeric-representation research over held-out
   vocabulary coverage and exact roundtrip semantics, not arbitrary numeric
   closure, learned exactness, or served promotion
+- landed decompilable learned-executor artifacts follow-on: `psionic-models`
+  now publishes a research-only `TassadarDecompilableExecutorPublication`
+  with two constrained learned families, seeded retrain artifacts, readable
+  symbolic decompilation targets, and benchmark lineage back to compiled
+  symbolic references, `psionic-eval` now freezes the committed fidelity
+  report at
+  `fixtures/tassadar/reports/tassadar_decompilation_fidelity_report.json`,
+  `psionic-research` now freezes the companion artifact story at
+  `fixtures/tassadar/reports/tassadar_decompilable_executor_artifacts_report.json`,
+  and `psionic-provider` now projects those research summaries into a
+  provider-facing `TassadarDecompilationReceipt`; the lane is explicitly
+  research-only decompilation evidence for auditability and promotion
+  discipline, not a claim of broad learned exactness, arbitrary Wasm closure,
+  or served readiness
 - landed Phase 9D bar: typed learned-plus-compiled and learned-circuit
   research in `psionic-research`, with explicit research-line,
   instruction-set, execution-proxy, claim-boundary, and proof-expectation

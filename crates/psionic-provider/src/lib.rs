@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use psionic_research::{
+    TassadarDecompilationArtifactSummary,
     TassadarPromotionChecklistGateKind, TassadarPromotionPolicyReport,
     TassadarPromotionPolicyStatus,
 };
@@ -240,6 +241,63 @@ impl TassadarPromotionPolicyReceipt {
                 )
             },
             failed_gates,
+        }
+    }
+}
+
+/// Provider-facing receipt for one decompilable learned-executor artifact summary.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarDecompilationReceipt {
+    /// Stable case identifier.
+    pub case_id: String,
+    /// Seeded symbolic-reference case identifier.
+    pub source_case_id: String,
+    /// Candidate model identifier.
+    pub candidate_model_id: String,
+    /// Stable family label.
+    pub family: psionic_models::TassadarDecompilationFamily,
+    /// Stable reference program digest.
+    pub reference_program_digest: String,
+    /// Number of retrains compared for the case.
+    pub retrain_count: u32,
+    /// Number of distinct readable forms observed across retrains.
+    pub distinct_readable_program_count: u32,
+    /// Receipt-ready stability class.
+    pub stability_class: psionic_models::TassadarDecompilationStabilityClass,
+    /// Stable benchmark refs anchoring the receipt.
+    pub benchmark_refs: Vec<String>,
+    /// Whether the case is ready for provider-facing receipt projection.
+    pub receipt_ready: bool,
+    /// Plain-language receipt detail.
+    pub detail: String,
+}
+
+impl TassadarDecompilationReceipt {
+    /// Builds a provider-facing receipt from the shared research artifact summary.
+    #[must_use]
+    pub fn from_artifact_summary(summary: &TassadarDecompilationArtifactSummary) -> Self {
+        Self {
+            case_id: summary.case_id.clone(),
+            source_case_id: summary.source_case_id.clone(),
+            candidate_model_id: summary.candidate_model_id.clone(),
+            family: summary.family,
+            reference_program_digest: summary.reference_program_digest.clone(),
+            retrain_count: summary.retrain_count,
+            distinct_readable_program_count: summary.distinct_readable_program_count,
+            stability_class: summary.stability_class,
+            benchmark_refs: summary.benchmark_refs.clone(),
+            receipt_ready: summary.receipt_ready,
+            detail: if summary.receipt_ready {
+                format!(
+                    "decompilation case `{}` is receipt-ready with {} retrains and stability class {:?}",
+                    summary.source_case_id, summary.retrain_count, summary.stability_class
+                )
+            } else {
+                format!(
+                    "decompilation case `{}` is not receipt-ready and remains bounded to research-only artifact comparison",
+                    summary.source_case_id
+                )
+            },
         }
     }
 }
@@ -3101,6 +3159,7 @@ mod tests {
     };
     use psionic_models::{TassadarExecutorFixture, TassadarWorkloadClass};
     use psionic_research::{
+        build_tassadar_decompilable_executor_artifacts_report,
         TassadarPromotionChecklistGateKind, TassadarPromotionPolicyStatus,
         build_tassadar_promotion_policy_report,
     };
@@ -3162,7 +3221,8 @@ mod tests {
         CapabilityEnvelope, ComputeMarketSupplyViolationCode, ExecutionReceipt, KvCacheMode,
         LocalRuntimeObservabilityEnvelope, ProviderReadiness, ReceiptStatus,
         SandboxExecutionCapabilityEnvelope, SandboxExecutionReceipt, TassadarCapabilityEnvelope,
-        TassadarCapabilityEnvelopeError, TassadarExactnessRefusalReceipt,
+        TassadarCapabilityEnvelopeError, TassadarDecompilationReceipt,
+        TassadarExactnessRefusalReceipt,
         TassadarPlannerRouteCapabilityEnvelope, TassadarPlannerRouteCapabilityEnvelopeError,
         TassadarPromotionPolicyReceipt, TassadarTraceArtifactReceipt, TassadarTraceDiffReceipt,
         TextGenerationCapabilityEnvelope, TextGenerationReceipt, WeightBundleEvidence,
@@ -8593,5 +8653,24 @@ mod tests {
             ]
         );
         assert_eq!(receipt.candidate_model_id, report.candidate_model_id);
+    }
+
+    #[test]
+    fn tassadar_decompilation_receipt_projects_research_artifact_summary()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let report = build_tassadar_decompilable_executor_artifacts_report()?;
+        let summary = report
+            .artifact_summaries
+            .iter()
+            .find(|summary| summary.source_case_id == "addition_pair")
+            .expect("addition summary should exist");
+
+        let receipt = TassadarDecompilationReceipt::from_artifact_summary(summary);
+
+        assert_eq!(receipt.source_case_id, "addition_pair");
+        assert_eq!(receipt.retrain_count, 3);
+        assert!(receipt.receipt_ready);
+        assert!(receipt.detail.contains("receipt-ready"));
+        Ok(())
     }
 }
