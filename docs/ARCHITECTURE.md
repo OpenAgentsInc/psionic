@@ -751,6 +751,16 @@ The current scope is:
   compiled-weight suite artifacts for `program_compiled` candidates, and the
   machine-readable direct-vs-compiled comparison report at
   `fixtures/tassadar/reports/tassadar_program_to_weights_benchmark_suite.json`
+- landed module-aware compiled-specialization follow-on: `psionic-runtime` now
+  owns a public module-specialization plan plus bounded exact export lowering
+  over normalized Wasm module structure and call-graph reachability,
+  `psionic-models` now publishes a research-only shared
+  `TassadarCompiledModuleSpecialization` artifact with per-export compiled
+  lineage and exactness facts, and `psionic-research` now freezes the current
+  size-vs-dispatch-cost evidence at
+  `fixtures/tassadar/reports/tassadar_module_specialization_benchmark.json`
+  instead of treating today's per-export program-specialized lane as the only
+  honest compile-to-weights story for multi-function modules
 - landed bounded symbolic compiler-target follow-on: `psionic-ir` now owns a
   public straight-line `TassadarSymbolicProgram` contract with textual
   parsing, validation, direct symbolic evaluation, seeded

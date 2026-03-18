@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "benchmark_suite_id": "tassadar.module_specialization_benchmark.v0",
+  "report_ref": "fixtures/tassadar/reports/tassadar_module_specialization_benchmark.json",
+  "regeneration_commands": [
+    "cargo run -p psionic-research --example tassadar_module_specialization_benchmark",
+    "cargo test -p psionic-research module_specialization_benchmark_report_matches_committed_truth -- --nocapture"
+  ],
+  "module_reports": [
+    {
+      "module_id": "seeded_call_graph_module",
+      "module_digest": "ccf48ae3859bb4eddf2c893f158d305b9ec19079d5b57f16dfdac326ed1b89ff",
+      "function_count": 3,
+      "export_count": 3,
+      "call_edge_count": 2,
+      "imported_function_count": 0,
+      "baseline_total_compiled_weight_artifact_bytes": 7377,
+      "module_specialized_artifact_bytes": 652,
+      "module_specialized_over_unspecialized_size_ratio": 0.088382811441,
+      "baseline_dispatch_cost_units": 18,
+      "module_specialized_dispatch_cost_units": 34,
+      "estimated_module_specialized_over_unspecialized_throughput_ratio": 0.529411764706,
+      "exact_trace_export_count": 3,
+      "final_output_match_export_count": 3,
+      "final_memory_match_export_count": 3,
+      "halt_match_export_count": 3,
+      "proof_lineage_verified": true,
+      "export_reports": [
+        {
+          "export_name": "aggregate",
+          "program_digest": "7268476747809f3c8842eb2ca28183d844d8ab71de873e8af1cdb8eae1e0a4f1",
+          "compiled_weight_artifact_digest": "63f79a564e3a91cb0e1d08b513644f0428b60c040a2645b8fe94b8273f85b261",
+          "runtime_contract_digest": "c02a2b342d1011c9218a6c058583c3d96e4f36604935f30f107d0805d54e0969",
+          "expected_trace_digest": "793e2e19901cc4c676e21caa21f1dfb5ab6571a185a982d40d8ae1a87fdbddfd",
+          "compiled_trace_digest": "793e2e19901cc4c676e21caa21f1dfb5ab6571a185a982d40d8ae1a87fdbddfd",
+          "exact_trace_match": true,
+          "final_output_match": true,
+          "final_memory_match": true,
+          "halt_match": true
+        },
+        {
+          "export_name": "leaf_left",
+          "program_digest": "51625c9016992a53fed9a1a3d61acd00f300fde7fc7eeeb0b4d28e95b653921f",
+          "compiled_weight_artifact_digest": "5e9e6b9dc39bc4068639ec9ca11b8e70bdad3e4399b1e1f809c543af96ec5035",
+          "runtime_contract_digest": "7a36ec59a10545aea3f5f8246528c1608790007b481976f1a119707b7fa600c1",
+          "expected_trace_digest": "c8c29f87f7e164d2ad9c9895cd2daef8a87e006e55f6663950ba3ae02ca6616c",
+          "compiled_trace_digest": "c8c29f87f7e164d2ad9c9895cd2daef8a87e006e55f6663950ba3ae02ca6616c",
+          "exact_trace_match": true,
+          "final_output_match": true,
+          "final_memory_match": true,
+          "halt_match": true
+        },
+        {
+          "export_name": "leaf_right",
+          "program_digest": "bbc9eb320f476806f51db46e82f4ca6ef98b30e8eeee81e4a93e496374f67e8e",
+          "compiled_weight_artifact_digest": "e4aa2735667cebaba7fbd188250ad64cd1e3641de92526cef218013724c021b4",
+          "runtime_contract_digest": "673f28ded6532c2d04a3b2bad15abef6fbbda6b540686ab997f5f9a7a0f3eb13",
+          "expected_trace_digest": "0af905513e6a1f495f77e0dce6618cfbcd5dfdfc7700b91ba0ead09b9818ca94",
+          "compiled_trace_digest": "0af905513e6a1f495f77e0dce6618cfbcd5dfdfc7700b91ba0ead09b9818ca94",
+          "exact_trace_match": true,
+          "final_output_match": true,
+          "final_memory_match": true,
+          "halt_match": true
+        }
+      ],
+      "detail": "size_ratio=0.088382811441; estimated_throughput_ratio=0.529411764706; proof_lineage_verified=true"
+    },
+    {
+      "module_id": "seeded_memory_call_graph_module",
+      "module_digest": "61bacf50f67b63932ee202a79f41297a33c3a205f31e045d037f235dd0de1f28",
+      "function_count": 2,
+      "export_count": 2,
+      "call_edge_count": 1,
+      "imported_function_count": 0,
+      "baseline_total_compiled_weight_artifact_bytes": 4938,
+      "module_specialized_artifact_bytes": 575,
+      "module_specialized_over_unspecialized_size_ratio": 0.116443904415,
+      "baseline_dispatch_cost_units": 14,
+      "module_specialized_dispatch_cost_units": 22,
+      "estimated_module_specialized_over_unspecialized_throughput_ratio": 0.636363636364,
+      "exact_trace_export_count": 2,
+      "final_output_match_export_count": 2,
+      "final_memory_match_export_count": 2,
+      "halt_match_export_count": 2,
+      "proof_lineage_verified": true,
+      "export_reports": [
+        {
+          "export_name": "pair_sum",
+          "program_digest": "028e3924d75e6dac2f689d1ae13cafb2cb4fe41c5fe87fde564e400590fff68e",
+          "compiled_weight_artifact_digest": "c466a864f3432d1e2c04d067b442fea15ecce55222eb874fa0b0473cffca7066",
+          "runtime_contract_digest": "f8d14bdefa1fa876511935b48c3a69bfc3298236d0c9d27d86481d5987734b90",
+          "expected_trace_digest": "e1eb079eeed3f4cfd5ef8397ff8022a0aa6babceecd6a2d3ee4ee62f50790331",
+          "compiled_trace_digest": "e1eb079eeed3f4cfd5ef8397ff8022a0aa6babceecd6a2d3ee4ee62f50790331",
+          "exact_trace_match": true,
+          "final_output_match": true,
+          "final_memory_match": true,
+          "halt_match": true
+        },
+        {
+          "export_name": "pair_sum_plus_four",
+          "program_digest": "85a18bdef8a05dc1b71b93e545327b0941b4bccb728876ba35fb6d03a10987b1",
+          "compiled_weight_artifact_digest": "a2500f7f5b0b3566af88e3d5ee04126aa95bd9f87f2334ebed469f1ef01ce5e0",
+          "runtime_contract_digest": "7dba05e30def6e4e3fd25d569be6f1a1eb640223dabe463585fa91a6e668400b",
+          "expected_trace_digest": "e6e55a0b02611765ff817e34ea308e8def7bd6b2c28231fc8ef94b25b7b39a26",
+          "compiled_trace_digest": "e6e55a0b02611765ff817e34ea308e8def7bd6b2c28231fc8ef94b25b7b39a26",
+          "exact_trace_match": true,
+          "final_output_match": true,
+          "final_memory_match": true,
+          "halt_match": true
+        }
+      ],
+      "detail": "size_ratio=0.116443904415; estimated_throughput_ratio=0.636363636364; proof_lineage_verified=true"
+    },
+    {
+      "module_id": "seeded_multi_function_module",
+      "module_digest": "aff6d8209a2f50a502739ec6f5e2c7eb04ee1d9b7277dcf2761bbb172bd46f9a",
+      "function_count": 2,
+      "export_count": 2,
+      "call_edge_count": 0,
+      "imported_function_count": 0,
+      "baseline_total_compiled_weight_artifact_bytes": 4927,
+      "module_specialized_artifact_bytes": 572,
+      "module_specialized_over_unspecialized_size_ratio": 0.116094986807,
+      "baseline_dispatch_cost_units": 12,
+      "module_specialized_dispatch_cost_units": 18,
+      "estimated_module_specialized_over_unspecialized_throughput_ratio": 0.666666666667,
+      "exact_trace_export_count": 2,
+      "final_output_match_export_count": 2,
+      "final_memory_match_export_count": 2,
+      "halt_match_export_count": 2,
+      "proof_lineage_verified": true,
+      "export_reports": [
+        {
+          "export_name": "local_double",
+          "program_digest": "9747ebc5ceaf5650717a44fcaaef84ba00af7ba7f9877a4ba27588b1a064c2af",
+          "compiled_weight_artifact_digest": "f70db453831c8ca2703509002beea244e0c75798f0d86812f68d1a8c0a8e9eeb",
+          "runtime_contract_digest": "202a5cff550b55564f2d145a8f830ab46fff1a5c48ae144e77aa056f1547bf9f",
+          "expected_trace_digest": "ffd6a732e16961158953b70c894418e55133d7ce7f0746b7c83dc2a687b7a5a9",
+          "compiled_trace_digest": "ffd6a732e16961158953b70c894418e55133d7ce7f0746b7c83dc2a687b7a5a9",
+          "exact_trace_match": true,
+          "final_output_match": true,
+          "final_memory_match": true,
+          "halt_match": true
+        },
+        {
+          "export_name": "pair_sum",
+          "program_digest": "b40cc8e489c247ef9855235db3a66f07f08ea1b568e71172a249d805e590771a",
+          "compiled_weight_artifact_digest": "7b638df9742f933ffbb1c751ccd24e30a730e900e05e34b28a1ccd214f6bde40",
+          "runtime_contract_digest": "5276155c834e19319b6b53af2d4fb3fd9ae88c6d7bdeea7cf6b84591c0e2e857",
+          "expected_trace_digest": "e1eb079eeed3f4cfd5ef8397ff8022a0aa6babceecd6a2d3ee4ee62f50790331",
+          "compiled_trace_digest": "e1eb079eeed3f4cfd5ef8397ff8022a0aa6babceecd6a2d3ee4ee62f50790331",
+          "exact_trace_match": true,
+          "final_output_match": true,
+          "final_memory_match": true,
+          "halt_match": true
+        }
+      ],
+      "detail": "size_ratio=0.116094986807; estimated_throughput_ratio=0.666666666667; proof_lineage_verified=true"
+    }
+  ],
+  "refusal_reports": [
+    {
+      "module_id": "seeded_import_boundary_module",
+      "module_digest": "a167a9900b807a67e6351bd3d2a630763a052814c1675833e4815e2eb9dba6a0",
+      "refusal_kind": "unsupported_imported_call",
+      "detail": "export `import_bridge` function 1 calls imported function 0 (`env::const_seven`), but import-boundary specialization remains explicitly unsupported"
+    }
+  ],
+  "claim_boundary": "this report compares a research-only shared module-specialization artifact against today's per-export program-specialized compiled lane on the same bounded multi-function modules; throughput is represented as deterministic dispatch-cost units rather than wall-clock runtime, and import-boundary cases remain explicit refusal evidence instead of silent fallback",
+  "detail": "supported_module_count=3; refusal_count=1; average_size_ratio=0.106973900888; average_estimated_throughput_ratio=0.610814022579",
+  "report_digest": "80588db237cb097316d4fef617c0f17143e783109f3733748f4faf9cad6de39b"
+}

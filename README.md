@@ -700,6 +700,16 @@ Current posture:
   report that compares direct reference-linear execution against compiled-weight
   deployment on the same widened Wasm workloads, and explicit 2D-head family
   geometry and compiled-weight suite outputs in research runs
+- its module-aware program-to-weights specialization follow-on now also exists
+  across `psionic-runtime`, `psionic-models`, and `psionic-research`, with a
+  public module-specialization plan over normalized Wasm module structure plus
+  call-graph reachability, a research-only shared module-specialization
+  artifact that preserves per-export compiled lineage and exactness facts, and
+  the deterministic
+  `fixtures/tassadar/reports/tassadar_module_specialization_benchmark.json`
+  report that compares shared module-specialized artifact size plus modeled
+  dispatch cost against today's per-export compiled lane while keeping
+  import-boundary cases explicit refusal evidence
 - its Phase 9D learned-plus-compiled and learned-circuit research program now
   exists in `psionic-research`, with a typed research-only family that
   benchmarks explicit proxy surfaces against the handcrafted Wasm baseline and
