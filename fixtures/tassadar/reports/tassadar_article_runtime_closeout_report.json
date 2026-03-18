@@ -1,0 +1,944 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.article_runtime_closeout.report.v1",
+  "bundle_ref": "fixtures/tassadar/runs/article_runtime_closeout_v1/article_runtime_closeout_bundle.json",
+  "bundle": {
+    "schema_version": 1,
+    "bundle_id": "tassadar.article_runtime_closeout.bundle.v1",
+    "bundle_root_ref": "fixtures/tassadar/runs/article_runtime_closeout_v1",
+    "generated_from_refs": [
+      "fixtures/tassadar/sources/tassadar_long_loop_kernel.rs",
+      "fixtures/tassadar/sources/tassadar_state_machine_kernel.rs"
+    ],
+    "workload_family_ids": [
+      "rust.long_loop_kernel",
+      "rust.state_machine_kernel"
+    ],
+    "horizon_receipts": [
+      {
+        "workload_family": "long_loop_kernel",
+        "workload_family_id": "rust.long_loop_kernel",
+        "source_ref": "fixtures/tassadar/sources/tassadar_long_loop_kernel.rs",
+        "horizon": "million_step",
+        "horizon_id": "long_loop_kernel.million_step",
+        "iteration_count": 131071,
+        "exact_step_count": 1048575,
+        "cpu_reference_summary": {
+          "program_id": "tassadar.article_runtime_closeout.long_loop.131071.v1",
+          "profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+          "runner_id": "tassadar.cpu_reference.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "trace_digest": "aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+          "behavior_digest": "aef45cdadb6aab38b156d31396777956a27cda82a79f2f4274bd77118145e6ad",
+          "step_count": 1048575,
+          "serialized_trace_bytes": 236174842,
+          "outputs": [
+            0
+          ],
+          "final_locals": [
+            0
+          ],
+          "final_memory": [],
+          "final_stack": [],
+          "halt_reason": "returned"
+        },
+        "direct_executor_summary": {
+          "program_id": "tassadar.article_runtime_closeout.long_loop.131071.v1",
+          "profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+          "runner_id": "tassadar.fixture_runner.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "trace_digest": "aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+          "behavior_digest": "aef45cdadb6aab38b156d31396777956a27cda82a79f2f4274bd77118145e6ad",
+          "step_count": 1048575,
+          "serialized_trace_bytes": 236174842,
+          "outputs": [
+            0
+          ],
+          "final_locals": [
+            0
+          ],
+          "final_memory": [],
+          "final_stack": [],
+          "halt_reason": "returned"
+        },
+        "direct_steps_per_second": 791807.474286504,
+        "throughput_floor_steps_per_second": 250000.0,
+        "floor_status": "passed",
+        "exactness_bps": 10000,
+        "evidence_bundle": {
+          "runtime_manifest": {
+            "schema_version": 1,
+            "manifest_id": "tassadar-runtime-summary-manifest-tassadar-article-runtime-closeout-long_loop_kernel-million_step",
+            "runtime_identity": {
+              "runtime_backend": "cpu",
+              "backend_toolchain": {
+                "effective_backend": "cpu",
+                "toolchain_version": "tassadar.fixture_runner.v1",
+                "compiled_backend_features": [
+                  "tassadar_executor_summary",
+                  "tassadar.wasm.article_runtime_closeout.v1"
+                ],
+                "probe_state": "compiled_only"
+              }
+            },
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "environment_refs": [
+              "env.openagents.tassadar.article_runtime_closeout.long_loop_kernel"
+            ],
+            "artifact_bindings": [
+              {
+                "kind": "model_descriptor",
+                "reference": "model://tassadar/tassadar.fixture_runner.v1/tassadar.wasm.article_runtime_closeout.v1",
+                "digest": "34753f189387f4d4898668c80228e25946be90c982ebca918f204c4fc86e0d8f"
+              },
+              {
+                "kind": "program_artifact",
+                "reference": "tassadar://artifact/article_runtime_closeout/long_loop_kernel/million_step",
+                "digest": "80f2502d05d18b749baab1b15da6cc4c85af8957334d2b176a94e4e4ae81bbf2"
+              },
+              {
+                "kind": "execution_trace",
+                "reference": "tassadar://trace_summary/tassadar-article-runtime-closeout-long_loop_kernel-million_step/aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+                "digest": "423cd19ee8dfe9b3d3ccc587fc00a3d62e015f3b48b9f740fc7cdd0b610b991a"
+              }
+            ],
+            "static_config_bindings": [
+              {
+                "key": "tassadar.compile_toolchain_digest",
+                "value_digest": "ea5fb0d78f38a2b7042874d5f231456d3ace54876313482e7f0ae26571d19911"
+              },
+              {
+                "key": "tassadar.program_digest",
+                "value_digest": "6403f7bf7b0bfbc7f84ccd5f931a31b352f713a3492616655935600d2fb429bb"
+              },
+              {
+                "key": "tassadar.reference_runner",
+                "value_digest": "e0c7cc93027f98a2ca1a06f8e049ff88e80265603c581d22db0ded1f1c44fbff"
+              },
+              {
+                "key": "tassadar.source_program_digest",
+                "value_digest": "1670523ec05c7511efe99700e5d55df8653ac45b32055c4d8f61e6c4807ec416"
+              }
+            ],
+            "claims_profile_id": "tassadar.executor_trace.proof.v1",
+            "identity_digest": "aeb8225bee412303f9b70e8c2b1bbc8c4a860da3e05b7159e51e615eb8434333",
+            "manifest_digest": "354eb6ce0cfe542f1b0fff7ad76b3196e46fa05e5557137b2bafccd086821b62"
+          },
+          "trace_summary_artifact": {
+            "schema_version": 1,
+            "artifact_id": "tassadar://trace_summary/tassadar-article-runtime-closeout-long_loop_kernel-million_step/aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+            "artifact_digest": "423cd19ee8dfe9b3d3ccc587fc00a3d62e015f3b48b9f740fc7cdd0b610b991a",
+            "program_id": "tassadar.article_runtime_closeout.long_loop.131071.v1",
+            "runner_id": "tassadar.fixture_runner.v1",
+            "trace_abi_id": "tassadar.trace.v1",
+            "trace_abi_version": 1,
+            "trace_digest": "aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+            "behavior_digest": "aef45cdadb6aab38b156d31396777956a27cda82a79f2f4274bd77118145e6ad",
+            "step_count": 1048575,
+            "serialized_trace_bytes": 236174842,
+            "outputs": [
+              0
+            ],
+            "final_locals": [
+              0
+            ],
+            "final_memory": [],
+            "final_stack": [],
+            "halt_reason": "returned"
+          },
+          "trace_summary_proof": {
+            "proof_receipt_id": "tassadar://trace_summary_proof/tassadar-article-runtime-closeout-long_loop_kernel-million_step/aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+            "proof_receipt_digest": "aa55e919dbdd1fdecf9592486707669894a8f0f0a9af498d847dd8b6b2c64f28",
+            "trace_artifact_ref": "tassadar://trace_summary/tassadar-article-runtime-closeout-long_loop_kernel-million_step/aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+            "trace_artifact_digest": "423cd19ee8dfe9b3d3ccc587fc00a3d62e015f3b48b9f740fc7cdd0b610b991a",
+            "trace_digest": "aa6cbadcd3aa0772eda234982716bfcb3f9594b049ce5cbb55afa05354acf8e5",
+            "program_digest": "6403f7bf7b0bfbc7f84ccd5f931a31b352f713a3492616655935600d2fb429bb",
+            "program_artifact_digest": "80f2502d05d18b749baab1b15da6cc4c85af8957334d2b176a94e4e4ae81bbf2",
+            "wasm_profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+            "runtime_backend": "cpu",
+            "runner_id": "tassadar.fixture_runner.v1",
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "runtime_manifest_identity_digest": "aeb8225bee412303f9b70e8c2b1bbc8c4a860da3e05b7159e51e615eb8434333",
+            "runtime_manifest_digest": "354eb6ce0cfe542f1b0fff7ad76b3196e46fa05e5557137b2bafccd086821b62"
+          },
+          "proof_bundle": {
+            "schema_version": 1,
+            "bundle_kind": "local",
+            "status": "succeeded",
+            "request_id": "tassadar-article-runtime-closeout-long_loop_kernel-million_step",
+            "request_digest": "a4ca7e87f92cf1b9ec5fc15bdd8585b1abd48c5c24675302972ffe2295a78c4d",
+            "product_id": "psionic.tassadar.article_runtime_closeout.v1",
+            "model_id": "model://tassadar/tassadar.fixture_runner.v1/tassadar.wasm.article_runtime_closeout.v1",
+            "runtime_identity": {
+              "runtime_backend": "cpu",
+              "backend_toolchain": {
+                "effective_backend": "cpu",
+                "toolchain_version": "tassadar.fixture_runner.v1",
+                "compiled_backend_features": [
+                  "tassadar_executor_summary",
+                  "tassadar.wasm.article_runtime_closeout.v1"
+                ],
+                "probe_state": "compiled_only"
+              }
+            },
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "artifact_residency": {
+              "weight_bundle_digest": "34753f189387f4d4898668c80228e25946be90c982ebca918f204c4fc86e0d8f",
+              "input_artifact_digests": [
+                "80f2502d05d18b749baab1b15da6cc4c85af8957334d2b176a94e4e4ae81bbf2"
+              ],
+              "output_artifact_digests": [
+                "423cd19ee8dfe9b3d3ccc587fc00a3d62e015f3b48b9f740fc7cdd0b610b991a",
+                "aa55e919dbdd1fdecf9592486707669894a8f0f0a9af498d847dd8b6b2c64f28"
+              ]
+            },
+            "activation_fingerprint_posture": "unavailable"
+          }
+        },
+        "reference_linear": {
+          "requested_decode_mode": "reference_linear",
+          "selection_state": "direct",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "measured",
+          "steps_per_second": 791807.474286504,
+          "note": "reference-linear is the only direct measured runtime lane for the committed Rust-only closeout kernels at these horizons"
+        },
+        "hull_cache": {
+          "requested_decode_mode": "hull_cache",
+          "selection_state": "fallback",
+          "selection_reason": "hull_cache_control_flow_unsupported",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "selection_only",
+          "note": "HullCache remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+        },
+        "sparse_top_k": {
+          "requested_decode_mode": "sparse_top_k",
+          "selection_state": "fallback",
+          "selection_reason": "sparse_top_k_validation_unsupported",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "selection_only",
+          "note": "SparseTopK remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+        },
+        "note": "long_loop_kernel at `million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor"
+      },
+      {
+        "workload_family": "long_loop_kernel",
+        "workload_family_id": "rust.long_loop_kernel",
+        "source_ref": "fixtures/tassadar/sources/tassadar_long_loop_kernel.rs",
+        "horizon": "two_million_step",
+        "horizon_id": "long_loop_kernel.two_million_step",
+        "iteration_count": 262143,
+        "exact_step_count": 2097151,
+        "cpu_reference_summary": {
+          "program_id": "tassadar.article_runtime_closeout.long_loop.262143.v1",
+          "profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+          "runner_id": "tassadar.cpu_reference.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "trace_digest": "498956dc6650dc85e9d33898217424b1ccfb4730a4d8ad297754902ca58fe8f1",
+          "behavior_digest": "b177ac778ea39e6982d841843307dd546c509b3c9486a56c124ca191e6ce6ef0",
+          "step_count": 2097151,
+          "serialized_trace_bytes": 475905530,
+          "outputs": [
+            0
+          ],
+          "final_locals": [
+            0
+          ],
+          "final_memory": [],
+          "final_stack": [],
+          "halt_reason": "returned"
+        },
+        "direct_executor_summary": {
+          "program_id": "tassadar.article_runtime_closeout.long_loop.262143.v1",
+          "profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+          "runner_id": "tassadar.fixture_runner.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "trace_digest": "498956dc6650dc85e9d33898217424b1ccfb4730a4d8ad297754902ca58fe8f1",
+          "behavior_digest": "b177ac778ea39e6982d841843307dd546c509b3c9486a56c124ca191e6ce6ef0",
+          "step_count": 2097151,
+          "serialized_trace_bytes": 475905530,
+          "outputs": [
+            0
+          ],
+          "final_locals": [
+            0
+          ],
+          "final_memory": [],
+          "final_stack": [],
+          "halt_reason": "returned"
+        },
+        "direct_steps_per_second": 786541.1754380915,
+        "throughput_floor_steps_per_second": 250000.0,
+        "floor_status": "passed",
+        "exactness_bps": 10000,
+        "evidence_bundle": {
+          "runtime_manifest": {
+            "schema_version": 1,
+            "manifest_id": "tassadar-runtime-summary-manifest-tassadar-article-runtime-closeout-long_loop_kernel-two_million_step",
+            "runtime_identity": {
+              "runtime_backend": "cpu",
+              "backend_toolchain": {
+                "effective_backend": "cpu",
+                "toolchain_version": "tassadar.fixture_runner.v1",
+                "compiled_backend_features": [
+                  "tassadar_executor_summary",
+                  "tassadar.wasm.article_runtime_closeout.v1"
+                ],
+                "probe_state": "compiled_only"
+              }
+            },
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "environment_refs": [
+              "env.openagents.tassadar.article_runtime_closeout.long_loop_kernel"
+            ],
+            "artifact_bindings": [
+              {
+                "kind": "model_descriptor",
+                "reference": "model://tassadar/tassadar.fixture_runner.v1/tassadar.wasm.article_runtime_closeout.v1",
+                "digest": "34753f189387f4d4898668c80228e25946be90c982ebca918f204c4fc86e0d8f"
+              },
+              {
+                "kind": "program_artifact",
+                "reference": "tassadar://artifact/article_runtime_closeout/long_loop_kernel/two_million_step",
+                "digest": "c213cee3ba4dca72b72e7b84e00c49ec34f1095172af45ff16647c14c961f498"
+              },
+              {
+                "kind": "execution_trace",
+                "reference": "tassadar://trace_summary/tassadar-article-runtime-closeout-long_loop_kernel-two_million_step/498956dc6650dc85e9d33898217424b1ccfb4730a4d8ad297754902ca58fe8f1",
+                "digest": "226e2f6f0f6183ee27d8cfd4e6b368d120b212951a312ac9ef8a2b0a2256bfa5"
+              }
+            ],
+            "static_config_bindings": [
+              {
+                "key": "tassadar.compile_toolchain_digest",
+                "value_digest": "ea5fb0d78f38a2b7042874d5f231456d3ace54876313482e7f0ae26571d19911"
+              },
+              {
+                "key": "tassadar.program_digest",
+                "value_digest": "6f4a53f0242b7b34b7255912b8985d1cd8785082679767496cc780925424441c"
+              },
+              {
+                "key": "tassadar.reference_runner",
+                "value_digest": "e0c7cc93027f98a2ca1a06f8e049ff88e80265603c581d22db0ded1f1c44fbff"
+              },
+              {
+                "key": "tassadar.source_program_digest",
+                "value_digest": "05f2c3487d878bd1d5817e3df51b1e129305d4359a5a5cd96cd62e8526ba52ab"
+              }
+            ],
+            "claims_profile_id": "tassadar.executor_trace.proof.v1",
+            "identity_digest": "3878ac23eb3612b8e09b2131dec8402cb826be81fb4491ba225ad1c8899aa633",
+            "manifest_digest": "406cb068b750e14008e105bc9ed0af11281eff98cf79b60dc4033345ab98dc91"
+          },
+          "trace_summary_artifact": {
+            "schema_version": 1,
+            "artifact_id": "tassadar://trace_summary/tassadar-article-runtime-closeout-long_loop_kernel-two_million_step/498956dc6650dc85e9d33898217424b1ccfb4730a4d8ad297754902ca58fe8f1",
+            "artifact_digest": "226e2f6f0f6183ee27d8cfd4e6b368d120b212951a312ac9ef8a2b0a2256bfa5",
+            "program_id": "tassadar.article_runtime_closeout.long_loop.262143.v1",
+            "runner_id": "tassadar.fixture_runner.v1",
+            "trace_abi_id": "tassadar.trace.v1",
+            "trace_abi_version": 1,
+            "trace_digest": "498956dc6650dc85e9d33898217424b1ccfb4730a4d8ad297754902ca58fe8f1",
+            "behavior_digest": "b177ac778ea39e6982d841843307dd546c509b3c9486a56c124ca191e6ce6ef0",
+            "step_count": 2097151,
+            "serialized_trace_bytes": 475905530,
+            "outputs": [
+              0
+            ],
+            "final_locals": [
+              0
+            ],
+            "final_memory": [],
+            "final_stack": [],
+            "halt_reason": "returned"
+          },
+          "trace_summary_proof": {
+            "proof_receipt_id": "tassadar://trace_summary_proof/tassadar-article-runtime-closeout-long_loop_kernel-two_million_step/498956dc6650dc85e9d33898217424b1ccfb4730a4d8ad297754902ca58fe8f1",
+            "proof_receipt_digest": "bc7bdb04603b70dc4a717da90c88f59aef8e3a4b4bad2fd2ecf7c0b036432370",
+            "trace_artifact_ref": "tassadar://trace_summary/tassadar-article-runtime-closeout-long_loop_kernel-two_million_step/498956dc6650dc85e9d33898217424b1ccfb4730a4d8ad297754902ca58fe8f1",
+            "trace_artifact_digest": "226e2f6f0f6183ee27d8cfd4e6b368d120b212951a312ac9ef8a2b0a2256bfa5",
+            "trace_digest": "498956dc6650dc85e9d33898217424b1ccfb4730a4d8ad297754902ca58fe8f1",
+            "program_digest": "6f4a53f0242b7b34b7255912b8985d1cd8785082679767496cc780925424441c",
+            "program_artifact_digest": "c213cee3ba4dca72b72e7b84e00c49ec34f1095172af45ff16647c14c961f498",
+            "wasm_profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+            "runtime_backend": "cpu",
+            "runner_id": "tassadar.fixture_runner.v1",
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "runtime_manifest_identity_digest": "3878ac23eb3612b8e09b2131dec8402cb826be81fb4491ba225ad1c8899aa633",
+            "runtime_manifest_digest": "406cb068b750e14008e105bc9ed0af11281eff98cf79b60dc4033345ab98dc91"
+          },
+          "proof_bundle": {
+            "schema_version": 1,
+            "bundle_kind": "local",
+            "status": "succeeded",
+            "request_id": "tassadar-article-runtime-closeout-long_loop_kernel-two_million_step",
+            "request_digest": "3f383a7622c4eccecda5230192e87cc15fed931d4a9980a8ed355277518c7dd9",
+            "product_id": "psionic.tassadar.article_runtime_closeout.v1",
+            "model_id": "model://tassadar/tassadar.fixture_runner.v1/tassadar.wasm.article_runtime_closeout.v1",
+            "runtime_identity": {
+              "runtime_backend": "cpu",
+              "backend_toolchain": {
+                "effective_backend": "cpu",
+                "toolchain_version": "tassadar.fixture_runner.v1",
+                "compiled_backend_features": [
+                  "tassadar_executor_summary",
+                  "tassadar.wasm.article_runtime_closeout.v1"
+                ],
+                "probe_state": "compiled_only"
+              }
+            },
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "artifact_residency": {
+              "weight_bundle_digest": "34753f189387f4d4898668c80228e25946be90c982ebca918f204c4fc86e0d8f",
+              "input_artifact_digests": [
+                "c213cee3ba4dca72b72e7b84e00c49ec34f1095172af45ff16647c14c961f498"
+              ],
+              "output_artifact_digests": [
+                "226e2f6f0f6183ee27d8cfd4e6b368d120b212951a312ac9ef8a2b0a2256bfa5",
+                "bc7bdb04603b70dc4a717da90c88f59aef8e3a4b4bad2fd2ecf7c0b036432370"
+              ]
+            },
+            "activation_fingerprint_posture": "unavailable"
+          }
+        },
+        "reference_linear": {
+          "requested_decode_mode": "reference_linear",
+          "selection_state": "direct",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "measured",
+          "steps_per_second": 786541.1754380915,
+          "note": "reference-linear is the only direct measured runtime lane for the committed Rust-only closeout kernels at these horizons"
+        },
+        "hull_cache": {
+          "requested_decode_mode": "hull_cache",
+          "selection_state": "fallback",
+          "selection_reason": "hull_cache_control_flow_unsupported",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "selection_only",
+          "note": "HullCache remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+        },
+        "sparse_top_k": {
+          "requested_decode_mode": "sparse_top_k",
+          "selection_state": "fallback",
+          "selection_reason": "sparse_top_k_validation_unsupported",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "selection_only",
+          "note": "SparseTopK remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+        },
+        "note": "long_loop_kernel at `two_million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor"
+      },
+      {
+        "workload_family": "state_machine_kernel",
+        "workload_family_id": "rust.state_machine_kernel",
+        "source_ref": "fixtures/tassadar/sources/tassadar_state_machine_kernel.rs",
+        "horizon": "million_step",
+        "horizon_id": "state_machine_kernel.million_step",
+        "iteration_count": 76923,
+        "exact_step_count": 1230779,
+        "cpu_reference_summary": {
+          "program_id": "tassadar.article_runtime_closeout.state_machine.76923.v1",
+          "profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+          "runner_id": "tassadar.cpu_reference.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "trace_digest": "185e7c37e9d476a17eb3c25e094578265148a31d66fdeafa3f41aadfd8f97afa",
+          "behavior_digest": "1699491e7ad323f35c474c1da72d6e4044af5f545640f1231097e9984d171d35",
+          "step_count": 1230779,
+          "serialized_trace_bytes": 282134019,
+          "outputs": [
+            38462
+          ],
+          "final_locals": [
+            0,
+            38462
+          ],
+          "final_memory": [
+            1
+          ],
+          "final_stack": [],
+          "halt_reason": "returned"
+        },
+        "direct_executor_summary": {
+          "program_id": "tassadar.article_runtime_closeout.state_machine.76923.v1",
+          "profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+          "runner_id": "tassadar.fixture_runner.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "trace_digest": "185e7c37e9d476a17eb3c25e094578265148a31d66fdeafa3f41aadfd8f97afa",
+          "behavior_digest": "1699491e7ad323f35c474c1da72d6e4044af5f545640f1231097e9984d171d35",
+          "step_count": 1230779,
+          "serialized_trace_bytes": 282134019,
+          "outputs": [
+            38462
+          ],
+          "final_locals": [
+            0,
+            38462
+          ],
+          "final_memory": [
+            1
+          ],
+          "final_stack": [],
+          "halt_reason": "returned"
+        },
+        "direct_steps_per_second": 764267.9392263736,
+        "throughput_floor_steps_per_second": 250000.0,
+        "floor_status": "passed",
+        "exactness_bps": 10000,
+        "evidence_bundle": {
+          "runtime_manifest": {
+            "schema_version": 1,
+            "manifest_id": "tassadar-runtime-summary-manifest-tassadar-article-runtime-closeout-state_machine_kernel-million_step",
+            "runtime_identity": {
+              "runtime_backend": "cpu",
+              "backend_toolchain": {
+                "effective_backend": "cpu",
+                "toolchain_version": "tassadar.fixture_runner.v1",
+                "compiled_backend_features": [
+                  "tassadar_executor_summary",
+                  "tassadar.wasm.article_runtime_closeout.v1"
+                ],
+                "probe_state": "compiled_only"
+              }
+            },
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "environment_refs": [
+              "env.openagents.tassadar.article_runtime_closeout.state_machine_kernel"
+            ],
+            "artifact_bindings": [
+              {
+                "kind": "model_descriptor",
+                "reference": "model://tassadar/tassadar.fixture_runner.v1/tassadar.wasm.article_runtime_closeout.v1",
+                "digest": "34753f189387f4d4898668c80228e25946be90c982ebca918f204c4fc86e0d8f"
+              },
+              {
+                "kind": "program_artifact",
+                "reference": "tassadar://artifact/article_runtime_closeout/state_machine_kernel/million_step",
+                "digest": "c32317f79c8c3291b4b32f170c6ef2723435fb5bc15e40a445f0a02a77e96d07"
+              },
+              {
+                "kind": "execution_trace",
+                "reference": "tassadar://trace_summary/tassadar-article-runtime-closeout-state_machine_kernel-million_step/185e7c37e9d476a17eb3c25e094578265148a31d66fdeafa3f41aadfd8f97afa",
+                "digest": "084f6df2a2027595d8dddb4c59842b9bbb339ed8ebea0e05ca226214aa478bf8"
+              }
+            ],
+            "static_config_bindings": [
+              {
+                "key": "tassadar.compile_toolchain_digest",
+                "value_digest": "ea5fb0d78f38a2b7042874d5f231456d3ace54876313482e7f0ae26571d19911"
+              },
+              {
+                "key": "tassadar.program_digest",
+                "value_digest": "ca2a3d40dbfdcbb761207da931e05a6659dc94214951a610f554e907c0af4e69"
+              },
+              {
+                "key": "tassadar.reference_runner",
+                "value_digest": "e0c7cc93027f98a2ca1a06f8e049ff88e80265603c581d22db0ded1f1c44fbff"
+              },
+              {
+                "key": "tassadar.source_program_digest",
+                "value_digest": "3aed34b9019346bf8adfb7a46b4d39af59b7cdd0fea00bb545e45b039ae274bb"
+              }
+            ],
+            "claims_profile_id": "tassadar.executor_trace.proof.v1",
+            "identity_digest": "34a1d7f0373e10dccd977bbf416f3a767f52cb6b2b690a3c512f096ff6b43ea2",
+            "manifest_digest": "32cdd85a1c3842908876b9f43f43dac3e49886f594247eea57448b584106dd7b"
+          },
+          "trace_summary_artifact": {
+            "schema_version": 1,
+            "artifact_id": "tassadar://trace_summary/tassadar-article-runtime-closeout-state_machine_kernel-million_step/185e7c37e9d476a17eb3c25e094578265148a31d66fdeafa3f41aadfd8f97afa",
+            "artifact_digest": "084f6df2a2027595d8dddb4c59842b9bbb339ed8ebea0e05ca226214aa478bf8",
+            "program_id": "tassadar.article_runtime_closeout.state_machine.76923.v1",
+            "runner_id": "tassadar.fixture_runner.v1",
+            "trace_abi_id": "tassadar.trace.v1",
+            "trace_abi_version": 1,
+            "trace_digest": "185e7c37e9d476a17eb3c25e094578265148a31d66fdeafa3f41aadfd8f97afa",
+            "behavior_digest": "1699491e7ad323f35c474c1da72d6e4044af5f545640f1231097e9984d171d35",
+            "step_count": 1230779,
+            "serialized_trace_bytes": 282134019,
+            "outputs": [
+              38462
+            ],
+            "final_locals": [
+              0,
+              38462
+            ],
+            "final_memory": [
+              1
+            ],
+            "final_stack": [],
+            "halt_reason": "returned"
+          },
+          "trace_summary_proof": {
+            "proof_receipt_id": "tassadar://trace_summary_proof/tassadar-article-runtime-closeout-state_machine_kernel-million_step/185e7c37e9d476a17eb3c25e094578265148a31d66fdeafa3f41aadfd8f97afa",
+            "proof_receipt_digest": "6f8c83dd2fd31f0f19293f8cad24554c672bee85e0fb26cb3ddf6239625e762e",
+            "trace_artifact_ref": "tassadar://trace_summary/tassadar-article-runtime-closeout-state_machine_kernel-million_step/185e7c37e9d476a17eb3c25e094578265148a31d66fdeafa3f41aadfd8f97afa",
+            "trace_artifact_digest": "084f6df2a2027595d8dddb4c59842b9bbb339ed8ebea0e05ca226214aa478bf8",
+            "trace_digest": "185e7c37e9d476a17eb3c25e094578265148a31d66fdeafa3f41aadfd8f97afa",
+            "program_digest": "ca2a3d40dbfdcbb761207da931e05a6659dc94214951a610f554e907c0af4e69",
+            "program_artifact_digest": "c32317f79c8c3291b4b32f170c6ef2723435fb5bc15e40a445f0a02a77e96d07",
+            "wasm_profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+            "runtime_backend": "cpu",
+            "runner_id": "tassadar.fixture_runner.v1",
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "runtime_manifest_identity_digest": "34a1d7f0373e10dccd977bbf416f3a767f52cb6b2b690a3c512f096ff6b43ea2",
+            "runtime_manifest_digest": "32cdd85a1c3842908876b9f43f43dac3e49886f594247eea57448b584106dd7b"
+          },
+          "proof_bundle": {
+            "schema_version": 1,
+            "bundle_kind": "local",
+            "status": "succeeded",
+            "request_id": "tassadar-article-runtime-closeout-state_machine_kernel-million_step",
+            "request_digest": "34eeb3366c9f2fa744f31bf58782bdb90badfe68172e4a55293d6b039059014e",
+            "product_id": "psionic.tassadar.article_runtime_closeout.v1",
+            "model_id": "model://tassadar/tassadar.fixture_runner.v1/tassadar.wasm.article_runtime_closeout.v1",
+            "runtime_identity": {
+              "runtime_backend": "cpu",
+              "backend_toolchain": {
+                "effective_backend": "cpu",
+                "toolchain_version": "tassadar.fixture_runner.v1",
+                "compiled_backend_features": [
+                  "tassadar_executor_summary",
+                  "tassadar.wasm.article_runtime_closeout.v1"
+                ],
+                "probe_state": "compiled_only"
+              }
+            },
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "artifact_residency": {
+              "weight_bundle_digest": "34753f189387f4d4898668c80228e25946be90c982ebca918f204c4fc86e0d8f",
+              "input_artifact_digests": [
+                "c32317f79c8c3291b4b32f170c6ef2723435fb5bc15e40a445f0a02a77e96d07"
+              ],
+              "output_artifact_digests": [
+                "084f6df2a2027595d8dddb4c59842b9bbb339ed8ebea0e05ca226214aa478bf8",
+                "6f8c83dd2fd31f0f19293f8cad24554c672bee85e0fb26cb3ddf6239625e762e"
+              ]
+            },
+            "activation_fingerprint_posture": "unavailable"
+          }
+        },
+        "reference_linear": {
+          "requested_decode_mode": "reference_linear",
+          "selection_state": "direct",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "measured",
+          "steps_per_second": 764267.9392263736,
+          "note": "reference-linear is the only direct measured runtime lane for the committed Rust-only closeout kernels at these horizons"
+        },
+        "hull_cache": {
+          "requested_decode_mode": "hull_cache",
+          "selection_state": "fallback",
+          "selection_reason": "hull_cache_control_flow_unsupported",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "selection_only",
+          "note": "HullCache remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+        },
+        "sparse_top_k": {
+          "requested_decode_mode": "sparse_top_k",
+          "selection_state": "fallback",
+          "selection_reason": "sparse_top_k_validation_unsupported",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "selection_only",
+          "note": "SparseTopK remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+        },
+        "note": "state_machine_kernel at `million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor"
+      },
+      {
+        "workload_family": "state_machine_kernel",
+        "workload_family_id": "rust.state_machine_kernel",
+        "source_ref": "fixtures/tassadar/sources/tassadar_state_machine_kernel.rs",
+        "horizon": "two_million_step",
+        "horizon_id": "state_machine_kernel.two_million_step",
+        "iteration_count": 153846,
+        "exact_step_count": 2461547,
+        "cpu_reference_summary": {
+          "program_id": "tassadar.article_runtime_closeout.state_machine.153846.v1",
+          "profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+          "runner_id": "tassadar.cpu_reference.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "trace_digest": "229cfaecbd3d0267e1eb5cb916eeff841b8e60c778bb38e5a6030462dd23c10a",
+          "behavior_digest": "492c60e57a1ab2a5f8b85a419601f15e8f73376d837783e5bc9c06abe7ba5f83",
+          "step_count": 2461547,
+          "serialized_trace_bytes": 567902994,
+          "outputs": [
+            76923
+          ],
+          "final_locals": [
+            0,
+            76923
+          ],
+          "final_memory": [
+            0
+          ],
+          "final_stack": [],
+          "halt_reason": "returned"
+        },
+        "direct_executor_summary": {
+          "program_id": "tassadar.article_runtime_closeout.state_machine.153846.v1",
+          "profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+          "runner_id": "tassadar.fixture_runner.v1",
+          "trace_abi_id": "tassadar.trace.v1",
+          "trace_abi_version": 1,
+          "trace_digest": "229cfaecbd3d0267e1eb5cb916eeff841b8e60c778bb38e5a6030462dd23c10a",
+          "behavior_digest": "492c60e57a1ab2a5f8b85a419601f15e8f73376d837783e5bc9c06abe7ba5f83",
+          "step_count": 2461547,
+          "serialized_trace_bytes": 567902994,
+          "outputs": [
+            76923
+          ],
+          "final_locals": [
+            0,
+            76923
+          ],
+          "final_memory": [
+            0
+          ],
+          "final_stack": [],
+          "halt_reason": "returned"
+        },
+        "direct_steps_per_second": 756129.1775124758,
+        "throughput_floor_steps_per_second": 250000.0,
+        "floor_status": "passed",
+        "exactness_bps": 10000,
+        "evidence_bundle": {
+          "runtime_manifest": {
+            "schema_version": 1,
+            "manifest_id": "tassadar-runtime-summary-manifest-tassadar-article-runtime-closeout-state_machine_kernel-two_million_step",
+            "runtime_identity": {
+              "runtime_backend": "cpu",
+              "backend_toolchain": {
+                "effective_backend": "cpu",
+                "toolchain_version": "tassadar.fixture_runner.v1",
+                "compiled_backend_features": [
+                  "tassadar_executor_summary",
+                  "tassadar.wasm.article_runtime_closeout.v1"
+                ],
+                "probe_state": "compiled_only"
+              }
+            },
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "environment_refs": [
+              "env.openagents.tassadar.article_runtime_closeout.state_machine_kernel"
+            ],
+            "artifact_bindings": [
+              {
+                "kind": "model_descriptor",
+                "reference": "model://tassadar/tassadar.fixture_runner.v1/tassadar.wasm.article_runtime_closeout.v1",
+                "digest": "34753f189387f4d4898668c80228e25946be90c982ebca918f204c4fc86e0d8f"
+              },
+              {
+                "kind": "program_artifact",
+                "reference": "tassadar://artifact/article_runtime_closeout/state_machine_kernel/two_million_step",
+                "digest": "f67a1a0394f27be31b886ac0f3e6448f9be790284080f446cca3d8c335f48af6"
+              },
+              {
+                "kind": "execution_trace",
+                "reference": "tassadar://trace_summary/tassadar-article-runtime-closeout-state_machine_kernel-two_million_step/229cfaecbd3d0267e1eb5cb916eeff841b8e60c778bb38e5a6030462dd23c10a",
+                "digest": "593ca903d277b5ee520b8c8313beaf8112d8e4a3a5065549ac0ce59a494e2c0f"
+              }
+            ],
+            "static_config_bindings": [
+              {
+                "key": "tassadar.compile_toolchain_digest",
+                "value_digest": "ea5fb0d78f38a2b7042874d5f231456d3ace54876313482e7f0ae26571d19911"
+              },
+              {
+                "key": "tassadar.program_digest",
+                "value_digest": "23c5e870c41738cd57848ab575cafc3f56a3d88896bbddb8443acdb631cecf03"
+              },
+              {
+                "key": "tassadar.reference_runner",
+                "value_digest": "e0c7cc93027f98a2ca1a06f8e049ff88e80265603c581d22db0ded1f1c44fbff"
+              },
+              {
+                "key": "tassadar.source_program_digest",
+                "value_digest": "4843162ce01f78d1ae4f46662d8a0a4d4d372f3108c932043fd76df613c84289"
+              }
+            ],
+            "claims_profile_id": "tassadar.executor_trace.proof.v1",
+            "identity_digest": "e0e43354144c1b96ba6cb94636a86422b3d097c908f10d4dd52293ba76355407",
+            "manifest_digest": "c451bb82bede308299b735c284d54ed29ea1899936991e1fd77ca170816ea12e"
+          },
+          "trace_summary_artifact": {
+            "schema_version": 1,
+            "artifact_id": "tassadar://trace_summary/tassadar-article-runtime-closeout-state_machine_kernel-two_million_step/229cfaecbd3d0267e1eb5cb916eeff841b8e60c778bb38e5a6030462dd23c10a",
+            "artifact_digest": "593ca903d277b5ee520b8c8313beaf8112d8e4a3a5065549ac0ce59a494e2c0f",
+            "program_id": "tassadar.article_runtime_closeout.state_machine.153846.v1",
+            "runner_id": "tassadar.fixture_runner.v1",
+            "trace_abi_id": "tassadar.trace.v1",
+            "trace_abi_version": 1,
+            "trace_digest": "229cfaecbd3d0267e1eb5cb916eeff841b8e60c778bb38e5a6030462dd23c10a",
+            "behavior_digest": "492c60e57a1ab2a5f8b85a419601f15e8f73376d837783e5bc9c06abe7ba5f83",
+            "step_count": 2461547,
+            "serialized_trace_bytes": 567902994,
+            "outputs": [
+              76923
+            ],
+            "final_locals": [
+              0,
+              76923
+            ],
+            "final_memory": [
+              0
+            ],
+            "final_stack": [],
+            "halt_reason": "returned"
+          },
+          "trace_summary_proof": {
+            "proof_receipt_id": "tassadar://trace_summary_proof/tassadar-article-runtime-closeout-state_machine_kernel-two_million_step/229cfaecbd3d0267e1eb5cb916eeff841b8e60c778bb38e5a6030462dd23c10a",
+            "proof_receipt_digest": "0771e57a7bb018f40b06b2af665786b4fb1218b115e4e9c99ed64fdd895ce6fe",
+            "trace_artifact_ref": "tassadar://trace_summary/tassadar-article-runtime-closeout-state_machine_kernel-two_million_step/229cfaecbd3d0267e1eb5cb916eeff841b8e60c778bb38e5a6030462dd23c10a",
+            "trace_artifact_digest": "593ca903d277b5ee520b8c8313beaf8112d8e4a3a5065549ac0ce59a494e2c0f",
+            "trace_digest": "229cfaecbd3d0267e1eb5cb916eeff841b8e60c778bb38e5a6030462dd23c10a",
+            "program_digest": "23c5e870c41738cd57848ab575cafc3f56a3d88896bbddb8443acdb631cecf03",
+            "program_artifact_digest": "f67a1a0394f27be31b886ac0f3e6448f9be790284080f446cca3d8c335f48af6",
+            "wasm_profile_id": "tassadar.wasm.article_runtime_closeout.v1",
+            "runtime_backend": "cpu",
+            "runner_id": "tassadar.fixture_runner.v1",
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "runtime_manifest_identity_digest": "e0e43354144c1b96ba6cb94636a86422b3d097c908f10d4dd52293ba76355407",
+            "runtime_manifest_digest": "c451bb82bede308299b735c284d54ed29ea1899936991e1fd77ca170816ea12e"
+          },
+          "proof_bundle": {
+            "schema_version": 1,
+            "bundle_kind": "local",
+            "status": "succeeded",
+            "request_id": "tassadar-article-runtime-closeout-state_machine_kernel-two_million_step",
+            "request_digest": "7004e96e017128592edd648792e98a974898dac7597bd63b7fbad4e998dbb57f",
+            "product_id": "psionic.tassadar.article_runtime_closeout.v1",
+            "model_id": "model://tassadar/tassadar.fixture_runner.v1/tassadar.wasm.article_runtime_closeout.v1",
+            "runtime_identity": {
+              "runtime_backend": "cpu",
+              "backend_toolchain": {
+                "effective_backend": "cpu",
+                "toolchain_version": "tassadar.fixture_runner.v1",
+                "compiled_backend_features": [
+                  "tassadar_executor_summary",
+                  "tassadar.wasm.article_runtime_closeout.v1"
+                ],
+                "probe_state": "compiled_only"
+              }
+            },
+            "validation": {
+              "matrix_id": "psionic.minimum_hardware_validation.v1",
+              "documentation_path": "docs/HARDWARE_VALIDATION_MATRIX.md",
+              "claim_id": "tassadar.executor_trace.phase4",
+              "coverage": "not_yet_validated"
+            },
+            "artifact_residency": {
+              "weight_bundle_digest": "34753f189387f4d4898668c80228e25946be90c982ebca918f204c4fc86e0d8f",
+              "input_artifact_digests": [
+                "f67a1a0394f27be31b886ac0f3e6448f9be790284080f446cca3d8c335f48af6"
+              ],
+              "output_artifact_digests": [
+                "593ca903d277b5ee520b8c8313beaf8112d8e4a3a5065549ac0ce59a494e2c0f",
+                "0771e57a7bb018f40b06b2af665786b4fb1218b115e4e9c99ed64fdd895ce6fe"
+              ]
+            },
+            "activation_fingerprint_posture": "unavailable"
+          }
+        },
+        "reference_linear": {
+          "requested_decode_mode": "reference_linear",
+          "selection_state": "direct",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "measured",
+          "steps_per_second": 756129.1775124758,
+          "note": "reference-linear is the only direct measured runtime lane for the committed Rust-only closeout kernels at these horizons"
+        },
+        "hull_cache": {
+          "requested_decode_mode": "hull_cache",
+          "selection_state": "fallback",
+          "selection_reason": "hull_cache_control_flow_unsupported",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "selection_only",
+          "note": "HullCache remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+        },
+        "sparse_top_k": {
+          "requested_decode_mode": "sparse_top_k",
+          "selection_state": "fallback",
+          "selection_reason": "sparse_top_k_validation_unsupported",
+          "effective_decode_mode": "reference_linear",
+          "measurement_posture": "selection_only",
+          "note": "SparseTopK remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+        },
+        "note": "state_machine_kernel at `two_million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor"
+      }
+    ],
+    "exact_horizon_count": 4,
+    "floor_pass_count": 4,
+    "floor_refusal_count": 0,
+    "claim_boundary": "this bundle closes the Rust-only runtime floor only for the committed long-loop and state-machine kernel families at the declared million-step and two-million-step horizons on the direct reference-linear CPU executor path. HullCache and SparseTopK remain explicit fallback-only rows here, and this bundle does not widen served profile closure beyond the committed benchmark lane",
+    "summary": "Rust-only article runtime closeout now freezes 4 exact horizon receipts across 2 workload families with floor_passes=4 and floor_refusals=0.",
+    "bundle_digest": "6ac78318d5d89c8da00bd05463857922996e0909101162d480b7ec9beb74fb71"
+  },
+  "exact_horizon_count": 4,
+  "floor_pass_count": 4,
+  "floor_refusal_count": 0,
+  "slowest_workload_horizon_id": "state_machine_kernel.two_million_step",
+  "slowest_measured_steps_per_second": 756129.1775124758,
+  "claim_boundary": "this eval report summarizes the Rust-only runtime floor only for the committed article-closeout kernel families and horizons. It does not widen generic served profile support, and explicit fallback rows for HullCache and SparseTopK remain part of the reported truth",
+  "summary": "Article runtime closeout report now binds 4 exact horizon receipts with floor_passes=4, floor_refusals=0, and stress_anchor=`state_machine_kernel.two_million_step`.",
+  "report_digest": "92a4ec38db4075549b6fc30abd547846c41792a2f4ec1a6decf3fe5bb1e89ca7"
+}

@@ -666,6 +666,24 @@ Current posture:
   committed 9x9 corpus case set, and makes the direct/no-fallback/no-external-tool
   posture explicit without widening the claim to Hungarian, million-step, or
   arbitrary program closure
+- the repo now also carries one Rust-only article runtime closeout bundle at
+  `fixtures/tassadar/runs/article_runtime_closeout_v1/article_runtime_closeout_bundle.json`,
+  one eval report at
+  `fixtures/tassadar/reports/tassadar_article_runtime_closeout_report.json`,
+  and one research summary at
+  `fixtures/tassadar/reports/tassadar_article_runtime_closeout_summary.json`,
+  emitted by
+  `cargo run -p psionic-eval --example tassadar_article_runtime_closeout_report`
+  and
+  `cargo run -p psionic-research --example tassadar_article_runtime_closeout_summary`;
+  together they freeze the current runtime-performance closeout on the direct
+  reference-linear CPU path for exactly two committed Rust-owned long-horizon
+  workload families, `rust.long_loop_kernel` and
+  `rust.state_machine_kernel`, at the declared `million_step` and
+  `two_million_step` horizons with explicit throughput-floor checks,
+  exactness receipts, and explicit `HullCache` / `SparseTopK` fallback-only
+  posture instead of over-reading those long-horizon kernels as generic
+  fast-path closure
 - the repo now also carries one canonical Tassadar C-to-Wasm compile receipt at
   `fixtures/tassadar/reports/tassadar_c_to_wasm_compile_receipt.json`, emitted
   by `cargo run -p psionic-runtime --example tassadar_c_to_wasm_compile_receipt`;

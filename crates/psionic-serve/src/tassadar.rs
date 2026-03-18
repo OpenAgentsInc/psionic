@@ -6,16 +6,17 @@ use std::{
 
 use psionic_models::{
     TassadarExecutorContractError, TassadarExecutorFixture, TassadarExecutorModelDescriptor,
-    TassadarModuleExecutionCapabilityPublication, TassadarTraceTokenizer,
-    TassadarRustArticleProfileCompletenessPublication,
+    TassadarModuleExecutionCapabilityPublication,
+    TassadarRustArticleProfileCompletenessPublication, TassadarTraceTokenizer,
     TassadarWorkloadCapabilityMatrix, TassadarWorkloadCapabilityMatrixError,
     TassadarWorkloadCapabilityRow, TassadarWorkloadSupportPosture,
     tassadar_rust_article_profile_completeness_publication,
 };
 use psionic_research::{
-    TassadarAcceptanceReport, TassadarCompiledArticleClosureReport,
-    TassadarLearnedLongHorizonPolicyReport, TassadarPromotionChecklistGateKind,
-    TassadarPromotionPolicyReport, build_tassadar_promotion_policy_report,
+    TASSADAR_ARTICLE_RUNTIME_CLOSEOUT_SUMMARY_REPORT_REF, TassadarAcceptanceReport,
+    TassadarCompiledArticleClosureReport, TassadarLearnedLongHorizonPolicyReport,
+    TassadarPromotionChecklistGateKind, TassadarPromotionPolicyReport,
+    build_tassadar_article_runtime_closeout_summary_report, build_tassadar_promotion_policy_report,
 };
 use psionic_router::{
     TassadarPlannerExecutorDecodeCapability, TassadarPlannerExecutorRouteDescriptor,
@@ -80,6 +81,27 @@ pub struct TassadarExecutorCapabilityPublication {
     pub quantization_truth_envelope: crate::TassadarServedQuantizationTruthEnvelope,
 }
 
+/// Served publication for the Rust-only article runtime closeout surface.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TassadarRustOnlyArticleRuntimeCloseoutPublication {
+    /// Served product identifier.
+    pub product_id: String,
+    /// Stable served model identifier.
+    pub model_id: String,
+    /// Stable report reference for the committed closeout report.
+    pub report_ref: String,
+    /// Exact horizon count carried by the report.
+    pub exact_horizon_count: u32,
+    /// Floor pass count carried by the report.
+    pub floor_pass_count: u32,
+    /// Slowest committed horizon identifier.
+    pub slowest_workload_horizon_id: String,
+    /// Slowest measured direct throughput on the committed operator machine.
+    pub slowest_measured_steps_per_second: f64,
+    /// Explicit claim boundary.
+    pub claim_boundary: String,
+}
+
 /// Capability-publication failure for the explicit executor-trace lane.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum TassadarExecutorCapabilityPublicationError {
@@ -100,6 +122,12 @@ pub enum TassadarExecutorCapabilityPublicationError {
     InvalidQuantizationTruthEnvelope {
         /// Validation failure from the served quantization-envelope projection.
         error: crate::TassadarServedQuantizationTruthEnvelopeError,
+    },
+    /// The Rust-only article runtime closeout report was not publishable.
+    #[error("invalid Rust-only article runtime closeout report: {detail}")]
+    InvalidRustOnlyArticleRuntimeCloseout {
+        /// Machine-readable detail for the failed projection.
+        detail: String,
     },
 }
 
@@ -414,15 +442,12 @@ impl LocalTassadarExecutorService {
                 }
             })?;
         let runtime_capability = fixture.runtime_capability_report();
-        let quantization_truth_envelope =
-            crate::build_tassadar_served_quantization_truth_envelope(
-                runtime_capability.runtime_backend.as_str(),
-            )
-            .map_err(|error| {
-                TassadarExecutorCapabilityPublicationError::InvalidQuantizationTruthEnvelope {
-                    error,
-                }
-            })?;
+        let quantization_truth_envelope = crate::build_tassadar_served_quantization_truth_envelope(
+            runtime_capability.runtime_backend.as_str(),
+        )
+        .map_err(|error| {
+            TassadarExecutorCapabilityPublicationError::InvalidQuantizationTruthEnvelope { error }
+        })?;
         Ok(TassadarExecutorCapabilityPublication {
             product_id: String::from(EXECUTOR_TRACE_PRODUCT_ID),
             model_descriptor: fixture.descriptor().clone(),
@@ -432,6 +457,38 @@ impl LocalTassadarExecutorService {
                 tassadar_rust_article_profile_completeness_publication(),
             workload_capability_matrix,
             quantization_truth_envelope,
+        })
+    }
+
+    /// Returns the served Rust-only article runtime closeout publication for one fixture.
+    pub fn rust_only_article_runtime_closeout_publication(
+        &self,
+        requested_model_id: Option<&str>,
+    ) -> Result<
+        TassadarRustOnlyArticleRuntimeCloseoutPublication,
+        TassadarExecutorCapabilityPublicationError,
+    > {
+        let fixture = self
+            .resolve_fixture_by_model_id(requested_model_id)
+            .map_err(
+                |model_id| TassadarExecutorCapabilityPublicationError::UnknownModel { model_id },
+            )?;
+        let report = build_tassadar_article_runtime_closeout_summary_report().map_err(|error| {
+            TassadarExecutorCapabilityPublicationError::InvalidRustOnlyArticleRuntimeCloseout {
+                detail: error.to_string(),
+            }
+        })?;
+        Ok(TassadarRustOnlyArticleRuntimeCloseoutPublication {
+            product_id: String::from(EXECUTOR_TRACE_PRODUCT_ID),
+            model_id: fixture.descriptor().model.model_id.clone(),
+            report_ref: String::from(TASSADAR_ARTICLE_RUNTIME_CLOSEOUT_SUMMARY_REPORT_REF),
+            exact_horizon_count: report.closeout_report.exact_horizon_count,
+            floor_pass_count: report.closeout_report.floor_pass_count,
+            slowest_workload_horizon_id: report.slowest_workload_horizon_id,
+            slowest_measured_steps_per_second: report.slowest_measured_steps_per_second,
+            claim_boundary: String::from(
+                "this served publication cites the committed Rust-only article runtime closeout report for benchmark-only long-horizon kernels. It does not widen the main served Wasm profile matrix or imply broad long-horizon closure outside those committed workloads",
+            ),
         })
     }
 
@@ -5250,6 +5307,25 @@ mod tests {
             .map(|row| row["workload_class"].clone())
             .collect::<Vec<_>>();
         assert!(workload_classes.contains(&serde_json::json!("micro_wasm_kernel")));
+    }
+
+    #[test]
+    fn executor_service_publishes_rust_only_article_runtime_closeout_surface() {
+        let service = LocalTassadarExecutorService::new()
+            .with_fixture(TassadarExecutorFixture::article_i32_compute_v1());
+        let publication = service
+            .rust_only_article_runtime_closeout_publication(Some(
+                TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID,
+            ))
+            .expect("runtime closeout publication");
+
+        assert_eq!(
+            publication.report_ref,
+            "fixtures/tassadar/reports/tassadar_article_runtime_closeout_summary.json"
+        );
+        assert_eq!(publication.exact_horizon_count, 4);
+        assert_eq!(publication.floor_pass_count, 4);
+        assert!(!publication.slowest_workload_horizon_id.is_empty());
     }
 
     #[test]

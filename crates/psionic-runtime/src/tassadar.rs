@@ -8412,7 +8412,7 @@ fn finish_execution_summary(
     )
 }
 
-fn execute_program_direct_summary(
+pub fn execute_program_direct_summary(
     program: &TassadarProgram,
     profile: &TassadarWasmProfile,
     trace_abi: &TassadarTraceAbi,

@@ -14,12 +14,12 @@ mod apple_adapter_benchmark;
 mod attnres;
 #[path = "attnres_training.rs"]
 mod attnres_training;
-#[path = "parameter_golf_training.rs"]
-mod parameter_golf_training;
 #[path = "parameter_golf_benchmark.rs"]
 mod parameter_golf_benchmark;
 #[path = "parameter_golf_distributed.rs"]
 mod parameter_golf_distributed;
+#[path = "parameter_golf_training.rs"]
+mod parameter_golf_training;
 #[path = "tassadar.rs"]
 mod tassadar;
 #[path = "tassadar_approximate_attention_closure_matrix.rs"]
@@ -28,6 +28,8 @@ mod tassadar_approximate_attention_closure_matrix;
 mod tassadar_architecture_bakeoff;
 #[path = "tassadar_article_abi.rs"]
 mod tassadar_article_abi;
+#[path = "tassadar_article_runtime_closeout.rs"]
+mod tassadar_article_runtime_closeout;
 #[path = "tassadar_benchmark_package_set.rs"]
 mod tassadar_benchmark_package_set;
 #[path = "tassadar_call_frames.rs"]
@@ -175,6 +177,7 @@ pub use tassadar::*;
 pub use tassadar_approximate_attention_closure_matrix::*;
 pub use tassadar_architecture_bakeoff::*;
 pub use tassadar_article_abi::*;
+pub use tassadar_article_runtime_closeout::*;
 pub use tassadar_benchmark_package_set::*;
 pub use tassadar_call_frames::*;
 pub use tassadar_clrs_wasm_bridge::*;

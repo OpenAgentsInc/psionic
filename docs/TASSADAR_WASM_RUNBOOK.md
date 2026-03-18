@@ -22,6 +22,7 @@ This runbook covers the current repo-owned bounded Wasm flow only:
 - Rust-only article frontend canon
 - Rust-to-Wasm article profile completeness matrix
 - bounded Rust-only article ABI closure
+- Rust-only article runtime closeout
 - canonical Rust-only Hungarian-10x10 article reproducer
 - canonical C-to-Wasm compile receipt
 - source-to-Wasm-to-Tassadar compile-pipeline matrix
@@ -169,6 +170,30 @@ Expected outcome:
 - this closes one concrete backtracking-search workload family only; it does
   not yet imply Hungarian or multi-million-step article closure
 
+### 3C. Rust-only article runtime closeout
+
+```bash
+cargo run -p psionic-eval --example tassadar_article_runtime_closeout_report
+cargo run -p psionic-research --example tassadar_article_runtime_closeout_summary
+```
+
+Read:
+
+- `fixtures/tassadar/runs/article_runtime_closeout_v1/article_runtime_closeout_bundle.json`
+- `fixtures/tassadar/reports/tassadar_article_runtime_closeout_report.json`
+- `fixtures/tassadar/reports/tassadar_article_runtime_closeout_summary.json`
+
+Expected outcome:
+
+- exact direct-reference-linear CPU execution for the committed
+  `rust.long_loop_kernel` and `rust.state_machine_kernel` families at the
+  declared `million_step` and `two_million_step` horizons
+- explicit throughput-floor passes on all four committed horizon receipts
+- explicit `HullCache` and `SparseTopK` fallback-only rows on those same
+  backward-branch kernels instead of implied fast-path closure
+- one served publication path now exists for this closeout summary, but it is
+  benchmark-only and does not widen the generic served Wasm capability matrix
+
 ### 4. Optional historical C-to-Wasm compile receipt
 
 ```bash
@@ -278,6 +303,10 @@ Run the focused report checks after the flow:
 
 ```bash
 cargo test -p psionic-eval article_abi -- --nocapture
+cargo test -p psionic-runtime article_runtime_closeout -- --nocapture
+cargo test -p psionic-eval article_runtime_closeout -- --nocapture
+cargo test -p psionic-research article_runtime_closeout -- --nocapture
+cargo test -p psionic-serve executor_service_publishes_rust_only_article_runtime_closeout_surface -- --nocapture
 cargo test -p psionic-eval wasm_module_ingress -- --nocapture
 cargo test -p psionic-eval wasm_conformance -- --nocapture
 cargo test -p psionic-eval module_scale_workload_suite -- --nocapture
@@ -296,6 +325,10 @@ These checks should keep the committed reports and generated truth aligned.
   is a real bounded module-lane regression.
 - If the conformance report loses exact success or trap parity on the supported
   subset, that is a real execution-truth regression.
+- If the article runtime closeout loses direct exactness or its throughput
+  floor on the committed long-horizon kernels, the runtime-performance part of
+  the Rust-only article claim has regressed even if shorter bounded Wasm cases
+  still look healthy.
 - If the module-scale suite loses exactness on memcpy, checksum, parsing, or
   VM-style fixed-operand cases, that is a real workload-suite regression.
 - If trap parity or refusal parity drifts in the trap report, the widened Wasm
@@ -321,6 +354,8 @@ hold:
 
 - the compile-pipeline, ingress, conformance, module-scale, and trap reports
   reproduce without unexpected drift
+- the article runtime closeout bundle, report, and summary reproduce without
+  unexpected drift
 - the focused tests above pass
 - any local C-toolchain failure stays typed and explicit instead of silently
   widening or corrupting the lane
