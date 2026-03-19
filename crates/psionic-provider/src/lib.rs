@@ -21,6 +21,7 @@ mod tassadar_evidence_routing;
 mod tassadar_exact_compute_market;
 mod tassadar_execution_checkpoint;
 mod tassadar_execution_unit_registration;
+mod tassadar_frozen_core_wasm_closure_gate;
 mod tassadar_import_policy_matrix;
 mod tassadar_installed_module_evidence;
 mod tassadar_linked_program_bundle;
@@ -63,6 +64,7 @@ pub use tassadar_evidence_routing::*;
 pub use tassadar_exact_compute_market::*;
 pub use tassadar_execution_checkpoint::*;
 pub use tassadar_execution_unit_registration::*;
+pub use tassadar_frozen_core_wasm_closure_gate::*;
 pub use tassadar_import_policy_matrix::*;
 pub use tassadar_installed_module_evidence::*;
 pub use tassadar_linked_program_bundle::*;
@@ -491,6 +493,8 @@ pub struct TassadarCapabilityEnvelope {
     pub effect_safe_resume_receipt: TassadarEffectSafeResumeReceipt,
     /// Provider-facing receipt for the subset-profile promotion gate.
     pub subset_profile_promotion_gate_receipt: TassadarSubsetProfilePromotionGateReceipt,
+    /// Provider-facing receipt for the frozen core-Wasm closure gate.
+    pub frozen_core_wasm_closure_gate_receipt: TassadarFrozenCoreWasmClosureGateReceipt,
     /// Backend and quantization deployment truth for the served lane.
     pub quantization_truth_envelope: TassadarDeploymentTruthEnvelope,
     /// Current provider readiness state.
@@ -585,6 +589,20 @@ impl TassadarCapabilityEnvelope {
         let subset_profile_promotion_gate_receipt =
             TassadarSubsetProfilePromotionGateReceipt::from_report(
                 &subset_profile_promotion_gate_report,
+            );
+        let frozen_core_wasm_closure_gate_report =
+            psionic_eval::build_tassadar_frozen_core_wasm_closure_gate_report().map_err(
+                |error| {
+                    TassadarCapabilityEnvelopeError::UnpublishableFrozenCoreWasmClosureGate {
+                        detail: format!(
+                            "provider envelope requires a valid frozen core-Wasm closure gate report: {error}"
+                        ),
+                    }
+                },
+            )?;
+        let frozen_core_wasm_closure_gate_receipt =
+            TassadarFrozenCoreWasmClosureGateReceipt::from_report(
+                &frozen_core_wasm_closure_gate_report,
             );
         if broad_internal_compute_profile_publication_receipt
             .current_served_profile_id
@@ -707,6 +725,27 @@ impl TassadarCapabilityEnvelope {
                 },
             );
         }
+        if publication
+            .frozen_core_wasm_window_report_ref
+            .trim()
+            .is_empty()
+            || publication
+                .frozen_core_wasm_closure_gate_report_ref
+                .trim()
+                .is_empty()
+            || publication.frozen_core_wasm_closure_status
+                != frozen_core_wasm_closure_gate_receipt.closure_status
+            || publication.frozen_core_wasm_served_publication_allowed
+                != frozen_core_wasm_closure_gate_receipt.served_publication_allowed
+        {
+            return Err(
+                TassadarCapabilityEnvelopeError::UnpublishableFrozenCoreWasmClosureGate {
+                    detail: String::from(
+                        "provider envelope requires non-empty frozen core-Wasm window and closure-gate refs plus exact agreement with the committed closure-gate status and served-publication posture",
+                    ),
+                },
+            );
+        }
         Ok(Self {
             backend_family: String::from(BACKEND_FAMILY),
             product_id: publication.product_id.clone(),
@@ -717,6 +756,7 @@ impl TassadarCapabilityEnvelope {
             resumable_multi_slice_promotion_receipt,
             effect_safe_resume_receipt,
             subset_profile_promotion_gate_receipt,
+            frozen_core_wasm_closure_gate_receipt,
             quantization_truth_envelope,
             readiness,
         })
@@ -754,6 +794,11 @@ pub enum TassadarCapabilityEnvelopeError {
     },
     /// The served subset-profile promotion gate was not publishable provider-side.
     UnpublishableSubsetProfilePromotionGate {
+        /// Plain-text validation detail.
+        detail: String,
+    },
+    /// The served frozen core-Wasm closure gate was not publishable provider-side.
+    UnpublishableFrozenCoreWasmClosureGate {
         /// Plain-text validation detail.
         detail: String,
     },
@@ -8836,6 +8881,22 @@ mod tests {
             json!("fixtures/tassadar/reports/tassadar_subset_profile_promotion_gate_report.json")
         );
         assert_eq!(
+            encoded["publication"]["frozen_core_wasm_window_report_ref"],
+            json!("fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json")
+        );
+        assert_eq!(
+            encoded["publication"]["frozen_core_wasm_closure_gate_report_ref"],
+            json!("fixtures/tassadar/reports/tassadar_frozen_core_wasm_closure_gate_report.json")
+        );
+        assert_eq!(
+            encoded["publication"]["frozen_core_wasm_closure_status"],
+            json!("not_closed")
+        );
+        assert_eq!(
+            encoded["publication"]["frozen_core_wasm_served_publication_allowed"],
+            json!(false)
+        );
+        assert_eq!(
             encoded["broad_internal_compute_profile_publication_receipt"]
                 ["public_profile_specific_route_ids"],
             json!([
@@ -8862,6 +8923,14 @@ mod tests {
         assert_eq!(
             encoded["subset_profile_promotion_gate_receipt"]["overall_green"],
             json!(true)
+        );
+        assert_eq!(
+            encoded["frozen_core_wasm_closure_gate_receipt"]["closure_status"],
+            json!("not_closed")
+        );
+        assert_eq!(
+            encoded["frozen_core_wasm_closure_gate_receipt"]["served_publication_allowed"],
+            json!(false)
         );
         assert_eq!(
             encoded["quantization_truth_envelope"]["active_backend_family"],
@@ -8921,6 +8990,26 @@ mod tests {
         assert!(matches!(
             err,
             TassadarCapabilityEnvelopeError::UnpublishableInternalComputeProfileClaim { .. }
+        ));
+    }
+
+    #[test]
+    fn tassadar_capability_envelope_rejects_unpublishable_frozen_core_wasm_closure_gate() {
+        let service = LocalTassadarExecutorService::new()
+            .with_fixture(TassadarExecutorFixture::article_i32_compute_v1());
+        let mut publication = service
+            .capability_publication(Some(TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID))
+            .expect("article capability publication");
+        publication.frozen_core_wasm_closure_gate_report_ref.clear();
+
+        let err = TassadarCapabilityEnvelope::from_executor_capability_publication(
+            &publication,
+            ProviderReadiness::ready("article lane ready"),
+        )
+        .expect_err("provider envelope should reject a missing closure-gate ref");
+        assert!(matches!(
+            err,
+            TassadarCapabilityEnvelopeError::UnpublishableFrozenCoreWasmClosureGate { .. }
         ));
     }
 

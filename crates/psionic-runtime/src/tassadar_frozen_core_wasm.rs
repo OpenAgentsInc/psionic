@@ -3,6 +3,39 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use wasmparser::{Validator, WasmFeatures};
 
+/// Overall closure status for the frozen core-Wasm target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarFrozenCoreWasmClosureGateStatus {
+    /// The declared window is closed at the current claim boundary.
+    Closed,
+    /// The declared window is not closed yet.
+    NotClosed,
+}
+
+/// Row status inside the frozen core-Wasm closure gate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarFrozenCoreWasmClosureGateRowStatus {
+    /// The gate row is satisfied.
+    Green,
+    /// The gate row is not satisfied.
+    Red,
+}
+
+/// One machine-readable row inside the frozen core-Wasm closure gate.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarFrozenCoreWasmClosureGateRow {
+    /// Stable row id.
+    pub row_id: String,
+    /// Human-readable description.
+    pub description: String,
+    /// Green or red row status.
+    pub status: TassadarFrozenCoreWasmClosureGateRowStatus,
+    /// Machine-readable detail.
+    pub detail: String,
+}
+
 /// Typed refusal surface for the frozen core-Wasm validation harness.
 #[derive(Clone, Debug, Error, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]

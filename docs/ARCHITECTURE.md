@@ -722,6 +722,10 @@ The current scope is:
   `fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json`,
   which freezes the text, binary decode, binary encode, validation, and
   reference-execution authorities for the current int-first core-Wasm target
+- the current closure-verdict artifact is
+  `fixtures/tassadar/reports/tassadar_frozen_core_wasm_closure_gate_report.json`,
+  which currently remains `not_closed`; the declared window therefore stays a
+  closure target rather than a closed full core-Wasm claim
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

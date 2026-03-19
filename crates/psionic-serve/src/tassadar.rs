@@ -32,11 +32,13 @@ use psionic_runtime::{
     build_tassadar_execution_evidence_bundle, execute_tassadar_executor_request,
     tassadar_article_class_corpus, tassadar_trace_abi_for_profile_id, tassadar_wasm_profile_for_id,
     TassadarDirectModelWeightExecutionProofReceipt, TassadarExecution,
-    TassadarExecutionEvidenceBundle, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
-    TassadarExecutorExecutionReport, TassadarExecutorSelectionDiagnostic, TassadarInstruction,
-    TassadarProgramArtifact, TassadarRuntimeCapabilityReport, TassadarTraceEvent,
-    TassadarTraceStep, TassadarValidationCase, TASSADAR_ARTICLE_CLASS_BENCHMARK_ENVIRONMENT_REF,
-    TASSADAR_ARTICLE_CLASS_BENCHMARK_REF, TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
+    TassadarExecutionEvidenceBundle, TassadarExecutionRefusal,
+    TassadarExecutorDecodeMode, TassadarExecutorExecutionReport,
+    TassadarExecutorSelectionDiagnostic, TassadarFrozenCoreWasmClosureGateStatus,
+    TassadarInstruction, TassadarProgramArtifact, TassadarRuntimeCapabilityReport,
+    TassadarTraceEvent, TassadarTraceStep, TassadarValidationCase,
+    TASSADAR_ARTICLE_CLASS_BENCHMARK_ENVIRONMENT_REF, TASSADAR_ARTICLE_CLASS_BENCHMARK_REF,
+    TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
 };
 use psionic_train::{TassadarExecutorPromotionGateReport, TassadarExecutorSequenceFitReport};
 use serde::{Deserialize, Serialize};
@@ -96,6 +98,14 @@ pub struct TassadarExecutorCapabilityPublication {
     /// Broad internal-compute profile publication and current route selection.
     pub broad_internal_compute_profile_publication:
         crate::TassadarBroadInternalComputeProfilePublication,
+    /// Frozen core-Wasm window declaration report bound to the served lane.
+    pub frozen_core_wasm_window_report_ref: String,
+    /// Frozen core-Wasm closure gate report bound to the served lane.
+    pub frozen_core_wasm_closure_gate_report_ref: String,
+    /// Current closure status for the frozen core-Wasm target.
+    pub frozen_core_wasm_closure_status: TassadarFrozenCoreWasmClosureGateStatus,
+    /// Whether served publication can claim full frozen core-Wasm closure.
+    pub frozen_core_wasm_served_publication_allowed: bool,
     /// Deterministic-import and runtime-support subset promotion gate report bound to the served lane.
     pub subset_profile_promotion_gate_report_ref: String,
     /// Resumable multi-slice promotion report bound to the served lane.
@@ -165,6 +175,12 @@ pub enum TassadarExecutorCapabilityPublicationError {
     /// The broad internal-compute profile publication was not publishable.
     #[error("invalid broad internal-compute profile publication: {detail}")]
     InvalidBroadInternalComputeProfilePublication {
+        /// Machine-readable detail for the failed projection.
+        detail: String,
+    },
+    /// The frozen core-Wasm closure gate was not publishable.
+    #[error("invalid frozen core-Wasm closure gate: {detail}")]
+    InvalidFrozenCoreWasmClosureGate {
         /// Machine-readable detail for the failed projection.
         detail: String,
     },
@@ -535,6 +551,14 @@ impl LocalTassadarExecutorService {
                 detail: format!("invalid effect-safe resume report: {error}"),
             }
         })?;
+        let frozen_core_wasm_closure_gate_report =
+            psionic_eval::build_tassadar_frozen_core_wasm_closure_gate_report().map_err(
+                |error| {
+                    TassadarExecutorCapabilityPublicationError::InvalidFrozenCoreWasmClosureGate {
+                        detail: format!("invalid frozen core-Wasm closure gate report: {error}"),
+                    }
+                },
+            )?;
         Ok(TassadarExecutorCapabilityPublication {
             product_id: String::from(EXECUTOR_TRACE_PRODUCT_ID),
             model_descriptor: fixture.descriptor().clone(),
@@ -556,6 +580,15 @@ impl LocalTassadarExecutorService {
                 psionic_eval::TASSADAR_BROAD_INTERNAL_COMPUTE_ACCEPTANCE_GATE_REPORT_REF,
             ),
             broad_internal_compute_profile_publication,
+            frozen_core_wasm_window_report_ref: String::from(
+                psionic_eval::TASSADAR_FROZEN_CORE_WASM_WINDOW_REPORT_REF,
+            ),
+            frozen_core_wasm_closure_gate_report_ref: String::from(
+                psionic_eval::TASSADAR_FROZEN_CORE_WASM_CLOSURE_GATE_REPORT_REF,
+            ),
+            frozen_core_wasm_closure_status: frozen_core_wasm_closure_gate_report.closure_status,
+            frozen_core_wasm_served_publication_allowed: frozen_core_wasm_closure_gate_report
+                .served_publication_allowed,
             subset_profile_promotion_gate_report_ref: String::from(
                 psionic_eval::TASSADAR_SUBSET_PROFILE_PROMOTION_GATE_REPORT_REF,
             ),
@@ -5592,6 +5625,26 @@ mod tests {
             serde_json::json!(
                 "fixtures/tassadar/reports/tassadar_broad_internal_compute_route_policy_report.json"
             )
+        );
+        assert_eq!(
+            encoded["frozen_core_wasm_window_report_ref"],
+            serde_json::json!(
+                "fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json"
+            )
+        );
+        assert_eq!(
+            encoded["frozen_core_wasm_closure_gate_report_ref"],
+            serde_json::json!(
+                "fixtures/tassadar/reports/tassadar_frozen_core_wasm_closure_gate_report.json"
+            )
+        );
+        assert_eq!(
+            encoded["frozen_core_wasm_closure_status"],
+            serde_json::json!("not_closed")
+        );
+        assert_eq!(
+            encoded["frozen_core_wasm_served_publication_allowed"],
+            serde_json::json!(false)
         );
         assert_eq!(
             encoded["broad_internal_compute_profile_publication"]

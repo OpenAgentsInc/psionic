@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.frozen_core_wasm_closure_gate.report.v1",
+  "frozen_window_report_ref": "fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json",
+  "frozen_window_report_id": "tassadar.frozen_core_wasm_window.report.v1",
+  "frozen_window_id": "tassadar.frozen_core_wasm.window.v1",
+  "conformance_report_ref": "fixtures/tassadar/reports/tassadar_wasm_conformance_report.json",
+  "conformance_report_id": "tassadar.wasm_conformance.report.v1",
+  "trap_exception_report_ref": "fixtures/tassadar/reports/tassadar_trap_exception_report.json",
+  "trap_exception_report_id": "tassadar.trap_exception.report.v1",
+  "current_covered_feature_family_ids": [
+    "globals.mutable",
+    "module.import_export_start",
+    "segments.active_data_and_element"
+  ],
+  "missing_feature_family_ids": [
+    "control.structured_direct_call",
+    "core_types.i32_i64",
+    "memory.bulk_copy_fill",
+    "memory.single_linear_memory",
+    "numeric.sign_extension",
+    "tables.funcref_call_indirect"
+  ],
+  "gate_rows": [
+    {
+      "row_id": "cross_machine_harness_replay",
+      "description": "the closure gate only turns green once the frozen-window harness has its own dedicated cross-machine replay matrix",
+      "status": "red",
+      "detail": "no dedicated frozen-window cross-machine replay matrix is committed yet; broader portability evidence exists elsewhere but is not enough for this gate"
+    },
+    {
+      "row_id": "differential_execution_parity",
+      "description": "the differential execution harness preserves success, trap, and boundary-refusal parity without drift",
+      "status": "green",
+      "detail": "exact_success=8, exact_trap=3, boundary_refusal=1, drift=0"
+    },
+    {
+      "row_id": "official_window_and_harness",
+      "description": "the frozen window and official text/binary/validation/execution harness are declared and packaged",
+      "status": "green",
+      "detail": "window_id=tassadar.frozen_core_wasm.window.v1, admitted_validation_cases=3, refusal_validation_cases=2"
+    },
+    {
+      "row_id": "target_feature_family_coverage",
+      "description": "the closure gate only turns green once every declared frozen-window feature family is explicitly evidenced",
+      "status": "red",
+      "detail": "missing feature families: control.structured_direct_call, core_types.i32_i64, memory.bulk_copy_fill, memory.single_linear_memory, numeric.sign_extension, tables.funcref_call_indirect"
+    },
+    {
+      "row_id": "trap_and_refusal_parity",
+      "description": "the trap and refusal audit preserves explicit non-success parity over the declared bounded cases",
+      "status": "green",
+      "detail": "trap_parity=2, refusal_parity=2, drift=0"
+    }
+  ],
+  "closure_status": "not_closed",
+  "served_publication_allowed": false,
+  "detail": "frozen core-Wasm closure gate `tassadar.frozen_core_wasm_closure_gate.report.v1` is NotClosed; covered_feature_families=3, missing_feature_families=6, served_publication_allowed=false",
+  "report_digest": "e98bbd703bb80c7bff489c01195e0d89277914f28a57b6afad5e99ff1842c44e"
+}

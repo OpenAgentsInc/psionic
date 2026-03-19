@@ -37,6 +37,7 @@ This runbook covers the current repo-owned bounded Wasm flow only:
 - canonical C-to-Wasm compile receipt
 - source-to-Wasm-to-Tassadar compile-pipeline matrix
 - frozen core-Wasm window declaration and official harness
+- frozen core-Wasm semantic parity and closure gate
 - normalized Wasm-module ingress
 - differential Wasm conformance against `wasmi`
 - module-scale Wasm workload suite
@@ -64,6 +65,10 @@ Public claim discipline for this lane is:
   tests and reference authority for the declared window
 - the declared frozen-window artifact for the current target is
   `fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json`
+- the declared closure-verdict artifact for the current target is
+  `fixtures/tassadar/reports/tassadar_frozen_core_wasm_closure_gate_report.json`
+- the current closure verdict is `not_closed`, so the frozen-window declaration
+  must not be read as full core-Wasm closure
 - imports, effects, and host capability policy remain separate embedding
   contracts, not part of the bounded core language claim
 
@@ -669,6 +674,30 @@ Expected outcome:
 - this sets the closure target and official harness only; it does not by itself
   claim full core-Wasm closure
 
+### 6C. Frozen core-Wasm semantic parity and closure gate
+
+```bash
+cargo run -p psionic-eval --example tassadar_frozen_core_wasm_closure_gate_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_frozen_core_wasm_closure_gate_report.json`
+
+Expected outcome:
+
+- one machine-readable closure gate now joins the frozen-window declaration,
+  differential conformance report, and trap-exception report into a single
+  closure verdict
+- `official_window_and_harness`, `differential_execution_parity`, and
+  `trap_and_refusal_parity` should currently be green
+- `target_feature_family_coverage` and `cross_machine_harness_replay` should
+  currently remain red, which is why the honest current verdict is
+  `not_closed`
+- `served_publication_allowed` should currently be `false`
+- this artifact controls interpretation: the frozen-window declaration defines
+  the target, while the closure gate says whether the target is actually closed
+
 ### 7. Differential Wasm conformance
 
 ```bash
@@ -730,6 +759,7 @@ cargo test -p psionic-research article_runtime_closeout -- --nocapture
 cargo test -p psionic-serve executor_service_publishes_rust_only_article_runtime_closeout_surface -- --nocapture
 cargo test -p psionic-eval wasm_module_ingress -- --nocapture
 cargo test -p psionic-eval frozen_core_wasm_window -- --nocapture
+cargo test -p psionic-eval frozen_core_wasm_closure_gate -- --nocapture
 cargo test -p psionic-eval wasm_conformance -- --nocapture
 cargo test -p psionic-eval module_scale_workload_suite -- --nocapture
 cargo test -p psionic-eval trap_exception -- --nocapture
@@ -743,6 +773,9 @@ These checks should keep the committed reports and generated truth aligned.
   toolchain failure, the bounded Wasm lane can still be healthy.
 - If the compile-pipeline matrix loses the exact WAT cases, that is a real
   lowering regression.
+- If the frozen core-Wasm closure gate changes from its current explicit red
+  posture without new supporting evidence, that is a real claim-discipline
+  regression.
 - If the ingress report stops lowering the seeded synthetic module exactly, that
   is a real bounded module-lane regression.
 - If the conformance report loses exact success or trap parity on the supported

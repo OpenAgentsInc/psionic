@@ -84,6 +84,8 @@ mod tassadar_executor_benchmark;
 mod tassadar_executor_eval;
 #[path = "tassadar_executor_hull_benchmark.rs"]
 mod tassadar_executor_hull_benchmark;
+#[path = "tassadar_frozen_core_wasm_closure_gate.rs"]
+mod tassadar_frozen_core_wasm_closure_gate;
 #[path = "tassadar_frozen_core_wasm_window.rs"]
 mod tassadar_frozen_core_wasm_window;
 #[path = "tassadar_generalized_abi.rs"]
@@ -237,6 +239,7 @@ pub use tassadar_executor_baseline_comparison::*;
 pub use tassadar_executor_benchmark::*;
 pub use tassadar_executor_eval::*;
 pub use tassadar_executor_hull_benchmark::*;
+pub use tassadar_frozen_core_wasm_closure_gate::*;
 pub use tassadar_frozen_core_wasm_window::*;
 pub use tassadar_generalized_abi::*;
 pub use tassadar_hungarian_10x10_compiled_executor::*;

@@ -37,6 +37,9 @@ Current honest posture:
   refusal surfaces
 - the current served profile remains
   `tassadar.internal_compute.article_closeout.v1`
+- the frozen core-Wasm lane now has a declared semantic window plus a committed
+  closure gate, and the current closure verdict remains `not_closed` with
+  `served_publication_allowed = false`
 - broader profiles above that remain benchmarked, suppressed, refused, or
   unpromoted unless their explicit gates are green
 
@@ -62,9 +65,9 @@ Current dependency spine:
 
 Issue-state note:
 
-- `TAS-103` through `TAS-113` are already implemented and tracked in
+- `TAS-103` through `TAS-114` are already implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-114` and runs through
+- the current open GitHub backlog begins at `TAS-115` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs
