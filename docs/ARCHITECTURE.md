@@ -1046,6 +1046,15 @@ The current scope is:
   threads publication, relaxed-SIMD non-promotion, and arbitrary-Wasm claim
   leakage; this proves the current widening work still fails closed and is not
   a broader served internal-compute, arbitrary Wasm, or Turing-complete claim
+- the current pre-closeout universality artifacts are
+  `fixtures/tassadar/reports/tassadar_pre_closeout_universality_audit_report.json`,
+  `fixtures/tassadar/reports/tassadar_pre_closeout_universality_claim_boundary_report.json`,
+  and `docs/audits/2026-03-19-tassadar-pre-closeout-universality-audit.md`,
+  which freeze one disclosure-safe bridge between the landed broadness-adjacent
+  surfaces and the still-missing terminal-contract artifacts, explicitly
+  keeping `TCM.v1`, the universality witness construction, the witness suite,
+  the minimal universal-substrate gate, and the final verdict split as pending;
+  this is not a Turing-complete or final universality claim
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

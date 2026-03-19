@@ -89,6 +89,12 @@ Current honest posture:
   arbitrary-Wasm claim leakage; the current audit is clean and publication-safe
   as an audit surface, but it does not widen broad served internal compute,
   arbitrary Wasm, or Turing-complete support
+- the repo now also has one disclosure-safe pre-closeout universality audit,
+  with committed eval and research artifacts that freeze exactly which
+  broadness-adjacent surfaces are already real before the terminal contract and
+  exactly which terminal-contract artifacts are still missing; the current
+  claim status remains suppressed until `TCM.v1`, the witness construction, the
+  witness suite, the minimal gate, and the verdict split all land
 - the repo now also has one research-only shared-memory and threads profile
   with a deterministic scheduler envelope, explicit sandbox boundary truth,
   and typed refusal on host-nondeterministic scheduling plus relaxed
@@ -200,7 +206,7 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-125` through `TAS-146` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-150` and runs through
+- the current open GitHub backlog begins at `TAS-151` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs

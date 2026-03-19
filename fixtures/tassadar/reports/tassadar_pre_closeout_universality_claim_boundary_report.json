@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.pre_closeout_universality_claim_boundary.report.v1",
+  "eval_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.pre_closeout_universality_audit.report.v1",
+    "prerequisite_rows": [
+      {
+        "prerequisite_id": "red_team_boundary_audit",
+        "satisfied": true,
+        "source_refs": [
+          "fixtures/tassadar/reports/tassadar_general_internal_compute_red_team_audit_report.json"
+        ],
+        "note": "the pre-closeout claim boundary is only meaningful if the broader internal-compute lane has already been red-teamed and found to fail closed"
+      },
+      {
+        "prerequisite_id": "effective_unbounded_boundary_is_explicit",
+        "satisfied": true,
+        "source_refs": [
+          "fixtures/tassadar/reports/tassadar_effective_unbounded_compute_claim_report.json"
+        ],
+        "note": "the repo must already distinguish resumable bounded computation from a broader universality claim"
+      },
+      {
+        "prerequisite_id": "frozen_core_wasm_boundary_is_explicit",
+        "satisfied": true,
+        "source_refs": [
+          "fixtures/tassadar/reports/tassadar_full_core_wasm_public_acceptance_gate_report.json"
+        ],
+        "note": "the frozen core-Wasm lane must stay separately gated instead of being over-read as the universality claim"
+      },
+      {
+        "prerequisite_id": "proposal_family_boundary_is_explicit",
+        "satisfied": true,
+        "source_refs": [
+          "fixtures/tassadar/reports/tassadar_proposal_profile_ladder_claim_checker_report.json"
+        ],
+        "note": "post-core proposal families must still be separate named profiles with explicit promotion boundaries"
+      },
+      {
+        "prerequisite_id": "authority_and_economic_bridge_is_named",
+        "satisfied": true,
+        "source_refs": [
+          "fixtures/tassadar/reports/tassadar_broad_general_compute_validator_bridge_report.json"
+        ],
+        "note": "the pre-closeout report only counts broad-compute bridge posture when accepted-outcome-ready and candidate-only lanes remain explicitly distinct"
+      },
+      {
+        "prerequisite_id": "tcm_v1_declared_substrate_model",
+        "satisfied": false,
+        "source_refs": [
+          "docs/ROADMAP_TASSADAR.md"
+        ],
+        "note": "the terminal contract still lacks one declared universal substrate model"
+      },
+      {
+        "prerequisite_id": "reference_universal_machine_encoding",
+        "satisfied": false,
+        "source_refs": [
+          "docs/ROADMAP_TASSADAR.md"
+        ],
+        "note": "the terminal contract still lacks the explicit universal-machine witness encoding"
+      },
+      {
+        "prerequisite_id": "universality_witness_suite",
+        "satisfied": false,
+        "source_refs": [
+          "docs/ROADMAP_TASSADAR.md"
+        ],
+        "note": "the terminal contract still lacks the dedicated universality witness benchmark suite"
+      },
+      {
+        "prerequisite_id": "minimal_universal_substrate_gate",
+        "satisfied": false,
+        "source_refs": [
+          "docs/ROADMAP_TASSADAR.md"
+        ],
+        "note": "the terminal contract still lacks the single green gate over control, memory, continuation, replay, and witness workloads"
+      },
+      {
+        "prerequisite_id": "universality_verdict_split",
+        "satisfied": false,
+        "source_refs": [
+          "docs/ROADMAP_TASSADAR.md"
+        ],
+        "note": "the terminal contract still lacks the theory/operator/served verdict split"
+      }
+    ],
+    "satisfied_prerequisite_ids": [
+      "red_team_boundary_audit",
+      "effective_unbounded_boundary_is_explicit",
+      "frozen_core_wasm_boundary_is_explicit",
+      "proposal_family_boundary_is_explicit",
+      "authority_and_economic_bridge_is_named"
+    ],
+    "missing_prerequisite_ids": [
+      "tcm_v1_declared_substrate_model",
+      "reference_universal_machine_encoding",
+      "universality_witness_suite",
+      "minimal_universal_substrate_gate",
+      "universality_verdict_split"
+    ],
+    "claim_status": "suppressed",
+    "allowed_pre_closeout_statement": "Psionic/Tassadar can now say exactly which disclosure-safe broadness and boundary surfaces are real before the terminal universal-substrate contract starts, but it may not yet claim Turing-complete support or a final universality verdict.",
+    "current_true_scopes": [
+      "bounded named-profile internal computation",
+      "disclosure-safe effective-unbounded claim boundary",
+      "separate frozen core-Wasm public gate",
+      "named proposal-family promotion boundary",
+      "named authority-and-economic bridge for broad internal-compute profiles",
+      "disclosure-safe general internal-compute red-team audit"
+    ],
+    "remaining_terminal_contract_ids": [
+      "tcm_v1_declared_substrate_model",
+      "reference_universal_machine_encoding",
+      "universality_witness_suite",
+      "minimal_universal_substrate_gate",
+      "universality_verdict_split"
+    ],
+    "explicit_non_implications": [
+      "Turing-complete support",
+      "arbitrary Wasm execution",
+      "broad served internal compute"
+    ],
+    "claim_boundary": "this pre-closeout audit freezes the last honest claim boundary before the terminal universal-substrate tranche. It names what is already real, what remains gated, and what still must land before the repo can speak in terminal universality language.",
+    "summary": "Pre-closeout universality audit keeps satisfied_prerequisites=5, missing_terminal_contract_ids=5, claim_status=Suppressed.",
+    "report_digest": "e275a144b33d157cfadb44b28e34dbe36ff06f94b47ab251a985f3203748e9af"
+  },
+  "allowed_statement": "Psionic/Tassadar now has one pre-closeout universality boundary report that names the bounded broadness already landed and the exact terminal-contract artifacts still missing before the repo can speak in Turing-completeness language.",
+  "blocked_by": [
+    "tcm_v1_declared_substrate_model",
+    "reference_universal_machine_encoding",
+    "universality_witness_suite",
+    "minimal_universal_substrate_gate",
+    "universality_verdict_split"
+  ],
+  "current_true_scopes": [
+    "bounded named-profile internal computation",
+    "disclosure-safe effective-unbounded claim boundary",
+    "separate frozen core-Wasm public gate",
+    "named proposal-family promotion boundary",
+    "named authority-and-economic bridge for broad internal-compute profiles",
+    "disclosure-safe general internal-compute red-team audit"
+  ],
+  "explicit_non_implications": [
+    "Turing-complete support",
+    "arbitrary Wasm execution",
+    "broad served internal compute"
+  ],
+  "claim_boundary": "this summary is disclosure-safe. It keeps pre-closeout broadness, frozen-window Wasm, proposal-family widening, authority bridges, and the terminal universal-substrate contract as distinct claim classes.",
+  "summary": "Pre-closeout universality claim-boundary report keeps blocked_by=5, current_true_scopes=6, claim_status=Suppressed.",
+  "report_digest": "7f943b29f69991b574ac2df3f238a5c118da54d7f5c433a1151c25c857a5065e"
+}
