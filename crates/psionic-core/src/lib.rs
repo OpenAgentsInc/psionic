@@ -1975,6 +1975,16 @@ pub enum BackendExtensionOp {
         /// Epsilon added before square root for numeric stability.
         epsilon: StableF32,
     },
+    /// Input-gradient rule for RMSNorm over the last dimension.
+    RmsNormInputBackward {
+        /// Epsilon added before square root for numeric stability.
+        epsilon: StableF32,
+    },
+    /// Weight-gradient rule for RMSNorm over the last dimension.
+    RmsNormWeightBackward {
+        /// Epsilon added before square root for numeric stability.
+        epsilon: StableF32,
+    },
     /// Layer normalization over the last dimension.
     LayerNorm {
         /// Epsilon added before square root for numeric stability.
@@ -2004,7 +2014,9 @@ impl BackendExtensionOp {
     #[must_use]
     pub const fn kind(&self) -> BackendExtensionKind {
         match self {
-            Self::RmsNorm { .. } => BackendExtensionKind::RmsNorm,
+            Self::RmsNorm { .. }
+            | Self::RmsNormInputBackward { .. }
+            | Self::RmsNormWeightBackward { .. } => BackendExtensionKind::RmsNorm,
             Self::LayerNorm { .. } => BackendExtensionKind::LayerNorm,
             Self::RotaryEmbedding { .. } => BackendExtensionKind::RotaryEmbedding,
             Self::ScaledDotProductAttention { .. } => {
@@ -2017,7 +2029,15 @@ impl BackendExtensionOp {
     /// Returns a stable extension label.
     #[must_use]
     pub const fn label(&self) -> &'static str {
-        self.kind().label()
+        match self {
+            Self::RmsNorm { .. } => "rms_norm",
+            Self::RmsNormInputBackward { .. } => "rms_norm_input_backward",
+            Self::RmsNormWeightBackward { .. } => "rms_norm_weight_backward",
+            Self::LayerNorm { .. } => "layer_norm",
+            Self::RotaryEmbedding { .. } => "rotary_embedding",
+            Self::ScaledDotProductAttention { .. } => "scaled_dot_product_attention",
+            Self::QuantizedMatmul { .. } => "quantized_matmul",
+        }
     }
 }
 
@@ -2725,13 +2745,13 @@ mod tests {
     #![allow(clippy::expect_used)]
 
     use super::{
-        AutocastNumericsDiagnostic, AutocastOperationFamily, AutocastPolicyStatus,
-        AutocastPrecisionPolicy, DType, DTypeBackendFamily, DTypeCastKind, DTypeClass, Device,
-        DeviceKind, ExtendedDType, ExtendedDTypeClass, Layout, PsionicRefusal, PsionicRefusalCode,
-        PsionicRefusalScope, QuantizationCalibrationMode, QuantizationCapabilityStage,
-        QuantizationConfig, QuantizationGranularity, QuantizationMode, Shape, TensorSpec,
-        ViewSemantics, builtin_advanced_dtype_semantics_report,
-        builtin_autocast_policy_matrix_report, builtin_quantization_capability_semantics_report,
+        builtin_advanced_dtype_semantics_report, builtin_autocast_policy_matrix_report,
+        builtin_quantization_capability_semantics_report, AutocastNumericsDiagnostic,
+        AutocastOperationFamily, AutocastPolicyStatus, AutocastPrecisionPolicy, DType,
+        DTypeBackendFamily, DTypeCastKind, DTypeClass, Device, DeviceKind, ExtendedDType,
+        ExtendedDTypeClass, Layout, PsionicRefusal, PsionicRefusalCode, PsionicRefusalScope,
+        QuantizationCalibrationMode, QuantizationCapabilityStage, QuantizationConfig,
+        QuantizationGranularity, QuantizationMode, Shape, TensorSpec, ViewSemantics,
     };
 
     #[test]
@@ -2913,12 +2933,10 @@ mod tests {
         let report = builtin_advanced_dtype_semantics_report();
         assert_eq!(report.schema_version, 1);
         assert_eq!(report.current_scope_window, "psionic_advanced_dtype_v1");
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("report_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("report_digest=")));
 
         assert_eq!(ExtendedDType::Bool.class(), ExtendedDTypeClass::Boolean);
         assert_eq!(
@@ -3000,12 +3018,10 @@ mod tests {
         let report = builtin_autocast_policy_matrix_report();
         assert_eq!(report.schema_version, 1);
         assert_eq!(report.current_scope_window, "psionic_autocast_v1");
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("report_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("report_digest=")));
 
         let bf16_matmul = AutocastPrecisionPolicy::new(
             DTypeBackendFamily::CurrentRuntimeBackends,
@@ -3016,11 +3032,9 @@ mod tests {
         assert_eq!(bf16_matmul.status, AutocastPolicyStatus::Applied);
         assert_eq!(bf16_matmul.compute_dtype, Some(ExtendedDType::BF16));
         assert_eq!(bf16_matmul.accumulator_dtype, Some(ExtendedDType::F32));
-        assert!(
-            bf16_matmul
-                .diagnostics
-                .contains(&AutocastNumericsDiagnostic::Fp32Accumulator)
-        );
+        assert!(bf16_matmul
+            .diagnostics
+            .contains(&AutocastNumericsDiagnostic::Fp32Accumulator));
 
         let preserved_reduction = AutocastPrecisionPolicy::new(
             DTypeBackendFamily::CurrentRuntimeBackends,
@@ -3030,11 +3044,9 @@ mod tests {
         .expect("missing seeded preserved reduction rule");
         assert_eq!(preserved_reduction.status, AutocastPolicyStatus::Preserved);
         assert_eq!(preserved_reduction.compute_dtype, Some(ExtendedDType::F32));
-        assert!(
-            preserved_reduction
-                .diagnostics
-                .contains(&AutocastNumericsDiagnostic::PreservedForStability)
-        );
+        assert!(preserved_reduction
+            .diagnostics
+            .contains(&AutocastNumericsDiagnostic::PreservedForStability));
 
         let experimental_float8 = AutocastPrecisionPolicy::new(
             DTypeBackendFamily::MetaExecution,
@@ -3043,11 +3055,9 @@ mod tests {
         .resolve(AutocastOperationFamily::Matmul, ExtendedDType::F32)
         .expect("missing seeded meta float8 rule");
         assert_eq!(experimental_float8.status, AutocastPolicyStatus::Applied);
-        assert!(
-            experimental_float8
-                .diagnostics
-                .contains(&AutocastNumericsDiagnostic::ExperimentalLowPrecision)
-        );
+        assert!(experimental_float8
+            .diagnostics
+            .contains(&AutocastNumericsDiagnostic::ExperimentalLowPrecision));
 
         let complex_refusal = AutocastPrecisionPolicy::new(
             DTypeBackendFamily::CurrentRuntimeBackends,
@@ -3076,12 +3086,10 @@ mod tests {
         let report = builtin_quantization_capability_semantics_report();
         assert_eq!(report.schema_version, 1);
         assert_eq!(report.current_scope_window, "psionic_quantization_v1");
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("report_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("report_digest=")));
 
         let ptq_config = QuantizationConfig::new(
             QuantizationMode::Int8Symmetric,
@@ -3090,15 +3098,13 @@ mod tests {
             QuantizationCalibrationMode::MinMax,
             false,
         );
-        assert!(
-            report
-                .validate_support(
-                    QuantizationCapabilityStage::Ptq,
-                    DTypeBackendFamily::CurrentRuntimeBackends,
-                    &ptq_config
-                )
-                .is_ok()
-        );
+        assert!(report
+            .validate_support(
+                QuantizationCapabilityStage::Ptq,
+                DTypeBackendFamily::CurrentRuntimeBackends,
+                &ptq_config
+            )
+            .is_ok());
 
         let runtime_config = QuantizationConfig::new(
             QuantizationMode::GgmlQ4_0,
@@ -3107,15 +3113,13 @@ mod tests {
             QuantizationCalibrationMode::None,
             false,
         );
-        assert!(
-            report
-                .validate_support(
-                    QuantizationCapabilityStage::RuntimeExecution,
-                    DTypeBackendFamily::CurrentRuntimeBackends,
-                    &runtime_config
-                )
-                .is_ok()
-        );
+        assert!(report
+            .validate_support(
+                QuantizationCapabilityStage::RuntimeExecution,
+                DTypeBackendFamily::CurrentRuntimeBackends,
+                &runtime_config
+            )
+            .is_ok());
 
         let export_config = QuantizationConfig::new(
             QuantizationMode::Int8Symmetric,
@@ -3124,15 +3128,13 @@ mod tests {
             QuantizationCalibrationMode::MinMax,
             false,
         );
-        assert!(
-            report
-                .validate_support(
-                    QuantizationCapabilityStage::ExportAware,
-                    DTypeBackendFamily::MetaExecution,
-                    &export_config
-                )
-                .is_ok()
-        );
+        assert!(report
+            .validate_support(
+                QuantizationCapabilityStage::ExportAware,
+                DTypeBackendFamily::MetaExecution,
+                &export_config
+            )
+            .is_ok());
 
         let refused_qat = report
             .validate_support(

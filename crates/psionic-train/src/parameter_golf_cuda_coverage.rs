@@ -195,10 +195,10 @@ pub fn builtin_parameter_golf_cuda_training_capability_report(
                     "the compact decoder baseline requires RMSNorm in the train-time forward or backward path",
                 ),
                 current_surface: String::from(
-                    "the public CUDA execution backend now declares and executes backend-specialized dense f32 RMSNorm forward plans, and the Parameter Golf model family plus CPU reference lane own the broader RMSNorm semantics, but the backward and full train-path contracts are still missing on the public CUDA lane",
+                    "the public CUDA execution backend now declares and executes backend-specialized dense f32 RMSNorm forward plans, and psionic-ir now owns bounded dense f32 reference evaluation plus reverse-mode support for RMSNorm train-visible graphs, but the public CUDA backward execution contract is still missing on the train path",
                 ),
                 boundary_note: String::from(
-                    "Forward RMSNorm is now real on the public CUDA lane, but that is still not backward or full train-time RMSNorm closure.",
+                    "RMSNorm train-visible graph semantics are now real, but public CUDA backward execution is still missing on the train path.",
                 ),
             },
             ParameterGolfCudaTrainingCoverageCase {

@@ -4,8 +4,8 @@ use std::{
 };
 
 use psionic_core::{
-    DType, Device, PsionicRefusal, PsionicRefusalCode, PsionicRefusalScope, Shape, Tensor,
-    TensorData, TensorId,
+    BackendExtensionOp, DType, Device, PsionicRefusal, PsionicRefusalCode, PsionicRefusalScope,
+    Shape, Tensor, TensorData, TensorId,
 };
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
@@ -149,8 +149,11 @@ pub const fn gradient_support_for_op(op: &OpKind) -> AutodiffGradientSupport {
         OpKind::Cast { .. } => AutodiffGradientSupport::Unsupported {
             reason: AutodiffUnsupportedGradientReason::CastFamily,
         },
-        OpKind::BackendExtension { .. } => AutodiffGradientSupport::Unsupported {
-            reason: AutodiffUnsupportedGradientReason::BackendExtensionFamily,
+        OpKind::BackendExtension { op } => match op {
+            BackendExtensionOp::RmsNorm { .. } => AutodiffGradientSupport::Implemented,
+            _ => AutodiffGradientSupport::Unsupported {
+                reason: AutodiffUnsupportedGradientReason::BackendExtensionFamily,
+            },
         },
     }
 }
@@ -2206,9 +2209,58 @@ impl AutodiffGraph {
                         )?;
                     }
                 }
-                OpKind::BackendExtension { .. } => unreachable!(
-                    "backend extensions should have been rejected by the autodiff support matrix"
-                ),
+                OpKind::BackendExtension { op } => match op {
+                    BackendExtensionOp::RmsNorm { epsilon } => {
+                        let input_id = node.inputs()[0];
+                        let weight_id = node.inputs()[1];
+                        let input = primal_placeholder(
+                            &mut backward_builder,
+                            &mut primal_bindings,
+                            &self.graph,
+                            input_id,
+                        )?;
+                        if self.requires_grad(input_id) {
+                            let weight = primal_placeholder(
+                                &mut backward_builder,
+                                &mut primal_bindings,
+                                &self.graph,
+                                weight_id,
+                            )?;
+                            let contribution = backward_builder
+                                .rms_norm_input_backward(
+                                    &input,
+                                    &weight,
+                                    &current_gradient,
+                                    epsilon.to_f32(),
+                                )
+                                .map_err(map_graph_error)?;
+                            accumulate_gradient(
+                                &mut backward_builder,
+                                &mut gradients,
+                                input_id,
+                                contribution,
+                            )?;
+                        }
+                        if self.requires_grad(weight_id) {
+                            let contribution = backward_builder
+                                .rms_norm_weight_backward(
+                                    &input,
+                                    &current_gradient,
+                                    epsilon.to_f32(),
+                                )
+                                .map_err(map_graph_error)?;
+                            accumulate_gradient(
+                                &mut backward_builder,
+                                &mut gradients,
+                                weight_id,
+                                contribution,
+                            )?;
+                        }
+                    }
+                    _ => unreachable!(
+                        "unsupported backend extensions should have been rejected by the autodiff support matrix"
+                    ),
+                },
             }
         }
 
@@ -3730,11 +3782,8 @@ fn evaluate_graph_retaining(
                     *axis,
                 ))
             }
-            OpKind::BackendExtension { .. } => {
-                return Err(ReferenceEvaluationError::UnsupportedOp {
-                    tensor_id: node.tensor().id(),
-                    op: String::from(node.op().label()),
-                });
+            OpKind::BackendExtension { op } => {
+                evaluate_backend_extension_reference(graph, node, &values, op)?
             }
         };
         validate_output_length(node.tensor(), &value)?;
@@ -3943,17 +3992,69 @@ pub fn evaluate_graph(
                     *axis,
                 ))
             }
-            OpKind::BackendExtension { .. } => {
-                return Err(ReferenceEvaluationError::UnsupportedOp {
-                    tensor_id: node.tensor().id(),
-                    op: String::from(node.op().label()),
-                });
+            OpKind::BackendExtension { op } => {
+                evaluate_backend_extension_reference(graph, node, &values, op)?
             }
         };
         validate_output_length(node.tensor(), &value)?;
         values.insert(node.tensor().id(), value);
     }
     Ok(values)
+}
+
+fn evaluate_backend_extension_reference(
+    graph: &Graph,
+    node: &crate::Node,
+    values: &BTreeMap<TensorId, TensorData>,
+    op: &BackendExtensionOp,
+) -> Result<TensorData, ReferenceEvaluationError> {
+    match op {
+        BackendExtensionOp::RmsNorm { epsilon } => {
+            let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let weight = resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            Ok(TensorData::F32(rms_norm_forward_values(
+                input,
+                weight,
+                epsilon.to_f32(),
+            )))
+        }
+        BackendExtensionOp::RmsNormInputBackward { epsilon } => {
+            let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let weight = resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            let grad_output =
+                resolve_dense_input(graph, values, node.inputs()[2], node.op().label())?;
+            Ok(TensorData::F32(rms_norm_input_backward_values(
+                input,
+                weight,
+                grad_output,
+                epsilon.to_f32(),
+            )))
+        }
+        BackendExtensionOp::RmsNormWeightBackward { epsilon } => {
+            let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let grad_output =
+                resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            let Some(&last_dim) = graph
+                .node(node.inputs()[0])
+                .and_then(|input_node| input_node.tensor().spec().shape().dims().last())
+            else {
+                return Err(ReferenceEvaluationError::UnsupportedOp {
+                    tensor_id: node.tensor().id(),
+                    op: String::from(node.op().label()),
+                });
+            };
+            Ok(TensorData::F32(rms_norm_weight_backward_values(
+                input,
+                grad_output,
+                last_dim,
+                epsilon.to_f32(),
+            )))
+        }
+        _ => Err(ReferenceEvaluationError::UnsupportedOp {
+            tensor_id: node.tensor().id(),
+            op: String::from(node.op().label()),
+        }),
+    }
 }
 
 fn graph_input_use_counts(graph: &Graph) -> BTreeMap<TensorId, usize> {
@@ -4356,6 +4457,87 @@ fn reduce_sum_values(values: &[f32], input_shape: &Shape, axis: Option<usize>) -
     }
 }
 
+fn rms_norm_forward_values(input: &[f32], weight: &[f32], epsilon: f32) -> Vec<f32> {
+    if weight.is_empty() {
+        return Vec::new();
+    }
+    let last_dim = weight.len();
+    let mut output = vec![0.0_f32; input.len()];
+    for (src_row, dst_row) in input
+        .chunks_exact(last_dim)
+        .zip(output.chunks_exact_mut(last_dim))
+    {
+        let mean_square = src_row.iter().map(|value| value * value).sum::<f32>() / last_dim as f32;
+        let inv = (mean_square + epsilon).sqrt().recip();
+        for ((dst, value), scale) in dst_row.iter_mut().zip(src_row.iter()).zip(weight.iter()) {
+            *dst = *value * inv * *scale;
+        }
+    }
+    output
+}
+
+fn rms_norm_input_backward_values(
+    input: &[f32],
+    weight: &[f32],
+    grad_output: &[f32],
+    epsilon: f32,
+) -> Vec<f32> {
+    if weight.is_empty() {
+        return vec![0.0_f32; input.len()];
+    }
+    let last_dim = weight.len();
+    let mut output = vec![0.0_f32; input.len()];
+    for ((src_row, grad_row), dst_row) in input
+        .chunks_exact(last_dim)
+        .zip(grad_output.chunks_exact(last_dim))
+        .zip(output.chunks_exact_mut(last_dim))
+    {
+        let mean_square = src_row.iter().map(|value| value * value).sum::<f32>() / last_dim as f32;
+        let inv = (mean_square + epsilon).sqrt().recip();
+        let inv_cubed = inv * inv * inv;
+        let weighted_dot = src_row
+            .iter()
+            .zip(weight.iter())
+            .zip(grad_row.iter())
+            .map(|((value, scale), grad)| value * scale * grad)
+            .sum::<f32>();
+        for (((dst, value), scale), grad) in dst_row
+            .iter_mut()
+            .zip(src_row.iter())
+            .zip(weight.iter())
+            .zip(grad_row.iter())
+        {
+            *dst = (grad * scale * inv) - (value * inv_cubed * weighted_dot / last_dim as f32);
+        }
+    }
+    output
+}
+
+fn rms_norm_weight_backward_values(
+    input: &[f32],
+    grad_output: &[f32],
+    last_dim: usize,
+    epsilon: f32,
+) -> Vec<f32> {
+    if last_dim == 0 {
+        return Vec::new();
+    }
+    let mut output = vec![0.0_f32; last_dim];
+    for (src_row, grad_row) in input
+        .chunks_exact(last_dim)
+        .zip(grad_output.chunks_exact(last_dim))
+    {
+        let mean_square = src_row.iter().map(|value| value * value).sum::<f32>() / last_dim as f32;
+        let inv = (mean_square + epsilon).sqrt().recip();
+        for ((accumulated, value), grad) in
+            output.iter_mut().zip(src_row.iter()).zip(grad_row.iter())
+        {
+            *accumulated += grad * value * inv;
+        }
+    }
+    output
+}
+
 fn unravel_index(mut index: usize, dims: &[usize]) -> Vec<usize> {
     if dims.is_empty() {
         return Vec::new();
@@ -4391,13 +4573,13 @@ mod tests {
     use psionic_core::{DType, Device, PsionicRefusalCode, PsionicRefusalScope, Shape, TensorData};
 
     use crate::{
-        AutodiffContext, AutodiffError, AutodiffGradientSupport, AutodiffGraphBuilder,
-        AutodiffUnsupportedGradientReason, CheckpointTransformError, CustomVjpInvocation,
-        CustomVjpRule, CustomVjpTransformError, ForwardModeTransformError,
+        checkpoint, custom_vjp, evaluate_graph, grad, gradient_support_for_op, jvp, value_and_grad,
+        vjp, vmap, vmap_support_for_op, AutodiffContext, AutodiffError, AutodiffGradientSupport,
+        AutodiffGraphBuilder, AutodiffUnsupportedGradientReason, CheckpointTransformError,
+        CustomVjpInvocation, CustomVjpRule, CustomVjpTransformError, ForwardModeTransformError,
         ReverseModeTransformError, TensorId, TransformHookLookupError,
         TransformHookRegistrationError, TransformHookRegistry, VmapInputBinding, VmapSupport,
-        VmapTransformError, VmapUnsupportedReason, checkpoint, custom_vjp, grad,
-        gradient_support_for_op, jvp, value_and_grad, vjp, vmap, vmap_support_for_op,
+        VmapTransformError, VmapUnsupportedReason,
     };
 
     struct ScalingCustomVjpRule {
@@ -4472,8 +4654,8 @@ mod tests {
     }
 
     #[test]
-    fn reverse_mode_autodiff_accumulates_shared_paths_and_honors_detach()
-    -> Result<(), Box<dyn Error>> {
+    fn reverse_mode_autodiff_accumulates_shared_paths_and_honors_detach(
+    ) -> Result<(), Box<dyn Error>> {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let x = builder.input("x", Shape::new(vec![2]), DType::F32, true);
@@ -4525,12 +4707,135 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_gradient_ops_refuse_through_typed_error() -> Result<(), Box<dyn Error>> {
+    fn reference_evaluation_executes_rms_norm_backend_extension() -> Result<(), Box<dyn Error>> {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let input = builder.input("x", Shape::new(vec![1, 2]), DType::F32, true);
         let weight = builder.input("weight", Shape::new(vec![2]), DType::F32, true);
         let normalized = builder.rms_norm(&input, &weight, 1e-5)?;
+        let graph = builder.finish(vec![normalized.clone()]);
+
+        let inputs = BTreeMap::from([
+            (input.id(), TensorData::F32(vec![3.0, 4.0])),
+            (weight.id(), TensorData::F32(vec![1.5, 0.5])),
+        ]);
+        let values = evaluate_graph(graph.graph(), &inputs)?;
+        let output = dense_tensor(values.get(&normalized.id()).expect("forward output"));
+        let inv = (12.5_f32 + 1e-5).sqrt().recip();
+        assert_close_slice(&output, &[3.0 * 1.5 * inv, 4.0 * 0.5 * inv], 1e-5);
+        Ok(())
+    }
+
+    #[test]
+    fn reverse_mode_autodiff_materializes_rms_norm_gradients_against_finite_difference(
+    ) -> Result<(), Box<dyn Error>> {
+        let epsilon = 1e-5_f32;
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let input = builder.input("x", Shape::new(vec![2, 3]), DType::F32, true);
+        let weight = builder.input("weight", Shape::new(vec![3]), DType::F32, true);
+        let normalized = builder.rms_norm(&input, &weight, epsilon)?;
+        let scale = builder.constant_f32(
+            Shape::new(vec![2, 3]),
+            vec![0.5, -1.0, 0.25, 1.5, -0.75, 0.8],
+        )?;
+        let scaled = builder.mul(&normalized, &scale)?;
+        let loss = builder.reduce_sum(&scaled);
+        let graph = builder.finish(vec![loss.clone()]);
+
+        let backward_plan = graph.backward_plan(loss.id())?;
+        assert!(backward_plan.gradient_for(input.id()).is_some());
+        assert!(backward_plan.gradient_for(weight.id()).is_some());
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                crate::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::RmsNormInputBackward { .. }
+                }
+            )));
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                crate::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::RmsNormWeightBackward { .. }
+                }
+            )));
+
+        let input_values = vec![0.3_f32, -0.8, 1.1, -1.0, 0.5, 0.25];
+        let weight_values = vec![1.2_f32, -0.7, 0.9];
+        let inputs = BTreeMap::from([
+            (input.id(), TensorData::F32(input_values.clone())),
+            (weight.id(), TensorData::F32(weight_values.clone())),
+        ]);
+        let result = graph.backward_materialized(loss.id(), &inputs)?;
+        let analytical_input = dense_gradient(&result, input.id());
+        let analytical_weight = dense_gradient(&result, weight.id());
+
+        let delta = 1e-3_f32;
+        let mut finite_input = vec![0.0_f32; input_values.len()];
+        for index in 0..input_values.len() {
+            let mut plus = input_values.clone();
+            plus[index] += delta;
+            let mut minus = input_values.clone();
+            minus[index] -= delta;
+            finite_input[index] = (scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (input.id(), TensorData::F32(plus)),
+                    (weight.id(), TensorData::F32(weight_values.clone())),
+                ]),
+            )? - scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (input.id(), TensorData::F32(minus)),
+                    (weight.id(), TensorData::F32(weight_values.clone())),
+                ]),
+            )?) / (2.0 * delta);
+        }
+        let mut finite_weight = vec![0.0_f32; weight_values.len()];
+        for index in 0..weight_values.len() {
+            let mut plus = weight_values.clone();
+            plus[index] += delta;
+            let mut minus = weight_values.clone();
+            minus[index] -= delta;
+            finite_weight[index] = (scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (input.id(), TensorData::F32(input_values.clone())),
+                    (weight.id(), TensorData::F32(plus)),
+                ]),
+            )? - scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (input.id(), TensorData::F32(input_values.clone())),
+                    (weight.id(), TensorData::F32(minus)),
+                ]),
+            )?) / (2.0 * delta);
+        }
+
+        assert_close_slice(&analytical_input, &finite_input, 2e-3);
+        assert_close_slice(&analytical_weight, &finite_weight, 2e-3);
+        Ok(())
+    }
+
+    #[test]
+    fn unsupported_gradient_ops_refuse_through_typed_error() -> Result<(), Box<dyn Error>> {
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let input = builder.input("x", Shape::new(vec![1, 2]), DType::F32, true);
+        let weight = builder.input("weight", Shape::new(vec![2]), DType::F32, true);
+        let bias = builder.input("bias", Shape::new(vec![2]), DType::F32, true);
+        let normalized = builder.layer_norm(&input, &weight, &bias, 1e-5)?;
         let loss = builder.reduce_sum(&normalized);
         let graph = builder.finish(vec![loss.clone()]);
 
@@ -4538,7 +4843,7 @@ mod tests {
             graph.backward_plan(loss.id()),
             Err(AutodiffError::UnsupportedGradientOp {
                 tensor_id: normalized.id(),
-                op: String::from("rms_norm"),
+                op: String::from("layer_norm"),
             })
         );
         Ok(())
@@ -4548,7 +4853,7 @@ mod tests {
     fn autodiff_refusal_taxonomy_maps_unsupported_gradient_family() {
         let refusal = AutodiffError::UnsupportedGradientOp {
             tensor_id: TensorId(7),
-            op: String::from("rms_norm"),
+            op: String::from("layer_norm"),
         }
         .refusal();
         assert!(refusal.is_some());
@@ -4561,7 +4866,7 @@ mod tests {
     }
 
     #[test]
-    fn autodiff_support_matrix_marks_primitives_and_backend_extensions_explicitly() {
+    fn autodiff_support_matrix_marks_primitives_rms_norm_and_other_extensions_explicitly() {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let input = builder.input("x", Shape::new(vec![2, 2]), DType::F32, true);
@@ -4604,8 +4909,38 @@ mod tests {
         };
         assert_eq!(
             gradient_support_for_op(node.op()),
+            AutodiffGradientSupport::Implemented
+        );
+
+        let mut unsupported_builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let unsupported_input =
+            unsupported_builder.input("x", Shape::new(vec![1, 2]), DType::F32, true);
+        let unsupported_weight =
+            unsupported_builder.input("weight", Shape::new(vec![2]), DType::F32, true);
+        let unsupported_bias =
+            unsupported_builder.input("bias", Shape::new(vec![2]), DType::F32, true);
+        let layer_norm = unsupported_builder
+            .layer_norm(
+                &unsupported_input,
+                &unsupported_weight,
+                &unsupported_bias,
+                1e-5,
+            )
+            .expect("layer_norm");
+        let unsupported_graph = unsupported_builder.finish(vec![layer_norm]);
+        let Some(node) = unsupported_graph
+            .graph()
+            .nodes()
+            .iter()
+            .find(|node| matches!(node.op(), crate::OpKind::BackendExtension { .. }))
+        else {
+            panic!("backend extension node should exist");
+        };
+        assert_eq!(
+            gradient_support_for_op(node.op()),
             AutodiffGradientSupport::Unsupported {
-                reason: AutodiffUnsupportedGradientReason::BackendExtensionFamily
+                reason: AutodiffUnsupportedGradientReason::BackendExtensionFamily,
             }
         );
     }
@@ -4664,8 +4999,8 @@ mod tests {
     }
 
     #[test]
-    fn reverse_mode_autodiff_covers_select_concat_and_reshape_primitives()
-    -> Result<(), Box<dyn Error>> {
+    fn reverse_mode_autodiff_covers_select_concat_and_reshape_primitives(
+    ) -> Result<(), Box<dyn Error>> {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let x = builder.input("x", Shape::new(vec![2, 2]), DType::F32, true);
@@ -4795,8 +5130,8 @@ mod tests {
     }
 
     #[test]
-    fn public_reverse_mode_transforms_expose_grad_value_and_grad_and_vjp()
-    -> Result<(), Box<dyn Error>> {
+    fn public_reverse_mode_transforms_expose_grad_value_and_grad_and_vjp(
+    ) -> Result<(), Box<dyn Error>> {
         let mut grad_builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let x = grad_builder.input("x", Shape::new(vec![2]), DType::F32, true);
@@ -4855,8 +5190,8 @@ mod tests {
     }
 
     #[test]
-    fn public_checkpoint_transform_replays_primal_bindings_and_materializes_gradients()
-    -> Result<(), Box<dyn Error>> {
+    fn public_checkpoint_transform_replays_primal_bindings_and_materializes_gradients(
+    ) -> Result<(), Box<dyn Error>> {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let x = builder.input("x", Shape::new(vec![2]), DType::F32, true);
@@ -4978,8 +5313,8 @@ mod tests {
     }
 
     #[test]
-    fn custom_vjp_registry_and_transform_refuse_missing_and_duplicate_rules()
-    -> Result<(), Box<dyn Error>> {
+    fn custom_vjp_registry_and_transform_refuse_missing_and_duplicate_rules(
+    ) -> Result<(), Box<dyn Error>> {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let x = builder.input("x", Shape::new(vec![2]), DType::F32, true);
@@ -5035,8 +5370,8 @@ mod tests {
     }
 
     #[test]
-    fn public_reverse_mode_transforms_refuse_invalid_targets_and_zero_disconnected_paths()
-    -> Result<(), Box<dyn Error>> {
+    fn public_reverse_mode_transforms_refuse_invalid_targets_and_zero_disconnected_paths(
+    ) -> Result<(), Box<dyn Error>> {
         let mut invalid_builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let tracked = invalid_builder.input("tracked", Shape::new(vec![2]), DType::F32, true);
@@ -5201,8 +5536,8 @@ mod tests {
     }
 
     #[test]
-    fn public_vmap_transform_refuses_unsupported_ops_and_bad_batch_inputs()
-    -> Result<(), Box<dyn Error>> {
+    fn public_vmap_transform_refuses_unsupported_ops_and_bad_batch_inputs(
+    ) -> Result<(), Box<dyn Error>> {
         let mut cast_builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let cast_input = cast_builder.input("x", Shape::new(vec![2]), DType::F32, true);
@@ -5290,10 +5625,39 @@ mod tests {
         dense_tensor(gradient)
     }
 
+    fn scalar_loss(
+        graph: &crate::Graph,
+        output: TensorId,
+        inputs: BTreeMap<TensorId, TensorData>,
+    ) -> Result<f32, Box<dyn Error>> {
+        let values = evaluate_graph(graph, &inputs)?;
+        let TensorData::F32(output_values) = values
+            .get(&output)
+            .cloned()
+            .expect("scalar output should be present")
+        else {
+            panic!("expected dense f32 scalar output");
+        };
+        Ok(*output_values
+            .first()
+            .expect("scalar output should have one value"))
+    }
+
     fn dense_tensor(data: &TensorData) -> Vec<f32> {
         let TensorData::F32(values) = data else {
             panic!("expected dense f32 tensor");
         };
         values.clone()
+    }
+
+    fn assert_close_slice(actual: &[f32], expected: &[f32], tolerance: f32) {
+        assert_eq!(actual.len(), expected.len(), "length mismatch");
+        for (index, (actual, expected)) in actual.iter().zip(expected.iter()).enumerate() {
+            let delta = (actual - expected).abs();
+            assert!(
+                delta <= tolerance,
+                "value mismatch at index {index}: actual={actual} expected={expected} delta={delta} tolerance={tolerance}"
+            );
+        }
     }
 }

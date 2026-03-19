@@ -10,8 +10,8 @@ mod tassadar_internal_component_abi;
 mod tassadar_locality_scratchpad;
 mod tassadar_mixed_numeric_ladder;
 mod tassadar_mixed_trajectory;
-mod tassadar_multi_memory_profile;
 mod tassadar_module_manifest;
+mod tassadar_multi_memory_profile;
 mod tassadar_numeric_encoding;
 mod tassadar_scratchpad;
 mod tassadar_sparse_rule;
@@ -40,8 +40,8 @@ pub use tassadar_internal_component_abi::*;
 pub use tassadar_locality_scratchpad::*;
 pub use tassadar_mixed_numeric_ladder::*;
 pub use tassadar_mixed_trajectory::*;
-pub use tassadar_multi_memory_profile::*;
 pub use tassadar_module_manifest::*;
+pub use tassadar_multi_memory_profile::*;
 pub use tassadar_numeric_encoding::*;
 pub use tassadar_scratchpad::*;
 pub use tassadar_sparse_rule::*;
@@ -3848,6 +3848,18 @@ const BUILTIN_OPERATOR_SCHEMAS: &[OperatorSchema] = &[
         OperatorMetaExecutionKind::BuiltinInference,
     ),
     OperatorSchema::new(
+        "rms_norm_input_backward",
+        OperatorArity::Fixed(3),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
+        "rms_norm_weight_backward",
+        OperatorArity::Fixed(2),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
         "layer_norm",
         OperatorArity::Fixed(3),
         OperatorImplementationKind::BackendKernel,
@@ -4340,6 +4352,72 @@ fn meta_execute_backend_extension(
                 input.device().clone(),
             ))
         }
+        BackendExtensionOp::RmsNormInputBackward { .. } => {
+            if inputs.len() != 3 {
+                return Err(extension_error(
+                    "rms_norm_input_backward",
+                    format!("expected 3 inputs, received {}", inputs.len()),
+                ));
+            }
+            let input = &inputs[0];
+            let weight = &inputs[1];
+            let grad_output = &inputs[2];
+            if input != grad_output {
+                return Err(extension_error(
+                    "rms_norm_input_backward",
+                    format!(
+                        "input spec {} must match grad_output spec {}",
+                        format_spec(input),
+                        format_spec(grad_output)
+                    ),
+                ));
+            }
+            let Some(&last_dim) = input.shape().dims().last() else {
+                return Err(extension_error(
+                    "rms_norm_input_backward",
+                    "input must have at least one dimension",
+                ));
+            };
+            if weight.shape().dims() != [last_dim] {
+                return Err(extension_error(
+                    "rms_norm_input_backward",
+                    format!(
+                        "weight shape {} must match input last dimension {last_dim}",
+                        weight.shape()
+                    ),
+                ));
+            }
+            if weight.dtype() != input.dtype() || weight.device() != input.device() {
+                return Err(extension_error(
+                    "rms_norm_input_backward",
+                    format!(
+                        "weight spec {} must share dtype/device with input spec {}",
+                        format_spec(weight),
+                        format_spec(input)
+                    ),
+                ));
+            }
+            Ok(TensorSpec::new(
+                input.shape().clone(),
+                input.dtype(),
+                input.device().clone(),
+            ))
+        }
+        BackendExtensionOp::RmsNormWeightBackward { .. } => {
+            ensure_matching_specs("rms_norm_weight_backward", inputs)?;
+            let input = &inputs[0];
+            let Some(&last_dim) = input.shape().dims().last() else {
+                return Err(extension_error(
+                    "rms_norm_weight_backward",
+                    "input must have at least one dimension",
+                ));
+            };
+            Ok(TensorSpec::new(
+                Shape::new(vec![last_dim]),
+                input.dtype(),
+                input.device().clone(),
+            ))
+        }
         BackendExtensionOp::LayerNorm { .. } => {
             ensure_matching_specs("layer_norm", inputs)?;
             let input = &inputs[0];
@@ -4754,6 +4832,45 @@ impl GraphBuilder {
         Ok(self.register_backend_extension(op, vec![input.id(), weight.id()], spec))
     }
 
+    pub(crate) fn rms_norm_input_backward(
+        &mut self,
+        input: &Tensor,
+        weight: &Tensor,
+        grad_output: &Tensor,
+        epsilon: f32,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::RmsNormInputBackward {
+            epsilon: psionic_core::StableF32::from_f32(epsilon),
+        };
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[input, weight, grad_output],
+            None,
+        )?;
+        Ok(self.register_backend_extension(
+            op,
+            vec![input.id(), weight.id(), grad_output.id()],
+            spec,
+        ))
+    }
+
+    pub(crate) fn rms_norm_weight_backward(
+        &mut self,
+        input: &Tensor,
+        grad_output: &Tensor,
+        epsilon: f32,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::RmsNormWeightBackward {
+            epsilon: psionic_core::StableF32::from_f32(epsilon),
+        };
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[input, grad_output],
+            None,
+        )?;
+        Ok(self.register_backend_extension(op, vec![input.id(), grad_output.id()], spec))
+    }
+
     /// Applies layer normalization over the last dimension.
     pub fn layer_norm(
         &mut self,
@@ -5078,7 +5195,9 @@ fn format_execution_payload(op: &ExecutionOp) -> String {
 
 fn format_backend_extension_payload(op: &BackendExtensionOp) -> String {
     match op {
-        BackendExtensionOp::RmsNorm { epsilon } => {
+        BackendExtensionOp::RmsNorm { epsilon }
+        | BackendExtensionOp::RmsNormInputBackward { epsilon }
+        | BackendExtensionOp::RmsNormWeightBackward { epsilon } => {
             format!("epsilon_bits={:08x}", epsilon.0)
         }
         BackendExtensionOp::LayerNorm { epsilon } => {
@@ -5253,8 +5372,8 @@ pub fn builtin_operator_parity_matrix_report() -> Result<OperatorParityMatrixRep
 
 /// Returns the seeded advanced operator-program matrix report for the current
 /// bounded Psionic semantics surface.
-pub fn builtin_advanced_operator_program_matrix_report()
--> Result<AdvancedOperatorProgramMatrixReport, GraphError> {
+pub fn builtin_advanced_operator_program_matrix_report(
+) -> Result<AdvancedOperatorProgramMatrixReport, GraphError> {
     let mut cases = Vec::new();
 
     cases.push(run_advanced_operator_program_supported_case(
@@ -5629,19 +5748,19 @@ mod tests {
     use psionic_core::{Device, PsionicRefusalCode, PsionicRefusalScope, QuantizationMode};
 
     use super::{
-        AdvancedOperatorProgramStatus, DType, ExecutionOp, ExecutionPlan, ExecutionStep,
-        ExtensionContractKind, FunctionalTensorKind, FunctionalizationPolicy, GraphBuilder,
-        GraphError, GraphTransformError, KernelDispatchKind, KernelRegistration,
-        MaskedMetaContract, MetaCapabilityProfile, MetaTensor, MetaTensorFamily,
-        MetaTensorFamilyKind, NestedMetaContract, OperatorArity, OperatorImplementationKind,
-        OperatorMetaExecutionKind, OperatorParityStatus, OperatorRegistry, ProgramTransformFamily,
-        RegisteredOperatorSchema, RegistryExtensionError, Shape, SparseMetaContract,
-        SparseMetaLayout, StorageAwareMetaContract, TensorFamilyCapabilityStatus,
-        TensorFamilyCapabilitySurface, TensorSpec, TransformBarrierKind,
         builtin_advanced_operator_program_matrix_report,
         builtin_extension_contract_semantics_report, builtin_operator_parity_matrix_report,
         builtin_program_transform_capability_matrix_report,
-        builtin_tensor_family_capability_matrix_report,
+        builtin_tensor_family_capability_matrix_report, AdvancedOperatorProgramStatus, DType,
+        ExecutionOp, ExecutionPlan, ExecutionStep, ExtensionContractKind, FunctionalTensorKind,
+        FunctionalizationPolicy, GraphBuilder, GraphError, GraphTransformError, KernelDispatchKind,
+        KernelRegistration, MaskedMetaContract, MetaCapabilityProfile, MetaTensor,
+        MetaTensorFamily, MetaTensorFamilyKind, NestedMetaContract, OperatorArity,
+        OperatorImplementationKind, OperatorMetaExecutionKind, OperatorParityStatus,
+        OperatorRegistry, ProgramTransformFamily, RegisteredOperatorSchema, RegistryExtensionError,
+        Shape, SparseMetaContract, SparseMetaLayout, StorageAwareMetaContract,
+        TensorFamilyCapabilityStatus, TensorFamilyCapabilitySurface, TensorSpec,
+        TransformBarrierKind,
     };
 
     #[test]
@@ -6070,12 +6189,10 @@ mod tests {
         let report = builtin_tensor_family_capability_matrix_report();
         assert_eq!(report.schema_version, 1);
         assert_eq!(report.current_scope_window, "psionic_tensor_family_v1");
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("matrix_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("matrix_digest=")));
 
         let sparse_meta = report
             .cases
@@ -6285,12 +6402,10 @@ mod tests {
         let report = builtin_program_transform_capability_matrix_report();
         assert_eq!(report.schema_version, 1);
         assert_eq!(report.current_scope_window, "psionic_program_transform_v3");
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("matrix_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("matrix_digest=")));
 
         let mut builder = GraphBuilder::new(Device::cpu());
         let input = builder.input("input", Shape::new(vec![2, 4]), DType::F32);
@@ -6395,12 +6510,10 @@ mod tests {
             report.current_scope_window,
             "psionic_extension_contracts_v1"
         );
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("report_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("report_digest=")));
 
         let custom_op = report
             .cases
@@ -6481,17 +6594,15 @@ mod tests {
     }
 
     #[test]
-    fn operator_parity_matrix_report_tracks_seeded_supported_and_refusal_cases()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn operator_parity_matrix_report_tracks_seeded_supported_and_refusal_cases(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let report = builtin_operator_parity_matrix_report()?;
         assert_eq!(report.schema_version, 1);
         assert_eq!(report.oracle_family_window, "pytorch_opinfo_seed_v0");
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("matrix_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("matrix_digest=")));
 
         let add_case = report
             .cases
@@ -6535,20 +6646,18 @@ mod tests {
     }
 
     #[test]
-    fn advanced_operator_program_matrix_tracks_supported_and_refused_families()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn advanced_operator_program_matrix_tracks_supported_and_refused_families(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let report = builtin_advanced_operator_program_matrix_report()?;
         assert_eq!(report.schema_version, 1);
         assert_eq!(
             report.oracle_family_window,
             "pytorch_advanced_program_seed_v0"
         );
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("matrix_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("matrix_digest=")));
 
         let linalg_case = report
             .cases

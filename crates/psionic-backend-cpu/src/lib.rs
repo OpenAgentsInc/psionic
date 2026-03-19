@@ -412,6 +412,12 @@ impl CpuBackend {
             BackendExtensionOp::RmsNorm { epsilon } => {
                 self.rms_norm(step, values, epsilon.to_f32())
             }
+            BackendExtensionOp::RmsNormInputBackward { epsilon } => {
+                self.rms_norm_input_backward(step, values, epsilon.to_f32())
+            }
+            BackendExtensionOp::RmsNormWeightBackward { epsilon } => {
+                self.rms_norm_weight_backward(step, values, epsilon.to_f32())
+            }
             BackendExtensionOp::LayerNorm { epsilon } => {
                 self.layer_norm(step, values, epsilon.to_f32())
             }
@@ -566,6 +572,70 @@ impl CpuBackend {
             let inv = (mean_square + epsilon).sqrt().recip();
             for ((dst, value), scale) in dst_row.iter_mut().zip(src_row.iter()).zip(weight.iter()) {
                 *dst = *value * inv * *scale;
+            }
+        }
+        CpuBuffer::from_f32(step.spec.clone(), output)
+    }
+
+    fn rms_norm_input_backward(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CpuBuffer>,
+        epsilon: f32,
+    ) -> Result<CpuBuffer, RuntimeError> {
+        let input = self.input(step, values, 0)?.logical_values()?;
+        let weight = self.input(step, values, 1)?.logical_values()?;
+        let grad_output = self.input(step, values, 2)?.logical_values()?;
+        let last_dim = weight.len();
+        let mut output = vec![0.0_f32; input.len()];
+        for ((src_row, grad_row), dst_row) in input
+            .chunks_exact(last_dim)
+            .zip(grad_output.chunks_exact(last_dim))
+            .zip(output.chunks_exact_mut(last_dim))
+        {
+            let mean_square =
+                src_row.iter().map(|value| value * value).sum::<f32>() / last_dim as f32;
+            let inv = (mean_square + epsilon).sqrt().recip();
+            let inv_cubed = inv * inv * inv;
+            let weighted_dot = src_row
+                .iter()
+                .zip(weight.iter())
+                .zip(grad_row.iter())
+                .map(|((value, scale), grad)| value * scale * grad)
+                .sum::<f32>();
+            for (((dst, value), scale), grad) in dst_row
+                .iter_mut()
+                .zip(src_row.iter())
+                .zip(weight.iter())
+                .zip(grad_row.iter())
+            {
+                *dst = (grad * scale * inv) - (value * inv_cubed * weighted_dot / last_dim as f32);
+            }
+        }
+        CpuBuffer::from_f32(step.spec.clone(), output)
+    }
+
+    fn rms_norm_weight_backward(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CpuBuffer>,
+        epsilon: f32,
+    ) -> Result<CpuBuffer, RuntimeError> {
+        let input = self.input(step, values, 0)?.logical_values()?;
+        let grad_output = self.input(step, values, 1)?.logical_values()?;
+        let last_dim = step.spec.shape().dims()[0];
+        let mut output = vec![0.0_f32; last_dim];
+        for (src_row, grad_row) in input
+            .chunks_exact(last_dim)
+            .zip(grad_output.chunks_exact(last_dim))
+        {
+            let mean_square =
+                src_row.iter().map(|value| value * value).sum::<f32>() / last_dim as f32;
+            let inv = (mean_square + epsilon).sqrt().recip();
+            for ((accumulated, value), grad) in
+                output.iter_mut().zip(src_row.iter()).zip(grad_row.iter())
+            {
+                *accumulated += grad * value * inv;
             }
         }
         CpuBuffer::from_f32(step.spec.clone(), output)
@@ -1555,7 +1625,7 @@ mod tests {
         HealthStatus, RuntimeError, ServedProductBackendPolicy,
     };
 
-    use super::{CpuAllocatorPool, CpuBackend, CpuBuffer, cpu_allocator_pool_policy};
+    use super::{cpu_allocator_pool_policy, CpuAllocatorPool, CpuBackend, CpuBuffer};
 
     #[test]
     fn cpu_backend_reports_default_device() -> Result<(), psionic_runtime::RuntimeError> {

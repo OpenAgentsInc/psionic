@@ -32,6 +32,13 @@ widens needed by the baseline decoder lane:
 - backend-specialized dense `f32` `rms_norm` forward execution plus declared
   runtime extension support
 
+`psionic-ir` now also owns one real train-visible RMSNorm graph seam above the
+backend:
+
+- dense `f32` reference evaluation for `rms_norm`
+- bounded reverse-mode support for `rms_norm`, with explicit continued refusal
+  for the other backend-extension families
+
 That means the remaining CUDA train-path blockers are now machine-readable on
 the same benchmark seam that already carries topology, communication,
 wallclock, and memory facts.
@@ -64,13 +71,16 @@ Today it keeps these truths separate:
 - `implemented_early`
   - post-train quantized export or roundtrip support is real
 - `partial`
-  - BF16 policy, attention or RoPE program shape, RMSNorm backward closure,
-    residual decoder-path closure, and Muon semantics all have explicit
-    substrate or refusal contracts
+  - BF16 policy, attention or RoPE program shape, residual decoder-path
+    closure, and Muon semantics all have explicit substrate or refusal
+    contracts
   - the public CUDA execution backend now genuinely owns dense `f32`
     pointwise `mul` plus backend-specialized `rms_norm` forward execution, but
     the full train path is still narrower than the Parameter Golf challenge
     lane
+  - RMSNorm train-visible graph semantics are now real in the bounded dense
+    `f32` reference/autodiff lane, but public CUDA backward execution is still
+    missing
 
 This is the intended contract for the issue: do not hide missing CUDA kernels
 behind broader model or distributed receipts.
@@ -87,6 +97,8 @@ Without this report, the repo could say all of these misleading things:
 - an IR or meta-program proof means the direct CUDA kernel exists
 - one forward CUDA surface widening means the whole decoder block now trains on
   CUDA
+- bounded reference-autodiff closure means the public CUDA backward path is
+  already implemented
 - a CPU-reference Muon implementation means the CUDA optimizer surface is done
 - artifact quantization means train-time low-precision closure is done
 
