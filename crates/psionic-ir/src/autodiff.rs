@@ -150,7 +150,8 @@ pub const fn gradient_support_for_op(op: &OpKind) -> AutodiffGradientSupport {
             reason: AutodiffUnsupportedGradientReason::CastFamily,
         },
         OpKind::BackendExtension { op } => match op {
-            BackendExtensionOp::Silu
+            BackendExtensionOp::ReluSquared
+            | BackendExtensionOp::Silu
             | BackendExtensionOp::RmsNorm { .. }
             | BackendExtensionOp::RotaryEmbedding { .. }
             | BackendExtensionOp::ScaledDotProductAttention { .. } => {
@@ -2215,6 +2216,26 @@ impl AutodiffGraph {
                     }
                 }
                 OpKind::BackendExtension { op } => match op {
+                    BackendExtensionOp::ReluSquared => {
+                        let input_id = node.inputs()[0];
+                        if self.requires_grad(input_id) {
+                            let input = primal_placeholder(
+                                &mut backward_builder,
+                                &mut primal_bindings,
+                                &self.graph,
+                                input_id,
+                            )?;
+                            let contribution = backward_builder
+                                .relu_squared_backward(&input, &current_gradient)
+                                .map_err(map_graph_error)?;
+                            accumulate_gradient(
+                                &mut backward_builder,
+                                &mut gradients,
+                                input_id,
+                                contribution,
+                            )?;
+                        }
+                    }
                     BackendExtensionOp::Silu => {
                         let input_id = node.inputs()[0];
                         if self.requires_grad(input_id) {
@@ -3650,6 +3671,13 @@ impl AutodiffGraphBuilder {
         Ok(self.wrap(tensor, requires_grad))
     }
 
+    /// Applies ReLU-squared pointwise activation.
+    pub fn relu_squared(&mut self, input: &AutodiffTensor) -> Result<AutodiffTensor, GraphError> {
+        let requires_grad = self.any_requires_grad(&[input]);
+        let tensor = self.builder.relu_squared(input.tensor())?;
+        Ok(self.wrap(tensor, requires_grad))
+    }
+
     /// Applies SiLU pointwise activation.
     pub fn silu(&mut self, input: &AutodiffTensor) -> Result<AutodiffTensor, GraphError> {
         let requires_grad = self.any_requires_grad(&[input]);
@@ -4160,6 +4188,19 @@ fn evaluate_backend_extension_reference(
     op: &BackendExtensionOp,
 ) -> Result<TensorData, ReferenceEvaluationError> {
     match op {
+        BackendExtensionOp::ReluSquared => {
+            let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            Ok(TensorData::F32(relu_squared_forward_values(input)))
+        }
+        BackendExtensionOp::ReluSquaredBackward => {
+            let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let grad_output =
+                resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            Ok(TensorData::F32(relu_squared_backward_values(
+                input,
+                grad_output,
+            )))
+        }
         BackendExtensionOp::Silu => {
             let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
             Ok(TensorData::F32(silu_forward_values(input)))
@@ -4780,6 +4821,30 @@ fn reduce_sum_values(values: &[f32], input_shape: &Shape, axis: Option<usize>) -
     } else {
         vec![values.iter().sum()]
     }
+}
+
+fn relu_squared_forward_values(input: &[f32]) -> Vec<f32> {
+    input
+        .iter()
+        .map(|value| {
+            let positive = value.max(0.0);
+            positive * positive
+        })
+        .collect()
+}
+
+fn relu_squared_backward_values(input: &[f32], grad_output: &[f32]) -> Vec<f32> {
+    input
+        .iter()
+        .zip(grad_output.iter())
+        .map(|(value, grad)| {
+            if *value > 0.0 {
+                grad * (2.0 * value)
+            } else {
+                0.0
+            }
+        })
+        .collect()
 }
 
 fn silu_forward_values(input: &[f32]) -> Vec<f32> {
@@ -5416,6 +5481,74 @@ mod tests {
                 node.op(),
                 crate::OpKind::BackendExtension {
                     op: psionic_core::BackendExtensionOp::SiluBackward
+                }
+            )));
+
+        let input_values = vec![-1.25_f32, -0.5, 0.75, 2.0];
+        let inputs = BTreeMap::from([(input.id(), TensorData::F32(input_values.clone()))]);
+        let result = graph.backward_materialized(loss.id(), &inputs)?;
+        let analytical = dense_gradient(&result, input.id());
+
+        let delta = 1e-3_f32;
+        let mut finite = vec![0.0_f32; input_values.len()];
+        for index in 0..input_values.len() {
+            let mut plus = input_values.clone();
+            plus[index] += delta;
+            let mut minus = input_values.clone();
+            minus[index] -= delta;
+            finite[index] = (scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([(input.id(), TensorData::F32(plus))]),
+            )? - scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([(input.id(), TensorData::F32(minus))]),
+            )?) / (2.0 * delta);
+        }
+
+        assert_close_slice(&analytical, &finite, 2e-3);
+        Ok(())
+    }
+
+    #[test]
+    fn reference_evaluation_executes_relu_squared_backend_extension() -> Result<(), Box<dyn Error>>
+    {
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let input = builder.input("x", Shape::new(vec![4]), DType::F32, true);
+        let activated = builder.relu_squared(&input)?;
+        let graph = builder.finish(vec![activated.clone()]);
+
+        let inputs = BTreeMap::from([(input.id(), TensorData::F32(vec![-2.0, -0.5, 0.75, 3.0]))]);
+        let values = evaluate_graph(graph.graph(), &inputs)?;
+        let output = dense_tensor(values.get(&activated.id()).expect("forward output"));
+        assert_close_slice(&output, &[0.0, 0.0, 0.5625, 9.0], 1e-6);
+        Ok(())
+    }
+
+    #[test]
+    fn reverse_mode_autodiff_materializes_relu_squared_gradients_against_finite_difference(
+    ) -> Result<(), Box<dyn Error>> {
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let input = builder.input("x", Shape::new(vec![4]), DType::F32, true);
+        let activated = builder.relu_squared(&input)?;
+        let scale = builder.constant_f32(Shape::new(vec![4]), vec![0.5, -1.0, 0.25, 1.5])?;
+        let scaled = builder.mul(&activated, &scale)?;
+        let loss = builder.reduce_sum(&scaled);
+        let graph = builder.finish(vec![loss.clone()]);
+
+        let backward_plan = graph.backward_plan(loss.id())?;
+        assert!(backward_plan.gradient_for(input.id()).is_some());
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                crate::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::ReluSquaredBackward
                 }
             )));
 

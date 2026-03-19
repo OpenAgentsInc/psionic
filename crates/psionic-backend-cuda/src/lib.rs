@@ -60,6 +60,8 @@ pub const SUPPORTED_OPS: &[&str] = &[
     "matmul",
     "add",
     "mul",
+    "relu_squared",
+    "relu_squared_backward",
     "silu",
     "silu_backward",
     "rms_norm",
@@ -2489,6 +2491,7 @@ impl DeviceDiscovery for CudaBackend {
 
     fn extension_support(&self) -> Vec<BackendExtensionSupport> {
         vec![
+            BackendExtensionSupport::backend_specialized(BackendExtensionKind::ReluSquared),
             BackendExtensionSupport::backend_specialized(BackendExtensionKind::Silu),
             BackendExtensionSupport::backend_specialized(BackendExtensionKind::RmsNorm),
             BackendExtensionSupport::backend_specialized(BackendExtensionKind::RotaryEmbedding),
@@ -2691,6 +2694,30 @@ impl AvailableCudaBackend {
         let input = step_input(step, values, 0)?;
         let input_values = input.read_f32()?;
         let output_values = silu_forward_values(&input_values);
+        self.buffer_from_tensor_data(&step.spec, &TensorData::F32(output_values))
+    }
+
+    fn execute_relu_squared_step(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CudaBuffer>,
+    ) -> Result<CudaBuffer, RuntimeError> {
+        let input = step_input(step, values, 0)?;
+        let input_values = input.read_f32()?;
+        let output_values = relu_squared_forward_values(&input_values);
+        self.buffer_from_tensor_data(&step.spec, &TensorData::F32(output_values))
+    }
+
+    fn execute_relu_squared_backward_step(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CudaBuffer>,
+    ) -> Result<CudaBuffer, RuntimeError> {
+        let input = step_input(step, values, 0)?;
+        let grad_output = step_input(step, values, 1)?;
+        let input_values = input.read_f32()?;
+        let grad_output_values = grad_output.read_f32()?;
+        let output_values = relu_squared_backward_values(&input_values, &grad_output_values);
         self.buffer_from_tensor_data(&step.spec, &TensorData::F32(output_values))
     }
 
@@ -3102,6 +3129,15 @@ impl AvailableCudaBackend {
                     values.insert(step.output, output);
                 }
                 ExecutionOp::BackendExtension { op } => match op {
+                    BackendExtensionOp::ReluSquared => {
+                        values.insert(step.output, self.execute_relu_squared_step(step, &values)?);
+                    }
+                    BackendExtensionOp::ReluSquaredBackward => {
+                        values.insert(
+                            step.output,
+                            self.execute_relu_squared_backward_step(step, &values)?,
+                        );
+                    }
                     BackendExtensionOp::Silu => {
                         values.insert(step.output, self.execute_silu_step(step, &values)?);
                     }
@@ -3530,6 +3566,22 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
             }
         }
         ExecutionOp::BackendExtension { op } => match op {
+            BackendExtensionOp::ReluSquared => {
+                if step.inputs.len() != 1 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda relu_squared step {} requires one input",
+                        step.output
+                    )));
+                }
+            }
+            BackendExtensionOp::ReluSquaredBackward => {
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda relu_squared_backward step {} requires two inputs",
+                        step.output
+                    )));
+                }
+            }
             BackendExtensionOp::Silu => {
                 if step.inputs.len() != 1 {
                     return Err(RuntimeError::Backend(format!(
@@ -3635,6 +3687,30 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
         }
     }
     Ok(())
+}
+
+fn relu_squared_forward_values(input: &[f32]) -> Vec<f32> {
+    input
+        .iter()
+        .map(|value| {
+            let positive = value.max(0.0);
+            positive * positive
+        })
+        .collect()
+}
+
+fn relu_squared_backward_values(input: &[f32], grad_output: &[f32]) -> Vec<f32> {
+    input
+        .iter()
+        .zip(grad_output.iter())
+        .map(|(value, grad)| {
+            if *value > 0.0 {
+                grad * (2.0 * value)
+            } else {
+                0.0
+            }
+        })
+        .collect()
 }
 
 fn ensure_supported_spec(spec: &TensorSpec) -> Result<(), RuntimeError> {
@@ -9161,6 +9237,38 @@ mod tests {
     }
 
     #[test]
+    fn cuda_backend_executes_relu_squared_backend_extension_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let input_values = vec![-2.0_f32, -0.5, 0.75, 3.0];
+        let mut builder = GraphBuilder::new(selected.device.clone());
+        let input = builder.input("x", Shape::new(vec![input_values.len()]), DType::F32);
+        let activated = builder.relu_squared(&input)?;
+        let graph = builder.finish(vec![activated.clone()]);
+
+        let inputs = std::collections::BTreeMap::from([(
+            input.id(),
+            backend.input_buffer(Shape::new(vec![input_values.len()]), input_values.clone())?,
+        )]);
+        let result = backend.compile_and_execute(&graph, &inputs)?;
+        let output = result
+            .outputs
+            .get(&activated.id())
+            .ok_or("missing cuda relu_squared output")?;
+        assert_close(
+            &output.read_f32()?,
+            &super::relu_squared_forward_values(&input_values),
+            1e-6,
+        );
+        Ok(())
+    }
+
+    #[test]
     fn cuda_backend_executes_silu_backend_extension_when_available(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
@@ -9578,6 +9686,106 @@ mod tests {
                 .ok_or("missing expected value gradient")?
                 .as_f32_slice()
                 .ok_or("expected value gradient is not f32")?,
+            1e-5,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_relu_squared_backward_graph_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let mut builder = AutodiffGraphBuilder::with_context(
+            selected.device.clone(),
+            AutodiffContext::training(),
+        );
+        let input = builder.input("x", Shape::new(vec![1, 4]), DType::F32, true);
+        let activated = builder.relu_squared(&input)?;
+        let scale = builder.constant_f32(Shape::new(vec![1, 4]), vec![0.5, -1.0, 0.25, 1.5])?;
+        let scaled = builder.mul(&activated, &scale)?;
+        let graph = builder.finish(vec![scaled.clone()]);
+
+        let backward_plan = graph.backward_plan(scaled.id())?;
+        assert!(backward_plan.gradient_for(input.id()).is_some());
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                psionic_ir::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::ReluSquaredBackward
+                }
+            )));
+
+        let input_values = vec![-1.25_f32, -0.5, 0.75, 2.0];
+        let upstream_seed = vec![1.0_f32, 0.5, -0.25, 2.0];
+        let primal_inputs =
+            std::collections::BTreeMap::from([(input.id(), TensorData::F32(input_values))]);
+        let forward_values = evaluate_graph(graph.graph(), &primal_inputs)?;
+        let expected = graph.backward_materialized_with_seed(
+            scaled.id(),
+            &primal_inputs,
+            Some(TensorData::F32(upstream_seed.clone())),
+        )?;
+
+        let plan = compile_graph(&backward_plan.gradient_graph)?;
+        validate_supported_plan(&plan)?;
+
+        let mut backward_inputs = std::collections::BTreeMap::new();
+        for binding in &backward_plan.primal_bindings {
+            let value = forward_values
+                .get(&binding.primal_tensor)
+                .ok_or("missing forward value for backward binding")?;
+            let spec = backward_plan
+                .gradient_graph
+                .node(binding.gradient_graph_input)
+                .ok_or("missing backward graph input node")?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            backward_inputs.insert(
+                binding.gradient_graph_input,
+                backend.input_buffer(spec, value.as_f32_slice().ok_or("non-f32 forward value")?)?,
+            );
+        }
+        let seed_shape = backward_plan
+            .gradient_graph
+            .node(backward_plan.seed_input)
+            .ok_or("missing backward seed node")?
+            .tensor()
+            .spec()
+            .shape()
+            .clone();
+        backward_inputs.insert(
+            backward_plan.seed_input,
+            backend.input_buffer(seed_shape, upstream_seed)?,
+        );
+
+        let result =
+            backend.compile_and_execute(&backward_plan.gradient_graph, &backward_inputs)?;
+        let input_gradient = result
+            .outputs
+            .get(
+                &backward_plan
+                    .gradient_for(input.id())
+                    .ok_or("missing input gradient id")?,
+            )
+            .ok_or("missing cuda relu_squared input gradient output")?;
+
+        assert_close(
+            &input_gradient.read_f32()?,
+            expected
+                .gradient(input.id())
+                .ok_or("missing expected input gradient")?
+                .as_f32_slice()
+                .ok_or("expected input gradient is not f32")?,
             1e-5,
         );
         Ok(())

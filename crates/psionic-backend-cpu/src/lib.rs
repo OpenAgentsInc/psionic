@@ -409,6 +409,8 @@ impl CpuBackend {
         op: &BackendExtensionOp,
     ) -> Result<CpuBuffer, RuntimeError> {
         match op {
+            BackendExtensionOp::ReluSquared => self.relu_squared(step, values),
+            BackendExtensionOp::ReluSquaredBackward => self.relu_squared_backward(step, values),
             BackendExtensionOp::Silu => self.silu(step, values),
             BackendExtensionOp::SiluBackward => self.silu_backward(step, values),
             BackendExtensionOp::RmsNorm { epsilon } => {
@@ -560,6 +562,50 @@ impl CpuBackend {
             None => vec![logical.iter().copied().sum()],
             Some(axis) => reduce_sum_axis(&logical, input.spec().shape().dims(), axis)?,
         };
+        CpuBuffer::from_f32(step.spec.clone(), output)
+    }
+
+    fn relu_squared(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CpuBuffer>,
+    ) -> Result<CpuBuffer, RuntimeError> {
+        let input = self.input(step, values, 0)?.logical_values()?;
+        let output = input
+            .iter()
+            .map(|value| {
+                let positive = value.max(0.0);
+                positive * positive
+            })
+            .collect::<Vec<_>>();
+        CpuBuffer::from_f32(step.spec.clone(), output)
+    }
+
+    fn relu_squared_backward(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CpuBuffer>,
+    ) -> Result<CpuBuffer, RuntimeError> {
+        let input = self.input(step, values, 0)?.logical_values()?;
+        let grad_output = self.input(step, values, 1)?.logical_values()?;
+        if input.len() != grad_output.len() {
+            return Err(RuntimeError::Backend(format!(
+                "cpu relu_squared_backward requires matching input and grad_output lengths, actual {} and {}",
+                input.len(),
+                grad_output.len()
+            )));
+        }
+        let output = input
+            .iter()
+            .zip(grad_output.iter())
+            .map(|(value, grad)| {
+                if *value > 0.0 {
+                    grad * (2.0 * value)
+                } else {
+                    0.0
+                }
+            })
+            .collect::<Vec<_>>();
         CpuBuffer::from_f32(step.spec.clone(), output)
     }
 
@@ -1544,6 +1590,7 @@ impl DeviceDiscovery for CpuBackend {
 
     fn extension_support(&self) -> Vec<BackendExtensionSupport> {
         vec![
+            BackendExtensionSupport::reference(BackendExtensionKind::ReluSquared),
             BackendExtensionSupport::reference(BackendExtensionKind::Silu),
             BackendExtensionSupport::reference(BackendExtensionKind::RmsNorm),
             BackendExtensionSupport::reference(BackendExtensionKind::LayerNorm),
@@ -1763,6 +1810,7 @@ mod tests {
                 .map(|support| support.kind)
                 .collect::<Vec<_>>(),
             vec![
+                BackendExtensionKind::ReluSquared,
                 BackendExtensionKind::Silu,
                 BackendExtensionKind::RmsNorm,
                 BackendExtensionKind::LayerNorm,

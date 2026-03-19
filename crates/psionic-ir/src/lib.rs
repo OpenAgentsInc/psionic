@@ -3844,6 +3844,18 @@ const BUILTIN_OPERATOR_SCHEMAS: &[OperatorSchema] = &[
         OperatorMetaExecutionKind::BuiltinInference,
     ),
     OperatorSchema::new(
+        "relu_squared",
+        OperatorArity::Fixed(1),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
+        "relu_squared_backward",
+        OperatorArity::Fixed(2),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
         "silu",
         OperatorArity::Fixed(1),
         OperatorImplementationKind::BackendKernel,
@@ -4365,6 +4377,44 @@ fn meta_execute_backend_extension(
     inputs: &[TensorSpec],
 ) -> Result<TensorSpec, GraphError> {
     match op {
+        BackendExtensionOp::ReluSquared => {
+            if inputs.len() != 1 {
+                return Err(extension_error(
+                    "relu_squared",
+                    format!("expected 1 input, received {}", inputs.len()),
+                ));
+            }
+            Ok(TensorSpec::new(
+                inputs[0].shape().clone(),
+                inputs[0].dtype(),
+                inputs[0].device().clone(),
+            ))
+        }
+        BackendExtensionOp::ReluSquaredBackward => {
+            if inputs.len() != 2 {
+                return Err(extension_error(
+                    "relu_squared_backward",
+                    format!("expected 2 inputs, received {}", inputs.len()),
+                ));
+            }
+            let input = &inputs[0];
+            let grad_output = &inputs[1];
+            if input != grad_output {
+                return Err(extension_error(
+                    "relu_squared_backward",
+                    format!(
+                        "input spec {} must match grad_output spec {}",
+                        format_spec(input),
+                        format_spec(grad_output)
+                    ),
+                ));
+            }
+            Ok(TensorSpec::new(
+                input.shape().clone(),
+                input.dtype(),
+                input.device().clone(),
+            ))
+        }
         BackendExtensionOp::Silu => {
             if inputs.len() != 1 {
                 return Err(extension_error(
@@ -4833,6 +4883,31 @@ impl GraphBuilder {
             vec![input.id()],
             spec,
         ))
+    }
+
+    /// Applies ReLU-squared pointwise activation.
+    pub fn relu_squared(&mut self, input: &Tensor) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::ReluSquared;
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[input],
+            None,
+        )?;
+        Ok(self.register_backend_extension(op, vec![input.id()], spec))
+    }
+
+    pub(crate) fn relu_squared_backward(
+        &mut self,
+        input: &Tensor,
+        grad_output: &Tensor,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::ReluSquaredBackward;
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[input, grad_output],
+            None,
+        )?;
+        Ok(self.register_backend_extension(op, vec![input.id(), grad_output.id()], spec))
     }
 
     /// Applies SiLU pointwise activation.
@@ -5332,7 +5407,10 @@ fn format_execution_payload(op: &ExecutionOp) -> String {
 
 fn format_backend_extension_payload(op: &BackendExtensionOp) -> String {
     match op {
-        BackendExtensionOp::Silu | BackendExtensionOp::SiluBackward => String::new(),
+        BackendExtensionOp::ReluSquared
+        | BackendExtensionOp::ReluSquaredBackward
+        | BackendExtensionOp::Silu
+        | BackendExtensionOp::SiluBackward => String::new(),
         BackendExtensionOp::RmsNorm { epsilon }
         | BackendExtensionOp::RmsNormInputBackward { epsilon }
         | BackendExtensionOp::RmsNormWeightBackward { epsilon } => {

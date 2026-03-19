@@ -1940,6 +1940,8 @@ impl StableF32 {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BackendExtensionKind {
+    /// ReLU-squared pointwise activation.
+    ReluSquared,
     /// SiLU pointwise activation.
     Silu,
     /// Root-mean-square normalization over the last dimension.
@@ -1959,6 +1961,7 @@ impl BackendExtensionKind {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
+            Self::ReluSquared => "relu_squared",
             Self::Silu => "silu",
             Self::RmsNorm => "rms_norm",
             Self::LayerNorm => "layer_norm",
@@ -1973,6 +1976,10 @@ impl BackendExtensionKind {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum BackendExtensionOp {
+    /// ReLU-squared pointwise activation.
+    ReluSquared,
+    /// Input-gradient rule for ReLU-squared pointwise activation.
+    ReluSquaredBackward,
     /// SiLU pointwise activation.
     Silu,
     /// Input-gradient rule for SiLU pointwise activation.
@@ -2047,6 +2054,7 @@ impl BackendExtensionOp {
     #[must_use]
     pub const fn kind(&self) -> BackendExtensionKind {
         match self {
+            Self::ReluSquared | Self::ReluSquaredBackward => BackendExtensionKind::ReluSquared,
             Self::Silu | Self::SiluBackward => BackendExtensionKind::Silu,
             Self::RmsNorm { .. }
             | Self::RmsNormInputBackward { .. }
@@ -2069,6 +2077,8 @@ impl BackendExtensionOp {
     #[must_use]
     pub const fn label(&self) -> &'static str {
         match self {
+            Self::ReluSquared => "relu_squared",
+            Self::ReluSquaredBackward => "relu_squared_backward",
             Self::Silu => "silu",
             Self::SiluBackward => "silu_backward",
             Self::RmsNorm { .. } => "rms_norm",
