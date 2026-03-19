@@ -985,6 +985,32 @@ Expected outcome:
 - explicit accelerator-specific refusal row
 - no default served SIMD profile ids
 
+### 15. Research-only threads profile with deterministic scheduler envelope
+
+```bash
+cargo run -p psionic-runtime --example tassadar_threads_research_profile_report
+cargo run -p psionic-sandbox --example tassadar_threads_scheduler_sandbox_boundary_report
+cargo run -p psionic-eval --example tassadar_threads_research_profile_report
+cargo run -p psionic-research --example tassadar_threads_research_profile_summary
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_threads_research_profile_runtime_report.json`
+- `fixtures/tassadar/reports/tassadar_threads_scheduler_sandbox_boundary_report.json`
+- `fixtures/tassadar/reports/tassadar_threads_research_profile_report.json`
+- `fixtures/tassadar/reports/tassadar_threads_research_profile_summary.json`
+
+Expected outcome:
+
+- one research-only threads profile:
+  `tassadar.research_profile.threads_deterministic_scheduler.v1`
+- exact deterministic parity for the bounded round-robin shared-counter row
+- exact deterministic parity for the bounded barrier-then-reduce row
+- explicit sandbox refusal on host-nondeterministic scheduling
+- explicit runtime and sandbox refusal parity on relaxed shared-memory ordering
+- `served_publication_allowed = false`
+
 ## Validation Commands
 
 Run the focused report checks after the flow:
@@ -1028,6 +1054,11 @@ cargo test -p psionic-runtime simd_profile -- --nocapture
 cargo test -p psionic-serve executor_service_capability_publication_serializes_benchmark_gated_matrix -- --nocapture
 cargo test -p psionic-provider simd_profile -- --nocapture
 cargo test -p psionic-provider tassadar_capability_envelope_serializes_served_publication -- --nocapture
+cargo test -p psionic-runtime threads_research_profile -- --nocapture
+cargo test -p psionic-sandbox threads_scheduler_boundary -- --nocapture
+cargo test -p psionic-eval threads_research_profile -- --nocapture
+cargo test -p psionic-provider threads_research_profile -- --nocapture
+cargo test -p psionic-research threads_research_profile -- --nocapture
 ```
 
 These checks should keep the committed reports and generated truth aligned.

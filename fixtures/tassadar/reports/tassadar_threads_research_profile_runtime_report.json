@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.threads_research_profile.report.v1",
+  "profile_id": "tassadar.research_profile.threads_deterministic_scheduler.v1",
+  "exact_case_count": 2,
+  "refusal_case_count": 1,
+  "rows": [
+    {
+      "case_id": "round_robin_shared_counter",
+      "scheduler_id": "deterministic_round_robin_v1",
+      "workload_family": "shared_counter_increment",
+      "shared_memory_shape_id": "two_thread_shared_i32",
+      "status": "exact_deterministic_parity",
+      "exact_output_parity": true,
+      "exact_schedule_replay": true,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+      ],
+      "note": "two-thread round-robin shared-counter stepping remains replay-safe only inside the declared deterministic scheduler envelope"
+    },
+    {
+      "case_id": "barrier_then_reduce",
+      "scheduler_id": "deterministic_barrier_release_v1",
+      "workload_family": "barrier_reduce_kernel",
+      "shared_memory_shape_id": "two_thread_shared_slice_i32",
+      "status": "exact_deterministic_parity",
+      "exact_output_parity": true,
+      "exact_schedule_replay": true,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+      ],
+      "note": "barrier release plus reduce remains exact only when the scheduler order is explicit and fixed"
+    },
+    {
+      "case_id": "relaxed_memory_order_refusal",
+      "scheduler_id": "out_of_profile_relaxed_order",
+      "workload_family": "shared_counter_increment",
+      "shared_memory_shape_id": "two_thread_shared_i32",
+      "status": "exact_refusal_parity",
+      "exact_output_parity": false,
+      "exact_schedule_replay": false,
+      "refusal_reason_id": "unsupported_memory_ordering",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json"
+      ],
+      "note": "relaxed or nondeterministic memory ordering stays typed refusal truth instead of widening from the deterministic research rows"
+    }
+  ],
+  "claim_boundary": "this runtime report freezes one research-only shared-memory and threads profile with a deterministic scheduler envelope plus typed refusal on broader memory-ordering regimes. It does not claim general concurrency closure, broad shared-memory portability, or served publication",
+  "summary": "Threads research profile report covers 3 rows with exact_cases=2 and refusal_cases=1.",
+  "report_digest": "7cc0ed3944f3aceaf7daaf5213e5f913b37419d82c6e47a57c5ad6adc334f165"
+}

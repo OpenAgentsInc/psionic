@@ -76,6 +76,10 @@ Current honest posture:
   backend rows for cpu-reference exactness, metal and cuda scalar fallback,
   and typed accelerator-specific refusal truth, carried through served
   publication without creating a default served SIMD lane
+- the repo now also has one research-only shared-memory and threads profile
+  with a deterministic scheduler envelope, explicit sandbox boundary truth,
+  and typed refusal on host-nondeterministic scheduling plus relaxed
+  memory-ordering regimes; it remains non-served and non-promoted by design
 - broader profiles above that remain benchmarked, suppressed, refused, or
   unpromoted unless their explicit gates are green
 
@@ -101,9 +105,9 @@ Current dependency spine:
 
 Issue-state note:
 
-- `TAS-103` through `TAS-123` are already implemented and tracked in
+- `TAS-103` through `TAS-124` are already implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-124` and runs through
+- the current open GitHub backlog begins at `TAS-125` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs

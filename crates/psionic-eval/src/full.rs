@@ -46,14 +46,14 @@ mod tassadar_call_frames;
 mod tassadar_clrs_wasm_bridge;
 #[path = "tassadar_compile_pipeline_matrix.rs"]
 mod tassadar_compile_pipeline_matrix;
-#[path = "tassadar_component_linking_profile.rs"]
-mod tassadar_component_linking_profile;
 #[path = "tassadar_compiled_distillation.rs"]
 mod tassadar_compiled_distillation;
 #[path = "tassadar_compiled_executor.rs"]
 mod tassadar_compiled_executor;
 #[path = "tassadar_compiled_kernel_suite.rs"]
 mod tassadar_compiled_kernel_suite;
+#[path = "tassadar_component_linking_profile.rs"]
+mod tassadar_component_linking_profile;
 #[path = "tassadar_conditional_masking_report.rs"]
 mod tassadar_conditional_masking_report;
 #[path = "tassadar_cost_per_correct_job.rs"]
@@ -128,8 +128,6 @@ mod tassadar_memory_abi_v2;
 mod tassadar_mixed_numeric_ladder;
 #[path = "tassadar_mixed_trajectory.rs"]
 mod tassadar_mixed_trajectory;
-#[path = "tassadar_multi_memory_profile.rs"]
-mod tassadar_multi_memory_profile;
 #[path = "tassadar_module_installation_staging.rs"]
 mod tassadar_module_installation_staging;
 #[path = "tassadar_module_linker.rs"]
@@ -140,6 +138,8 @@ mod tassadar_module_promotion_state;
 mod tassadar_module_scale_workload_suite;
 #[path = "tassadar_module_trace_abi_v2.rs"]
 mod tassadar_module_trace_abi_v2;
+#[path = "tassadar_multi_memory_profile.rs"]
+mod tassadar_multi_memory_profile;
 #[path = "tassadar_negative_invocation.rs"]
 mod tassadar_negative_invocation;
 #[path = "tassadar_numeric_encoding.rs"]
@@ -166,14 +166,14 @@ mod tassadar_rust_only_article_closeout_audit;
 mod tassadar_rust_source_canon;
 #[path = "tassadar_search_native_executor.rs"]
 mod tassadar_search_native_executor;
-#[path = "tassadar_simd_profile.rs"]
-mod tassadar_simd_profile;
 #[path = "tassadar_sequence.rs"]
 mod tassadar_sequence;
 #[path = "tassadar_shared_depth_halting_calibration.rs"]
 mod tassadar_shared_depth_halting_calibration;
 #[path = "tassadar_shared_primitive_transfer.rs"]
 mod tassadar_shared_primitive_transfer;
+#[path = "tassadar_simd_profile.rs"]
+mod tassadar_simd_profile;
 #[path = "tassadar_sparse_rule_compiler_audit.rs"]
 mod tassadar_sparse_rule_compiler_audit;
 #[path = "tassadar_state_design_study_report.rs"]
@@ -186,6 +186,8 @@ mod tassadar_subset_profile_promotion_gate;
 mod tassadar_sudoku_9x9_compiled_executor;
 #[path = "tassadar_supervision_density.rs"]
 mod tassadar_supervision_density;
+#[path = "tassadar_threads_research_profile.rs"]
+mod tassadar_threads_research_profile;
 #[path = "tassadar_trace_state_ablation.rs"]
 mod tassadar_trace_state_ablation;
 #[path = "tassadar_trap_exception.rs"]
@@ -238,10 +240,10 @@ pub use tassadar_broad_internal_compute_profile_publication::*;
 pub use tassadar_call_frames::*;
 pub use tassadar_clrs_wasm_bridge::*;
 pub use tassadar_compile_pipeline_matrix::*;
-pub use tassadar_component_linking_profile::*;
 pub use tassadar_compiled_distillation::*;
 pub use tassadar_compiled_executor::*;
 pub use tassadar_compiled_kernel_suite::*;
+pub use tassadar_component_linking_profile::*;
 pub use tassadar_conditional_masking_report::*;
 pub use tassadar_cost_per_correct_job::*;
 pub use tassadar_counterfactual_route_quality::*;
@@ -275,16 +277,16 @@ pub use tassadar_learnability_gap::*;
 pub use tassadar_linked_program_bundle::*;
 pub use tassadar_locality_envelope::*;
 pub use tassadar_locality_scratchpad::*;
-pub use tassadar_memory64_profile::*;
 pub use tassadar_memory_abi_v2::*;
+pub use tassadar_memory64_profile::*;
 pub use tassadar_mixed_numeric_ladder::*;
 pub use tassadar_mixed_trajectory::*;
-pub use tassadar_multi_memory_profile::*;
 pub use tassadar_module_installation_staging::*;
 pub use tassadar_module_linker::*;
 pub use tassadar_module_promotion_state::*;
 pub use tassadar_module_scale_workload_suite::*;
 pub use tassadar_module_trace_abi_v2::*;
+pub use tassadar_multi_memory_profile::*;
 pub use tassadar_negative_invocation::*;
 pub use tassadar_numeric_encoding::*;
 pub use tassadar_numeric_opcode_ladder::*;
@@ -298,16 +300,17 @@ pub use tassadar_rust_only_article_acceptance_gate::*;
 pub use tassadar_rust_only_article_closeout_audit::*;
 pub use tassadar_rust_source_canon::*;
 pub use tassadar_search_native_executor::*;
-pub use tassadar_simd_profile::*;
 pub use tassadar_sequence::*;
 pub use tassadar_shared_depth_halting_calibration::*;
 pub use tassadar_shared_primitive_transfer::*;
+pub use tassadar_simd_profile::*;
 pub use tassadar_sparse_rule_compiler_audit::*;
 pub use tassadar_state_design_study_report::*;
 pub use tassadar_structured_control::*;
 pub use tassadar_subset_profile_promotion_gate::*;
 pub use tassadar_sudoku_9x9_compiled_executor::*;
 pub use tassadar_supervision_density::*;
+pub use tassadar_threads_research_profile::*;
 pub use tassadar_trace_state_ablation::*;
 pub use tassadar_trap_exception::*;
 pub use tassadar_verifier_guided_search_report::*;

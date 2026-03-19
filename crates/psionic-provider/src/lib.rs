@@ -9,9 +9,9 @@ mod tassadar_accepted_outcome_binding;
 mod tassadar_broad_internal_compute_acceptance_gate;
 mod tassadar_broad_internal_compute_portability;
 mod tassadar_broad_internal_compute_profile_publication;
+mod tassadar_component_linking_profile;
 mod tassadar_composite_accepted_outcome_template;
 mod tassadar_composite_routing;
-mod tassadar_component_linking_profile;
 mod tassadar_cost_per_correct_job;
 mod tassadar_counterfactual_route_quality;
 mod tassadar_delegation_benchmark;
@@ -29,7 +29,6 @@ mod tassadar_frozen_core_wasm_closure_gate;
 mod tassadar_import_policy_matrix;
 mod tassadar_installed_module_evidence;
 mod tassadar_linked_program_bundle;
-mod tassadar_multi_memory_profile;
 mod tassadar_module_catalog;
 mod tassadar_module_installation;
 mod tassadar_module_library;
@@ -38,6 +37,7 @@ mod tassadar_module_manifest;
 mod tassadar_module_overlap_resolution;
 mod tassadar_module_promotion_state;
 mod tassadar_module_trust_isolation;
+mod tassadar_multi_memory_profile;
 mod tassadar_numeric_portability;
 mod tassadar_planner_policy;
 mod tassadar_quantization_truth_envelope;
@@ -46,6 +46,7 @@ mod tassadar_resumable_multi_slice_promotion;
 mod tassadar_self_installation_gate;
 mod tassadar_simd_profile;
 mod tassadar_subset_profile_promotion_gate;
+mod tassadar_threads_research_profile;
 mod tassadar_trap_exception;
 mod tassadar_wedge_taxonomy;
 mod tassadar_world_mount_compatibility;
@@ -63,9 +64,9 @@ pub use tassadar_accepted_outcome_binding::*;
 pub use tassadar_broad_internal_compute_acceptance_gate::*;
 pub use tassadar_broad_internal_compute_portability::*;
 pub use tassadar_broad_internal_compute_profile_publication::*;
+pub use tassadar_component_linking_profile::*;
 pub use tassadar_composite_accepted_outcome_template::*;
 pub use tassadar_composite_routing::*;
-pub use tassadar_component_linking_profile::*;
 pub use tassadar_cost_per_correct_job::*;
 pub use tassadar_counterfactual_route_quality::*;
 pub use tassadar_delegation_benchmark::*;
@@ -83,7 +84,6 @@ pub use tassadar_frozen_core_wasm_closure_gate::*;
 pub use tassadar_import_policy_matrix::*;
 pub use tassadar_installed_module_evidence::*;
 pub use tassadar_linked_program_bundle::*;
-pub use tassadar_multi_memory_profile::*;
 pub use tassadar_module_catalog::*;
 pub use tassadar_module_installation::*;
 pub use tassadar_module_library::*;
@@ -92,6 +92,7 @@ pub use tassadar_module_manifest::*;
 pub use tassadar_module_overlap_resolution::*;
 pub use tassadar_module_promotion_state::*;
 pub use tassadar_module_trust_isolation::*;
+pub use tassadar_multi_memory_profile::*;
 pub use tassadar_numeric_portability::*;
 pub use tassadar_planner_policy::*;
 pub use tassadar_quantization_truth_envelope::*;
@@ -100,6 +101,7 @@ pub use tassadar_resumable_multi_slice_promotion::*;
 pub use tassadar_self_installation_gate::*;
 pub use tassadar_simd_profile::*;
 pub use tassadar_subset_profile_promotion_gate::*;
+pub use tassadar_threads_research_profile::*;
 pub use tassadar_trap_exception::*;
 pub use tassadar_wedge_taxonomy::*;
 pub use tassadar_world_mount_compatibility::*;
@@ -602,13 +604,14 @@ impl TassadarCapabilityEnvelope {
         let exception_profile_report = psionic_eval::build_tassadar_exception_profile_report();
         let exception_profile_receipt =
             TassadarExceptionProfileReceipt::from_report(&exception_profile_report);
-        let simd_profile_report = psionic_eval::build_tassadar_simd_profile_report().map_err(
-            |error| TassadarCapabilityEnvelopeError::UnpublishableSimdProfile {
-                detail: format!(
-                    "provider envelope requires a valid simd profile report: {error}"
-                ),
-            },
-        )?;
+        let simd_profile_report =
+            psionic_eval::build_tassadar_simd_profile_report().map_err(|error| {
+                TassadarCapabilityEnvelopeError::UnpublishableSimdProfile {
+                    detail: format!(
+                        "provider envelope requires a valid simd profile report: {error}"
+                    ),
+                }
+            })?;
         let simd_profile_receipt = TassadarSimdProfileReceipt::from_report(&simd_profile_report);
         let resumable_multi_slice_promotion_report =
             psionic_eval::build_tassadar_resumable_multi_slice_promotion_report().map_err(
@@ -914,7 +917,9 @@ impl TassadarCapabilityEnvelope {
             || !simd_profile_receipt.overall_green
             || !simd_profile_receipt
                 .public_profile_allowed_profile_ids
-                .contains(&String::from("tassadar.proposal_profile.simd_deterministic.v1"))
+                .contains(&String::from(
+                    "tassadar.proposal_profile.simd_deterministic.v1",
+                ))
             || !simd_profile_receipt
                 .default_served_profile_allowed_profile_ids
                 .is_empty()

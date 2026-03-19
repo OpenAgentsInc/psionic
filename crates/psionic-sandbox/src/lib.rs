@@ -23,3 +23,6 @@ pub use tassadar_import_boundary::*;
 
 mod tassadar_import_policy_matrix;
 pub use tassadar_import_policy_matrix::*;
+
+mod tassadar_threads_scheduler_boundary;
+pub use tassadar_threads_scheduler_boundary::*;

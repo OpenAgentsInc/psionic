@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.threads_research_profile.summary.v1",
+  "eval_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.threads_research_profile.eval_report.v1",
+    "profile_id": "tassadar.research_profile.threads_deterministic_scheduler.v1",
+    "runtime_report_ref": "fixtures/tassadar/reports/tassadar_threads_research_profile_runtime_report.json",
+    "runtime_report": {
+      "schema_version": 1,
+      "report_id": "tassadar.threads_research_profile.report.v1",
+      "profile_id": "tassadar.research_profile.threads_deterministic_scheduler.v1",
+      "exact_case_count": 2,
+      "refusal_case_count": 1,
+      "rows": [
+        {
+          "case_id": "round_robin_shared_counter",
+          "scheduler_id": "deterministic_round_robin_v1",
+          "workload_family": "shared_counter_increment",
+          "shared_memory_shape_id": "two_thread_shared_i32",
+          "status": "exact_deterministic_parity",
+          "exact_output_parity": true,
+          "exact_schedule_replay": true,
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+          ],
+          "note": "two-thread round-robin shared-counter stepping remains replay-safe only inside the declared deterministic scheduler envelope"
+        },
+        {
+          "case_id": "barrier_then_reduce",
+          "scheduler_id": "deterministic_barrier_release_v1",
+          "workload_family": "barrier_reduce_kernel",
+          "shared_memory_shape_id": "two_thread_shared_slice_i32",
+          "status": "exact_deterministic_parity",
+          "exact_output_parity": true,
+          "exact_schedule_replay": true,
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+          ],
+          "note": "barrier release plus reduce remains exact only when the scheduler order is explicit and fixed"
+        },
+        {
+          "case_id": "relaxed_memory_order_refusal",
+          "scheduler_id": "out_of_profile_relaxed_order",
+          "workload_family": "shared_counter_increment",
+          "shared_memory_shape_id": "two_thread_shared_i32",
+          "status": "exact_refusal_parity",
+          "exact_output_parity": false,
+          "exact_schedule_replay": false,
+          "refusal_reason_id": "unsupported_memory_ordering",
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json"
+          ],
+          "note": "relaxed or nondeterministic memory ordering stays typed refusal truth instead of widening from the deterministic research rows"
+        }
+      ],
+      "claim_boundary": "this runtime report freezes one research-only shared-memory and threads profile with a deterministic scheduler envelope plus typed refusal on broader memory-ordering regimes. It does not claim general concurrency closure, broad shared-memory portability, or served publication",
+      "summary": "Threads research profile report covers 3 rows with exact_cases=2 and refusal_cases=1.",
+      "report_digest": "7cc0ed3944f3aceaf7daaf5213e5f913b37419d82c6e47a57c5ad6adc334f165"
+    },
+    "sandbox_boundary_report_ref": "fixtures/tassadar/reports/tassadar_threads_scheduler_sandbox_boundary_report.json",
+    "sandbox_boundary_report": {
+      "schema_version": 1,
+      "report_id": "tassadar.threads_scheduler_sandbox_boundary.report.v1",
+      "profile_id": "tassadar.research_profile.threads_deterministic_scheduler.v1",
+      "allowed_scheduler_ids": [
+        "deterministic_round_robin_v1",
+        "deterministic_barrier_release_v1"
+      ],
+      "refused_scheduler_ids": [
+        "host_nondeterministic_runtime",
+        "deterministic_round_robin_v1"
+      ],
+      "allowed_case_count": 2,
+      "refused_case_count": 2,
+      "rows": [
+        {
+          "case_id": "round_robin_shared_counter",
+          "scheduler_id": "deterministic_round_robin_v1",
+          "shared_memory_shape_id": "two_thread_shared_i32",
+          "memory_order_id": "seq_cst",
+          "status": "allowed_deterministic",
+          "exact_schedule_replay": true,
+          "sandbox_descriptor_required": false,
+          "note": "deterministic round-robin shared-counter stepping is admitted only because schedule order and memory ordering are frozen explicitly"
+        },
+        {
+          "case_id": "barrier_then_reduce",
+          "scheduler_id": "deterministic_barrier_release_v1",
+          "shared_memory_shape_id": "two_thread_shared_slice_i32",
+          "memory_order_id": "acquire_release",
+          "status": "allowed_deterministic",
+          "exact_schedule_replay": true,
+          "sandbox_descriptor_required": false,
+          "note": "deterministic barrier release plus reduce stays inside the research envelope when barrier order is fixed and replayable"
+        },
+        {
+          "case_id": "host_scheduler_refusal",
+          "scheduler_id": "host_nondeterministic_runtime",
+          "shared_memory_shape_id": "two_thread_shared_i32",
+          "memory_order_id": "seq_cst",
+          "status": "refused_out_of_envelope",
+          "exact_schedule_replay": false,
+          "sandbox_descriptor_required": true,
+          "refusal_reason_id": "nondeterministic_scheduler",
+          "note": "host-owned scheduler selection remains refused because replay and challenge receipts would collapse without a frozen scheduler trace"
+        },
+        {
+          "case_id": "relaxed_memory_order_refusal",
+          "scheduler_id": "deterministic_round_robin_v1",
+          "shared_memory_shape_id": "two_thread_shared_i32",
+          "memory_order_id": "relaxed",
+          "status": "refused_out_of_envelope",
+          "exact_schedule_replay": false,
+          "sandbox_descriptor_required": true,
+          "refusal_reason_id": "unsupported_memory_ordering",
+          "note": "relaxed memory ordering remains refused because the deterministic scheduler envelope does not rescue weak-order semantics"
+        }
+      ],
+      "world_mount_dependency_marker": "world-mounts remain the authority owner for task-scoped shared-memory and scheduler admission outside standalone psionic",
+      "kernel_policy_dependency_marker": "kernel-policy remains the authority owner for settlement-grade scheduler and side-effect admission outside standalone psionic",
+      "claim_boundary": "this sandbox boundary admits only named deterministic scheduler shapes for the research threads profile and refuses host-nondeterministic scheduling plus relaxed shared-memory ordering. It does not create a served threads lane, arbitrary shared-memory portability, or general concurrency closure",
+      "summary": "Threads scheduler sandbox boundary report freezes 2 allowed deterministic cases and 2 refused out-of-envelope cases.",
+      "report_digest": "6a922a7f89896425dd8ac70940cbdafe2ab33e758342a86ce7850669d29221a7"
+    },
+    "case_audits": [
+      {
+        "case_id": "round_robin_shared_counter",
+        "scheduler_id": "deterministic_round_robin_v1",
+        "workload_family": "shared_counter_increment",
+        "shared_memory_shape_id": "two_thread_shared_i32",
+        "memory_order_id": "seq_cst",
+        "runtime_status": "exact_deterministic_parity",
+        "sandbox_status": "allowed_deterministic",
+        "exact_output_parity": true,
+        "exact_schedule_replay": true,
+        "in_declared_scheduler_envelope": true,
+        "note": "two-thread round-robin shared-counter stepping remains replay-safe only inside the declared deterministic scheduler envelope deterministic round-robin shared-counter stepping is admitted only because schedule order and memory ordering are frozen explicitly"
+      },
+      {
+        "case_id": "barrier_then_reduce",
+        "scheduler_id": "deterministic_barrier_release_v1",
+        "workload_family": "barrier_reduce_kernel",
+        "shared_memory_shape_id": "two_thread_shared_slice_i32",
+        "memory_order_id": "acquire_release",
+        "runtime_status": "exact_deterministic_parity",
+        "sandbox_status": "allowed_deterministic",
+        "exact_output_parity": true,
+        "exact_schedule_replay": true,
+        "in_declared_scheduler_envelope": true,
+        "note": "barrier release plus reduce remains exact only when the scheduler order is explicit and fixed deterministic barrier release plus reduce stays inside the research envelope when barrier order is fixed and replayable"
+      },
+      {
+        "case_id": "relaxed_memory_order_refusal",
+        "scheduler_id": "out_of_profile_relaxed_order",
+        "workload_family": "shared_counter_increment",
+        "shared_memory_shape_id": "two_thread_shared_i32",
+        "memory_order_id": "relaxed",
+        "runtime_status": "exact_refusal_parity",
+        "sandbox_status": "refused_out_of_envelope",
+        "exact_output_parity": false,
+        "exact_schedule_replay": false,
+        "refusal_reason_id": "unsupported_memory_ordering",
+        "in_declared_scheduler_envelope": true,
+        "note": "relaxed or nondeterministic memory ordering stays typed refusal truth instead of widening from the deterministic research rows relaxed memory ordering remains refused because the deterministic scheduler envelope does not rescue weak-order semantics"
+      }
+    ],
+    "exact_case_count": 2,
+    "refusal_case_count": 1,
+    "sandbox_negative_only_case_count": 1,
+    "green_scheduler_ids": [
+      "deterministic_barrier_release_v1",
+      "deterministic_round_robin_v1"
+    ],
+    "refused_scheduler_ids": [
+      "deterministic_round_robin_v1",
+      "host_nondeterministic_runtime"
+    ],
+    "served_publication_allowed": false,
+    "overall_green": true,
+    "generated_from_refs": [
+      "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+      "fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json",
+      "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+      "fixtures/tassadar/reports/tassadar_threads_research_profile_runtime_report.json",
+      "fixtures/tassadar/reports/tassadar_threads_scheduler_sandbox_boundary_report.json"
+    ],
+    "claim_boundary": "this eval report keeps the shared-memory and threads lane research-only. A green report means one deterministic scheduler envelope and its typed refusal rows are benchmarked honestly; it does not create a served threads lane, arbitrary shared-memory closure, or general concurrency portability",
+    "summary": "Threads research profile report covers exact_cases=2, refusal_cases=1, sandbox_negative_only_cases=1, green_schedulers=2, refused_schedulers=2, served_publication_allowed=false, overall_green=true.",
+    "report_digest": "aa23bb8f8ea997a47eaf848ca775c7865a684762c6bd42f8a2e4864d6b3525d5"
+  },
+  "fragile_scheduler_ids": [
+    "deterministic_round_robin_v1"
+  ],
+  "refused_scheduler_ids": [
+    "deterministic_round_robin_v1",
+    "host_nondeterministic_runtime"
+  ],
+  "deterministic_scope_sentence": "the current research surface is only a two-thread deterministic scheduler envelope with explicit replay order; host-nondeterministic scheduling and relaxed shared-memory ordering remain refused",
+  "claim_boundary": "this summary keeps shared-memory and threads as a research-only architecture surface. It highlights the narrow deterministic scheduler scope and explicit refusals instead of widening concurrency into served or market posture",
+  "summary": "Threads research summary now records overall_green=true, fragile_schedulers=1, refused_schedulers=2, and served_publication_allowed=false.",
+  "report_digest": "3216edb1c49c37a9911b879b2897ead6aec4e8e6c153e9ae682e19071eb5de24"
+}

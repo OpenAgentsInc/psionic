@@ -808,6 +808,16 @@ The current scope is:
   without creating a default served SIMD lane, and this still does not claim
   arbitrary SIMD closure, accelerator-invariant vector exactness, or broader
   served publication
+- the current threads research-profile artifacts are
+  `fixtures/tassadar/reports/tassadar_threads_research_profile_runtime_report.json`,
+  `fixtures/tassadar/reports/tassadar_threads_scheduler_sandbox_boundary_report.json`,
+  `fixtures/tassadar/reports/tassadar_threads_research_profile_report.json`,
+  and `fixtures/tassadar/reports/tassadar_threads_research_profile_summary.json`,
+  which freeze one research-only shared-memory and threads lane with a
+  deterministic scheduler envelope, explicit sandbox-boundary truth, and typed
+  refusal on host-nondeterministic scheduling plus relaxed memory-ordering
+  regimes; this is not a served threads lane, arbitrary shared-memory
+  portability, or general concurrency closure
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import
