@@ -48,6 +48,15 @@ pub fn build_tassadar_architecture_bakeoff_budget_bundle() -> TassadarArchitectu
     let publication = tassadar_architecture_bakeoff_publication();
     let budget_rows = vec![
         row(
+            TassadarArchitectureBakeoffFamily::CompiledExactExecutor,
+            &[
+                "fixtures/tassadar/reports/tassadar_article_runtime_closeout_report.json",
+                "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+                "fixtures/tassadar/reports/tassadar_effect_taxonomy_report.json",
+            ],
+            "compiled exact executors stay on the shared budget while carrying the exact checkpoint, effect-taxonomy, and long-horizon receipts that anchor the broadened program families",
+        ),
+        row(
             TassadarArchitectureBakeoffFamily::FlatDecoderTraceModel,
             &[
                 "fixtures/tassadar/runs/sudoku_v0_architecture_comparison_v11/architecture_comparison_report.json",
@@ -85,6 +94,15 @@ pub fn build_tassadar_architecture_bakeoff_budget_bundle() -> TassadarArchitectu
             TassadarArchitectureBakeoffFamily::SearchNativeExecutor,
             &["fixtures/tassadar/reports/tassadar_verifier_guided_search_architecture_report.json"],
             "search-native executors stay on the shared budget instead of getting a search-only evaluation universe",
+        ),
+        row(
+            TassadarArchitectureBakeoffFamily::HybridPlannerExecutor,
+            &[
+                "fixtures/tassadar/reports/tassadar_composite_routing_report.json",
+                "fixtures/tassadar/reports/tassadar_counterfactual_route_quality_report.json",
+                "fixtures/tassadar/reports/tassadar_effect_taxonomy_report.json",
+            ],
+            "hybrid planner executors stay on the same budget and keep routing plus effect-policy evidence explicit instead of inheriting a separate orchestration-only scorecard",
         ),
     ];
     let mut bundle = TassadarArchitectureBakeoffBudgetBundle {
@@ -192,7 +210,7 @@ mod tests {
     fn architecture_bakeoff_budget_bundle_is_machine_legible() {
         let bundle = build_tassadar_architecture_bakeoff_budget_bundle();
 
-        assert_eq!(bundle.budget_rows.len(), 6);
+        assert_eq!(bundle.budget_rows.len(), 8);
         assert!(
             bundle
                 .budget_rows
@@ -201,6 +219,9 @@ mod tests {
         );
         assert!(bundle.budget_rows.iter().any(|row| {
             row.architecture_family == TassadarArchitectureBakeoffFamily::MemoryAugmentedExecutor
+        }));
+        assert!(bundle.budget_rows.iter().any(|row| {
+            row.architecture_family == TassadarArchitectureBakeoffFamily::HybridPlannerExecutor
         }));
     }
 

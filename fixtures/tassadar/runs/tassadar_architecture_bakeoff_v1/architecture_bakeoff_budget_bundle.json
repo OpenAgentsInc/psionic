@@ -7,9 +7,26 @@
     "clrs_shortest_path",
     "sudoku_backtracking_search",
     "module_scale_wasm_loop",
-    "long_horizon_control"
+    "long_horizon_control",
+    "checkpointed_resumable_program",
+    "linked_program_bundle",
+    "import_mediated_process",
+    "stateful_process_loop"
   ],
   "budget_rows": [
+    {
+      "architecture_family": "compiled_exact_executor",
+      "train_budget_tokens": 1200000,
+      "eval_case_budget": 32,
+      "cost_cap_bps": 8000,
+      "stability_replay_count": 4,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_runtime_closeout_report.json",
+        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+        "fixtures/tassadar/reports/tassadar_effect_taxonomy_report.json"
+      ],
+      "note": "compiled exact executors stay on the shared budget while carrying the exact checkpoint, effect-taxonomy, and long-horizon receipts that anchor the broadened program families"
+    },
     {
       "architecture_family": "flat_decoder_trace_model",
       "train_budget_tokens": 1200000,
@@ -78,9 +95,22 @@
         "fixtures/tassadar/reports/tassadar_verifier_guided_search_architecture_report.json"
       ],
       "note": "search-native executors stay on the shared budget instead of getting a search-only evaluation universe"
+    },
+    {
+      "architecture_family": "hybrid_planner_executor",
+      "train_budget_tokens": 1200000,
+      "eval_case_budget": 32,
+      "cost_cap_bps": 8000,
+      "stability_replay_count": 4,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_composite_routing_report.json",
+        "fixtures/tassadar/reports/tassadar_counterfactual_route_quality_report.json",
+        "fixtures/tassadar/reports/tassadar_effect_taxonomy_report.json"
+      ],
+      "note": "hybrid planner executors stay on the same budget and keep routing plus effect-policy evidence explicit instead of inheriting a separate orchestration-only scorecard"
     }
   ],
   "claim_boundary": "this bundle freezes one same-task same-budget architecture matrix over shared workload families. It does not promote any architecture family by itself, and it does not allow earlier-landed lanes to quietly inherit extra budget or a separate evaluation universe",
-  "summary": "Architecture bakeoff budget bundle freezes 6 architecture rows over 5 shared workload families at one common budget.",
-  "bundle_digest": "1d9d4c39d9eb479752ec3be6431d1eb6d21b108a488484677221c55fe9f7302b"
+  "summary": "Architecture bakeoff budget bundle freezes 8 architecture rows over 9 shared workload families at one common budget.",
+  "bundle_digest": "fd46ce306b10ffc52cb145b8363bc7368d568f79843def5612a17e03378a95ea"
 }

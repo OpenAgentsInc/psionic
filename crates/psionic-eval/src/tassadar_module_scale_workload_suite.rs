@@ -522,6 +522,9 @@ fn build_tassadar_module_scale_environment_bundle(
         execution_checkpoint_binding:
             psionic_environments::default_tassadar_execution_checkpoint_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
+        architecture_bakeoff_binding: Some(
+            psionic_environments::default_tassadar_architecture_bakeoff_binding(),
+        ),
         module_scale_workload_suite_binding: Some(TassadarModuleScaleWorkloadSuiteBinding {
             suite_ref: String::from(suite_contract.suite_ref.clone()),
             suite_version: String::from(suite_contract.version.clone()),

@@ -21,9 +21,31 @@
     [
       "long_horizon_control",
       "shared_depth_recurrent_refinement"
+    ],
+    [
+      "checkpointed_resumable_program",
+      "compiled_exact_executor"
+    ],
+    [
+      "linked_program_bundle",
+      "hybrid_planner_executor"
+    ],
+    [
+      "import_mediated_process",
+      "hybrid_planner_executor"
+    ],
+    [
+      "stateful_process_loop",
+      "memory_augmented_executor"
     ]
   ],
   "owned_workloads_by_architecture": [
+    [
+      "compiled_exact_executor",
+      [
+        "checkpointed_resumable_program"
+      ]
+    ],
     [
       "flat_decoder_trace_model",
       []
@@ -57,11 +79,22 @@
       [
         "sudoku_backtracking_search"
       ]
+    ],
+    [
+      "hybrid_planner_executor",
+      []
     ]
   ],
+  "no_honest_owner_workloads": [
+    "linked_program_bundle",
+    "import_mediated_process",
+    "stateful_process_loop"
+  ],
   "refusal_first_workloads": [
+    "import_mediated_process",
+    "linked_program_bundle",
     "module_scale_wasm_loop"
   ],
-  "claim_boundary": "this summary remains a research-only architecture comparison over shared workloads. It makes workload-family ownership and refusal-first regions explicit and does not widen served capability or broad learned-compute claims by itself",
-  "summary_digest": "c5ace5c69468fcda6f1ed88c72b6163a37d7dcddc5d0f8ce5cd86c151a4c8d54"
+  "claim_boundary": "this summary remains a research-only architecture comparison over the broadened program-family suite. It makes workload-family ownership, no-owner regions, and refusal-first regions explicit and does not widen served capability or broad learned-compute claims by itself",
+  "summary_digest": "2a37ce6167c09aaf26bf97862f08d692cad88585b3a771fe3c176a4a4eca79d4"
 }

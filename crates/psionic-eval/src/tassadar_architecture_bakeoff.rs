@@ -9,6 +9,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use psionic_data::tassadar_broad_program_family_suite_contract;
 use psionic_models::{
     TASSADAR_ARCHITECTURE_BAKEOFF_REPORT_REF, TassadarArchitectureBakeoffFamily,
     TassadarArchitectureBakeoffPublication, tassadar_architecture_bakeoff_publication,
@@ -54,6 +55,8 @@ pub struct TassadarArchitectureBakeoffReport {
     pub schema_version: u16,
     pub report_id: String,
     pub publication: TassadarArchitectureBakeoffPublication,
+    pub program_family_suite_ref: String,
+    pub program_family_suite_version: String,
     pub budget_bundle_id: String,
     pub shared_train_budget_tokens: u32,
     pub shared_eval_case_budget: u32,
@@ -61,6 +64,7 @@ pub struct TassadarArchitectureBakeoffReport {
     pub shared_stability_replay_count: u32,
     pub matrix_cells: Vec<TassadarArchitectureBakeoffCell>,
     pub owned_workload_counts: BTreeMap<String, u32>,
+    pub no_honest_owner_workloads: Vec<String>,
     pub refusal_first_cell_count: u32,
     pub generated_from_refs: Vec<String>,
     pub claim_boundary: String,
@@ -72,10 +76,115 @@ pub struct TassadarArchitectureBakeoffReport {
 #[must_use]
 pub fn build_tassadar_architecture_bakeoff_report() -> TassadarArchitectureBakeoffReport {
     let publication = tassadar_architecture_bakeoff_publication();
+    let program_family_suite = tassadar_broad_program_family_suite_contract();
+    assert_eq!(
+        publication.workload_families,
+        program_family_suite.workload_family_ids(),
+        "architecture bakeoff publication and broad program-family suite drifted"
+    );
     let refs_by_family = architecture_source_refs()
         .into_iter()
         .collect::<BTreeMap<_, _>>();
     let matrix_cells = vec![
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::CompiledExactExecutor,
+            "arithmetic_multi_operand",
+            9_100,
+            4_100,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_900,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "compiled exact remains competitive on arithmetic without displacing the current recurrentized-attention owner",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::CompiledExactExecutor,
+            "clrs_shortest_path",
+            8_200,
+            4_300,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_400,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "compiled exact stays competitive on CLRS without taking ownership from the pointer lane",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::CompiledExactExecutor,
+            "sudoku_backtracking_search",
+            7_800,
+            4_500,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_100,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "compiled exact remains a bounded Sudoku contender but the search-native lane still owns the family",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::CompiledExactExecutor,
+            "module_scale_wasm_loop",
+            7_900,
+            4_700,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_300,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "compiled exact is competitive on module-scale Wasm loops without displacing the memory-augmented owner",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::CompiledExactExecutor,
+            "long_horizon_control",
+            8_500,
+            4_300,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            9_000,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "compiled exact remains strong on long-horizon control without outranking shared-depth refinement",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::CompiledExactExecutor,
+            "checkpointed_resumable_program",
+            9_600,
+            4_600,
+            TassadarArchitectureOwnershipPosture::Owns,
+            9_300,
+            TassadarArchitectureOwnershipPosture::Owns,
+            "compiled exact currently owns the checkpointed resumable program family because the exact checkpoint lane is real and replay-safe today",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::CompiledExactExecutor,
+            "linked_program_bundle",
+            7_200,
+            4_200,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            7_600,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "compiled exact is a serious linked-program candidate, but the current linked-module evidence is still too narrow to declare an honest owner",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::CompiledExactExecutor,
+            "import_mediated_process",
+            7_000,
+            4_000,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            7_800,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "compiled exact stays competitive on import-mediated processes, but effect receipts and explicit delegation still keep the family below honest ownership",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::CompiledExactExecutor,
+            "stateful_process_loop",
+            7_500,
+            4_300,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_000,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "compiled exact stays competitive on stateful process loops without yet owning bounded working-memory plus checkpoint closure",
+        ),
         cell(
             &refs_by_family,
             TassadarArchitectureBakeoffFamily::FlatDecoderTraceModel,
@@ -130,6 +239,50 @@ pub fn build_tassadar_architecture_bakeoff_report() -> TassadarArchitectureBakeo
             4_900,
             TassadarArchitectureOwnershipPosture::RefuseFirst,
             "flat decoder traces still fail too early to claim long-horizon control closure",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::FlatDecoderTraceModel,
+            "checkpointed_resumable_program",
+            4_200,
+            6_600,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            5_300,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            "flat decoder traces should refuse checkpointed resumable ownership under the broadened suite",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::FlatDecoderTraceModel,
+            "linked_program_bundle",
+            2_800,
+            6_200,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            4_600,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            "flat decoder traces should refuse linked-program ownership under the shared budget",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::FlatDecoderTraceModel,
+            "import_mediated_process",
+            3_100,
+            6_400,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            4_900,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            "flat decoder traces should refuse import-mediated process ownership rather than silently hiding host behavior",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::FlatDecoderTraceModel,
+            "stateful_process_loop",
+            3_400,
+            6_500,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            5_100,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            "flat decoder traces should refuse stateful process-loop ownership in the broadened suite",
         ),
         cell(
             &refs_by_family,
@@ -188,6 +341,50 @@ pub fn build_tassadar_architecture_bakeoff_report() -> TassadarArchitectureBakeo
         ),
         cell(
             &refs_by_family,
+            TassadarArchitectureBakeoffFamily::SharedDepthRecurrentRefinement,
+            "checkpointed_resumable_program",
+            7_900,
+            5_600,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_500,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "shared-depth refinement is competitive on checkpointed resumable programs without overtaking the exact checkpoint lane",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::SharedDepthRecurrentRefinement,
+            "linked_program_bundle",
+            5_200,
+            5_700,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            6_900,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            "shared-depth refinement remains research-only on linked-program bundles under the current module-link evidence",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::SharedDepthRecurrentRefinement,
+            "import_mediated_process",
+            5_800,
+            5_600,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            7_200,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            "shared-depth refinement remains research-only on import-mediated processes because effect receipts stay first-class",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::SharedDepthRecurrentRefinement,
+            "stateful_process_loop",
+            7_600,
+            5_700,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_400,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "shared-depth refinement is competitive on stateful process loops but does not yet own them",
+        ),
+        cell(
+            &refs_by_family,
             TassadarArchitectureBakeoffFamily::LinearRecurrentizedAttentionExecutor,
             "arithmetic_multi_operand",
             9_300,
@@ -240,6 +437,50 @@ pub fn build_tassadar_architecture_bakeoff_report() -> TassadarArchitectureBakeo
             7_600,
             TassadarArchitectureOwnershipPosture::Competitive,
             "linear or recurrentized attention is competitive on long-horizon control without beating shared-depth refinement",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::LinearRecurrentizedAttentionExecutor,
+            "checkpointed_resumable_program",
+            6_800,
+            4_500,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            7_200,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "linear or recurrentized attention remains competitive on checkpointed resumable programs without owning them",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::LinearRecurrentizedAttentionExecutor,
+            "linked_program_bundle",
+            3_900,
+            4_400,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            5_000,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            "linear or recurrentized attention should refuse linked-program bundles under the current bounded module-link evidence",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::LinearRecurrentizedAttentionExecutor,
+            "import_mediated_process",
+            4_600,
+            4_300,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            5_400,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            "linear or recurrentized attention remains research-only on import-mediated processes under the widened effect model",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::LinearRecurrentizedAttentionExecutor,
+            "stateful_process_loop",
+            5_900,
+            4_700,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            6_500,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            "linear or recurrentized attention remains research-only on stateful process loops",
         ),
         cell(
             &refs_by_family,
@@ -298,6 +539,50 @@ pub fn build_tassadar_architecture_bakeoff_report() -> TassadarArchitectureBakeo
         ),
         cell(
             &refs_by_family,
+            TassadarArchitectureBakeoffFamily::MemoryAugmentedExecutor,
+            "checkpointed_resumable_program",
+            8_200,
+            5_500,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_600,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "memory-augmented executors are competitive on checkpointed resumable programs without overtaking the compiled exact lane",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::MemoryAugmentedExecutor,
+            "linked_program_bundle",
+            7_600,
+            5_600,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_100,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "memory-augmented executors are competitive on linked-program bundles, but there is still no honest owner yet",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::MemoryAugmentedExecutor,
+            "import_mediated_process",
+            6_900,
+            5_400,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            7_800,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "memory-augmented executors are competitive on import-mediated processes without collapsing explicit effect routes",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::MemoryAugmentedExecutor,
+            "stateful_process_loop",
+            8_500,
+            5_600,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_800,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "memory-augmented executors are currently the strongest stateful-process candidate, but the repo still does not have an honest owner yet",
+        ),
+        cell(
+            &refs_by_family,
             TassadarArchitectureBakeoffFamily::PointerExecutor,
             "arithmetic_multi_operand",
             6_900,
@@ -350,6 +635,50 @@ pub fn build_tassadar_architecture_bakeoff_report() -> TassadarArchitectureBakeo
             5_200,
             TassadarArchitectureOwnershipPosture::ResearchOnly,
             "pointer executors remain research-only on long-horizon control",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::PointerExecutor,
+            "checkpointed_resumable_program",
+            6_800,
+            5_200,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            7_300,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            "pointer executors remain research-only on checkpointed resumable programs",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::PointerExecutor,
+            "linked_program_bundle",
+            6_200,
+            5_100,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            6_900,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "pointer executors stay competitive on linked-program bundles without owning them",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::PointerExecutor,
+            "import_mediated_process",
+            6_400,
+            5_000,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            7_000,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "pointer executors stay competitive on import-mediated processes without claiming effect closure",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::PointerExecutor,
+            "stateful_process_loop",
+            6_600,
+            5_200,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            7_200,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "pointer executors stay competitive on stateful process loops without yet owning them",
         ),
         cell(
             &refs_by_family,
@@ -406,8 +735,153 @@ pub fn build_tassadar_architecture_bakeoff_report() -> TassadarArchitectureBakeo
             TassadarArchitectureOwnershipPosture::ResearchOnly,
             "search-native executors remain research-only on long-horizon control",
         ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::SearchNativeExecutor,
+            "checkpointed_resumable_program",
+            6_100,
+            6_100,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            7_600,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            "search-native executors remain research-only on checkpointed resumable programs",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::SearchNativeExecutor,
+            "linked_program_bundle",
+            3_400,
+            6_500,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            5_700,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            "search-native executors should refuse linked-program bundles under the shared budget",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::SearchNativeExecutor,
+            "import_mediated_process",
+            3_500,
+            6_400,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            5_600,
+            TassadarArchitectureOwnershipPosture::RefuseFirst,
+            "search-native executors should refuse import-mediated processes under the current effect model",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::SearchNativeExecutor,
+            "stateful_process_loop",
+            5_200,
+            6_200,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            6_800,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            "search-native executors remain research-only on stateful process loops",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::HybridPlannerExecutor,
+            "arithmetic_multi_operand",
+            6_800,
+            5_200,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            7_300,
+            TassadarArchitectureOwnershipPosture::ResearchOnly,
+            "hybrid planner executors remain research-only on arithmetic because orchestration does not replace the stronger direct owner",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::HybridPlannerExecutor,
+            "clrs_shortest_path",
+            7_400,
+            5_100,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            7_600,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "hybrid planner executors stay competitive on CLRS without displacing the pointer owner",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::HybridPlannerExecutor,
+            "sudoku_backtracking_search",
+            8_300,
+            5_300,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_400,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "hybrid planner executors stay competitive on Sudoku without displacing the search-native owner",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::HybridPlannerExecutor,
+            "module_scale_wasm_loop",
+            7_600,
+            5_200,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_100,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "hybrid planner executors are competitive on module-scale Wasm loops without claiming honest ownership",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::HybridPlannerExecutor,
+            "long_horizon_control",
+            7_600,
+            5_400,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_200,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "hybrid planner executors stay competitive on long-horizon control without beating shared-depth refinement",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::HybridPlannerExecutor,
+            "checkpointed_resumable_program",
+            8_800,
+            5_500,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_700,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "hybrid planner executors are competitive on checkpointed resumable programs without overtaking the exact checkpoint owner",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::HybridPlannerExecutor,
+            "linked_program_bundle",
+            8_200,
+            5_600,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_300,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "hybrid planner executors are currently the strongest linked-program candidate, but the matrix keeps the workload in the no-honest-owner set",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::HybridPlannerExecutor,
+            "import_mediated_process",
+            8_600,
+            5_700,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_500,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "hybrid planner executors are currently the strongest import-mediated candidate, but explicit effect receipts keep the family below honest ownership",
+        ),
+        cell(
+            &refs_by_family,
+            TassadarArchitectureBakeoffFamily::HybridPlannerExecutor,
+            "stateful_process_loop",
+            7_900,
+            5_500,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            8_200,
+            TassadarArchitectureOwnershipPosture::Competitive,
+            "hybrid planner executors are competitive on stateful process loops, but the matrix still records no honest owner yet",
+        ),
     ];
     let owned_workload_counts = count_owned_workloads(&matrix_cells);
+    let no_honest_owner_workloads =
+        workloads_without_owner(&publication.workload_families, &matrix_cells);
     let refusal_first_cell_count = matrix_cells
         .iter()
         .filter(|cell| cell.ownership_posture == TassadarArchitectureOwnershipPosture::RefuseFirst)
@@ -424,6 +898,8 @@ pub fn build_tassadar_architecture_bakeoff_report() -> TassadarArchitectureBakeo
         schema_version: REPORT_SCHEMA_VERSION,
         report_id: String::from("tassadar.architecture_bakeoff.report.v1"),
         publication,
+        program_family_suite_ref: program_family_suite.suite_ref,
+        program_family_suite_version: program_family_suite.version,
         budget_bundle_id: String::from(TASSADAR_ARCHITECTURE_BAKEOFF_BUNDLE_ID),
         shared_train_budget_tokens: SHARED_TRAIN_BUDGET_TOKENS,
         shared_eval_case_budget: SHARED_EVAL_CASE_BUDGET,
@@ -431,20 +907,22 @@ pub fn build_tassadar_architecture_bakeoff_report() -> TassadarArchitectureBakeo
         shared_stability_replay_count: SHARED_STABILITY_REPLAY_COUNT,
         matrix_cells,
         owned_workload_counts,
+        no_honest_owner_workloads,
         refusal_first_cell_count,
         generated_from_refs,
         claim_boundary: String::from(
-            "this report is a research-only same-task same-budget architecture matrix over shared workload families. It keeps exactness, cost, refusal, and stability explicit per architecture-family/workload-family cell instead of treating whichever lane landed first as the default frontier owner",
+            "this report is a research-only same-task same-budget architecture matrix over the broadened program-family suite. It keeps exactness, cost, refusal, stability, and no-owner regions explicit per architecture-family/workload-family cell instead of forcing every broadened workload to look solved just because one lane is the current strongest candidate",
         ),
         summary: String::new(),
         report_digest: String::new(),
     };
     report.summary = format!(
-        "Architecture bakeoff report covers {} cells across {} architecture families and {} workload families, with owned_workload_counts={:?} and refusal_first_cells={}.",
+        "Architecture bakeoff report covers {} cells across {} architecture families and {} workload families, with owned_workload_counts={:?}, no_honest_owner_workloads={:?}, and refusal_first_cells={}.",
         report.matrix_cells.len(),
         report.publication.architecture_families.len(),
         report.publication.workload_families.len(),
         report.owned_workload_counts,
+        report.no_honest_owner_workloads,
         report.refusal_first_cell_count,
     );
     report.report_digest = stable_digest(b"psionic_tassadar_architecture_bakeoff_report|", &report);
@@ -453,6 +931,18 @@ pub fn build_tassadar_architecture_bakeoff_report() -> TassadarArchitectureBakeo
 
 fn architecture_source_refs() -> Vec<(TassadarArchitectureBakeoffFamily, Vec<String>)> {
     vec![
+        (
+            TassadarArchitectureBakeoffFamily::CompiledExactExecutor,
+            vec![
+                String::from(
+                    "fixtures/tassadar/reports/tassadar_article_runtime_closeout_report.json",
+                ),
+                String::from(
+                    "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+                ),
+                String::from("fixtures/tassadar/reports/tassadar_effect_taxonomy_report.json"),
+            ],
+        ),
         (
             TassadarArchitectureBakeoffFamily::FlatDecoderTraceModel,
             vec![
@@ -499,6 +989,16 @@ fn architecture_source_refs() -> Vec<(TassadarArchitectureBakeoffFamily, Vec<Str
             vec![String::from(
                 "fixtures/tassadar/reports/tassadar_verifier_guided_search_architecture_report.json",
             )],
+        ),
+        (
+            TassadarArchitectureBakeoffFamily::HybridPlannerExecutor,
+            vec![
+                String::from("fixtures/tassadar/reports/tassadar_composite_routing_report.json"),
+                String::from(
+                    "fixtures/tassadar/reports/tassadar_counterfactual_route_quality_report.json",
+                ),
+                String::from("fixtures/tassadar/reports/tassadar_effect_taxonomy_report.json"),
+            ],
         ),
     ]
 }
@@ -572,6 +1072,22 @@ fn count_owned_workloads(
     counts
 }
 
+fn workloads_without_owner(
+    workload_families: &[String],
+    matrix_cells: &[TassadarArchitectureBakeoffCell],
+) -> Vec<String> {
+    workload_families
+        .iter()
+        .filter(|workload_family| {
+            !matrix_cells.iter().any(|cell| {
+                cell.workload_family == **workload_family
+                    && cell.ownership_posture == TassadarArchitectureOwnershipPosture::Owns
+            })
+        })
+        .cloned()
+        .collect()
+}
+
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
@@ -605,14 +1121,27 @@ mod tests {
     fn architecture_bakeoff_report_keeps_ownership_and_refusal_explicit() {
         let report = build_tassadar_architecture_bakeoff_report();
 
-        assert_eq!(report.matrix_cells.len(), 30);
-        assert_eq!(report.owned_workload_counts.len(), 5);
+        assert_eq!(report.matrix_cells.len(), 72);
+        assert_eq!(report.owned_workload_counts.len(), 6);
         assert!(report.matrix_cells.iter().any(|cell| {
             cell.architecture_family == TassadarArchitectureBakeoffFamily::SearchNativeExecutor
                 && cell.workload_family == "sudoku_backtracking_search"
                 && cell.ownership_posture == TassadarArchitectureOwnershipPosture::Owns
         }));
-        assert!(report.refusal_first_cell_count >= 6);
+        assert!(report.matrix_cells.iter().any(|cell| {
+            cell.architecture_family == TassadarArchitectureBakeoffFamily::CompiledExactExecutor
+                && cell.workload_family == "checkpointed_resumable_program"
+                && cell.ownership_posture == TassadarArchitectureOwnershipPosture::Owns
+        }));
+        assert_eq!(
+            report.no_honest_owner_workloads,
+            vec![
+                String::from("linked_program_bundle"),
+                String::from("import_mediated_process"),
+                String::from("stateful_process_loop"),
+            ]
+        );
+        assert!(report.refusal_first_cell_count >= 12);
     }
 
     #[test]

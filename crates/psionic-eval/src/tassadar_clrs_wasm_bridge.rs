@@ -487,6 +487,9 @@ fn build_tassadar_clrs_wasm_bridge_environment_bundle(
         execution_checkpoint_binding:
             psionic_environments::default_tassadar_execution_checkpoint_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
+        architecture_bakeoff_binding: Some(
+            psionic_environments::default_tassadar_architecture_bakeoff_binding(),
+        ),
         module_scale_workload_suite_binding: None,
         clrs_wasm_bridge_binding: Some(TassadarClrsWasmBridgeBinding {
             bridge_ref: bridge.bridge_ref.clone(),

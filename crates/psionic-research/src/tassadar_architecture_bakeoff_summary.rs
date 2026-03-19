@@ -22,6 +22,7 @@ pub struct TassadarArchitectureBakeoffSummary {
     pub report_id: String,
     pub strongest_architecture_by_workload: Vec<(String, String)>,
     pub owned_workloads_by_architecture: Vec<(String, Vec<String>)>,
+    pub no_honest_owner_workloads: Vec<String>,
     pub refusal_first_workloads: Vec<String>,
     pub claim_boundary: String,
     pub summary_digest: String,
@@ -78,9 +79,10 @@ pub fn build_tassadar_architecture_bakeoff_summary() -> TassadarArchitectureBake
         report_id: report.report_id,
         strongest_architecture_by_workload,
         owned_workloads_by_architecture,
+        no_honest_owner_workloads: report.no_honest_owner_workloads,
         refusal_first_workloads,
         claim_boundary: String::from(
-            "this summary remains a research-only architecture comparison over shared workloads. It makes workload-family ownership and refusal-first regions explicit and does not widen served capability or broad learned-compute claims by itself",
+            "this summary remains a research-only architecture comparison over the broadened program-family suite. It makes workload-family ownership, no-owner regions, and refusal-first regions explicit and does not widen served capability or broad learned-compute claims by itself",
         ),
         summary_digest: String::new(),
     };
@@ -179,6 +181,14 @@ mod tests {
             summary
                 .refusal_first_workloads
                 .contains(&String::from("module_scale_wasm_loop"))
+        );
+        assert_eq!(
+            summary.no_honest_owner_workloads,
+            vec![
+                String::from("linked_program_bundle"),
+                String::from("import_mediated_process"),
+                String::from("stateful_process_loop"),
+            ]
         );
     }
 

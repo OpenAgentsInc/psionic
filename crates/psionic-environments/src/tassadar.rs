@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use psionic_data::{
     DatasetKey, TassadarBenchmarkAxis, TassadarBenchmarkFamily, TassadarClrsAlgorithmFamily,
     TassadarClrsLengthBucket, TassadarClrsTrajectoryFamily, TassadarModuleScaleWorkloadFamily,
+    tassadar_broad_program_family_suite_contract,
 };
 use psionic_models::{
     TassadarGeneralizedAbiPublication, TassadarInternalComputeProfileClaimCheckResult,
@@ -45,6 +46,7 @@ const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_LADDER_KEY: &str =
 const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_CLAIM_KEY: &str =
     "tassadar.internal_compute_profile_claim";
 const TASSADAR_METADATA_WASM_CONFORMANCE_KEY: &str = "tassadar.wasm_conformance";
+const TASSADAR_METADATA_ARCHITECTURE_BAKEOFF_KEY: &str = "tassadar.architecture_bakeoff";
 const TASSADAR_METADATA_MODULE_SCALE_WORKLOAD_SUITE_KEY: &str =
     "tassadar.module_scale_workload_suite";
 const TASSADAR_METADATA_CLRS_WASM_BRIDGE_KEY: &str = "tassadar.clrs_wasm_bridge";
@@ -277,6 +279,74 @@ pub fn default_tassadar_execution_checkpoint_binding() -> TassadarExecutionCheck
             String::from("state_machine_accumulator"),
             String::from("search_frontier_kernel"),
         ],
+    }
+}
+
+/// Public architecture-bakeoff binding reused by Tassadar environment bundles.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarArchitectureBakeoffBinding {
+    /// Stable suite reference.
+    pub suite_ref: String,
+    /// Immutable suite version.
+    pub suite_version: String,
+    /// Workload families covered by the broadened matrix.
+    pub workload_family_ids: Vec<String>,
+    /// Stable architecture bakeoff report reference.
+    pub report_ref: String,
+    /// Stable architecture bakeoff summary reference.
+    pub summary_report_ref: String,
+}
+
+impl TassadarArchitectureBakeoffBinding {
+    /// Returns a stable digest over the binding.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let encoded = serde_json::to_vec(self)
+            .expect("Tassadar architecture bakeoff binding should serialize");
+        let digest = sha2::Sha256::digest(encoded.as_slice());
+        hex::encode(digest)
+    }
+
+    /// Validates that the binding is explicit.
+    pub fn validate(&self) -> Result<(), TassadarEnvironmentError> {
+        if self.suite_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingArchitectureBakeoffSuiteRef);
+        }
+        if self.suite_version.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingArchitectureBakeoffSuiteVersion);
+        }
+        if self.workload_family_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingArchitectureBakeoffWorkloadFamilies);
+        }
+        if self
+            .workload_family_ids
+            .iter()
+            .any(|workload_family_id| workload_family_id.trim().is_empty())
+        {
+            return Err(TassadarEnvironmentError::InvalidArchitectureBakeoffWorkloadFamilyId);
+        }
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingArchitectureBakeoffReportRef);
+        }
+        if self.summary_report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingArchitectureBakeoffSummaryReportRef);
+        }
+        Ok(())
+    }
+}
+
+/// Returns the canonical architecture-bakeoff binding reused by Tassadar
+/// environment surfaces.
+#[must_use]
+pub fn default_tassadar_architecture_bakeoff_binding() -> TassadarArchitectureBakeoffBinding {
+    let suite = tassadar_broad_program_family_suite_contract();
+    let workload_family_ids = suite.workload_family_ids();
+    TassadarArchitectureBakeoffBinding {
+        suite_ref: suite.suite_ref,
+        suite_version: suite.version,
+        workload_family_ids,
+        report_ref: suite.report_ref,
+        summary_report_ref: suite.summary_report_ref,
     }
 }
 
@@ -688,6 +758,9 @@ pub struct TassadarEnvironmentSpec {
     pub execution_checkpoint_binding: TassadarExecutionCheckpointBinding,
     /// Public Wasm conformance binding.
     pub wasm_conformance_binding: TassadarWasmConformanceBinding,
+    /// Optional broadened architecture-bakeoff binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub architecture_bakeoff_binding: Option<TassadarArchitectureBakeoffBinding>,
     /// Optional public module-scale workload-suite binding.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub module_scale_workload_suite_binding: Option<TassadarModuleScaleWorkloadSuiteBinding>,
@@ -790,6 +863,7 @@ impl TassadarEnvironmentSpec {
                 tassadar_current_served_internal_compute_profile_claim(),
             ),
             wasm_conformance_binding: self.wasm_conformance_binding.clone(),
+            architecture_bakeoff_binding: self.architecture_bakeoff_binding.clone(),
             module_scale_workload_suite_binding: self.module_scale_workload_suite_binding.clone(),
             clrs_wasm_bridge_binding: self.clrs_wasm_bridge_binding.clone(),
             current_workload_targets: self.current_workload_targets.clone(),
@@ -827,6 +901,9 @@ impl TassadarEnvironmentSpec {
         self.compile_pipeline_matrix_binding.validate()?;
         self.execution_checkpoint_binding.validate()?;
         self.wasm_conformance_binding.validate()?;
+        if let Some(binding) = &self.architecture_bakeoff_binding {
+            binding.validate()?;
+        }
         if let Some(binding) = &self.module_scale_workload_suite_binding {
             binding.validate()?;
         }
@@ -1040,6 +1117,12 @@ impl TassadarEnvironmentSpec {
             String::from(TASSADAR_METADATA_WASM_CONFORMANCE_KEY),
             serde_json::to_value(&self.wasm_conformance_binding).unwrap_or(Value::Null),
         );
+        if let Some(binding) = &self.architecture_bakeoff_binding {
+            metadata.insert(
+                String::from(TASSADAR_METADATA_ARCHITECTURE_BAKEOFF_KEY),
+                serde_json::to_value(binding).unwrap_or(Value::Null),
+            );
+        }
         if let Some(binding) = &self.module_scale_workload_suite_binding {
             metadata.insert(
                 String::from(TASSADAR_METADATA_MODULE_SCALE_WORKLOAD_SUITE_KEY),
@@ -1129,6 +1212,9 @@ pub struct TassadarEnvironmentBundle {
     pub internal_compute_profile_claim_check: TassadarInternalComputeProfileClaimCheckResult,
     /// Wasm conformance binding.
     pub wasm_conformance_binding: TassadarWasmConformanceBinding,
+    /// Optional broadened architecture-bakeoff binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub architecture_bakeoff_binding: Option<TassadarArchitectureBakeoffBinding>,
     /// Optional module-scale workload-suite binding.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub module_scale_workload_suite_binding: Option<TassadarModuleScaleWorkloadSuiteBinding>,
@@ -1218,6 +1304,24 @@ pub enum TassadarEnvironmentError {
     /// Invalid execution-checkpoint workload family id.
     #[error("Tassadar environment spec includes an empty execution-checkpoint workload family id")]
     InvalidExecutionCheckpointWorkloadFamilyId,
+    /// Missing architecture-bakeoff suite ref.
+    #[error("Tassadar environment spec is missing `architecture_bakeoff_binding.suite_ref`")]
+    MissingArchitectureBakeoffSuiteRef,
+    /// Missing architecture-bakeoff suite version.
+    #[error("Tassadar environment spec is missing `architecture_bakeoff_binding.suite_version`")]
+    MissingArchitectureBakeoffSuiteVersion,
+    /// Missing architecture-bakeoff workload coverage.
+    #[error("Tassadar environment spec is missing `architecture_bakeoff_binding.workload_family_ids`")]
+    MissingArchitectureBakeoffWorkloadFamilies,
+    /// Invalid architecture-bakeoff workload family id.
+    #[error("Tassadar environment spec includes an empty architecture-bakeoff workload family id")]
+    InvalidArchitectureBakeoffWorkloadFamilyId,
+    /// Missing architecture-bakeoff report ref.
+    #[error("Tassadar environment spec is missing `architecture_bakeoff_binding.report_ref`")]
+    MissingArchitectureBakeoffReportRef,
+    /// Missing architecture-bakeoff summary report ref.
+    #[error("Tassadar environment spec is missing `architecture_bakeoff_binding.summary_report_ref`")]
+    MissingArchitectureBakeoffSummaryReportRef,
     /// Missing Wasm conformance report ref.
     #[error("Tassadar environment spec is missing `wasm_conformance_binding.report_ref`")]
     MissingWasmConformanceReportRef,
@@ -1516,6 +1620,7 @@ mod tests {
                     String::from("generated.global_state"),
                 ],
             },
+            architecture_bakeoff_binding: Some(default_tassadar_architecture_bakeoff_binding()),
             module_scale_workload_suite_binding: None,
             clrs_wasm_bridge_binding: None,
             eval_policy_references: vec![EnvironmentPolicyReference {
@@ -1653,6 +1758,15 @@ mod tests {
             Some("fixtures/tassadar/reports/tassadar_wasm_conformance_report.json")
         );
         assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
+                .get(TASSADAR_METADATA_ARCHITECTURE_BAKEOFF_KEY)
+                .and_then(|value| value.get("report_ref"))
+                .and_then(Value::as_str),
+            Some("fixtures/tassadar/reports/tassadar_architecture_bakeoff_report.json")
+        );
+        assert_eq!(
             bundle.current_workload_targets,
             vec![
                 TassadarWorkloadTarget::ArithmeticMicroprogram,
@@ -1676,6 +1790,13 @@ mod tests {
         assert_eq!(
             bundle.execution_checkpoint_binding.run_bundle_ref,
             "fixtures/tassadar/runs/tassadar_execution_checkpoint_v1/tassadar_execution_checkpoint_bundle.json"
+        );
+        assert_eq!(
+            bundle
+                .architecture_bakeoff_binding
+                .as_ref()
+                .map(|binding| binding.workload_family_ids.len()),
+            Some(9)
         );
         assert!(bundle.internal_compute_profile_claim_check.green);
         Ok(())
