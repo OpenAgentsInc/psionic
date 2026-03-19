@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.broad_general_compute_validator_bridge.report.v1",
+  "publication_report_ref": "fixtures/tassadar/reports/tassadar_broad_internal_compute_profile_publication_report.json",
+  "validator_route_policy_report_ref": "fixtures/tassadar/reports/tassadar_broad_general_compute_validator_route_policy_report.json",
+  "rows": [
+    {
+      "profile_id": "tassadar.internal_compute.article_closeout.v1",
+      "publication_status": "published",
+      "world_mount_binding_status": "compatible_with_current_exact_compute_mount",
+      "accepted_outcome_binding_status": "exact_compute_envelope_available",
+      "authority_status": "accepted_outcome_ready",
+      "validator_policy_ref": "validator-policies.internal_compute.article_closeout.v1",
+      "validator_attachment_required": true,
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": true,
+      "bridge_status": "accepted_outcome_ready",
+      "dependency_refs": [
+        "world-mounts.internal_compute.article_closeout.v1",
+        "kernel-policy.accepted-outcome.internal_compute.article_closeout.v1",
+        "nexus.accepted-outcome.internal_compute.article_closeout.v1",
+        "compute-market.internal_compute.article_closeout.v1"
+      ],
+      "note": "current served article-closeout stays accepted-outcome-ready and can issue validator-bound economic receipts under the existing exact-compute envelope; publication note: profile `tassadar.internal_compute.article_closeout.v1` is the current served internal-compute profile and remains compatible with the current exact-compute mount, accepted-outcome, and market envelope refs"
+    },
+    {
+      "profile_id": "tassadar.internal_compute.deterministic_import_subset.v1",
+      "publication_status": "suppressed",
+      "world_mount_binding_status": "profile_specific_mount_template_available",
+      "accepted_outcome_binding_status": "profile_specific_accepted_outcome_template_available",
+      "authority_status": "candidate_only_challenge_window",
+      "validator_policy_ref": "validator-policies.internal_compute.deterministic_import_subset.v1",
+      "validator_attachment_required": true,
+      "challenge_window_minutes": 120,
+      "economic_receipt_allowed": true,
+      "bridge_status": "candidate_only_challenge_window",
+      "dependency_refs": [
+        "world-mounts.profile_specific.tassadar.internal_compute.deterministic_import_subset.v1",
+        "kernel-policy.profile_specific.tassadar.internal_compute.deterministic_import_subset.v1",
+        "nexus.challenge_window.tassadar.internal_compute.deterministic_import_subset.v1",
+        "compute-market.profile_specific.tassadar.internal_compute.deterministic_import_subset.v1"
+      ],
+      "note": "deterministic import subset is now profile-specific and validator-attachable, but it stays candidate-only until the challenge window closes and the profile-specific authority envelope is satisfied; publication note: profile `tassadar.internal_compute.deterministic_import_subset.v1` stays suppressed as a served capability, but now has explicit profile-specific route, mount, and accepted-outcome templates for bounded public use under named policy and portability envelopes"
+    },
+    {
+      "profile_id": "tassadar.internal_compute.generalized_abi.v1",
+      "publication_status": "suppressed",
+      "world_mount_binding_status": "requires_profile_specific_mount_policy",
+      "accepted_outcome_binding_status": "requires_profile_specific_accepted_outcome_template",
+      "authority_status": "suppressed_pending_policy",
+      "validator_attachment_required": false,
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": false,
+      "bridge_status": "suppressed_pending_policy",
+      "dependency_refs": [
+        "world-mounts.pending.tassadar.internal_compute.generalized_abi.v1",
+        "kernel-policy.pending.tassadar.internal_compute.generalized_abi.v1"
+      ],
+      "note": "profile remains suppressed pending explicit profile-specific mount, accepted-outcome, and economic policy artifacts; publication note: profile `tassadar.internal_compute.generalized_abi.v1` is benchmarked enough to name publicly, but broader mount policy and accepted-outcome templates must stay explicit before it can widen the current served lane"
+    },
+    {
+      "profile_id": "tassadar.internal_compute.portable_broad_family.v1",
+      "publication_status": "failed",
+      "world_mount_binding_status": "refused_pending_profile_evidence",
+      "accepted_outcome_binding_status": "refused_pending_profile_evidence",
+      "authority_status": "refused_pending_evidence",
+      "validator_attachment_required": false,
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": false,
+      "bridge_status": "refused_pending_evidence",
+      "dependency_refs": [
+        "portability.pending.tassadar.internal_compute.portable_broad_family.v1",
+        "validator.pending.tassadar.internal_compute.portable_broad_family.v1"
+      ],
+      "note": "portable broad family stays refused because portability evidence and public authority posture are still incomplete; publication note: profile `tassadar.internal_compute.portable_broad_family.v1` remains refused for broader route publication because portability, evidence, or refusal posture is still incomplete"
+    },
+    {
+      "profile_id": "tassadar.internal_compute.public_broad_family.v1",
+      "publication_status": "suppressed",
+      "world_mount_binding_status": "requires_profile_specific_mount_policy",
+      "accepted_outcome_binding_status": "requires_profile_specific_accepted_outcome_template",
+      "authority_status": "suppressed_pending_policy",
+      "validator_attachment_required": false,
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": false,
+      "bridge_status": "suppressed_pending_policy",
+      "dependency_refs": [
+        "world-mounts.pending.tassadar.internal_compute.public_broad_family.v1",
+        "kernel-policy.pending.tassadar.internal_compute.public_broad_family.v1"
+      ],
+      "note": "profile remains suppressed pending explicit profile-specific mount, accepted-outcome, and economic policy artifacts; publication note: profile `tassadar.internal_compute.public_broad_family.v1` is benchmarked enough to name publicly, but broader mount policy and accepted-outcome templates must stay explicit before it can widen the current served lane"
+    },
+    {
+      "profile_id": "tassadar.internal_compute.resumable_multi_slice.v1",
+      "publication_status": "suppressed",
+      "world_mount_binding_status": "requires_profile_specific_mount_policy",
+      "accepted_outcome_binding_status": "requires_profile_specific_accepted_outcome_template",
+      "authority_status": "suppressed_pending_policy",
+      "validator_attachment_required": false,
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": false,
+      "bridge_status": "suppressed_pending_policy",
+      "dependency_refs": [
+        "world-mounts.pending.tassadar.internal_compute.resumable_multi_slice.v1",
+        "kernel-policy.pending.tassadar.internal_compute.resumable_multi_slice.v1"
+      ],
+      "note": "profile remains suppressed pending explicit profile-specific mount, accepted-outcome, and economic policy artifacts; publication note: profile `tassadar.internal_compute.resumable_multi_slice.v1` is benchmarked enough to name publicly, but broader mount policy and accepted-outcome templates must stay explicit before it can widen the current served lane"
+    },
+    {
+      "profile_id": "tassadar.internal_compute.runtime_support_subset.v1",
+      "publication_status": "suppressed",
+      "world_mount_binding_status": "profile_specific_mount_template_available",
+      "accepted_outcome_binding_status": "profile_specific_accepted_outcome_template_available",
+      "authority_status": "candidate_only_challenge_window",
+      "validator_policy_ref": "validator-policies.internal_compute.runtime_support_subset.v1",
+      "validator_attachment_required": true,
+      "challenge_window_minutes": 90,
+      "economic_receipt_allowed": true,
+      "bridge_status": "candidate_only_challenge_window",
+      "dependency_refs": [
+        "world-mounts.profile_specific.tassadar.internal_compute.runtime_support_subset.v1",
+        "kernel-policy.profile_specific.tassadar.internal_compute.runtime_support_subset.v1",
+        "nexus.challenge_window.tassadar.internal_compute.runtime_support_subset.v1",
+        "compute-market.profile_specific.tassadar.internal_compute.runtime_support_subset.v1"
+      ],
+      "note": "runtime-support subset is now profile-specific and validator-attachable, but it stays candidate-only until the challenge window closes and the profile-specific authority envelope is satisfied; publication note: profile `tassadar.internal_compute.runtime_support_subset.v1` stays suppressed as a served capability, but now has explicit profile-specific route, mount, and accepted-outcome templates for bounded public use under named policy and portability envelopes"
+    },
+    {
+      "profile_id": "tassadar.internal_compute.wider_numeric_data_layout.v1",
+      "publication_status": "suppressed",
+      "world_mount_binding_status": "requires_profile_specific_mount_policy",
+      "accepted_outcome_binding_status": "requires_profile_specific_accepted_outcome_template",
+      "authority_status": "suppressed_pending_policy",
+      "validator_attachment_required": false,
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": false,
+      "bridge_status": "suppressed_pending_policy",
+      "dependency_refs": [
+        "world-mounts.pending.tassadar.internal_compute.wider_numeric_data_layout.v1",
+        "kernel-policy.pending.tassadar.internal_compute.wider_numeric_data_layout.v1"
+      ],
+      "note": "profile remains suppressed pending explicit profile-specific mount, accepted-outcome, and economic policy artifacts; publication note: profile `tassadar.internal_compute.wider_numeric_data_layout.v1` is benchmarked enough to name publicly, but broader mount policy and accepted-outcome templates must stay explicit before it can widen the current served lane"
+    }
+  ],
+  "accepted_outcome_ready_profile_ids": [
+    "tassadar.internal_compute.article_closeout.v1"
+  ],
+  "candidate_only_profile_ids": [
+    "tassadar.internal_compute.deterministic_import_subset.v1",
+    "tassadar.internal_compute.runtime_support_subset.v1"
+  ],
+  "economic_receipt_allowed_profile_ids": [
+    "tassadar.internal_compute.article_closeout.v1",
+    "tassadar.internal_compute.deterministic_import_subset.v1",
+    "tassadar.internal_compute.runtime_support_subset.v1"
+  ],
+  "suppressed_profile_ids": [
+    "tassadar.internal_compute.generalized_abi.v1",
+    "tassadar.internal_compute.public_broad_family.v1",
+    "tassadar.internal_compute.resumable_multi_slice.v1",
+    "tassadar.internal_compute.wider_numeric_data_layout.v1"
+  ],
+  "refused_profile_ids": [
+    "tassadar.internal_compute.portable_broad_family.v1"
+  ],
+  "world_mount_dependency_marker": "world-mounts remain the owner of canonical profile-specific mount templates outside standalone psionic",
+  "kernel_policy_dependency_marker": "kernel-policy remains the owner of canonical validator-policy and accepted-outcome-template approval outside standalone psionic",
+  "nexus_dependency_marker": "nexus remains the owner of canonical candidate-outcome, challenge-window, and accepted-outcome issuance outside standalone psionic",
+  "compute_market_dependency_marker": "compute-market remains the owner of canonical broad-profile product publication and economic routing outside standalone psionic",
+  "claim_boundary": "this eval report bridges named broad internal-compute profiles into validator-facing and authority-facing posture without flattening them into one generic broad-compute claim. It keeps accepted-outcome-ready, candidate-only, suppressed, and refused profiles explicit, along with their challenge-window and dependency posture.",
+  "summary": "Broad general-compute validator bridge now records accepted_outcome_ready_profiles=1, candidate_only_profiles=2, economic_receipt_allowed_profiles=3, suppressed_profiles=4, refused_profiles=1.",
+  "report_digest": "f99965c5e121a24b98da62938d1b91783993c800b057bcedef539d76928452f3"
+}

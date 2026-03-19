@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.broad_general_compute_economic_bridge.report.v1",
+  "validator_bridge_report_ref": "fixtures/tassadar/reports/tassadar_broad_general_compute_validator_bridge_report.json",
+  "validator_route_policy_report_ref": "fixtures/tassadar/reports/tassadar_broad_general_compute_validator_route_policy_report.json",
+  "exact_compute_market_report_id": "tassadar.exact_compute_market.report.v1",
+  "composite_accepted_outcome_report_id": "tassadar.composite_accepted_outcome_template.report.v1",
+  "templates": [
+    {
+      "template_id": "accepted_outcome.tassadar.internal_compute.article_closeout.v1.v1",
+      "profile_id": "tassadar.internal_compute.article_closeout.v1",
+      "world_mount_template_ref": "world-mounts.template.tassadar.internal_compute.article_closeout.v1",
+      "kernel_policy_template_ref": "kernel-policy.template.tassadar.internal_compute.article_closeout.v1",
+      "nexus_template_ref": "nexus.template.tassadar.internal_compute.article_closeout.v1",
+      "validator_policy_ref": "validator-policies.internal_compute.article_closeout.v1",
+      "challenge_window_minutes": 0,
+      "settlement_dependency_refs": [
+        "world-mounts.internal_compute.article_closeout.v1",
+        "kernel-policy.accepted-outcome.internal_compute.article_closeout.v1",
+        "nexus.accepted-outcome.internal_compute.article_closeout.v1",
+        "compute-market.internal_compute.article_closeout.v1"
+      ],
+      "note": "accepted-outcome template for `tassadar.internal_compute.article_closeout.v1` stays bounded to the named profile bridge posture"
+    },
+    {
+      "template_id": "accepted_outcome.tassadar.internal_compute.deterministic_import_subset.v1.v1",
+      "profile_id": "tassadar.internal_compute.deterministic_import_subset.v1",
+      "world_mount_template_ref": "world-mounts.template.tassadar.internal_compute.deterministic_import_subset.v1",
+      "kernel_policy_template_ref": "kernel-policy.template.tassadar.internal_compute.deterministic_import_subset.v1",
+      "nexus_template_ref": "nexus.template.tassadar.internal_compute.deterministic_import_subset.v1",
+      "validator_policy_ref": "validator-policies.internal_compute.deterministic_import_subset.v1",
+      "challenge_window_minutes": 120,
+      "settlement_dependency_refs": [
+        "world-mounts.profile_specific.tassadar.internal_compute.deterministic_import_subset.v1",
+        "kernel-policy.profile_specific.tassadar.internal_compute.deterministic_import_subset.v1",
+        "nexus.challenge_window.tassadar.internal_compute.deterministic_import_subset.v1",
+        "compute-market.profile_specific.tassadar.internal_compute.deterministic_import_subset.v1"
+      ],
+      "note": "accepted-outcome template for `tassadar.internal_compute.deterministic_import_subset.v1` stays bounded to the named profile bridge posture"
+    },
+    {
+      "template_id": "accepted_outcome.tassadar.internal_compute.runtime_support_subset.v1.v1",
+      "profile_id": "tassadar.internal_compute.runtime_support_subset.v1",
+      "world_mount_template_ref": "world-mounts.template.tassadar.internal_compute.runtime_support_subset.v1",
+      "kernel_policy_template_ref": "kernel-policy.template.tassadar.internal_compute.runtime_support_subset.v1",
+      "nexus_template_ref": "nexus.template.tassadar.internal_compute.runtime_support_subset.v1",
+      "validator_policy_ref": "validator-policies.internal_compute.runtime_support_subset.v1",
+      "challenge_window_minutes": 90,
+      "settlement_dependency_refs": [
+        "world-mounts.profile_specific.tassadar.internal_compute.runtime_support_subset.v1",
+        "kernel-policy.profile_specific.tassadar.internal_compute.runtime_support_subset.v1",
+        "nexus.challenge_window.tassadar.internal_compute.runtime_support_subset.v1",
+        "compute-market.profile_specific.tassadar.internal_compute.runtime_support_subset.v1"
+      ],
+      "note": "accepted-outcome template for `tassadar.internal_compute.runtime_support_subset.v1` stays bounded to the named profile bridge posture"
+    }
+  ],
+  "economic_receipts": [
+    {
+      "receipt_id": "receipt.tassadar.internal_compute.article_closeout.v1.economic.v1",
+      "profile_id": "tassadar.internal_compute.article_closeout.v1",
+      "template_id": "accepted_outcome.tassadar.internal_compute.article_closeout.v1.v1",
+      "product_ref": "compute-market.product.tassadar.internal_compute.article_closeout.v1",
+      "quote_posture": "validator_bound",
+      "pricing_posture": "validator_premium",
+      "settlement_posture": "accepted_outcome_dependent",
+      "status": "receipt_ready",
+      "candidate_outcome_id": "candidate.tassadar.internal_compute.article_closeout.v1.ready.v1",
+      "accepted_outcome_id": "accepted_outcome.tassadar.internal_compute.article_closeout.v1.ready.v1",
+      "note": "profile is accepted-outcome-ready, so the economic receipt can bind the named profile directly under the current authority envelope"
+    },
+    {
+      "receipt_id": "receipt.tassadar.internal_compute.deterministic_import_subset.v1.economic.v1",
+      "profile_id": "tassadar.internal_compute.deterministic_import_subset.v1",
+      "template_id": "accepted_outcome.tassadar.internal_compute.deterministic_import_subset.v1.v1",
+      "product_ref": "compute-market.product.tassadar.internal_compute.deterministic_import_subset.v1",
+      "quote_posture": "challenge_window_required",
+      "pricing_posture": "challenge_window_premium",
+      "settlement_posture": "accepted_outcome_dependent",
+      "status": "candidate_only_challenge_window",
+      "candidate_outcome_id": "candidate.tassadar.internal_compute.deterministic_import_subset.v1.challenge_window.v1",
+      "note": "profile is economic-participating but candidate-only; challenge-window closure remains explicit before accepted-outcome issuance"
+    },
+    {
+      "receipt_id": "receipt.tassadar.internal_compute.runtime_support_subset.v1.economic.v1",
+      "profile_id": "tassadar.internal_compute.runtime_support_subset.v1",
+      "template_id": "accepted_outcome.tassadar.internal_compute.runtime_support_subset.v1.v1",
+      "product_ref": "compute-market.product.tassadar.internal_compute.runtime_support_subset.v1",
+      "quote_posture": "challenge_window_required",
+      "pricing_posture": "challenge_window_premium",
+      "settlement_posture": "accepted_outcome_dependent",
+      "status": "candidate_only_challenge_window",
+      "candidate_outcome_id": "candidate.tassadar.internal_compute.runtime_support_subset.v1.challenge_window.v1",
+      "note": "profile is economic-participating but candidate-only; challenge-window closure remains explicit before accepted-outcome issuance"
+    }
+  ],
+  "refused_envelopes": [
+    {
+      "profile_id": "tassadar.internal_compute.generalized_abi.v1",
+      "refusal_reason": "pending_profile_specific_policy",
+      "note": "profile stays refused for authority-facing and economic publication until explicit profile-specific mount and accepted-outcome templates exist"
+    },
+    {
+      "profile_id": "tassadar.internal_compute.portable_broad_family.v1",
+      "refusal_reason": "pending_portability_evidence",
+      "note": "profile stays refused for authority-facing and economic publication until portability and validator evidence are green"
+    },
+    {
+      "profile_id": "tassadar.internal_compute.public_broad_family.v1",
+      "refusal_reason": "pending_profile_specific_policy",
+      "note": "profile stays refused for authority-facing and economic publication until explicit profile-specific mount and accepted-outcome templates exist"
+    },
+    {
+      "profile_id": "tassadar.internal_compute.resumable_multi_slice.v1",
+      "refusal_reason": "pending_profile_specific_policy",
+      "note": "profile stays refused for authority-facing and economic publication until explicit profile-specific mount and accepted-outcome templates exist"
+    },
+    {
+      "profile_id": "tassadar.internal_compute.wider_numeric_data_layout.v1",
+      "refusal_reason": "pending_profile_specific_policy",
+      "note": "profile stays refused for authority-facing and economic publication until explicit profile-specific mount and accepted-outcome templates exist"
+    }
+  ],
+  "accepted_outcome_ready_receipt_count": 1,
+  "candidate_only_receipt_count": 2,
+  "refused_profile_count": 5,
+  "world_mount_dependency_marker": "world-mounts remain the owner of canonical broad profile mount objects outside standalone psionic",
+  "kernel_policy_dependency_marker": "kernel-policy remains the owner of canonical broad profile accepted-outcome template approval outside standalone psionic",
+  "nexus_dependency_marker": "nexus remains the owner of canonical candidate-outcome, challenge-window, and accepted-outcome authority outside standalone psionic",
+  "compute_market_dependency_marker": "compute-market remains the owner of canonical broad general-compute products, quotes, and market-wide economic posture outside standalone psionic",
+  "claim_boundary": "this provider report turns the validator bridge into explicit accepted-outcome templates and economic receipts for named broad internal-compute profiles. It keeps ready, candidate-only, and refused profiles explicit and does not treat candidate receipts or runtime success as accepted-outcome or settlement authority.",
+  "summary": "Broad general-compute economic bridge now records templates=3, receipts=3, ready_receipts=1, candidate_only_receipts=2, refused_profiles=5.",
+  "report_digest": "fdcbecac112de2ce35c8da95d221755584baca76a0618f89069a84d5bb436948"
+}

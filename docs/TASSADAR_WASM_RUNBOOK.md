@@ -479,6 +479,40 @@ Expected outcome:
   profiles generic served exact compute and does not widen the current default
   served profile beyond `tassadar.internal_compute.article_closeout.v1`
 
+### 3B.8. Broad general-compute validator bridge and economic receipts
+
+```bash
+cargo run -p psionic-router --example tassadar_broad_general_compute_validator_route_policy_report
+cargo run -p psionic-eval --example tassadar_broad_general_compute_validator_bridge_report
+cargo run -p psionic-provider --example tassadar_broad_general_compute_economic_bridge_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_broad_general_compute_validator_route_policy_report.json`
+- `fixtures/tassadar/reports/tassadar_broad_general_compute_validator_bridge_report.json`
+- `fixtures/tassadar/reports/tassadar_broad_general_compute_economic_bridge_report.json`
+
+Expected outcome:
+
+- `tassadar.internal_compute.article_closeout.v1` is the only
+  `accepted_outcome_ready` broad internal-compute profile
+- `tassadar.internal_compute.deterministic_import_subset.v1` and
+  `tassadar.internal_compute.runtime_support_subset.v1` are validator-attachable
+  and economically publishable only as `candidate_only_challenge_window`
+  profiles
+- the remaining broad internal-compute profiles stay explicitly refused pending
+  profile-specific policy or portability evidence
+- the provider bridge now materializes accepted-outcome templates plus economic
+  receipts for the three named profiles above without widening the current
+  default served posture
+- `world-mounts`, `kernel-policy`, `nexus`, and `compute-market` remain
+  explicit dependency markers for canonical mounts, accepted outcomes,
+  challenge-window closure, and market-wide product publication outside
+  standalone `psionic`
+- this is still not broad served internal compute, settlement-qualified
+  authority, arbitrary Wasm, or Turing-complete support
+
 ### 3C. Hungarian-10x10 Rust-only article reproducer
 
 ```bash

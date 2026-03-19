@@ -15,6 +15,7 @@ mod response_state;
 mod tassadar_composite_routing;
 mod tassadar_async_lifecycle_route_policy;
 mod tassadar_broad_internal_compute_route_policy;
+mod tassadar_broad_general_compute_validator_route_policy;
 mod tassadar_counterfactual_route_quality;
 mod tassadar_cross_profile_link_compatibility;
 mod tassadar_delegation_benchmark;
@@ -44,6 +45,7 @@ pub use response_state::{
 pub use tassadar_async_lifecycle_route_policy::*;
 pub use tassadar_composite_routing::*;
 pub use tassadar_broad_internal_compute_route_policy::*;
+pub use tassadar_broad_general_compute_validator_route_policy::*;
 pub use tassadar_counterfactual_route_quality::*;
 pub use tassadar_cross_profile_link_compatibility::*;
 pub use tassadar_delegation_benchmark::*;

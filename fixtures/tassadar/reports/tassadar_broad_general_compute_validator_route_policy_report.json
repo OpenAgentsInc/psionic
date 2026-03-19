@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.broad_general_compute_validator_route_policy.report.v1",
+  "base_route_policy_report_ref": "fixtures/tassadar/reports/tassadar_broad_internal_compute_route_policy_report.json",
+  "rows": [
+    {
+      "route_policy_id": "validator_route.tassadar.internal_compute.article_closeout.v1",
+      "target_profile_id": "tassadar.internal_compute.article_closeout.v1",
+      "base_route_status": "selected",
+      "authority_status": "accepted_outcome_ready",
+      "validator_policy_ref": "validator-policies.internal_compute.article_closeout.v1",
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": true,
+      "note": "current served article-closeout stays accepted-outcome-ready and can issue validator-bound economic receipts under the existing exact-compute envelope"
+    },
+    {
+      "route_policy_id": "validator_route.tassadar.internal_compute.generalized_abi.v1",
+      "target_profile_id": "tassadar.internal_compute.generalized_abi.v1",
+      "base_route_status": "suppressed",
+      "authority_status": "suppressed_pending_policy",
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": false,
+      "note": "profile remains suppressed pending explicit profile-specific mount, accepted-outcome, and economic policy artifacts"
+    },
+    {
+      "route_policy_id": "validator_route.tassadar.internal_compute.wider_numeric_data_layout.v1",
+      "target_profile_id": "tassadar.internal_compute.wider_numeric_data_layout.v1",
+      "base_route_status": "suppressed",
+      "authority_status": "suppressed_pending_policy",
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": false,
+      "note": "profile remains suppressed pending explicit profile-specific mount, accepted-outcome, and economic policy artifacts"
+    },
+    {
+      "route_policy_id": "validator_route.tassadar.internal_compute.runtime_support_subset.v1",
+      "target_profile_id": "tassadar.internal_compute.runtime_support_subset.v1",
+      "base_route_status": "promoted_profile_specific",
+      "authority_status": "candidate_only_challenge_window",
+      "validator_policy_ref": "validator-policies.internal_compute.runtime_support_subset.v1",
+      "challenge_window_minutes": 90,
+      "economic_receipt_allowed": true,
+      "note": "runtime-support subset is now profile-specific and validator-attachable, but it stays candidate-only until the challenge window closes and the profile-specific authority envelope is satisfied"
+    },
+    {
+      "route_policy_id": "validator_route.tassadar.internal_compute.deterministic_import_subset.v1",
+      "target_profile_id": "tassadar.internal_compute.deterministic_import_subset.v1",
+      "base_route_status": "promoted_profile_specific",
+      "authority_status": "candidate_only_challenge_window",
+      "validator_policy_ref": "validator-policies.internal_compute.deterministic_import_subset.v1",
+      "challenge_window_minutes": 120,
+      "economic_receipt_allowed": true,
+      "note": "deterministic import subset is now profile-specific and validator-attachable, but it stays candidate-only until the challenge window closes and the profile-specific authority envelope is satisfied"
+    },
+    {
+      "route_policy_id": "validator_route.tassadar.internal_compute.resumable_multi_slice.v1",
+      "target_profile_id": "tassadar.internal_compute.resumable_multi_slice.v1",
+      "base_route_status": "suppressed",
+      "authority_status": "suppressed_pending_policy",
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": false,
+      "note": "profile remains suppressed pending explicit profile-specific mount, accepted-outcome, and economic policy artifacts"
+    },
+    {
+      "route_policy_id": "validator_route.tassadar.internal_compute.portable_broad_family.v1",
+      "target_profile_id": "tassadar.internal_compute.portable_broad_family.v1",
+      "base_route_status": "refused",
+      "authority_status": "refused_pending_evidence",
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": false,
+      "note": "portable broad family stays refused because portability evidence and public authority posture are still incomplete"
+    },
+    {
+      "route_policy_id": "validator_route.tassadar.internal_compute.public_broad_family.v1",
+      "target_profile_id": "tassadar.internal_compute.public_broad_family.v1",
+      "base_route_status": "suppressed",
+      "authority_status": "suppressed_pending_policy",
+      "challenge_window_minutes": 0,
+      "economic_receipt_allowed": false,
+      "note": "profile remains suppressed pending explicit profile-specific mount, accepted-outcome, and economic policy artifacts"
+    }
+  ],
+  "accepted_outcome_ready_route_count": 1,
+  "candidate_only_route_count": 2,
+  "suppressed_route_count": 4,
+  "refused_route_count": 1,
+  "accepted_outcome_ready_profile_ids": [
+    "tassadar.internal_compute.article_closeout.v1"
+  ],
+  "candidate_only_profile_ids": [
+    "tassadar.internal_compute.runtime_support_subset.v1",
+    "tassadar.internal_compute.deterministic_import_subset.v1"
+  ],
+  "economic_receipt_allowed_profile_ids": [
+    "tassadar.internal_compute.article_closeout.v1",
+    "tassadar.internal_compute.runtime_support_subset.v1",
+    "tassadar.internal_compute.deterministic_import_subset.v1"
+  ],
+  "claim_boundary": "this router report is the authority-facing and economic-facing overlay for named broad internal-compute profiles. It keeps accepted-outcome-ready, candidate-only, suppressed, and refused profiles explicit instead of turning broader internal compute into one generic validator-safe or market-safe lane.",
+  "summary": "Broad general-compute validator route policy now records accepted_outcome_ready_routes=1, candidate_only_routes=2, suppressed_routes=4, refused_routes=1.",
+  "report_digest": "c3c0b19dc83536a86221951def86a5e7bac1e309ad454e3fd76a9282170fc272"
+}

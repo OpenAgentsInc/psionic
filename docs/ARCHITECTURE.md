@@ -835,6 +835,17 @@ The current scope is:
   research-only with explicit route refusal; this is not implicit proposal
   inheritance, a default served proposal lane, arbitrary Wasm, or broad
   internal-compute publication
+- the current broad general-compute bridge artifacts are
+  `fixtures/tassadar/reports/tassadar_broad_general_compute_validator_route_policy_report.json`,
+  `fixtures/tassadar/reports/tassadar_broad_general_compute_validator_bridge_report.json`,
+  and `fixtures/tassadar/reports/tassadar_broad_general_compute_economic_bridge_report.json`,
+  which freeze one bounded authority-and-economic bridge over named broad
+  internal-compute profiles: article-closeout is accepted-outcome-ready,
+  deterministic-import and runtime-support subsets are candidate-only under
+  explicit challenge windows, and the remaining profiles stay refused pending
+  profile-specific policy or portability evidence; this is not broad served
+  internal compute, settlement-qualified authority, or generic economic
+  closure
 - the current durable process-object artifacts are
   `fixtures/tassadar/reports/tassadar_process_object_report.json` and
   `fixtures/tassadar/runs/tassadar_process_objects_v1/tassadar_process_object_bundle.json`,

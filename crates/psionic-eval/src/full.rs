@@ -48,6 +48,8 @@ mod tassadar_broad_internal_compute_acceptance_gate;
 mod tassadar_broad_internal_compute_portability;
 #[path = "tassadar_broad_internal_compute_profile_publication.rs"]
 mod tassadar_broad_internal_compute_profile_publication;
+#[path = "tassadar_broad_general_compute_validator_bridge.rs"]
+mod tassadar_broad_general_compute_validator_bridge;
 #[path = "tassadar_call_frames.rs"]
 mod tassadar_call_frames;
 #[path = "tassadar_clrs_wasm_bridge.rs"]
@@ -283,6 +285,7 @@ pub use tassadar_broad_family_specialization::*;
 pub use tassadar_broad_internal_compute_acceptance_gate::*;
 pub use tassadar_broad_internal_compute_portability::*;
 pub use tassadar_broad_internal_compute_profile_publication::*;
+pub use tassadar_broad_general_compute_validator_bridge::*;
 pub use tassadar_call_frames::*;
 pub use tassadar_clrs_wasm_bridge::*;
 pub use tassadar_compile_pipeline_matrix::*;
