@@ -1,0 +1,467 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.preemptive_job_profile.report.v1",
+  "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+  "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_preemptive_jobs_v1/tassadar_preemptive_job_runtime_bundle.json",
+  "runtime_bundle": {
+    "schema_version": 1,
+    "bundle_id": "tassadar.preemptive_job.runtime_bundle.v1",
+    "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+    "case_receipts": [
+      {
+        "case_id": "counter_round_robin_job",
+        "job_id": "tassadar.job.counter_round_robin.v1",
+        "process_id": "tassadar.process.long_loop_kernel.v1",
+        "workload_family": "long_loop_kernel",
+        "scheduler_id": "deterministic_round_robin",
+        "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+        "slice_budget_steps": 64,
+        "fairness_window_slices": 2,
+        "max_consecutive_wait_slices": 1,
+        "preemption_count": 2,
+        "starvation_free": true,
+        "exact_slice_boundary_parity": true,
+        "exact_resume_parity": true,
+        "status": "exact_slice_boundary_parity",
+        "slice_receipts": [
+          {
+            "slice_id": "counter_round_robin_job::slice::00",
+            "slice_index": 0,
+            "scheduler_id": "deterministic_round_robin",
+            "executed_step_count": 64,
+            "cumulative_step_count": 64,
+            "emitted_checkpoint_id": "checkpoint.counter_round_robin.00",
+            "wait_slices_before_run": 0,
+            "preempted_after_slice": true,
+            "detail": "slice 0 under `deterministic_round_robin` executed 64 steps after waiting 0 slice(s)"
+          },
+          {
+            "slice_id": "counter_round_robin_job::slice::01",
+            "slice_index": 1,
+            "scheduler_id": "deterministic_round_robin",
+            "executed_step_count": 64,
+            "cumulative_step_count": 128,
+            "resumed_from_checkpoint_id": "checkpoint.counter_round_robin.00",
+            "emitted_checkpoint_id": "checkpoint.counter_round_robin.01",
+            "wait_slices_before_run": 1,
+            "preempted_after_slice": true,
+            "detail": "slice 1 under `deterministic_round_robin` executed 64 steps after waiting 1 slice(s)"
+          },
+          {
+            "slice_id": "counter_round_robin_job::slice::02",
+            "slice_index": 2,
+            "scheduler_id": "deterministic_round_robin",
+            "executed_step_count": 48,
+            "cumulative_step_count": 176,
+            "resumed_from_checkpoint_id": "checkpoint.counter_round_robin.01",
+            "wait_slices_before_run": 1,
+            "preempted_after_slice": false,
+            "detail": "slice 2 under `deterministic_round_robin` executed 48 steps after waiting 1 slice(s)"
+          }
+        ],
+        "refusal_cases": [],
+        "note": "round-robin slice boundaries preserve exact resume parity and keep bounded wait at one slice",
+        "receipt_digest": "3b9ec7b65ac5e1f159d0e8c6f6c8a493222df885a88816d99c28b6fa6fd551e4"
+      },
+      {
+        "case_id": "search_weighted_fair_job",
+        "job_id": "tassadar.job.search_weighted_fair.v1",
+        "process_id": "tassadar.process.search_frontier_kernel.v1",
+        "workload_family": "search_frontier_kernel",
+        "scheduler_id": "weighted_fair_slice_rotation",
+        "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+        "slice_budget_steps": 40,
+        "fairness_window_slices": 3,
+        "max_consecutive_wait_slices": 2,
+        "preemption_count": 3,
+        "starvation_free": true,
+        "exact_slice_boundary_parity": true,
+        "exact_resume_parity": true,
+        "status": "exact_slice_boundary_parity",
+        "slice_receipts": [
+          {
+            "slice_id": "search_weighted_fair_job::slice::00",
+            "slice_index": 0,
+            "scheduler_id": "weighted_fair_slice_rotation",
+            "executed_step_count": 40,
+            "cumulative_step_count": 40,
+            "emitted_checkpoint_id": "checkpoint.search_weighted_fair.00",
+            "wait_slices_before_run": 0,
+            "preempted_after_slice": true,
+            "detail": "slice 0 under `weighted_fair_slice_rotation` executed 40 steps after waiting 0 slice(s)"
+          },
+          {
+            "slice_id": "search_weighted_fair_job::slice::01",
+            "slice_index": 1,
+            "scheduler_id": "weighted_fair_slice_rotation",
+            "executed_step_count": 40,
+            "cumulative_step_count": 80,
+            "resumed_from_checkpoint_id": "checkpoint.search_weighted_fair.00",
+            "emitted_checkpoint_id": "checkpoint.search_weighted_fair.01",
+            "wait_slices_before_run": 2,
+            "preempted_after_slice": true,
+            "detail": "slice 1 under `weighted_fair_slice_rotation` executed 40 steps after waiting 2 slice(s)"
+          },
+          {
+            "slice_id": "search_weighted_fair_job::slice::02",
+            "slice_index": 2,
+            "scheduler_id": "weighted_fair_slice_rotation",
+            "executed_step_count": 40,
+            "cumulative_step_count": 120,
+            "resumed_from_checkpoint_id": "checkpoint.search_weighted_fair.01",
+            "emitted_checkpoint_id": "checkpoint.search_weighted_fair.02",
+            "wait_slices_before_run": 1,
+            "preempted_after_slice": true,
+            "detail": "slice 2 under `weighted_fair_slice_rotation` executed 40 steps after waiting 1 slice(s)"
+          },
+          {
+            "slice_id": "search_weighted_fair_job::slice::03",
+            "slice_index": 3,
+            "scheduler_id": "weighted_fair_slice_rotation",
+            "executed_step_count": 24,
+            "cumulative_step_count": 144,
+            "resumed_from_checkpoint_id": "checkpoint.search_weighted_fair.02",
+            "wait_slices_before_run": 2,
+            "preempted_after_slice": false,
+            "detail": "slice 3 under `weighted_fair_slice_rotation` executed 24 steps after waiting 2 slice(s)"
+          }
+        ],
+        "refusal_cases": [],
+        "note": "weighted fair rotation preserves exact slice-boundary parity while bounding starvation to two wait slices",
+        "receipt_digest": "7e3c1911ed00de9cd6ba441155725ce1d7763d250c78c7d0ef3ddfebc55db105"
+      },
+      {
+        "case_id": "host_scheduler_nondeterministic_refusal",
+        "job_id": "tassadar.job.host_scheduler_nondeterministic.v1",
+        "process_id": "tassadar.process.state_machine_accumulator.v1",
+        "workload_family": "state_machine_accumulator",
+        "scheduler_id": "host_nondeterministic_scheduler",
+        "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+        "slice_budget_steps": 64,
+        "fairness_window_slices": 0,
+        "max_consecutive_wait_slices": 0,
+        "preemption_count": 0,
+        "starvation_free": false,
+        "exact_slice_boundary_parity": false,
+        "exact_resume_parity": false,
+        "status": "exact_refusal_parity",
+        "slice_receipts": [],
+        "refusal_cases": [
+          {
+            "refusal_kind": "unsupported_scheduler_regime",
+            "scheduler_id": "host_nondeterministic_scheduler",
+            "detail": "host nondeterministic scheduling stays outside the bounded preemptive-job lane"
+          },
+          {
+            "refusal_kind": "fairness_regime_out_of_envelope",
+            "scheduler_id": "host_nondeterministic_scheduler",
+            "detail": "unbounded or unverified fairness regimes remain explicit refusals instead of implicit operator trust"
+          }
+        ],
+        "note": "host nondeterministic scheduling remains on an explicit refusal path instead of widening the bounded preemptive-job claim",
+        "receipt_digest": "4be346a17efad7967910493373153ea71d45ca21e21e7400ec36d422e3ccbf45"
+      }
+    ],
+    "exact_case_count": 2,
+    "refusal_case_count": 2,
+    "green_scheduler_ids": [
+      "deterministic_round_robin",
+      "weighted_fair_slice_rotation"
+    ],
+    "refused_scheduler_ids": [
+      "host_nondeterministic_scheduler"
+    ],
+    "claim_boundary": "this runtime bundle freezes one bounded preemptive-job lane with deterministic slice boundaries, resumable checkpoints, and explicit scheduler-regime refusal truth. It does not claim arbitrary host scheduling, general concurrency closure, non-deterministic fairness, or broader served internal compute",
+    "summary": "Preemptive-job runtime bundle covers exact_cases=2, refusal_rows=2, green_schedulers=2, refused_schedulers=1.",
+    "bundle_digest": "a910717e881f5c1e00f2581a0bd3ccc9625178f31755be4bda89b605700c1d9e"
+  },
+  "fairness_report_ref": "fixtures/tassadar/reports/tassadar_preemptive_job_fairness_report.json",
+  "fairness_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.preemptive_job_fairness.report.v1",
+    "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_preemptive_jobs_v1/tassadar_preemptive_job_runtime_bundle.json",
+    "runtime_bundle": {
+      "schema_version": 1,
+      "bundle_id": "tassadar.preemptive_job.runtime_bundle.v1",
+      "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+      "case_receipts": [
+        {
+          "case_id": "counter_round_robin_job",
+          "job_id": "tassadar.job.counter_round_robin.v1",
+          "process_id": "tassadar.process.long_loop_kernel.v1",
+          "workload_family": "long_loop_kernel",
+          "scheduler_id": "deterministic_round_robin",
+          "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+          "slice_budget_steps": 64,
+          "fairness_window_slices": 2,
+          "max_consecutive_wait_slices": 1,
+          "preemption_count": 2,
+          "starvation_free": true,
+          "exact_slice_boundary_parity": true,
+          "exact_resume_parity": true,
+          "status": "exact_slice_boundary_parity",
+          "slice_receipts": [
+            {
+              "slice_id": "counter_round_robin_job::slice::00",
+              "slice_index": 0,
+              "scheduler_id": "deterministic_round_robin",
+              "executed_step_count": 64,
+              "cumulative_step_count": 64,
+              "emitted_checkpoint_id": "checkpoint.counter_round_robin.00",
+              "wait_slices_before_run": 0,
+              "preempted_after_slice": true,
+              "detail": "slice 0 under `deterministic_round_robin` executed 64 steps after waiting 0 slice(s)"
+            },
+            {
+              "slice_id": "counter_round_robin_job::slice::01",
+              "slice_index": 1,
+              "scheduler_id": "deterministic_round_robin",
+              "executed_step_count": 64,
+              "cumulative_step_count": 128,
+              "resumed_from_checkpoint_id": "checkpoint.counter_round_robin.00",
+              "emitted_checkpoint_id": "checkpoint.counter_round_robin.01",
+              "wait_slices_before_run": 1,
+              "preempted_after_slice": true,
+              "detail": "slice 1 under `deterministic_round_robin` executed 64 steps after waiting 1 slice(s)"
+            },
+            {
+              "slice_id": "counter_round_robin_job::slice::02",
+              "slice_index": 2,
+              "scheduler_id": "deterministic_round_robin",
+              "executed_step_count": 48,
+              "cumulative_step_count": 176,
+              "resumed_from_checkpoint_id": "checkpoint.counter_round_robin.01",
+              "wait_slices_before_run": 1,
+              "preempted_after_slice": false,
+              "detail": "slice 2 under `deterministic_round_robin` executed 48 steps after waiting 1 slice(s)"
+            }
+          ],
+          "refusal_cases": [],
+          "note": "round-robin slice boundaries preserve exact resume parity and keep bounded wait at one slice",
+          "receipt_digest": "3b9ec7b65ac5e1f159d0e8c6f6c8a493222df885a88816d99c28b6fa6fd551e4"
+        },
+        {
+          "case_id": "search_weighted_fair_job",
+          "job_id": "tassadar.job.search_weighted_fair.v1",
+          "process_id": "tassadar.process.search_frontier_kernel.v1",
+          "workload_family": "search_frontier_kernel",
+          "scheduler_id": "weighted_fair_slice_rotation",
+          "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+          "slice_budget_steps": 40,
+          "fairness_window_slices": 3,
+          "max_consecutive_wait_slices": 2,
+          "preemption_count": 3,
+          "starvation_free": true,
+          "exact_slice_boundary_parity": true,
+          "exact_resume_parity": true,
+          "status": "exact_slice_boundary_parity",
+          "slice_receipts": [
+            {
+              "slice_id": "search_weighted_fair_job::slice::00",
+              "slice_index": 0,
+              "scheduler_id": "weighted_fair_slice_rotation",
+              "executed_step_count": 40,
+              "cumulative_step_count": 40,
+              "emitted_checkpoint_id": "checkpoint.search_weighted_fair.00",
+              "wait_slices_before_run": 0,
+              "preempted_after_slice": true,
+              "detail": "slice 0 under `weighted_fair_slice_rotation` executed 40 steps after waiting 0 slice(s)"
+            },
+            {
+              "slice_id": "search_weighted_fair_job::slice::01",
+              "slice_index": 1,
+              "scheduler_id": "weighted_fair_slice_rotation",
+              "executed_step_count": 40,
+              "cumulative_step_count": 80,
+              "resumed_from_checkpoint_id": "checkpoint.search_weighted_fair.00",
+              "emitted_checkpoint_id": "checkpoint.search_weighted_fair.01",
+              "wait_slices_before_run": 2,
+              "preempted_after_slice": true,
+              "detail": "slice 1 under `weighted_fair_slice_rotation` executed 40 steps after waiting 2 slice(s)"
+            },
+            {
+              "slice_id": "search_weighted_fair_job::slice::02",
+              "slice_index": 2,
+              "scheduler_id": "weighted_fair_slice_rotation",
+              "executed_step_count": 40,
+              "cumulative_step_count": 120,
+              "resumed_from_checkpoint_id": "checkpoint.search_weighted_fair.01",
+              "emitted_checkpoint_id": "checkpoint.search_weighted_fair.02",
+              "wait_slices_before_run": 1,
+              "preempted_after_slice": true,
+              "detail": "slice 2 under `weighted_fair_slice_rotation` executed 40 steps after waiting 1 slice(s)"
+            },
+            {
+              "slice_id": "search_weighted_fair_job::slice::03",
+              "slice_index": 3,
+              "scheduler_id": "weighted_fair_slice_rotation",
+              "executed_step_count": 24,
+              "cumulative_step_count": 144,
+              "resumed_from_checkpoint_id": "checkpoint.search_weighted_fair.02",
+              "wait_slices_before_run": 2,
+              "preempted_after_slice": false,
+              "detail": "slice 3 under `weighted_fair_slice_rotation` executed 24 steps after waiting 2 slice(s)"
+            }
+          ],
+          "refusal_cases": [],
+          "note": "weighted fair rotation preserves exact slice-boundary parity while bounding starvation to two wait slices",
+          "receipt_digest": "7e3c1911ed00de9cd6ba441155725ce1d7763d250c78c7d0ef3ddfebc55db105"
+        },
+        {
+          "case_id": "host_scheduler_nondeterministic_refusal",
+          "job_id": "tassadar.job.host_scheduler_nondeterministic.v1",
+          "process_id": "tassadar.process.state_machine_accumulator.v1",
+          "workload_family": "state_machine_accumulator",
+          "scheduler_id": "host_nondeterministic_scheduler",
+          "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+          "slice_budget_steps": 64,
+          "fairness_window_slices": 0,
+          "max_consecutive_wait_slices": 0,
+          "preemption_count": 0,
+          "starvation_free": false,
+          "exact_slice_boundary_parity": false,
+          "exact_resume_parity": false,
+          "status": "exact_refusal_parity",
+          "slice_receipts": [],
+          "refusal_cases": [
+            {
+              "refusal_kind": "unsupported_scheduler_regime",
+              "scheduler_id": "host_nondeterministic_scheduler",
+              "detail": "host nondeterministic scheduling stays outside the bounded preemptive-job lane"
+            },
+            {
+              "refusal_kind": "fairness_regime_out_of_envelope",
+              "scheduler_id": "host_nondeterministic_scheduler",
+              "detail": "unbounded or unverified fairness regimes remain explicit refusals instead of implicit operator trust"
+            }
+          ],
+          "note": "host nondeterministic scheduling remains on an explicit refusal path instead of widening the bounded preemptive-job claim",
+          "receipt_digest": "4be346a17efad7967910493373153ea71d45ca21e21e7400ec36d422e3ccbf45"
+        }
+      ],
+      "exact_case_count": 2,
+      "refusal_case_count": 2,
+      "green_scheduler_ids": [
+        "deterministic_round_robin",
+        "weighted_fair_slice_rotation"
+      ],
+      "refused_scheduler_ids": [
+        "host_nondeterministic_scheduler"
+      ],
+      "claim_boundary": "this runtime bundle freezes one bounded preemptive-job lane with deterministic slice boundaries, resumable checkpoints, and explicit scheduler-regime refusal truth. It does not claim arbitrary host scheduling, general concurrency closure, non-deterministic fairness, or broader served internal compute",
+      "summary": "Preemptive-job runtime bundle covers exact_cases=2, refusal_rows=2, green_schedulers=2, refused_schedulers=1.",
+      "bundle_digest": "a910717e881f5c1e00f2581a0bd3ccc9625178f31755be4bda89b605700c1d9e"
+    },
+    "rows": [
+      {
+        "scheduler_id": "deterministic_round_robin",
+        "status": "green",
+        "case_count": 1,
+        "max_consecutive_wait_slices": 1,
+        "max_preemption_count": 2,
+        "starvation_free": true,
+        "note": "deterministic round-robin keeps one-slice wait bounds and exact resumable parity"
+      },
+      {
+        "scheduler_id": "weighted_fair_slice_rotation",
+        "status": "green",
+        "case_count": 1,
+        "max_consecutive_wait_slices": 2,
+        "max_preemption_count": 3,
+        "starvation_free": true,
+        "note": "weighted fair slice rotation keeps bounded wait and exact resumable parity on the seeded search workload"
+      },
+      {
+        "scheduler_id": "host_nondeterministic_scheduler",
+        "status": "refused",
+        "case_count": 1,
+        "max_consecutive_wait_slices": 0,
+        "max_preemption_count": 0,
+        "starvation_free": false,
+        "note": "host nondeterministic scheduling remains explicitly refused for the bounded preemptive-job lane"
+      }
+    ],
+    "green_scheduler_ids": [
+      "deterministic_round_robin",
+      "weighted_fair_slice_rotation"
+    ],
+    "refused_scheduler_ids": [
+      "host_nondeterministic_scheduler"
+    ],
+    "exact_case_count": 2,
+    "refusal_case_count": 2,
+    "starvation_free_case_count": 2,
+    "fairness_window_green_case_count": 2,
+    "claim_boundary": "this cluster report covers one bounded set of scheduler regimes for the preemptive-job lane only. It keeps host-nondeterministic or otherwise unverified fairness regimes on explicit refusal paths and does not imply arbitrary cluster scheduling, concurrent executor closure, or broader served internal compute",
+    "summary": "Preemptive-job fairness report covers green_schedulers=2, refused_schedulers=1, exact_cases=2, refusal_rows=2.",
+    "report_digest": "79e97bbfac6ee220ff213bc997a3d324149bf0f0b597911937bda90ae0a4e9e5"
+  },
+  "case_audits": [
+    {
+      "case_id": "counter_round_robin_job",
+      "job_id": "tassadar.job.counter_round_robin.v1",
+      "process_id": "tassadar.process.long_loop_kernel.v1",
+      "workload_family": "long_loop_kernel",
+      "scheduler_id": "deterministic_round_robin",
+      "runtime_status": "exact_slice_boundary_parity",
+      "exact_slice_boundary_parity": true,
+      "exact_resume_parity": true,
+      "starvation_free": true,
+      "fairness_window_slices": 2,
+      "max_consecutive_wait_slices": 1,
+      "refusal_kinds": [],
+      "note": "round-robin slice boundaries preserve exact resume parity and keep bounded wait at one slice"
+    },
+    {
+      "case_id": "search_weighted_fair_job",
+      "job_id": "tassadar.job.search_weighted_fair.v1",
+      "process_id": "tassadar.process.search_frontier_kernel.v1",
+      "workload_family": "search_frontier_kernel",
+      "scheduler_id": "weighted_fair_slice_rotation",
+      "runtime_status": "exact_slice_boundary_parity",
+      "exact_slice_boundary_parity": true,
+      "exact_resume_parity": true,
+      "starvation_free": true,
+      "fairness_window_slices": 3,
+      "max_consecutive_wait_slices": 2,
+      "refusal_kinds": [],
+      "note": "weighted fair rotation preserves exact slice-boundary parity while bounding starvation to two wait slices"
+    },
+    {
+      "case_id": "host_scheduler_nondeterministic_refusal",
+      "job_id": "tassadar.job.host_scheduler_nondeterministic.v1",
+      "process_id": "tassadar.process.state_machine_accumulator.v1",
+      "workload_family": "state_machine_accumulator",
+      "scheduler_id": "host_nondeterministic_scheduler",
+      "runtime_status": "exact_refusal_parity",
+      "exact_slice_boundary_parity": false,
+      "exact_resume_parity": false,
+      "starvation_free": false,
+      "fairness_window_slices": 0,
+      "max_consecutive_wait_slices": 0,
+      "refusal_kinds": [
+        "unsupported_scheduler_regime",
+        "fairness_regime_out_of_envelope"
+      ],
+      "note": "host nondeterministic scheduling remains on an explicit refusal path instead of widening the bounded preemptive-job claim"
+    }
+  ],
+  "exact_case_count": 2,
+  "refusal_case_count": 2,
+  "overall_green": true,
+  "green_scheduler_ids": [
+    "deterministic_round_robin",
+    "weighted_fair_slice_rotation"
+  ],
+  "refused_scheduler_ids": [
+    "host_nondeterministic_scheduler"
+  ],
+  "resumable_process_ids": [
+    "tassadar.process.long_loop_kernel.v1",
+    "tassadar.process.search_frontier_kernel.v1"
+  ],
+  "served_publication_allowed": false,
+  "claim_boundary": "this eval report covers one bounded preemptive-job profile with deterministic scheduler envelopes, explicit slice-boundary receipts, resumable checkpoints, and operator-visible fairness truth. It does not claim arbitrary host scheduling, general concurrency closure, or served public widening for preemptive jobs",
+  "summary": "Preemptive-job profile report covers exact_cases=2, refusal_rows=2, green_schedulers=2, refused_schedulers=1, served_publication_allowed=false.",
+  "report_digest": "e6dbc64061e5aefb5871020c1b5c9017ede7e245418aff1a59df3f8d5e807bda"
+}

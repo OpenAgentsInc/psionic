@@ -154,6 +154,8 @@ mod tassadar_numeric_portability;
 mod tassadar_pointer_memory_scratchpad;
 #[path = "tassadar_precision_attention_robustness_audit.rs"]
 mod tassadar_precision_attention_robustness_audit;
+#[path = "tassadar_preemptive_job_profile.rs"]
+mod tassadar_preemptive_job_profile;
 #[path = "tassadar_process_object_family.rs"]
 mod tassadar_process_object_family;
 #[path = "tassadar_quantization_truth_envelope.rs"]
@@ -170,12 +172,10 @@ mod tassadar_rust_only_article_closeout_audit;
 mod tassadar_rust_source_canon;
 #[path = "tassadar_search_native_executor.rs"]
 mod tassadar_search_native_executor;
-#[path = "tassadar_session_process_profile.rs"]
-mod tassadar_session_process_profile;
-#[path = "tassadar_spill_tape_store_profile.rs"]
-mod tassadar_spill_tape_store_profile;
 #[path = "tassadar_sequence.rs"]
 mod tassadar_sequence;
+#[path = "tassadar_session_process_profile.rs"]
+mod tassadar_session_process_profile;
 #[path = "tassadar_shared_depth_halting_calibration.rs"]
 mod tassadar_shared_depth_halting_calibration;
 #[path = "tassadar_shared_primitive_transfer.rs"]
@@ -184,6 +184,8 @@ mod tassadar_shared_primitive_transfer;
 mod tassadar_simd_profile;
 #[path = "tassadar_sparse_rule_compiler_audit.rs"]
 mod tassadar_sparse_rule_compiler_audit;
+#[path = "tassadar_spill_tape_store_profile.rs"]
+mod tassadar_spill_tape_store_profile;
 #[path = "tassadar_state_design_study_report.rs"]
 mod tassadar_state_design_study_report;
 #[path = "tassadar_structured_control.rs"]
@@ -302,6 +304,7 @@ pub use tassadar_numeric_opcode_ladder::*;
 pub use tassadar_numeric_portability::*;
 pub use tassadar_pointer_memory_scratchpad::*;
 pub use tassadar_precision_attention_robustness_audit::*;
+pub use tassadar_preemptive_job_profile::*;
 pub use tassadar_process_object_family::*;
 pub use tassadar_quantization_truth_envelope::*;
 pub use tassadar_resumable_multi_slice_promotion::*;
@@ -310,13 +313,13 @@ pub use tassadar_rust_only_article_acceptance_gate::*;
 pub use tassadar_rust_only_article_closeout_audit::*;
 pub use tassadar_rust_source_canon::*;
 pub use tassadar_search_native_executor::*;
-pub use tassadar_session_process_profile::*;
-pub use tassadar_spill_tape_store_profile::*;
 pub use tassadar_sequence::*;
+pub use tassadar_session_process_profile::*;
 pub use tassadar_shared_depth_halting_calibration::*;
 pub use tassadar_shared_primitive_transfer::*;
 pub use tassadar_simd_profile::*;
 pub use tassadar_sparse_rule_compiler_audit::*;
+pub use tassadar_spill_tape_store_profile::*;
 pub use tassadar_state_design_study_report::*;
 pub use tassadar_structured_control::*;
 pub use tassadar_subset_profile_promotion_gate::*;

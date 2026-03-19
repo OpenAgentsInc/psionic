@@ -7,6 +7,7 @@ mod pipeline_sharded;
 mod replicated_serving;
 mod scheduler;
 mod serving_policy;
+mod tassadar_preemptive_job_fairness;
 mod tensor_sharded;
 
 pub use benchmark_receipts::*;
@@ -17,6 +18,7 @@ pub use psionic_net::*;
 pub use replicated_serving::*;
 pub use scheduler::*;
 pub use serving_policy::*;
+pub use tassadar_preemptive_job_fairness::*;
 pub use tensor_sharded::*;
 
 /// Human-readable crate ownership summary.

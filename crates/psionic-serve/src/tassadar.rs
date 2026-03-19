@@ -136,6 +136,22 @@ pub struct TassadarExecutorCapabilityPublication {
     pub session_process_routeable_interaction_surface_ids: Vec<String>,
     /// Refused interaction surfaces currently bound to the named session-process profile.
     pub session_process_refused_interaction_surface_ids: Vec<String>,
+    /// Preemptive-job profile report bound to the served lane.
+    pub preemptive_job_profile_report_ref: String,
+    /// Preemptive-job fairness report bound to the served lane.
+    pub preemptive_job_fairness_report_ref: String,
+    /// Stable bounded preemptive-job profile identifier.
+    pub preemptive_job_profile_id: String,
+    /// Scheduler ids currently green for the bounded preemptive-job profile.
+    pub preemptive_job_green_scheduler_ids: Vec<String>,
+    /// Scheduler ids currently refused for the bounded preemptive-job profile.
+    pub preemptive_job_refused_scheduler_ids: Vec<String>,
+    /// Exact preemptive-job case count bound to the served lane.
+    pub preemptive_job_exact_case_count: u32,
+    /// Explicit refusal-row count bound to the served lane.
+    pub preemptive_job_refusal_case_count: u32,
+    /// Whether served publication is allowed for the bounded preemptive-job profile.
+    pub preemptive_job_served_publication_allowed: bool,
     /// Broad internal-compute acceptance gate bound to the served lane.
     pub broad_internal_compute_acceptance_gate_report_ref: String,
     /// Broad internal-compute profile publication and current route selection.
@@ -248,6 +264,12 @@ pub enum TassadarExecutorCapabilityPublicationError {
     /// The bounded session-process profile was not publishable.
     #[error("invalid session-process profile report: {detail}")]
     InvalidSessionProcessProfile {
+        /// Machine-readable detail for the failed projection.
+        detail: String,
+    },
+    /// The bounded preemptive-job profile was not publishable.
+    #[error("invalid preemptive-job profile report: {detail}")]
+    InvalidPreemptiveJobProfile {
         /// Machine-readable detail for the failed projection.
         detail: String,
     },
@@ -637,19 +659,24 @@ impl LocalTassadarExecutorService {
                 },
             );
         }
-        let simd_profile_report = psionic_eval::build_tassadar_simd_profile_report().map_err(
-            |error| TassadarExecutorCapabilityPublicationError::InvalidSimdProfile {
-                detail: format!("invalid simd profile report: {error}"),
-            },
-        )?;
+        let simd_profile_report =
+            psionic_eval::build_tassadar_simd_profile_report().map_err(|error| {
+                TassadarExecutorCapabilityPublicationError::InvalidSimdProfile {
+                    detail: format!("invalid simd profile report: {error}"),
+                }
+            })?;
         if !simd_profile_report.overall_green
-            || simd_profile_report.public_profile_allowed_profile_ids.is_empty()
+            || simd_profile_report
+                .public_profile_allowed_profile_ids
+                .is_empty()
         {
-            return Err(TassadarExecutorCapabilityPublicationError::InvalidSimdProfile {
-                detail: String::from(
-                    "simd profile report must stay green and expose at least one named public profile",
-                ),
-            });
+            return Err(
+                TassadarExecutorCapabilityPublicationError::InvalidSimdProfile {
+                    detail: String::from(
+                        "simd profile report must stay green and expose at least one named public profile",
+                    ),
+                },
+            );
         }
         let session_process_profile_report =
             psionic_eval::build_tassadar_session_process_profile_report().map_err(|error| {
@@ -675,10 +702,8 @@ impl LocalTassadarExecutorService {
         }
         let session_process_route_policy_report =
             psionic_router::build_tassadar_session_process_route_policy_report().map_err(
-                |error| {
-                    TassadarExecutorCapabilityPublicationError::InvalidSessionProcessProfile {
-                        detail: format!("invalid session-process route policy report: {error}"),
-                    }
+                |error| TassadarExecutorCapabilityPublicationError::InvalidSessionProcessProfile {
+                    detail: format!("invalid session-process route policy report: {error}"),
                 },
             )?;
         if session_process_route_policy_report.promoted_profile_specific_route_count == 0
@@ -688,6 +713,27 @@ impl LocalTassadarExecutorService {
                 TassadarExecutorCapabilityPublicationError::InvalidSessionProcessProfile {
                     detail: String::from(
                         "session-process route policy report must keep at least one promoted profile-specific route and one refused route",
+                    ),
+                },
+            );
+        }
+        let preemptive_job_profile_report =
+            psionic_eval::build_tassadar_preemptive_job_profile_report().map_err(|error| {
+                TassadarExecutorCapabilityPublicationError::InvalidPreemptiveJobProfile {
+                    detail: format!("invalid preemptive-job profile report: {error}"),
+                }
+            })?;
+        if !preemptive_job_profile_report.overall_green
+            || preemptive_job_profile_report.green_scheduler_ids.is_empty()
+            || preemptive_job_profile_report
+                .refused_scheduler_ids
+                .is_empty()
+            || preemptive_job_profile_report.served_publication_allowed
+        {
+            return Err(
+                TassadarExecutorCapabilityPublicationError::InvalidPreemptiveJobProfile {
+                    detail: String::from(
+                        "preemptive-job profile report must stay green, keep at least one green scheduler and one refused scheduler, and remain non-served",
                     ),
                 },
             );
@@ -757,8 +803,7 @@ impl LocalTassadarExecutorService {
             exception_profile_portability_envelope_ids: exception_profile_report
                 .portability_envelope_ids,
             simd_profile_report_ref: String::from(psionic_eval::TASSADAR_SIMD_PROFILE_REPORT_REF),
-            simd_profile_public_profile_ids: simd_profile_report
-                .public_profile_allowed_profile_ids,
+            simd_profile_public_profile_ids: simd_profile_report.public_profile_allowed_profile_ids,
             simd_profile_default_served_profile_ids: simd_profile_report
                 .default_served_profile_allowed_profile_ids,
             simd_profile_exact_backend_ids: simd_profile_report.exact_backend_ids,
@@ -778,6 +823,23 @@ impl LocalTassadarExecutorService {
                 .routeable_interaction_surface_ids,
             session_process_refused_interaction_surface_ids: session_process_profile_report
                 .refused_interaction_surface_ids,
+            preemptive_job_profile_report_ref: String::from(
+                psionic_eval::TASSADAR_PREEMPTIVE_JOB_PROFILE_REPORT_REF,
+            ),
+            preemptive_job_fairness_report_ref: preemptive_job_profile_report
+                .fairness_report_ref
+                .clone(),
+            preemptive_job_profile_id: preemptive_job_profile_report.profile_id.clone(),
+            preemptive_job_green_scheduler_ids: preemptive_job_profile_report
+                .green_scheduler_ids
+                .clone(),
+            preemptive_job_refused_scheduler_ids: preemptive_job_profile_report
+                .refused_scheduler_ids
+                .clone(),
+            preemptive_job_exact_case_count: preemptive_job_profile_report.exact_case_count,
+            preemptive_job_refusal_case_count: preemptive_job_profile_report.refusal_case_count,
+            preemptive_job_served_publication_allowed: preemptive_job_profile_report
+                .served_publication_allowed,
             broad_internal_compute_acceptance_gate_report_ref: String::from(
                 psionic_eval::TASSADAR_BROAD_INTERNAL_COMPUTE_ACCEPTANCE_GATE_REPORT_REF,
             ),
@@ -5922,14 +5984,45 @@ mod tests {
         );
         assert_eq!(
             encoded["session_process_routeable_interaction_surface_ids"],
-            serde_json::json!([
-                "deterministic_echo_turn_loop",
-                "stateful_counter_turn_loop"
-            ])
+            serde_json::json!(["deterministic_echo_turn_loop", "stateful_counter_turn_loop"])
         );
         assert_eq!(
             encoded["session_process_refused_interaction_surface_ids"],
             serde_json::json!(["open_ended_external_event_stream"])
+        );
+        assert_eq!(
+            encoded["preemptive_job_profile_report_ref"],
+            serde_json::json!("fixtures/tassadar/reports/tassadar_preemptive_job_report.json")
+        );
+        assert_eq!(
+            encoded["preemptive_job_fairness_report_ref"],
+            serde_json::json!(
+                "fixtures/tassadar/reports/tassadar_preemptive_job_fairness_report.json"
+            )
+        );
+        assert_eq!(
+            encoded["preemptive_job_profile_id"],
+            serde_json::json!("tassadar.internal_compute.preemptive_jobs.v1")
+        );
+        assert_eq!(
+            encoded["preemptive_job_green_scheduler_ids"],
+            serde_json::json!(["deterministic_round_robin", "weighted_fair_slice_rotation"])
+        );
+        assert_eq!(
+            encoded["preemptive_job_refused_scheduler_ids"],
+            serde_json::json!(["host_nondeterministic_scheduler"])
+        );
+        assert_eq!(
+            encoded["preemptive_job_exact_case_count"],
+            serde_json::json!(2)
+        );
+        assert_eq!(
+            encoded["preemptive_job_refusal_case_count"],
+            serde_json::json!(2)
+        );
+        assert_eq!(
+            encoded["preemptive_job_served_publication_allowed"],
+            serde_json::json!(false)
         );
         assert_eq!(
             encoded["broad_internal_compute_profile_publication"]["current_served_profile_id"],

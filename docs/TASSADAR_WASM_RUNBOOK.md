@@ -1084,6 +1084,30 @@ Expected outcome:
 - typed datastream locators for spill segments and external tape-store segments
 - explicit oversize-state, missing-segment, and non-cpu portability refusals
 
+### 19. Preemption, scheduling fairness, and resumable job receipts
+
+```bash
+cargo run -p psionic-runtime --example tassadar_preemptive_job_runtime_bundle
+cargo run -p psionic-cluster --example tassadar_preemptive_job_fairness_report
+cargo run -p psionic-eval --example tassadar_preemptive_job_report
+```
+
+Read:
+
+- `fixtures/tassadar/runs/tassadar_preemptive_jobs_v1/tassadar_preemptive_job_runtime_bundle.json`
+- `fixtures/tassadar/reports/tassadar_preemptive_job_fairness_report.json`
+- `fixtures/tassadar/reports/tassadar_preemptive_job_report.json`
+
+Expected outcome:
+
+- one named bounded preemptive-job profile:
+  `tassadar.internal_compute.preemptive_jobs.v1`
+- exact slice-boundary and resume parity on the deterministic round-robin row
+- exact slice-boundary and resume parity on the weighted-fair search row
+- explicit green scheduler truth for deterministic round-robin and weighted fair
+- explicit refusal on the host-nondeterministic scheduler regime
+- zero served publication widening for the preemptive-job lane
+
 ## Validation Commands
 
 Run the focused report checks after the flow:
@@ -1148,6 +1172,10 @@ cargo test -p psionic-datastream external_tape -- --nocapture
 cargo test -p psionic-eval spill_tape -- --nocapture
 cargo test -p psionic-provider spill_tape_store -- --nocapture
 cargo test -p psionic-environments tassadar_environment_bundle_is_machine_legible -- --nocapture
+cargo test -p psionic-runtime preemptive_job -- --nocapture
+cargo test -p psionic-cluster preemptive_job -- --nocapture
+cargo test -p psionic-eval preemptive_job -- --nocapture
+cargo test -p psionic-provider preemptive_job -- --nocapture
 ```
 
 These checks should keep the committed reports and generated truth aligned.

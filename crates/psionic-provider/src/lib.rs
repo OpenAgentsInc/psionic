@@ -40,14 +40,15 @@ mod tassadar_module_trust_isolation;
 mod tassadar_multi_memory_profile;
 mod tassadar_numeric_portability;
 mod tassadar_planner_policy;
+mod tassadar_preemptive_job_profile;
 mod tassadar_process_object_family;
 mod tassadar_quantization_truth_envelope;
 mod tassadar_receipt_supervision;
 mod tassadar_resumable_multi_slice_promotion;
-mod tassadar_session_process_profile;
-mod tassadar_spill_tape_store_profile;
 mod tassadar_self_installation_gate;
+mod tassadar_session_process_profile;
 mod tassadar_simd_profile;
+mod tassadar_spill_tape_store_profile;
 mod tassadar_subset_profile_promotion_gate;
 mod tassadar_threads_research_profile;
 mod tassadar_trap_exception;
@@ -98,14 +99,15 @@ pub use tassadar_module_trust_isolation::*;
 pub use tassadar_multi_memory_profile::*;
 pub use tassadar_numeric_portability::*;
 pub use tassadar_planner_policy::*;
+pub use tassadar_preemptive_job_profile::*;
 pub use tassadar_process_object_family::*;
 pub use tassadar_quantization_truth_envelope::*;
 pub use tassadar_receipt_supervision::*;
 pub use tassadar_resumable_multi_slice_promotion::*;
-pub use tassadar_session_process_profile::*;
-pub use tassadar_spill_tape_store_profile::*;
 pub use tassadar_self_installation_gate::*;
+pub use tassadar_session_process_profile::*;
 pub use tassadar_simd_profile::*;
+pub use tassadar_spill_tape_store_profile::*;
 pub use tassadar_subset_profile_promotion_gate::*;
 pub use tassadar_threads_research_profile::*;
 pub use tassadar_trap_exception::*;
@@ -522,6 +524,8 @@ pub struct TassadarCapabilityEnvelope {
     pub simd_profile_receipt: TassadarSimdProfileReceipt,
     /// Provider-facing receipt for the bounded interactive session-process profile.
     pub session_process_profile_receipt: TassadarSessionProcessProfileReceipt,
+    /// Provider-facing receipt for the bounded preemptive-job profile.
+    pub preemptive_job_receipt: TassadarPreemptiveJobReceipt,
     /// Provider-facing receipt for the resumable multi-slice promotion lane.
     pub resumable_multi_slice_promotion_receipt: TassadarResumableMultiSlicePromotionReceipt,
     /// Provider-facing receipt for deterministic import-mediated effect-safe resume.
@@ -631,6 +635,16 @@ impl TassadarCapabilityEnvelope {
             })?;
         let session_process_profile_receipt =
             TassadarSessionProcessProfileReceipt::from_report(&session_process_profile_report);
+        let preemptive_job_profile_report =
+            psionic_eval::build_tassadar_preemptive_job_profile_report().map_err(|error| {
+                TassadarCapabilityEnvelopeError::UnpublishablePreemptiveJobProfile {
+                    detail: format!(
+                        "provider envelope requires a valid preemptive-job profile report: {error}"
+                    ),
+                }
+            })?;
+        let preemptive_job_receipt =
+            TassadarPreemptiveJobReceipt::from_report(&preemptive_job_profile_report);
         let resumable_multi_slice_promotion_report =
             psionic_eval::build_tassadar_resumable_multi_slice_promotion_report().map_err(
                 |error| {
@@ -1001,6 +1015,51 @@ impl TassadarCapabilityEnvelope {
                 },
             );
         }
+        if publication
+            .preemptive_job_profile_report_ref
+            .trim()
+            .is_empty()
+            || publication
+                .preemptive_job_fairness_report_ref
+                .trim()
+                .is_empty()
+            || publication.preemptive_job_profile_id != preemptive_job_receipt.profile_id
+            || publication.preemptive_job_green_scheduler_ids
+                != preemptive_job_receipt.green_scheduler_ids
+            || publication.preemptive_job_refused_scheduler_ids
+                != preemptive_job_receipt.refused_scheduler_ids
+            || publication.preemptive_job_exact_case_count
+                != preemptive_job_receipt.exact_case_count
+            || publication.preemptive_job_refusal_case_count
+                != preemptive_job_receipt.refusal_case_count
+            || publication.preemptive_job_served_publication_allowed
+                != preemptive_job_receipt.served_publication_allowed
+            || !preemptive_job_profile_report.overall_green
+            || !preemptive_job_receipt
+                .green_scheduler_ids
+                .contains(&String::from("deterministic_round_robin"))
+            || !preemptive_job_receipt
+                .green_scheduler_ids
+                .contains(&String::from("weighted_fair_slice_rotation"))
+            || !preemptive_job_receipt
+                .refused_scheduler_ids
+                .contains(&String::from("host_nondeterministic_scheduler"))
+            || preemptive_job_receipt.served_publication_allowed
+            || !preemptive_job_receipt
+                .resumable_process_ids
+                .contains(&String::from("tassadar.process.long_loop_kernel.v1"))
+            || !preemptive_job_receipt
+                .resumable_process_ids
+                .contains(&String::from("tassadar.process.search_frontier_kernel.v1"))
+        {
+            return Err(
+                TassadarCapabilityEnvelopeError::UnpublishablePreemptiveJobProfile {
+                    detail: String::from(
+                        "provider envelope requires non-empty preemptive-job profile and fairness refs, exact agreement with the committed profile/scheduler/count posture, a green bounded preemptive-job profile, deterministic round-robin and weighted-fair scheduler rows, explicit refusal on the host-nondeterministic scheduler, resumable long-loop and search-frontier process ids, and zero served-publication widening",
+                    ),
+                },
+            );
+        }
         Ok(Self {
             backend_family: String::from(BACKEND_FAMILY),
             product_id: publication.product_id.clone(),
@@ -1013,6 +1072,7 @@ impl TassadarCapabilityEnvelope {
             exception_profile_receipt,
             simd_profile_receipt,
             session_process_profile_receipt,
+            preemptive_job_receipt,
             resumable_multi_slice_promotion_receipt,
             effect_safe_resume_receipt,
             subset_profile_promotion_gate_receipt,
@@ -1074,6 +1134,11 @@ pub enum TassadarCapabilityEnvelopeError {
     },
     /// The served interactive session-process profile was not publishable provider-side.
     UnpublishableSessionProcessProfile {
+        /// Plain-text validation detail.
+        detail: String,
+    },
+    /// The served preemptive-job profile was not publishable provider-side.
+    UnpublishablePreemptiveJobProfile {
         /// Plain-text validation detail.
         detail: String,
     },
@@ -9238,14 +9303,43 @@ mod tests {
         );
         assert_eq!(
             encoded["publication"]["session_process_routeable_interaction_surface_ids"],
-            json!([
-                "deterministic_echo_turn_loop",
-                "stateful_counter_turn_loop"
-            ])
+            json!(["deterministic_echo_turn_loop", "stateful_counter_turn_loop"])
         );
         assert_eq!(
             encoded["publication"]["session_process_refused_interaction_surface_ids"],
             json!(["open_ended_external_event_stream"])
+        );
+        assert_eq!(
+            encoded["publication"]["preemptive_job_profile_report_ref"],
+            json!("fixtures/tassadar/reports/tassadar_preemptive_job_report.json")
+        );
+        assert_eq!(
+            encoded["publication"]["preemptive_job_fairness_report_ref"],
+            json!("fixtures/tassadar/reports/tassadar_preemptive_job_fairness_report.json")
+        );
+        assert_eq!(
+            encoded["publication"]["preemptive_job_profile_id"],
+            json!("tassadar.internal_compute.preemptive_jobs.v1")
+        );
+        assert_eq!(
+            encoded["publication"]["preemptive_job_green_scheduler_ids"],
+            json!(["deterministic_round_robin", "weighted_fair_slice_rotation"])
+        );
+        assert_eq!(
+            encoded["publication"]["preemptive_job_refused_scheduler_ids"],
+            json!(["host_nondeterministic_scheduler"])
+        );
+        assert_eq!(
+            encoded["publication"]["preemptive_job_exact_case_count"],
+            json!(2)
+        );
+        assert_eq!(
+            encoded["publication"]["preemptive_job_refusal_case_count"],
+            json!(2)
+        );
+        assert_eq!(
+            encoded["publication"]["preemptive_job_served_publication_allowed"],
+            json!(false)
         );
         assert_eq!(
             encoded["broad_internal_compute_profile_publication_receipt"]["public_profile_specific_route_ids"],
@@ -9334,14 +9428,30 @@ mod tests {
         );
         assert_eq!(
             encoded["session_process_profile_receipt"]["routeable_interaction_surface_ids"],
-            json!([
-                "deterministic_echo_turn_loop",
-                "stateful_counter_turn_loop"
-            ])
+            json!(["deterministic_echo_turn_loop", "stateful_counter_turn_loop"])
         );
         assert_eq!(
             encoded["session_process_profile_receipt"]["refused_interaction_surface_ids"],
             json!(["open_ended_external_event_stream"])
+        );
+        assert_eq!(
+            encoded["preemptive_job_receipt"]["green_scheduler_ids"],
+            json!(["deterministic_round_robin", "weighted_fair_slice_rotation"])
+        );
+        assert_eq!(
+            encoded["preemptive_job_receipt"]["refused_scheduler_ids"],
+            json!(["host_nondeterministic_scheduler"])
+        );
+        assert_eq!(
+            encoded["preemptive_job_receipt"]["resumable_process_ids"],
+            json!([
+                "tassadar.process.long_loop_kernel.v1",
+                "tassadar.process.search_frontier_kernel.v1"
+            ])
+        );
+        assert_eq!(
+            encoded["preemptive_job_receipt"]["served_publication_allowed"],
+            json!(false)
         );
         assert_eq!(
             encoded["effect_safe_resume_receipt"]["target_profile_id"],

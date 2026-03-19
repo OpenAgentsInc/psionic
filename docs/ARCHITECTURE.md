@@ -846,6 +846,15 @@ The current scope is:
   portability widening; this is not infinite in-core memory, arbitrary
   persistent process semantics, async effect closure, or broader served
   internal compute
+- the current preemptive-job artifacts are
+  `fixtures/tassadar/runs/tassadar_preemptive_jobs_v1/tassadar_preemptive_job_runtime_bundle.json`,
+  `fixtures/tassadar/reports/tassadar_preemptive_job_fairness_report.json`,
+  and `fixtures/tassadar/reports/tassadar_preemptive_job_report.json`, which
+  freeze one bounded preemptive-job lane with deterministic round-robin and
+  weighted-fair scheduler envelopes, resumable slice-boundary receipts, and
+  explicit refusal on host-nondeterministic scheduling; this is not arbitrary
+  cluster scheduling, general concurrency closure, or broader served internal
+  compute
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

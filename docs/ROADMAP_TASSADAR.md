@@ -98,6 +98,12 @@ Current honest posture:
   provider, and environment bindings on the current-host cpu-reference
   portability envelope while keeping oversize state, missing tape segments, and
   non-cpu portability widening on explicit refusal paths
+- the repo now also has one bounded preemptive-job profile
+  `tassadar.internal_compute.preemptive_jobs.v1` over deterministic
+  round-robin and weighted-fair slice schedulers, with committed runtime,
+  cluster, and eval reports plus served-publication and provider-envelope
+  bindings that keep the lane operator-visible but non-served while refusing
+  host-nondeterministic scheduling explicitly
 - broader profiles above that remain benchmarked, suppressed, refused, or
   unpromoted unless their explicit gates are green
 
