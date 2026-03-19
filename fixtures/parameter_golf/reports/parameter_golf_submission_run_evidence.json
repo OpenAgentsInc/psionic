@@ -368,10 +368,10 @@
       "axes": [],
       "stages": []
     },
-    "training_capability_report_digest": "0a8d03ac9cf00ea6c3961669dd782658a555f4511d5f287887eb2690535a4d71",
+    "training_capability_report_digest": "74abd92cee354758305c81e54f93bf22a2ae386082a9d125cbd3ce3153961ca4",
     "challenge_kernel_blockers": [
       "cuda_bf16_train_graph_and_optimizer_surface",
-      "cuda_rope_gqa_decoder_block_reverse_mode"
+      "cuda_rope_gqa_decoder_block_backward_runtime"
     ],
     "disposition": "refused",
     "refusal": {
@@ -382,11 +382,11 @@
     "boundary_notes": [
       "The current exported-folder evidence is bound to a local review host rather than challenge-matching 8xH100 inventory, so the challenge receipt remains an explicit refusal.",
       "cuda_bf16_train_graph_and_optimizer_surface: Do not treat the first BF16 runtime seam as proof that the public CUDA lane already owns broad BF16 train-graph, backward, or optimizer execution.",
-      "cuda_rope_gqa_decoder_block_reverse_mode: Do not treat bounded forward CUDA RoPE/GQA decoder-block execution as proof that the public train path already owns reverse-mode or full trainer closure for that block."
+      "cuda_rope_gqa_decoder_block_backward_runtime: Do not treat bounded decoder reverse-mode graph semantics as proof that the public CUDA lane already owns backward execution or full trainer closure for that block."
     ],
     "claim_boundary": "exact 8xH100 DDP-style topology, communication, wallclock, and memory receipts are explicit, but challenge-ready CUDA kernel and runtime widening remains a separate closure item",
-    "receipt_digest": "8ea51f08102b967c5f38b80c0a4463c4736c9c1d08b2942419cc34431e8f5a65"
+    "receipt_digest": "d36ea296cc8f6b14858edf9e63a154730027834e89995fef1dd6e517c87af5ca"
   },
   "claim_boundary": "This report binds the exact exported submission folder to one real folder-local entrypoint replay, the preserved bounded wallclock/memory/artifact receipts, and one measured-or-refused 8xH100 challenge receipt. The committed evidence is still a local review-host refusal rather than true 8xH100 success.",
-  "report_digest": "c97cde427ceacb895ce980efed4e98d7e8f243318a99e1152e93436bf4b24bdc"
+  "report_digest": "0dc276d9fc9125935830597c3c0622eecc0f9e442b6df80f85471b96d26a6d30"
 }

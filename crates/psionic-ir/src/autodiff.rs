@@ -150,7 +150,11 @@ pub const fn gradient_support_for_op(op: &OpKind) -> AutodiffGradientSupport {
             reason: AutodiffUnsupportedGradientReason::CastFamily,
         },
         OpKind::BackendExtension { op } => match op {
-            BackendExtensionOp::RmsNorm { .. } => AutodiffGradientSupport::Implemented,
+            BackendExtensionOp::RmsNorm { .. }
+            | BackendExtensionOp::RotaryEmbedding { .. }
+            | BackendExtensionOp::ScaledDotProductAttention { .. } => {
+                AutodiffGradientSupport::Implemented
+            }
             _ => AutodiffGradientSupport::Unsupported {
                 reason: AutodiffUnsupportedGradientReason::BackendExtensionFamily,
             },
@@ -2257,6 +2261,122 @@ impl AutodiffGraph {
                             )?;
                         }
                     }
+                    BackendExtensionOp::RotaryEmbedding { interleaved } => {
+                        let input_id = node.inputs()[0];
+                        let cos_id = node.inputs()[1];
+                        let sin_id = node.inputs()[2];
+                        if self.requires_grad(cos_id) || self.requires_grad(sin_id) {
+                            return Err(AutodiffError::UnsupportedGradientOp {
+                                tensor_id: node.tensor().id(),
+                                op: String::from("rotary_embedding_table_gradients"),
+                            });
+                        }
+                        if self.requires_grad(input_id) {
+                            let cos = primal_placeholder(
+                                &mut backward_builder,
+                                &mut primal_bindings,
+                                &self.graph,
+                                cos_id,
+                            )?;
+                            let sin = primal_placeholder(
+                                &mut backward_builder,
+                                &mut primal_bindings,
+                                &self.graph,
+                                sin_id,
+                            )?;
+                            let contribution = backward_builder
+                                .rotary_embedding_backward(
+                                    &current_gradient,
+                                    &cos,
+                                    &sin,
+                                    *interleaved,
+                                )
+                                .map_err(map_graph_error)?;
+                            accumulate_gradient(
+                                &mut backward_builder,
+                                &mut gradients,
+                                input_id,
+                                contribution,
+                            )?;
+                        }
+                    }
+                    BackendExtensionOp::ScaledDotProductAttention { scale, causal } => {
+                        let query_id = node.inputs()[0];
+                        let key_id = node.inputs()[1];
+                        let value_id = node.inputs()[2];
+                        let query = primal_placeholder(
+                            &mut backward_builder,
+                            &mut primal_bindings,
+                            &self.graph,
+                            query_id,
+                        )?;
+                        let key = primal_placeholder(
+                            &mut backward_builder,
+                            &mut primal_bindings,
+                            &self.graph,
+                            key_id,
+                        )?;
+                        let value = primal_placeholder(
+                            &mut backward_builder,
+                            &mut primal_bindings,
+                            &self.graph,
+                            value_id,
+                        )?;
+                        if self.requires_grad(query_id) {
+                            let contribution = backward_builder
+                                .scaled_dot_product_attention_query_backward(
+                                    &query,
+                                    &key,
+                                    &value,
+                                    &current_gradient,
+                                    scale.to_f32(),
+                                    *causal,
+                                )
+                                .map_err(map_graph_error)?;
+                            accumulate_gradient(
+                                &mut backward_builder,
+                                &mut gradients,
+                                query_id,
+                                contribution,
+                            )?;
+                        }
+                        if self.requires_grad(key_id) {
+                            let contribution = backward_builder
+                                .scaled_dot_product_attention_key_backward(
+                                    &query,
+                                    &key,
+                                    &value,
+                                    &current_gradient,
+                                    scale.to_f32(),
+                                    *causal,
+                                )
+                                .map_err(map_graph_error)?;
+                            accumulate_gradient(
+                                &mut backward_builder,
+                                &mut gradients,
+                                key_id,
+                                contribution,
+                            )?;
+                        }
+                        if self.requires_grad(value_id) {
+                            let contribution = backward_builder
+                                .scaled_dot_product_attention_value_backward(
+                                    &query,
+                                    &key,
+                                    &value,
+                                    &current_gradient,
+                                    scale.to_f32(),
+                                    *causal,
+                                )
+                                .map_err(map_graph_error)?;
+                            accumulate_gradient(
+                                &mut backward_builder,
+                                &mut gradients,
+                                value_id,
+                                contribution,
+                            )?;
+                        }
+                    }
                     _ => unreachable!(
                         "unsupported backend extensions should have been rejected by the autodiff support matrix"
                     ),
@@ -4053,6 +4173,168 @@ fn evaluate_backend_extension_reference(
                 epsilon.to_f32(),
             )))
         }
+        BackendExtensionOp::RotaryEmbedding { interleaved } => {
+            let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let cos = resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            let sin = resolve_dense_input(graph, values, node.inputs()[2], node.op().label())?;
+            let input_shape = graph
+                .node(node.inputs()[0])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[0],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            let cos_shape = graph
+                .node(node.inputs()[1])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[1],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            Ok(TensorData::F32(rotary_embedding_values(
+                input,
+                &input_shape,
+                cos,
+                sin,
+                &cos_shape,
+                *interleaved,
+            )))
+        }
+        BackendExtensionOp::RotaryEmbeddingBackward { interleaved } => {
+            let grad_output =
+                resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let cos = resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            let sin = resolve_dense_input(graph, values, node.inputs()[2], node.op().label())?;
+            let grad_shape = graph
+                .node(node.inputs()[0])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[0],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            let cos_shape = graph
+                .node(node.inputs()[1])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[1],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            Ok(TensorData::F32(rotary_embedding_backward_values(
+                grad_output,
+                &grad_shape,
+                cos,
+                sin,
+                &cos_shape,
+                *interleaved,
+            )))
+        }
+        BackendExtensionOp::ScaledDotProductAttention { scale, causal } => {
+            let query = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let key = resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            let value = resolve_dense_input(graph, values, node.inputs()[2], node.op().label())?;
+            let query_shape = graph
+                .node(node.inputs()[0])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[0],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            let key_shape = graph
+                .node(node.inputs()[1])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[1],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            let value_shape = graph
+                .node(node.inputs()[2])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[2],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            Ok(TensorData::F32(scaled_dot_product_attention_forward_values(
+                query,
+                &query_shape,
+                key,
+                &key_shape,
+                value,
+                &value_shape,
+                scale.to_f32(),
+                *causal,
+            )))
+        }
+        BackendExtensionOp::ScaledDotProductAttentionQueryBackward { scale, causal }
+        | BackendExtensionOp::ScaledDotProductAttentionKeyBackward { scale, causal }
+        | BackendExtensionOp::ScaledDotProductAttentionValueBackward { scale, causal } => {
+            let query = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let key = resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            let value = resolve_dense_input(graph, values, node.inputs()[2], node.op().label())?;
+            let grad_output =
+                resolve_dense_input(graph, values, node.inputs()[3], node.op().label())?;
+            let query_shape = graph
+                .node(node.inputs()[0])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[0],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            let key_shape = graph
+                .node(node.inputs()[1])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[1],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            let value_shape = graph
+                .node(node.inputs()[2])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[2],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            let gradients = scaled_dot_product_attention_backward_values(
+                query,
+                &query_shape,
+                key,
+                &key_shape,
+                value,
+                &value_shape,
+                grad_output,
+                scale.to_f32(),
+                *causal,
+            );
+            Ok(TensorData::F32(match op {
+                BackendExtensionOp::ScaledDotProductAttentionQueryBackward { .. } => {
+                    gradients.query
+                }
+                BackendExtensionOp::ScaledDotProductAttentionKeyBackward { .. } => gradients.key,
+                BackendExtensionOp::ScaledDotProductAttentionValueBackward { .. } => {
+                    gradients.value
+                }
+                _ => unreachable!("backward op match arm should stay aligned"),
+            }))
+        }
         _ => Err(ReferenceEvaluationError::UnsupportedOp {
             tensor_id: node.tensor().id(),
             op: String::from(node.op().label()),
@@ -4541,6 +4823,323 @@ fn rms_norm_weight_backward_values(
     output
 }
 
+fn rotary_embedding_values(
+    input: &[f32],
+    input_shape: &Shape,
+    cos: &[f32],
+    sin: &[f32],
+    cos_shape: &Shape,
+    interleaved: bool,
+) -> Vec<f32> {
+    let dims = input_shape.dims();
+    let batch = dims[0];
+    let heads = dims[1];
+    let seq_len = dims[2];
+    let head_dim = dims[3];
+    let half_dim = head_dim / 2;
+    let batched_cos = cos_shape.rank() == 3;
+    let mut output = input.to_vec();
+
+    for batch_index in 0..batch {
+        for head_index in 0..heads {
+            for position in 0..seq_len {
+                let base = ((batch_index * heads + head_index) * seq_len + position) * head_dim;
+                for pair in 0..half_dim {
+                    let cos_index = if batched_cos {
+                        (batch_index * seq_len + position) * half_dim + pair
+                    } else {
+                        position * half_dim + pair
+                    };
+                    let cosine = cos[cos_index];
+                    let sine = sin[cos_index];
+                    let (left_index, right_index) = if interleaved {
+                        (base + pair * 2, base + pair * 2 + 1)
+                    } else {
+                        (base + pair, base + half_dim + pair)
+                    };
+                    let left = input[left_index];
+                    let right = input[right_index];
+                    output[left_index] = left * cosine - right * sine;
+                    output[right_index] = left * sine + right * cosine;
+                }
+            }
+        }
+    }
+
+    output
+}
+
+fn rotary_embedding_backward_values(
+    grad_output: &[f32],
+    grad_shape: &Shape,
+    cos: &[f32],
+    sin: &[f32],
+    cos_shape: &Shape,
+    interleaved: bool,
+) -> Vec<f32> {
+    let dims = grad_shape.dims();
+    let batch = dims[0];
+    let heads = dims[1];
+    let seq_len = dims[2];
+    let head_dim = dims[3];
+    let half_dim = head_dim / 2;
+    let batched_cos = cos_shape.rank() == 3;
+    let mut grad_input = grad_output.to_vec();
+
+    for batch_index in 0..batch {
+        for head_index in 0..heads {
+            for position in 0..seq_len {
+                let base = ((batch_index * heads + head_index) * seq_len + position) * head_dim;
+                for pair in 0..half_dim {
+                    let cos_index = if batched_cos {
+                        (batch_index * seq_len + position) * half_dim + pair
+                    } else {
+                        position * half_dim + pair
+                    };
+                    let cosine = cos[cos_index];
+                    let sine = sin[cos_index];
+                    let (left_index, right_index) = if interleaved {
+                        (base + pair * 2, base + pair * 2 + 1)
+                    } else {
+                        (base + pair, base + half_dim + pair)
+                    };
+                    let grad_left = grad_output[left_index];
+                    let grad_right = grad_output[right_index];
+                    grad_input[left_index] = grad_left * cosine + grad_right * sine;
+                    grad_input[right_index] = grad_right * cosine - grad_left * sine;
+                }
+            }
+        }
+    }
+
+    grad_input
+}
+
+fn scaled_dot_product_attention_forward_values(
+    query: &[f32],
+    query_shape: &Shape,
+    key: &[f32],
+    key_shape: &Shape,
+    value: &[f32],
+    value_shape: &Shape,
+    scale: f32,
+    causal: bool,
+) -> Vec<f32> {
+    let query_dims = query_shape.dims();
+    let key_dims = key_shape.dims();
+    let value_dims = value_shape.dims();
+    let batch = query_dims[0];
+    let query_heads = query_dims[1];
+    let key_heads = key_dims[1];
+    let query_seq = query_dims[2];
+    let key_seq = key_dims[2];
+    let head_dim = query_dims[3];
+    let value_dim = value_dims[3];
+    let group_size = query_heads / key_heads;
+    let mut output = vec![0.0_f32; batch * query_heads * query_seq * value_dim];
+    let mut scores = vec![0.0_f32; key_seq];
+    let mut weights = vec![0.0_f32; key_seq];
+
+    for batch_index in 0..batch {
+        for head_index in 0..query_heads {
+            let kv_head = head_index / group_size;
+            for query_index in 0..query_seq {
+                let mut max_score = f32::NEG_INFINITY;
+                let mut valid_scores = 0usize;
+                for key_index in 0..key_seq {
+                    if causal && key_index > query_index {
+                        scores[key_index] = f32::NEG_INFINITY;
+                        continue;
+                    }
+                    let query_base =
+                        ((batch_index * query_heads + head_index) * query_seq + query_index)
+                            * head_dim;
+                    let key_base =
+                        ((batch_index * key_heads + kv_head) * key_seq + key_index) * head_dim;
+                    let mut dot = 0.0_f32;
+                    for dim in 0..head_dim {
+                        dot += query[query_base + dim] * key[key_base + dim];
+                    }
+                    let score = dot * scale;
+                    scores[key_index] = score;
+                    max_score = max_score.max(score);
+                    valid_scores += 1;
+                }
+                if valid_scores == 0 {
+                    continue;
+                }
+                let mut weight_sum = 0.0_f32;
+                for key_index in 0..key_seq {
+                    if !scores[key_index].is_finite() {
+                        weights[key_index] = 0.0;
+                        continue;
+                    }
+                    let weight = (scores[key_index] - max_score).exp();
+                    weights[key_index] = weight;
+                    weight_sum += weight;
+                }
+                if weight_sum <= 0.0 {
+                    continue;
+                }
+                let output_base =
+                    ((batch_index * query_heads + head_index) * query_seq + query_index)
+                        * value_dim;
+                for key_index in 0..key_seq {
+                    let normalized = weights[key_index] / weight_sum;
+                    if normalized == 0.0 {
+                        continue;
+                    }
+                    let value_base =
+                        ((batch_index * key_heads + kv_head) * key_seq + key_index) * value_dim;
+                    for dim in 0..value_dim {
+                        output[output_base + dim] += normalized * value[value_base + dim];
+                    }
+                }
+            }
+        }
+    }
+
+    output
+}
+
+struct ScaledDotProductAttentionBackwardValues {
+    query: Vec<f32>,
+    key: Vec<f32>,
+    value: Vec<f32>,
+}
+
+fn scaled_dot_product_attention_backward_values(
+    query: &[f32],
+    query_shape: &Shape,
+    key: &[f32],
+    key_shape: &Shape,
+    value: &[f32],
+    value_shape: &Shape,
+    grad_output: &[f32],
+    scale: f32,
+    causal: bool,
+) -> ScaledDotProductAttentionBackwardValues {
+    let query_dims = query_shape.dims();
+    let key_dims = key_shape.dims();
+    let value_dims = value_shape.dims();
+    let batch = query_dims[0];
+    let query_heads = query_dims[1];
+    let key_heads = key_dims[1];
+    let query_seq = query_dims[2];
+    let key_seq = key_dims[2];
+    let head_dim = query_dims[3];
+    let value_dim = value_dims[3];
+    let group_size = query_heads / key_heads;
+    let mut query_grad = vec![0.0_f32; query.len()];
+    let mut key_grad = vec![0.0_f32; key.len()];
+    let mut value_grad = vec![0.0_f32; value.len()];
+    let mut scores = vec![0.0_f32; key_seq];
+    let mut probs = vec![0.0_f32; key_seq];
+    let mut grad_probs = vec![0.0_f32; key_seq];
+    let mut grad_scores = vec![0.0_f32; key_seq];
+
+    for batch_index in 0..batch {
+        for head_index in 0..query_heads {
+            let kv_head = head_index / group_size;
+            for query_index in 0..query_seq {
+                let query_base =
+                    ((batch_index * query_heads + head_index) * query_seq + query_index)
+                        * head_dim;
+                let grad_output_base =
+                    ((batch_index * query_heads + head_index) * query_seq + query_index)
+                        * value_dim;
+                let mut max_score = f32::NEG_INFINITY;
+                let mut valid_scores = 0usize;
+                for key_index in 0..key_seq {
+                    if causal && key_index > query_index {
+                        scores[key_index] = f32::NEG_INFINITY;
+                        probs[key_index] = 0.0;
+                        continue;
+                    }
+                    let key_base =
+                        ((batch_index * key_heads + kv_head) * key_seq + key_index) * head_dim;
+                    let mut dot = 0.0_f32;
+                    for dim in 0..head_dim {
+                        dot += query[query_base + dim] * key[key_base + dim];
+                    }
+                    let score = dot * scale;
+                    scores[key_index] = score;
+                    max_score = max_score.max(score);
+                    valid_scores += 1;
+                }
+                if valid_scores == 0 {
+                    continue;
+                }
+
+                let mut weight_sum = 0.0_f32;
+                for key_index in 0..key_seq {
+                    if !scores[key_index].is_finite() {
+                        probs[key_index] = 0.0;
+                        continue;
+                    }
+                    let weight = (scores[key_index] - max_score).exp();
+                    probs[key_index] = weight;
+                    weight_sum += weight;
+                }
+                if weight_sum <= 0.0 {
+                    continue;
+                }
+                for probability in &mut probs {
+                    *probability /= weight_sum;
+                }
+
+                let mut weighted_grad_prob = 0.0_f32;
+                for key_index in 0..key_seq {
+                    let probability = probs[key_index];
+                    if probability == 0.0 {
+                        grad_probs[key_index] = 0.0;
+                        continue;
+                    }
+                    let value_base =
+                        ((batch_index * key_heads + kv_head) * key_seq + key_index) * value_dim;
+                    let mut grad_prob = 0.0_f32;
+                    for dim in 0..value_dim {
+                        grad_prob += grad_output[grad_output_base + dim] * value[value_base + dim];
+                        value_grad[value_base + dim] +=
+                            probability * grad_output[grad_output_base + dim];
+                    }
+                    grad_probs[key_index] = grad_prob;
+                    weighted_grad_prob += probability * grad_prob;
+                }
+
+                for key_index in 0..key_seq {
+                    let probability = probs[key_index];
+                    if probability == 0.0 {
+                        grad_scores[key_index] = 0.0;
+                        continue;
+                    }
+                    grad_scores[key_index] =
+                        probability * (grad_probs[key_index] - weighted_grad_prob);
+                }
+
+                for key_index in 0..key_seq {
+                    let grad_score = grad_scores[key_index];
+                    if grad_score == 0.0 {
+                        continue;
+                    }
+                    let key_base =
+                        ((batch_index * key_heads + kv_head) * key_seq + key_index) * head_dim;
+                    for dim in 0..head_dim {
+                        query_grad[query_base + dim] += scale * grad_score * key[key_base + dim];
+                        key_grad[key_base + dim] += scale * grad_score * query[query_base + dim];
+                    }
+                }
+            }
+        }
+    }
+
+    ScaledDotProductAttentionBackwardValues {
+        query: query_grad,
+        key: key_grad,
+        value: value_grad,
+    }
+}
+
 fn unravel_index(mut index: usize, dims: &[usize]) -> Vec<usize> {
     if dims.is_empty() {
         return Vec::new();
@@ -4836,6 +5435,220 @@ mod tests {
     }
 
     #[test]
+    fn reverse_mode_autodiff_materializes_rotary_embedding_input_gradients_against_finite_difference(
+    ) -> Result<(), Box<dyn Error>> {
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let input = builder.input("x", Shape::new(vec![1, 2, 2, 4]), DType::F32, true);
+        let cos = builder.constant_f32(Shape::new(vec![2, 2]), vec![1.0, 0.75, 0.5, 0.25])?;
+        let sin = builder.constant_f32(Shape::new(vec![2, 2]), vec![0.0, 0.2, 0.35, 0.45])?;
+        let roped = builder.rope(&input, &cos, &sin, false)?;
+        let scale = builder.constant_f32(
+            Shape::new(vec![1, 2, 2, 4]),
+            vec![
+                0.5, -1.0, 0.25, 1.5, -0.75, 0.8, 0.1, -0.4, 0.3, -0.2, 0.6, -0.9, 0.4, 0.7,
+                -0.5, 0.2,
+            ],
+        )?;
+        let scaled = builder.mul(&roped, &scale)?;
+        let loss = builder.reduce_sum(&scaled);
+        let graph = builder.finish(vec![loss.clone()]);
+
+        let backward_plan = graph.backward_plan(loss.id())?;
+        assert!(backward_plan.gradient_for(input.id()).is_some());
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                crate::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::RotaryEmbeddingBackward { .. }
+                }
+            )));
+
+        let input_values = vec![
+            0.1_f32, -0.3, 0.5, 0.7, -0.2, 0.4, -0.6, 0.8, 0.9, -1.1, 1.3, -1.5, 0.25, -0.45,
+            0.65, -0.85,
+        ];
+        let inputs = BTreeMap::from([(input.id(), TensorData::F32(input_values.clone()))]);
+        let result = graph.backward_materialized(loss.id(), &inputs)?;
+        let analytical = dense_gradient(&result, input.id());
+
+        let delta = 1e-3_f32;
+        let mut finite = vec![0.0_f32; input_values.len()];
+        for index in 0..input_values.len() {
+            let mut plus = input_values.clone();
+            plus[index] += delta;
+            let mut minus = input_values.clone();
+            minus[index] -= delta;
+            finite[index] = (scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([(input.id(), TensorData::F32(plus))]),
+            )? - scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([(input.id(), TensorData::F32(minus))]),
+            )?) / (2.0 * delta);
+        }
+
+        assert_close_slice(&analytical, &finite, 2e-3);
+        Ok(())
+    }
+
+    #[test]
+    fn reverse_mode_autodiff_materializes_gqa_attention_gradients_against_finite_difference(
+    ) -> Result<(), Box<dyn Error>> {
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let query = builder.input("q", Shape::new(vec![1, 2, 2, 4]), DType::F32, true);
+        let key = builder.input("k", Shape::new(vec![1, 1, 2, 4]), DType::F32, true);
+        let value = builder.input("v", Shape::new(vec![1, 1, 2, 4]), DType::F32, true);
+        let attended = builder.scaled_dot_product_attention(&query, &key, &value, 0.5, true)?;
+        let scale = builder.constant_f32(
+            Shape::new(vec![1, 2, 2, 4]),
+            vec![
+                0.25, -0.75, 1.25, -0.5, 0.1, 0.9, -0.2, 0.4, -0.3, 0.7, -0.6, 0.8, 1.1, -0.4,
+                0.2, -0.9,
+            ],
+        )?;
+        let scaled = builder.mul(&attended, &scale)?;
+        let loss = builder.reduce_sum(&scaled);
+        let graph = builder.finish(vec![loss.clone()]);
+
+        let backward_plan = graph.backward_plan(loss.id())?;
+        assert!(backward_plan.gradient_for(query.id()).is_some());
+        assert!(backward_plan.gradient_for(key.id()).is_some());
+        assert!(backward_plan.gradient_for(value.id()).is_some());
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                crate::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::ScaledDotProductAttentionQueryBackward { .. }
+                }
+            )));
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                crate::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::ScaledDotProductAttentionKeyBackward { .. }
+                }
+            )));
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                crate::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::ScaledDotProductAttentionValueBackward { .. }
+                }
+            )));
+
+        let query_values = vec![
+            0.1_f32, -0.2, 0.3, -0.4, 0.5, -0.6, 0.7, -0.8, -0.9, 1.0, -1.1, 1.2, -1.3, 1.4,
+            -1.5, 1.6,
+        ];
+        let key_values = vec![0.2_f32, -0.1, 0.4, -0.3, 0.6, -0.5, 0.8, -0.7];
+        let value_values = vec![-0.15_f32, 0.25, -0.35, 0.45, -0.55, 0.65, -0.75, 0.85];
+        let inputs = BTreeMap::from([
+            (query.id(), TensorData::F32(query_values.clone())),
+            (key.id(), TensorData::F32(key_values.clone())),
+            (value.id(), TensorData::F32(value_values.clone())),
+        ]);
+        let result = graph.backward_materialized(loss.id(), &inputs)?;
+        let analytical_query = dense_gradient(&result, query.id());
+        let analytical_key = dense_gradient(&result, key.id());
+        let analytical_value = dense_gradient(&result, value.id());
+
+        let delta = 1e-3_f32;
+        let mut finite_query = vec![0.0_f32; query_values.len()];
+        for index in 0..query_values.len() {
+            let mut plus = query_values.clone();
+            plus[index] += delta;
+            let mut minus = query_values.clone();
+            minus[index] -= delta;
+            finite_query[index] = (scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (query.id(), TensorData::F32(plus)),
+                    (key.id(), TensorData::F32(key_values.clone())),
+                    (value.id(), TensorData::F32(value_values.clone())),
+                ]),
+            )? - scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (query.id(), TensorData::F32(minus)),
+                    (key.id(), TensorData::F32(key_values.clone())),
+                    (value.id(), TensorData::F32(value_values.clone())),
+                ]),
+            )?) / (2.0 * delta);
+        }
+        let mut finite_key = vec![0.0_f32; key_values.len()];
+        for index in 0..key_values.len() {
+            let mut plus = key_values.clone();
+            plus[index] += delta;
+            let mut minus = key_values.clone();
+            minus[index] -= delta;
+            finite_key[index] = (scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (query.id(), TensorData::F32(query_values.clone())),
+                    (key.id(), TensorData::F32(plus)),
+                    (value.id(), TensorData::F32(value_values.clone())),
+                ]),
+            )? - scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (query.id(), TensorData::F32(query_values.clone())),
+                    (key.id(), TensorData::F32(minus)),
+                    (value.id(), TensorData::F32(value_values.clone())),
+                ]),
+            )?) / (2.0 * delta);
+        }
+        let mut finite_value = vec![0.0_f32; value_values.len()];
+        for index in 0..value_values.len() {
+            let mut plus = value_values.clone();
+            plus[index] += delta;
+            let mut minus = value_values.clone();
+            minus[index] -= delta;
+            finite_value[index] = (scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (query.id(), TensorData::F32(query_values.clone())),
+                    (key.id(), TensorData::F32(key_values.clone())),
+                    (value.id(), TensorData::F32(plus)),
+                ]),
+            )? - scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (query.id(), TensorData::F32(query_values.clone())),
+                    (key.id(), TensorData::F32(key_values.clone())),
+                    (value.id(), TensorData::F32(minus)),
+                ]),
+            )?) / (2.0 * delta);
+        }
+
+        assert_close_slice(&analytical_query, &finite_query, 3e-3);
+        assert_close_slice(&analytical_key, &finite_key, 3e-3);
+        assert_close_slice(&analytical_value, &finite_value, 3e-3);
+        Ok(())
+    }
+
+    #[test]
     fn backward_plan_deduplicates_gradient_graph_outputs_for_residual_mix_graph(
     ) -> Result<(), Box<dyn Error>> {
         let shape = Shape::new(vec![1, 2, 4]);
@@ -4936,6 +5749,53 @@ mod tests {
             .expect("rms_norm");
         let extension_graph = extension_builder.finish(vec![normalized]);
         let Some(node) = extension_graph
+            .graph()
+            .nodes()
+            .iter()
+            .find(|node| matches!(node.op(), crate::OpKind::BackendExtension { .. }))
+        else {
+            panic!("backend extension node should exist");
+        };
+        assert_eq!(
+            gradient_support_for_op(node.op()),
+            AutodiffGradientSupport::Implemented
+        );
+
+        let mut rope_builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let rope_input = rope_builder.input("x", Shape::new(vec![1, 2, 2, 4]), DType::F32, true);
+        let cos = rope_builder
+            .constant_f32(Shape::new(vec![2, 2]), vec![1.0, 0.5, 0.25, 0.75])
+            .expect("cos");
+        let sin = rope_builder
+            .constant_f32(Shape::new(vec![2, 2]), vec![0.0, 0.1, 0.2, 0.3])
+            .expect("sin");
+        let roped = rope_builder.rope(&rope_input, &cos, &sin, false).expect("rope");
+        let rope_graph = rope_builder.finish(vec![roped]);
+        let Some(node) = rope_graph
+            .graph()
+            .nodes()
+            .iter()
+            .find(|node| matches!(node.op(), crate::OpKind::BackendExtension { .. }))
+        else {
+            panic!("backend extension node should exist");
+        };
+        assert_eq!(
+            gradient_support_for_op(node.op()),
+            AutodiffGradientSupport::Implemented
+        );
+
+        let mut attention_builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let query =
+            attention_builder.input("q", Shape::new(vec![1, 2, 2, 4]), DType::F32, true);
+        let key = attention_builder.input("k", Shape::new(vec![1, 1, 2, 4]), DType::F32, true);
+        let value = attention_builder.input("v", Shape::new(vec![1, 1, 2, 4]), DType::F32, true);
+        let attended = attention_builder
+            .scaled_dot_product_attention(&query, &key, &value, 0.5, true)
+            .expect("attention");
+        let attention_graph = attention_builder.finish(vec![attended]);
+        let Some(node) = attention_graph
             .graph()
             .nodes()
             .iter()
@@ -5091,8 +5951,8 @@ mod tests {
         let mut rope_builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let rope_input = rope_builder.input("x", Shape::new(vec![1, 1, 2, 4]), DType::F32, true);
-        let cos = rope_builder.constant_f32(Shape::new(vec![2, 2]), vec![1.0; 4])?;
-        let sin = rope_builder.constant_f32(Shape::new(vec![2, 2]), vec![0.0; 4])?;
+        let cos = rope_builder.input("cos", Shape::new(vec![2, 2]), DType::F32, true);
+        let sin = rope_builder.input("sin", Shape::new(vec![2, 2]), DType::F32, true);
         let roped = rope_builder.rope(&rope_input, &cos, &sin, false)?;
         let rope_loss = rope_builder.reduce_sum(&roped);
         let rope_graph = rope_builder.finish(vec![rope_loss.clone()]);
@@ -5100,24 +5960,7 @@ mod tests {
             rope_graph.backward_plan(rope_loss.id()),
             Err(AutodiffError::UnsupportedGradientOp {
                 tensor_id: roped.id(),
-                op: String::from("rotary_embedding"),
-            })
-        );
-
-        let mut attention_builder =
-            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
-        let query = attention_builder.input("q", Shape::new(vec![1, 1, 2, 4]), DType::F32, true);
-        let key = attention_builder.input("k", Shape::new(vec![1, 1, 2, 4]), DType::F32, true);
-        let value = attention_builder.input("v", Shape::new(vec![1, 1, 2, 4]), DType::F32, true);
-        let attended =
-            attention_builder.scaled_dot_product_attention(&query, &key, &value, 0.5, true)?;
-        let attention_loss = attention_builder.reduce_sum(&attended);
-        let attention_graph = attention_builder.finish(vec![attention_loss.clone()]);
-        assert_eq!(
-            attention_graph.backward_plan(attention_loss.id()),
-            Err(AutodiffError::UnsupportedGradientOp {
-                tensor_id: attended.id(),
-                op: String::from("scaled_dot_product_attention"),
+                op: String::from("rotary_embedding_table_gradients"),
             })
         );
 

@@ -174,17 +174,17 @@ pub fn builtin_parameter_golf_cuda_training_capability_report()
                 ),
             },
             ParameterGolfCudaTrainingCoverageCase {
-                case_id: String::from("cuda_rope_gqa_decoder_block_reverse_mode"),
+                case_id: String::from("cuda_rope_gqa_decoder_block_backward_runtime"),
                 family: ParameterGolfCudaTrainingFamily::Attention,
                 status: ParameterGolfCudaTrainingCoverageStatus::Partial,
                 required_scope: String::from(
                     "the compact decoder baseline requires train-time RoPE plus grouped-query attention over the public 9x512 family",
                 ),
                 current_surface: String::from(
-                    "psionic-ir now accepts grouped-query attention program shapes and the public CUDA execution backend now executes one bounded dense f32 non-interleaved rotary plus causal grouped-query decoder block on the baseline self-attention lane, but reverse-mode decoder-block training semantics are still not public",
+                    "psionic-ir now accepts grouped-query attention program shapes, the public CUDA execution backend now executes one bounded dense f32 non-interleaved rotary plus causal grouped-query decoder block on the baseline self-attention lane, and psionic-ir now lowers bounded reverse-mode decoder-block gradients through dedicated rotary_embedding_backward plus scaled_dot_product_attention_{query,key,value}_backward ops on the dense f32 reference path",
                 ),
                 boundary_note: String::from(
-                    "Do not treat bounded forward CUDA RoPE/GQA decoder-block execution as proof that the public train path already owns reverse-mode or full trainer closure for that block.",
+                    "Do not treat bounded decoder reverse-mode graph semantics as proof that the public CUDA lane already owns backward execution or full trainer closure for that block.",
                 ),
             },
             ParameterGolfCudaTrainingCoverageCase {
@@ -293,6 +293,12 @@ mod tests {
         );
         assert_eq!(report.blocking_case_ids.len(), 2);
         assert!(
+            report
+                .blocking_case_ids
+                .iter()
+                .any(|case_id| case_id == "cuda_rope_gqa_decoder_block_backward_runtime")
+        );
+        assert!(
             !report
                 .blocking_case_ids
                 .iter()
@@ -328,6 +334,11 @@ mod tests {
             refusal
                 .detail
                 .contains("cuda_bf16_train_graph_and_optimizer_surface")
+        );
+        assert!(
+            refusal
+                .detail
+                .contains("cuda_rope_gqa_decoder_block_backward_runtime")
         );
         Ok(())
     }

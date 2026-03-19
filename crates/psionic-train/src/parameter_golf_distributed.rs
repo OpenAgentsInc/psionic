@@ -983,7 +983,7 @@ mod tests {
                 ))
         );
         assert!(receipt.boundary_notes.iter().any(|note| {
-            note.contains("cuda_rope_gqa_decoder_block_reverse_mode")
+            note.contains("cuda_rope_gqa_decoder_block_backward_runtime")
                 || note.contains("cuda_bf16_train_graph_and_optimizer_surface")
         }));
         assert!(

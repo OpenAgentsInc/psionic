@@ -424,8 +424,16 @@ impl CpuBackend {
             BackendExtensionOp::RotaryEmbedding { interleaved } => {
                 self.rotary_embedding(step, values, *interleaved)
             }
+            BackendExtensionOp::RotaryEmbeddingBackward { .. } => {
+                Err(RuntimeError::UnsupportedStep(op.label().to_string()))
+            }
             BackendExtensionOp::ScaledDotProductAttention { scale, causal } => {
                 self.scaled_dot_product_attention(step, values, scale.to_f32(), *causal)
+            }
+            BackendExtensionOp::ScaledDotProductAttentionQueryBackward { .. }
+            | BackendExtensionOp::ScaledDotProductAttentionKeyBackward { .. }
+            | BackendExtensionOp::ScaledDotProductAttentionValueBackward { .. } => {
+                Err(RuntimeError::UnsupportedStep(op.label().to_string()))
             }
             BackendExtensionOp::QuantizedMatmul { rhs_mode } => {
                 self.quantized_matmul(step, values, *rhs_mode)

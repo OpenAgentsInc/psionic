@@ -1995,8 +1995,34 @@ pub enum BackendExtensionOp {
         /// Whether pairs are interleaved on the last dimension.
         interleaved: bool,
     },
+    /// Input-gradient rule for rotary position embedding.
+    RotaryEmbeddingBackward {
+        /// Whether pairs are interleaved on the last dimension.
+        interleaved: bool,
+    },
     /// Scaled dot-product attention over query/key/value tensors.
     ScaledDotProductAttention {
+        /// Multiplicative scale applied to query-key dot products.
+        scale: StableF32,
+        /// Whether causal masking is applied.
+        causal: bool,
+    },
+    /// Query-gradient rule for scaled dot-product attention.
+    ScaledDotProductAttentionQueryBackward {
+        /// Multiplicative scale applied to query-key dot products.
+        scale: StableF32,
+        /// Whether causal masking is applied.
+        causal: bool,
+    },
+    /// Key-gradient rule for scaled dot-product attention.
+    ScaledDotProductAttentionKeyBackward {
+        /// Multiplicative scale applied to query-key dot products.
+        scale: StableF32,
+        /// Whether causal masking is applied.
+        causal: bool,
+    },
+    /// Value-gradient rule for scaled dot-product attention.
+    ScaledDotProductAttentionValueBackward {
         /// Multiplicative scale applied to query-key dot products.
         scale: StableF32,
         /// Whether causal masking is applied.
@@ -2018,8 +2044,13 @@ impl BackendExtensionOp {
             | Self::RmsNormInputBackward { .. }
             | Self::RmsNormWeightBackward { .. } => BackendExtensionKind::RmsNorm,
             Self::LayerNorm { .. } => BackendExtensionKind::LayerNorm,
-            Self::RotaryEmbedding { .. } => BackendExtensionKind::RotaryEmbedding,
-            Self::ScaledDotProductAttention { .. } => {
+            Self::RotaryEmbedding { .. } | Self::RotaryEmbeddingBackward { .. } => {
+                BackendExtensionKind::RotaryEmbedding
+            }
+            Self::ScaledDotProductAttention { .. }
+            | Self::ScaledDotProductAttentionQueryBackward { .. }
+            | Self::ScaledDotProductAttentionKeyBackward { .. }
+            | Self::ScaledDotProductAttentionValueBackward { .. } => {
                 BackendExtensionKind::ScaledDotProductAttention
             }
             Self::QuantizedMatmul { .. } => BackendExtensionKind::QuantizedMatmul,
@@ -2035,7 +2066,17 @@ impl BackendExtensionOp {
             Self::RmsNormWeightBackward { .. } => "rms_norm_weight_backward",
             Self::LayerNorm { .. } => "layer_norm",
             Self::RotaryEmbedding { .. } => "rotary_embedding",
+            Self::RotaryEmbeddingBackward { .. } => "rotary_embedding_backward",
             Self::ScaledDotProductAttention { .. } => "scaled_dot_product_attention",
+            Self::ScaledDotProductAttentionQueryBackward { .. } => {
+                "scaled_dot_product_attention_query_backward"
+            }
+            Self::ScaledDotProductAttentionKeyBackward { .. } => {
+                "scaled_dot_product_attention_key_backward"
+            }
+            Self::ScaledDotProductAttentionValueBackward { .. } => {
+                "scaled_dot_product_attention_value_backward"
+            }
             Self::QuantizedMatmul { .. } => "quantized_matmul",
         }
     }

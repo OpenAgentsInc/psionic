@@ -54,6 +54,19 @@ baseline self-attention token slices into the existing decode-kernel surface,
 so the old "no public decoder-block execution" gap is no longer the honest
 attention blocker.
 
+`psionic-ir` now also owns one bounded decoder reverse-mode seam above that
+forward runtime:
+
+- dense `f32` reference evaluation for RoPE and grouped-query attention
+- bounded reverse-mode lowering through dedicated
+  `rotary_embedding_backward` and
+  `scaled_dot_product_attention_{query,key,value}_backward` ops
+- explicit continued refusal for RoPE table gradients, which are not part of
+  the Parameter Golf trainer lane
+
+That narrows the attention blocker from "no public decoder reverse-mode" to the
+remaining public CUDA backward-runtime gap for that decoder block.
+
 The public CUDA backend now also owns one bounded BF16 runtime seam needed by
 the baseline mixed-precision lane:
 
@@ -95,7 +108,7 @@ The report now keeps the following families explicit:
 The current canonical blocker set is:
 
 - `cuda_bf16_train_graph_and_optimizer_surface`
-- `cuda_rope_gqa_decoder_block_reverse_mode`
+- `cuda_rope_gqa_decoder_block_backward_runtime`
 
 ## Current Honest Boundary
 
@@ -108,18 +121,22 @@ Today it keeps these truths separate:
     execution is real on the public CUDA path
   - one bounded full-shape residual-mix train graph is real on the public CUDA
     path
+  - bounded dense `f32` decoder reverse-mode graph semantics are real on the
+    reference path for non-interleaved RoPE plus causal grouped-query
+    attention
   - one bounded host-orchestrated CUDA Muon step is real on the public lane
   - post-train quantized export or roundtrip support is real
 - `partial`
-  - BF16 policy plus one bounded BF16 runtime primitive seam and bounded
-    RoPE/GQA forward closure now have explicit substrate or refusal contracts
+  - BF16 policy plus one bounded BF16 runtime primitive seam and one bounded
+    decoder backward-runtime gap now have explicit substrate or refusal
+    contracts
   - the public CUDA execution backend now genuinely owns dense `f32`
     pointwise `mul`, bounded dense contiguous `f32` RMSNorm forward and
     backward execution, one bounded residual-mix graph, one bounded
-    causal RoPE/GQA decoder-block forward path, and one bounded BF16 matmul
-    primitive, but the full BF16 train graph, decoder reverse-mode, or
-    optimizer train path is still narrower than the Parameter Golf challenge
-    lane
+    causal RoPE/GQA decoder-block forward path, one bounded decoder reverse-mode
+    graph seam on the dense `f32` reference path, and one bounded BF16 matmul
+    primitive, but the full BF16 train graph or decoder-block CUDA backward
+    runtime is still narrower than the Parameter Golf challenge lane
 
 This is the intended contract for the issue: do not hide missing CUDA kernels
 behind broader model or distributed receipts.
@@ -136,8 +153,8 @@ Without this report, the repo could say all of these misleading things:
 - an IR or meta-program proof means the direct CUDA kernel exists
 - one forward CUDA surface widening means the whole decoder block now trains on
   CUDA
-- one bounded forward RoPE/GQA decoder block means reverse-mode closure now
-  exists for that block
+- one bounded decoder reverse-mode graph seam means direct CUDA backward
+  execution now exists for that block
 - one bounded RMSNorm closure means the whole decoder block now trains on CUDA
 - one bounded full-shape residual-mix graph means generic broadcast or fused
   decoder closure now exists

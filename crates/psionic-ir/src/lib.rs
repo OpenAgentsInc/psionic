@@ -3872,8 +3872,32 @@ const BUILTIN_OPERATOR_SCHEMAS: &[OperatorSchema] = &[
         OperatorMetaExecutionKind::BuiltinInference,
     ),
     OperatorSchema::new(
+        "rotary_embedding_backward",
+        OperatorArity::Fixed(3),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
         "scaled_dot_product_attention",
         OperatorArity::Fixed(3),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
+        "scaled_dot_product_attention_query_backward",
+        OperatorArity::Fixed(4),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
+        "scaled_dot_product_attention_key_backward",
+        OperatorArity::Fixed(4),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
+        "scaled_dot_product_attention_value_backward",
+        OperatorArity::Fixed(4),
         OperatorImplementationKind::BackendKernel,
         OperatorMetaExecutionKind::BuiltinInference,
     ),
@@ -4454,90 +4478,34 @@ fn meta_execute_backend_extension(
             ))
         }
         BackendExtensionOp::RotaryEmbedding { .. } => {
-            ensure_matching_specs("rotary_embedding", inputs)?;
-            let input = &inputs[0];
-            let cos = &inputs[1];
-            let sin = &inputs[2];
-            let input_dims = input.shape().dims();
-            if input_dims.len() != 4 || input_dims[3] == 0 || !input_dims[3].is_multiple_of(2) {
-                return Err(extension_error(
-                    "rotary_embedding",
-                    format!(
-                        "input shape {} must be rank-4 with an even last dimension",
-                        input.shape()
-                    ),
-                ));
-            }
-            if cos.shape().dims() != sin.shape().dims() {
-                return Err(extension_error(
-                    "rotary_embedding",
-                    format!(
-                        "cos shape {} must match sin shape {}",
-                        cos.shape(),
-                        sin.shape()
-                    ),
-                ));
-            }
-            let seq_len = input_dims[2];
-            let half_dim = input_dims[3] / 2;
-            let cos_dims = cos.shape().dims();
-            let valid = matches!(cos_dims, [s, d] if *s == seq_len && *d == half_dim)
-                || matches!(cos_dims, [b, s, d] if *b == input_dims[0] && *s == seq_len && *d == half_dim);
-            if !valid {
-                return Err(extension_error(
-                    "rotary_embedding",
-                    format!(
-                        "cos/sin shape {} must be [{seq_len}, {half_dim}] or [{}, {seq_len}, {half_dim}]",
-                        cos.shape(),
-                        input_dims[0]
-                    ),
-                ));
-            }
-            Ok(TensorSpec::new(
-                input.shape().clone(),
-                input.dtype(),
-                input.device().clone(),
-            ))
+            validate_rotary_embedding_spec("rotary_embedding", inputs)
+        }
+        BackendExtensionOp::RotaryEmbeddingBackward { .. } => {
+            validate_rotary_embedding_spec("rotary_embedding_backward", inputs)
         }
         BackendExtensionOp::ScaledDotProductAttention { .. } => {
-            ensure_matching_specs("scaled_dot_product_attention", inputs)?;
-            let query = &inputs[0];
-            let key = &inputs[1];
-            let value = &inputs[2];
-            let query_dims = query.shape().dims();
-            let key_dims = key.shape().dims();
-            let value_dims = value.shape().dims();
-            let valid = query_dims.len() == 4
-                && key_dims.len() == 4
-                && value_dims.len() == 4
-                && query_dims[0] == key_dims[0]
-                && query_dims[0] == value_dims[0]
-                && key_dims[1] == value_dims[1]
-                && key_dims[1] > 0
-                && query_dims[1].is_multiple_of(key_dims[1])
-                && key_dims[2] == value_dims[2]
-                && query_dims[3] == key_dims[3];
-            if !valid {
-                return Err(extension_error(
-                    "scaled_dot_product_attention",
-                    format!(
-                        "query/key/value shapes {} / {} / {} are incompatible",
-                        query.shape(),
-                        key.shape(),
-                        value.shape()
-                    ),
-                ));
-            }
-            Ok(TensorSpec::new(
-                Shape::new(vec![
-                    query_dims[0],
-                    query_dims[1],
-                    query_dims[2],
-                    value_dims[3],
-                ]),
-                query.dtype(),
-                query.device().clone(),
-            ))
+            validate_scaled_dot_product_attention_spec("scaled_dot_product_attention", inputs)
+        }
+        BackendExtensionOp::ScaledDotProductAttentionQueryBackward { .. } => {
+            validate_scaled_dot_product_attention_backward_spec(
+                "scaled_dot_product_attention_query_backward",
+                inputs,
+                0,
+            )
+        }
+        BackendExtensionOp::ScaledDotProductAttentionKeyBackward { .. } => {
+            validate_scaled_dot_product_attention_backward_spec(
+                "scaled_dot_product_attention_key_backward",
+                inputs,
+                1,
+            )
+        }
+        BackendExtensionOp::ScaledDotProductAttentionValueBackward { .. } => {
+            validate_scaled_dot_product_attention_backward_spec(
+                "scaled_dot_product_attention_value_backward",
+                inputs,
+                2,
+            )
         }
         BackendExtensionOp::QuantizedMatmul { rhs_mode } => {
             if *rhs_mode == QuantizationMode::None {
@@ -4908,6 +4876,26 @@ impl GraphBuilder {
         Ok(self.register_backend_extension(op, vec![input.id(), cos.id(), sin.id()], spec))
     }
 
+    pub(crate) fn rotary_embedding_backward(
+        &mut self,
+        grad_output: &Tensor,
+        cos: &Tensor,
+        sin: &Tensor,
+        interleaved: bool,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::RotaryEmbeddingBackward { interleaved };
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[grad_output, cos, sin],
+            None,
+        )?;
+        Ok(self.register_backend_extension(
+            op,
+            vec![grad_output.id(), cos.id(), sin.id()],
+            spec,
+        ))
+    }
+
     /// Applies scaled dot-product attention over rank-4 `[batch, heads, seq, dim]` tensors.
     pub fn scaled_dot_product_attention(
         &mut self,
@@ -4927,6 +4915,81 @@ impl GraphBuilder {
             None,
         )?;
         Ok(self.register_backend_extension(op, vec![query.id(), key.id(), value.id()], spec))
+    }
+
+    pub(crate) fn scaled_dot_product_attention_query_backward(
+        &mut self,
+        query: &Tensor,
+        key: &Tensor,
+        value: &Tensor,
+        grad_output: &Tensor,
+        scale: f32,
+        causal: bool,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::ScaledDotProductAttentionQueryBackward {
+            scale: psionic_core::StableF32::from_f32(scale),
+            causal,
+        };
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[query, key, value, grad_output],
+            None,
+        )?;
+        Ok(self.register_backend_extension(
+            op,
+            vec![query.id(), key.id(), value.id(), grad_output.id()],
+            spec,
+        ))
+    }
+
+    pub(crate) fn scaled_dot_product_attention_key_backward(
+        &mut self,
+        query: &Tensor,
+        key: &Tensor,
+        value: &Tensor,
+        grad_output: &Tensor,
+        scale: f32,
+        causal: bool,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::ScaledDotProductAttentionKeyBackward {
+            scale: psionic_core::StableF32::from_f32(scale),
+            causal,
+        };
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[query, key, value, grad_output],
+            None,
+        )?;
+        Ok(self.register_backend_extension(
+            op,
+            vec![query.id(), key.id(), value.id(), grad_output.id()],
+            spec,
+        ))
+    }
+
+    pub(crate) fn scaled_dot_product_attention_value_backward(
+        &mut self,
+        query: &Tensor,
+        key: &Tensor,
+        value: &Tensor,
+        grad_output: &Tensor,
+        scale: f32,
+        causal: bool,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::ScaledDotProductAttentionValueBackward {
+            scale: psionic_core::StableF32::from_f32(scale),
+            causal,
+        };
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[query, key, value, grad_output],
+            None,
+        )?;
+        Ok(self.register_backend_extension(
+            op,
+            vec![query.id(), key.id(), value.id(), grad_output.id()],
+            spec,
+        ))
     }
 
     /// Registers a matmul that is eligible for a quantized-GEMM specialization.
@@ -5204,10 +5267,14 @@ fn format_backend_extension_payload(op: &BackendExtensionOp) -> String {
         BackendExtensionOp::LayerNorm { epsilon } => {
             format!("epsilon_bits={:08x}", epsilon.0)
         }
-        BackendExtensionOp::RotaryEmbedding { interleaved } => {
+        BackendExtensionOp::RotaryEmbedding { interleaved }
+        | BackendExtensionOp::RotaryEmbeddingBackward { interleaved } => {
             format!("interleaved={interleaved}")
         }
-        BackendExtensionOp::ScaledDotProductAttention { scale, causal } => {
+        BackendExtensionOp::ScaledDotProductAttention { scale, causal }
+        | BackendExtensionOp::ScaledDotProductAttentionQueryBackward { scale, causal }
+        | BackendExtensionOp::ScaledDotProductAttentionKeyBackward { scale, causal }
+        | BackendExtensionOp::ScaledDotProductAttentionValueBackward { scale, causal } => {
             format!("scale_bits={:08x},causal={causal}", scale.0)
         }
         BackendExtensionOp::QuantizedMatmul { rhs_mode } => {
@@ -5369,6 +5436,126 @@ pub fn builtin_operator_parity_matrix_report() -> Result<OperatorParityMatrixRep
         "pytorch_opinfo_seed_v0",
         cases,
     ))
+}
+
+fn validate_rotary_embedding_spec(
+    label: &str,
+    inputs: &[TensorSpec],
+) -> Result<TensorSpec, GraphError> {
+    ensure_matching_specs(label, inputs)?;
+    let input = &inputs[0];
+    let cos = &inputs[1];
+    let sin = &inputs[2];
+    let input_dims = input.shape().dims();
+    if input_dims.len() != 4 || input_dims[3] == 0 || !input_dims[3].is_multiple_of(2) {
+        return Err(extension_error(
+            label,
+            format!(
+                "input shape {} must be rank-4 with an even last dimension",
+                input.shape()
+            ),
+        ));
+    }
+    if cos.shape().dims() != sin.shape().dims() {
+        return Err(extension_error(
+            label,
+            format!(
+                "cos shape {} must match sin shape {}",
+                cos.shape(),
+                sin.shape()
+            ),
+        ));
+    }
+    let seq_len = input_dims[2];
+    let half_dim = input_dims[3] / 2;
+    let cos_dims = cos.shape().dims();
+    let valid = matches!(cos_dims, [s, d] if *s == seq_len && *d == half_dim)
+        || matches!(cos_dims, [b, s, d] if *b == input_dims[0] && *s == seq_len && *d == half_dim);
+    if !valid {
+        return Err(extension_error(
+            label,
+            format!(
+                "cos/sin shape {} must be [{seq_len}, {half_dim}] or [{}, {seq_len}, {half_dim}]",
+                cos.shape(),
+                input_dims[0]
+            ),
+        ));
+    }
+    Ok(TensorSpec::new(
+        input.shape().clone(),
+        input.dtype(),
+        input.device().clone(),
+    ))
+}
+
+fn validate_scaled_dot_product_attention_spec(
+    label: &str,
+    inputs: &[TensorSpec],
+) -> Result<TensorSpec, GraphError> {
+    ensure_matching_specs(label, inputs)?;
+    let query = &inputs[0];
+    let key = &inputs[1];
+    let value = &inputs[2];
+    let query_dims = query.shape().dims();
+    let key_dims = key.shape().dims();
+    let value_dims = value.shape().dims();
+    let valid = query_dims.len() == 4
+        && key_dims.len() == 4
+        && value_dims.len() == 4
+        && query_dims[0] == key_dims[0]
+        && query_dims[0] == value_dims[0]
+        && key_dims[1] == value_dims[1]
+        && key_dims[1] > 0
+        && query_dims[1].is_multiple_of(key_dims[1])
+        && key_dims[2] == value_dims[2]
+        && query_dims[3] == key_dims[3];
+    if !valid {
+        return Err(extension_error(
+            label,
+            format!(
+                "query/key/value shapes {} / {} / {} are incompatible",
+                query.shape(),
+                key.shape(),
+                value.shape()
+            ),
+        ));
+    }
+    Ok(TensorSpec::new(
+        Shape::new(vec![
+            query_dims[0],
+            query_dims[1],
+            query_dims[2],
+            value_dims[3],
+        ]),
+        query.dtype(),
+        query.device().clone(),
+    ))
+}
+
+fn validate_scaled_dot_product_attention_backward_spec(
+    label: &str,
+    inputs: &[TensorSpec],
+    target_input_index: usize,
+) -> Result<TensorSpec, GraphError> {
+    if inputs.len() != 4 {
+        return Err(extension_error(
+            label,
+            format!("expected 4 inputs, received {}", inputs.len()),
+        ));
+    }
+    let forward_spec = validate_scaled_dot_product_attention_spec(label, &inputs[..3])?;
+    let grad_output = &inputs[3];
+    if grad_output != &forward_spec {
+        return Err(extension_error(
+            label,
+            format!(
+                "grad_output spec {} must match forward output spec {}",
+                format_spec(grad_output),
+                format_spec(&forward_spec)
+            ),
+        ));
+    }
+    Ok(inputs[target_input_index].clone())
 }
 
 /// Returns the seeded advanced operator-program matrix report for the current
