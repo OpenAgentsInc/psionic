@@ -77,6 +77,11 @@ Current honest posture:
   backend rows for cpu-reference exactness, metal and cuda scalar fallback,
   and typed accelerator-specific refusal truth, carried through served
   publication without creating a default served SIMD lane
+- the repo now also has one research-only relaxed-SIMD ladder with committed
+  runtime, eval, and research artifacts over one exact cpu-reference anchor,
+  bounded metal/cuda drift candidates, and typed refusal on unstable lane
+  semantics plus cross-backend non-portability; it remains explicitly
+  non-promoted and non-served by design
 - the repo now also has one research-only shared-memory and threads profile
   with a deterministic scheduler envelope, explicit sandbox boundary truth,
   and typed refusal on host-nondeterministic scheduling plus relaxed

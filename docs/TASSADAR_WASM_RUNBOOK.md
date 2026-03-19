@@ -1111,6 +1111,32 @@ Expected outcome:
 - explicit accelerator-specific refusal row
 - no default served SIMD profile ids
 
+### 14A. Research-only relaxed-SIMD ladder
+
+```bash
+cargo run -p psionic-runtime --example tassadar_relaxed_simd_runtime_report
+cargo run -p psionic-eval --example tassadar_relaxed_simd_research_ladder_report
+cargo run -p psionic-research --example tassadar_relaxed_simd_research_summary
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_relaxed_simd_runtime_report.json`
+- `fixtures/tassadar/reports/tassadar_relaxed_simd_research_ladder_report.json`
+- `fixtures/tassadar/reports/tassadar_relaxed_simd_research_summary.json`
+
+Expected outcome:
+
+- one research-only relaxed-SIMD profile ladder:
+  `tassadar.research_profile.relaxed_simd_accelerator.v1`
+- one exact cpu-reference anchor row
+- bounded metal and cuda drift rows that stay explicit instead of becoming
+  deterministic profile truth
+- explicit refusal on unstable lane-shuffle semantics
+- explicit refusal on cross-backend relaxed-SIMD equivalence
+- `public_promotion_allowed = false`
+- `default_served_profile_allowed = false`
+
 ### 15. Research-only threads profile with deterministic scheduler envelope
 
 ```bash

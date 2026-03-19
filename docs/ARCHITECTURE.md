@@ -815,6 +815,15 @@ The current scope is:
   without creating a default served SIMD lane, and this still does not claim
   arbitrary SIMD closure, accelerator-invariant vector exactness, or broader
   served publication
+- the current relaxed-SIMD research artifacts are
+  `fixtures/tassadar/reports/tassadar_relaxed_simd_runtime_report.json`,
+  `fixtures/tassadar/reports/tassadar_relaxed_simd_research_ladder_report.json`,
+  and `fixtures/tassadar/reports/tassadar_relaxed_simd_research_summary.json`,
+  which freeze one research-only relaxed-SIMD ladder with an exact
+  cpu-reference anchor, bounded metal/cuda drift rows, and typed refusal on
+  unstable lane semantics plus cross-backend non-portability; this is not a
+  public SIMD profile, deterministic relaxed-SIMD closure, accelerator
+  equivalence, or broader served publication
 - the current threads research-profile artifacts are
   `fixtures/tassadar/reports/tassadar_threads_research_profile_runtime_report.json`,
   `fixtures/tassadar/reports/tassadar_threads_scheduler_sandbox_boundary_report.json`,

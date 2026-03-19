@@ -190,6 +190,8 @@ mod tassadar_preemptive_job_profile;
 mod tassadar_process_object_family;
 #[path = "tassadar_quantization_truth_envelope.rs"]
 mod tassadar_quantization_truth_envelope;
+#[path = "tassadar_relaxed_simd_research_ladder.rs"]
+mod tassadar_relaxed_simd_research_ladder;
 #[path = "tassadar_resumable_multi_slice_promotion.rs"]
 mod tassadar_resumable_multi_slice_promotion;
 #[path = "tassadar_rust_article_profile_completeness.rs"]
@@ -360,6 +362,7 @@ pub use tassadar_precision_attention_robustness_audit::*;
 pub use tassadar_preemptive_job_profile::*;
 pub use tassadar_process_object_family::*;
 pub use tassadar_quantization_truth_envelope::*;
+pub use tassadar_relaxed_simd_research_ladder::*;
 pub use tassadar_resumable_multi_slice_promotion::*;
 pub use tassadar_rust_article_profile_completeness::*;
 pub use tassadar_rust_only_article_acceptance_gate::*;

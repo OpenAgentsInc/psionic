@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.relaxed_simd.runtime_report.v1",
+  "research_profile_id": "tassadar.research_profile.relaxed_simd_accelerator.v1",
+  "exact_anchor_backend_ids": [
+    "cpu_reference_anchor"
+  ],
+  "approximate_backend_ids": [
+    "metal_relaxed_simd_candidate",
+    "cuda_relaxed_simd_candidate"
+  ],
+  "refused_backend_ids": [
+    "metal_lane_shuffle_relaxed",
+    "cross_backend_relaxed_simd"
+  ],
+  "rows": [
+    {
+      "backend_id": "cpu_reference_anchor",
+      "workload_family": "simd_reduce_kernel",
+      "semantics_family_id": "deterministic_scalar_anchor",
+      "posture": "exact_anchor",
+      "drift_bps": 0,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_simd_profile_runtime_report.json"
+      ],
+      "note": "cpu-reference scalar anchor stays exact and is the baseline the relaxed-SIMD ladder is measured against"
+    },
+    {
+      "backend_id": "metal_relaxed_simd_candidate",
+      "workload_family": "simd_reduce_kernel",
+      "semantics_family_id": "relaxed_simd_fused_reduce",
+      "posture": "approximate_bounded",
+      "drift_bps": 12,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_simd_profile_runtime_report.json"
+      ],
+      "note": "metal relaxed-SIMD stays research-only with explicit bounded drift instead of claiming deterministic parity"
+    },
+    {
+      "backend_id": "cuda_relaxed_simd_candidate",
+      "workload_family": "simd_reduce_kernel",
+      "semantics_family_id": "relaxed_simd_fused_reduce",
+      "posture": "approximate_bounded",
+      "drift_bps": 18,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_simd_profile_runtime_report.json"
+      ],
+      "note": "cuda relaxed-SIMD stays research-only with explicit bounded drift instead of claiming deterministic parity"
+    },
+    {
+      "backend_id": "metal_lane_shuffle_relaxed",
+      "workload_family": "simd_lane_shuffle_kernel",
+      "semantics_family_id": "relaxed_lane_shuffle",
+      "posture": "refused",
+      "drift_bps": 0,
+      "refusal_reason_id": "relaxed_lane_semantics_unstable",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_simd_profile_runtime_report.json"
+      ],
+      "note": "lane-shuffle relaxed semantics remain typed refusal because backend-specific reorder rules are not stable enough for even research-ladder promotion"
+    },
+    {
+      "backend_id": "cross_backend_relaxed_simd",
+      "workload_family": "simd_reduce_kernel",
+      "semantics_family_id": "cross_backend_equivalence",
+      "posture": "refused",
+      "drift_bps": 0,
+      "refusal_reason_id": "accelerator_specific_nonportable",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_simd_profile_runtime_report.json"
+      ],
+      "note": "cross-backend relaxed-SIMD equivalence remains typed refusal because accelerator-specific semantics are not portable enough to flatten into one claim"
+    }
+  ],
+  "non_promotion_gate_reason_ids": [
+    "approximate_accelerator_drift",
+    "relaxed_lane_semantics_unstable",
+    "accelerator_specific_nonportable"
+  ],
+  "overall_green": true,
+  "claim_boundary": "this runtime report freezes one research-only relaxed-SIMD ladder with an exact cpu-reference anchor, bounded accelerator drift rows, and typed refusal on unstable lane semantics and nonportable cross-backend equivalence. It does not claim deterministic relaxed-SIMD closure, public profile promotion, or broader served publication",
+  "summary": "Relaxed-SIMD runtime report covers exact_anchor_backends=1, approximate_backends=2, refused_backends=2, non_promotion_gates=3.",
+  "report_digest": "eb357f0bf2a7d13ba59ccf61e0606ece47d1c3735032fcefcaa701c1d06ae2d6"
+}
