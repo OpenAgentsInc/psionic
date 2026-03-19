@@ -36,6 +36,7 @@ This runbook covers the current repo-owned bounded Wasm flow only:
 - canonical Rust-only Hungarian-10x10 article reproducer
 - canonical C-to-Wasm compile receipt
 - source-to-Wasm-to-Tassadar compile-pipeline matrix
+- frozen core-Wasm window declaration and official harness
 - normalized Wasm-module ingress
 - differential Wasm conformance against `wasmi`
 - module-scale Wasm workload suite
@@ -61,6 +62,8 @@ Public claim discipline for this lane is:
   subset, not a claim of general WebAssembly closure
 - any future broad or full-Wasm closure should be tied to the official core
   tests and reference authority for the declared window
+- the declared frozen-window artifact for the current target is
+  `fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json`
 - imports, effects, and host capability policy remain separate embedding
   contracts, not part of the bounded core language claim
 
@@ -643,6 +646,29 @@ Expected outcome:
   `memory.size`, `memory.grow`, `memory.copy`, and `memory.fill`, but that
   bounded module slice is still not equivalent to arbitrary Wasm
 
+### 6B. Frozen core-Wasm window declaration and official harness
+
+```bash
+cargo run -p psionic-eval --example tassadar_frozen_core_wasm_window_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json`
+
+Expected outcome:
+
+- one frozen int-first core-Wasm semantic window is declared explicitly
+- the report binds the official text harness to the existing `.wat` fixtures
+- the report binds the official binary harness to the existing compiled `.wasm`
+  fixtures
+- the report binds the official execution harness to the committed differential
+  conformance report
+- the report also freezes validator-backed out-of-window refusal rows for at
+  least floating-point and multi-memory proposal families
+- this sets the closure target and official harness only; it does not by itself
+  claim full core-Wasm closure
+
 ### 7. Differential Wasm conformance
 
 ```bash
@@ -703,6 +729,7 @@ cargo test -p psionic-eval article_runtime_closeout -- --nocapture
 cargo test -p psionic-research article_runtime_closeout -- --nocapture
 cargo test -p psionic-serve executor_service_publishes_rust_only_article_runtime_closeout_surface -- --nocapture
 cargo test -p psionic-eval wasm_module_ingress -- --nocapture
+cargo test -p psionic-eval frozen_core_wasm_window -- --nocapture
 cargo test -p psionic-eval wasm_conformance -- --nocapture
 cargo test -p psionic-eval module_scale_workload_suite -- --nocapture
 cargo test -p psionic-eval trap_exception -- --nocapture

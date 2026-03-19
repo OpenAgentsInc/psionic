@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.frozen_core_wasm_window.report.v1",
+  "frozen_window": {
+    "schema_version": 1,
+    "window_id": "tassadar.frozen_core_wasm.window.v1",
+    "spec_window_label": "frozen core-Wasm int-first window v1",
+    "official_harness_id": "tassadar.frozen_core_wasm.harness.v1",
+    "text_authority_id": "wat.reference.v1",
+    "binary_decode_authority_id": "wasmparser.decode.0.244.0",
+    "binary_encode_authority_id": "wasm_encoder.encode.0.244.0",
+    "validation_authority_id": "wasmparser.validate.core_int_first.v1",
+    "reference_execution_authority_id": "wasmi.reference.v1",
+    "target_feature_family_ids": [
+      "control.structured_direct_call",
+      "core_types.i32_i64",
+      "globals.mutable",
+      "memory.bulk_copy_fill",
+      "memory.single_linear_memory",
+      "module.import_export_start",
+      "numeric.sign_extension",
+      "segments.active_data_and_element",
+      "tables.funcref_call_indirect"
+    ],
+    "unsupported_proposal_family_ids": [
+      "component_model",
+      "exceptions",
+      "floating_point",
+      "function_references",
+      "gc",
+      "memory64",
+      "multi_memory",
+      "multi_value",
+      "relaxed_simd",
+      "saturating_float_to_int",
+      "simd",
+      "tail_call",
+      "threads"
+    ],
+    "claim_boundary": "declares the frozen core-Wasm semantic window and official harness ids Tassadar will use for closure work; it names one bounded int-first core target and explicit out-of-window proposal families, not current arbitrary Wasm support or full closure by itself",
+    "window_digest": "c407b8a40da5e21e162f67a13c74b144f96c22a9fa0a496a3d08bcff79965e75"
+  },
+  "compile_pipeline_matrix_report_ref": "fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json",
+  "compile_pipeline_matrix_report_id": "tassadar.compile_pipeline_matrix_report.v1",
+  "official_text_fixture_refs": [
+    "fixtures/tassadar/sources/tassadar_memory_lookup_kernel.wat",
+    "fixtures/tassadar/sources/tassadar_multi_export_kernel.wat",
+    "fixtures/tassadar/sources/tassadar_param_abi_kernel.wat"
+  ],
+  "official_binary_fixture_refs": [
+    "fixtures/tassadar/wasm/tassadar_memory_lookup_kernel.wasm",
+    "fixtures/tassadar/wasm/tassadar_multi_export_kernel.wasm",
+    "fixtures/tassadar/wasm/tassadar_param_abi_kernel.wasm"
+  ],
+  "validation_cases": [
+    {
+      "case_id": "admitted.tassadar_memory_lookup_kernel",
+      "harness_axis": "binary_validation",
+      "source_ref": "fixtures/tassadar/wasm/tassadar_memory_lookup_kernel.wasm",
+      "wasm_binary_digest": "ca9d981e65b648d0e01062fc14a42b263bf0cf35d0953a91a211165e97b7c4e2",
+      "status": "admitted"
+    },
+    {
+      "case_id": "admitted.tassadar_multi_export_kernel",
+      "harness_axis": "binary_validation",
+      "source_ref": "fixtures/tassadar/wasm/tassadar_multi_export_kernel.wasm",
+      "wasm_binary_digest": "af9f82749e29eca1da7c86f0bfd14253a80bd96818354e802eba2ee525bcec84",
+      "status": "admitted"
+    },
+    {
+      "case_id": "admitted.tassadar_param_abi_kernel",
+      "harness_axis": "binary_validation",
+      "source_ref": "fixtures/tassadar/wasm/tassadar_param_abi_kernel.wasm",
+      "wasm_binary_digest": "13983a84ab4032835e382dadb647bf636ce5298a69224768d7d3e11b43e49186",
+      "status": "admitted"
+    },
+    {
+      "case_id": "proposal.float_value_type_refused",
+      "harness_axis": "proposal_refusal",
+      "source_ref": "fixtures/tassadar/sources/tassadar_float_kernel.wat",
+      "wasm_binary_digest": "05d436dcfde01f803f30f083fe44fd1314584de85d33a389f3bed0429fc661d0",
+      "status": "refused_out_of_window",
+      "proposal_family_id": "floating_point",
+      "detail": "floating-point support is disabled (at offset 0xb)"
+    },
+    {
+      "case_id": "proposal.multi_memory_refused",
+      "harness_axis": "proposal_refusal",
+      "source_ref": "fixtures/tassadar/sources/tassadar_multi_memory_kernel.wat",
+      "wasm_binary_digest": "31c4004a1a07872c274b0efd757bec4de7135c9d62b3d79556fb5cabd46e92e5",
+      "status": "refused_out_of_window",
+      "proposal_family_id": "multi_memory",
+      "detail": "multiple memories (at offset 0x15)"
+    }
+  ],
+  "execution_harness_report_ref": "fixtures/tassadar/reports/tassadar_wasm_conformance_report.json",
+  "execution_harness_report_id": "tassadar.wasm_conformance.report.v1",
+  "execution_reference_authority_id": "wasmi.reference.v1",
+  "execution_case_family_ids": [
+    "curated.call_indirect",
+    "curated.call_indirect_trap",
+    "curated.deterministic_import",
+    "curated.global_state",
+    "curated.instantiation",
+    "curated.unsupported_host_import",
+    "generated.call_indirect",
+    "generated.call_indirect_trap",
+    "generated.global_state"
+  ],
+  "claim_boundary": "declares one frozen core-Wasm semantic window and official harness over text fixtures, binary fixtures, validator-backed refusal cases, and the existing differential execution report; it fixes the closure target and current out-of-window families, but it does not by itself claim full Wasm closure or arbitrary Wasm execution",
+  "report_digest": "505b5b5a8ae38dd4d73d275a70d573a4f8295d42db0fe4350ed8ecdd124e82d0"
+}

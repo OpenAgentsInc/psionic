@@ -30,3 +30,4 @@ wasmi = "1"
 
 [dev-dependencies]
 tempfile = "3"
+wat = "1"

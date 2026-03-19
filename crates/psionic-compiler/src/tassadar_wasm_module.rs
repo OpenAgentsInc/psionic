@@ -1,11 +1,12 @@
 use std::{convert::TryFrom, path::Path};
 
 use psionic_ir::{
-    TassadarNormalizedWasmConstExpr, TassadarNormalizedWasmDataMode,
+    TassadarFrozenCoreWasmWindow, TassadarNormalizedWasmConstExpr, TassadarNormalizedWasmDataMode,
     TassadarNormalizedWasmGlobalMutability, TassadarNormalizedWasmInstruction,
     TassadarNormalizedWasmModule, TassadarNormalizedWasmModuleError,
     TassadarNormalizedWasmTableElementKind, TassadarNormalizedWasmValueType,
     encode_tassadar_normalized_wasm_module, parse_tassadar_normalized_wasm_module,
+    tassadar_frozen_core_wasm_window_v1,
 };
 use psionic_runtime::{
     TassadarCToWasmCompileConfig, TassadarCToWasmCompileReceipt, TassadarCompileRefusal,
@@ -30,6 +31,71 @@ const TASSADAR_WASM_MODULE_COMPILER_VERSION: &str = "v1";
 const TASSADAR_WASM_TEXT_COMPILER_FAMILY: &str = "tassadar_wasm_text_parse";
 const TASSADAR_WASM_TEXT_COMPILER_VERSION: &str = "v1";
 const TASSADAR_WASM_MODULE_BUNDLE_CLAIM_BOUNDARY: &str = "bounded normalized Wasm module lowering compiles exported zero-parameter functions from the current straight-line core module slice into runnable Tassadar program artifacts; calls, structured control flow, dynamic memory addresses, multi-memory, byte-addressed memory ABI closure, and arbitrary Wasm remain out of scope";
+
+/// Seeded validation case for the frozen core-Wasm harness.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarFrozenCoreWasmValidationFixture {
+    /// Stable case id.
+    pub case_id: String,
+    /// Stable source ref or label.
+    pub source_ref: String,
+    /// Expected refused proposal family.
+    pub proposal_family_id: String,
+    /// Compiled Wasm payload.
+    pub wasm_binary: Vec<u8>,
+}
+
+/// Returns the shared frozen core-Wasm window declaration imported by compiler-owned surfaces.
+#[must_use]
+pub fn tassadar_compiler_frozen_core_wasm_window() -> TassadarFrozenCoreWasmWindow {
+    tassadar_frozen_core_wasm_window_v1()
+}
+
+/// Returns the canonical text fixture refs for the frozen core-Wasm harness.
+#[must_use]
+pub fn tassadar_frozen_core_wasm_text_fixture_refs() -> Vec<String> {
+    vec![
+        String::from("fixtures/tassadar/sources/tassadar_memory_lookup_kernel.wat"),
+        String::from("fixtures/tassadar/sources/tassadar_multi_export_kernel.wat"),
+        String::from("fixtures/tassadar/sources/tassadar_param_abi_kernel.wat"),
+    ]
+}
+
+/// Returns the canonical binary fixture refs for the frozen core-Wasm harness.
+#[must_use]
+pub fn tassadar_frozen_core_wasm_binary_fixture_refs() -> Vec<String> {
+    vec![
+        String::from("fixtures/tassadar/wasm/tassadar_memory_lookup_kernel.wasm"),
+        String::from("fixtures/tassadar/wasm/tassadar_multi_export_kernel.wasm"),
+        String::from("fixtures/tassadar/wasm/tassadar_param_abi_kernel.wasm"),
+    ]
+}
+
+/// Returns deterministic negative validation fixtures for out-of-window proposal families.
+#[must_use]
+pub fn tassadar_frozen_core_wasm_negative_validation_fixtures()
+-> Vec<TassadarFrozenCoreWasmValidationFixture> {
+    vec![
+        TassadarFrozenCoreWasmValidationFixture {
+            case_id: String::from("proposal.float_value_type_refused"),
+            source_ref: String::from("fixtures/tassadar/sources/tassadar_float_kernel.wat"),
+            proposal_family_id: String::from("floating_point"),
+            wasm_binary: wat::parse_str(include_str!(
+                "../../../fixtures/tassadar/sources/tassadar_float_kernel.wat"
+            ))
+            .expect("seeded float fixture should encode"),
+        },
+        TassadarFrozenCoreWasmValidationFixture {
+            case_id: String::from("proposal.multi_memory_refused"),
+            source_ref: String::from("fixtures/tassadar/sources/tassadar_multi_memory_kernel.wat"),
+            proposal_family_id: String::from("multi_memory"),
+            wasm_binary: wat::parse_str(include_str!(
+                "../../../fixtures/tassadar/sources/tassadar_multi_memory_kernel.wat"
+            ))
+            .expect("seeded multi-memory fixture should encode"),
+        },
+    ]
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 enum PendingValue {
@@ -2205,7 +2271,10 @@ mod tests {
         compile_tassadar_normalized_wasm_module_export_to_module_execution_program,
         compile_tassadar_normalized_wasm_module_to_artifact_bundle,
         compile_tassadar_wasm_binary_module_to_artifact_bundle,
-        compile_tassadar_wasm_text_to_artifact_bundle,
+        compile_tassadar_wasm_text_to_artifact_bundle, tassadar_compiler_frozen_core_wasm_window,
+        tassadar_frozen_core_wasm_binary_fixture_refs,
+        tassadar_frozen_core_wasm_negative_validation_fixtures,
+        tassadar_frozen_core_wasm_text_fixture_refs,
     };
 
     #[test]
@@ -2444,6 +2513,45 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn frozen_core_wasm_harness_imports_shared_window_contract() {
+        let window = tassadar_compiler_frozen_core_wasm_window();
+        assert_eq!(window.window_id, "tassadar.frozen_core_wasm.window.v1");
+        assert_eq!(
+            tassadar_frozen_core_wasm_text_fixture_refs(),
+            vec![
+                String::from("fixtures/tassadar/sources/tassadar_memory_lookup_kernel.wat"),
+                String::from("fixtures/tassadar/sources/tassadar_multi_export_kernel.wat"),
+                String::from("fixtures/tassadar/sources/tassadar_param_abi_kernel.wat"),
+            ]
+        );
+        assert_eq!(
+            tassadar_frozen_core_wasm_binary_fixture_refs(),
+            vec![
+                String::from("fixtures/tassadar/wasm/tassadar_memory_lookup_kernel.wasm"),
+                String::from("fixtures/tassadar/wasm/tassadar_multi_export_kernel.wasm"),
+                String::from("fixtures/tassadar/wasm/tassadar_param_abi_kernel.wasm"),
+            ]
+        );
+    }
+
+    #[test]
+    fn frozen_core_wasm_negative_validation_fixtures_are_seeded_and_machine_legible() {
+        let fixtures = tassadar_frozen_core_wasm_negative_validation_fixtures();
+        assert_eq!(fixtures.len(), 2);
+        assert!(fixtures.iter().any(|fixture| fixture.case_id
+            == "proposal.float_value_type_refused"
+            && fixture.proposal_family_id == "floating_point"
+            && !fixture.wasm_binary.is_empty()));
+        assert!(
+            fixtures
+                .iter()
+                .any(|fixture| fixture.case_id == "proposal.multi_memory_refused"
+                    && fixture.proposal_family_id == "multi_memory"
+                    && !fixture.wasm_binary.is_empty())
+        );
     }
 
     fn exact_outputs_by_export(

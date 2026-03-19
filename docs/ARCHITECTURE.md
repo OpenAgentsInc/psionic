@@ -718,6 +718,10 @@ The current scope is:
   from the core language claim; any future broader or full-Wasm closure should
   also be tied to the official test corpus and reference authority for that
   frozen window instead of an open-ended feature list
+- the current declared frozen-window artifact is
+  `fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json`,
+  which freezes the text, binary decode, binary encode, validation, and
+  reference-execution authorities for the current int-first core-Wasm target
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

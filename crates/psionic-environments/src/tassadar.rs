@@ -1,18 +1,18 @@
 use std::collections::BTreeMap;
 
 use psionic_data::{
-    tassadar_broad_program_family_suite_contract, DatasetKey, TassadarBenchmarkAxis,
-    TassadarBenchmarkFamily, TassadarClrsAlgorithmFamily, TassadarClrsLengthBucket,
-    TassadarClrsTrajectoryFamily, TassadarModuleScaleWorkloadFamily,
+    DatasetKey, TassadarBenchmarkAxis, TassadarBenchmarkFamily, TassadarClrsAlgorithmFamily,
+    TassadarClrsLengthBucket, TassadarClrsTrajectoryFamily, TassadarModuleScaleWorkloadFamily,
+    tassadar_broad_program_family_suite_contract,
 };
 use psionic_models::{
+    TassadarGeneralizedAbiPublication, TassadarInternalComputeProfileClaimCheckResult,
+    TassadarInternalComputeProfileLadderPublication,
+    TassadarRustArticleProfileCompletenessPublication,
     check_tassadar_internal_compute_profile_claim,
     tassadar_current_served_internal_compute_profile_claim, tassadar_generalized_abi_publication,
     tassadar_internal_compute_profile_ladder_publication,
-    tassadar_rust_article_profile_completeness_publication, TassadarGeneralizedAbiPublication,
-    TassadarInternalComputeProfileClaimCheckResult,
-    TassadarInternalComputeProfileLadderPublication,
-    TassadarRustArticleProfileCompletenessPublication,
+    tassadar_rust_article_profile_completeness_publication,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -505,8 +505,8 @@ impl TassadarBroadInternalComputePortabilityBinding {
 /// Returns the canonical broader internal-compute portability binding reused by
 /// Tassadar environment surfaces.
 #[must_use]
-pub fn default_tassadar_broad_internal_compute_portability_binding(
-) -> TassadarBroadInternalComputePortabilityBinding {
+pub fn default_tassadar_broad_internal_compute_portability_binding()
+-> TassadarBroadInternalComputePortabilityBinding {
     TassadarBroadInternalComputePortabilityBinding {
         report_ref: String::from(
             "fixtures/tassadar/reports/tassadar_broad_internal_compute_portability_report.json",
@@ -542,6 +542,22 @@ pub fn default_tassadar_broad_internal_compute_portability_binding(
 /// Public Wasm conformance binding reused by Tassadar environment bundles.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TassadarWasmConformanceBinding {
+    /// Stable frozen window report reference.
+    pub window_report_ref: String,
+    /// Stable frozen window report identifier.
+    pub window_report_id: String,
+    /// Stable frozen semantic window id.
+    pub window_id: String,
+    /// Stable official harness id.
+    pub official_harness_id: String,
+    /// Stable text authority id.
+    pub text_authority_id: String,
+    /// Stable binary decode authority id.
+    pub binary_decode_authority_id: String,
+    /// Stable binary encode authority id.
+    pub binary_encode_authority_id: String,
+    /// Stable validation authority id.
+    pub validation_authority_id: String,
     /// Stable Wasm conformance report reference.
     pub report_ref: String,
     /// Stable Wasm conformance report identifier.
@@ -550,6 +566,8 @@ pub struct TassadarWasmConformanceBinding {
     pub reference_authority_id: String,
     /// Case families covered by the committed report.
     pub case_family_ids: Vec<String>,
+    /// Explicit proposal families outside the frozen window.
+    pub unsupported_proposal_family_ids: Vec<String>,
 }
 
 impl TassadarWasmConformanceBinding {
@@ -564,6 +582,30 @@ impl TassadarWasmConformanceBinding {
 
     /// Validates that the binding is explicit.
     pub fn validate(&self) -> Result<(), TassadarEnvironmentError> {
+        if self.window_report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceWindowReportRef);
+        }
+        if self.window_report_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceWindowReportId);
+        }
+        if self.window_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceWindowId);
+        }
+        if self.official_harness_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceOfficialHarnessId);
+        }
+        if self.text_authority_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceTextAuthorityId);
+        }
+        if self.binary_decode_authority_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceBinaryDecodeAuthorityId);
+        }
+        if self.binary_encode_authority_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceBinaryEncodeAuthorityId);
+        }
+        if self.validation_authority_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingWasmConformanceValidationAuthorityId);
+        }
         if self.report_ref.trim().is_empty() {
             return Err(TassadarEnvironmentError::MissingWasmConformanceReportRef);
         }
@@ -582,6 +624,20 @@ impl TassadarWasmConformanceBinding {
             .any(|case_family_id| case_family_id.trim().is_empty())
         {
             return Err(TassadarEnvironmentError::InvalidWasmConformanceCaseFamilyId);
+        }
+        if self.unsupported_proposal_family_ids.is_empty() {
+            return Err(
+                TassadarEnvironmentError::MissingWasmConformanceUnsupportedProposalFamilies,
+            );
+        }
+        if self
+            .unsupported_proposal_family_ids
+            .iter()
+            .any(|proposal_family_id| proposal_family_id.trim().is_empty())
+        {
+            return Err(
+                TassadarEnvironmentError::InvalidWasmConformanceUnsupportedProposalFamilyId,
+            );
         }
         Ok(())
     }
@@ -1379,10 +1435,9 @@ impl TassadarEnvironmentSpec {
                     pin_alias: self.package_refs.benchmark_pin_alias.clone(),
                     surfaces: vec![EnvironmentUsageSurface::Benchmark],
                     required_workloads: vec![EnvironmentWorkloadClass::ValidatorBenchmark],
-                    required_benchmark_profiles: vec![self
-                        .package_refs
-                        .benchmark_profile_ref
-                        .clone()],
+                    required_benchmark_profiles: vec![
+                        self.package_refs.benchmark_profile_ref.clone(),
+                    ],
                 },
             ],
         }
@@ -1472,9 +1527,7 @@ pub enum TassadarEnvironmentError {
     #[error("Tassadar environment spec is missing the benchmark dataset binding")]
     MissingBenchmarkDataset,
     /// Missing benchmark package-set ref.
-    #[error(
-        "Tassadar environment spec is missing `benchmark_package_set_binding.package_set_ref`"
-    )]
+    #[error("Tassadar environment spec is missing `benchmark_package_set_binding.package_set_ref`")]
     MissingBenchmarkPackageSetRef,
     /// Missing benchmark package-set version.
     #[error(
@@ -1572,9 +1625,7 @@ pub enum TassadarEnvironmentError {
     )]
     MissingBroadInternalComputeBackendFamilyIds,
     /// Invalid broad internal-compute backend family id.
-    #[error(
-        "Tassadar environment spec includes an empty broad internal-compute backend family id"
-    )]
+    #[error("Tassadar environment spec includes an empty broad internal-compute backend family id")]
     InvalidBroadInternalComputeBackendFamilyId,
     /// Missing broad internal-compute toolchain families.
     #[error(
@@ -1616,6 +1667,36 @@ pub enum TassadarEnvironmentError {
         "Tassadar environment spec is missing `architecture_bakeoff_binding.summary_report_ref`"
     )]
     MissingArchitectureBakeoffSummaryReportRef,
+    /// Missing Wasm conformance window report ref.
+    #[error("Tassadar environment spec is missing `wasm_conformance_binding.window_report_ref`")]
+    MissingWasmConformanceWindowReportRef,
+    /// Missing Wasm conformance window report id.
+    #[error("Tassadar environment spec is missing `wasm_conformance_binding.window_report_id`")]
+    MissingWasmConformanceWindowReportId,
+    /// Missing Wasm conformance window id.
+    #[error("Tassadar environment spec is missing `wasm_conformance_binding.window_id`")]
+    MissingWasmConformanceWindowId,
+    /// Missing Wasm conformance official harness id.
+    #[error("Tassadar environment spec is missing `wasm_conformance_binding.official_harness_id`")]
+    MissingWasmConformanceOfficialHarnessId,
+    /// Missing Wasm conformance text authority id.
+    #[error("Tassadar environment spec is missing `wasm_conformance_binding.text_authority_id`")]
+    MissingWasmConformanceTextAuthorityId,
+    /// Missing Wasm conformance binary decode authority id.
+    #[error(
+        "Tassadar environment spec is missing `wasm_conformance_binding.binary_decode_authority_id`"
+    )]
+    MissingWasmConformanceBinaryDecodeAuthorityId,
+    /// Missing Wasm conformance binary encode authority id.
+    #[error(
+        "Tassadar environment spec is missing `wasm_conformance_binding.binary_encode_authority_id`"
+    )]
+    MissingWasmConformanceBinaryEncodeAuthorityId,
+    /// Missing Wasm conformance validation authority id.
+    #[error(
+        "Tassadar environment spec is missing `wasm_conformance_binding.validation_authority_id`"
+    )]
+    MissingWasmConformanceValidationAuthorityId,
     /// Missing Wasm conformance report ref.
     #[error("Tassadar environment spec is missing `wasm_conformance_binding.report_ref`")]
     MissingWasmConformanceReportRef,
@@ -1633,10 +1714,18 @@ pub enum TassadarEnvironmentError {
     /// Invalid Wasm conformance case family id.
     #[error("Tassadar environment spec includes an empty Wasm conformance case family id")]
     InvalidWasmConformanceCaseFamilyId,
-    /// Missing module-scale suite ref.
+    /// Missing Wasm conformance unsupported proposal families.
     #[error(
-        "Tassadar environment spec is missing `module_scale_workload_suite_binding.suite_ref`"
+        "Tassadar environment spec must declare `wasm_conformance_binding.unsupported_proposal_family_ids`"
     )]
+    MissingWasmConformanceUnsupportedProposalFamilies,
+    /// Invalid Wasm conformance unsupported proposal family id.
+    #[error(
+        "Tassadar environment spec includes an empty Wasm conformance unsupported proposal family id"
+    )]
+    InvalidWasmConformanceUnsupportedProposalFamilyId,
+    /// Missing module-scale suite ref.
+    #[error("Tassadar environment spec is missing `module_scale_workload_suite_binding.suite_ref`")]
     MissingModuleScaleSuiteRef,
     /// Missing module-scale suite version.
     #[error(
@@ -1904,6 +1993,16 @@ mod tests {
                 default_tassadar_broad_internal_compute_portability_binding(),
             ),
             wasm_conformance_binding: TassadarWasmConformanceBinding {
+                window_report_ref: String::from(
+                    "fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json",
+                ),
+                window_report_id: String::from("tassadar.frozen_core_wasm_window.report.v1"),
+                window_id: String::from("tassadar.frozen_core_wasm.window.v1"),
+                official_harness_id: String::from("tassadar.frozen_core_wasm.harness.v1"),
+                text_authority_id: String::from("wat.reference.v1"),
+                binary_decode_authority_id: String::from("wasmparser.decode.0.244.0"),
+                binary_encode_authority_id: String::from("wasm_encoder.encode.0.244.0"),
+                validation_authority_id: String::from("wasmparser.validate.core_int_first.v1"),
                 report_ref: String::from(
                     "fixtures/tassadar/reports/tassadar_wasm_conformance_report.json",
                 ),
@@ -1918,6 +2017,21 @@ mod tests {
                     String::from("generated.call_indirect"),
                     String::from("generated.call_indirect_trap"),
                     String::from("generated.global_state"),
+                ],
+                unsupported_proposal_family_ids: vec![
+                    String::from("component_model"),
+                    String::from("exceptions"),
+                    String::from("floating_point"),
+                    String::from("function_references"),
+                    String::from("gc"),
+                    String::from("memory64"),
+                    String::from("multi_memory"),
+                    String::from("multi_value"),
+                    String::from("relaxed_simd"),
+                    String::from("saturating_float_to_int"),
+                    String::from("simd"),
+                    String::from("tail_call"),
+                    String::from("threads"),
                 ],
             },
             architecture_bakeoff_binding: Some(default_tassadar_architecture_bakeoff_binding()),
@@ -2156,8 +2270,8 @@ mod tests {
     }
 
     #[test]
-    fn tassadar_environment_bundle_carries_optional_module_scale_suite_binding(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn tassadar_environment_bundle_carries_optional_module_scale_suite_binding()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut spec = sample_spec();
         spec.module_scale_workload_suite_binding = Some(TassadarModuleScaleWorkloadSuiteBinding {
             suite_ref: String::from("benchmark-suite://openagents/tassadar/module_scale"),
@@ -2200,8 +2314,8 @@ mod tests {
     }
 
     #[test]
-    fn tassadar_environment_bundle_carries_optional_clrs_wasm_bridge_binding(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn tassadar_environment_bundle_carries_optional_clrs_wasm_bridge_binding()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut spec = sample_spec();
         spec.clrs_wasm_bridge_binding = Some(TassadarClrsWasmBridgeBinding {
             bridge_ref: String::from("benchmark-bridge://openagents/tassadar/clrs_wasm"),

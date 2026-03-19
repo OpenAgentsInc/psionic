@@ -33,7 +33,7 @@ use crate::{
     EvalFinalStateCapture, EvalMetric, EvalRunContract, EvalRunMode, EvalRunState,
     EvalRuntimeError, EvalSampleRecord, EvalSampleStatus, EvalTimerIntegrityFacts,
     EvalVerificationFacts, TASSADAR_COMPILE_PIPELINE_MATRIX_REPORT_REF,
-    TASSADAR_WASM_CONFORMANCE_REPORT_REF,
+    TASSADAR_FROZEN_CORE_WASM_WINDOW_REPORT_REF, TASSADAR_WASM_CONFORMANCE_REPORT_REF,
 };
 
 /// Stable environment ref for the Tassadar eval package.
@@ -131,6 +131,14 @@ fn standard_compile_pipeline_matrix_binding() -> TassadarCompilePipelineMatrixBi
 
 fn standard_wasm_conformance_binding() -> TassadarWasmConformanceBinding {
     TassadarWasmConformanceBinding {
+        window_report_ref: String::from(TASSADAR_FROZEN_CORE_WASM_WINDOW_REPORT_REF),
+        window_report_id: String::from("tassadar.frozen_core_wasm_window.report.v1"),
+        window_id: String::from("tassadar.frozen_core_wasm.window.v1"),
+        official_harness_id: String::from("tassadar.frozen_core_wasm.harness.v1"),
+        text_authority_id: String::from("wat.reference.v1"),
+        binary_decode_authority_id: String::from("wasmparser.decode.0.244.0"),
+        binary_encode_authority_id: String::from("wasm_encoder.encode.0.244.0"),
+        validation_authority_id: String::from("wasmparser.validate.core_int_first.v1"),
         report_ref: String::from(TASSADAR_WASM_CONFORMANCE_REPORT_REF),
         report_id: String::from("tassadar.wasm_conformance.report.v1"),
         reference_authority_id: String::from("wasmi.reference.v1"),
@@ -143,6 +151,21 @@ fn standard_wasm_conformance_binding() -> TassadarWasmConformanceBinding {
             String::from("generated.call_indirect"),
             String::from("generated.call_indirect_trap"),
             String::from("generated.global_state"),
+        ],
+        unsupported_proposal_family_ids: vec![
+            String::from("component_model"),
+            String::from("exceptions"),
+            String::from("floating_point"),
+            String::from("function_references"),
+            String::from("gc"),
+            String::from("memory64"),
+            String::from("multi_memory"),
+            String::from("multi_value"),
+            String::from("relaxed_simd"),
+            String::from("saturating_float_to_int"),
+            String::from("simd"),
+            String::from("tail_call"),
+            String::from("threads"),
         ],
     }
 }
