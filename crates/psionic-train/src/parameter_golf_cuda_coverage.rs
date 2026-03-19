@@ -160,17 +160,17 @@ pub fn builtin_parameter_golf_cuda_training_capability_report()
         quantization_report.report_digest,
         vec![
             ParameterGolfCudaTrainingCoverageCase {
-                case_id: String::from("cuda_bf16_train_precision_contract"),
+                case_id: String::from("cuda_bf16_train_graph_and_optimizer_surface"),
                 family: ParameterGolfCudaTrainingFamily::Precision,
                 status: ParameterGolfCudaTrainingCoverageStatus::Partial,
                 required_scope: String::from(
                     "the public 8xH100 baseline requires BF16 train-visible parameters and gradients with FP32 optimizer or master-weight posture",
                 ),
                 current_surface: String::from(
-                    "the distributed 8xH100 receipt lane now encodes an explicit BF16-forward or FP32-master precision policy, but the public CUDA array surface still advertises only bounded dense f32 execution instead of broad BF16 train-time closure",
+                    "the distributed 8xH100 receipt lane now encodes an explicit BF16-forward or FP32-master precision policy, and the public CUDA runtime now owns BF16 dense buffer residency plus bounded BF16xBF16-to-F32 matmul execution on the same row-major surface already used for mixed-precision baseline primitives",
                 ),
                 boundary_note: String::from(
-                    "Do not treat the BF16 policy contract as proof that the public CUDA array surface already owns broad BF16 tensor, backward, and optimizer execution.",
+                    "Do not treat the first BF16 runtime seam as proof that the public CUDA lane already owns broad BF16 train-graph, backward, or optimizer execution.",
                 ),
             },
             ParameterGolfCudaTrainingCoverageCase {
@@ -321,7 +321,7 @@ mod tests {
         assert!(
             refusal
                 .detail
-                .contains("cuda_bf16_train_precision_contract")
+                .contains("cuda_bf16_train_graph_and_optimizer_surface")
         );
         Ok(())
     }

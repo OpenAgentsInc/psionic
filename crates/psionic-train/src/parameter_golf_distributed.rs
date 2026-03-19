@@ -978,11 +978,13 @@ mod tests {
         assert!(
             receipt
                 .challenge_kernel_blockers
-                .contains(&String::from("cuda_bf16_train_precision_contract"))
+                .contains(&String::from(
+                    "cuda_bf16_train_graph_and_optimizer_surface"
+                ))
         );
         assert!(receipt.boundary_notes.iter().any(|note| {
             note.contains("cuda_rope_gqa_decoder_block_reverse_mode")
-                || note.contains("cuda_bf16_train_precision_contract")
+                || note.contains("cuda_bf16_train_graph_and_optimizer_surface")
         }));
         assert!(
             receipt

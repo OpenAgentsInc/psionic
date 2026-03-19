@@ -955,7 +955,9 @@ mod tests {
         assert!(report.refusal.is_some());
         assert!(report
             .challenge_kernel_blockers
-            .contains(&String::from("cuda_bf16_train_precision_contract")));
+            .contains(&String::from(
+                "cuda_bf16_train_graph_and_optimizer_surface"
+            )));
         assert_eq!(
             report.machine_thresholds,
             ParameterGolfSingleH100ChallengeThresholds::challenge_h100()

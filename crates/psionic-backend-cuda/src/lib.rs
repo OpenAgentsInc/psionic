@@ -19,6 +19,7 @@
 
 use std::{collections::BTreeMap, fmt, io::ErrorKind, process::Command};
 
+use half::bf16;
 use psionic_compiler::compile_graph;
 use psionic_core::{
     BackendExtensionKind, BackendExtensionOp, DType, Device, DeviceKind, QuantizationMode, Shape,
@@ -362,6 +363,29 @@ impl CudaBuffer {
         )
     }
 
+    /// Writes contiguous `f32` values into a `bf16` buffer with explicit
+    /// round-to-bf16 conversion on the host staging path.
+    pub fn write_bf16_from_f32(&mut self, values: &[f32]) -> Result<(), RuntimeError> {
+        if self.spec.dtype() != DType::BF16 {
+            return Err(RuntimeError::Backend(format!(
+                "write_bf16_from_f32 requires BF16 buffer, actual {:?}",
+                self.spec.dtype()
+            )));
+        }
+        if values.len() != self.spec.storage_size() {
+            return Err(RuntimeError::Backend(format!(
+                "cuda bf16 buffer write length mismatch: expected {} values, actual {}",
+                self.spec.storage_size(),
+                values.len()
+            )));
+        }
+        let mut bytes = Vec::with_capacity(self.byte_len);
+        for value in values {
+            bytes.extend_from_slice(&bf16::from_f32(*value).to_bits().to_ne_bytes());
+        }
+        self.write_bytes(bytes.as_slice())
+    }
+
     /// Reads contiguous `f32` values from an `f32` buffer.
     pub fn read_f32(&self) -> Result<Vec<f32>, RuntimeError> {
         if self.spec.dtype() != DType::F32 {
@@ -374,6 +398,22 @@ impl CudaBuffer {
         let mut values = Vec::with_capacity(bytes.len() / size_of_dtype(self.spec.dtype()));
         for chunk in bytes.chunks_exact(size_of_dtype(self.spec.dtype())) {
             values.push(f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
+        }
+        Ok(values)
+    }
+
+    /// Reads contiguous `bf16` values and widens them to `f32`.
+    pub fn read_bf16_to_f32(&self) -> Result<Vec<f32>, RuntimeError> {
+        if self.spec.dtype() != DType::BF16 {
+            return Err(RuntimeError::Backend(format!(
+                "read_bf16_to_f32 requires BF16 buffer, actual {:?}",
+                self.spec.dtype()
+            )));
+        }
+        let bytes = self.read_bytes()?;
+        let mut values = Vec::with_capacity(bytes.len() / size_of_dtype(self.spec.dtype()));
+        for chunk in bytes.chunks_exact(size_of_dtype(self.spec.dtype())) {
+            values.push(bf16::from_bits(u16::from_ne_bytes([chunk[0], chunk[1]])).to_f32());
         }
         Ok(values)
     }
@@ -792,6 +832,29 @@ impl CudaSubmission {
         cols: usize,
     ) -> Result<(), RuntimeError> {
         self.platform.encode_matmul_f16_to_f32(
+            &left.platform,
+            &right.platform,
+            &output.platform,
+            rows,
+            inner,
+            cols,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Launches one dense row-major matrix multiply with `bf16` inputs and
+    /// `f32` accumulate/output.
+    pub fn matmul_bf16_to_f32(
+        &mut self,
+        left: &CudaBuffer,
+        right: &CudaBuffer,
+        output: &CudaBuffer,
+        rows: usize,
+        inner: usize,
+        cols: usize,
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_matmul_bf16_to_f32(
             &left.platform,
             &right.platform,
             &output.platform,
@@ -2007,6 +2070,19 @@ impl CudaBackend {
         self.allocate_buffer(&TensorSpec::new(Shape::new(vec![len]), DType::F16, device))
     }
 
+    /// Allocates an uninitialized dense `bf16` buffer on the selected CUDA device.
+    pub fn bf16_buffer(&mut self, len: usize) -> Result<CudaBuffer, RuntimeError> {
+        let Some(device) = self
+            .selected_device()
+            .map(|descriptor| descriptor.device.clone())
+        else {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda backend unavailable: no selected execution device",
+            )));
+        };
+        self.allocate_buffer(&TensorSpec::new(Shape::new(vec![len]), DType::BF16, device))
+    }
+
     /// Allocates an uninitialized dense `i32` buffer on the selected CUDA device.
     pub fn i32_buffer(&mut self, len: usize) -> Result<CudaBuffer, RuntimeError> {
         self.byte_buffer(&vec![0_u8; len.saturating_mul(size_of::<i32>())])
@@ -2295,9 +2371,10 @@ impl CudaBackend {
             };
             return Err(RuntimeError::Backend(message));
         };
-        if spec.dtype() != DType::F32 && spec.dtype() != DType::F16 {
+        if spec.dtype() != DType::F32 && spec.dtype() != DType::F16 && spec.dtype() != DType::BF16
+        {
             return Err(RuntimeError::Backend(format!(
-                "cuda dense surface only supports F32/F16 buffers, actual {:?}",
+                "cuda dense surface only supports F32/F16/BF16 buffers, actual {:?}",
                 spec.dtype()
             )));
         }
@@ -3833,7 +3910,9 @@ mod platform {
     const CUBLAS_OP_N: c_int = 0;
     const CUDA_R_32F: c_int = 0;
     const CUDA_R_16F: c_int = 2;
+    const CUDA_R_16BF: c_int = 14;
     const CUDA_STREAM_CAPTURE_MODE_RELAXED: c_int = 2;
+    const CUBLAS_COMPUTE_32F: c_int = 68;
     const CUBLAS_COMPUTE_32F_FAST_16F: c_int = 74;
     const CUBLAS_GEMM_DEFAULT_TENSOR_OP: c_int = 99;
 
@@ -5031,6 +5110,64 @@ mod platform {
                         CUDA_R_32F,
                         m,
                         CUBLAS_COMPUTE_32F_FAST_16F,
+                        CUBLAS_GEMM_DEFAULT_TENSOR_OP,
+                    )
+                },
+                "cublasGemmEx",
+            )
+        }
+
+        pub(super) fn encode_matmul_bf16_to_f32(
+            &mut self,
+            left: &PlatformBuffer,
+            right: &PlatformBuffer,
+            output: &PlatformBuffer,
+            rows: usize,
+            inner: usize,
+            cols: usize,
+        ) -> Result<(), RuntimeError> {
+            if rows == 0 || inner == 0 || cols == 0 {
+                return Ok(());
+            }
+            let m = c_int::try_from(cols).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda bf16 matmul column count exceeds cublas limits",
+                ))
+            })?;
+            let n = c_int::try_from(rows).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda bf16 matmul row count exceeds cublas limits",
+                ))
+            })?;
+            let k = c_int::try_from(inner).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda bf16 matmul inner dimension exceeds cublas limits",
+                ))
+            })?;
+            let alpha = 1.0_f32;
+            let beta = 0.0_f32;
+            self.runtime.bind_stream(self.stream)?;
+            self.runtime.check_cublas(
+                unsafe {
+                    (self.runtime.cublas_gemm_ex)(
+                        self.runtime.cublas_handle,
+                        CUBLAS_OP_N,
+                        CUBLAS_OP_N,
+                        m,
+                        n,
+                        k,
+                        (&alpha as *const f32).cast(),
+                        right.inner.device_ptr,
+                        CUDA_R_16BF,
+                        m,
+                        left.inner.device_ptr,
+                        CUDA_R_16BF,
+                        k,
+                        (&beta as *const f32).cast(),
+                        output.inner.device_ptr,
+                        CUDA_R_32F,
+                        m,
+                        CUBLAS_COMPUTE_32F,
                         CUBLAS_GEMM_DEFAULT_TENSOR_OP,
                     )
                 },
@@ -7552,6 +7689,20 @@ mod platform {
             )))
         }
 
+        pub(super) fn encode_matmul_bf16_to_f32(
+            &mut self,
+            _left: &PlatformBuffer,
+            _right: &PlatformBuffer,
+            _output: &PlatformBuffer,
+            _rows: usize,
+            _inner: usize,
+            _cols: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda runtime substrate currently requires Linux libcudart",
+            )))
+        }
+
         pub(super) fn encode_quantized_matvec(
             &mut self,
             _weights: &PlatformBuffer,
@@ -9059,6 +9210,31 @@ mod tests {
         let report = submission.commit(CudaCommandWait::Completed)?;
         assert_eq!(report.status, CudaCommandStatus::Completed);
         assert_eq!(output.read_f32()?, vec![7.0, 10.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_executes_bf16_matmul_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let mut left = backend.bf16_buffer(2)?;
+        left.write_bf16_from_f32(&[1.0, 2.0])?;
+        let mut right = backend.bf16_buffer(4)?;
+        right.write_bf16_from_f32(&[1.0, 2.0, 3.0, 4.0])?;
+        let output = backend.f32_buffer(2)?;
+
+        let mut submission = backend.begin_submission()?;
+        submission.matmul_bf16_to_f32(&left, &right, &output, 1, 2, 2)?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.status, CudaCommandStatus::Completed);
+        assert_close(&left.read_bf16_to_f32()?, &[1.0, 2.0], 1e-5);
+        assert_close(&right.read_bf16_to_f32()?, &[1.0, 2.0, 3.0, 4.0], 1e-5);
+        assert_close(&output.read_f32()?, &[7.0, 10.0], 1e-5);
         Ok(())
     }
 

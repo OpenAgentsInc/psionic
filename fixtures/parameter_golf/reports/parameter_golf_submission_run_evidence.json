@@ -368,9 +368,9 @@
       "axes": [],
       "stages": []
     },
-    "training_capability_report_digest": "8ce13e7a584b22fe7bf2f014d81fcd0a5a8198d6ebd7a4d7cc54848d998ffc73",
+    "training_capability_report_digest": "7ea4d7ad7391bd7619f01b4553a3960419ab66e64b4093ca5ebc341effd9523d",
     "challenge_kernel_blockers": [
-      "cuda_bf16_train_precision_contract",
+      "cuda_bf16_train_graph_and_optimizer_surface",
       "cuda_rope_gqa_decoder_block_reverse_mode",
       "cuda_muon_optimizer_path"
     ],
@@ -382,13 +382,13 @@
     },
     "boundary_notes": [
       "The current exported-folder evidence is bound to a local review host rather than challenge-matching 8xH100 inventory, so the challenge receipt remains an explicit refusal.",
-      "cuda_bf16_train_precision_contract: Do not treat the BF16 policy contract as proof that the public CUDA array surface already owns broad BF16 tensor, backward, and optimizer execution.",
+      "cuda_bf16_train_graph_and_optimizer_surface: Do not treat the first BF16 runtime seam as proof that the public CUDA lane already owns broad BF16 train-graph, backward, or optimizer execution.",
       "cuda_rope_gqa_decoder_block_reverse_mode: Do not treat bounded forward CUDA RoPE/GQA decoder-block execution as proof that the public train path already owns reverse-mode or full trainer closure for that block.",
       "cuda_muon_optimizer_path: Muon semantics are explicit and distributed communication is explicit, but the train-time CUDA optimizer surface is still narrower than the lane contract."
     ],
     "claim_boundary": "exact 8xH100 DDP-style topology, communication, wallclock, and memory receipts are explicit, but challenge-ready CUDA kernel and runtime widening remains a separate closure item",
-    "receipt_digest": "49de16b37a53301eb274c517586ebac67cd0027bfed31b00b58ce3c72403e9bc"
+    "receipt_digest": "b8c53c95103e9947bf4a979607d088b6c1e9393edba150d9224c023d73e7c970"
   },
   "claim_boundary": "This report binds the exact exported submission folder to one real folder-local entrypoint replay, the preserved bounded wallclock/memory/artifact receipts, and one measured-or-refused 8xH100 challenge receipt. The committed evidence is still a local review-host refusal rather than true 8xH100 success.",
-  "report_digest": "2a6fe19e9919f4d9b7fad4256a30df2f78d03461543d51a467c983ef7b49c028"
+  "report_digest": "10a3c40056cb5d717ee8b071c16dc50a76106fab5a9268b0cdc60da23e0e1623"
 }

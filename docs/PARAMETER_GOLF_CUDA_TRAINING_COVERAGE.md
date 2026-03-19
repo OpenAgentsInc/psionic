@@ -54,6 +54,15 @@ baseline self-attention token slices into the existing decode-kernel surface,
 so the old "no public decoder-block execution" gap is no longer the honest
 attention blocker.
 
+The public CUDA backend now also owns one bounded BF16 runtime seam needed by
+the baseline mixed-precision lane:
+
+- dense BF16 buffer residency on the public CUDA dense surface
+- bounded row-major BF16xBF16-to-F32 matmul execution through cuBLAS
+
+That narrows the BF16 blocker from "no public BF16 runtime primitive" to the
+remaining BF16 train-graph and optimizer surface.
+
 That means the remaining CUDA train-path blockers are now machine-readable on
 the same benchmark seam that already carries topology, communication,
 wallclock, and memory facts.
@@ -71,7 +80,7 @@ The report now keeps the following families explicit:
 
 The current canonical blocker set is:
 
-- `cuda_bf16_train_precision_contract`
+- `cuda_bf16_train_graph_and_optimizer_surface`
 - `cuda_rope_gqa_decoder_block_reverse_mode`
 - `cuda_muon_optimizer_path`
 
@@ -88,14 +97,16 @@ Today it keeps these truths separate:
     path
   - post-train quantized export or roundtrip support is real
 - `partial`
-  - BF16 policy, bounded RoPE/GQA forward closure, and Muon semantics all have
-    explicit substrate or refusal contracts
+  - BF16 policy plus one bounded BF16 runtime primitive seam, bounded RoPE/GQA
+    forward closure, and Muon semantics all have explicit substrate or refusal
+    contracts
   - the public CUDA execution backend now genuinely owns dense `f32`
-    pointwise `mul` plus bounded dense contiguous `f32` RMSNorm forward and
-    backward execution, one bounded residual-mix graph, and one bounded
-    causal RoPE/GQA decoder-block forward path, but the full decoder reverse-
-    mode or optimizer train path is still narrower than the Parameter Golf
-    challenge lane
+    pointwise `mul`, bounded dense contiguous `f32` RMSNorm forward and
+    backward execution, one bounded residual-mix graph, one bounded
+    causal RoPE/GQA decoder-block forward path, and one bounded BF16 matmul
+    primitive, but the full BF16 train graph, decoder reverse-mode, or
+    optimizer train path is still narrower than the Parameter Golf challenge
+    lane
 
 This is the intended contract for the issue: do not hide missing CUDA kernels
 behind broader model or distributed receipts.

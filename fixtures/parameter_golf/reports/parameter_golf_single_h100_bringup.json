@@ -126,9 +126,9 @@
   "optimizer_plan_digest": "554cecb74ff631024d7d20ae49b1e162bda4fd2e64d9aeef1dc2245bc7f741ef",
   "psionic_entrypoint": "cargo run -q -p psionic-train --bin parameter_golf_single_h100_bringup -- /home/christopherdavid/code/parameter-golf/data/datasets/fineweb10B_sp1024 /home/christopherdavid/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model",
   "upstream_reference_entrypoint": "RUN_ID=parameter-golf-single-h100-bringup DATA_PATH=/home/christopherdavid/code/parameter-golf/data/datasets/fineweb10B_sp1024 TOKENIZER_PATH=/home/christopherdavid/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model VOCAB_SIZE=1024 torchrun --standalone --nproc_per_node=1 train_gpt.py",
-  "cuda_training_capability_report_digest": "8ce13e7a584b22fe7bf2f014d81fcd0a5a8198d6ebd7a4d7cc54848d998ffc73",
+  "cuda_training_capability_report_digest": "7ea4d7ad7391bd7619f01b4553a3960419ab66e64b4093ca5ebc341effd9523d",
   "challenge_kernel_blockers": [
-    "cuda_bf16_train_precision_contract",
+    "cuda_bf16_train_graph_and_optimizer_surface",
     "cuda_rope_gqa_decoder_block_reverse_mode",
     "cuda_muon_optimizer_path"
   ],
@@ -136,11 +136,11 @@
     "code": "unsupported_backend_capability",
     "scope": "runtime",
     "subject": "parameter_golf_cuda_training",
-    "detail": "parameter golf CUDA challenge closure still has explicit blockers: cuda_bf16_train_precision_contract, cuda_rope_gqa_decoder_block_reverse_mode, cuda_muon_optimizer_path"
+    "detail": "parameter golf CUDA challenge closure still has explicit blockers: cuda_bf16_train_graph_and_optimizer_surface, cuda_rope_gqa_decoder_block_reverse_mode, cuda_muon_optimizer_path"
   },
-  "started_at_ms": 1773957059931,
-  "finished_at_ms": 1773957074880,
-  "observed_wallclock_ms": 14948,
+  "started_at_ms": 1773958181749,
+  "finished_at_ms": 1773958196776,
+  "observed_wallclock_ms": 15026,
   "execution_posture": "contract_validation_only",
   "disposition": "refused_machine_contract",
   "refusal": {
@@ -150,7 +150,7 @@
     "detail": "single-H100 bring-up requires at least 1 non-MIG `H100` device(s) on backend `cuda` but found 0 matching device(s) among: NVIDIA GeForce RTX 4080"
   },
   "drift_notes": [
-    "cuda_bf16_train_precision_contract: Do not treat the BF16 policy contract as proof that the public CUDA array surface already owns broad BF16 tensor, backward, and optimizer execution.",
+    "cuda_bf16_train_graph_and_optimizer_surface: Do not treat the first BF16 runtime seam as proof that the public CUDA lane already owns broad BF16 train-graph, backward, or optimizer execution.",
     "cuda_rope_gqa_decoder_block_reverse_mode: Do not treat bounded forward CUDA RoPE/GQA decoder-block execution as proof that the public train path already owns reverse-mode or full trainer closure for that block.",
     "cuda_muon_optimizer_path: Muon semantics are explicit and distributed communication is explicit, but the train-time CUDA optimizer surface is still narrower than the lane contract.",
     "Observed CUDA backend health was Ready with 1 discovered CUDA device(s); 0 matched the single-H100 contract.",
@@ -159,5 +159,5 @@
     "final_val_loss, final_val_bpb, and compressed_model_bytes are absent because no training artifact was produced by this command."
   ],
   "claim_boundary": "This report proves the Rust-native single-H100 bring-up command owns the challenge dataset, tokenizer identity, local CUDA machine-admission truth, baseline model contract, observed bring-up wallclock, and explicit CUDA blocker truth. It does not claim successful Psionic training execution or a produced model artifact while the current command remains a validation-and-refusal seam.",
-  "report_digest": "1ee7cf2c0c0a7d58c21c8db519b0fc4aa9a982b8111cfd350cc918c2293a2b82"
+  "report_digest": "add0d222895a9cd62cb1d2407b63d106f137e15467118e4f33c9dcefeb5a034d"
 }
