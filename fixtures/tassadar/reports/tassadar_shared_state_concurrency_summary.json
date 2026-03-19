@@ -1,0 +1,681 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.shared_state_concurrency.summary.v1",
+  "eval_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.shared_state_concurrency.verdict_report.v1",
+    "runtime_report_ref": "fixtures/tassadar/reports/tassadar_shared_state_concurrency_runtime_verdict_report.json",
+    "runtime_report": {
+      "schema_version": 1,
+      "report_id": "tassadar.shared_state_concurrency.runtime_verdict_report.v1",
+      "threads_runtime_report_ref": "fixtures/tassadar/reports/tassadar_threads_research_profile_runtime_report.json",
+      "threads_runtime_report": {
+        "schema_version": 1,
+        "report_id": "tassadar.threads_research_profile.report.v1",
+        "profile_id": "tassadar.research_profile.threads_deterministic_scheduler.v1",
+        "exact_case_count": 2,
+        "refusal_case_count": 1,
+        "rows": [
+          {
+            "case_id": "round_robin_shared_counter",
+            "scheduler_id": "deterministic_round_robin_v1",
+            "workload_family": "shared_counter_increment",
+            "shared_memory_shape_id": "two_thread_shared_i32",
+            "status": "exact_deterministic_parity",
+            "exact_output_parity": true,
+            "exact_schedule_replay": true,
+            "benchmark_refs": [
+              "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+            ],
+            "note": "two-thread round-robin shared-counter stepping remains replay-safe only inside the declared deterministic scheduler envelope"
+          },
+          {
+            "case_id": "barrier_then_reduce",
+            "scheduler_id": "deterministic_barrier_release_v1",
+            "workload_family": "barrier_reduce_kernel",
+            "shared_memory_shape_id": "two_thread_shared_slice_i32",
+            "status": "exact_deterministic_parity",
+            "exact_output_parity": true,
+            "exact_schedule_replay": true,
+            "benchmark_refs": [
+              "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+            ],
+            "note": "barrier release plus reduce remains exact only when the scheduler order is explicit and fixed"
+          },
+          {
+            "case_id": "relaxed_memory_order_refusal",
+            "scheduler_id": "out_of_profile_relaxed_order",
+            "workload_family": "shared_counter_increment",
+            "shared_memory_shape_id": "two_thread_shared_i32",
+            "status": "exact_refusal_parity",
+            "exact_output_parity": false,
+            "exact_schedule_replay": false,
+            "refusal_reason_id": "unsupported_memory_ordering",
+            "benchmark_refs": [
+              "fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json"
+            ],
+            "note": "relaxed or nondeterministic memory ordering stays typed refusal truth instead of widening from the deterministic research rows"
+          }
+        ],
+        "claim_boundary": "this runtime report freezes one research-only shared-memory and threads profile with a deterministic scheduler envelope plus typed refusal on broader memory-ordering regimes. It does not claim general concurrency closure, broad shared-memory portability, or served publication",
+        "summary": "Threads research profile report covers 3 rows with exact_cases=2 and refusal_cases=1.",
+        "report_digest": "7cc0ed3944f3aceaf7daaf5213e5f913b37419d82c6e47a57c5ad6adc334f165"
+      },
+      "operator_green_class_ids": [
+        "single_host_round_robin_shared_counter",
+        "single_host_barrier_reduce"
+      ],
+      "public_suppressed_profile_ids": [
+        "tassadar.research_profile.threads_deterministic_scheduler.v1"
+      ],
+      "refused_class_ids": [
+        "host_nondeterministic_shared_counter",
+        "relaxed_memory_order_shared_counter",
+        "cross_worker_shared_heap_replication"
+      ],
+      "rows": [
+        {
+          "concurrency_class_id": "single_host_round_robin_shared_counter",
+          "backing_profile_id": "tassadar.research_profile.threads_deterministic_scheduler.v1",
+          "scheduler_scope_id": "deterministic_round_robin_v1",
+          "memory_order_scope_id": "seq_cst_explicit_order",
+          "status": "operator_deterministic_green",
+          "exact_case_count": 1,
+          "refusal_case_count": 0,
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+          ],
+          "note": "single-host shared-counter replay stays operator-green only inside the explicit deterministic scheduler envelope"
+        },
+        {
+          "concurrency_class_id": "single_host_barrier_reduce",
+          "backing_profile_id": "tassadar.research_profile.threads_deterministic_scheduler.v1",
+          "scheduler_scope_id": "deterministic_barrier_release_v1",
+          "memory_order_scope_id": "seq_cst_barrier_release",
+          "status": "operator_deterministic_green",
+          "exact_case_count": 1,
+          "refusal_case_count": 0,
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+          ],
+          "note": "barrier-then-reduce replay stays operator-green only for the bounded two-thread deterministic scheduler envelope"
+        },
+        {
+          "concurrency_class_id": "host_nondeterministic_shared_counter",
+          "scheduler_scope_id": "host_nondeterministic_runtime",
+          "memory_order_scope_id": "implicit_interleaving",
+          "status": "refused",
+          "exact_case_count": 0,
+          "refusal_case_count": 1,
+          "refusal_reason_id": "host_nondeterministic_scheduler",
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+          ],
+          "note": "host-nondeterministic scheduling remains explicit refusal truth and cannot inherit the deterministic shared-state lane"
+        },
+        {
+          "concurrency_class_id": "relaxed_memory_order_shared_counter",
+          "scheduler_scope_id": "out_of_profile_relaxed_order",
+          "memory_order_scope_id": "relaxed_shared_memory_order",
+          "status": "refused",
+          "exact_case_count": 0,
+          "refusal_case_count": 1,
+          "refusal_reason_id": "unsupported_memory_ordering",
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json"
+          ],
+          "note": "relaxed shared-memory ordering remains explicit refusal truth instead of becoming a widened deterministic profile claim"
+        },
+        {
+          "concurrency_class_id": "cross_worker_shared_heap_replication",
+          "scheduler_scope_id": "cluster_shared_state_fanout",
+          "memory_order_scope_id": "cross_worker_shared_heap",
+          "status": "refused",
+          "exact_case_count": 0,
+          "refusal_case_count": 1,
+          "refusal_reason_id": "cross_worker_shared_state_unfrozen",
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_linked_program_bundle_report.json"
+          ],
+          "note": "cross-worker shared-state replication remains refused because the repo has linked-program evidence for the gap but not a frozen deterministic shared-heap claim"
+        }
+      ],
+      "overall_green": true,
+      "claim_boundary": "this runtime report keeps shared-state concurrency on a narrow operator-truth lane. Only the explicit single-host deterministic scheduler rows are operator-green; host-nondeterministic scheduling, relaxed memory ordering, and cross-worker shared heaps stay refused. Nothing here creates a served threads lane, broad concurrency closure, or public shared-state promotion",
+      "summary": "Shared-state concurrency runtime verdict report covers operator_green_classes=2, refused_classes=3, public_suppressed_profiles=1, overall_green=true.",
+      "report_digest": "dba3b9383eb8508575a1844b351e89fe09c9a7ca05446a0d5fd8a9f99b554652"
+    },
+    "cluster_report_ref": "fixtures/tassadar/reports/tassadar_shared_state_concurrency_challenge_matrix_report.json",
+    "cluster_report": {
+      "schema_version": 1,
+      "report_id": "tassadar.shared_state_concurrency.challenge_matrix.report.v1",
+      "runtime_verdict_report_ref": "fixtures/tassadar/reports/tassadar_shared_state_concurrency_runtime_verdict_report.json",
+      "runtime_verdict_report": {
+        "schema_version": 1,
+        "report_id": "tassadar.shared_state_concurrency.runtime_verdict_report.v1",
+        "threads_runtime_report_ref": "fixtures/tassadar/reports/tassadar_threads_research_profile_runtime_report.json",
+        "threads_runtime_report": {
+          "schema_version": 1,
+          "report_id": "tassadar.threads_research_profile.report.v1",
+          "profile_id": "tassadar.research_profile.threads_deterministic_scheduler.v1",
+          "exact_case_count": 2,
+          "refusal_case_count": 1,
+          "rows": [
+            {
+              "case_id": "round_robin_shared_counter",
+              "scheduler_id": "deterministic_round_robin_v1",
+              "workload_family": "shared_counter_increment",
+              "shared_memory_shape_id": "two_thread_shared_i32",
+              "status": "exact_deterministic_parity",
+              "exact_output_parity": true,
+              "exact_schedule_replay": true,
+              "benchmark_refs": [
+                "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+              ],
+              "note": "two-thread round-robin shared-counter stepping remains replay-safe only inside the declared deterministic scheduler envelope"
+            },
+            {
+              "case_id": "barrier_then_reduce",
+              "scheduler_id": "deterministic_barrier_release_v1",
+              "workload_family": "barrier_reduce_kernel",
+              "shared_memory_shape_id": "two_thread_shared_slice_i32",
+              "status": "exact_deterministic_parity",
+              "exact_output_parity": true,
+              "exact_schedule_replay": true,
+              "benchmark_refs": [
+                "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+              ],
+              "note": "barrier release plus reduce remains exact only when the scheduler order is explicit and fixed"
+            },
+            {
+              "case_id": "relaxed_memory_order_refusal",
+              "scheduler_id": "out_of_profile_relaxed_order",
+              "workload_family": "shared_counter_increment",
+              "shared_memory_shape_id": "two_thread_shared_i32",
+              "status": "exact_refusal_parity",
+              "exact_output_parity": false,
+              "exact_schedule_replay": false,
+              "refusal_reason_id": "unsupported_memory_ordering",
+              "benchmark_refs": [
+                "fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json"
+              ],
+              "note": "relaxed or nondeterministic memory ordering stays typed refusal truth instead of widening from the deterministic research rows"
+            }
+          ],
+          "claim_boundary": "this runtime report freezes one research-only shared-memory and threads profile with a deterministic scheduler envelope plus typed refusal on broader memory-ordering regimes. It does not claim general concurrency closure, broad shared-memory portability, or served publication",
+          "summary": "Threads research profile report covers 3 rows with exact_cases=2 and refusal_cases=1.",
+          "report_digest": "7cc0ed3944f3aceaf7daaf5213e5f913b37419d82c6e47a57c5ad6adc334f165"
+        },
+        "operator_green_class_ids": [
+          "single_host_round_robin_shared_counter",
+          "single_host_barrier_reduce"
+        ],
+        "public_suppressed_profile_ids": [
+          "tassadar.research_profile.threads_deterministic_scheduler.v1"
+        ],
+        "refused_class_ids": [
+          "host_nondeterministic_shared_counter",
+          "relaxed_memory_order_shared_counter",
+          "cross_worker_shared_heap_replication"
+        ],
+        "rows": [
+          {
+            "concurrency_class_id": "single_host_round_robin_shared_counter",
+            "backing_profile_id": "tassadar.research_profile.threads_deterministic_scheduler.v1",
+            "scheduler_scope_id": "deterministic_round_robin_v1",
+            "memory_order_scope_id": "seq_cst_explicit_order",
+            "status": "operator_deterministic_green",
+            "exact_case_count": 1,
+            "refusal_case_count": 0,
+            "benchmark_refs": [
+              "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+            ],
+            "note": "single-host shared-counter replay stays operator-green only inside the explicit deterministic scheduler envelope"
+          },
+          {
+            "concurrency_class_id": "single_host_barrier_reduce",
+            "backing_profile_id": "tassadar.research_profile.threads_deterministic_scheduler.v1",
+            "scheduler_scope_id": "deterministic_barrier_release_v1",
+            "memory_order_scope_id": "seq_cst_barrier_release",
+            "status": "operator_deterministic_green",
+            "exact_case_count": 1,
+            "refusal_case_count": 0,
+            "benchmark_refs": [
+              "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+            ],
+            "note": "barrier-then-reduce replay stays operator-green only for the bounded two-thread deterministic scheduler envelope"
+          },
+          {
+            "concurrency_class_id": "host_nondeterministic_shared_counter",
+            "scheduler_scope_id": "host_nondeterministic_runtime",
+            "memory_order_scope_id": "implicit_interleaving",
+            "status": "refused",
+            "exact_case_count": 0,
+            "refusal_case_count": 1,
+            "refusal_reason_id": "host_nondeterministic_scheduler",
+            "benchmark_refs": [
+              "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+            ],
+            "note": "host-nondeterministic scheduling remains explicit refusal truth and cannot inherit the deterministic shared-state lane"
+          },
+          {
+            "concurrency_class_id": "relaxed_memory_order_shared_counter",
+            "scheduler_scope_id": "out_of_profile_relaxed_order",
+            "memory_order_scope_id": "relaxed_shared_memory_order",
+            "status": "refused",
+            "exact_case_count": 0,
+            "refusal_case_count": 1,
+            "refusal_reason_id": "unsupported_memory_ordering",
+            "benchmark_refs": [
+              "fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json"
+            ],
+            "note": "relaxed shared-memory ordering remains explicit refusal truth instead of becoming a widened deterministic profile claim"
+          },
+          {
+            "concurrency_class_id": "cross_worker_shared_heap_replication",
+            "scheduler_scope_id": "cluster_shared_state_fanout",
+            "memory_order_scope_id": "cross_worker_shared_heap",
+            "status": "refused",
+            "exact_case_count": 0,
+            "refusal_case_count": 1,
+            "refusal_reason_id": "cross_worker_shared_state_unfrozen",
+            "benchmark_refs": [
+              "fixtures/tassadar/reports/tassadar_linked_program_bundle_report.json"
+            ],
+            "note": "cross-worker shared-state replication remains refused because the repo has linked-program evidence for the gap but not a frozen deterministic shared-heap claim"
+          }
+        ],
+        "overall_green": true,
+        "claim_boundary": "this runtime report keeps shared-state concurrency on a narrow operator-truth lane. Only the explicit single-host deterministic scheduler rows are operator-green; host-nondeterministic scheduling, relaxed memory ordering, and cross-worker shared heaps stay refused. Nothing here creates a served threads lane, broad concurrency closure, or public shared-state promotion",
+        "summary": "Shared-state concurrency runtime verdict report covers operator_green_classes=2, refused_classes=3, public_suppressed_profiles=1, overall_green=true.",
+        "report_digest": "dba3b9383eb8508575a1844b351e89fe09c9a7ca05446a0d5fd8a9f99b554652"
+      },
+      "fairness_report_ref": "fixtures/tassadar/reports/tassadar_preemptive_job_fairness_report.json",
+      "fairness_report": {
+        "schema_version": 1,
+        "report_id": "tassadar.preemptive_job_fairness.report.v1",
+        "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_preemptive_jobs_v1/tassadar_preemptive_job_runtime_bundle.json",
+        "runtime_bundle": {
+          "schema_version": 1,
+          "bundle_id": "tassadar.preemptive_job.runtime_bundle.v1",
+          "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+          "case_receipts": [
+            {
+              "case_id": "counter_round_robin_job",
+              "job_id": "tassadar.job.counter_round_robin.v1",
+              "process_id": "tassadar.process.long_loop_kernel.v1",
+              "workload_family": "long_loop_kernel",
+              "scheduler_id": "deterministic_round_robin",
+              "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+              "slice_budget_steps": 64,
+              "fairness_window_slices": 2,
+              "max_consecutive_wait_slices": 1,
+              "preemption_count": 2,
+              "starvation_free": true,
+              "exact_slice_boundary_parity": true,
+              "exact_resume_parity": true,
+              "status": "exact_slice_boundary_parity",
+              "slice_receipts": [
+                {
+                  "slice_id": "counter_round_robin_job::slice::00",
+                  "slice_index": 0,
+                  "scheduler_id": "deterministic_round_robin",
+                  "executed_step_count": 64,
+                  "cumulative_step_count": 64,
+                  "emitted_checkpoint_id": "checkpoint.counter_round_robin.00",
+                  "wait_slices_before_run": 0,
+                  "preempted_after_slice": true,
+                  "detail": "slice 0 under `deterministic_round_robin` executed 64 steps after waiting 0 slice(s)"
+                },
+                {
+                  "slice_id": "counter_round_robin_job::slice::01",
+                  "slice_index": 1,
+                  "scheduler_id": "deterministic_round_robin",
+                  "executed_step_count": 64,
+                  "cumulative_step_count": 128,
+                  "resumed_from_checkpoint_id": "checkpoint.counter_round_robin.00",
+                  "emitted_checkpoint_id": "checkpoint.counter_round_robin.01",
+                  "wait_slices_before_run": 1,
+                  "preempted_after_slice": true,
+                  "detail": "slice 1 under `deterministic_round_robin` executed 64 steps after waiting 1 slice(s)"
+                },
+                {
+                  "slice_id": "counter_round_robin_job::slice::02",
+                  "slice_index": 2,
+                  "scheduler_id": "deterministic_round_robin",
+                  "executed_step_count": 48,
+                  "cumulative_step_count": 176,
+                  "resumed_from_checkpoint_id": "checkpoint.counter_round_robin.01",
+                  "wait_slices_before_run": 1,
+                  "preempted_after_slice": false,
+                  "detail": "slice 2 under `deterministic_round_robin` executed 48 steps after waiting 1 slice(s)"
+                }
+              ],
+              "refusal_cases": [],
+              "note": "round-robin slice boundaries preserve exact resume parity and keep bounded wait at one slice",
+              "receipt_digest": "3b9ec7b65ac5e1f159d0e8c6f6c8a493222df885a88816d99c28b6fa6fd551e4"
+            },
+            {
+              "case_id": "search_weighted_fair_job",
+              "job_id": "tassadar.job.search_weighted_fair.v1",
+              "process_id": "tassadar.process.search_frontier_kernel.v1",
+              "workload_family": "search_frontier_kernel",
+              "scheduler_id": "weighted_fair_slice_rotation",
+              "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+              "slice_budget_steps": 40,
+              "fairness_window_slices": 3,
+              "max_consecutive_wait_slices": 2,
+              "preemption_count": 3,
+              "starvation_free": true,
+              "exact_slice_boundary_parity": true,
+              "exact_resume_parity": true,
+              "status": "exact_slice_boundary_parity",
+              "slice_receipts": [
+                {
+                  "slice_id": "search_weighted_fair_job::slice::00",
+                  "slice_index": 0,
+                  "scheduler_id": "weighted_fair_slice_rotation",
+                  "executed_step_count": 40,
+                  "cumulative_step_count": 40,
+                  "emitted_checkpoint_id": "checkpoint.search_weighted_fair.00",
+                  "wait_slices_before_run": 0,
+                  "preempted_after_slice": true,
+                  "detail": "slice 0 under `weighted_fair_slice_rotation` executed 40 steps after waiting 0 slice(s)"
+                },
+                {
+                  "slice_id": "search_weighted_fair_job::slice::01",
+                  "slice_index": 1,
+                  "scheduler_id": "weighted_fair_slice_rotation",
+                  "executed_step_count": 40,
+                  "cumulative_step_count": 80,
+                  "resumed_from_checkpoint_id": "checkpoint.search_weighted_fair.00",
+                  "emitted_checkpoint_id": "checkpoint.search_weighted_fair.01",
+                  "wait_slices_before_run": 2,
+                  "preempted_after_slice": true,
+                  "detail": "slice 1 under `weighted_fair_slice_rotation` executed 40 steps after waiting 2 slice(s)"
+                },
+                {
+                  "slice_id": "search_weighted_fair_job::slice::02",
+                  "slice_index": 2,
+                  "scheduler_id": "weighted_fair_slice_rotation",
+                  "executed_step_count": 40,
+                  "cumulative_step_count": 120,
+                  "resumed_from_checkpoint_id": "checkpoint.search_weighted_fair.01",
+                  "emitted_checkpoint_id": "checkpoint.search_weighted_fair.02",
+                  "wait_slices_before_run": 1,
+                  "preempted_after_slice": true,
+                  "detail": "slice 2 under `weighted_fair_slice_rotation` executed 40 steps after waiting 1 slice(s)"
+                },
+                {
+                  "slice_id": "search_weighted_fair_job::slice::03",
+                  "slice_index": 3,
+                  "scheduler_id": "weighted_fair_slice_rotation",
+                  "executed_step_count": 24,
+                  "cumulative_step_count": 144,
+                  "resumed_from_checkpoint_id": "checkpoint.search_weighted_fair.02",
+                  "wait_slices_before_run": 2,
+                  "preempted_after_slice": false,
+                  "detail": "slice 3 under `weighted_fair_slice_rotation` executed 24 steps after waiting 2 slice(s)"
+                }
+              ],
+              "refusal_cases": [],
+              "note": "weighted fair rotation preserves exact slice-boundary parity while bounding starvation to two wait slices",
+              "receipt_digest": "7e3c1911ed00de9cd6ba441155725ce1d7763d250c78c7d0ef3ddfebc55db105"
+            },
+            {
+              "case_id": "host_scheduler_nondeterministic_refusal",
+              "job_id": "tassadar.job.host_scheduler_nondeterministic.v1",
+              "process_id": "tassadar.process.state_machine_accumulator.v1",
+              "workload_family": "state_machine_accumulator",
+              "scheduler_id": "host_nondeterministic_scheduler",
+              "profile_id": "tassadar.internal_compute.preemptive_jobs.v1",
+              "slice_budget_steps": 64,
+              "fairness_window_slices": 0,
+              "max_consecutive_wait_slices": 0,
+              "preemption_count": 0,
+              "starvation_free": false,
+              "exact_slice_boundary_parity": false,
+              "exact_resume_parity": false,
+              "status": "exact_refusal_parity",
+              "slice_receipts": [],
+              "refusal_cases": [
+                {
+                  "refusal_kind": "unsupported_scheduler_regime",
+                  "scheduler_id": "host_nondeterministic_scheduler",
+                  "detail": "host nondeterministic scheduling stays outside the bounded preemptive-job lane"
+                },
+                {
+                  "refusal_kind": "fairness_regime_out_of_envelope",
+                  "scheduler_id": "host_nondeterministic_scheduler",
+                  "detail": "unbounded or unverified fairness regimes remain explicit refusals instead of implicit operator trust"
+                }
+              ],
+              "note": "host nondeterministic scheduling remains on an explicit refusal path instead of widening the bounded preemptive-job claim",
+              "receipt_digest": "4be346a17efad7967910493373153ea71d45ca21e21e7400ec36d422e3ccbf45"
+            }
+          ],
+          "exact_case_count": 2,
+          "refusal_case_count": 2,
+          "green_scheduler_ids": [
+            "deterministic_round_robin",
+            "weighted_fair_slice_rotation"
+          ],
+          "refused_scheduler_ids": [
+            "host_nondeterministic_scheduler"
+          ],
+          "claim_boundary": "this runtime bundle freezes one bounded preemptive-job lane with deterministic slice boundaries, resumable checkpoints, and explicit scheduler-regime refusal truth. It does not claim arbitrary host scheduling, general concurrency closure, non-deterministic fairness, or broader served internal compute",
+          "summary": "Preemptive-job runtime bundle covers exact_cases=2, refusal_rows=2, green_schedulers=2, refused_schedulers=1.",
+          "bundle_digest": "a910717e881f5c1e00f2581a0bd3ccc9625178f31755be4bda89b605700c1d9e"
+        },
+        "rows": [
+          {
+            "scheduler_id": "deterministic_round_robin",
+            "status": "green",
+            "case_count": 1,
+            "max_consecutive_wait_slices": 1,
+            "max_preemption_count": 2,
+            "starvation_free": true,
+            "note": "deterministic round-robin keeps one-slice wait bounds and exact resumable parity"
+          },
+          {
+            "scheduler_id": "weighted_fair_slice_rotation",
+            "status": "green",
+            "case_count": 1,
+            "max_consecutive_wait_slices": 2,
+            "max_preemption_count": 3,
+            "starvation_free": true,
+            "note": "weighted fair slice rotation keeps bounded wait and exact resumable parity on the seeded search workload"
+          },
+          {
+            "scheduler_id": "host_nondeterministic_scheduler",
+            "status": "refused",
+            "case_count": 1,
+            "max_consecutive_wait_slices": 0,
+            "max_preemption_count": 0,
+            "starvation_free": false,
+            "note": "host nondeterministic scheduling remains explicitly refused for the bounded preemptive-job lane"
+          }
+        ],
+        "green_scheduler_ids": [
+          "deterministic_round_robin",
+          "weighted_fair_slice_rotation"
+        ],
+        "refused_scheduler_ids": [
+          "host_nondeterministic_scheduler"
+        ],
+        "exact_case_count": 2,
+        "refusal_case_count": 2,
+        "starvation_free_case_count": 2,
+        "fairness_window_green_case_count": 2,
+        "claim_boundary": "this cluster report covers one bounded set of scheduler regimes for the preemptive-job lane only. It keeps host-nondeterministic or otherwise unverified fairness regimes on explicit refusal paths and does not imply arbitrary cluster scheduling, concurrent executor closure, or broader served internal compute",
+        "summary": "Preemptive-job fairness report covers green_schedulers=2, refused_schedulers=1, exact_cases=2, refusal_rows=2.",
+        "report_digest": "79e97bbfac6ee220ff213bc997a3d324149bf0f0b597911937bda90ae0a4e9e5"
+      },
+      "green_concurrency_class_ids": [
+        "single_host_round_robin_shared_counter",
+        "single_host_barrier_reduce"
+      ],
+      "refused_concurrency_class_ids": [
+        "host_nondeterministic_shared_counter",
+        "relaxed_memory_order_shared_counter",
+        "cross_worker_shared_heap_replication"
+      ],
+      "rows": [
+        {
+          "concurrency_class_id": "single_host_round_robin_shared_counter",
+          "cluster_scheduler_id": "deterministic_round_robin",
+          "challenge_scope_id": "scheduler_order_audit",
+          "status": "deterministic_green",
+          "replay_green": true,
+          "race_detected": false,
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_shared_state_concurrency_runtime_verdict_report.json",
+            "fixtures/tassadar/reports/tassadar_preemptive_job_fairness_report.json"
+          ],
+          "note": "single-host round-robin shared-state replay stays deterministic when scheduler order and replay are both explicit"
+        },
+        {
+          "concurrency_class_id": "single_host_barrier_reduce",
+          "cluster_scheduler_id": "deterministic_round_robin",
+          "challenge_scope_id": "barrier_release_audit",
+          "status": "deterministic_green",
+          "replay_green": true,
+          "race_detected": false,
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_shared_state_concurrency_runtime_verdict_report.json",
+            "fixtures/tassadar/reports/tassadar_preemptive_job_fairness_report.json"
+          ],
+          "note": "single-host barrier release plus reduce stays deterministic only inside the same explicit scheduler envelope"
+        },
+        {
+          "concurrency_class_id": "host_nondeterministic_shared_counter",
+          "cluster_scheduler_id": "host_nondeterministic_scheduler",
+          "challenge_scope_id": "race_vs_replay_audit",
+          "status": "refused",
+          "replay_green": false,
+          "race_detected": true,
+          "refusal_reason_id": "host_nondeterministic_scheduler",
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_shared_state_concurrency_runtime_verdict_report.json",
+            "fixtures/tassadar/reports/tassadar_preemptive_job_fairness_report.json"
+          ],
+          "note": "host-nondeterministic scheduling stays refused because replay and race behavior cannot be flattened into one deterministic class"
+        },
+        {
+          "concurrency_class_id": "relaxed_memory_order_shared_counter",
+          "cluster_scheduler_id": "deterministic_round_robin",
+          "challenge_scope_id": "memory_order_audit",
+          "status": "refused",
+          "replay_green": false,
+          "race_detected": true,
+          "refusal_reason_id": "unsupported_memory_ordering",
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_shared_state_concurrency_runtime_verdict_report.json"
+          ],
+          "note": "relaxed memory ordering stays refused even when the scheduler is fixed because the memory semantics themselves are not frozen"
+        },
+        {
+          "concurrency_class_id": "cross_worker_shared_heap_replication",
+          "cluster_scheduler_id": "weighted_fair_slice_rotation",
+          "challenge_scope_id": "cross_worker_shared_heap_audit",
+          "status": "refused",
+          "replay_green": false,
+          "race_detected": true,
+          "refusal_reason_id": "cross_worker_shared_state_unfrozen",
+          "benchmark_refs": [
+            "fixtures/tassadar/reports/tassadar_shared_state_concurrency_runtime_verdict_report.json",
+            "fixtures/tassadar/reports/tassadar_linked_program_bundle_report.json"
+          ],
+          "note": "cross-worker shared heaps stay refused because the repo still has a documented shared-state gap instead of a frozen deterministic cluster semantics claim"
+        }
+      ],
+      "overall_green": true,
+      "claim_boundary": "this cluster report freezes one shared-state challenge matrix over explicit deterministic and refused concurrency classes. It keeps the current operator-green single-host classes visible, but host-nondeterministic scheduling, relaxed memory ordering, and cross-worker shared heaps remain explicit refusal truth. It does not imply served threads publication, broad cluster concurrency closure, or arbitrary shared-state portability",
+      "summary": "Shared-state concurrency challenge matrix covers green_classes=2, refused_classes=3, runtime_operator_green_classes=2, overall_green=true.",
+      "report_digest": "ee4dc8b4a76ce07ca799de0bb7e6710b747fdf1c5553b7701e20fe312921a347"
+    },
+    "rows": [
+      {
+        "concurrency_class_id": "single_host_round_robin_shared_counter",
+        "runtime_status": "operator_deterministic_green",
+        "cluster_status": "deterministic_green",
+        "final_verdict": "operator_green_public_suppressed",
+        "operator_truth_allowed": true,
+        "public_truth_allowed": false,
+        "note": "single-host shared-counter replay stays operator-green only inside the explicit deterministic scheduler envelope single-host round-robin shared-state replay stays deterministic when scheduler order and replay are both explicit"
+      },
+      {
+        "concurrency_class_id": "single_host_barrier_reduce",
+        "runtime_status": "operator_deterministic_green",
+        "cluster_status": "deterministic_green",
+        "final_verdict": "operator_green_public_suppressed",
+        "operator_truth_allowed": true,
+        "public_truth_allowed": false,
+        "note": "barrier-then-reduce replay stays operator-green only for the bounded two-thread deterministic scheduler envelope single-host barrier release plus reduce stays deterministic only inside the same explicit scheduler envelope"
+      },
+      {
+        "concurrency_class_id": "host_nondeterministic_shared_counter",
+        "runtime_status": "refused",
+        "cluster_status": "refused",
+        "final_verdict": "refused",
+        "operator_truth_allowed": false,
+        "public_truth_allowed": false,
+        "refusal_reason_id": "host_nondeterministic_scheduler",
+        "note": "host-nondeterministic scheduling remains explicit refusal truth and cannot inherit the deterministic shared-state lane host-nondeterministic scheduling stays refused because replay and race behavior cannot be flattened into one deterministic class"
+      },
+      {
+        "concurrency_class_id": "relaxed_memory_order_shared_counter",
+        "runtime_status": "refused",
+        "cluster_status": "refused",
+        "final_verdict": "refused",
+        "operator_truth_allowed": false,
+        "public_truth_allowed": false,
+        "refusal_reason_id": "unsupported_memory_ordering",
+        "note": "relaxed shared-memory ordering remains explicit refusal truth instead of becoming a widened deterministic profile claim relaxed memory ordering stays refused even when the scheduler is fixed because the memory semantics themselves are not frozen"
+      },
+      {
+        "concurrency_class_id": "cross_worker_shared_heap_replication",
+        "runtime_status": "refused",
+        "cluster_status": "refused",
+        "final_verdict": "refused",
+        "operator_truth_allowed": false,
+        "public_truth_allowed": false,
+        "refusal_reason_id": "cross_worker_shared_state_unfrozen",
+        "note": "cross-worker shared-state replication remains refused because the repo has linked-program evidence for the gap but not a frozen deterministic shared-heap claim cross-worker shared heaps stay refused because the repo still has a documented shared-state gap instead of a frozen deterministic cluster semantics claim"
+      }
+    ],
+    "operator_green_class_ids": [
+      "single_host_round_robin_shared_counter",
+      "single_host_barrier_reduce"
+    ],
+    "refused_class_ids": [
+      "host_nondeterministic_shared_counter",
+      "relaxed_memory_order_shared_counter",
+      "cross_worker_shared_heap_replication"
+    ],
+    "operator_profile_allowed_profile_ids": [
+      "tassadar.research_profile.threads_deterministic_scheduler.v1"
+    ],
+    "public_profile_allowed_profile_ids": [],
+    "overall_green": true,
+    "claim_boundary": "this eval report publishes shared-state concurrency verdicts by class. The current honest posture is operator-green only for the explicit single-host deterministic scheduler classes, with public publication still suppressed and broader shared-state families kept on refusal paths. It does not claim public threads publication, general concurrency closure, or arbitrary shared-state portability",
+    "summary": "Shared-state concurrency verdict report covers operator_green_classes=2, refused_classes=3, operator_profiles=1, public_profiles=0, overall_green=true.",
+    "report_digest": "7b0bcc708e208fcbf17fb2bbea4cb01212eb3a2938a356700a074cf2796eb420"
+  },
+  "operator_green_class_ids": [
+    "single_host_round_robin_shared_counter",
+    "single_host_barrier_reduce"
+  ],
+  "public_suppressed_profile_ids": [
+    "tassadar.research_profile.threads_deterministic_scheduler.v1"
+  ],
+  "refused_class_ids": [
+    "host_nondeterministic_shared_counter",
+    "relaxed_memory_order_shared_counter",
+    "cross_worker_shared_heap_replication"
+  ],
+  "allowed_statement": "Psionic/Tassadar has one operator-truth shared-state concurrency lane for explicit single-host deterministic scheduler classes, but public shared-state publication remains suppressed and broader concurrency classes stay refused.",
+  "claim_boundary": "this summary keeps shared-state concurrency verdicts disclosure-safe. It highlights the narrow operator-green classes and the still-refused families instead of widening concurrency into public served or market posture",
+  "summary": "Shared-state concurrency summary keeps operator_green_classes=2, refused_classes=3, public_profiles=1, overall_green=true.",
+  "report_digest": "618bc4885004839b3327b741be76601e1d10f4dfc56f9eb197bf51be3de3ad71"
+}

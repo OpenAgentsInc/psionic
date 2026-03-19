@@ -86,6 +86,12 @@ Current honest posture:
   with a deterministic scheduler envelope, explicit sandbox boundary truth,
   and typed refusal on host-nondeterministic scheduling plus relaxed
   memory-ordering regimes; it remains non-served and non-promoted by design
+- the repo now also has one shared-state concurrency challenge lane with
+  committed runtime, cluster, eval, and research artifacts over two
+  operator-green single-host deterministic classes, one explicitly suppressed
+  threads profile, and typed refusal on host-nondeterministic scheduling,
+  relaxed memory ordering, and cross-worker shared heaps; it remains
+  non-served and disclosure-bounded by design
 - the repo now also has one durable process-object family
   `tassadar.internal_compute.process_objects.v1` over the committed
   checkpoint-backed workloads, with first-class snapshot, tape, and work-queue

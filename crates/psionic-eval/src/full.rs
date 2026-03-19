@@ -212,6 +212,8 @@ mod tassadar_semantic_window_migration_planner;
 mod tassadar_sequence;
 #[path = "tassadar_session_process_profile.rs"]
 mod tassadar_session_process_profile;
+#[path = "tassadar_shared_state_concurrency_verdicts.rs"]
+mod tassadar_shared_state_concurrency_verdicts;
 #[path = "tassadar_simulator_effect_profile.rs"]
 mod tassadar_simulator_effect_profile;
 #[path = "tassadar_shared_depth_halting_calibration.rs"]
@@ -373,6 +375,7 @@ pub use tassadar_semantic_window_compatibility_delta::*;
 pub use tassadar_semantic_window_migration_planner::*;
 pub use tassadar_sequence::*;
 pub use tassadar_session_process_profile::*;
+pub use tassadar_shared_state_concurrency_verdicts::*;
 pub use tassadar_simulator_effect_profile::*;
 pub use tassadar_shared_depth_halting_calibration::*;
 pub use tassadar_shared_primitive_transfer::*;

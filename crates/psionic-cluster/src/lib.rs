@@ -8,6 +8,7 @@ mod replicated_serving;
 mod scheduler;
 mod serving_policy;
 mod tassadar_preemptive_job_fairness;
+mod tassadar_shared_state_concurrency_challenge_matrix;
 mod tensor_sharded;
 
 pub use benchmark_receipts::*;
@@ -19,6 +20,7 @@ pub use replicated_serving::*;
 pub use scheduler::*;
 pub use serving_policy::*;
 pub use tassadar_preemptive_job_fairness::*;
+pub use tassadar_shared_state_concurrency_challenge_matrix::*;
 pub use tensor_sharded::*;
 
 /// Human-readable crate ownership summary.

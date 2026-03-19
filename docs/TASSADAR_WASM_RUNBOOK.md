@@ -1163,6 +1163,34 @@ Expected outcome:
 - explicit runtime and sandbox refusal parity on relaxed shared-memory ordering
 - `served_publication_allowed = false`
 
+### 15B. Shared-state concurrency challenge matrix and deterministic verdicts
+
+```bash
+cargo run -p psionic-runtime --example tassadar_shared_state_concurrency_runtime_verdict_report
+cargo run -p psionic-cluster --example tassadar_shared_state_concurrency_challenge_matrix_report
+cargo run -p psionic-eval --example tassadar_shared_state_concurrency_verdict_report
+cargo run -p psionic-research --example tassadar_shared_state_concurrency_summary
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_shared_state_concurrency_runtime_verdict_report.json`
+- `fixtures/tassadar/reports/tassadar_shared_state_concurrency_challenge_matrix_report.json`
+- `fixtures/tassadar/reports/tassadar_shared_state_concurrency_verdict_report.json`
+- `fixtures/tassadar/reports/tassadar_shared_state_concurrency_summary.json`
+
+Expected outcome:
+
+- two operator-green shared-state classes:
+  `single_host_round_robin_shared_counter` and
+  `single_host_barrier_reduce`
+- one explicitly public-suppressed profile:
+  `tassadar.research_profile.threads_deterministic_scheduler.v1`
+- explicit refusal on host-nondeterministic scheduling
+- explicit refusal on relaxed shared-memory ordering
+- explicit refusal on cross-worker shared heaps
+- `public_profile_allowed_profile_ids = []`
+
 ### 15A. Proposal-profile ladder claim checker and served-publication policy
 
 ```bash

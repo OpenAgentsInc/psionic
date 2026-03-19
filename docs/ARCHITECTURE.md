@@ -834,6 +834,17 @@ The current scope is:
   refusal on host-nondeterministic scheduling plus relaxed memory-ordering
   regimes; this is not a served threads lane, arbitrary shared-memory
   portability, or general concurrency closure
+- the current shared-state concurrency verdict artifacts are
+  `fixtures/tassadar/reports/tassadar_shared_state_concurrency_runtime_verdict_report.json`,
+  `fixtures/tassadar/reports/tassadar_shared_state_concurrency_challenge_matrix_report.json`,
+  `fixtures/tassadar/reports/tassadar_shared_state_concurrency_verdict_report.json`,
+  and `fixtures/tassadar/reports/tassadar_shared_state_concurrency_summary.json`,
+  which freeze one operator-truth shared-state challenge lane with two
+  deterministic single-host classes, explicit public suppression for the named
+  threads profile, and typed refusal on host-nondeterministic scheduling,
+  relaxed memory ordering, and cross-worker shared heaps; this is not a served
+  threads lane, general concurrency closure, or broad shared-state
+  portability
 - the current proposal-profile ladder artifacts are
   `fixtures/tassadar/reports/tassadar_proposal_profile_ladder_claim_checker_report.json`
   and `fixtures/tassadar/reports/tassadar_proposal_profile_route_policy_report.json`,
