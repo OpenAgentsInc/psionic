@@ -26,13 +26,13 @@ use psionic_router::{
 };
 use psionic_runtime::{
     TASSADAR_ARTICLE_CLASS_BENCHMARK_ENVIRONMENT_REF, TASSADAR_ARTICLE_CLASS_BENCHMARK_REF,
-    TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF, TassadarExecution,
-    TassadarExecutionEvidenceBundle, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
-    TassadarExecutorExecutionReport, TassadarExecutorSelectionDiagnostic, TassadarInstruction,
-    TassadarProgramArtifact, TassadarRuntimeCapabilityReport, TassadarTraceEvent,
-    TassadarTraceStep, TassadarValidationCase, build_tassadar_execution_evidence_bundle,
-    execute_tassadar_executor_request, tassadar_article_class_corpus,
-    tassadar_trace_abi_for_profile_id, tassadar_wasm_profile_for_id,
+    TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF, TassadarDirectModelWeightExecutionProofReceipt,
+    TassadarExecution, TassadarExecutionEvidenceBundle, TassadarExecutionRefusal,
+    TassadarExecutorDecodeMode, TassadarExecutorExecutionReport,
+    TassadarExecutorSelectionDiagnostic, TassadarInstruction, TassadarProgramArtifact,
+    TassadarRuntimeCapabilityReport, TassadarTraceEvent, TassadarTraceStep, TassadarValidationCase,
+    build_tassadar_execution_evidence_bundle, execute_tassadar_executor_request,
+    tassadar_article_class_corpus, tassadar_trace_abi_for_profile_id, tassadar_wasm_profile_for_id,
 };
 use psionic_train::{TassadarExecutorPromotionGateReport, TassadarExecutorSequenceFitReport};
 use serde::{Deserialize, Serialize};
@@ -834,6 +834,9 @@ pub struct TassadarArticleExecutorSessionRequest {
     /// Ordered environment refs carried into lineage in addition to the canonical benchmark ref.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub environment_refs: Vec<String>,
+    /// Whether the session must fail closed unless a direct model-weight proof receipt is emitted.
+    #[serde(default)]
+    pub require_direct_model_weight_proof: bool,
 }
 
 impl TassadarArticleExecutorSessionRequest {
@@ -851,6 +854,7 @@ impl TassadarArticleExecutorSessionRequest {
             requested_model_id: None,
             requested_decode_mode,
             environment_refs: Vec::new(),
+            require_direct_model_weight_proof: false,
         }
     }
 
@@ -867,6 +871,13 @@ impl TassadarArticleExecutorSessionRequest {
         environment_refs.sort();
         environment_refs.dedup();
         self.environment_refs = environment_refs;
+        self
+    }
+
+    /// Requires a direct model-weight proof receipt on completion.
+    #[must_use]
+    pub fn require_direct_model_weight_proof(mut self) -> Self {
+        self.require_direct_model_weight_proof = true;
         self
     }
 
@@ -919,6 +930,10 @@ pub struct TassadarArticleExecutorSessionResponse {
     pub readable_log: TassadarArticleReadableLogExcerpt,
     /// Derived symbolic token-trace view over the canonical trace.
     pub token_trace: TassadarArticleTokenTraceExcerpt,
+    /// Direct model-weight proof receipt when the caller required it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct_model_weight_execution_proof_receipt:
+        Option<TassadarDirectModelWeightExecutionProofReceipt>,
 }
 
 impl TassadarArticleExecutorSessionResponse {
@@ -957,6 +972,13 @@ pub struct TassadarArticleBenchmarkIdentityEvent {
 pub struct TassadarArticleProofIdentityEvent {
     /// Preserved proof identity for the completed exact executor span.
     pub proof_identity: TassadarArticleProofIdentity,
+}
+
+/// Direct model-weight proof event emitted by the article-session stream.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarArticleDirectModelWeightExecutionProofEvent {
+    /// Direct model-weight proof payload.
+    pub proof_receipt: TassadarDirectModelWeightExecutionProofReceipt,
 }
 
 /// Readable-log event emitted by the article-session stream.
@@ -1013,6 +1035,11 @@ pub enum TassadarArticleExecutorSessionStreamEvent {
     ProofIdentity {
         /// Proof identity payload.
         proof_identity: TassadarArticleProofIdentityEvent,
+    },
+    /// Direct model-weight proof surfaced for proof-required sessions.
+    DirectModelWeightExecutionProof {
+        /// Direct model-weight proof payload.
+        direct_model_weight_execution_proof: TassadarArticleDirectModelWeightExecutionProofEvent,
     },
     /// One derived readable-log line.
     ReadableLogLine {
@@ -1133,17 +1160,51 @@ impl LocalTassadarArticleExecutorSessionService {
                     build_article_readable_log_excerpt(&case, &response.execution_report.execution);
                 let token_trace =
                     build_article_token_trace_excerpt(&case, &response.execution_report.execution);
-                Ok(TassadarArticleExecutorSessionOutcome::Completed {
-                    response: TassadarArticleExecutorSessionResponse {
-                        request_id: request.request_id.clone(),
-                        product_id: request.product_id.clone(),
-                        benchmark_identity,
-                        proof_identity,
-                        executor_response: response,
-                        readable_log,
-                        token_trace,
-                    },
-                })
+                let mut response = TassadarArticleExecutorSessionResponse {
+                    request_id: request.request_id.clone(),
+                    product_id: request.product_id.clone(),
+                    benchmark_identity,
+                    proof_identity,
+                    executor_response: response,
+                    readable_log,
+                    token_trace,
+                    direct_model_weight_execution_proof_receipt: None,
+                };
+                if request.require_direct_model_weight_proof {
+                    match crate::build_tassadar_direct_model_weight_execution_proof_receipt_for_article_session(
+                        &self.executor_service,
+                        request,
+                        &response,
+                    ) {
+                        Ok(receipt) => {
+                            response.direct_model_weight_execution_proof_receipt = Some(receipt);
+                        }
+                        Err(error) => {
+                            return Ok(TassadarArticleExecutorSessionOutcome::Refused {
+                                refusal: TassadarArticleExecutorSessionRefusalResponse {
+                                    request_id: request.request_id.clone(),
+                                    product_id: request.product_id.clone(),
+                                    benchmark_identity: Some(response.benchmark_identity.clone()),
+                                    model_descriptor: Some(
+                                        response.executor_response.model_descriptor.clone(),
+                                    ),
+                                    runtime_capability: response
+                                        .executor_response
+                                        .runtime_capability
+                                        .clone(),
+                                    contract_error: None,
+                                    selection: Some(
+                                        response.executor_response.execution_report.selection.clone(),
+                                    ),
+                                    detail: format!(
+                                        "article session cannot publish direct model-weight execution proof: {error}"
+                                    ),
+                                },
+                            });
+                        }
+                    }
+                }
+                Ok(TassadarArticleExecutorSessionOutcome::Completed { response })
             }
             Ok(TassadarExecutorOutcome::Refused { refusal }) => {
                 Ok(TassadarArticleExecutorSessionOutcome::Refused {
@@ -2906,6 +2967,16 @@ fn article_stream_events_for_outcome(
                     proof_identity: response.proof_identity.clone(),
                 },
             });
+            if let Some(proof_receipt) = &response.direct_model_weight_execution_proof_receipt {
+                events.push(
+                    TassadarArticleExecutorSessionStreamEvent::DirectModelWeightExecutionProof {
+                        direct_model_weight_execution_proof:
+                            TassadarArticleDirectModelWeightExecutionProofEvent {
+                                proof_receipt: proof_receipt.clone(),
+                            },
+                    },
+                );
+            }
             for (line_index, line) in response.readable_log.lines.iter().enumerate() {
                 events.push(TassadarArticleExecutorSessionStreamEvent::ReadableLogLine {
                     readable_log_line: TassadarArticleReadableLogLineEvent {
@@ -4984,6 +5055,17 @@ fn tassadar_lab_update_from_article_event(
         TassadarArticleExecutorSessionStreamEvent::ProofIdentity { proof_identity } => {
             TassadarLabUpdate::ProofIdentity { proof_identity }
         }
+        TassadarArticleExecutorSessionStreamEvent::DirectModelWeightExecutionProof {
+            direct_model_weight_execution_proof,
+        } => TassadarLabUpdate::StatusLine {
+            line_index: 0,
+            line: format!(
+                "direct model-weight proof {}",
+                direct_model_weight_execution_proof
+                    .proof_receipt
+                    .receipt_digest
+            ),
+        },
         TassadarArticleExecutorSessionStreamEvent::ReadableLogLine { readable_log_line } => {
             TassadarLabUpdate::ReadableLogLine { readable_log_line }
         }
@@ -5414,6 +5496,9 @@ mod tests {
                     break;
                 }
                 TassadarArticleExecutorSessionStreamEvent::Capability { .. }
+                | TassadarArticleExecutorSessionStreamEvent::DirectModelWeightExecutionProof {
+                    ..
+                }
                 | TassadarArticleExecutorSessionStreamEvent::Selection { .. }
                 | TassadarArticleExecutorSessionStreamEvent::Output { .. } => {}
             }
@@ -5445,6 +5530,60 @@ mod tests {
                 );
             }
             other => panic!("expected completed fallback article session, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn article_session_emits_direct_model_weight_proof_when_required() {
+        let service = LocalTassadarArticleExecutorSessionService::new();
+        let request = article_request_for_case(
+            "long_loop_kernel",
+            TassadarExecutorDecodeMode::ReferenceLinear,
+        )
+        .require_direct_model_weight_proof();
+
+        let outcome = service.execute(&request).expect("request should be typed");
+        match outcome {
+            TassadarArticleExecutorSessionOutcome::Completed { response } => {
+                let receipt = response
+                    .direct_model_weight_execution_proof_receipt
+                    .expect("proof receipt should be present");
+                assert_eq!(receipt.article_case_id, "long_loop_kernel");
+                assert_eq!(receipt.external_call_count, 0);
+                assert!(!receipt.fallback_observed);
+                assert_eq!(
+                    receipt.requested_decode_mode,
+                    TassadarExecutorDecodeMode::ReferenceLinear
+                );
+                assert_eq!(
+                    receipt.effective_decode_mode,
+                    TassadarExecutorDecodeMode::ReferenceLinear
+                );
+                assert!(!receipt.route_binding.route_descriptor_digest.is_empty());
+            }
+            other => panic!("expected completed proof-required article session, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn article_session_refuses_proof_required_fallback_requests() {
+        let service = LocalTassadarArticleExecutorSessionService::new();
+        let request = article_request_for_case(
+            "branch_heavy_kernel",
+            TassadarExecutorDecodeMode::SparseTopK,
+        )
+        .require_direct_model_weight_proof();
+
+        let outcome = service.execute(&request).expect("request should be typed");
+        match outcome {
+            TassadarArticleExecutorSessionOutcome::Refused { refusal } => {
+                assert!(
+                    refusal
+                        .detail
+                        .contains("direct model-weight execution proof")
+                );
+            }
+            other => panic!("expected proof-required fallback refusal, got {other:?}"),
         }
     }
 

@@ -1,7 +1,11 @@
 use psionic_models::TassadarWorkloadClass;
-use psionic_runtime::TassadarExecutorDecodeMode;
+use psionic_runtime::{
+    TassadarDirectModelWeightRouteBinding, TassadarDirectModelWeightRoutePosture,
+    TassadarExecutorDecodeMode,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use thiserror::Error;
 
 /// Stable routed product identifier for planner-owned executor delegation.
 pub const TASSADAR_PLANNER_EXECUTOR_ROUTE_PRODUCT_ID: &str = "psionic.planner_executor_route";
@@ -291,6 +295,65 @@ impl TassadarPlannerExecutorRouteDescriptor {
         );
         descriptor
     }
+}
+
+/// Route-binding failure for the direct model-weight execution proof.
+#[derive(Clone, Debug, Error, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum TassadarDirectModelWeightRouteBindingError {
+    /// The requested decode mode is absent from the published route descriptor.
+    #[error(
+        "route `{route_descriptor_digest}` does not publish decode `{requested_decode_mode:?}` for direct model-weight proof"
+    )]
+    DecodeModeMissing {
+        route_descriptor_digest: String,
+        requested_decode_mode: TassadarExecutorDecodeMode,
+    },
+    /// The route publishes the decode mode only with fallback-capable posture.
+    #[error(
+        "route `{route_descriptor_digest}` publishes decode `{requested_decode_mode:?}` as `{route_posture:?}` and cannot close direct model-weight proof"
+    )]
+    RouteNotDirectGuaranteed {
+        route_descriptor_digest: String,
+        requested_decode_mode: TassadarExecutorDecodeMode,
+        route_posture: TassadarPlannerExecutorRoutePosture,
+    },
+}
+
+/// Binds one served route descriptor into the runtime-owned direct-proof route surface.
+pub fn bind_tassadar_direct_model_weight_route(
+    route_descriptor: &TassadarPlannerExecutorRouteDescriptor,
+    requested_decode_mode: TassadarExecutorDecodeMode,
+) -> Result<TassadarDirectModelWeightRouteBinding, TassadarDirectModelWeightRouteBindingError> {
+    let capability = route_descriptor
+        .decode_capabilities
+        .iter()
+        .find(|capability| capability.requested_decode_mode == requested_decode_mode)
+        .ok_or_else(
+            || TassadarDirectModelWeightRouteBindingError::DecodeModeMissing {
+                route_descriptor_digest: route_descriptor.descriptor_digest.clone(),
+                requested_decode_mode,
+            },
+        )?;
+    if capability.route_posture != TassadarPlannerExecutorRoutePosture::DirectGuaranteed {
+        return Err(
+            TassadarDirectModelWeightRouteBindingError::RouteNotDirectGuaranteed {
+                route_descriptor_digest: route_descriptor.descriptor_digest.clone(),
+                requested_decode_mode,
+                route_posture: capability.route_posture,
+            },
+        );
+    }
+    Ok(TassadarDirectModelWeightRouteBinding {
+        route_product_id: route_descriptor.product_id.clone(),
+        route_id: route_descriptor.route_id.clone(),
+        route_descriptor_digest: route_descriptor.descriptor_digest.clone(),
+        route_model_id: route_descriptor.model_id.clone(),
+        benchmark_report_ref: capability.benchmark_report_ref.clone(),
+        requested_decode_mode: capability.requested_decode_mode,
+        route_posture: TassadarDirectModelWeightRoutePosture::DirectGuaranteed,
+        note: capability.note.clone(),
+    })
 }
 
 /// Route candidate contributed by one provider / worker pair.
@@ -984,13 +1047,14 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        TassadarPlannerExecutorDecodeCapability, TassadarPlannerExecutorNegotiatedRouteState,
-        TassadarPlannerExecutorRouteCandidate, TassadarPlannerExecutorRouteDescriptor,
-        TassadarPlannerExecutorRouteNegotiationOutcome,
+        TassadarDirectModelWeightRouteBindingError, TassadarPlannerExecutorDecodeCapability,
+        TassadarPlannerExecutorNegotiatedRouteState, TassadarPlannerExecutorRouteCandidate,
+        TassadarPlannerExecutorRouteDescriptor, TassadarPlannerExecutorRouteNegotiationOutcome,
         TassadarPlannerExecutorRouteNegotiationRequest, TassadarPlannerExecutorRoutePosture,
         TassadarPlannerExecutorRouteRefusalReason, TassadarPlannerExecutorWasmCapabilityMatrix,
         TassadarPlannerExecutorWasmCapabilityRow, TassadarPlannerExecutorWasmImportPosture,
-        TassadarPlannerExecutorWasmOpcodeFamily, negotiate_tassadar_planner_executor_route,
+        TassadarPlannerExecutorWasmOpcodeFamily, bind_tassadar_direct_model_weight_route,
+        negotiate_tassadar_planner_executor_route,
     };
     use psionic_models::TassadarWorkloadClass;
     use psionic_runtime::TassadarExecutorDecodeMode;
@@ -1090,6 +1154,66 @@ mod tests {
             ],
             "test route descriptor",
         )
+    }
+
+    #[test]
+    fn direct_model_weight_route_binding_projects_direct_route_descriptor() {
+        let descriptor = route_descriptor(
+            "route-direct-proof",
+            "article-model",
+            vec![TassadarPlannerExecutorDecodeCapability {
+                requested_decode_mode: TassadarExecutorDecodeMode::ReferenceLinear,
+                route_posture: TassadarPlannerExecutorRoutePosture::DirectGuaranteed,
+                benchmark_report_ref: String::from(
+                    "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+                ),
+                note: String::from("direct dense floor"),
+            }],
+        );
+
+        let binding = bind_tassadar_direct_model_weight_route(
+            &descriptor,
+            TassadarExecutorDecodeMode::ReferenceLinear,
+        )
+        .expect("direct route binding");
+
+        assert_eq!(
+            binding.route_descriptor_digest,
+            descriptor.descriptor_digest
+        );
+        assert_eq!(
+            binding.route_posture,
+            psionic_runtime::TassadarDirectModelWeightRoutePosture::DirectGuaranteed
+        );
+    }
+
+    #[test]
+    fn direct_model_weight_route_binding_refuses_fallback_capable_route() {
+        let descriptor = route_descriptor(
+            "route-fallback-proof",
+            "article-model",
+            vec![TassadarPlannerExecutorDecodeCapability {
+                requested_decode_mode: TassadarExecutorDecodeMode::HullCache,
+                route_posture: TassadarPlannerExecutorRoutePosture::FallbackCapable,
+                benchmark_report_ref: String::from(
+                    "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+                ),
+                note: String::from("fallback capable"),
+            }],
+        );
+
+        assert_eq!(
+            bind_tassadar_direct_model_weight_route(
+                &descriptor,
+                TassadarExecutorDecodeMode::HullCache,
+            )
+            .unwrap_err(),
+            TassadarDirectModelWeightRouteBindingError::RouteNotDirectGuaranteed {
+                route_descriptor_digest: descriptor.descriptor_digest,
+                requested_decode_mode: TassadarExecutorDecodeMode::HullCache,
+                route_posture: TassadarPlannerExecutorRoutePosture::FallbackCapable,
+            }
+        );
     }
 
     #[test]

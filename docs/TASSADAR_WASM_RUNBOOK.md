@@ -194,6 +194,31 @@ Expected outcome:
 - one served publication path now exists for this closeout summary, but it is
   benchmark-only and does not widen the generic served Wasm capability matrix
 
+### 3D. Direct model-weight execution proof
+
+```bash
+cargo run -p psionic-serve --example tassadar_direct_model_weight_execution_proof_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_direct_model_weight_execution_proof_report.json`
+
+Expected outcome:
+
+- one operator-facing proof report freezes the current direct-execution claim
+  over exactly three canonical article workloads:
+  `long_loop_kernel`, `sudoku_v0_test_a`, and `hungarian_matching`
+- each receipt in the report binds the article session to one
+  direct-guaranteed planner route, one requested and effective decode mode,
+  one model-weight bundle digest, one proof bundle, and one runtime-manifest
+  lineage chain
+- the report makes `fallback_observed=false`, `external_call_count=0`, and
+  `cpu_result_substitution_observed=false` explicit instead of treating a
+  completed session as sufficient evidence
+- this closes the current "inside the model weights" claim only for the named
+  workloads and only on the exact route digest in the report
+
 ### 4. Optional historical C-to-Wasm compile receipt
 
 ```bash

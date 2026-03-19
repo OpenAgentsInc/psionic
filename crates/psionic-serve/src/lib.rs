@@ -22,9 +22,10 @@ mod gguf;
 mod gpt_oss;
 mod openai_http;
 mod tassadar;
+mod tassadar_direct_model_weight_execution_proof;
 mod tassadar_execution_unit_registration;
-mod tassadar_module_installation;
 mod tassadar_module_catalog;
+mod tassadar_module_installation;
 mod tassadar_module_library;
 mod tassadar_quantization_truth_envelope;
 
@@ -39,11 +40,6 @@ pub use gguf::*;
 pub use gpt_oss::*;
 pub use openai_http::*;
 pub use psionic_adapters::*;
-pub use tassadar_execution_unit_registration::*;
-pub use tassadar_module_installation::*;
-pub use tassadar_module_catalog::*;
-pub use tassadar_module_library::*;
-pub use tassadar_quantization_truth_envelope::*;
 use psionic_backend_cpu::CpuBackend;
 use psionic_backend_cuda::{
     CudaBackend, EMBEDDINGS_SUPPORTED_OPS as CUDA_EMBEDDINGS_SUPPORTED_OPS,
@@ -98,6 +94,12 @@ use psionic_runtime::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use tassadar::*;
+pub use tassadar_direct_model_weight_execution_proof::*;
+pub use tassadar_execution_unit_registration::*;
+pub use tassadar_module_catalog::*;
+pub use tassadar_module_installation::*;
+pub use tassadar_module_library::*;
+pub use tassadar_quantization_truth_envelope::*;
 use thiserror::Error;
 
 /// Human-readable crate ownership summary.

@@ -684,6 +684,18 @@ Current posture:
   exactness receipts, and explicit `HullCache` / `SparseTopK` fallback-only
   posture instead of over-reading those long-horizon kernels as generic
   fast-path closure
+- the repo now also carries one canonical direct model-weight execution proof
+  report at
+  `fixtures/tassadar/reports/tassadar_direct_model_weight_execution_proof_report.json`,
+  emitted by
+  `cargo run -p psionic-serve --example tassadar_direct_model_weight_execution_proof_report`;
+  it freezes three representative canonical article workloads,
+  `long_loop_kernel`, `sudoku_v0_test_a`, and `hungarian_matching`, on one
+  route-bound direct executor lane with explicit direct/no-fallback,
+  zero-external-call, and no-CPU-substitution proof receipts, and it is the
+  operator-facing artifact that closes the current "inside the model weights"
+  claim only for those committed workloads rather than for undeclared routes or
+  future workloads
 - the repo now also carries one canonical Tassadar C-to-Wasm compile receipt at
   `fixtures/tassadar/reports/tassadar_c_to_wasm_compile_receipt.json`, emitted
   by `cargo run -p psionic-runtime --example tassadar_c_to_wasm_compile_receipt`;
