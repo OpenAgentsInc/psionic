@@ -1,0 +1,13 @@
+{
+  "receipt_id": "long_loop_kernel.migration_receipt.v1",
+  "source_machine_class_id": "cpu_reference_x86_64.v1",
+  "target_machine_class_id": "cpu_reference_aarch64.v1",
+  "source_profile_id": "tassadar.internal_compute.process_objects.v1",
+  "target_profile_id": "tassadar.internal_compute.installed_process_lifecycle.v1",
+  "source_profile_revision_id": "session_counter.profile_revision.r2",
+  "target_profile_revision_id": "session_counter.profile_revision.r2",
+  "portability_envelope_id": "portable_cpu_reference_v1",
+  "replay_parity": true,
+  "snapshot_digest": "4b6fde135d305ab041cf87819276280aee1b689a65582da076a0a22728e55ada",
+  "receipt_digest": "4708c2e800fd557e68f6e1434df4b8137c4fde32241f7a15224eaf878180b573"
+}

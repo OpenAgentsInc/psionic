@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.installed_process_lifecycle.bundle.v1",
+  "profile_id": "tassadar.internal_compute.installed_process_lifecycle.v1",
+  "snapshot_family_id": "tassadar.installed_process_snapshot.v1",
+  "migration_receipt_family_id": "tassadar.installed_process_migration_receipt.v1",
+  "rollback_receipt_family_id": "tassadar.installed_process_rollback_receipt.v1",
+  "portability_envelope_ids": [
+    "portable_cpu_reference_v1",
+    "current_host_cpu_reference"
+  ],
+  "case_receipts": [
+    {
+      "case_id": "installed_process.session_counter.migrate_portable.v1",
+      "process_id": "tassadar.process.long_loop_kernel.v1",
+      "workload_family": "long_loop_kernel",
+      "portability_envelope_id": "portable_cpu_reference_v1",
+      "status": "exact_migration_parity",
+      "exact_migration_parity": true,
+      "exact_rollback_parity": false,
+      "cross_machine_portability_green": true,
+      "snapshot": {
+        "process_id": "tassadar.process.long_loop_kernel.v1",
+        "snapshot_id": "tassadar.process.long_loop_kernel.v1.installed_snapshot.v1",
+        "source_profile_id": "tassadar.internal_compute.process_objects.v1",
+        "source_profile_revision_id": "session_counter.profile_revision.r2",
+        "source_machine_class_id": "cpu_reference_x86_64.v1",
+        "portability_envelope_id": "portable_cpu_reference_v1",
+        "checkpoint_id": "tassadar.long_loop_kernel.checkpoint.slice_0003",
+        "next_step_index": 12,
+        "state_digest": "d66d35222e85c5ed2e425a9acc6755d4135be6eab3fbb380781a53c7e0cb73c3",
+        "snapshot_digest": "4b6fde135d305ab041cf87819276280aee1b689a65582da076a0a22728e55ada"
+      },
+      "migration_receipt": {
+        "receipt_id": "long_loop_kernel.migration_receipt.v1",
+        "source_machine_class_id": "cpu_reference_x86_64.v1",
+        "target_machine_class_id": "cpu_reference_aarch64.v1",
+        "source_profile_id": "tassadar.internal_compute.process_objects.v1",
+        "target_profile_id": "tassadar.internal_compute.installed_process_lifecycle.v1",
+        "source_profile_revision_id": "session_counter.profile_revision.r2",
+        "target_profile_revision_id": "session_counter.profile_revision.r2",
+        "portability_envelope_id": "portable_cpu_reference_v1",
+        "replay_parity": true,
+        "snapshot_digest": "4b6fde135d305ab041cf87819276280aee1b689a65582da076a0a22728e55ada",
+        "receipt_digest": "4708c2e800fd557e68f6e1434df4b8137c4fde32241f7a15224eaf878180b573"
+      },
+      "refusal_cases": [],
+      "note": "installed process snapshot migrates across the portable cpu-reference envelope with exact replay parity",
+      "receipt_digest": "0c608f26a9b17530afffad7afc8d75babf4d734c8f426cffb7118a07dc5e7c59"
+    },
+    {
+      "case_id": "installed_process.search_frontier.rollback_ready.v1",
+      "process_id": "tassadar.process.state_machine_accumulator.v1",
+      "workload_family": "state_machine_accumulator",
+      "portability_envelope_id": "portable_cpu_reference_v1",
+      "status": "exact_rollback_parity",
+      "exact_migration_parity": false,
+      "exact_rollback_parity": true,
+      "cross_machine_portability_green": true,
+      "snapshot": {
+        "process_id": "tassadar.process.state_machine_accumulator.v1",
+        "snapshot_id": "tassadar.process.state_machine_accumulator.v1.installed_snapshot.v1",
+        "source_profile_id": "tassadar.internal_compute.process_objects.v1",
+        "source_profile_revision_id": "search_frontier.profile_revision.r3",
+        "source_machine_class_id": "cpu_reference_x86_64.v1",
+        "portability_envelope_id": "portable_cpu_reference_v1",
+        "checkpoint_id": "tassadar.state_machine_accumulator.checkpoint.slice_0001",
+        "next_step_index": 6,
+        "state_digest": "69abf6322ebead0e9f213bbb118e0e84c47c0cff17ef1610ded150ec25fb544c",
+        "snapshot_digest": "98febd12cafb4f88c4b337e927f2e940c2c4aabde1219255c4d3eb4cbf8ab98f"
+      },
+      "rollback_receipt": {
+        "receipt_id": "state_machine_accumulator.rollback_receipt.v1",
+        "active_revision_id": "search_frontier.profile_revision.r3",
+        "rollback_revision_id": "search_frontier.profile_revision.r2",
+        "rollback_trigger_id": "rollback.trigger.integrity_regression.v1",
+        "rollback_parity": true,
+        "snapshot_digest": "98febd12cafb4f88c4b337e927f2e940c2c4aabde1219255c4d3eb4cbf8ab98f",
+        "lineage_digest": "2bf0e40f5c0a11445366f7daf44da7302bb143dc94698c77a8cb415223de651c",
+        "receipt_digest": "2c5dc155f9edc4692f71b0272650ea57bc23e1d4938cdeecbe02b5fd968d57b9"
+      },
+      "refusal_cases": [],
+      "note": "installed process rollback preserves exact replay parity against the prior revision under the same portability envelope",
+      "receipt_digest": "04f488bd3ccdd0ee21a2f314354fdfe1ef9da45de27606831a1564deadd91c64"
+    },
+    {
+      "case_id": "installed_process.state_machine.stale_snapshot_refusal.v1",
+      "process_id": "tassadar.process.search_frontier_kernel.v1",
+      "workload_family": "search_frontier_kernel",
+      "portability_envelope_id": "portable_cpu_reference_v1",
+      "status": "exact_refusal_parity",
+      "exact_migration_parity": false,
+      "exact_rollback_parity": false,
+      "cross_machine_portability_green": false,
+      "snapshot": {
+        "process_id": "tassadar.process.search_frontier_kernel.v1",
+        "snapshot_id": "tassadar.process.search_frontier_kernel.v1.installed_snapshot.v1",
+        "source_profile_id": "tassadar.internal_compute.process_objects.v1",
+        "source_profile_revision_id": "state_machine.profile_revision.r1",
+        "source_machine_class_id": "cpu_reference_x86_64.v1",
+        "portability_envelope_id": "portable_cpu_reference_v1",
+        "checkpoint_id": "tassadar.search_frontier_kernel.checkpoint.slice_0002",
+        "next_step_index": 9,
+        "state_digest": "9162240aed1896b18b0595a6fb39cda31d502f890c10d0822aaaf3fe4f614aee",
+        "snapshot_digest": "32fe9b2eff3881ba0a51b5554733a3cf338f79ae2cfbe9261ca1a8192993082b"
+      },
+      "refusal_cases": [
+        {
+          "refusal_kind": "stale_snapshot_revision",
+          "object_ref": "snapshot://tassadar.process.search_frontier_kernel.v1.installed_snapshot.v1",
+          "detail": "stale installed-process snapshot revision stays on explicit refusal instead of silent forward migration"
+        },
+        {
+          "refusal_kind": "portability_envelope_mismatch",
+          "object_ref": "portability://metal_served",
+          "detail": "installed-process snapshot migration remains bounded to the portable cpu-reference envelope and refuses accelerator-specific widening"
+        },
+        {
+          "refusal_kind": "rollback_lineage_missing",
+          "object_ref": "rollback://tassadar.process.search_frontier_kernel.v1",
+          "detail": "missing rollback lineage remains explicit instead of silently reconstructing a previous installed revision"
+        }
+      ],
+      "note": "stale snapshots, non-portable targets, and missing rollback lineage remain explicit refusals in the installed-process lifecycle lane",
+      "receipt_digest": "36b10820d8e5b38dcc8f0693087f422ec2fe310653dda943ffca3da58fabae8a"
+    }
+  ],
+  "exact_migration_case_count": 1,
+  "exact_rollback_case_count": 1,
+  "refusal_case_count": 3,
+  "portable_process_ids": [
+    "tassadar.process.long_loop_kernel.v1",
+    "tassadar.process.state_machine_accumulator.v1"
+  ],
+  "claim_boundary": "this runtime bundle freezes one bounded installed-process lifecycle lane over committed process objects with portable snapshot export, typed migration receipts, and typed rollback receipts. It keeps stale snapshots, portability mismatches, and missing rollback lineage on explicit refusal paths instead of implying arbitrary cluster failover, arbitrary version migration, or broader served internal compute",
+  "summary": "Installed-process lifecycle runtime bundle covers cases=3, exact_migration_cases=1, exact_rollback_cases=1, refusal_cases=3.",
+  "bundle_digest": "88c77e8bdb8f776b9265a0177543cd0c10eca78fa49e6dfa974e6e3beac44148"
+}

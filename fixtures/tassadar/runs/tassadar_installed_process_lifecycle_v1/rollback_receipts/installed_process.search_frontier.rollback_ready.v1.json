@@ -1,0 +1,10 @@
+{
+  "receipt_id": "state_machine_accumulator.rollback_receipt.v1",
+  "active_revision_id": "search_frontier.profile_revision.r3",
+  "rollback_revision_id": "search_frontier.profile_revision.r2",
+  "rollback_trigger_id": "rollback.trigger.integrity_regression.v1",
+  "rollback_parity": true,
+  "snapshot_digest": "98febd12cafb4f88c4b337e927f2e940c2c4aabde1219255c4d3eb4cbf8ab98f",
+  "lineage_digest": "2bf0e40f5c0a11445366f7daf44da7302bb143dc94698c77a8cb415223de651c",
+  "receipt_digest": "2c5dc155f9edc4692f71b0272650ea57bc23e1d4938cdeecbe02b5fd968d57b9"
+}

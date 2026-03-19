@@ -1,0 +1,12 @@
+{
+  "process_id": "tassadar.process.state_machine_accumulator.v1",
+  "snapshot_id": "tassadar.process.state_machine_accumulator.v1.installed_snapshot.v1",
+  "source_profile_id": "tassadar.internal_compute.process_objects.v1",
+  "source_profile_revision_id": "search_frontier.profile_revision.r3",
+  "source_machine_class_id": "cpu_reference_x86_64.v1",
+  "portability_envelope_id": "portable_cpu_reference_v1",
+  "checkpoint_id": "tassadar.state_machine_accumulator.checkpoint.slice_0001",
+  "next_step_index": 6,
+  "state_digest": "69abf6322ebead0e9f213bbb118e0e84c47c0cff17ef1610ded150ec25fb544c",
+  "snapshot_digest": "98febd12cafb4f88c4b337e927f2e940c2c4aabde1219255c4d3eb4cbf8ab98f"
+}

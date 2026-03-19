@@ -1284,6 +1284,31 @@ Expected outcome:
 - explicit refusal on portability-envelope and effect-boundary mismatches
 - explicit non-served posture with `served_publication_allowed = false`
 
+### 27. Installed-process lifecycle
+
+```bash
+cargo run -p psionic-runtime --example tassadar_installed_process_lifecycle_bundle
+cargo run -p psionic-eval --example tassadar_installed_process_lifecycle_report
+```
+
+Read:
+
+- `fixtures/tassadar/runs/tassadar_installed_process_lifecycle_v1/tassadar_installed_process_lifecycle_bundle.json`
+- `fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json`
+- installed-snapshot, migration-receipt, and rollback-receipt artifacts under
+  `fixtures/tassadar/runs/tassadar_installed_process_lifecycle_v1`
+
+Expected outcome:
+
+- one bounded installed-process lifecycle lane
+- one exact portable migration row and one exact rollback row over committed
+  process objects
+- typed datastream locators for installed snapshots, migration receipts, and
+  rollback receipts
+- explicit refusal on stale snapshots, portability mismatches, and missing
+  rollback lineage
+- explicit operator-only posture with `served_publication_allowed = false`
+
 ## Validation Commands
 
 Run the focused report checks after the flow:

@@ -926,6 +926,17 @@ The current scope is:
   non-served with `served_publication_allowed = false`, so it is not arbitrary
   profile composition, implicit portability lifting, or broad served internal
   compute publication
+- the current installed-process lifecycle artifacts are
+  `fixtures/tassadar/runs/tassadar_installed_process_lifecycle_v1/tassadar_installed_process_lifecycle_bundle.json`
+  and `fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json`,
+  plus the persisted installed-snapshot, migration-receipt, and
+  rollback-receipt artifacts under the same run root, which freeze one
+  bounded installed-process lifecycle lane with portable snapshot export,
+  explicit cross-machine migration parity, explicit rollback drills, and
+  typed stale-snapshot, portability-mismatch, and missing-lineage refusals;
+  this remains operator-only with `served_publication_allowed = false`, so it
+  is not arbitrary cluster failover, arbitrary revision migration, or broad
+  served internal compute publication
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

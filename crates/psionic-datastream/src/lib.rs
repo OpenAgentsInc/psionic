@@ -13,6 +13,12 @@ const KV_CACHE_CHECKPOINT_FAMILY_PREFIX: &str = "serve.kv_cache";
 const TASSADAR_CALL_FRAME_RESUME_FAMILY_PREFIX: &str = "tassadar.call_frame_resume";
 const TASSADAR_DYNAMIC_MEMORY_RESUME_FAMILY_PREFIX: &str = "tassadar.dynamic_memory_resume";
 const TASSADAR_EXECUTION_CHECKPOINT_FAMILY_PREFIX: &str = "tassadar.execution_checkpoint";
+const TASSADAR_INSTALLED_PROCESS_MIGRATION_RECEIPT_FAMILY_PREFIX: &str =
+    "tassadar.installed_process_migration_receipt";
+const TASSADAR_INSTALLED_PROCESS_ROLLBACK_RECEIPT_FAMILY_PREFIX: &str =
+    "tassadar.installed_process_rollback_receipt";
+const TASSADAR_INSTALLED_PROCESS_SNAPSHOT_FAMILY_PREFIX: &str =
+    "tassadar.installed_process_snapshot";
 const TASSADAR_MEMORY64_RESUME_FAMILY_PREFIX: &str = "tassadar.memory64_resume";
 const TASSADAR_PROCESS_SNAPSHOT_FAMILY_PREFIX: &str = "tassadar.process_snapshot";
 const TASSADAR_PROCESS_TAPE_FAMILY_PREFIX: &str = "tassadar.process_tape";
@@ -213,6 +219,45 @@ impl DatastreamCheckpointBinding {
         Self::new("tassadar.memory64_resume.v1")
             .with_checkpoint_ref(format!(
                 "checkpoint://tassadar.memory64_resume/{checkpoint_id}"
+            ))
+            .with_step(step)
+    }
+
+    /// Creates a checkpoint binding for one installed Tassadar process snapshot.
+    #[must_use]
+    pub fn tassadar_installed_process_snapshot(process_id: impl AsRef<str>, step: u64) -> Self {
+        let process_id = process_id.as_ref();
+        Self::new("tassadar.installed_process_snapshot.v1")
+            .with_checkpoint_ref(format!(
+                "checkpoint://tassadar.installed_process_snapshot/{process_id}"
+            ))
+            .with_step(step)
+    }
+
+    /// Creates a checkpoint binding for one installed Tassadar process migration receipt.
+    #[must_use]
+    pub fn tassadar_installed_process_migration_receipt(
+        process_id: impl AsRef<str>,
+        step: u64,
+    ) -> Self {
+        let process_id = process_id.as_ref();
+        Self::new("tassadar.installed_process_migration_receipt.v1")
+            .with_checkpoint_ref(format!(
+                "checkpoint://tassadar.installed_process_migration_receipt/{process_id}"
+            ))
+            .with_step(step)
+    }
+
+    /// Creates a checkpoint binding for one installed Tassadar process rollback receipt.
+    #[must_use]
+    pub fn tassadar_installed_process_rollback_receipt(
+        process_id: impl AsRef<str>,
+        step: u64,
+    ) -> Self {
+        let process_id = process_id.as_ref();
+        Self::new("tassadar.installed_process_rollback_receipt.v1")
+            .with_checkpoint_ref(format!(
+                "checkpoint://tassadar.installed_process_rollback_receipt/{process_id}"
             ))
             .with_step(step)
     }
@@ -924,6 +969,48 @@ pub struct TassadarProcessWorkQueueLocator {
     pub detail: String,
 }
 
+/// Explicit locator for one persisted installed Tassadar process snapshot.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarInstalledProcessSnapshotLocator {
+    pub stream_id: String,
+    pub manifest_digest: String,
+    pub checkpoint_ref: String,
+    pub checkpoint_family: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step: Option<u64>,
+    pub object_digest: String,
+    pub total_bytes: u64,
+    pub detail: String,
+}
+
+/// Explicit locator for one persisted installed Tassadar process migration receipt.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarInstalledProcessMigrationReceiptLocator {
+    pub stream_id: String,
+    pub manifest_digest: String,
+    pub checkpoint_ref: String,
+    pub checkpoint_family: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step: Option<u64>,
+    pub object_digest: String,
+    pub total_bytes: u64,
+    pub detail: String,
+}
+
+/// Explicit locator for one persisted installed Tassadar process rollback receipt.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarInstalledProcessRollbackReceiptLocator {
+    pub stream_id: String,
+    pub manifest_digest: String,
+    pub checkpoint_ref: String,
+    pub checkpoint_family: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step: Option<u64>,
+    pub object_digest: String,
+    pub total_bytes: u64,
+    pub detail: String,
+}
+
 /// Explicit locator for one persisted Tassadar spill-backed memory segment.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TassadarSpillSegmentLocator {
@@ -1135,6 +1222,144 @@ impl DatastreamManifestRef {
         })
     }
 
+    /// Exports this manifest reference as a typed installed Tassadar process snapshot locator.
+    pub fn tassadar_installed_process_snapshot_locator(
+        &self,
+    ) -> Result<TassadarInstalledProcessSnapshotLocator, DatastreamTransferError> {
+        let checkpoint_binding = self.checkpoint_binding.as_ref().ok_or_else(|| {
+            DatastreamTransferError::TassadarInstalledProcessSnapshotContractInvalid {
+                stream_id: self.stream_id.clone(),
+                subject: self.subject,
+                checkpoint_family: None,
+            }
+        })?;
+        if self.subject != DatastreamSubjectKind::Checkpoint
+            || !checkpoint_binding
+                .checkpoint_family
+                .starts_with(TASSADAR_INSTALLED_PROCESS_SNAPSHOT_FAMILY_PREFIX)
+        {
+            return Err(
+                DatastreamTransferError::TassadarInstalledProcessSnapshotContractInvalid {
+                    stream_id: self.stream_id.clone(),
+                    subject: self.subject,
+                    checkpoint_family: Some(checkpoint_binding.checkpoint_family.clone()),
+                },
+            );
+        }
+        Ok(TassadarInstalledProcessSnapshotLocator {
+            stream_id: self.stream_id.clone(),
+            manifest_digest: self.manifest_digest.clone(),
+            checkpoint_ref: checkpoint_binding
+                .checkpoint_ref
+                .clone()
+                .unwrap_or_default(),
+            checkpoint_family: checkpoint_binding.checkpoint_family.clone(),
+            step: checkpoint_binding.step,
+            object_digest: self.object_digest.clone(),
+            total_bytes: self.total_bytes,
+            detail: format!(
+                "tassadar installed-process snapshot locator via family `{}` ref `{}`",
+                checkpoint_binding.checkpoint_family,
+                checkpoint_binding
+                    .checkpoint_ref
+                    .as_deref()
+                    .unwrap_or_default(),
+            ),
+        })
+    }
+
+    /// Exports this manifest reference as a typed installed Tassadar process migration receipt locator.
+    pub fn tassadar_installed_process_migration_receipt_locator(
+        &self,
+    ) -> Result<TassadarInstalledProcessMigrationReceiptLocator, DatastreamTransferError> {
+        let checkpoint_binding = self.checkpoint_binding.as_ref().ok_or_else(|| {
+            DatastreamTransferError::TassadarInstalledProcessMigrationReceiptContractInvalid {
+                stream_id: self.stream_id.clone(),
+                subject: self.subject,
+                checkpoint_family: None,
+            }
+        })?;
+        if self.subject != DatastreamSubjectKind::Checkpoint
+            || !checkpoint_binding
+                .checkpoint_family
+                .starts_with(TASSADAR_INSTALLED_PROCESS_MIGRATION_RECEIPT_FAMILY_PREFIX)
+        {
+            return Err(
+                DatastreamTransferError::TassadarInstalledProcessMigrationReceiptContractInvalid {
+                    stream_id: self.stream_id.clone(),
+                    subject: self.subject,
+                    checkpoint_family: Some(checkpoint_binding.checkpoint_family.clone()),
+                },
+            );
+        }
+        Ok(TassadarInstalledProcessMigrationReceiptLocator {
+            stream_id: self.stream_id.clone(),
+            manifest_digest: self.manifest_digest.clone(),
+            checkpoint_ref: checkpoint_binding
+                .checkpoint_ref
+                .clone()
+                .unwrap_or_default(),
+            checkpoint_family: checkpoint_binding.checkpoint_family.clone(),
+            step: checkpoint_binding.step,
+            object_digest: self.object_digest.clone(),
+            total_bytes: self.total_bytes,
+            detail: format!(
+                "tassadar installed-process migration-receipt locator via family `{}` ref `{}`",
+                checkpoint_binding.checkpoint_family,
+                checkpoint_binding
+                    .checkpoint_ref
+                    .as_deref()
+                    .unwrap_or_default(),
+            ),
+        })
+    }
+
+    /// Exports this manifest reference as a typed installed Tassadar process rollback receipt locator.
+    pub fn tassadar_installed_process_rollback_receipt_locator(
+        &self,
+    ) -> Result<TassadarInstalledProcessRollbackReceiptLocator, DatastreamTransferError> {
+        let checkpoint_binding = self.checkpoint_binding.as_ref().ok_or_else(|| {
+            DatastreamTransferError::TassadarInstalledProcessRollbackReceiptContractInvalid {
+                stream_id: self.stream_id.clone(),
+                subject: self.subject,
+                checkpoint_family: None,
+            }
+        })?;
+        if self.subject != DatastreamSubjectKind::Checkpoint
+            || !checkpoint_binding
+                .checkpoint_family
+                .starts_with(TASSADAR_INSTALLED_PROCESS_ROLLBACK_RECEIPT_FAMILY_PREFIX)
+        {
+            return Err(
+                DatastreamTransferError::TassadarInstalledProcessRollbackReceiptContractInvalid {
+                    stream_id: self.stream_id.clone(),
+                    subject: self.subject,
+                    checkpoint_family: Some(checkpoint_binding.checkpoint_family.clone()),
+                },
+            );
+        }
+        Ok(TassadarInstalledProcessRollbackReceiptLocator {
+            stream_id: self.stream_id.clone(),
+            manifest_digest: self.manifest_digest.clone(),
+            checkpoint_ref: checkpoint_binding
+                .checkpoint_ref
+                .clone()
+                .unwrap_or_default(),
+            checkpoint_family: checkpoint_binding.checkpoint_family.clone(),
+            step: checkpoint_binding.step,
+            object_digest: self.object_digest.clone(),
+            total_bytes: self.total_bytes,
+            detail: format!(
+                "tassadar installed-process rollback-receipt locator via family `{}` ref `{}`",
+                checkpoint_binding.checkpoint_family,
+                checkpoint_binding
+                    .checkpoint_ref
+                    .as_deref()
+                    .unwrap_or_default(),
+            ),
+        })
+    }
+
     /// Exports this manifest reference as a typed Tassadar call-frame resume locator.
     pub fn tassadar_call_frame_resume_locator(
         &self,
@@ -1335,11 +1560,13 @@ impl DatastreamManifestRef {
                 .checkpoint_family
                 .starts_with(TASSADAR_SPILL_SEGMENT_FAMILY_PREFIX)
         {
-            return Err(DatastreamTransferError::TassadarSpillSegmentContractInvalid {
-                stream_id: self.stream_id.clone(),
-                subject: self.subject,
-                checkpoint_family: Some(checkpoint_binding.checkpoint_family.clone()),
-            });
+            return Err(
+                DatastreamTransferError::TassadarSpillSegmentContractInvalid {
+                    stream_id: self.stream_id.clone(),
+                    subject: self.subject,
+                    checkpoint_family: Some(checkpoint_binding.checkpoint_family.clone()),
+                },
+            );
         }
         Ok(TassadarSpillSegmentLocator {
             stream_id: self.stream_id.clone(),
@@ -1859,6 +2086,33 @@ pub enum DatastreamTransferError {
         "datastream `{stream_id}` is not a valid Tassadar memory64 continuation contract: subject `{subject:?}`, checkpoint family `{checkpoint_family:?}`"
     )]
     TassadarMemory64ResumeContractInvalid {
+        stream_id: String,
+        subject: DatastreamSubjectKind,
+        checkpoint_family: Option<String>,
+    },
+    /// The manifest reference is not a valid installed Tassadar process snapshot contract.
+    #[error(
+        "datastream `{stream_id}` is not a valid installed Tassadar process snapshot contract: subject `{subject:?}`, checkpoint family `{checkpoint_family:?}`"
+    )]
+    TassadarInstalledProcessSnapshotContractInvalid {
+        stream_id: String,
+        subject: DatastreamSubjectKind,
+        checkpoint_family: Option<String>,
+    },
+    /// The manifest reference is not a valid installed Tassadar process migration-receipt contract.
+    #[error(
+        "datastream `{stream_id}` is not a valid installed Tassadar process migration-receipt contract: subject `{subject:?}`, checkpoint family `{checkpoint_family:?}`"
+    )]
+    TassadarInstalledProcessMigrationReceiptContractInvalid {
+        stream_id: String,
+        subject: DatastreamSubjectKind,
+        checkpoint_family: Option<String>,
+    },
+    /// The manifest reference is not a valid installed Tassadar process rollback-receipt contract.
+    #[error(
+        "datastream `{stream_id}` is not a valid installed Tassadar process rollback-receipt contract: subject `{subject:?}`, checkpoint family `{checkpoint_family:?}`"
+    )]
+    TassadarInstalledProcessRollbackReceiptContractInvalid {
         stream_id: String,
         subject: DatastreamSubjectKind,
         checkpoint_family: Option<String>,
@@ -2954,6 +3208,96 @@ mod tests {
     }
 
     #[test]
+    fn checkpoint_manifest_can_export_installed_process_snapshot_locator()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = br#"{"process_id":"installed_process"}"#.to_vec();
+        let manifest = super::DatastreamManifest::from_bytes(
+            "tassadar-installed-process-snapshot-5",
+            DatastreamSubjectKind::Checkpoint,
+            &payload,
+            8,
+            DatastreamEncoding::RawBinary,
+        )
+        .with_checkpoint_binding(
+            DatastreamCheckpointBinding::tassadar_installed_process_snapshot(
+                "tassadar.process.session_counter.v1",
+                5,
+            ),
+        );
+
+        let locator = manifest
+            .manifest_ref()
+            .tassadar_installed_process_snapshot_locator()?;
+        assert_eq!(locator.stream_id, "tassadar-installed-process-snapshot-5");
+        assert_eq!(
+            locator.checkpoint_ref,
+            "checkpoint://tassadar.installed_process_snapshot/tassadar.process.session_counter.v1"
+        );
+        assert_eq!(locator.step, Some(5));
+        Ok(())
+    }
+
+    #[test]
+    fn checkpoint_manifest_can_export_installed_process_migration_receipt_locator()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = br#"{"receipt":"migration"}"#.to_vec();
+        let manifest = super::DatastreamManifest::from_bytes(
+            "tassadar-installed-process-migration-6",
+            DatastreamSubjectKind::Checkpoint,
+            &payload,
+            8,
+            DatastreamEncoding::RawBinary,
+        )
+        .with_checkpoint_binding(
+            DatastreamCheckpointBinding::tassadar_installed_process_migration_receipt(
+                "tassadar.process.session_counter.v1",
+                6,
+            ),
+        );
+
+        let locator = manifest
+            .manifest_ref()
+            .tassadar_installed_process_migration_receipt_locator()?;
+        assert_eq!(locator.stream_id, "tassadar-installed-process-migration-6");
+        assert_eq!(
+            locator.checkpoint_ref,
+            "checkpoint://tassadar.installed_process_migration_receipt/tassadar.process.session_counter.v1"
+        );
+        assert_eq!(locator.step, Some(6));
+        Ok(())
+    }
+
+    #[test]
+    fn checkpoint_manifest_can_export_installed_process_rollback_receipt_locator()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = br#"{"receipt":"rollback"}"#.to_vec();
+        let manifest = super::DatastreamManifest::from_bytes(
+            "tassadar-installed-process-rollback-7",
+            DatastreamSubjectKind::Checkpoint,
+            &payload,
+            8,
+            DatastreamEncoding::RawBinary,
+        )
+        .with_checkpoint_binding(
+            DatastreamCheckpointBinding::tassadar_installed_process_rollback_receipt(
+                "tassadar.process.search_frontier.v1",
+                7,
+            ),
+        );
+
+        let locator = manifest
+            .manifest_ref()
+            .tassadar_installed_process_rollback_receipt_locator()?;
+        assert_eq!(locator.stream_id, "tassadar-installed-process-rollback-7");
+        assert_eq!(
+            locator.checkpoint_ref,
+            "checkpoint://tassadar.installed_process_rollback_receipt/tassadar.process.search_frontier.v1"
+        );
+        assert_eq!(locator.step, Some(7));
+        Ok(())
+    }
+
+    #[test]
     fn checkpoint_manifest_can_export_tassadar_process_tape_locator()
     -> Result<(), Box<dyn std::error::Error>> {
         let payload = br#"{"process_id":"search_frontier_kernel"}"#.to_vec();
@@ -3030,6 +3374,96 @@ mod tests {
                 stream_id: String::from("checkpoint-train-25"),
                 subject: DatastreamSubjectKind::Checkpoint,
                 checkpoint_family: Some(String::from("tassadar.execution_checkpoint.v1")),
+            }
+        );
+    }
+
+    #[test]
+    fn non_installed_process_snapshot_manifest_is_refused_as_installed_process_snapshot_locator() {
+        let manifest = super::DatastreamManifest::from_bytes(
+            "checkpoint-train-installed-9",
+            DatastreamSubjectKind::Checkpoint,
+            b"weights",
+            4,
+            DatastreamEncoding::RawBinary,
+        )
+        .with_checkpoint_binding(
+            DatastreamCheckpointBinding::tassadar_execution_checkpoint("alpha", 9),
+        );
+
+        let error = manifest
+            .manifest_ref()
+            .tassadar_installed_process_snapshot_locator()
+            .expect_err("non-installed-process-snapshot manifest should be refused");
+        assert_eq!(
+            error,
+            DatastreamTransferError::TassadarInstalledProcessSnapshotContractInvalid {
+                stream_id: String::from("checkpoint-train-installed-9"),
+                subject: DatastreamSubjectKind::Checkpoint,
+                checkpoint_family: Some(String::from("tassadar.execution_checkpoint.v1")),
+            }
+        );
+    }
+
+    #[test]
+    fn non_installed_process_migration_manifest_is_refused_as_installed_process_migration_locator()
+    {
+        let manifest = super::DatastreamManifest::from_bytes(
+            "checkpoint-train-installed-10",
+            DatastreamSubjectKind::Checkpoint,
+            b"weights",
+            4,
+            DatastreamEncoding::RawBinary,
+        )
+        .with_checkpoint_binding(
+            DatastreamCheckpointBinding::tassadar_installed_process_snapshot(
+                "tassadar.process.session_counter.v1",
+                10,
+            ),
+        );
+
+        let error = manifest
+            .manifest_ref()
+            .tassadar_installed_process_migration_receipt_locator()
+            .expect_err("non-migration manifest should be refused");
+        assert_eq!(
+            error,
+            DatastreamTransferError::TassadarInstalledProcessMigrationReceiptContractInvalid {
+                stream_id: String::from("checkpoint-train-installed-10"),
+                subject: DatastreamSubjectKind::Checkpoint,
+                checkpoint_family: Some(String::from("tassadar.installed_process_snapshot.v1")),
+            }
+        );
+    }
+
+    #[test]
+    fn non_installed_process_rollback_manifest_is_refused_as_installed_process_rollback_locator() {
+        let manifest = super::DatastreamManifest::from_bytes(
+            "checkpoint-train-installed-11",
+            DatastreamSubjectKind::Checkpoint,
+            b"weights",
+            4,
+            DatastreamEncoding::RawBinary,
+        )
+        .with_checkpoint_binding(
+            DatastreamCheckpointBinding::tassadar_installed_process_migration_receipt(
+                "tassadar.process.search_frontier.v1",
+                11,
+            ),
+        );
+
+        let error = manifest
+            .manifest_ref()
+            .tassadar_installed_process_rollback_receipt_locator()
+            .expect_err("non-rollback manifest should be refused");
+        assert_eq!(
+            error,
+            DatastreamTransferError::TassadarInstalledProcessRollbackReceiptContractInvalid {
+                stream_id: String::from("checkpoint-train-installed-11"),
+                subject: DatastreamSubjectKind::Checkpoint,
+                checkpoint_family: Some(String::from(
+                    "tassadar.installed_process_migration_receipt.v1"
+                )),
             }
         );
     }
@@ -3116,8 +3550,8 @@ mod tests {
     }
 
     #[test]
-    fn external_tape_store_manifest_exports_typed_locator()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn external_tape_store_manifest_exports_typed_locator() -> Result<(), Box<dyn std::error::Error>>
+    {
         let payload = br#"{"tape":"segment"}"#.to_vec();
         let manifest = super::DatastreamManifest::from_bytes(
             "tassadar-external-tape-33",
@@ -3126,10 +3560,12 @@ mod tests {
             8,
             DatastreamEncoding::RawBinary,
         )
-        .with_checkpoint_binding(DatastreamCheckpointBinding::tassadar_external_tape_store(
-            "tassadar.process.search_frontier_kernel.v1",
-            33,
-        ));
+        .with_checkpoint_binding(
+            DatastreamCheckpointBinding::tassadar_external_tape_store(
+                "tassadar.process.search_frontier_kernel.v1",
+                33,
+            ),
+        );
 
         let locator = manifest
             .manifest_ref()

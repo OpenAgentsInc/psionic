@@ -112,6 +112,8 @@ mod tassadar_hungarian_10x10_compiled_executor;
 mod tassadar_hungarian_compiled_executor;
 #[path = "tassadar_installed_module_evidence.rs"]
 mod tassadar_installed_module_evidence;
+#[path = "tassadar_installed_process_lifecycle.rs"]
+mod tassadar_installed_process_lifecycle;
 #[path = "tassadar_internal_component_abi.rs"]
 mod tassadar_internal_component_abi;
 #[path = "tassadar_internal_compute_package_manager.rs"]
@@ -297,6 +299,7 @@ pub use tassadar_generalized_abi::*;
 pub use tassadar_hungarian_10x10_compiled_executor::*;
 pub use tassadar_hungarian_compiled_executor::*;
 pub use tassadar_installed_module_evidence::*;
+pub use tassadar_installed_process_lifecycle::*;
 pub use tassadar_internal_component_abi::*;
 pub use tassadar_internal_compute_package_manager::*;
 pub use tassadar_internal_compute_profile_ladder::*;

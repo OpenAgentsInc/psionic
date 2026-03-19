@@ -1,0 +1,12 @@
+{
+  "process_id": "tassadar.process.long_loop_kernel.v1",
+  "snapshot_id": "tassadar.process.long_loop_kernel.v1.installed_snapshot.v1",
+  "source_profile_id": "tassadar.internal_compute.process_objects.v1",
+  "source_profile_revision_id": "session_counter.profile_revision.r2",
+  "source_machine_class_id": "cpu_reference_x86_64.v1",
+  "portability_envelope_id": "portable_cpu_reference_v1",
+  "checkpoint_id": "tassadar.long_loop_kernel.checkpoint.slice_0003",
+  "next_step_index": 12,
+  "state_digest": "d66d35222e85c5ed2e425a9acc6755d4135be6eab3fbb380781a53c7e0cb73c3",
+  "snapshot_digest": "4b6fde135d305ab041cf87819276280aee1b689a65582da076a0a22728e55ada"
+}

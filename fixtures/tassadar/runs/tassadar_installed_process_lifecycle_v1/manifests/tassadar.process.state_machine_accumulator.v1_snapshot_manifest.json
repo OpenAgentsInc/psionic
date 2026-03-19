@@ -1,0 +1,63 @@
+{
+  "stream_id": "tassadar.process.state_machine_accumulator.v1-installed-snapshot",
+  "subject": "checkpoint",
+  "object_digest": "4303de78cccbb687e66f8eb85b438f309465f06c10c0b55e19b42d0f43bb80f8",
+  "total_bytes": 690,
+  "chunk_bytes": 96,
+  "encoding": "raw_binary",
+  "checkpoint_binding": {
+    "checkpoint_family": "tassadar.installed_process_snapshot.v1",
+    "checkpoint_ref": "checkpoint://tassadar.installed_process_snapshot/tassadar.process.state_machine_accumulator.v1",
+    "step": 6
+  },
+  "chunks": [
+    {
+      "index": 0,
+      "offset": 0,
+      "length": 96,
+      "chunk_digest": "9d92c52addecbfcde555c7375d914fc08f479795442705ce1ba3f9063ed4c8c4"
+    },
+    {
+      "index": 1,
+      "offset": 96,
+      "length": 96,
+      "chunk_digest": "bd15c47261f116048b785692cf8eb224ec68dc51d289919bc0128c15ea4c0681"
+    },
+    {
+      "index": 2,
+      "offset": 192,
+      "length": 96,
+      "chunk_digest": "c8b686b3bba8f480f90c233adc2fc57aac3d9f33cd13b67ab1610ba37b0d7357"
+    },
+    {
+      "index": 3,
+      "offset": 288,
+      "length": 96,
+      "chunk_digest": "3c427fbc270c83df17a4c45c890deb72c742644153c84572dbc65491b4b81951"
+    },
+    {
+      "index": 4,
+      "offset": 384,
+      "length": 96,
+      "chunk_digest": "b703200e6c1fb27f43a973a87299e097e7d9fda810a6c9e0596bb9e2925f61bd"
+    },
+    {
+      "index": 5,
+      "offset": 480,
+      "length": 96,
+      "chunk_digest": "28a915e432949510d70f594d7b06de1dbb30936e52c4d23cb9fea75e59ddca07"
+    },
+    {
+      "index": 6,
+      "offset": 576,
+      "length": 96,
+      "chunk_digest": "0aeb0d4a52e57b108d891f940c622e7f4ac8ef8d0fd569bfe405db5469477cf8"
+    },
+    {
+      "index": 7,
+      "offset": 672,
+      "length": 18,
+      "chunk_digest": "6fcb1eab11c43cb807555d7e4213ce5090fa6da925573df2f63729e1f35ab409"
+    }
+  ]
+}

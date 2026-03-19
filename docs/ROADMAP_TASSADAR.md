@@ -181,7 +181,7 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-125` through `TAS-135` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-136` and runs through
+- the current open GitHub backlog begins at `TAS-137` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs
