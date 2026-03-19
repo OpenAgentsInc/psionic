@@ -1371,6 +1371,22 @@ Expected outcome:
 - no arbitrary hybrid execution, broad internal compute, or served
   internal-compute promotion
 
+Read:
+
+- `fixtures/tassadar/reports/tassadar_broad_family_specialization_runtime_report.json`
+- `fixtures/tassadar/reports/tassadar_broad_family_specialization_report.json`
+- `fixtures/tassadar/reports/tassadar_broad_family_specialization_summary.json`
+
+Expected outcome:
+
+- one research-only broad-family specialization gate over state-machine,
+  search-frontier, linked-worker, and effectful-resume bundles
+- explicit stable-specializable, benchmark-only, and refused families plus
+  lineage, decompilation, and safety-gate facts
+- typed refusal on non-decompilable effect receipts and no served publication
+- no arbitrary program-to-weights closure, broad internal compute, or served
+  internal-compute promotion
+
 ## Validation Commands
 
 Run the focused report checks after the flow:

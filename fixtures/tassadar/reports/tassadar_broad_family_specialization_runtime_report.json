@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.broad_family_specialization.runtime.report.v1",
+  "rows": [
+    {
+      "family_id": "state_machine_bundle",
+      "runtime_status": "stable_specializable",
+      "specialization_artifact_id": "specialized.state_machine_bundle.weights.v1",
+      "lineage_green": true,
+      "decompilable": true,
+      "portability_envelope_id": "cpu_reference_current_host",
+      "safety_gate_ready": true,
+      "note": "state-machine bundles stay lineage-clean, decompilable, and safety-gate ready under the current bounded specialization family"
+    },
+    {
+      "family_id": "search_frontier_bundle",
+      "runtime_status": "benchmark_only",
+      "specialization_artifact_id": "specialized.search_frontier_bundle.weights.v1",
+      "lineage_green": true,
+      "decompilable": true,
+      "portability_envelope_id": "cpu_reference_current_host",
+      "safety_gate_ready": false,
+      "note": "search-frontier bundles stay benchmark-worthy but remain below the safety gate because structure varies across retrains"
+    },
+    {
+      "family_id": "linked_worker_bundle",
+      "runtime_status": "benchmark_only",
+      "specialization_artifact_id": "specialized.linked_worker_bundle.weights.v1",
+      "lineage_green": true,
+      "decompilable": true,
+      "portability_envelope_id": "cpu_reference_current_host",
+      "safety_gate_ready": false,
+      "note": "linked-worker bundles remain benchmark-only because their portability and helper-surface envelope is still too narrow for safe promotion"
+    },
+    {
+      "family_id": "effectful_resume_bundle",
+      "runtime_status": "refused",
+      "specialization_artifact_id": "specialized.effectful_resume_bundle.weights.v1",
+      "lineage_green": false,
+      "decompilable": false,
+      "portability_envelope_id": "cpu_reference_current_host",
+      "safety_gate_ready": false,
+      "refusal_reason_id": "non_decompilable_effect_receipts",
+      "note": "effectful resume bundles refuse the safety gate because the current artifact family is not decompilable enough to stay challengeable"
+    }
+  ],
+  "stable_specializable_count": 1,
+  "benchmark_only_count": 2,
+  "refused_count": 1,
+  "claim_boundary": "this runtime report freezes one bounded broad-family specialization gate over named reusable families only. It does not imply arbitrary program-to-weights closure, arbitrary Wasm specialization, or served promotion",
+  "summary": "Broad-family specialization runtime report covers stable_specializable=1, benchmark_only=2, refused=1.",
+  "report_digest": "07707cde93948ceb3e65cb230107414759138a7205409e6a13d0f4e3e86074df"
+}

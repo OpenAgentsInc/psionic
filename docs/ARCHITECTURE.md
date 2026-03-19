@@ -969,6 +969,16 @@ The current scope is:
   challenge-path simulations, route posture, and typed unsupported-transition
   refusal; this is not arbitrary hybrid execution, broad internal compute, or
   broader served internal compute promotion
+- the current broad-family specialization gate artifacts are
+  `fixtures/tassadar/reports/tassadar_broad_family_specialization_runtime_report.json`,
+  `fixtures/tassadar/reports/tassadar_broad_family_specialization_report.json`,
+  and `fixtures/tassadar/reports/tassadar_broad_family_specialization_summary.json`,
+  which freeze one research-only specialization gate over state-machine,
+  search-frontier, linked-worker, and effectful-resume bundles with explicit
+  stable-specializable, benchmark-only, and refused families plus lineage,
+  decompilation, and safety-gate reasons; this is not arbitrary
+  program-to-weights closure, broad internal compute, or broader served
+  internal compute promotion
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

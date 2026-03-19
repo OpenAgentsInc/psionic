@@ -8,6 +8,7 @@
 mod tassadar_accepted_outcome_binding;
 mod tassadar_async_lifecycle_profile;
 mod tassadar_broad_internal_compute_acceptance_gate;
+mod tassadar_broad_family_specialization;
 mod tassadar_broad_internal_compute_portability;
 mod tassadar_broad_internal_compute_profile_publication;
 mod tassadar_component_linking_profile;
@@ -76,6 +77,7 @@ use sha2::{Digest, Sha256};
 pub use tassadar_accepted_outcome_binding::*;
 pub use tassadar_async_lifecycle_profile::*;
 pub use tassadar_broad_internal_compute_acceptance_gate::*;
+pub use tassadar_broad_family_specialization::*;
 pub use tassadar_broad_internal_compute_portability::*;
 pub use tassadar_broad_internal_compute_profile_publication::*;
 pub use tassadar_component_linking_profile::*;

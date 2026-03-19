@@ -180,9 +180,9 @@ Issue-state note:
 - `TAS-103` through `TAS-124` are already implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-125` through `TAS-138` are now implemented and tracked in
-- `TAS-125` through `TAS-139` are now implemented and tracked in
+- `TAS-125` through `TAS-140` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-140` and runs through
+- the current open GitHub backlog begins at `TAS-141` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs
