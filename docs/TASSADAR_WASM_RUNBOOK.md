@@ -964,6 +964,27 @@ Expected outcome:
   `fixtures/tassadar/runs/tassadar_component_linking_profile_v1`
 - explicit incompatible-component-interface refusal parity
 
+### 14. Bounded SIMD deterministic profile
+
+```bash
+cargo run -p psionic-runtime --example tassadar_simd_profile_runtime_report
+cargo run -p psionic-eval --example tassadar_simd_profile_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_simd_profile_runtime_report.json`
+- `fixtures/tassadar/reports/tassadar_simd_profile_report.json`
+
+Expected outcome:
+
+- one named bounded SIMD profile:
+  `tassadar.proposal_profile.simd_deterministic.v1`
+- exact cpu-reference row
+- explicit metal and cuda scalar-fallback rows
+- explicit accelerator-specific refusal row
+- no default served SIMD profile ids
+
 ## Validation Commands
 
 Run the focused report checks after the flow:
@@ -1003,6 +1024,10 @@ cargo test -p psionic-compiler component_linking_profile -- --nocapture
 cargo test -p psionic-runtime component_linking_profile -- --nocapture
 cargo test -p psionic-eval component_linking_profile -- --nocapture
 cargo test -p psionic-provider component_linking_profile -- --nocapture
+cargo test -p psionic-runtime simd_profile -- --nocapture
+cargo test -p psionic-serve executor_service_capability_publication_serializes_benchmark_gated_matrix -- --nocapture
+cargo test -p psionic-provider simd_profile -- --nocapture
+cargo test -p psionic-provider tassadar_capability_envelope_serializes_served_publication -- --nocapture
 ```
 
 These checks should keep the committed reports and generated truth aligned.

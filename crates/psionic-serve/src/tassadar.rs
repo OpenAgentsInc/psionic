@@ -112,6 +112,18 @@ pub struct TassadarExecutorCapabilityPublication {
     pub exception_profile_default_served_profile_ids: Vec<String>,
     /// Portability envelopes currently bound to the named exception profiles.
     pub exception_profile_portability_envelope_ids: Vec<String>,
+    /// SIMD-profile report bound to the served lane.
+    pub simd_profile_report_ref: String,
+    /// SIMD profiles currently allowed as named public profiles.
+    pub simd_profile_public_profile_ids: Vec<String>,
+    /// SIMD profiles currently allowed as default served profiles.
+    pub simd_profile_default_served_profile_ids: Vec<String>,
+    /// Exact backend ids currently bound to the named SIMD profile.
+    pub simd_profile_exact_backend_ids: Vec<String>,
+    /// Scalar-fallback backend ids currently bound to the named SIMD profile.
+    pub simd_profile_fallback_backend_ids: Vec<String>,
+    /// Refused backend ids currently bound to the named SIMD profile.
+    pub simd_profile_refused_backend_ids: Vec<String>,
     /// Broad internal-compute acceptance gate bound to the served lane.
     pub broad_internal_compute_acceptance_gate_report_ref: String,
     /// Broad internal-compute profile publication and current route selection.
@@ -212,6 +224,12 @@ pub enum TassadarExecutorCapabilityPublicationError {
     /// The bounded exception profile was not publishable.
     #[error("invalid exception profile report: {detail}")]
     InvalidExceptionProfile {
+        /// Machine-readable detail for the failed projection.
+        detail: String,
+    },
+    /// The bounded SIMD profile was not publishable.
+    #[error("invalid simd profile report: {detail}")]
+    InvalidSimdProfile {
         /// Machine-readable detail for the failed projection.
         detail: String,
     },
@@ -601,6 +619,20 @@ impl LocalTassadarExecutorService {
                 },
             );
         }
+        let simd_profile_report = psionic_eval::build_tassadar_simd_profile_report().map_err(
+            |error| TassadarExecutorCapabilityPublicationError::InvalidSimdProfile {
+                detail: format!("invalid simd profile report: {error}"),
+            },
+        )?;
+        if !simd_profile_report.overall_green
+            || simd_profile_report.public_profile_allowed_profile_ids.is_empty()
+        {
+            return Err(TassadarExecutorCapabilityPublicationError::InvalidSimdProfile {
+                detail: String::from(
+                    "simd profile report must stay green and expose at least one named public profile",
+                ),
+            });
+        }
         psionic_eval::build_tassadar_subset_profile_promotion_gate_report().map_err(|error| {
             TassadarExecutorCapabilityPublicationError::InvalidBroadInternalComputeProfilePublication {
                 detail: format!("invalid subset profile promotion gate report: {error}"),
@@ -665,6 +697,14 @@ impl LocalTassadarExecutorService {
                 .default_served_profile_allowed_profile_ids,
             exception_profile_portability_envelope_ids: exception_profile_report
                 .portability_envelope_ids,
+            simd_profile_report_ref: String::from(psionic_eval::TASSADAR_SIMD_PROFILE_REPORT_REF),
+            simd_profile_public_profile_ids: simd_profile_report
+                .public_profile_allowed_profile_ids,
+            simd_profile_default_served_profile_ids: simd_profile_report
+                .default_served_profile_allowed_profile_ids,
+            simd_profile_exact_backend_ids: simd_profile_report.exact_backend_ids,
+            simd_profile_fallback_backend_ids: simd_profile_report.fallback_backend_ids,
+            simd_profile_refused_backend_ids: simd_profile_report.refused_backend_ids,
             broad_internal_compute_acceptance_gate_report_ref: String::from(
                 psionic_eval::TASSADAR_BROAD_INTERNAL_COMPUTE_ACCEPTANCE_GATE_REPORT_REF,
             ),
@@ -5762,6 +5802,30 @@ mod tests {
         assert_eq!(
             encoded["exception_profile_portability_envelope_ids"],
             serde_json::json!(["cpu_reference_current_host"])
+        );
+        assert_eq!(
+            encoded["simd_profile_report_ref"],
+            serde_json::json!("fixtures/tassadar/reports/tassadar_simd_profile_report.json")
+        );
+        assert_eq!(
+            encoded["simd_profile_public_profile_ids"],
+            serde_json::json!(["tassadar.proposal_profile.simd_deterministic.v1"])
+        );
+        assert_eq!(
+            encoded["simd_profile_default_served_profile_ids"],
+            serde_json::json!([])
+        );
+        assert_eq!(
+            encoded["simd_profile_exact_backend_ids"],
+            serde_json::json!(["cpu_reference_current_host"])
+        );
+        assert_eq!(
+            encoded["simd_profile_fallback_backend_ids"],
+            serde_json::json!(["metal_served", "cuda_served"])
+        );
+        assert_eq!(
+            encoded["simd_profile_refused_backend_ids"],
+            serde_json::json!(["accelerator_specific_unbounded"])
         );
         assert_eq!(
             encoded["broad_internal_compute_profile_publication"]["current_served_profile_id"],

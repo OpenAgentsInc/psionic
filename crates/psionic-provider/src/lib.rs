@@ -44,6 +44,7 @@ mod tassadar_quantization_truth_envelope;
 mod tassadar_receipt_supervision;
 mod tassadar_resumable_multi_slice_promotion;
 mod tassadar_self_installation_gate;
+mod tassadar_simd_profile;
 mod tassadar_subset_profile_promotion_gate;
 mod tassadar_trap_exception;
 mod tassadar_wedge_taxonomy;
@@ -97,6 +98,7 @@ pub use tassadar_quantization_truth_envelope::*;
 pub use tassadar_receipt_supervision::*;
 pub use tassadar_resumable_multi_slice_promotion::*;
 pub use tassadar_self_installation_gate::*;
+pub use tassadar_simd_profile::*;
 pub use tassadar_subset_profile_promotion_gate::*;
 pub use tassadar_trap_exception::*;
 pub use tassadar_wedge_taxonomy::*;
@@ -508,6 +510,8 @@ pub struct TassadarCapabilityEnvelope {
     pub float_profile_acceptance_gate_receipt: TassadarFloatProfileAcceptanceGateReceipt,
     /// Provider-facing receipt for the bounded exceptions proposal profile.
     pub exception_profile_receipt: TassadarExceptionProfileReceipt,
+    /// Provider-facing receipt for the bounded SIMD deterministic profile.
+    pub simd_profile_receipt: TassadarSimdProfileReceipt,
     /// Provider-facing receipt for the resumable multi-slice promotion lane.
     pub resumable_multi_slice_promotion_receipt: TassadarResumableMultiSlicePromotionReceipt,
     /// Provider-facing receipt for deterministic import-mediated effect-safe resume.
@@ -598,6 +602,14 @@ impl TassadarCapabilityEnvelope {
         let exception_profile_report = psionic_eval::build_tassadar_exception_profile_report();
         let exception_profile_receipt =
             TassadarExceptionProfileReceipt::from_report(&exception_profile_report);
+        let simd_profile_report = psionic_eval::build_tassadar_simd_profile_report().map_err(
+            |error| TassadarCapabilityEnvelopeError::UnpublishableSimdProfile {
+                detail: format!(
+                    "provider envelope requires a valid simd profile report: {error}"
+                ),
+            },
+        )?;
+        let simd_profile_receipt = TassadarSimdProfileReceipt::from_report(&simd_profile_report);
         let resumable_multi_slice_promotion_report =
             psionic_eval::build_tassadar_resumable_multi_slice_promotion_report().map_err(
                 |error| {
@@ -889,6 +901,40 @@ impl TassadarCapabilityEnvelope {
                 },
             );
         }
+        if publication.simd_profile_report_ref.trim().is_empty()
+            || publication.simd_profile_public_profile_ids
+                != simd_profile_receipt.public_profile_allowed_profile_ids
+            || publication.simd_profile_default_served_profile_ids
+                != simd_profile_receipt.default_served_profile_allowed_profile_ids
+            || publication.simd_profile_exact_backend_ids != simd_profile_receipt.exact_backend_ids
+            || publication.simd_profile_fallback_backend_ids
+                != simd_profile_receipt.fallback_backend_ids
+            || publication.simd_profile_refused_backend_ids
+                != simd_profile_receipt.refused_backend_ids
+            || !simd_profile_receipt.overall_green
+            || !simd_profile_receipt
+                .public_profile_allowed_profile_ids
+                .contains(&String::from("tassadar.proposal_profile.simd_deterministic.v1"))
+            || !simd_profile_receipt
+                .default_served_profile_allowed_profile_ids
+                .is_empty()
+            || !simd_profile_receipt
+                .exact_backend_ids
+                .contains(&String::from("cpu_reference_current_host"))
+            || !simd_profile_receipt
+                .fallback_backend_ids
+                .contains(&String::from("metal_served"))
+            || !simd_profile_receipt
+                .fallback_backend_ids
+                .contains(&String::from("cuda_served"))
+            || simd_profile_receipt.refused_backend_ids.is_empty()
+        {
+            return Err(TassadarCapabilityEnvelopeError::UnpublishableSimdProfile {
+                detail: String::from(
+                    "provider envelope requires a non-empty simd-profile report ref, exact agreement with the committed public/default-served/backend ids, a green bounded simd profile, one named public simd profile, zero default served simd profiles, a cpu-reference exact row, explicit metal/cuda fallback rows, and at least one refused backend row",
+                ),
+            });
+        }
         Ok(Self {
             backend_family: String::from(BACKEND_FAMILY),
             product_id: publication.product_id.clone(),
@@ -899,6 +945,7 @@ impl TassadarCapabilityEnvelope {
             numeric_portability_receipt,
             float_profile_acceptance_gate_receipt,
             exception_profile_receipt,
+            simd_profile_receipt,
             resumable_multi_slice_promotion_receipt,
             effect_safe_resume_receipt,
             subset_profile_promotion_gate_receipt,
@@ -950,6 +997,11 @@ pub enum TassadarCapabilityEnvelopeError {
     },
     /// The served exceptions proposal profile was not publishable provider-side.
     UnpublishableExceptionProfile {
+        /// Plain-text validation detail.
+        detail: String,
+    },
+    /// The served SIMD deterministic profile was not publishable provider-side.
+    UnpublishableSimdProfile {
         /// Plain-text validation detail.
         detail: String,
     },
@@ -9073,6 +9125,30 @@ mod tests {
             json!(["cpu_reference_current_host"])
         );
         assert_eq!(
+            encoded["publication"]["simd_profile_report_ref"],
+            json!("fixtures/tassadar/reports/tassadar_simd_profile_report.json")
+        );
+        assert_eq!(
+            encoded["publication"]["simd_profile_public_profile_ids"],
+            json!(["tassadar.proposal_profile.simd_deterministic.v1"])
+        );
+        assert_eq!(
+            encoded["publication"]["simd_profile_default_served_profile_ids"],
+            json!([])
+        );
+        assert_eq!(
+            encoded["publication"]["simd_profile_exact_backend_ids"],
+            json!(["cpu_reference_current_host"])
+        );
+        assert_eq!(
+            encoded["publication"]["simd_profile_fallback_backend_ids"],
+            json!(["metal_served", "cuda_served"])
+        );
+        assert_eq!(
+            encoded["publication"]["simd_profile_refused_backend_ids"],
+            json!(["accelerator_specific_unbounded"])
+        );
+        assert_eq!(
             encoded["broad_internal_compute_profile_publication_receipt"]["public_profile_specific_route_ids"],
             json!([
                 "tassadar.internal_compute.deterministic_import_subset.v1",
@@ -9128,6 +9204,26 @@ mod tests {
         assert_eq!(
             encoded["exception_profile_receipt"]["portability_envelope_ids"],
             json!(["cpu_reference_current_host"])
+        );
+        assert_eq!(
+            encoded["simd_profile_receipt"]["public_profile_allowed_profile_ids"],
+            json!(["tassadar.proposal_profile.simd_deterministic.v1"])
+        );
+        assert_eq!(
+            encoded["simd_profile_receipt"]["default_served_profile_allowed_profile_ids"],
+            json!([])
+        );
+        assert_eq!(
+            encoded["simd_profile_receipt"]["exact_backend_ids"],
+            json!(["cpu_reference_current_host"])
+        );
+        assert_eq!(
+            encoded["simd_profile_receipt"]["fallback_backend_ids"],
+            json!(["metal_served", "cuda_served"])
+        );
+        assert_eq!(
+            encoded["simd_profile_receipt"]["refused_backend_ids"],
+            json!(["accelerator_specific_unbounded"])
         );
         assert_eq!(
             encoded["effect_safe_resume_receipt"]["target_profile_id"],

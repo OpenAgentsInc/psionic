@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.simd_profile.report.v1",
+  "runtime_report_ref": "fixtures/tassadar/reports/tassadar_simd_profile_runtime_report.json",
+  "runtime_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.simd_profile.runtime_report.v1",
+    "profile_id": "tassadar.proposal_profile.simd_deterministic.v1",
+    "exact_backend_ids": [
+      "cpu_reference_current_host"
+    ],
+    "fallback_backend_ids": [
+      "metal_served",
+      "cuda_served"
+    ],
+    "refused_backend_ids": [
+      "accelerator_specific_unbounded"
+    ],
+    "exact_case_count": 1,
+    "fallback_case_count": 2,
+    "refusal_case_count": 1,
+    "rows": [
+      {
+        "backend_id": "cpu_reference_current_host",
+        "workload_family": "simd_reduce_kernel",
+        "vector_op_id": "i32x4_add_reduce",
+        "posture": "exact",
+        "exact_output_parity": true,
+        "exact_trace_parity": true,
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_decode_scaling_report.json"
+        ],
+        "note": "cpu-reference SIMD stays exact on the bounded lane and is the only backend admitted as exact profile truth"
+      },
+      {
+        "backend_id": "metal_served",
+        "workload_family": "simd_reduce_kernel",
+        "vector_op_id": "i32x4_add_reduce",
+        "posture": "scalar_fallback",
+        "exact_output_parity": true,
+        "exact_trace_parity": false,
+        "fallback_reason_id": "vector_backend_not_yet_frozen",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_decode_scaling_report.json"
+        ],
+        "note": "metal stays explicit as scalar-fallback posture while vector-lane semantics are not frozen for public exactness"
+      },
+      {
+        "backend_id": "cuda_served",
+        "workload_family": "simd_reduce_kernel",
+        "vector_op_id": "i32x4_add_reduce",
+        "posture": "scalar_fallback",
+        "exact_output_parity": true,
+        "exact_trace_parity": false,
+        "fallback_reason_id": "vector_backend_not_yet_frozen",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_decode_scaling_report.json"
+        ],
+        "note": "cuda stays explicit as scalar-fallback posture while vector-lane semantics are not frozen for public exactness"
+      },
+      {
+        "backend_id": "accelerator_specific_unbounded",
+        "workload_family": "simd_lane_shuffle_kernel",
+        "vector_op_id": "i8x16_lane_shuffle",
+        "posture": "refused",
+        "exact_output_parity": false,
+        "exact_trace_parity": false,
+        "refusal_reason_id": "accelerator_specific_simd_semantics",
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_decode_scaling_report.json"
+        ],
+        "note": "accelerator-specific SIMD semantics remain typed refusal truth instead of widening from bounded cpu-reference exactness"
+      }
+    ],
+    "claim_boundary": "this runtime report freezes one bounded SIMD deterministic profile with exact cpu-reference truth, explicit scalar-fallback accelerator rows, and typed accelerator-specific refusal truth. It does not claim arbitrary SIMD closure, accelerator-invariant vector exactness, or broader served publication",
+    "summary": "SIMD runtime report covers 4 rows with exact_cases=1, fallback_cases=2, refusal_cases=1.",
+    "report_digest": "f7fcb4d9e5b1282669464e21dbe6c15c35bd00c0e621dc000bfffe415ee1c7d7"
+  },
+  "public_profile_allowed_profile_ids": [
+    "tassadar.proposal_profile.simd_deterministic.v1"
+  ],
+  "default_served_profile_allowed_profile_ids": [],
+  "exact_backend_ids": [
+    "cpu_reference_current_host"
+  ],
+  "fallback_backend_ids": [
+    "metal_served",
+    "cuda_served"
+  ],
+  "refused_backend_ids": [
+    "accelerator_specific_unbounded"
+  ],
+  "overall_green": true,
+  "claim_boundary": "this eval report covers one bounded SIMD deterministic profile with exact cpu-reference publication, explicit scalar-fallback accelerator rows, and typed refusal truth. It does not claim arbitrary SIMD closure, accelerator-invariant vector exactness, or a default served SIMD lane",
+  "summary": "SIMD profile report covers exact_backends=1, fallback_backends=2, refused_backends=1, overall_green=true.",
+  "report_digest": "37f6e6c904728de19069cc2a172d3fd4631e6e0d9f53d72524e131e98b4e81d0"
+}

@@ -799,6 +799,15 @@ The current scope is:
   envelope; this is not arbitrary component-model closure, unrestricted
   interface-type lowering, arbitrary host-import composition, or broader
   served publication
+- the current SIMD proposal-profile artifacts are
+  `fixtures/tassadar/reports/tassadar_simd_profile_runtime_report.json` and
+  `fixtures/tassadar/reports/tassadar_simd_profile_report.json`, which freeze
+  one bounded SIMD deterministic profile with exact cpu-reference truth, metal
+  and cuda scalar-fallback rows, and typed accelerator-specific refusal truth;
+  served publication carries that named profile plus the backend matrix
+  without creating a default served SIMD lane, and this still does not claim
+  arbitrary SIMD closure, accelerator-invariant vector exactness, or broader
+  served publication
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import
