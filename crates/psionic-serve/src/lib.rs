@@ -27,6 +27,7 @@ mod tassadar_broad_internal_compute_profile_publication;
 mod tassadar_direct_model_weight_execution_proof;
 mod tassadar_execution_unit_registration;
 mod tassadar_full_core_wasm_publication_gate;
+mod tassadar_general_internal_compute_red_team_publication;
 mod tassadar_internal_compute_package_manager;
 mod tassadar_installed_process_lifecycle;
 mod tassadar_module_catalog;
@@ -77,6 +78,7 @@ pub use psionic_models::{
     TokenVocabulary, TokenizerBoundary, WeightArtifactMetadata, WeightBundleMetadata, WeightFormat,
     WeightSource, WeightTensorMetadata, apply_context_window, digest_generation_defaults,
 };
+pub use tassadar_general_internal_compute_red_team_publication::*;
 use psionic_runtime::{
     BackendHealthTracker, BackendSelection, BackendSelectionState, BackendToolchainIdentity,
     CacheAction, CacheInvalidationPolicy, CacheInvalidationTrigger, CacheKind, CacheObservation,

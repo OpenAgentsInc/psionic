@@ -110,6 +110,8 @@ mod tassadar_float_profile_acceptance_gate;
 mod tassadar_float_semantics;
 #[path = "tassadar_full_core_wasm_public_acceptance_gate.rs"]
 mod tassadar_full_core_wasm_public_acceptance_gate;
+#[path = "tassadar_general_internal_compute_red_team_audit.rs"]
+mod tassadar_general_internal_compute_red_team_audit;
 #[path = "tassadar_frozen_core_wasm_closure_gate.rs"]
 mod tassadar_frozen_core_wasm_closure_gate;
 #[path = "tassadar_frozen_core_wasm_window.rs"]
@@ -324,6 +326,7 @@ pub use tassadar_executor_hull_benchmark::*;
 pub use tassadar_float_profile_acceptance_gate::*;
 pub use tassadar_float_semantics::*;
 pub use tassadar_full_core_wasm_public_acceptance_gate::*;
+pub use tassadar_general_internal_compute_red_team_audit::*;
 pub use tassadar_frozen_core_wasm_closure_gate::*;
 pub use tassadar_frozen_core_wasm_window::*;
 pub use tassadar_generalized_abi::*;

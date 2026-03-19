@@ -1036,6 +1036,16 @@ The current scope is:
   prerequisites with explicit blockers and non-implications; this keeps the
   stronger public claim suppressed and is not a broad universality or
   Turing-complete claim
+- the current general internal-compute red-team artifacts are
+  `fixtures/tassadar/reports/tassadar_general_internal_compute_red_team_route_exercises_report.json`,
+  `fixtures/tassadar/reports/tassadar_general_internal_compute_red_team_audit_report.json`,
+  `fixtures/tassadar/reports/tassadar_general_internal_compute_red_team_summary.json`,
+  and `docs/audits/2026-03-19-tassadar-general-internal-compute-red-team-audit.md`,
+  which freeze one disclosure-safe boundary audit over candidate-only broad
+  internal-compute routes, operator-only proposal families, research-only
+  threads publication, relaxed-SIMD non-promotion, and arbitrary-Wasm claim
+  leakage; this proves the current widening work still fails closed and is not
+  a broader served internal-compute, arbitrary Wasm, or Turing-complete claim
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

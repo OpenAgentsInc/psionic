@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.general_internal_compute.red_team.summary.v1",
+  "audit_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.general_internal_compute.red_team_audit.report.v1",
+    "route_exercises_report_ref": "fixtures/tassadar/reports/tassadar_general_internal_compute_red_team_route_exercises_report.json",
+    "route_exercises_report": {
+      "schema_version": 1,
+      "report_id": "tassadar.general_internal_compute.red_team_route_exercises.report.v1",
+      "cases": [
+        {
+          "case_id": "candidate_only_profile_cannot_skip_challenge_window",
+          "target_profile_id": "tassadar.internal_compute.deterministic_import_subset.v1",
+          "requested_posture": "accepted_outcome_ready_route",
+          "route_outcome": "blocked_as_expected",
+          "source_refs": [
+            "fixtures/tassadar/reports/tassadar_broad_general_compute_validator_route_policy_report.json"
+          ],
+          "note": "candidate-only internal-compute profiles must stay challenge-window bounded instead of routing as accepted-outcome-ready immediately"
+        },
+        {
+          "case_id": "portable_broad_family_cannot_route_without_evidence",
+          "target_profile_id": "tassadar.internal_compute.portable_broad_family.v1",
+          "requested_posture": "broad_general_compute_route",
+          "route_outcome": "blocked_as_expected",
+          "source_refs": [
+            "fixtures/tassadar/reports/tassadar_broad_general_compute_validator_route_policy_report.json"
+          ],
+          "note": "portable broad-family requests stay refused until portability evidence and authority policy are complete"
+        },
+        {
+          "case_id": "memory64_cannot_inherit_public_route",
+          "target_profile_id": "tassadar.proposal_profile.memory64_continuation.v1",
+          "requested_posture": "public_proposal_route",
+          "route_outcome": "blocked_as_expected",
+          "source_refs": [
+            "fixtures/tassadar/reports/tassadar_proposal_profile_route_policy_report.json"
+          ],
+          "note": "memory64 remains operator-only and cannot inherit public routeability from the frozen core lane"
+        },
+        {
+          "case_id": "threads_cannot_route_as_public_profile",
+          "target_profile_id": "tassadar.research_profile.threads_deterministic_scheduler.v1",
+          "requested_posture": "public_threads_route",
+          "route_outcome": "blocked_as_expected",
+          "source_refs": [
+            "fixtures/tassadar/reports/tassadar_proposal_profile_route_policy_report.json"
+          ],
+          "note": "threads stays research-only and cannot surface as a public profile-specific route"
+        }
+      ],
+      "blocked_case_ids": [
+        "candidate_only_profile_cannot_skip_challenge_window",
+        "portable_broad_family_cannot_route_without_evidence",
+        "memory64_cannot_inherit_public_route",
+        "threads_cannot_route_as_public_profile"
+      ],
+      "failed_case_ids": [],
+      "overall_green": true,
+      "claim_boundary": "this router report red-teams the served and authority-facing route surfaces for broad internal-compute and proposal profiles. It exists to prove that candidate-only, operator-only, and research-only profiles stay blocked instead of becoming implicitly routeable.",
+      "summary": "General internal-compute red-team route exercises keep blocked_cases=4, failed_cases=0, overall_green=true.",
+      "report_digest": "d94cfe77a875781dc7d178132c5844d2ec5b3082f0621c283a4aebe9732a83fd"
+    },
+    "finding_rows": [
+      {
+        "finding_id": "arbitrary_wasm_claim_stays_blocked",
+        "target_surface": "claim_checker",
+        "finding_status": "blocked_as_expected",
+        "source_refs": [
+          "fixtures/tassadar/reports/tassadar_effective_unbounded_compute_claim_report.json"
+        ],
+        "note": "the effective-unbounded claim checker still names arbitrary Wasm execution as an explicit non-implication"
+      },
+      {
+        "finding_id": "full_core_wasm_publication_stays_suppressed",
+        "target_surface": "public_acceptance_gate",
+        "finding_status": "blocked_as_expected",
+        "source_refs": [
+          "fixtures/tassadar/reports/tassadar_full_core_wasm_public_acceptance_gate_report.json"
+        ],
+        "note": "the frozen core-Wasm lane still refuses silent public publication while its gate remains suppressed"
+      },
+      {
+        "finding_id": "relaxed_simd_stays_non_promoted",
+        "target_surface": "proposal_profile_ladder",
+        "finding_status": "blocked_as_expected",
+        "source_refs": [
+          "fixtures/tassadar/reports/tassadar_relaxed_simd_research_ladder_report.json"
+        ],
+        "note": "relaxed-SIMD remains a research-only ladder and cannot inherit deterministic SIMD publication"
+      },
+      {
+        "finding_id": "shared_state_threads_stay_publicly_suppressed",
+        "target_surface": "shared_state_verdicts",
+        "finding_status": "blocked_as_expected",
+        "source_refs": [
+          "fixtures/tassadar/reports/tassadar_shared_state_concurrency_verdict_report.json"
+        ],
+        "note": "threads remains operator-visible but publicly suppressed, so concurrency research does not widen public posture"
+      },
+      {
+        "finding_id": "route_exercises_found_no_leak",
+        "target_surface": "router",
+        "finding_status": "blocked_as_expected",
+        "source_refs": [
+          "fixtures/tassadar/reports/tassadar_general_internal_compute_red_team_route_exercises_report.json"
+        ],
+        "note": "the router route-exercise matrix found no case where candidate-only, operator-only, or research-only profiles routed more broadly than declared"
+      }
+    ],
+    "blocked_finding_ids": [
+      "arbitrary_wasm_claim_stays_blocked",
+      "full_core_wasm_publication_stays_suppressed",
+      "relaxed_simd_stays_non_promoted",
+      "shared_state_threads_stay_publicly_suppressed",
+      "route_exercises_found_no_leak"
+    ],
+    "failed_finding_ids": [],
+    "overall_green": true,
+    "publication_safe": true,
+    "claim_boundary": "this red-team audit is a disclosure-safe boundary check for the broader internal-compute lane. It proves that unsupported publication, implicit proposal inheritance, and silent route widening still fail closed instead of leaking into public claim posture.",
+    "summary": "General internal-compute red-team audit keeps blocked_findings=5, failed_findings=0, route_cases=4, publication_safe=true.",
+    "report_digest": "69fbd46f06e40928b246cb30f212ed17c3ae03224da6eaf0211b513d44b64308"
+  },
+  "allowed_statement": "Psionic/Tassadar can now say that the broader internal-compute lane has an explicit red-team boundary audit, and that the audited publication, route, and proposal-family leaks still fail closed under the current named-profile posture.",
+  "blocked_finding_ids": [
+    "arbitrary_wasm_claim_stays_blocked",
+    "full_core_wasm_publication_stays_suppressed",
+    "relaxed_simd_stays_non_promoted",
+    "shared_state_threads_stay_publicly_suppressed",
+    "route_exercises_found_no_leak"
+  ],
+  "explicit_non_implications": [
+    "arbitrary Wasm execution",
+    "silent proposal-family inheritance",
+    "public threads publication",
+    "default served relaxed-SIMD"
+  ],
+  "claim_boundary": "this summary is disclosure-safe. It says the broader internal-compute lane has been red-teamed successfully without turning the successful audit itself into broader public capability promotion.",
+  "summary": "General internal-compute red-team summary keeps blocked_findings=5, explicit_non_implications=4, publication_safe=true.",
+  "report_digest": "4c26f73ec6784699009fa22d9643b25015d8be66202e5c4fa4dc22de65119a60"
+}

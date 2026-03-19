@@ -82,6 +82,13 @@ Current honest posture:
   bounded metal/cuda drift candidates, and typed refusal on unstable lane
   semantics plus cross-backend non-portability; it remains explicitly
   non-promoted and non-served by design
+- the repo now also has one disclosure-safe general internal-compute red-team
+  audit, with committed router, eval, and research artifacts over candidate-
+  only broad internal-compute routes, operator-only proposal-family profiles,
+  research-only threads publication, relaxed-SIMD non-promotion, and
+  arbitrary-Wasm claim leakage; the current audit is clean and publication-safe
+  as an audit surface, but it does not widen broad served internal compute,
+  arbitrary Wasm, or Turing-complete support
 - the repo now also has one research-only shared-memory and threads profile
   with a deterministic scheduler envelope, explicit sandbox boundary truth,
   and typed refusal on host-nondeterministic scheduling plus relaxed
@@ -193,7 +200,7 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-125` through `TAS-146` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-147` and runs through
+- the current open GitHub backlog begins at `TAS-150` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs

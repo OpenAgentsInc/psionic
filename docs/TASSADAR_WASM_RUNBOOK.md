@@ -1191,6 +1191,34 @@ Expected outcome:
 - explicit refusal on cross-worker shared heaps
 - `public_profile_allowed_profile_ids = []`
 
+### 15C. General internal-compute red-team and refusal-boundary audit
+
+Run:
+
+```bash
+cargo run -p psionic-router --example tassadar_general_internal_compute_red_team_route_exercises_report
+cargo run -p psionic-eval --example tassadar_general_internal_compute_red_team_audit_report
+cargo run -p psionic-research --example tassadar_general_internal_compute_red_team_summary
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_general_internal_compute_red_team_route_exercises_report.json`
+- `fixtures/tassadar/reports/tassadar_general_internal_compute_red_team_audit_report.json`
+- `fixtures/tassadar/reports/tassadar_general_internal_compute_red_team_summary.json`
+
+Expected outcome:
+
+- the route-exercise report is fully green and records four blocked cases
+- the aggregate audit is fully green and publication-safe as an audit surface
+- the summary keeps arbitrary Wasm, silent proposal-family inheritance, public
+  threads publication, and default served relaxed-SIMD explicit as
+  non-implications
+
+This lane proves that broader internal-compute widening is still failing closed
+at the route, publication, and claim surfaces. It does not widen any served
+capability.
+
 ### 15A. Proposal-profile ladder claim checker and served-publication policy
 
 ```bash
