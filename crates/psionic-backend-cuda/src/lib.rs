@@ -60,6 +60,8 @@ pub const SUPPORTED_OPS: &[&str] = &[
     "matmul",
     "add",
     "mul",
+    "silu",
+    "silu_backward",
     "rms_norm",
     "rotary_embedding",
     "rotary_embedding_backward",
@@ -2487,6 +2489,7 @@ impl DeviceDiscovery for CudaBackend {
 
     fn extension_support(&self) -> Vec<BackendExtensionSupport> {
         vec![
+            BackendExtensionSupport::backend_specialized(BackendExtensionKind::Silu),
             BackendExtensionSupport::backend_specialized(BackendExtensionKind::RmsNorm),
             BackendExtensionSupport::backend_specialized(BackendExtensionKind::RotaryEmbedding),
             BackendExtensionSupport::backend_specialized(
@@ -2678,6 +2681,30 @@ impl AvailableCudaBackend {
             }
         }
         Ok(output)
+    }
+
+    fn execute_silu_step(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CudaBuffer>,
+    ) -> Result<CudaBuffer, RuntimeError> {
+        let input = step_input(step, values, 0)?;
+        let input_values = input.read_f32()?;
+        let output_values = silu_forward_values(&input_values);
+        self.buffer_from_tensor_data(&step.spec, &TensorData::F32(output_values))
+    }
+
+    fn execute_silu_backward_step(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CudaBuffer>,
+    ) -> Result<CudaBuffer, RuntimeError> {
+        let input = step_input(step, values, 0)?;
+        let grad_output = step_input(step, values, 1)?;
+        let input_values = input.read_f32()?;
+        let grad_output_values = grad_output.read_f32()?;
+        let output_values = silu_backward_values(&input_values, &grad_output_values);
+        self.buffer_from_tensor_data(&step.spec, &TensorData::F32(output_values))
     }
 
     fn execute_scaled_dot_product_attention_step(
@@ -3075,6 +3102,12 @@ impl AvailableCudaBackend {
                     values.insert(step.output, output);
                 }
                 ExecutionOp::BackendExtension { op } => match op {
+                    BackendExtensionOp::Silu => {
+                        values.insert(step.output, self.execute_silu_step(step, &values)?);
+                    }
+                    BackendExtensionOp::SiluBackward => {
+                        values.insert(step.output, self.execute_silu_backward_step(step, &values)?);
+                    }
                     BackendExtensionOp::RmsNorm { epsilon } => {
                         let input = step_input(step, &values, 0)?;
                         let weight = step_input(step, &values, 1)?;
@@ -3497,6 +3530,22 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
             }
         }
         ExecutionOp::BackendExtension { op } => match op {
+            BackendExtensionOp::Silu => {
+                if step.inputs.len() != 1 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda silu step {} requires one input",
+                        step.output
+                    )));
+                }
+            }
+            BackendExtensionOp::SiluBackward => {
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda silu_backward step {} requires two inputs",
+                        step.output
+                    )));
+                }
+            }
             BackendExtensionOp::RmsNorm { .. } => {
                 if step.inputs.len() != 2 {
                     return Err(RuntimeError::Backend(format!(
@@ -3607,6 +3656,28 @@ fn ensure_supported_spec(spec: &TensorSpec) -> Result<(), RuntimeError> {
         )));
     }
     Ok(())
+}
+
+fn silu_forward_values(input: &[f32]) -> Vec<f32> {
+    input
+        .iter()
+        .map(|value| {
+            let sigmoid = 1.0 / (1.0 + (-value).exp());
+            value * sigmoid
+        })
+        .collect()
+}
+
+fn silu_backward_values(input: &[f32], grad_output: &[f32]) -> Vec<f32> {
+    input
+        .iter()
+        .zip(grad_output.iter())
+        .map(|(value, grad)| {
+            let sigmoid = 1.0 / (1.0 + (-value).exp());
+            let derivative = sigmoid * (1.0 + value * (1.0 - sigmoid));
+            grad * derivative
+        })
+        .collect()
 }
 
 fn byte_len_for_f32_elements(element_count: usize) -> Result<usize, RuntimeError> {
@@ -9090,6 +9161,38 @@ mod tests {
     }
 
     #[test]
+    fn cuda_backend_executes_silu_backend_extension_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let input_values = vec![-2.0_f32, -0.5, 0.75, 3.0];
+        let mut builder = GraphBuilder::new(selected.device.clone());
+        let input = builder.input("x", Shape::new(vec![input_values.len()]), DType::F32);
+        let activated = builder.silu(&input)?;
+        let graph = builder.finish(vec![activated.clone()]);
+
+        let inputs = std::collections::BTreeMap::from([(
+            input.id(),
+            backend.input_buffer(Shape::new(vec![input_values.len()]), input_values.clone())?,
+        )]);
+        let result = backend.compile_and_execute(&graph, &inputs)?;
+        let output = result
+            .outputs
+            .get(&activated.id())
+            .ok_or("missing cuda silu output")?;
+        assert_close(
+            &output.read_f32()?,
+            &super::silu_forward_values(&input_values),
+            1e-6,
+        );
+        Ok(())
+    }
+
+    #[test]
     fn cuda_backend_executes_rms_norm_backend_extension_when_available(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
@@ -9475,6 +9578,106 @@ mod tests {
                 .ok_or("missing expected value gradient")?
                 .as_f32_slice()
                 .ok_or("expected value gradient is not f32")?,
+            1e-5,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_silu_backward_graph_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let mut builder = AutodiffGraphBuilder::with_context(
+            selected.device.clone(),
+            AutodiffContext::training(),
+        );
+        let input = builder.input("x", Shape::new(vec![1, 4]), DType::F32, true);
+        let activated = builder.silu(&input)?;
+        let scale = builder.constant_f32(Shape::new(vec![1, 4]), vec![0.5, -1.0, 0.25, 1.5])?;
+        let scaled = builder.mul(&activated, &scale)?;
+        let graph = builder.finish(vec![scaled.clone()]);
+
+        let backward_plan = graph.backward_plan(scaled.id())?;
+        assert!(backward_plan.gradient_for(input.id()).is_some());
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                psionic_ir::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::SiluBackward
+                }
+            )));
+
+        let input_values = vec![-1.25_f32, -0.5, 0.75, 2.0];
+        let upstream_seed = vec![1.0_f32, 0.5, -0.25, 2.0];
+        let primal_inputs =
+            std::collections::BTreeMap::from([(input.id(), TensorData::F32(input_values))]);
+        let forward_values = evaluate_graph(graph.graph(), &primal_inputs)?;
+        let expected = graph.backward_materialized_with_seed(
+            scaled.id(),
+            &primal_inputs,
+            Some(TensorData::F32(upstream_seed.clone())),
+        )?;
+
+        let plan = compile_graph(&backward_plan.gradient_graph)?;
+        validate_supported_plan(&plan)?;
+
+        let mut backward_inputs = std::collections::BTreeMap::new();
+        for binding in &backward_plan.primal_bindings {
+            let value = forward_values
+                .get(&binding.primal_tensor)
+                .ok_or("missing forward value for backward binding")?;
+            let spec = backward_plan
+                .gradient_graph
+                .node(binding.gradient_graph_input)
+                .ok_or("missing backward graph input node")?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            backward_inputs.insert(
+                binding.gradient_graph_input,
+                backend.input_buffer(spec, value.as_f32_slice().ok_or("non-f32 forward value")?)?,
+            );
+        }
+        let seed_shape = backward_plan
+            .gradient_graph
+            .node(backward_plan.seed_input)
+            .ok_or("missing backward seed node")?
+            .tensor()
+            .spec()
+            .shape()
+            .clone();
+        backward_inputs.insert(
+            backward_plan.seed_input,
+            backend.input_buffer(seed_shape, upstream_seed)?,
+        );
+
+        let result =
+            backend.compile_and_execute(&backward_plan.gradient_graph, &backward_inputs)?;
+        let input_gradient = result
+            .outputs
+            .get(
+                &backward_plan
+                    .gradient_for(input.id())
+                    .ok_or("missing input gradient id")?,
+            )
+            .ok_or("missing cuda silu input gradient output")?;
+
+        assert_close(
+            &input_gradient.read_f32()?,
+            expected
+                .gradient(input.id())
+                .ok_or("missing expected input gradient")?
+                .as_f32_slice()
+                .ok_or("expected input gradient is not f32")?,
             1e-5,
         );
         Ok(())

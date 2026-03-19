@@ -409,6 +409,8 @@ impl CpuBackend {
         op: &BackendExtensionOp,
     ) -> Result<CpuBuffer, RuntimeError> {
         match op {
+            BackendExtensionOp::Silu => self.silu(step, values),
+            BackendExtensionOp::SiluBackward => self.silu_backward(step, values),
             BackendExtensionOp::RmsNorm { epsilon } => {
                 self.rms_norm(step, values, epsilon.to_f32())
             }
@@ -558,6 +560,48 @@ impl CpuBackend {
             None => vec![logical.iter().copied().sum()],
             Some(axis) => reduce_sum_axis(&logical, input.spec().shape().dims(), axis)?,
         };
+        CpuBuffer::from_f32(step.spec.clone(), output)
+    }
+
+    fn silu(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CpuBuffer>,
+    ) -> Result<CpuBuffer, RuntimeError> {
+        let input = self.input(step, values, 0)?.logical_values()?;
+        let output = input
+            .iter()
+            .map(|value| {
+                let sigmoid = 1.0 / (1.0 + (-value).exp());
+                value * sigmoid
+            })
+            .collect::<Vec<_>>();
+        CpuBuffer::from_f32(step.spec.clone(), output)
+    }
+
+    fn silu_backward(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CpuBuffer>,
+    ) -> Result<CpuBuffer, RuntimeError> {
+        let input = self.input(step, values, 0)?.logical_values()?;
+        let grad_output = self.input(step, values, 1)?.logical_values()?;
+        if input.len() != grad_output.len() {
+            return Err(RuntimeError::Backend(format!(
+                "cpu silu_backward requires matching input and grad_output lengths, actual {} and {}",
+                input.len(),
+                grad_output.len()
+            )));
+        }
+        let output = input
+            .iter()
+            .zip(grad_output.iter())
+            .map(|(value, grad)| {
+                let sigmoid = 1.0 / (1.0 + (-value).exp());
+                let derivative = sigmoid * (1.0 + value * (1.0 - sigmoid));
+                grad * derivative
+            })
+            .collect::<Vec<_>>();
         CpuBuffer::from_f32(step.spec.clone(), output)
     }
 
@@ -1500,6 +1544,7 @@ impl DeviceDiscovery for CpuBackend {
 
     fn extension_support(&self) -> Vec<BackendExtensionSupport> {
         vec![
+            BackendExtensionSupport::reference(BackendExtensionKind::Silu),
             BackendExtensionSupport::reference(BackendExtensionKind::RmsNorm),
             BackendExtensionSupport::reference(BackendExtensionKind::LayerNorm),
             BackendExtensionSupport::reference(BackendExtensionKind::RotaryEmbedding),
@@ -1637,7 +1682,7 @@ mod tests {
         HealthStatus, RuntimeError, ServedProductBackendPolicy,
     };
 
-    use super::{CpuAllocatorPool, CpuBackend, CpuBuffer, cpu_allocator_pool_policy};
+    use super::{cpu_allocator_pool_policy, CpuAllocatorPool, CpuBackend, CpuBuffer};
 
     #[test]
     fn cpu_backend_reports_default_device() -> Result<(), psionic_runtime::RuntimeError> {
@@ -1718,6 +1763,7 @@ mod tests {
                 .map(|support| support.kind)
                 .collect::<Vec<_>>(),
             vec![
+                BackendExtensionKind::Silu,
                 BackendExtensionKind::RmsNorm,
                 BackendExtensionKind::LayerNorm,
                 BackendExtensionKind::RotaryEmbedding,

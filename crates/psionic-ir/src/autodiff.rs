@@ -150,7 +150,8 @@ pub const fn gradient_support_for_op(op: &OpKind) -> AutodiffGradientSupport {
             reason: AutodiffUnsupportedGradientReason::CastFamily,
         },
         OpKind::BackendExtension { op } => match op {
-            BackendExtensionOp::RmsNorm { .. }
+            BackendExtensionOp::Silu
+            | BackendExtensionOp::RmsNorm { .. }
             | BackendExtensionOp::RotaryEmbedding { .. }
             | BackendExtensionOp::ScaledDotProductAttention { .. } => {
                 AutodiffGradientSupport::Implemented
@@ -2214,6 +2215,26 @@ impl AutodiffGraph {
                     }
                 }
                 OpKind::BackendExtension { op } => match op {
+                    BackendExtensionOp::Silu => {
+                        let input_id = node.inputs()[0];
+                        if self.requires_grad(input_id) {
+                            let input = primal_placeholder(
+                                &mut backward_builder,
+                                &mut primal_bindings,
+                                &self.graph,
+                                input_id,
+                            )?;
+                            let contribution = backward_builder
+                                .silu_backward(&input, &current_gradient)
+                                .map_err(map_graph_error)?;
+                            accumulate_gradient(
+                                &mut backward_builder,
+                                &mut gradients,
+                                input_id,
+                                contribution,
+                            )?;
+                        }
+                    }
                     BackendExtensionOp::RmsNorm { epsilon } => {
                         let input_id = node.inputs()[0];
                         let weight_id = node.inputs()[1];
@@ -3629,6 +3650,13 @@ impl AutodiffGraphBuilder {
         Ok(self.wrap(tensor, requires_grad))
     }
 
+    /// Applies SiLU pointwise activation.
+    pub fn silu(&mut self, input: &AutodiffTensor) -> Result<AutodiffTensor, GraphError> {
+        let requires_grad = self.any_requires_grad(&[input]);
+        let tensor = self.builder.silu(input.tensor())?;
+        Ok(self.wrap(tensor, requires_grad))
+    }
+
     /// Applies RMS normalization.
     pub fn rms_norm(
         &mut self,
@@ -4132,6 +4160,16 @@ fn evaluate_backend_extension_reference(
     op: &BackendExtensionOp,
 ) -> Result<TensorData, ReferenceEvaluationError> {
     match op {
+        BackendExtensionOp::Silu => {
+            let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            Ok(TensorData::F32(silu_forward_values(input)))
+        }
+        BackendExtensionOp::SiluBackward => {
+            let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let grad_output =
+                resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            Ok(TensorData::F32(silu_backward_values(input, grad_output)))
+        }
         BackendExtensionOp::RmsNorm { epsilon } => {
             let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
             let weight = resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
@@ -4267,16 +4305,18 @@ fn evaluate_backend_extension_reference(
                 .spec()
                 .shape()
                 .clone();
-            Ok(TensorData::F32(scaled_dot_product_attention_forward_values(
-                query,
-                &query_shape,
-                key,
-                &key_shape,
-                value,
-                &value_shape,
-                scale.to_f32(),
-                *causal,
-            )))
+            Ok(TensorData::F32(
+                scaled_dot_product_attention_forward_values(
+                    query,
+                    &query_shape,
+                    key,
+                    &key_shape,
+                    value,
+                    &value_shape,
+                    scale.to_f32(),
+                    *causal,
+                ),
+            ))
         }
         BackendExtensionOp::ScaledDotProductAttentionQueryBackward { scale, causal }
         | BackendExtensionOp::ScaledDotProductAttentionKeyBackward { scale, causal }
@@ -4742,6 +4782,28 @@ fn reduce_sum_values(values: &[f32], input_shape: &Shape, axis: Option<usize>) -
     }
 }
 
+fn silu_forward_values(input: &[f32]) -> Vec<f32> {
+    input
+        .iter()
+        .map(|value| {
+            let sigmoid = 1.0 / (1.0 + (-value).exp());
+            value * sigmoid
+        })
+        .collect()
+}
+
+fn silu_backward_values(input: &[f32], grad_output: &[f32]) -> Vec<f32> {
+    input
+        .iter()
+        .zip(grad_output.iter())
+        .map(|(value, grad)| {
+            let sigmoid = 1.0 / (1.0 + (-value).exp());
+            let derivative = sigmoid * (1.0 + (value * (1.0 - sigmoid)));
+            grad * derivative
+        })
+        .collect()
+}
+
 fn rms_norm_forward_values(input: &[f32], weight: &[f32], epsilon: f32) -> Vec<f32> {
     if weight.is_empty() {
         return Vec::new();
@@ -4951,9 +5013,9 @@ fn scaled_dot_product_attention_forward_values(
                         scores[key_index] = f32::NEG_INFINITY;
                         continue;
                     }
-                    let query_base =
-                        ((batch_index * query_heads + head_index) * query_seq + query_index)
-                            * head_dim;
+                    let query_base = ((batch_index * query_heads + head_index) * query_seq
+                        + query_index)
+                        * head_dim;
                     let key_base =
                         ((batch_index * key_heads + kv_head) * key_seq + key_index) * head_dim;
                     let mut dot = 0.0_f32;
@@ -4981,9 +5043,9 @@ fn scaled_dot_product_attention_forward_values(
                 if weight_sum <= 0.0 {
                     continue;
                 }
-                let output_base =
-                    ((batch_index * query_heads + head_index) * query_seq + query_index)
-                        * value_dim;
+                let output_base = ((batch_index * query_heads + head_index) * query_seq
+                    + query_index)
+                    * value_dim;
                 for key_index in 0..key_seq {
                     let normalized = weights[key_index] / weight_sum;
                     if normalized == 0.0 {
@@ -5043,11 +5105,10 @@ fn scaled_dot_product_attention_backward_values(
             let kv_head = head_index / group_size;
             for query_index in 0..query_seq {
                 let query_base =
-                    ((batch_index * query_heads + head_index) * query_seq + query_index)
-                        * head_dim;
-                let grad_output_base =
-                    ((batch_index * query_heads + head_index) * query_seq + query_index)
-                        * value_dim;
+                    ((batch_index * query_heads + head_index) * query_seq + query_index) * head_dim;
+                let grad_output_base = ((batch_index * query_heads + head_index) * query_seq
+                    + query_index)
+                    * value_dim;
                 let mut max_score = f32::NEG_INFINITY;
                 let mut valid_scores = 0usize;
                 for key_index in 0..key_seq {
@@ -5313,6 +5374,79 @@ mod tests {
     }
 
     #[test]
+    fn reference_evaluation_executes_silu_backend_extension() -> Result<(), Box<dyn Error>> {
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let input = builder.input("x", Shape::new(vec![4]), DType::F32, true);
+        let activated = builder.silu(&input)?;
+        let graph = builder.finish(vec![activated.clone()]);
+
+        let inputs = BTreeMap::from([(input.id(), TensorData::F32(vec![-2.0, -0.5, 0.75, 3.0]))]);
+        let values = evaluate_graph(graph.graph(), &inputs)?;
+        let output = dense_tensor(values.get(&activated.id()).expect("forward output"));
+        let expected = vec![
+            -2.0 / (1.0 + 2.0_f32.exp()),
+            -0.5 / (1.0 + 0.5_f32.exp()),
+            0.75 / (1.0 + (-0.75_f32).exp()),
+            3.0 / (1.0 + (-3.0_f32).exp()),
+        ];
+        assert_close_slice(&output, &expected, 1e-6);
+        Ok(())
+    }
+
+    #[test]
+    fn reverse_mode_autodiff_materializes_silu_gradients_against_finite_difference(
+    ) -> Result<(), Box<dyn Error>> {
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let input = builder.input("x", Shape::new(vec![4]), DType::F32, true);
+        let activated = builder.silu(&input)?;
+        let scale = builder.constant_f32(Shape::new(vec![4]), vec![0.5, -1.0, 0.25, 1.5])?;
+        let scaled = builder.mul(&activated, &scale)?;
+        let loss = builder.reduce_sum(&scaled);
+        let graph = builder.finish(vec![loss.clone()]);
+
+        let backward_plan = graph.backward_plan(loss.id())?;
+        assert!(backward_plan.gradient_for(input.id()).is_some());
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                crate::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::SiluBackward
+                }
+            )));
+
+        let input_values = vec![-1.25_f32, -0.5, 0.75, 2.0];
+        let inputs = BTreeMap::from([(input.id(), TensorData::F32(input_values.clone()))]);
+        let result = graph.backward_materialized(loss.id(), &inputs)?;
+        let analytical = dense_gradient(&result, input.id());
+
+        let delta = 1e-3_f32;
+        let mut finite = vec![0.0_f32; input_values.len()];
+        for index in 0..input_values.len() {
+            let mut plus = input_values.clone();
+            plus[index] += delta;
+            let mut minus = input_values.clone();
+            minus[index] -= delta;
+            finite[index] = (scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([(input.id(), TensorData::F32(plus))]),
+            )? - scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([(input.id(), TensorData::F32(minus))]),
+            )?) / (2.0 * delta);
+        }
+
+        assert_close_slice(&analytical, &finite, 2e-3);
+        Ok(())
+    }
+
+    #[test]
     fn reference_evaluation_executes_rms_norm_backend_extension() -> Result<(), Box<dyn Error>> {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
@@ -5446,8 +5580,8 @@ mod tests {
         let scale = builder.constant_f32(
             Shape::new(vec![1, 2, 2, 4]),
             vec![
-                0.5, -1.0, 0.25, 1.5, -0.75, 0.8, 0.1, -0.4, 0.3, -0.2, 0.6, -0.9, 0.4, 0.7,
-                -0.5, 0.2,
+                0.5, -1.0, 0.25, 1.5, -0.75, 0.8, 0.1, -0.4, 0.3, -0.2, 0.6, -0.9, 0.4, 0.7, -0.5,
+                0.2,
             ],
         )?;
         let scaled = builder.mul(&roped, &scale)?;
@@ -5468,8 +5602,8 @@ mod tests {
             )));
 
         let input_values = vec![
-            0.1_f32, -0.3, 0.5, 0.7, -0.2, 0.4, -0.6, 0.8, 0.9, -1.1, 1.3, -1.5, 0.25, -0.45,
-            0.65, -0.85,
+            0.1_f32, -0.3, 0.5, 0.7, -0.2, 0.4, -0.6, 0.8, 0.9, -1.1, 1.3, -1.5, 0.25, -0.45, 0.65,
+            -0.85,
         ];
         let inputs = BTreeMap::from([(input.id(), TensorData::F32(input_values.clone()))]);
         let result = graph.backward_materialized(loss.id(), &inputs)?;
@@ -5509,8 +5643,8 @@ mod tests {
         let scale = builder.constant_f32(
             Shape::new(vec![1, 2, 2, 4]),
             vec![
-                0.25, -0.75, 1.25, -0.5, 0.1, 0.9, -0.2, 0.4, -0.3, 0.7, -0.6, 0.8, 1.1, -0.4,
-                0.2, -0.9,
+                0.25, -0.75, 1.25, -0.5, 0.1, 0.9, -0.2, 0.4, -0.3, 0.7, -0.6, 0.8, 1.1, -0.4, 0.2,
+                -0.9,
             ],
         )?;
         let scaled = builder.mul(&attended, &scale)?;
@@ -5553,8 +5687,8 @@ mod tests {
             )));
 
         let query_values = vec![
-            0.1_f32, -0.2, 0.3, -0.4, 0.5, -0.6, 0.7, -0.8, -0.9, 1.0, -1.1, 1.2, -1.3, 1.4,
-            -1.5, 1.6,
+            0.1_f32, -0.2, 0.3, -0.4, 0.5, -0.6, 0.7, -0.8, -0.9, 1.0, -1.1, 1.2, -1.3, 1.4, -1.5,
+            1.6,
         ];
         let key_values = vec![0.2_f32, -0.1, 0.4, -0.3, 0.6, -0.5, 0.8, -0.7];
         let value_values = vec![-0.15_f32, 0.25, -0.35, 0.45, -0.55, 0.65, -0.75, 0.85];
@@ -5770,7 +5904,9 @@ mod tests {
         let sin = rope_builder
             .constant_f32(Shape::new(vec![2, 2]), vec![0.0, 0.1, 0.2, 0.3])
             .expect("sin");
-        let roped = rope_builder.rope(&rope_input, &cos, &sin, false).expect("rope");
+        let roped = rope_builder
+            .rope(&rope_input, &cos, &sin, false)
+            .expect("rope");
         let rope_graph = rope_builder.finish(vec![roped]);
         let Some(node) = rope_graph
             .graph()
@@ -5787,8 +5923,7 @@ mod tests {
 
         let mut attention_builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
-        let query =
-            attention_builder.input("q", Shape::new(vec![1, 2, 2, 4]), DType::F32, true);
+        let query = attention_builder.input("q", Shape::new(vec![1, 2, 2, 4]), DType::F32, true);
         let key = attention_builder.input("k", Shape::new(vec![1, 1, 2, 4]), DType::F32, true);
         let value = attention_builder.input("v", Shape::new(vec![1, 1, 2, 4]), DType::F32, true);
         let attended = attention_builder

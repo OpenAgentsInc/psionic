@@ -3844,6 +3844,18 @@ const BUILTIN_OPERATOR_SCHEMAS: &[OperatorSchema] = &[
         OperatorMetaExecutionKind::BuiltinInference,
     ),
     OperatorSchema::new(
+        "silu",
+        OperatorArity::Fixed(1),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
+        "silu_backward",
+        OperatorArity::Fixed(2),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
         "rms_norm",
         OperatorArity::Fixed(2),
         OperatorImplementationKind::BackendKernel,
@@ -4353,6 +4365,44 @@ fn meta_execute_backend_extension(
     inputs: &[TensorSpec],
 ) -> Result<TensorSpec, GraphError> {
     match op {
+        BackendExtensionOp::Silu => {
+            if inputs.len() != 1 {
+                return Err(extension_error(
+                    "silu",
+                    format!("expected 1 input, received {}", inputs.len()),
+                ));
+            }
+            Ok(TensorSpec::new(
+                inputs[0].shape().clone(),
+                inputs[0].dtype(),
+                inputs[0].device().clone(),
+            ))
+        }
+        BackendExtensionOp::SiluBackward => {
+            if inputs.len() != 2 {
+                return Err(extension_error(
+                    "silu_backward",
+                    format!("expected 2 inputs, received {}", inputs.len()),
+                ));
+            }
+            let input = &inputs[0];
+            let grad_output = &inputs[1];
+            if input != grad_output {
+                return Err(extension_error(
+                    "silu_backward",
+                    format!(
+                        "input spec {} must match grad_output spec {}",
+                        format_spec(input),
+                        format_spec(grad_output)
+                    ),
+                ));
+            }
+            Ok(TensorSpec::new(
+                input.shape().clone(),
+                input.dtype(),
+                input.device().clone(),
+            ))
+        }
         BackendExtensionOp::RmsNorm { .. } => {
             ensure_matching_specs("rms_norm", inputs)?;
             let input = &inputs[0];
@@ -4785,6 +4835,31 @@ impl GraphBuilder {
         ))
     }
 
+    /// Applies SiLU pointwise activation.
+    pub fn silu(&mut self, input: &Tensor) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::Silu;
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[input],
+            None,
+        )?;
+        Ok(self.register_backend_extension(op, vec![input.id()], spec))
+    }
+
+    pub(crate) fn silu_backward(
+        &mut self,
+        input: &Tensor,
+        grad_output: &Tensor,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::SiluBackward;
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[input, grad_output],
+            None,
+        )?;
+        Ok(self.register_backend_extension(op, vec![input.id(), grad_output.id()], spec))
+    }
+
     /// Applies RMS normalization over the last dimension.
     pub fn rms_norm(
         &mut self,
@@ -4891,11 +4966,7 @@ impl GraphBuilder {
             &[grad_output, cos, sin],
             None,
         )?;
-        Ok(self.register_backend_extension(
-            op,
-            vec![grad_output.id(), cos.id(), sin.id()],
-            spec,
-        ))
+        Ok(self.register_backend_extension(op, vec![grad_output.id(), cos.id(), sin.id()], spec))
     }
 
     /// Applies scaled dot-product attention over rank-4 `[batch, heads, seq, dim]` tensors.
@@ -5261,6 +5332,7 @@ fn format_execution_payload(op: &ExecutionOp) -> String {
 
 fn format_backend_extension_payload(op: &BackendExtensionOp) -> String {
     match op {
+        BackendExtensionOp::Silu | BackendExtensionOp::SiluBackward => String::new(),
         BackendExtensionOp::RmsNorm { epsilon }
         | BackendExtensionOp::RmsNormInputBackward { epsilon }
         | BackendExtensionOp::RmsNormWeightBackward { epsilon } => {
@@ -5562,8 +5634,8 @@ fn validate_scaled_dot_product_attention_backward_spec(
 
 /// Returns the seeded advanced operator-program matrix report for the current
 /// bounded Psionic semantics surface.
-pub fn builtin_advanced_operator_program_matrix_report()
--> Result<AdvancedOperatorProgramMatrixReport, GraphError> {
+pub fn builtin_advanced_operator_program_matrix_report(
+) -> Result<AdvancedOperatorProgramMatrixReport, GraphError> {
     let mut cases = Vec::new();
 
     cases.push(run_advanced_operator_program_supported_case(
@@ -5938,19 +6010,19 @@ mod tests {
     use psionic_core::{Device, PsionicRefusalCode, PsionicRefusalScope, QuantizationMode};
 
     use super::{
-        AdvancedOperatorProgramStatus, DType, ExecutionOp, ExecutionPlan, ExecutionStep,
-        ExtensionContractKind, FunctionalTensorKind, FunctionalizationPolicy, GraphBuilder,
-        GraphError, GraphTransformError, KernelDispatchKind, KernelRegistration,
-        MaskedMetaContract, MetaCapabilityProfile, MetaTensor, MetaTensorFamily,
-        MetaTensorFamilyKind, NestedMetaContract, OperatorArity, OperatorImplementationKind,
-        OperatorMetaExecutionKind, OperatorParityStatus, OperatorRegistry, ProgramTransformFamily,
-        RegisteredOperatorSchema, RegistryExtensionError, Shape, SparseMetaContract,
-        SparseMetaLayout, StorageAwareMetaContract, TensorFamilyCapabilityStatus,
-        TensorFamilyCapabilitySurface, TensorSpec, TransformBarrierKind,
         builtin_advanced_operator_program_matrix_report,
         builtin_extension_contract_semantics_report, builtin_operator_parity_matrix_report,
         builtin_program_transform_capability_matrix_report,
-        builtin_tensor_family_capability_matrix_report,
+        builtin_tensor_family_capability_matrix_report, AdvancedOperatorProgramStatus, DType,
+        ExecutionOp, ExecutionPlan, ExecutionStep, ExtensionContractKind, FunctionalTensorKind,
+        FunctionalizationPolicy, GraphBuilder, GraphError, GraphTransformError, KernelDispatchKind,
+        KernelRegistration, MaskedMetaContract, MetaCapabilityProfile, MetaTensor,
+        MetaTensorFamily, MetaTensorFamilyKind, NestedMetaContract, OperatorArity,
+        OperatorImplementationKind, OperatorMetaExecutionKind, OperatorParityStatus,
+        OperatorRegistry, ProgramTransformFamily, RegisteredOperatorSchema, RegistryExtensionError,
+        Shape, SparseMetaContract, SparseMetaLayout, StorageAwareMetaContract,
+        TensorFamilyCapabilityStatus, TensorFamilyCapabilitySurface, TensorSpec,
+        TransformBarrierKind,
     };
 
     #[test]
@@ -6379,12 +6451,10 @@ mod tests {
         let report = builtin_tensor_family_capability_matrix_report();
         assert_eq!(report.schema_version, 1);
         assert_eq!(report.current_scope_window, "psionic_tensor_family_v1");
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("matrix_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("matrix_digest=")));
 
         let sparse_meta = report
             .cases
@@ -6594,12 +6664,10 @@ mod tests {
         let report = builtin_program_transform_capability_matrix_report();
         assert_eq!(report.schema_version, 1);
         assert_eq!(report.current_scope_window, "psionic_program_transform_v3");
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("matrix_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("matrix_digest=")));
 
         let mut builder = GraphBuilder::new(Device::cpu());
         let input = builder.input("input", Shape::new(vec![2, 4]), DType::F32);
@@ -6704,12 +6772,10 @@ mod tests {
             report.current_scope_window,
             "psionic_extension_contracts_v1"
         );
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("report_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("report_digest=")));
 
         let custom_op = report
             .cases
@@ -6790,17 +6856,15 @@ mod tests {
     }
 
     #[test]
-    fn operator_parity_matrix_report_tracks_seeded_supported_and_refusal_cases()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn operator_parity_matrix_report_tracks_seeded_supported_and_refusal_cases(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let report = builtin_operator_parity_matrix_report()?;
         assert_eq!(report.schema_version, 1);
         assert_eq!(report.oracle_family_window, "pytorch_opinfo_seed_v0");
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("matrix_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("matrix_digest=")));
 
         let add_case = report
             .cases
@@ -6844,20 +6908,18 @@ mod tests {
     }
 
     #[test]
-    fn advanced_operator_program_matrix_tracks_supported_and_refused_families()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn advanced_operator_program_matrix_tracks_supported_and_refused_families(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let report = builtin_advanced_operator_program_matrix_report()?;
         assert_eq!(report.schema_version, 1);
         assert_eq!(
             report.oracle_family_window,
             "pytorch_advanced_program_seed_v0"
         );
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("matrix_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("matrix_digest=")));
 
         let linalg_case = report
             .cases
