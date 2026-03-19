@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.mixed_numeric_profile_ladder.report.v1",
+  "ladder_contract": {
+    "schema_version": 1,
+    "contract_id": "tassadar.mixed_numeric_profile_ladder.contract.v1",
+    "profiles": [
+      {
+        "profile_id": "tassadar.numeric_profile.f32_only.v1",
+        "support_posture": "exact",
+        "admitted_conversion_ids": [
+          "f32_identity",
+          "f32_ordered_comparison"
+        ],
+        "refused_reason_ids": [
+          "f64_out_of_scope",
+          "mixed_numeric_out_of_scope"
+        ],
+        "detail": "scalar-f32 arithmetic and ordered comparisons remain exact inside the bounded float lane"
+      },
+      {
+        "profile_id": "tassadar.numeric_profile.mixed_i32_f32.v1",
+        "support_posture": "exact",
+        "admitted_conversion_ids": [
+          "i32_to_f32_exact_range",
+          "f32_to_i32_trunc_checked",
+          "mixed_i32_f32_scale_add_exact"
+        ],
+        "refused_reason_ids": [
+          "i32_to_f32_non_exact",
+          "f32_to_i32_invalid"
+        ],
+        "detail": "mixed i32/f32 programs are exact only inside the declared exact-conversion and checked-truncation envelope"
+      },
+      {
+        "profile_id": "tassadar.numeric_profile.bounded_f64_conversion.v1",
+        "support_posture": "bounded_approximate",
+        "admitted_conversion_ids": [
+          "f64_to_f32_bounded_rounding"
+        ],
+        "refused_reason_ids": [
+          "f64_out_of_range",
+          "f64_nan_invalid"
+        ],
+        "detail": "bounded f64 conversion is admitted only as an explicit approximation envelope into f32, not as full f64 exactness"
+      }
+    ],
+    "refused_numeric_family_ids": [
+      "arbitrary_mixed_numeric_programs",
+      "full_f64_exactness",
+      "generic_wasm_numeric_closure"
+    ],
+    "claim_boundary": "this contract stages mixed numeric widening into exact scalar-f32, exact mixed i32/f32, and bounded-approximate f64-to-f32 profiles. It does not claim arbitrary Wasm numeric closure, generic mixed-numeric exactness, or full f64 exactness",
+    "contract_digest": "6b508dc031219f9f8878d9d2315f353e4fe9ddf95d835b8994250ab1b1d3cc37"
+  },
+  "exact_case_count": 3,
+  "bounded_approximate_case_count": 1,
+  "refusal_case_count": 3,
+  "cases": [
+    {
+      "case_id": "i32_to_f32_exact_range",
+      "source_ref": "synthetic://tassadar/mixed_numeric_profile_ladder/v1",
+      "profile_id": "tassadar.numeric_profile.mixed_i32_f32.v1",
+      "status": "exact",
+      "observed_f32_bits_hex": "0x44800000",
+      "expected_f32_bits_hex": "0x44800000"
+    },
+    {
+      "case_id": "i32_to_f32_nonexact_refusal",
+      "source_ref": "synthetic://tassadar/mixed_numeric_profile_ladder/v1",
+      "profile_id": "tassadar.numeric_profile.mixed_i32_f32.v1",
+      "status": "refused",
+      "refusal_reason_id": "i32_to_f32_non_exact",
+      "refusal_detail": "mixed i32/f32 exactness refuses i32 values outside the exact f32 range"
+    },
+    {
+      "case_id": "f32_to_i32_trunc_exact",
+      "source_ref": "synthetic://tassadar/mixed_numeric_profile_ladder/v1",
+      "profile_id": "tassadar.numeric_profile.mixed_i32_f32.v1",
+      "status": "exact",
+      "observed_i32": 42,
+      "expected_i32": 42
+    },
+    {
+      "case_id": "f32_to_i32_nan_refusal",
+      "source_ref": "synthetic://tassadar/mixed_numeric_profile_ladder/v1",
+      "profile_id": "tassadar.numeric_profile.mixed_i32_f32.v1",
+      "status": "refused",
+      "refusal_reason_id": "f32_to_i32_invalid_nan",
+      "refusal_detail": "checked f32-to-i32 truncation refuses NaN inputs"
+    },
+    {
+      "case_id": "mixed_i32_f32_scale_add_exact",
+      "source_ref": "synthetic://tassadar/mixed_numeric_profile_ladder/v1",
+      "profile_id": "tassadar.numeric_profile.mixed_i32_f32.v1",
+      "status": "exact",
+      "observed_f32_bits_hex": "0x40400000",
+      "expected_f32_bits_hex": "0x40400000"
+    },
+    {
+      "case_id": "f64_to_f32_bounded_approximate",
+      "source_ref": "synthetic://tassadar/mixed_numeric_profile_ladder/v1",
+      "profile_id": "tassadar.numeric_profile.bounded_f64_conversion.v1",
+      "status": "bounded_approximate",
+      "observed_f32_bits_hex": "0x3dcccccd",
+      "expected_f32_bits_hex": "0x3dcccccd"
+    },
+    {
+      "case_id": "f64_to_f32_out_of_range_refusal",
+      "source_ref": "synthetic://tassadar/mixed_numeric_profile_ladder/v1",
+      "profile_id": "tassadar.numeric_profile.bounded_f64_conversion.v1",
+      "status": "refused",
+      "refusal_reason_id": "f64_out_of_range",
+      "refusal_detail": "bounded f64 conversion refuses values outside the f32 range"
+    }
+  ],
+  "profile_coverage": [
+    {
+      "profile_id": "tassadar.numeric_profile.f32_only.v1",
+      "support_posture": "exact",
+      "exact_case_ids": [],
+      "bounded_approximate_case_ids": [],
+      "refusal_case_ids": []
+    },
+    {
+      "profile_id": "tassadar.numeric_profile.mixed_i32_f32.v1",
+      "support_posture": "exact",
+      "exact_case_ids": [
+        "i32_to_f32_exact_range",
+        "f32_to_i32_trunc_exact",
+        "mixed_i32_f32_scale_add_exact"
+      ],
+      "bounded_approximate_case_ids": [],
+      "refusal_case_ids": [
+        "i32_to_f32_nonexact_refusal",
+        "f32_to_i32_nan_refusal"
+      ]
+    },
+    {
+      "profile_id": "tassadar.numeric_profile.bounded_f64_conversion.v1",
+      "support_posture": "bounded_approximate",
+      "exact_case_ids": [],
+      "bounded_approximate_case_ids": [
+        "f64_to_f32_bounded_approximate"
+      ],
+      "refusal_case_ids": [
+        "f64_to_f32_out_of_range_refusal"
+      ]
+    }
+  ],
+  "claim_boundary": "this report stages numeric widening into exact scalar-f32, exact mixed i32/f32, and bounded-approximate f64-to-f32 cases while keeping malformed conversions and out-of-profile inputs on typed refusal paths. It does not claim arbitrary Wasm numeric closure or full f64 exactness",
+  "report_digest": "c7f9e336a3922d2b496aa1ba39ce91a829a58f3a17d5f2af92252a32b3a3d018"
+}

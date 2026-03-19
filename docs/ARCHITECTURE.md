@@ -731,6 +731,12 @@ The current scope is:
   which narrows float semantics to one scalar-`f32`, CPU-reference-only lane
   with canonical quiet-NaN normalization and ordered Wasm-style comparisons;
   `f64`, NaN-payload preservation, and non-CPU fast-math remain explicit refusals
+- the current mixed-numeric widening artifact is
+  `fixtures/tassadar/reports/tassadar_mixed_numeric_profile_ladder_report.json`,
+  which stages exact scalar-`f32`, exact mixed `i32`/`f32`, and
+  bounded-approximate `f64 -> f32` conversion profiles with typed refusal on
+  malformed, out-of-range, and non-exact conversion regimes; this is not
+  arbitrary Wasm numeric closure or full `f64` exactness
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

@@ -39,6 +39,7 @@ This runbook covers the current repo-owned bounded Wasm flow only:
 - frozen core-Wasm window declaration and official harness
 - frozen core-Wasm semantic parity and closure gate
 - bounded scalar-f32 semantics, NaN policy, and comparison matrix
+- frozen mixed-numeric profile ladder
 - normalized Wasm-module ingress
 - differential Wasm conformance against `wasmi`
 - module-scale Wasm workload suite
@@ -74,6 +75,11 @@ Public claim discipline for this lane is:
   `fixtures/tassadar/reports/tassadar_float_semantics_comparison_matrix_report.json`
 - that float artifact is scalar-`f32`, CPU-reference-only, and refusal-first
   outside its declared regimes; it is not generic Wasm float closure
+- the current mixed-numeric widening artifact is
+  `fixtures/tassadar/reports/tassadar_mixed_numeric_profile_ladder_report.json`
+- that mixed-numeric artifact stages exact scalar-`f32`, exact mixed
+  `i32`/`f32`, and bounded-approximate `f64 -> f32` conversion profiles; it
+  is not generic Wasm numeric closure or full `f64` exactness
 - imports, effects, and host capability policy remain separate embedding
   contracts, not part of the bounded core language claim
 
@@ -728,6 +734,32 @@ Expected outcome:
 - this artifact widens bounded numeric semantics only; it does not make full
   Wasm float execution or served publication green
 
+### 6E. Frozen mixed-numeric profile ladder
+
+```bash
+cargo run -p psionic-eval --example tassadar_mixed_numeric_profile_ladder_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_mixed_numeric_profile_ladder_report.json`
+
+Expected outcome:
+
+- one machine-readable ladder now stages numeric widening into exact
+  scalar-`f32`, exact mixed `i32`/`f32`, and bounded-approximate
+  `f64 -> f32` conversion profiles
+- exact cases should currently cover in-range `i32 -> f32`,
+  checked-truncation `f32 -> i32`, and one exact mixed scale-add case
+- bounded-approximate cases should currently remain explicit rather than being
+  flattened into exactness, especially for non-roundtripping `f64 -> f32`
+  narrowing
+- explicit refusal cases should currently cover non-exact `i32 -> f32`, NaN
+  `f32 -> i32`, and out-of-range `f64 -> f32`
+- this artifact widens one declared mixed-numeric family only; it does not
+  make arbitrary Wasm numeric closure, generic mixed-numeric exactness, or
+  full `f64` exactness green
+
 ### 7. Differential Wasm conformance
 
 ```bash
@@ -791,6 +823,7 @@ cargo test -p psionic-eval wasm_module_ingress -- --nocapture
 cargo test -p psionic-eval frozen_core_wasm_window -- --nocapture
 cargo test -p psionic-eval frozen_core_wasm_closure_gate -- --nocapture
 cargo test -p psionic-eval float_semantics -- --nocapture
+cargo test -p psionic-eval mixed_numeric -- --nocapture
 cargo test -p psionic-eval wasm_conformance -- --nocapture
 cargo test -p psionic-eval module_scale_workload_suite -- --nocapture
 cargo test -p psionic-eval trap_exception -- --nocapture
@@ -809,6 +842,9 @@ These checks should keep the committed reports and generated truth aligned.
   regression.
 - If the float-semantics matrix starts claiming non-CPU backends, `f64`, or
   NaN-payload preservation without new evidence, that is a real claim-discipline
+  regression.
+- If the mixed-numeric ladder starts claiming arbitrary mixed-numeric closure
+  or full `f64` exactness without new evidence, that is a real claim-discipline
   regression.
 - If the ingress report stops lowering the seeded synthetic module exactly, that
   is a real bounded module-lane regression.

@@ -116,6 +116,8 @@ mod tassadar_locality_envelope;
 mod tassadar_locality_scratchpad;
 #[path = "tassadar_memory_abi_v2.rs"]
 mod tassadar_memory_abi_v2;
+#[path = "tassadar_mixed_numeric_ladder.rs"]
+mod tassadar_mixed_numeric_ladder;
 #[path = "tassadar_mixed_trajectory.rs"]
 mod tassadar_mixed_trajectory;
 #[path = "tassadar_module_installation_staging.rs"]
@@ -257,6 +259,7 @@ pub use tassadar_linked_program_bundle::*;
 pub use tassadar_locality_envelope::*;
 pub use tassadar_locality_scratchpad::*;
 pub use tassadar_memory_abi_v2::*;
+pub use tassadar_mixed_numeric_ladder::*;
 pub use tassadar_mixed_trajectory::*;
 pub use tassadar_module_installation_staging::*;
 pub use tassadar_module_linker::*;

@@ -44,6 +44,10 @@ Current honest posture:
   quiet-NaN normalization, ordered Wasm-style comparisons, CPU-reference-only
   execution posture, and explicit refusal on `f64`, NaN-payload preservation,
   and non-CPU fast-math regimes
+- the repo now also has a staged mixed-numeric ladder over exact scalar-`f32`,
+  exact mixed `i32`/`f32`, and bounded-approximate `f64 -> f32` conversion
+  profiles, with malformed and out-of-envelope conversions kept on explicit
+  typed refusal paths
 - broader profiles above that remain benchmarked, suppressed, refused, or
   unpromoted unless their explicit gates are green
 
@@ -69,9 +73,9 @@ Current dependency spine:
 
 Issue-state note:
 
-- `TAS-103` through `TAS-115` are already implemented and tracked in
+- `TAS-103` through `TAS-116` are already implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-116` and runs through
+- the current open GitHub backlog begins at `TAS-117` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs
