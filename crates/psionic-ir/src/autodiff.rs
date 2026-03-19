@@ -2283,6 +2283,9 @@ impl AutodiffGraph {
         let gradient_outputs = gradient_targets
             .iter()
             .filter_map(|target| gradients.get(&target.primal_tensor).cloned())
+            .scan(BTreeSet::new(), |seen, tensor| {
+                seen.insert(tensor.id()).then_some(tensor)
+            })
             .collect::<Vec<_>>();
         let primal_bindings = primal_bindings
             .into_iter()
@@ -4568,7 +4571,11 @@ fn ravel_index(coords: &[usize], dims: &[usize]) -> usize {
 mod tests {
     #![allow(clippy::expect_used)]
 
-    use std::{collections::BTreeMap, error::Error, sync::Arc};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        error::Error,
+        sync::Arc,
+    };
 
     use psionic_core::{DType, Device, PsionicRefusalCode, PsionicRefusalScope, Shape, TensorData};
 
@@ -4825,6 +4832,35 @@ mod tests {
 
         assert_close_slice(&analytical_input, &finite_input, 2e-3);
         assert_close_slice(&analytical_weight, &finite_weight, 2e-3);
+        Ok(())
+    }
+
+    #[test]
+    fn backward_plan_deduplicates_gradient_graph_outputs_for_residual_mix_graph(
+    ) -> Result<(), Box<dyn Error>> {
+        let shape = Shape::new(vec![1, 2, 4]);
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let current = builder.input("current", shape.clone(), DType::F32, true);
+        let source = builder.input("source", shape.clone(), DType::F32, true);
+        let mix_current = builder.input("mix_current", shape.clone(), DType::F32, true);
+        let mix_source = builder.input("mix_source", shape.clone(), DType::F32, true);
+        let mixed_current = builder.mul(&current, &mix_current)?;
+        let mixed_source = builder.mul(&source, &mix_source)?;
+        let mixed = builder.add(&mixed_current, &mixed_source)?;
+        let graph = builder.finish(vec![mixed.clone()]);
+
+        let backward_plan = graph.backward_plan(mixed.id())?;
+        let unique_outputs = backward_plan
+            .gradient_graph
+            .outputs()
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            unique_outputs.len(),
+            backward_plan.gradient_graph.outputs().len()
+        );
         Ok(())
     }
 

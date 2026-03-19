@@ -368,11 +368,10 @@
       "axes": [],
       "stages": []
     },
-    "training_capability_report_digest": "61b5efd220154169e7cb1e1d3c580e5de567404101123ef847d838263f0b8ca6",
+    "training_capability_report_digest": "ae4d011a7f8b7aa1e63fa69dc8533d37517a1536c51b27bc193e781e8d1dced7",
     "challenge_kernel_blockers": [
       "cuda_bf16_train_precision_contract",
       "cuda_rope_gqa_attention_block",
-      "cuda_residual_mix_train_path",
       "cuda_muon_optimizer_path"
     ],
     "disposition": "refused",
@@ -385,12 +384,11 @@
       "The current exported-folder evidence is bound to a local review host rather than challenge-matching 8xH100 inventory, so the challenge receipt remains an explicit refusal.",
       "cuda_bf16_train_precision_contract: Do not treat the BF16 policy contract as proof that the public CUDA array surface already owns broad BF16 tensor, backward, and optimizer execution.",
       "cuda_rope_gqa_attention_block: IR-level attention or RoPE coverage is now explicit, but the public CUDA train path still lacks a declared direct decoder-block execution surface.",
-      "cuda_residual_mix_train_path: Treat residual support as forward operator evidence only until the fused decoder path and backward lane are widened on CUDA.",
       "cuda_muon_optimizer_path: Muon semantics are explicit and distributed communication is explicit, but the train-time CUDA optimizer surface is still narrower than the lane contract."
     ],
     "claim_boundary": "exact 8xH100 DDP-style topology, communication, wallclock, and memory receipts are explicit, but challenge-ready CUDA kernel and runtime widening remains a separate closure item",
-    "receipt_digest": "4c536637c17844388821f3e0720954195416a921160d64f170da675cfe657761"
+    "receipt_digest": "7e050833382bce2f58db7cd2233eb2a358bd1696ecd0ebb607e4085192d782a0"
   },
   "claim_boundary": "This report binds the exact exported submission folder to one real folder-local entrypoint replay, the preserved bounded wallclock/memory/artifact receipts, and one measured-or-refused 8xH100 challenge receipt. The committed evidence is still a local review-host refusal rather than true 8xH100 success.",
-  "report_digest": "175a6ad4b88d60eb3153ce038b34587bdbf375126ae2b037881c7511254cde02"
+  "report_digest": "bf41b67dada958e6f7eac5ff89a79113530c135d62e2cf59d57343f5285fb5a6"
 }

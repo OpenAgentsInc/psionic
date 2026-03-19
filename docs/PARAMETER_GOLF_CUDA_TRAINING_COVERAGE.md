@@ -43,6 +43,11 @@ The public CUDA backend now also executes the bounded RMSNorm backward graph
 ops introduced by that autodiff seam, so RMSNorm itself is no longer part of
 the remaining blocker set.
 
+The public CUDA backend now also executes one bounded residual-mix training
+graph directly through dense `add`/`mul` plus CUDA backward graphs when the
+residual-control tensors are already materialized to activation shape, so the
+explicit residual-mix blocker is also retired.
+
 That means the remaining CUDA train-path blockers are now machine-readable on
 the same benchmark seam that already carries topology, communication,
 wallclock, and memory facts.
@@ -62,7 +67,6 @@ The current canonical blocker set is:
 
 - `cuda_bf16_train_precision_contract`
 - `cuda_rope_gqa_attention_block`
-- `cuda_residual_mix_train_path`
 - `cuda_muon_optimizer_path`
 
 ## Current Honest Boundary
@@ -74,15 +78,17 @@ Today it keeps these truths separate:
 - `implemented_early`
   - bounded dense contiguous `f32` RMSNorm forward plus backward graph
     execution is real on the public CUDA path
+  - one bounded full-shape residual-mix train graph is real on the public CUDA
+    path
   - post-train quantized export or roundtrip support is real
 - `partial`
-  - BF16 policy, attention or RoPE program shape, residual decoder-path
-    closure, and Muon semantics all have explicit substrate or refusal
-    contracts
+  - BF16 policy, attention or RoPE program shape, and Muon semantics all have
+    explicit substrate or refusal contracts
   - the public CUDA execution backend now genuinely owns dense `f32`
     pointwise `mul` plus bounded dense contiguous `f32` RMSNorm forward and
-    backward execution, but the full decoder or optimizer train path is still
-    narrower than the Parameter Golf challenge lane
+    backward execution, plus one bounded residual-mix graph, but the full
+    decoder or optimizer train path is still narrower than the Parameter Golf
+    challenge lane
 
 This is the intended contract for the issue: do not hide missing CUDA kernels
 behind broader model or distributed receipts.
@@ -100,6 +106,8 @@ Without this report, the repo could say all of these misleading things:
 - one forward CUDA surface widening means the whole decoder block now trains on
   CUDA
 - one bounded RMSNorm closure means the whole decoder block now trains on CUDA
+- one bounded full-shape residual-mix graph means generic broadcast or fused
+  decoder closure now exists
 - a CPU-reference Muon implementation means the CUDA optimizer surface is done
 - artifact quantization means train-time low-precision closure is done
 

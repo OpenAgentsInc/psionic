@@ -204,15 +204,15 @@ pub fn builtin_parameter_golf_cuda_training_capability_report(
             ParameterGolfCudaTrainingCoverageCase {
                 case_id: String::from("cuda_residual_mix_train_path"),
                 family: ParameterGolfCudaTrainingFamily::Residual,
-                status: ParameterGolfCudaTrainingCoverageStatus::Partial,
+                status: ParameterGolfCudaTrainingCoverageStatus::ImplementedEarly,
                 required_scope: String::from(
                     "the compact decoder baseline requires residual addition plus learned residual-mix control tensors across the train-time path",
                 ),
                 current_surface: String::from(
-                    "simple add is inside the public builtin operator matrix, and the public CUDA execution backend now also executes dense f32 pointwise mul for residual-control tensors, but the coupled decoder path still rides on CPU reference and IR evidence rather than a widened direct CUDA train path",
+                    "the public CUDA runtime now executes one bounded Parameter Golf residual-mix train graph directly through dense contiguous f32 add and mul plus CUDA backward graphs when the residual-control tensors are already materialized to activation shape",
                 ),
                 boundary_note: String::from(
-                    "Treat residual support as forward operator evidence only until the fused decoder path and backward lane are widened on CUDA.",
+                    "Do not treat bounded full-shape residual-control execution as proof that generic broadcast, fused decoder, or RoPE/GQA closure is already done.",
                 ),
             },
             ParameterGolfCudaTrainingCoverageCase {
@@ -291,11 +291,15 @@ mod tests {
             report.cases.last().expect("quantization case").status,
             ParameterGolfCudaTrainingCoverageStatus::ImplementedEarly
         );
-        assert_eq!(report.blocking_case_ids.len(), 4);
+        assert_eq!(report.blocking_case_ids.len(), 3);
         assert!(!report
             .blocking_case_ids
             .iter()
             .any(|case_id| case_id == "cuda_rms_norm_train_path"));
+        assert!(!report
+            .blocking_case_ids
+            .iter()
+            .any(|case_id| case_id == "cuda_residual_mix_train_path"));
         Ok(())
     }
 

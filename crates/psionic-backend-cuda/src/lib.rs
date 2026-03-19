@@ -8252,6 +8252,154 @@ mod tests {
     }
 
     #[test]
+    fn cuda_backend_executes_parameter_golf_residual_mix_backward_graph_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let shape = Shape::new(vec![1, 2, 4]);
+        let mut builder = AutodiffGraphBuilder::with_context(
+            selected.device.clone(),
+            AutodiffContext::training(),
+        );
+        let current = builder.input("current", shape.clone(), DType::F32, false);
+        let source = builder.input("source", shape.clone(), DType::F32, false);
+        let mix_current = builder.input("mix_current", shape.clone(), DType::F32, true);
+        let mix_source = builder.constant_f32(
+            shape.clone(),
+            vec![0.1, -0.7, 1.3, 0.8, -0.5, 0.2, 0.75, -1.0],
+        )?;
+        let attention = builder.constant_f32(
+            shape.clone(),
+            vec![0.4, -0.6, 0.3, 0.2, -0.7, 1.0, -0.2, 0.5],
+        )?;
+        let attn_scale = builder.constant_f32(
+            shape.clone(),
+            vec![1.0, 0.5, -1.1, 0.3, 0.2, -0.4, 0.9, 1.4],
+        )?;
+        let mlp = builder.constant_f32(
+            shape.clone(),
+            vec![0.6, 0.7, -0.5, 0.1, -0.3, 0.2, 1.1, -0.8],
+        )?;
+        let mlp_scale = builder.constant_f32(
+            shape.clone(),
+            vec![0.25, -0.9, 0.4, 0.6, 1.2, -0.2, 0.5, 0.75],
+        )?;
+        let skip = builder.constant_f32(
+            shape.clone(),
+            vec![0.3, -1.0, 0.2, 0.9, -0.4, 0.8, -0.6, 1.3],
+        )?;
+        let skip_scale = builder.constant_f32(
+            shape.clone(),
+            vec![1.5, 0.3, -0.7, 0.2, 0.6, -1.4, 0.8, 0.45],
+        )?;
+
+        let mixed_current = builder.mul(&current, &mix_current)?;
+        let mixed_source = builder.mul(&source, &mix_source)?;
+        let mixed = builder.add(&mixed_current, &mixed_source)?;
+        let attention_delta = builder.mul(&attention, &attn_scale)?;
+        let with_attention = builder.add(&mixed, &attention_delta)?;
+        let mlp_delta = builder.mul(&mlp, &mlp_scale)?;
+        let with_mlp = builder.add(&with_attention, &mlp_delta)?;
+        let skip_delta = builder.mul(&skip, &skip_scale)?;
+        let updated = builder.add(&with_mlp, &skip_delta)?;
+        let graph = builder.finish(vec![updated.clone()]);
+
+        let backward_plan = graph.backward_plan(updated.id())?;
+        let plan = compile_graph(&backward_plan.gradient_graph)?;
+        validate_supported_plan(&plan)?;
+
+        let primal_inputs = std::collections::BTreeMap::from([
+            (
+                current.id(),
+                TensorData::F32(vec![0.2, -0.4, 0.8, 1.0, -1.5, 0.3, 0.7, -0.9]),
+            ),
+            (
+                source.id(),
+                TensorData::F32(vec![1.2, 0.5, -0.2, 0.4, 0.6, -1.1, 0.9, 0.25]),
+            ),
+            (
+                mix_current.id(),
+                TensorData::F32(vec![0.9, 1.1, -0.3, 0.5, 0.4, -0.8, 0.6, 1.2]),
+            ),
+        ]);
+        let upstream_seed = TensorData::F32(vec![1.0, -0.25, 0.5, 1.2, -0.75, 0.6, -1.1, 0.8]);
+        let forward_values =
+            evaluate_graph(graph.graph(), &primal_inputs).expect("residual-mix forward eval");
+        let expected = graph
+            .backward_materialized_with_seed(
+                updated.id(),
+                &primal_inputs,
+                Some(upstream_seed.clone()),
+            )
+            .expect("residual-mix backward materialization");
+
+        let mut backward_inputs = std::collections::BTreeMap::new();
+        for node in backward_plan.gradient_graph.nodes() {
+            let psionic_ir::OpKind::Input { .. } = node.op() else {
+                continue;
+            };
+            if node.tensor().id() == backward_plan.seed_input {
+                continue;
+            }
+            let value = backward_plan
+                .primal_bindings
+                .iter()
+                .find(|binding| binding.gradient_graph_input == node.tensor().id())
+                .and_then(|binding| forward_values.get(&binding.primal_tensor))
+                .or_else(|| forward_values.get(&node.tensor().id()))
+                .ok_or("missing forward value for residual-mix backward input")?;
+            backward_inputs.insert(
+                node.tensor().id(),
+                backend.input_buffer(
+                    node.tensor().spec().shape().clone(),
+                    value
+                        .as_f32_slice()
+                        .ok_or("non-f32 residual-mix forward value")?,
+                )?,
+            );
+        }
+        let seed_shape = backward_plan
+            .gradient_graph
+            .node(backward_plan.seed_input)
+            .ok_or("missing residual-mix backward seed node")?
+            .tensor()
+            .spec()
+            .shape()
+            .clone();
+        backward_inputs.insert(
+            backward_plan.seed_input,
+            backend.input_buffer(
+                seed_shape,
+                upstream_seed
+                    .as_f32_slice()
+                    .ok_or("non-f32 residual-mix seed")?,
+            )?,
+        );
+        let result = backend
+            .compile_and_execute(&backward_plan.gradient_graph, &backward_inputs)
+            .expect("cuda residual-mix compile and execute");
+        let gradient_id = backward_plan
+            .gradient_for(mix_current.id())
+            .ok_or("missing residual-mix control gradient id")?;
+        let actual = result
+            .outputs
+            .get(&gradient_id)
+            .ok_or("missing cuda residual-mix control gradient output")?
+            .read_f32()?;
+        let expected_gradient = expected
+            .gradient(mix_current.id())
+            .ok_or("missing expected residual-mix control gradient")?
+            .as_f32_slice()
+            .ok_or("expected residual-mix control gradient is not f32")?;
+        assert_close(&actual, expected_gradient, 1e-5);
+        Ok(())
+    }
+
+    #[test]
     fn cuda_submission_executes_f16_rhs_matmul_when_available(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
