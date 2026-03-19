@@ -34,6 +34,7 @@ mod tassadar_module_manifest;
 mod tassadar_module_overlap_resolution;
 mod tassadar_module_promotion_state;
 mod tassadar_module_trust_isolation;
+mod tassadar_numeric_portability;
 mod tassadar_planner_policy;
 mod tassadar_quantization_truth_envelope;
 mod tassadar_receipt_supervision;
@@ -78,6 +79,7 @@ pub use tassadar_module_manifest::*;
 pub use tassadar_module_overlap_resolution::*;
 pub use tassadar_module_promotion_state::*;
 pub use tassadar_module_trust_isolation::*;
+pub use tassadar_numeric_portability::*;
 pub use tassadar_planner_policy::*;
 pub use tassadar_quantization_truth_envelope::*;
 pub use tassadar_receipt_supervision::*;
@@ -489,6 +491,8 @@ pub struct TassadarCapabilityEnvelope {
         TassadarBroadInternalComputeProfilePublicationReceipt,
     /// Provider-facing receipt for the broad internal-compute portability matrix.
     pub broad_internal_compute_portability_receipt: TassadarBroadInternalComputePortabilityReceipt,
+    /// Provider-facing receipt for the numeric portability matrix.
+    pub numeric_portability_receipt: TassadarNumericPortabilityReceipt,
     /// Provider-facing receipt for the resumable multi-slice promotion lane.
     pub resumable_multi_slice_promotion_receipt: TassadarResumableMultiSlicePromotionReceipt,
     /// Provider-facing receipt for deterministic import-mediated effect-safe resume.
@@ -554,6 +558,14 @@ impl TassadarCapabilityEnvelope {
             TassadarBroadInternalComputePortabilityReceipt::from_report(
                 &broad_internal_compute_portability_report,
             );
+        let numeric_portability_report = psionic_eval::build_tassadar_numeric_portability_report()
+            .map_err(|error| TassadarCapabilityEnvelopeError::UnpublishableNumericPortability {
+                detail: format!(
+                    "provider envelope requires a valid numeric portability report: {error}"
+                ),
+            })?;
+        let numeric_portability_receipt =
+            TassadarNumericPortabilityReceipt::from_report(&numeric_portability_report);
         let resumable_multi_slice_promotion_report =
             psionic_eval::build_tassadar_resumable_multi_slice_promotion_report().map_err(
                 |error| {
@@ -748,6 +760,33 @@ impl TassadarCapabilityEnvelope {
                 },
             );
         }
+        if publication.numeric_portability_report_ref.trim().is_empty()
+            || publication.numeric_portability_backend_family_ids.is_empty()
+            || publication.numeric_portability_toolchain_family_ids.is_empty()
+            || publication.numeric_portability_profile_ids.is_empty()
+            || publication.numeric_portability_backend_family_ids
+                != numeric_portability_receipt.backend_family_ids
+            || publication.numeric_portability_toolchain_family_ids
+                != numeric_portability_receipt.toolchain_family_ids
+            || publication.numeric_portability_profile_ids != numeric_portability_receipt.profile_ids
+            || !numeric_portability_receipt
+                .publication_allowed_profile_ids
+                .contains(&String::from("tassadar.numeric_profile.f32_only.v1"))
+            || !numeric_portability_receipt
+                .publication_allowed_profile_ids
+                .contains(&String::from("tassadar.numeric_profile.mixed_i32_f32.v1"))
+            || !numeric_portability_receipt
+                .suppressed_profile_ids
+                .contains(&String::from(
+                    "tassadar.numeric_profile.bounded_f64_conversion.v1",
+                ))
+        {
+            return Err(TassadarCapabilityEnvelopeError::UnpublishableNumericPortability {
+                detail: String::from(
+                    "provider envelope requires a non-empty numeric portability ref, non-empty backend/toolchain/profile ids, exact agreement with the committed numeric portability report, exact cpu-reference publication for the exact f32-only and mixed-i32-f32 profiles, and continued suppression of the bounded f64 conversion profile",
+                ),
+            });
+        }
         Ok(Self {
             backend_family: String::from(BACKEND_FAMILY),
             product_id: publication.product_id.clone(),
@@ -755,6 +794,7 @@ impl TassadarCapabilityEnvelope {
             publication: publication.clone(),
             broad_internal_compute_profile_publication_receipt,
             broad_internal_compute_portability_receipt,
+            numeric_portability_receipt,
             resumable_multi_slice_promotion_receipt,
             effect_safe_resume_receipt,
             subset_profile_promotion_gate_receipt,
@@ -791,6 +831,11 @@ pub enum TassadarCapabilityEnvelopeError {
     },
     /// The served broad internal-compute portability matrix was not publishable provider-side.
     UnpublishableBroadInternalComputePortability {
+        /// Plain-text validation detail.
+        detail: String,
+    },
+    /// The served numeric portability matrix was not publishable provider-side.
+    UnpublishableNumericPortability {
         /// Plain-text validation detail.
         detail: String,
     },
@@ -8916,6 +8961,21 @@ mod tests {
                 "rustc:wasm32-unknown-unknown",
                 "rustc:wasm32-unknown-unknown+cuda_served",
                 "rustc:wasm32-unknown-unknown+metal_served"
+            ])
+        );
+        assert_eq!(
+            encoded["numeric_portability_receipt"]["profile_ids"],
+            json!([
+                "tassadar.numeric_profile.bounded_f64_conversion.v1",
+                "tassadar.numeric_profile.f32_only.v1",
+                "tassadar.numeric_profile.mixed_i32_f32.v1"
+            ])
+        );
+        assert_eq!(
+            encoded["numeric_portability_receipt"]["publication_allowed_profile_ids"],
+            json!([
+                "tassadar.numeric_profile.f32_only.v1",
+                "tassadar.numeric_profile.mixed_i32_f32.v1"
             ])
         );
         assert_eq!(

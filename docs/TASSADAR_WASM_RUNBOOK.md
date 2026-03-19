@@ -40,6 +40,7 @@ This runbook covers the current repo-owned bounded Wasm flow only:
 - frozen core-Wasm semantic parity and closure gate
 - bounded scalar-f32 semantics, NaN policy, and comparison matrix
 - frozen mixed-numeric profile ladder
+- numeric portability envelopes across backend and toolchain families
 - normalized Wasm-module ingress
 - differential Wasm conformance against `wasmi`
 - module-scale Wasm workload suite
@@ -80,6 +81,11 @@ Public claim discipline for this lane is:
 - that mixed-numeric artifact stages exact scalar-`f32`, exact mixed
   `i32`/`f32`, and bounded-approximate `f64 -> f32` conversion profiles; it
   is not generic Wasm numeric closure or full `f64` exactness
+- the current numeric-portability artifact is
+  `fixtures/tassadar/reports/tassadar_numeric_portability_report.json`
+- that numeric-portability artifact freezes backend-, toolchain-, and
+  machine-class envelopes for the bounded float and mixed-numeric lanes; it is
+  not backend-invariant float exactness or broad served numeric publication
 - imports, effects, and host capability policy remain separate embedding
   contracts, not part of the bounded core language claim
 
@@ -760,6 +766,31 @@ Expected outcome:
   make arbitrary Wasm numeric closure, generic mixed-numeric exactness, or
   full `f64` exactness green
 
+### 6F. Numeric portability envelopes across backend and toolchain families
+
+```bash
+cargo run -p psionic-eval --example tassadar_numeric_portability_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_numeric_portability_report.json`
+
+Expected outcome:
+
+- one machine-readable portability matrix now freezes backend-, toolchain-,
+  and machine-class envelopes for the bounded float and mixed-numeric lanes
+- exact cpu-reference rows should currently be publication-allowed only for
+  `tassadar.numeric_profile.f32_only.v1` and
+  `tassadar.numeric_profile.mixed_i32_f32.v1`
+- non-CPU backend rows should currently remain explicit backend-envelope
+  suppressions instead of being flattened into generic numeric portability
+- the bounded-approximate `tassadar.numeric_profile.bounded_f64_conversion.v1`
+  row family should currently remain explicit as benchmarked but non-published
+- this artifact narrows deployment truth for numeric widening only; it does
+  not make backend-invariant float exactness, arbitrary Wasm numeric closure,
+  or broader served publication green
+
 ### 7. Differential Wasm conformance
 
 ```bash
@@ -824,6 +855,7 @@ cargo test -p psionic-eval frozen_core_wasm_window -- --nocapture
 cargo test -p psionic-eval frozen_core_wasm_closure_gate -- --nocapture
 cargo test -p psionic-eval float_semantics -- --nocapture
 cargo test -p psionic-eval mixed_numeric -- --nocapture
+cargo test -p psionic-eval numeric_portability -- --nocapture
 cargo test -p psionic-eval wasm_conformance -- --nocapture
 cargo test -p psionic-eval module_scale_workload_suite -- --nocapture
 cargo test -p psionic-eval trap_exception -- --nocapture
@@ -846,6 +878,9 @@ These checks should keep the committed reports and generated truth aligned.
 - If the mixed-numeric ladder starts claiming arbitrary mixed-numeric closure
   or full `f64` exactness without new evidence, that is a real claim-discipline
   regression.
+- If the numeric-portability matrix starts claiming non-CPU or
+  bounded-approximate profiles as publication-allowed without new evidence,
+  that is a real claim-discipline regression.
 - If the ingress report stops lowering the seeded synthetic module exactly, that
   is a real bounded module-lane regression.
 - If the conformance report loses exact success or trap parity on the supported

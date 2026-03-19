@@ -93,6 +93,14 @@ pub struct TassadarExecutorCapabilityPublication {
     pub broad_internal_compute_portability_backend_family_ids: Vec<String>,
     /// Toolchain families currently carried by the broad internal-compute portability matrix.
     pub broad_internal_compute_portability_toolchain_family_ids: Vec<String>,
+    /// Numeric portability report bound to the served lane.
+    pub numeric_portability_report_ref: String,
+    /// Backend families currently carried by the numeric portability matrix.
+    pub numeric_portability_backend_family_ids: Vec<String>,
+    /// Toolchain families currently carried by the numeric portability matrix.
+    pub numeric_portability_toolchain_family_ids: Vec<String>,
+    /// Numeric profile ids currently carried by the numeric portability matrix.
+    pub numeric_portability_profile_ids: Vec<String>,
     /// Broad internal-compute acceptance gate bound to the served lane.
     pub broad_internal_compute_acceptance_gate_report_ref: String,
     /// Broad internal-compute profile publication and current route selection.
@@ -175,6 +183,12 @@ pub enum TassadarExecutorCapabilityPublicationError {
     /// The broad internal-compute profile publication was not publishable.
     #[error("invalid broad internal-compute profile publication: {detail}")]
     InvalidBroadInternalComputeProfilePublication {
+        /// Machine-readable detail for the failed projection.
+        detail: String,
+    },
+    /// The numeric portability report was not publishable.
+    #[error("invalid numeric portability report: {detail}")]
+    InvalidNumericPortability {
         /// Machine-readable detail for the failed projection.
         detail: String,
     },
@@ -534,6 +548,12 @@ impl LocalTassadarExecutorService {
                     }
                 },
             )?;
+        let numeric_portability_report = psionic_eval::build_tassadar_numeric_portability_report()
+            .map_err(|error| {
+                TassadarExecutorCapabilityPublicationError::InvalidNumericPortability {
+                    detail: format!("invalid numeric portability report: {error}"),
+                }
+            })?;
         psionic_eval::build_tassadar_subset_profile_promotion_gate_report().map_err(|error| {
             TassadarExecutorCapabilityPublicationError::InvalidBroadInternalComputeProfilePublication {
                 detail: format!("invalid subset profile promotion gate report: {error}"),
@@ -576,6 +596,13 @@ impl LocalTassadarExecutorService {
                 broad_internal_compute_portability_report.backend_family_ids,
             broad_internal_compute_portability_toolchain_family_ids:
                 broad_internal_compute_portability_report.toolchain_family_ids,
+            numeric_portability_report_ref: String::from(
+                psionic_runtime::TASSADAR_NUMERIC_PORTABILITY_REPORT_REF,
+            ),
+            numeric_portability_backend_family_ids: numeric_portability_report.backend_family_ids,
+            numeric_portability_toolchain_family_ids:
+                numeric_portability_report.toolchain_family_ids,
+            numeric_portability_profile_ids: numeric_portability_report.profile_ids,
             broad_internal_compute_acceptance_gate_report_ref: String::from(
                 psionic_eval::TASSADAR_BROAD_INTERNAL_COMPUTE_ACCEPTANCE_GATE_REPORT_REF,
             ),
@@ -5616,6 +5643,44 @@ mod tests {
                 "fixtures/tassadar/reports/tassadar_broad_internal_compute_acceptance_gate.json"
             )
         );
+        assert_eq!(
+            encoded["numeric_portability_report_ref"],
+            serde_json::json!("fixtures/tassadar/reports/tassadar_numeric_portability_report.json")
+        );
+        let numeric_backend_families = encoded["numeric_portability_backend_family_ids"]
+            .as_array()
+            .expect("numeric backend family ids should encode as an array")
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(numeric_backend_families.contains(&serde_json::json!("cpu_reference")));
+        assert!(numeric_backend_families.contains(&serde_json::json!("metal_served")));
+        assert!(numeric_backend_families.contains(&serde_json::json!("cuda_served")));
+        let numeric_toolchain_families = encoded["numeric_portability_toolchain_family_ids"]
+            .as_array()
+            .expect("numeric toolchain family ids should encode as an array")
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(
+            numeric_toolchain_families
+                .contains(&serde_json::json!("rustc:wasm32-unknown-unknown"))
+        );
+        let numeric_profile_ids = encoded["numeric_portability_profile_ids"]
+            .as_array()
+            .expect("numeric profile ids should encode as an array")
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(
+            numeric_profile_ids.contains(&serde_json::json!("tassadar.numeric_profile.f32_only.v1"))
+        );
+        assert!(numeric_profile_ids.contains(&serde_json::json!(
+            "tassadar.numeric_profile.mixed_i32_f32.v1"
+        )));
+        assert!(numeric_profile_ids.contains(&serde_json::json!(
+            "tassadar.numeric_profile.bounded_f64_conversion.v1"
+        )));
         assert_eq!(
             encoded["broad_internal_compute_profile_publication"]["current_served_profile_id"],
             serde_json::json!("tassadar.internal_compute.article_closeout.v1")

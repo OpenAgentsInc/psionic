@@ -48,6 +48,7 @@ const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_CLAIM_KEY: &str =
     "tassadar.internal_compute_profile_claim";
 const TASSADAR_METADATA_BROAD_INTERNAL_COMPUTE_PORTABILITY_KEY: &str =
     "tassadar.broad_internal_compute_portability";
+const TASSADAR_METADATA_NUMERIC_PORTABILITY_KEY: &str = "tassadar.numeric_portability";
 const TASSADAR_METADATA_FLOAT_SEMANTICS_KEY: &str = "tassadar.float_semantics";
 const TASSADAR_METADATA_WASM_CONFORMANCE_KEY: &str = "tassadar.wasm_conformance";
 const TASSADAR_METADATA_ARCHITECTURE_BAKEOFF_KEY: &str = "tassadar.architecture_bakeoff";
@@ -536,6 +537,100 @@ pub fn default_tassadar_broad_internal_compute_portability_binding()
             String::from("tassadar.internal_compute.deterministic_import_subset.v1"),
             String::from("tassadar.internal_compute.portable_broad_family.v1"),
             String::from("tassadar.internal_compute.public_broad_family.v1"),
+        ],
+    }
+}
+
+/// Public numeric-portability binding reused by Tassadar environment bundles.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarNumericPortabilityBinding {
+    /// Stable numeric-portability report reference.
+    pub report_ref: String,
+    /// Stable numeric-portability report identifier.
+    pub report_id: String,
+    /// Backend families carried by the committed numeric portability matrix.
+    pub backend_family_ids: Vec<String>,
+    /// Toolchain families carried by the committed numeric portability matrix.
+    pub toolchain_family_ids: Vec<String>,
+    /// Numeric profile ids carried by the committed numeric portability matrix.
+    pub profile_ids: Vec<String>,
+}
+
+impl TassadarNumericPortabilityBinding {
+    /// Returns a stable digest over the binding.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let encoded = serde_json::to_vec(self)
+            .expect("Tassadar numeric portability binding should serialize");
+        let digest = sha2::Sha256::digest(encoded.as_slice());
+        hex::encode(digest)
+    }
+
+    /// Validates that the binding is explicit.
+    pub fn validate(&self) -> Result<(), TassadarEnvironmentError> {
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingNumericPortabilityReportRef);
+        }
+        if self.report_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingNumericPortabilityReportId);
+        }
+        if self.backend_family_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingNumericPortabilityBackendFamilyIds);
+        }
+        if self
+            .backend_family_ids
+            .iter()
+            .any(|backend_family_id| backend_family_id.trim().is_empty())
+        {
+            return Err(TassadarEnvironmentError::InvalidNumericPortabilityBackendFamilyId);
+        }
+        if self.toolchain_family_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingNumericPortabilityToolchainFamilyIds);
+        }
+        if self
+            .toolchain_family_ids
+            .iter()
+            .any(|toolchain_family_id| toolchain_family_id.trim().is_empty())
+        {
+            return Err(TassadarEnvironmentError::InvalidNumericPortabilityToolchainFamilyId);
+        }
+        if self.profile_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingNumericPortabilityProfileIds);
+        }
+        if self
+            .profile_ids
+            .iter()
+            .any(|profile_id| profile_id.trim().is_empty())
+        {
+            return Err(TassadarEnvironmentError::InvalidNumericPortabilityProfileId);
+        }
+        Ok(())
+    }
+}
+
+/// Returns the canonical numeric-portability binding reused by Tassadar
+/// environment surfaces.
+#[must_use]
+pub fn default_tassadar_numeric_portability_binding() -> TassadarNumericPortabilityBinding {
+    TassadarNumericPortabilityBinding {
+        report_ref: String::from(
+            "fixtures/tassadar/reports/tassadar_numeric_portability_report.json",
+        ),
+        report_id: String::from("tassadar.numeric_portability.report.v1"),
+        backend_family_ids: vec![
+            String::from("cpu_reference"),
+            String::from("cuda_served"),
+            String::from("metal_served"),
+        ],
+        toolchain_family_ids: vec![
+            String::from("rustc:wasm32-unknown-unknown"),
+            String::from("rustc:wasm32-unknown-unknown+cuda_served"),
+            String::from("rustc:wasm32-unknown-unknown+metal_served"),
+        ],
+        profile_ids: vec![
+            String::from("tassadar.numeric_profile.f32_only.v1"),
+            String::from("tassadar.numeric_profile.mixed_i32_f32.v1"),
+            String::from("tassadar.numeric_profile.bounded_f64_conversion.v1"),
         ],
     }
 }
@@ -1099,6 +1194,9 @@ pub struct TassadarEnvironmentSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub broad_internal_compute_portability_binding:
         Option<TassadarBroadInternalComputePortabilityBinding>,
+    /// Optional numeric portability binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub numeric_portability_binding: Option<TassadarNumericPortabilityBinding>,
     /// Public bounded float-semantics binding.
     pub float_semantics_binding: TassadarFloatSemanticsBinding,
     /// Public Wasm conformance binding.
@@ -1203,6 +1301,7 @@ impl TassadarEnvironmentSpec {
             broad_internal_compute_portability_binding: self
                 .broad_internal_compute_portability_binding
                 .clone(),
+            numeric_portability_binding: self.numeric_portability_binding.clone(),
             float_semantics_binding: self.float_semantics_binding.clone(),
             rust_article_profile_completeness:
                 tassadar_rust_article_profile_completeness_publication(),
@@ -1252,6 +1351,9 @@ impl TassadarEnvironmentSpec {
         self.execution_checkpoint_binding.validate()?;
         self.dynamic_memory_resume_binding.validate()?;
         if let Some(binding) = &self.broad_internal_compute_portability_binding {
+            binding.validate()?;
+        }
+        if let Some(binding) = &self.numeric_portability_binding {
             binding.validate()?;
         }
         self.float_semantics_binding.validate()?;
@@ -1478,6 +1580,12 @@ impl TassadarEnvironmentSpec {
                 serde_json::to_value(binding).unwrap_or(Value::Null),
             );
         }
+        if let Some(binding) = &self.numeric_portability_binding {
+            metadata.insert(
+                String::from(TASSADAR_METADATA_NUMERIC_PORTABILITY_KEY),
+                serde_json::to_value(binding).unwrap_or(Value::Null),
+            );
+        }
         metadata.insert(
             String::from(TASSADAR_METADATA_FLOAT_SEMANTICS_KEY),
             serde_json::to_value(&self.float_semantics_binding).unwrap_or(Value::Null),
@@ -1577,6 +1685,9 @@ pub struct TassadarEnvironmentBundle {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub broad_internal_compute_portability_binding:
         Option<TassadarBroadInternalComputePortabilityBinding>,
+    /// Optional numeric portability binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub numeric_portability_binding: Option<TassadarNumericPortabilityBinding>,
     /// Bounded float-semantics binding.
     pub float_semantics_binding: TassadarFloatSemanticsBinding,
     /// Rust-to-Wasm article profile completeness publication.
@@ -1747,6 +1858,34 @@ pub enum TassadarEnvironmentError {
     /// Invalid broad internal-compute profile id.
     #[error("Tassadar environment spec includes an empty broad internal-compute profile id")]
     InvalidBroadInternalComputeProfileId,
+    /// Missing numeric portability report ref.
+    #[error("Tassadar environment spec is missing `numeric_portability_binding.report_ref`")]
+    MissingNumericPortabilityReportRef,
+    /// Missing numeric portability report id.
+    #[error("Tassadar environment spec is missing `numeric_portability_binding.report_id`")]
+    MissingNumericPortabilityReportId,
+    /// Missing numeric portability backend families.
+    #[error(
+        "Tassadar environment spec is missing `numeric_portability_binding.backend_family_ids`"
+    )]
+    MissingNumericPortabilityBackendFamilyIds,
+    /// Invalid numeric portability backend family id.
+    #[error("Tassadar environment spec includes an empty numeric portability backend family id")]
+    InvalidNumericPortabilityBackendFamilyId,
+    /// Missing numeric portability toolchain families.
+    #[error(
+        "Tassadar environment spec is missing `numeric_portability_binding.toolchain_family_ids`"
+    )]
+    MissingNumericPortabilityToolchainFamilyIds,
+    /// Invalid numeric portability toolchain family id.
+    #[error("Tassadar environment spec includes an empty numeric portability toolchain family id")]
+    InvalidNumericPortabilityToolchainFamilyId,
+    /// Missing numeric portability profile ids.
+    #[error("Tassadar environment spec is missing `numeric_portability_binding.profile_ids`")]
+    MissingNumericPortabilityProfileIds,
+    /// Invalid numeric portability profile id.
+    #[error("Tassadar environment spec includes an empty numeric portability profile id")]
+    InvalidNumericPortabilityProfileId,
     /// Missing float-semantics report ref.
     #[error("Tassadar environment spec is missing `float_semantics_binding.report_ref`")]
     MissingFloatSemanticsReportRef,
@@ -2125,6 +2264,7 @@ mod tests {
             broad_internal_compute_portability_binding: Some(
                 default_tassadar_broad_internal_compute_portability_binding(),
             ),
+            numeric_portability_binding: Some(default_tassadar_numeric_portability_binding()),
             float_semantics_binding: default_tassadar_float_semantics_binding(),
             wasm_conformance_binding: TassadarWasmConformanceBinding {
                 window_report_ref: String::from(
@@ -2315,6 +2455,15 @@ mod tests {
             Some(
                 "fixtures/tassadar/reports/tassadar_broad_internal_compute_portability_report.json"
             )
+        );
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
+                .get(TASSADAR_METADATA_NUMERIC_PORTABILITY_KEY)
+                .and_then(|value| value.get("report_ref"))
+                .and_then(Value::as_str),
+            Some("fixtures/tassadar/reports/tassadar_numeric_portability_report.json")
         );
         assert_eq!(
             bundle

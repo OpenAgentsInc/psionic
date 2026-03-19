@@ -48,6 +48,10 @@ Current honest posture:
   exact mixed `i32`/`f32`, and bounded-approximate `f64 -> f32` conversion
   profiles, with malformed and out-of-envelope conversions kept on explicit
   typed refusal paths
+- the repo now also has a numeric portability matrix over backend, toolchain,
+  and machine-class envelopes for the bounded float and mixed-numeric lanes,
+  keeping exact cpu-reference publication separate from suppressed non-CPU and
+  bounded-approximate numeric regimes
 - broader profiles above that remain benchmarked, suppressed, refused, or
   unpromoted unless their explicit gates are green
 
@@ -73,9 +77,9 @@ Current dependency spine:
 
 Issue-state note:
 
-- `TAS-103` through `TAS-116` are already implemented and tracked in
+- `TAS-103` through `TAS-117` are already implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-117` and runs through
+- the current open GitHub backlog begins at `TAS-118` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs

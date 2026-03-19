@@ -527,6 +527,9 @@ fn build_tassadar_module_scale_environment_bundle(
         broad_internal_compute_portability_binding: Some(
             psionic_environments::default_tassadar_broad_internal_compute_portability_binding(),
         ),
+        numeric_portability_binding: Some(
+            psionic_environments::default_tassadar_numeric_portability_binding(),
+        ),
         float_semantics_binding: psionic_environments::default_tassadar_float_semantics_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
         architecture_bakeoff_binding: Some(

@@ -737,6 +737,14 @@ The current scope is:
   bounded-approximate `f64 -> f32` conversion profiles with typed refusal on
   malformed, out-of-range, and non-exact conversion regimes; this is not
   arbitrary Wasm numeric closure or full `f64` exactness
+- the current numeric-portability artifact is
+  `fixtures/tassadar/reports/tassadar_numeric_portability_report.json`, which
+  freezes backend-, toolchain-, and machine-class envelopes for those bounded
+  float and mixed-numeric profiles, publishing exact cpu-reference rows only
+  for the exact `f32_only` and `mixed_i32_f32` profiles while keeping non-CPU
+  backends and bounded-approximate `f64` narrowing explicit as suppressed
+  states; this is not backend-invariant float exactness or broad numeric
+  served publication
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import
