@@ -1,0 +1,33 @@
+{
+  "source_id": "tassadar.linked_program_bundle_source.parser_allocator_rollback.v1",
+  "bundle_id": "tassadar.linked_program_bundle.parser_allocator_rollback.v1",
+  "consumer_family": "parser_runtime_support_bundle",
+  "trust_posture": "benchmark_gated_internal",
+  "modules": [
+    {
+      "module_ref": "parsing_pipeline_core@1.0.0",
+      "role": "primary_compute",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_parsing_suite.wat",
+      "state_posture": "module_local_state"
+    },
+    {
+      "module_ref": "parser_helper_core@1.1.0-candidate",
+      "role": "helper_parser",
+      "runtime_support_class": "parser",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_parsing_suite.wat",
+      "state_posture": "module_local_state"
+    },
+    {
+      "module_ref": "bounded_allocator_core@1.0.0",
+      "role": "helper_allocator",
+      "runtime_support_class": "allocator",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_memcpy_suite.wat",
+      "state_posture": "module_local_state"
+    }
+  ],
+  "benchmark_lineage_refs": [
+    "fixtures/tassadar/reports/tassadar_module_link_runtime_report.json",
+    "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+  ],
+  "note": "Bounded linked-program bundle with an explicit helper rollback path instead of silent runtime-support drift."
+}

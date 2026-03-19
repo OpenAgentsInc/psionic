@@ -1,0 +1,10 @@
+{
+  "source_id": "tassadar.runtime_support.checkpoint_backtrack.v1",
+  "module_ref": "checkpoint_backtrack_core@1.0.0",
+  "runtime_support_class": "checkpoint_backtrack",
+  "state_posture": "shared_bundle_state",
+  "benchmark_lineage_refs": [
+    "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+  ],
+  "note": "Bounded runtime-support helper for deterministic checkpoint and backtrack state restoration inside the linked-program bundle lane."
+}

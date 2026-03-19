@@ -1,0 +1,33 @@
+{
+  "source_id": "tassadar.linked_program_bundle_source.vm_checksum_parser.v1",
+  "bundle_id": "tassadar.linked_program_bundle.vm_checksum_parser.v1",
+  "consumer_family": "module_scale_pipeline",
+  "trust_posture": "benchmark_gated_internal",
+  "modules": [
+    {
+      "module_ref": "vm_dispatch_core@1.0.0",
+      "role": "primary_compute",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_vm_style_suite.wat",
+      "state_posture": "module_local_state"
+    },
+    {
+      "module_ref": "parser_helper_core@1.0.0",
+      "role": "helper_parser",
+      "runtime_support_class": "parser",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_parsing_suite.wat",
+      "state_posture": "module_local_state"
+    },
+    {
+      "module_ref": "checksum_helper_core@1.0.0",
+      "role": "helper_checksum",
+      "runtime_support_class": "checksum",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_checksum_suite.wat",
+      "state_posture": "module_local_state"
+    }
+  ],
+  "benchmark_lineage_refs": [
+    "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+    "fixtures/tassadar/reports/tassadar_module_link_eval_report.json"
+  ],
+  "note": "Bounded linked-program bundle showing explicit parser and checksum helper roles around one VM-style primary module."
+}

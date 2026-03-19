@@ -1,0 +1,33 @@
+{
+  "source_id": "tassadar.linked_program_bundle_source.checkpoint_backtrack.v1",
+  "bundle_id": "tassadar.linked_program_bundle.checkpoint_backtrack.v1",
+  "consumer_family": "checkpointed_search_bundle",
+  "trust_posture": "benchmark_gated_internal",
+  "modules": [
+    {
+      "module_ref": "search_frontier_core@1.0.0",
+      "role": "primary_compute",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_vm_style_suite.wat",
+      "state_posture": "shared_bundle_state"
+    },
+    {
+      "module_ref": "checkpoint_backtrack_core@1.0.0",
+      "role": "helper_checkpoint_backtrack",
+      "runtime_support_class": "checkpoint_backtrack",
+      "source_ref": "fixtures/tassadar/sources/tassadar_runtime_support_checkpoint_backtrack.json",
+      "state_posture": "shared_bundle_state"
+    },
+    {
+      "module_ref": "bounded_allocator_core@1.0.0",
+      "role": "helper_allocator",
+      "runtime_support_class": "allocator",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_memcpy_suite.wat",
+      "state_posture": "module_local_state"
+    }
+  ],
+  "benchmark_lineage_refs": [
+    "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+    "fixtures/tassadar/reports/tassadar_module_link_eval_report.json"
+  ],
+  "note": "Bounded checkpointed search bundle with explicit shared-state posture and exact checkpoint lineage."
+}

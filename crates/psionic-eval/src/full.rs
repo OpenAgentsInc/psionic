@@ -96,6 +96,8 @@ mod tassadar_learnability_gap;
 mod tassadar_locality_envelope;
 #[path = "tassadar_locality_scratchpad.rs"]
 mod tassadar_locality_scratchpad;
+#[path = "tassadar_linked_program_bundle.rs"]
+mod tassadar_linked_program_bundle;
 #[path = "tassadar_memory_abi_v2.rs"]
 mod tassadar_memory_abi_v2;
 #[path = "tassadar_mixed_trajectory.rs"]
@@ -209,6 +211,7 @@ pub use tassadar_error_regime_catalog::*;
 pub use tassadar_effect_taxonomy::*;
 pub use tassadar_exactness_refusal_report::*;
 pub use tassadar_execution_checkpoint::*;
+pub use tassadar_linked_program_bundle::*;
 pub use tassadar_executor_architecture_comparison::*;
 pub use tassadar_executor_baseline_comparison::*;
 pub use tassadar_executor_benchmark::*;

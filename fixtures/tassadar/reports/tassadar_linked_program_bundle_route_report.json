@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.linked_program_bundle_route.report.v1",
+  "runtime_report_ref": "fixtures/tassadar/reports/tassadar_linked_program_bundle_runtime_report.json",
+  "rows": [
+    {
+      "bundle_id": "tassadar.linked_program_bundle.vm_checksum_parser.v1",
+      "consumer_family": "module_scale_pipeline",
+      "route_kind": "internal_exact",
+      "runtime_posture": "exact",
+      "helper_module_refs": [
+        "parser_helper_core@1.0.0",
+        "checksum_helper_core@1.0.0"
+      ],
+      "runtime_support_classes": [
+        "parser",
+        "checksum"
+      ],
+      "shared_state_module_refs": [],
+      "benchmark_lineage_complete": true,
+      "dependency_graph_digest": "c225cd23d5873e345d7bd3010b9bed99c055b1ed2023b178847a55f1ca312f71",
+      "note": "module-local helper parser and checksum support remain exact when helper lineage and state posture are fully explicit"
+    },
+    {
+      "bundle_id": "tassadar.linked_program_bundle.checkpoint_backtrack.v1",
+      "consumer_family": "checkpointed_search_bundle",
+      "route_kind": "shared_state_receipt_bound",
+      "runtime_posture": "exact",
+      "helper_module_refs": [
+        "checkpoint_backtrack_core@1.0.0",
+        "bounded_allocator_core@1.0.0"
+      ],
+      "runtime_support_classes": [
+        "checkpoint_backtrack",
+        "allocator"
+      ],
+      "shared_state_module_refs": [
+        "search_frontier_core@1.0.0",
+        "checkpoint_backtrack_core@1.0.0"
+      ],
+      "benchmark_lineage_complete": true,
+      "dependency_graph_digest": "2fbd4235ae8b9b59dabcd2e525a8aaf826b4dfdbe2314514b3d9dc853aacea24",
+      "note": "checkpoint plus backtrack plus allocator support remains exact when shared bundle state stays visible in the receipt"
+    },
+    {
+      "bundle_id": "tassadar.linked_program_bundle.parser_allocator_rollback.v1",
+      "consumer_family": "parser_runtime_support_bundle",
+      "route_kind": "rollback_pinned_helper",
+      "runtime_posture": "rolled_back",
+      "helper_module_refs": [
+        "parser_helper_core@1.1.0-candidate",
+        "bounded_allocator_core@1.0.0"
+      ],
+      "runtime_support_classes": [
+        "parser",
+        "allocator"
+      ],
+      "shared_state_module_refs": [],
+      "benchmark_lineage_complete": true,
+      "dependency_graph_digest": "997aa8cc64922b914653c044ae95da5e095161275c4353a7c94f1e796f69c264",
+      "note": "helper-module rollback stays explicit at bundle scale instead of silently drifting across runtime-support helper versions"
+    },
+    {
+      "bundle_id": "tassadar.linked_program_bundle.shared_state_gap.v1",
+      "consumer_family": "stateful_runtime_support_gap",
+      "route_kind": "refused",
+      "runtime_posture": "refused",
+      "helper_module_refs": [
+        "parser_helper_core@1.0.0",
+        "checksum_helper_core@1.0.0"
+      ],
+      "runtime_support_classes": [
+        "parser",
+        "checksum"
+      ],
+      "shared_state_module_refs": [
+        "stateful_vm_core@1.0.0",
+        "parser_helper_core@1.0.0",
+        "checksum_helper_core@1.0.0"
+      ],
+      "benchmark_lineage_complete": false,
+      "dependency_graph_digest": "7dcfcd8282b083c83f99e94eee24a5f8d97689c6dfa69606f4c6c5580edd7677",
+      "note": "shared-state bundle refuses because helper-module benchmark lineage is incomplete and the shared-state receipt would otherwise be ambiguous"
+    }
+  ],
+  "internal_exact_row_count": 1,
+  "shared_state_row_count": 1,
+  "rollback_row_count": 1,
+  "refused_row_count": 1,
+  "claim_boundary": "this router report freezes bounded route posture for linked-program bundles with explicit shared-state, helper rollback, and refusal boundaries. It does not imply arbitrary bundle composition or unrestricted runtime-support installation",
+  "summary": "Linked-program bundle route report exposes 4 rows with internal_exact=1, shared_state_receipt_bound=1, rollback_pinned_helper=1, refused=1.",
+  "report_digest": "2cacc2b9f40cdeaebe50503708898c09fb2c1b5e345a7c4f23eb9d82b455501f"
+}

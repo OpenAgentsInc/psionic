@@ -1,0 +1,32 @@
+{
+  "source_id": "tassadar.linked_program_bundle_source.shared_state_gap.v1",
+  "bundle_id": "tassadar.linked_program_bundle.shared_state_gap.v1",
+  "consumer_family": "stateful_runtime_support_gap",
+  "trust_posture": "benchmark_gated_internal",
+  "modules": [
+    {
+      "module_ref": "stateful_vm_core@1.0.0",
+      "role": "primary_compute",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_vm_style_suite.wat",
+      "state_posture": "shared_bundle_state"
+    },
+    {
+      "module_ref": "parser_helper_core@1.0.0",
+      "role": "helper_parser",
+      "runtime_support_class": "parser",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_parsing_suite.wat",
+      "state_posture": "shared_bundle_state"
+    },
+    {
+      "module_ref": "checksum_helper_core@1.0.0",
+      "role": "helper_checksum",
+      "runtime_support_class": "checksum",
+      "source_ref": "fixtures/tassadar/sources/tassadar_module_checksum_suite.wat",
+      "state_posture": "shared_bundle_state"
+    }
+  ],
+  "benchmark_lineage_refs": [
+    "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+  ],
+  "note": "Deliberately incomplete shared-state bundle source used to keep benchmark-lineage and shared-state gaps explicit as refusals."
+}
