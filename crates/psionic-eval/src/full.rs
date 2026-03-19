@@ -204,6 +204,8 @@ mod tassadar_rust_source_canon;
 mod tassadar_search_native_executor;
 #[path = "tassadar_semantic_window_compatibility_delta.rs"]
 mod tassadar_semantic_window_compatibility_delta;
+#[path = "tassadar_semantic_window_migration_planner.rs"]
+mod tassadar_semantic_window_migration_planner;
 #[path = "tassadar_sequence.rs"]
 mod tassadar_sequence;
 #[path = "tassadar_session_process_profile.rs"]
@@ -365,6 +367,7 @@ pub use tassadar_rust_only_article_closeout_audit::*;
 pub use tassadar_rust_source_canon::*;
 pub use tassadar_search_native_executor::*;
 pub use tassadar_semantic_window_compatibility_delta::*;
+pub use tassadar_semantic_window_migration_planner::*;
 pub use tassadar_sequence::*;
 pub use tassadar_session_process_profile::*;
 pub use tassadar_simulator_effect_profile::*;

@@ -11,10 +11,11 @@ use thiserror::Error;
 pub const TASSADAR_SEMANTIC_WINDOW_REVISION_RECEIPT_REF: &str =
     "fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json";
 
-const TASSADAR_METADATA_REFRESH_WINDOW_ID: &str = "tassadar.frozen_core_wasm.window.v1_1.metadata";
-const TASSADAR_PUBLIC_PROPOSAL_LIFT_WINDOW_ID: &str =
+pub const TASSADAR_METADATA_REFRESH_WINDOW_ID: &str =
+    "tassadar.frozen_core_wasm.window.v1_1.metadata";
+pub const TASSADAR_PUBLIC_PROPOSAL_LIFT_WINDOW_ID: &str =
     "tassadar.frozen_core_wasm.window.v1_plus_public_proposals";
-const TASSADAR_OPERATOR_PROPOSAL_LIFT_WINDOW_ID: &str =
+pub const TASSADAR_OPERATOR_PROPOSAL_LIFT_WINDOW_ID: &str =
     "tassadar.frozen_core_wasm.window.v1_plus_operator_proposals";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

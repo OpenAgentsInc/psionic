@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.semantic_window_route_policy.report.v1",
+  "migration_report_ref": "fixtures/tassadar/reports/tassadar_semantic_window_migration_report.json",
+  "selected_requested_window_ids": [
+    "tassadar.frozen_core_wasm.window.v1",
+    "tassadar.frozen_core_wasm.window.v1_1.metadata"
+  ],
+  "downgraded_requested_window_ids": [
+    "tassadar.frozen_core_wasm.window.v1_plus_public_proposals"
+  ],
+  "refused_requested_window_ids": [
+    "tassadar.frozen_core_wasm.window.v1_plus_operator_proposals",
+    "tassadar.frozen_core_wasm.window.v0"
+  ],
+  "case_reports": [
+    {
+      "case_id": "window.active.selected.v1",
+      "requested_window_id": "tassadar.frozen_core_wasm.window.v1",
+      "effective_window_id": "tassadar.frozen_core_wasm.window.v1",
+      "effective_profile_ids": [],
+      "decision": "selected_active_window",
+      "detail": "the active frozen core-Wasm window remains selected exactly and does not require downgrade planning"
+    },
+    {
+      "case_id": "window.metadata_refresh.forward.v1",
+      "requested_window_id": "tassadar.frozen_core_wasm.window.v1_1.metadata",
+      "effective_window_id": "tassadar.frozen_core_wasm.window.v1",
+      "effective_profile_ids": [],
+      "decision": "selected_active_window",
+      "detail": "the metadata-only candidate migrates to the active frozen core window as a no-op after rerunning the declared frozen-window drill"
+    },
+    {
+      "case_id": "window.operator_proposal_lift.refuse.v1",
+      "requested_window_id": "tassadar.frozen_core_wasm.window.v1_plus_operator_proposals",
+      "effective_profile_ids": [],
+      "decision": "refused",
+      "refusal_reason_id": "evidence_boundary",
+      "detail": "operator-only proposal families remain blocked until each family graduates through its own evidence and publication posture; there is no honest cross-window downgrade here"
+    },
+    {
+      "case_id": "window.public_proposal_lift.downgrade.v1",
+      "requested_window_id": "tassadar.frozen_core_wasm.window.v1_plus_public_proposals",
+      "effective_window_id": "tassadar.frozen_core_wasm.window.v1",
+      "effective_profile_ids": [
+        "tassadar.proposal_profile.exceptions_try_catch_rethrow.v1",
+        "tassadar.proposal_profile.simd_deterministic.v1"
+      ],
+      "decision": "downgraded_named_profiles",
+      "detail": "public proposal-family widening does not become a new frozen window; the honest migration path downgrades to the active window plus explicit named exceptions and SIMD profiles"
+    },
+    {
+      "case_id": "window.stale_v0.refuse.v1",
+      "requested_window_id": "tassadar.frozen_core_wasm.window.v0",
+      "effective_profile_ids": [],
+      "decision": "refused",
+      "refusal_reason_id": "undeclared_window_id",
+      "detail": "stale frozen-window ids stay on typed undeclared-window refusal instead of silently shadowing the active window"
+    }
+  ],
+  "overall_green": true,
+  "claim_boundary": "this router report freezes active-window selection, named-profile downgrade, and typed refusal for declared semantic-window requests. It does not flatten all windows into a single superset or widen served posture implicitly",
+  "summary": "Semantic-window route policy keeps selected_windows=2, downgraded_windows=1, refused_windows=2, overall_green=true.",
+  "report_digest": "23041827e6ed2b1f23a600d3e6795f2a8678f51c8763e897cb69614696e8c979"
+}

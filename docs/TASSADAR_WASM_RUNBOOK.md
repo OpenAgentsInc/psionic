@@ -818,6 +818,36 @@ Expected outcome:
   window, implicit proposal inheritance, arbitrary Wasm, or Turing-complete
   support
 
+### 6C.3 Cross-window migration report and downgrade-or-refuse planner
+
+```bash
+cargo run -p psionic-runtime --example tassadar_semantic_window_migration_report
+cargo run -p psionic-router --example tassadar_semantic_window_route_policy_report
+cargo run -p psionic-eval --example tassadar_semantic_window_migration_planner_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_semantic_window_migration_report.json`
+- `fixtures/tassadar/reports/tassadar_semantic_window_route_policy_report.json`
+- `fixtures/tassadar/reports/tassadar_semantic_window_migration_planner_report.json`
+
+Expected outcome:
+
+- the active frozen core-Wasm window and the metadata-refresh candidate should
+  currently route exactly to the active window
+- the public-proposal candidate should currently downgrade to the active
+  window plus explicit named exceptions and SIMD profiles instead of becoming a
+  new frozen semantic window
+- the operator-only proposal candidate should currently refuse on
+  `evidence_boundary`
+- stale `v0` window ids should currently refuse on `undeclared_window_id`
+- the planner report should keep `served_publication_allowed_window_ids` empty
+  even though exact and downgrade paths exist
+- this trio governs downgrade-or-refuse planning only; it does not claim a
+  semantic-window superset, implicit stale-window shadowing, arbitrary Wasm,
+  or Turing-complete support
+
 ### 6D. Bounded scalar-f32 semantics, NaN policy, and comparison matrix
 
 ```bash
@@ -1621,6 +1651,10 @@ These checks should keep the committed reports and generated truth aligned.
   compatibility-delta report starts collapsing proposal profiles into frozen
   core-Wasm support without new evidence, that is a real semantic-drift and
   claim-discipline regression.
+- If the semantic-window migration report or route policy stops refusing stale
+  windows, stops downgrading public-proposal lift explicitly, or starts
+  widening served semantic-window publication without a new promotion gate,
+  that is a real downgrade-planning and claim-discipline regression.
 - If the float-semantics matrix starts claiming non-CPU backends, `f64`, or
   NaN-payload preservation without new evidence, that is a real claim-discipline
   regression.

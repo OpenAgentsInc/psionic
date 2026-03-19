@@ -1029,6 +1029,19 @@ The current scope is:
   evidence and publication posture; this is not an activated new Wasm window,
   implicit proposal inheritance, arbitrary Wasm support, or Turing-complete
   support
+- the current semantic-window migration artifacts are
+  `fixtures/tassadar/reports/tassadar_semantic_window_migration_report.json`,
+  `fixtures/tassadar/reports/tassadar_semantic_window_route_policy_report.json`,
+  and
+  `fixtures/tassadar/reports/tassadar_semantic_window_migration_planner_report.json`,
+  which freeze one bounded cross-window migration lane over the frozen
+  core-Wasm semantic window: the active window and metadata-refresh candidate
+  route exactly to the active window, public proposal-family widening
+  downgrades to the active window plus explicit named exceptions and SIMD
+  profiles, operator-only widening refuses on evidence-boundary grounds, stale
+  window ids refuse explicitly, and served semantic-window publication stays
+  empty; this is not one semantic-window superset, implicit stale-window
+  shadowing, arbitrary Wasm support, or Turing-complete support
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

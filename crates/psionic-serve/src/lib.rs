@@ -36,6 +36,7 @@ mod tassadar_proposal_profile_publication_policy;
 mod tassadar_quantization_truth_envelope;
 mod tassadar_rust_only_article_acceptance_gate_v2;
 mod tassadar_rust_only_article_reproduction;
+mod tassadar_semantic_window_publication_policy;
 
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -116,6 +117,7 @@ pub use tassadar_proposal_profile_publication_policy::*;
 pub use tassadar_quantization_truth_envelope::*;
 pub use tassadar_rust_only_article_acceptance_gate_v2::*;
 pub use tassadar_rust_only_article_reproduction::*;
+pub use tassadar_semantic_window_publication_policy::*;
 use thiserror::Error;
 
 /// Human-readable crate ownership summary.

@@ -34,6 +34,7 @@ mod tassadar_negative_invocation;
 mod tassadar_planner_policy;
 mod tassadar_proposal_profile_route_policy;
 mod tassadar_route;
+mod tassadar_semantic_window_route_policy;
 mod tassadar_self_installation_gate;
 mod tassadar_world_mount_compatibility;
 mod tool_loop;
@@ -64,6 +65,7 @@ pub use tassadar_negative_invocation::*;
 pub use tassadar_planner_policy::*;
 pub use tassadar_proposal_profile_route_policy::*;
 pub use tassadar_route::*;
+pub use tassadar_semantic_window_route_policy::*;
 pub use tassadar_self_installation_gate::*;
 pub use tassadar_world_mount_compatibility::*;
 pub use tool_loop::{
