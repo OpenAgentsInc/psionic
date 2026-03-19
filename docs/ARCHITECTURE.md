@@ -827,6 +827,15 @@ The current scope is:
   stale-snapshot, out-of-range tape, and profile-mismatched queue refusals;
   this is not arbitrary process semantics, async-effect closure, broad
   internal compute, or served-profile widening
+- the current session-process profile artifacts are
+  `fixtures/tassadar/reports/tassadar_session_process_profile_runtime_report.json`,
+  `fixtures/tassadar/reports/tassadar_session_process_profile_report.json`,
+  and `fixtures/tassadar/reports/tassadar_session_process_route_policy_report.json`,
+  which freeze one bounded interactive session-process lane with deterministic
+  echo and stateful-counter message loops, explicit profile-specific route
+  promotion for those surfaces, and typed refusal on open-ended external event
+  streams; this is not a generic agent loop, arbitrary interactive Wasm, async
+  effect closure, or broader served internal compute
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

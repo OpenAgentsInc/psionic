@@ -86,6 +86,12 @@ Current honest posture:
   objects, typed datastream locators, provider receipts, and environment
   bindings while keeping stale snapshots, out-of-range tape cursors, and
   profile-mismatched queues on explicit refusal paths
+- the repo now also has one bounded interactive session-process profile
+  `tassadar.internal_compute.session_process.v1` over deterministic echo and
+  stateful counter message-loop surfaces, with committed runtime, eval, and
+  route-policy reports plus served-publication and provider-envelope bindings,
+  while keeping open-ended external event streams on explicit refusal paths and
+  leaving the default served session-process lane empty
 - broader profiles above that remain benchmarked, suppressed, refused, or
   unpromoted unless their explicit gates are green
 
@@ -113,7 +119,9 @@ Issue-state note:
 
 - `TAS-103` through `TAS-124` are already implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-126` and runs through
+- `TAS-125` through `TAS-126` are now implemented and tracked in
+  `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
+- the current open GitHub backlog begins at `TAS-127` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs

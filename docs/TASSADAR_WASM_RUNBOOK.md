@@ -1036,6 +1036,30 @@ Expected outcome:
 - explicit stale-snapshot, out-of-range tape cursor, and profile-mismatched
   queue refusals
 
+### 17. Interactive message-loop and session-process compute profile
+
+```bash
+cargo run -p psionic-runtime --example tassadar_session_process_profile_runtime_report
+cargo run -p psionic-eval --example tassadar_session_process_profile_report
+cargo run -p psionic-router --example tassadar_session_process_route_policy_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_session_process_profile_runtime_report.json`
+- `fixtures/tassadar/reports/tassadar_session_process_profile_report.json`
+- `fixtures/tassadar/reports/tassadar_session_process_route_policy_report.json`
+
+Expected outcome:
+
+- one named bounded interactive session-process profile:
+  `tassadar.internal_compute.session_process.v1`
+- exact deterministic parity for the bounded echo-turn loop
+- exact deterministic parity for the bounded stateful-counter loop
+- named public profile posture only for the deterministic interaction surfaces
+- zero default served session-process profiles
+- explicit route-policy refusal on the open-ended external-event surface
+
 ## Validation Commands
 
 Run the focused report checks after the flow:
@@ -1088,6 +1112,12 @@ cargo test -p psionic-runtime process_object -- --nocapture
 cargo test -p psionic-datastream process_ -- --nocapture
 cargo test -p psionic-eval process_object -- --nocapture
 cargo test -p psionic-provider process_object -- --nocapture
+cargo test -p psionic-runtime session_process -- --nocapture
+cargo test -p psionic-eval session_process -- --nocapture
+cargo test -p psionic-router session_process -- --nocapture
+cargo test -p psionic-serve executor_service_capability_publication_serializes_benchmark_gated_matrix -- --nocapture
+cargo test -p psionic-provider session_process_profile_receipt_projects_report -- --nocapture
+cargo test -p psionic-provider tassadar_capability_envelope_serializes_served_publication -- --nocapture
 ```
 
 These checks should keep the committed reports and generated truth aligned.

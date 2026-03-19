@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.session_process_profile.report.v1",
+  "profile_id": "tassadar.internal_compute.session_process.v1",
+  "runtime_report_ref": "fixtures/tassadar/reports/tassadar_session_process_profile_runtime_report.json",
+  "runtime_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.session_process_profile.runtime_report.v1",
+    "profile_id": "tassadar.internal_compute.session_process.v1",
+    "rows": [
+      {
+        "case_id": "echo_roundtrip_session",
+        "session_id": "session.echo_roundtrip.v1",
+        "interaction_surface_id": "deterministic_echo_turn_loop",
+        "local_state_shape_id": "single_reply_buffer",
+        "route_profile_id": "tassadar.internal_compute.session_process.v1",
+        "input_messages": [
+          {
+            "message_id": "echo_roundtrip_session::00",
+            "turn_index": 0,
+            "kind": "open_session",
+            "payload_digest": "876d3e677954505601473f268451200b2267d47fd6a809388f9f6010daefedcb",
+            "note": "open:echo"
+          },
+          {
+            "message_id": "echo_roundtrip_session::01",
+            "turn_index": 1,
+            "kind": "user_turn",
+            "payload_digest": "2ee3608a6c29c8d703e773ddcabb70706e5d03cef51c0e2bb04a3051cd37de9f",
+            "note": "user:hello bounded world"
+          },
+          {
+            "message_id": "echo_roundtrip_session::02",
+            "turn_index": 2,
+            "kind": "close_session",
+            "payload_digest": "1cd03b16a7002d58a571c74dc113421dfa8a552ca360bc4400f64abc613b02ac",
+            "note": "close:echo"
+          }
+        ],
+        "output_messages": [
+          {
+            "message_id": "echo_roundtrip_session::00",
+            "turn_index": 0,
+            "kind": "assistant_turn",
+            "payload_digest": "5be45573871bc19f88c88c0cd22adb111e444534f73991cfcd0a7a2ca8b1f341",
+            "note": "assistant:hello bounded world"
+          },
+          {
+            "message_id": "echo_roundtrip_session::01",
+            "turn_index": 1,
+            "kind": "assistant_turn",
+            "payload_digest": "d51a79b50cb685070dc94ed02387a7b950c462f908a26e433fb2089314f3b2aa",
+            "note": "assistant:echo closed"
+          }
+        ],
+        "status": "exact_deterministic_parity",
+        "exact_state_parity": true,
+        "exact_output_parity": true,
+        "final_state_digest": "ab084cb8acfb32ed6938c0b64d26e47b03aea5ddd82bc3953812b476e6f2ddac",
+        "note": "echo loop preserves one bounded reply buffer across a deterministic turn pair"
+      },
+      {
+        "case_id": "counter_stateful_session",
+        "session_id": "session.counter_stateful.v1",
+        "interaction_surface_id": "stateful_counter_turn_loop",
+        "local_state_shape_id": "persistent_counter_register",
+        "route_profile_id": "tassadar.internal_compute.session_process.v1",
+        "input_messages": [
+          {
+            "message_id": "counter_stateful_session::00",
+            "turn_index": 0,
+            "kind": "open_session",
+            "payload_digest": "cc999bfa219499966fa58f2ee96a3396f70218140025a5386d171882c4f593f0",
+            "note": "open:counter"
+          },
+          {
+            "message_id": "counter_stateful_session::01",
+            "turn_index": 1,
+            "kind": "user_turn",
+            "payload_digest": "0e4b49082ef91b2516a68e940937ffd6a0fcfb4ff00db149048ae9933cca2425",
+            "note": "user:increment"
+          },
+          {
+            "message_id": "counter_stateful_session::02",
+            "turn_index": 2,
+            "kind": "user_turn",
+            "payload_digest": "03dc079dbb9fc155969ddf6f23188be560c9fb149fe2cb80811ae5f9351734d6",
+            "note": "user:increment"
+          },
+          {
+            "message_id": "counter_stateful_session::03",
+            "turn_index": 3,
+            "kind": "user_turn",
+            "payload_digest": "54215df2543a1df6795c5f69045b62b1dc22b42e6d69926c82aa23690e395205",
+            "note": "user:query"
+          },
+          {
+            "message_id": "counter_stateful_session::04",
+            "turn_index": 4,
+            "kind": "close_session",
+            "payload_digest": "4e4eba44c9e7e8a3d5feabf7bfcbb56f4d0a450d4c8a34a89b25b5dd3cede744",
+            "note": "close:counter"
+          }
+        ],
+        "output_messages": [
+          {
+            "message_id": "counter_stateful_session::00",
+            "turn_index": 0,
+            "kind": "assistant_turn",
+            "payload_digest": "710424fb0c3b3870f91bdb108e735a938f0e6ec946ffab59f45b1f59a0b5b7f7",
+            "note": "assistant:count=1"
+          },
+          {
+            "message_id": "counter_stateful_session::01",
+            "turn_index": 1,
+            "kind": "assistant_turn",
+            "payload_digest": "9844e4b698b6b5e716d4172364e0ea580b1cc73942e3275fd20b86b078fe9533",
+            "note": "assistant:count=2"
+          },
+          {
+            "message_id": "counter_stateful_session::02",
+            "turn_index": 2,
+            "kind": "assistant_turn",
+            "payload_digest": "73c53794754c070d86e3303a7ea449794cab63eeaab02345bebac356ebbcd42a",
+            "note": "assistant:count=2"
+          },
+          {
+            "message_id": "counter_stateful_session::03",
+            "turn_index": 3,
+            "kind": "assistant_turn",
+            "payload_digest": "c4b88c2d3b7f8a6e65be386fe4dba52390d5922b15eaee460a32c655847573f9",
+            "note": "assistant:counter closed"
+          }
+        ],
+        "status": "exact_deterministic_parity",
+        "exact_state_parity": true,
+        "exact_output_parity": true,
+        "final_state_digest": "ac80a888e8270a4df9a3e7c480be315e63394bc3508edf48bc54e29098be3d49",
+        "note": "stateful loop preserves a bounded counter register across deterministic turns"
+      },
+      {
+        "case_id": "open_ended_external_event_stream",
+        "session_id": "session.open_ended_external.v1",
+        "interaction_surface_id": "open_ended_external_event_stream",
+        "local_state_shape_id": "ambient_event_mailbox",
+        "route_profile_id": "tassadar.internal_compute.session_process.v1",
+        "input_messages": [
+          {
+            "message_id": "open_ended_external_event_stream::00",
+            "turn_index": 0,
+            "kind": "open_session",
+            "payload_digest": "a9490bc05562b64fa17d6d9ed63729f86886b446b05f2ebaf4dd40abc42b7b70",
+            "note": "open:external"
+          },
+          {
+            "message_id": "open_ended_external_event_stream::01",
+            "turn_index": 1,
+            "kind": "user_turn",
+            "payload_digest": "4867da52b3f83d5f873618984d447307e341beb04b744dd7d45ec454d19b9887",
+            "note": "user:wait_for_external_event"
+          }
+        ],
+        "output_messages": [],
+        "status": "exact_refusal_parity",
+        "exact_state_parity": true,
+        "exact_output_parity": true,
+        "refusal_reason_id": "interactive_surface_out_of_envelope",
+        "final_state_digest": "d757f0f894a93c52615dcfe034781dc59cd701caa1522585dd89678d708da55e",
+        "note": "open-ended external event streams stay outside the bounded session-process profile"
+      }
+    ],
+    "exact_case_count": 2,
+    "refusal_case_count": 1,
+    "overall_green": true,
+    "public_profile_allowed_profile_ids": [
+      "tassadar.internal_compute.session_process.v1"
+    ],
+    "default_served_profile_allowed_profile_ids": [],
+    "routeable_interaction_surface_ids": [
+      "deterministic_echo_turn_loop",
+      "stateful_counter_turn_loop"
+    ],
+    "refused_interaction_surface_ids": [
+      "open_ended_external_event_stream"
+    ],
+    "claim_boundary": "this runtime report covers one bounded deterministic session-process profile with persisted local state, finite message transcripts, and explicit refusal on open-ended external event streams. It does not claim a generic agent loop, arbitrary interactive Wasm, ambient tool execution, or broader served internal compute",
+    "summary": "Session-process runtime report covers exact_cases=2, refusal_cases=1, routeable_surfaces=2, refused_surfaces=1, overall_green=true.",
+    "report_digest": "212656398edd1eab6a8dbe70863cf52cb91cddf13b89d903fcc65bbd9c13a92d"
+  },
+  "case_audits": [
+    {
+      "case_id": "echo_roundtrip_session",
+      "session_id": "session.echo_roundtrip.v1",
+      "interaction_surface_id": "deterministic_echo_turn_loop",
+      "local_state_shape_id": "single_reply_buffer",
+      "runtime_status": "exact_deterministic_parity",
+      "exact_state_parity": true,
+      "exact_output_parity": true,
+      "route_eligible": true,
+      "note": "echo loop preserves one bounded reply buffer across a deterministic turn pair"
+    },
+    {
+      "case_id": "counter_stateful_session",
+      "session_id": "session.counter_stateful.v1",
+      "interaction_surface_id": "stateful_counter_turn_loop",
+      "local_state_shape_id": "persistent_counter_register",
+      "runtime_status": "exact_deterministic_parity",
+      "exact_state_parity": true,
+      "exact_output_parity": true,
+      "route_eligible": true,
+      "note": "stateful loop preserves a bounded counter register across deterministic turns"
+    },
+    {
+      "case_id": "open_ended_external_event_stream",
+      "session_id": "session.open_ended_external.v1",
+      "interaction_surface_id": "open_ended_external_event_stream",
+      "local_state_shape_id": "ambient_event_mailbox",
+      "runtime_status": "exact_refusal_parity",
+      "exact_state_parity": true,
+      "exact_output_parity": true,
+      "refusal_reason_id": "interactive_surface_out_of_envelope",
+      "route_eligible": false,
+      "note": "open-ended external event streams stay outside the bounded session-process profile"
+    }
+  ],
+  "exact_case_count": 2,
+  "refusal_case_count": 1,
+  "overall_green": true,
+  "public_profile_allowed_profile_ids": [
+    "tassadar.internal_compute.session_process.v1"
+  ],
+  "default_served_profile_allowed_profile_ids": [],
+  "routeable_interaction_surface_ids": [
+    "deterministic_echo_turn_loop",
+    "stateful_counter_turn_loop"
+  ],
+  "refused_interaction_surface_ids": [
+    "open_ended_external_event_stream"
+  ],
+  "claim_boundary": "this eval report covers one bounded interactive session-process profile with finite message transcripts and persisted local session state. It admits profile-specific named public posture only for the deterministic surfaces in this report and keeps open-ended external event loops on explicit refusal paths instead of implying a generic agent loop or broader served internal compute",
+  "summary": "Session-process profile report covers exact_cases=2, refusal_cases=1, routeable_surfaces=2, refused_surfaces=1, overall_green=true.",
+  "report_digest": "7d267ea312cb4c5b6e881d4f690a9d63312d8c565ede4388fb1fe40dd3a4ea93"
+}

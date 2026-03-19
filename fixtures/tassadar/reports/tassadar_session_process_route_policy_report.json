@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.session_process_route_policy.report.v1",
+  "profile_report_ref": "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+  "rows": [
+    {
+      "route_policy_id": "route.session_process.echo_turn_loop",
+      "target_profile_id": "tassadar.internal_compute.session_process.v1",
+      "interaction_surface_id": "deterministic_echo_turn_loop",
+      "decision_status": "promoted_profile_specific",
+      "note": "interactive surface `deterministic_echo_turn_loop` is routeable only as a named profile-specific session-process lane"
+    },
+    {
+      "route_policy_id": "route.session_process.stateful_counter_turn_loop",
+      "target_profile_id": "tassadar.internal_compute.session_process.v1",
+      "interaction_surface_id": "stateful_counter_turn_loop",
+      "decision_status": "promoted_profile_specific",
+      "note": "interactive surface `stateful_counter_turn_loop` is routeable only as a named profile-specific session-process lane"
+    },
+    {
+      "route_policy_id": "route.session_process.open_ended_external",
+      "target_profile_id": "tassadar.internal_compute.session_process.v1",
+      "interaction_surface_id": "open_ended_external_event_stream",
+      "decision_status": "refused",
+      "note": "interactive surface `open_ended_external_event_stream` remains explicitly refused because it depends on open-ended external events outside the bounded session-process envelope"
+    }
+  ],
+  "promoted_profile_specific_route_count": 2,
+  "suppressed_route_count": 0,
+  "refused_route_count": 1,
+  "claim_boundary": "this router report promotes only the bounded deterministic session-process interaction surfaces as profile-specific routes. It keeps open-ended external event streams explicitly refused and does not widen the session-process profile into a default served route",
+  "summary": "Session-process route policy now records promoted_profile_specific_routes=2, suppressed_routes=0, refused_routes=1.",
+  "report_digest": "064751fbd7311d9c0b7d0b129401c69e4e71f3a9e6ed341bf2f7ed5d46cc2a32"
+}

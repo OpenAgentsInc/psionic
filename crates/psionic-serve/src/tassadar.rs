@@ -124,6 +124,18 @@ pub struct TassadarExecutorCapabilityPublication {
     pub simd_profile_fallback_backend_ids: Vec<String>,
     /// Refused backend ids currently bound to the named SIMD profile.
     pub simd_profile_refused_backend_ids: Vec<String>,
+    /// Session-process profile report bound to the served lane.
+    pub session_process_profile_report_ref: String,
+    /// Session-process route-policy report bound to the served lane.
+    pub session_process_route_policy_report_ref: String,
+    /// Session-process profiles currently allowed as named public profiles.
+    pub session_process_public_profile_ids: Vec<String>,
+    /// Session-process profiles currently allowed as default served profiles.
+    pub session_process_default_served_profile_ids: Vec<String>,
+    /// Routeable interaction surfaces currently bound to the named session-process profile.
+    pub session_process_routeable_interaction_surface_ids: Vec<String>,
+    /// Refused interaction surfaces currently bound to the named session-process profile.
+    pub session_process_refused_interaction_surface_ids: Vec<String>,
     /// Broad internal-compute acceptance gate bound to the served lane.
     pub broad_internal_compute_acceptance_gate_report_ref: String,
     /// Broad internal-compute profile publication and current route selection.
@@ -230,6 +242,12 @@ pub enum TassadarExecutorCapabilityPublicationError {
     /// The bounded SIMD profile was not publishable.
     #[error("invalid simd profile report: {detail}")]
     InvalidSimdProfile {
+        /// Machine-readable detail for the failed projection.
+        detail: String,
+    },
+    /// The bounded session-process profile was not publishable.
+    #[error("invalid session-process profile report: {detail}")]
+    InvalidSessionProcessProfile {
         /// Machine-readable detail for the failed projection.
         detail: String,
     },
@@ -633,6 +651,47 @@ impl LocalTassadarExecutorService {
                 ),
             });
         }
+        let session_process_profile_report =
+            psionic_eval::build_tassadar_session_process_profile_report().map_err(|error| {
+                TassadarExecutorCapabilityPublicationError::InvalidSessionProcessProfile {
+                    detail: format!("invalid session-process profile report: {error}"),
+                }
+            })?;
+        if !session_process_profile_report.overall_green
+            || session_process_profile_report
+                .public_profile_allowed_profile_ids
+                .is_empty()
+            || session_process_profile_report
+                .routeable_interaction_surface_ids
+                .is_empty()
+        {
+            return Err(
+                TassadarExecutorCapabilityPublicationError::InvalidSessionProcessProfile {
+                    detail: String::from(
+                        "session-process profile report must stay green, expose at least one named public profile, and keep at least one routeable interaction surface",
+                    ),
+                },
+            );
+        }
+        let session_process_route_policy_report =
+            psionic_router::build_tassadar_session_process_route_policy_report().map_err(
+                |error| {
+                    TassadarExecutorCapabilityPublicationError::InvalidSessionProcessProfile {
+                        detail: format!("invalid session-process route policy report: {error}"),
+                    }
+                },
+            )?;
+        if session_process_route_policy_report.promoted_profile_specific_route_count == 0
+            || session_process_route_policy_report.refused_route_count == 0
+        {
+            return Err(
+                TassadarExecutorCapabilityPublicationError::InvalidSessionProcessProfile {
+                    detail: String::from(
+                        "session-process route policy report must keep at least one promoted profile-specific route and one refused route",
+                    ),
+                },
+            );
+        }
         psionic_eval::build_tassadar_subset_profile_promotion_gate_report().map_err(|error| {
             TassadarExecutorCapabilityPublicationError::InvalidBroadInternalComputeProfilePublication {
                 detail: format!("invalid subset profile promotion gate report: {error}"),
@@ -705,6 +764,20 @@ impl LocalTassadarExecutorService {
             simd_profile_exact_backend_ids: simd_profile_report.exact_backend_ids,
             simd_profile_fallback_backend_ids: simd_profile_report.fallback_backend_ids,
             simd_profile_refused_backend_ids: simd_profile_report.refused_backend_ids,
+            session_process_profile_report_ref: String::from(
+                psionic_eval::TASSADAR_SESSION_PROCESS_PROFILE_REPORT_REF,
+            ),
+            session_process_route_policy_report_ref: String::from(
+                psionic_router::TASSADAR_SESSION_PROCESS_ROUTE_POLICY_REPORT_REF,
+            ),
+            session_process_public_profile_ids: session_process_profile_report
+                .public_profile_allowed_profile_ids,
+            session_process_default_served_profile_ids: session_process_profile_report
+                .default_served_profile_allowed_profile_ids,
+            session_process_routeable_interaction_surface_ids: session_process_profile_report
+                .routeable_interaction_surface_ids,
+            session_process_refused_interaction_surface_ids: session_process_profile_report
+                .refused_interaction_surface_ids,
             broad_internal_compute_acceptance_gate_report_ref: String::from(
                 psionic_eval::TASSADAR_BROAD_INTERNAL_COMPUTE_ACCEPTANCE_GATE_REPORT_REF,
             ),
@@ -5826,6 +5899,37 @@ mod tests {
         assert_eq!(
             encoded["simd_profile_refused_backend_ids"],
             serde_json::json!(["accelerator_specific_unbounded"])
+        );
+        assert_eq!(
+            encoded["session_process_profile_report_ref"],
+            serde_json::json!(
+                "fixtures/tassadar/reports/tassadar_session_process_profile_report.json"
+            )
+        );
+        assert_eq!(
+            encoded["session_process_route_policy_report_ref"],
+            serde_json::json!(
+                "fixtures/tassadar/reports/tassadar_session_process_route_policy_report.json"
+            )
+        );
+        assert_eq!(
+            encoded["session_process_public_profile_ids"],
+            serde_json::json!(["tassadar.internal_compute.session_process.v1"])
+        );
+        assert_eq!(
+            encoded["session_process_default_served_profile_ids"],
+            serde_json::json!([])
+        );
+        assert_eq!(
+            encoded["session_process_routeable_interaction_surface_ids"],
+            serde_json::json!([
+                "deterministic_echo_turn_loop",
+                "stateful_counter_turn_loop"
+            ])
+        );
+        assert_eq!(
+            encoded["session_process_refused_interaction_surface_ids"],
+            serde_json::json!(["open_ended_external_event_stream"])
         );
         assert_eq!(
             encoded["broad_internal_compute_profile_publication"]["current_served_profile_id"],

@@ -44,6 +44,7 @@ mod tassadar_process_object_family;
 mod tassadar_quantization_truth_envelope;
 mod tassadar_receipt_supervision;
 mod tassadar_resumable_multi_slice_promotion;
+mod tassadar_session_process_profile;
 mod tassadar_self_installation_gate;
 mod tassadar_simd_profile;
 mod tassadar_subset_profile_promotion_gate;
@@ -100,6 +101,7 @@ pub use tassadar_process_object_family::*;
 pub use tassadar_quantization_truth_envelope::*;
 pub use tassadar_receipt_supervision::*;
 pub use tassadar_resumable_multi_slice_promotion::*;
+pub use tassadar_session_process_profile::*;
 pub use tassadar_self_installation_gate::*;
 pub use tassadar_simd_profile::*;
 pub use tassadar_subset_profile_promotion_gate::*;
@@ -516,6 +518,8 @@ pub struct TassadarCapabilityEnvelope {
     pub exception_profile_receipt: TassadarExceptionProfileReceipt,
     /// Provider-facing receipt for the bounded SIMD deterministic profile.
     pub simd_profile_receipt: TassadarSimdProfileReceipt,
+    /// Provider-facing receipt for the bounded interactive session-process profile.
+    pub session_process_profile_receipt: TassadarSessionProcessProfileReceipt,
     /// Provider-facing receipt for the resumable multi-slice promotion lane.
     pub resumable_multi_slice_promotion_receipt: TassadarResumableMultiSlicePromotionReceipt,
     /// Provider-facing receipt for deterministic import-mediated effect-safe resume.
@@ -615,6 +619,16 @@ impl TassadarCapabilityEnvelope {
                 }
             })?;
         let simd_profile_receipt = TassadarSimdProfileReceipt::from_report(&simd_profile_report);
+        let session_process_profile_report =
+            psionic_eval::build_tassadar_session_process_profile_report().map_err(|error| {
+                TassadarCapabilityEnvelopeError::UnpublishableSessionProcessProfile {
+                    detail: format!(
+                        "provider envelope requires a valid session-process profile report: {error}"
+                    ),
+                }
+            })?;
+        let session_process_profile_receipt =
+            TassadarSessionProcessProfileReceipt::from_report(&session_process_profile_report);
         let resumable_multi_slice_promotion_report =
             psionic_eval::build_tassadar_resumable_multi_slice_promotion_report().map_err(
                 |error| {
@@ -942,6 +956,49 @@ impl TassadarCapabilityEnvelope {
                 ),
             });
         }
+        if publication
+            .session_process_profile_report_ref
+            .trim()
+            .is_empty()
+            || publication
+                .session_process_route_policy_report_ref
+                .trim()
+                .is_empty()
+            || publication.session_process_public_profile_ids
+                != session_process_profile_receipt.public_profile_allowed_profile_ids
+            || publication.session_process_default_served_profile_ids
+                != session_process_profile_receipt.default_served_profile_allowed_profile_ids
+            || publication.session_process_routeable_interaction_surface_ids
+                != session_process_profile_receipt.routeable_interaction_surface_ids
+            || publication.session_process_refused_interaction_surface_ids
+                != session_process_profile_receipt.refused_interaction_surface_ids
+            || !session_process_profile_receipt.overall_green
+            || !session_process_profile_receipt
+                .public_profile_allowed_profile_ids
+                .contains(&String::from(
+                    "tassadar.internal_compute.session_process.v1",
+                ))
+            || !session_process_profile_receipt
+                .default_served_profile_allowed_profile_ids
+                .is_empty()
+            || !session_process_profile_receipt
+                .routeable_interaction_surface_ids
+                .contains(&String::from("deterministic_echo_turn_loop"))
+            || !session_process_profile_receipt
+                .routeable_interaction_surface_ids
+                .contains(&String::from("stateful_counter_turn_loop"))
+            || !session_process_profile_receipt
+                .refused_interaction_surface_ids
+                .contains(&String::from("open_ended_external_event_stream"))
+        {
+            return Err(
+                TassadarCapabilityEnvelopeError::UnpublishableSessionProcessProfile {
+                    detail: String::from(
+                        "provider envelope requires non-empty session-process profile and route-policy refs, exact agreement with the committed public/default-served/interaction-surface ids, a green bounded session-process profile, one named public session-process profile, zero default served session-process profiles, two deterministic routeable interaction surfaces, and explicit refusal on the open-ended external event stream surface",
+                    ),
+                },
+            );
+        }
         Ok(Self {
             backend_family: String::from(BACKEND_FAMILY),
             product_id: publication.product_id.clone(),
@@ -953,6 +1010,7 @@ impl TassadarCapabilityEnvelope {
             float_profile_acceptance_gate_receipt,
             exception_profile_receipt,
             simd_profile_receipt,
+            session_process_profile_receipt,
             resumable_multi_slice_promotion_receipt,
             effect_safe_resume_receipt,
             subset_profile_promotion_gate_receipt,
@@ -1009,6 +1067,11 @@ pub enum TassadarCapabilityEnvelopeError {
     },
     /// The served SIMD deterministic profile was not publishable provider-side.
     UnpublishableSimdProfile {
+        /// Plain-text validation detail.
+        detail: String,
+    },
+    /// The served interactive session-process profile was not publishable provider-side.
+    UnpublishableSessionProcessProfile {
         /// Plain-text validation detail.
         detail: String,
     },
@@ -9156,6 +9219,33 @@ mod tests {
             json!(["accelerator_specific_unbounded"])
         );
         assert_eq!(
+            encoded["publication"]["session_process_profile_report_ref"],
+            json!("fixtures/tassadar/reports/tassadar_session_process_profile_report.json")
+        );
+        assert_eq!(
+            encoded["publication"]["session_process_route_policy_report_ref"],
+            json!("fixtures/tassadar/reports/tassadar_session_process_route_policy_report.json")
+        );
+        assert_eq!(
+            encoded["publication"]["session_process_public_profile_ids"],
+            json!(["tassadar.internal_compute.session_process.v1"])
+        );
+        assert_eq!(
+            encoded["publication"]["session_process_default_served_profile_ids"],
+            json!([])
+        );
+        assert_eq!(
+            encoded["publication"]["session_process_routeable_interaction_surface_ids"],
+            json!([
+                "deterministic_echo_turn_loop",
+                "stateful_counter_turn_loop"
+            ])
+        );
+        assert_eq!(
+            encoded["publication"]["session_process_refused_interaction_surface_ids"],
+            json!(["open_ended_external_event_stream"])
+        );
+        assert_eq!(
             encoded["broad_internal_compute_profile_publication_receipt"]["public_profile_specific_route_ids"],
             json!([
                 "tassadar.internal_compute.deterministic_import_subset.v1",
@@ -9231,6 +9321,25 @@ mod tests {
         assert_eq!(
             encoded["simd_profile_receipt"]["refused_backend_ids"],
             json!(["accelerator_specific_unbounded"])
+        );
+        assert_eq!(
+            encoded["session_process_profile_receipt"]["public_profile_allowed_profile_ids"],
+            json!(["tassadar.internal_compute.session_process.v1"])
+        );
+        assert_eq!(
+            encoded["session_process_profile_receipt"]["default_served_profile_allowed_profile_ids"],
+            json!([])
+        );
+        assert_eq!(
+            encoded["session_process_profile_receipt"]["routeable_interaction_surface_ids"],
+            json!([
+                "deterministic_echo_turn_loop",
+                "stateful_counter_turn_loop"
+            ])
+        );
+        assert_eq!(
+            encoded["session_process_profile_receipt"]["refused_interaction_surface_ids"],
+            json!(["open_ended_external_event_stream"])
         );
         assert_eq!(
             encoded["effect_safe_resume_receipt"]["target_profile_id"],
