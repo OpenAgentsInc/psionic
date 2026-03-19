@@ -33,6 +33,7 @@ mod tassadar_module_trust_isolation;
 mod tassadar_planner_policy;
 mod tassadar_quantization_truth_envelope;
 mod tassadar_receipt_supervision;
+mod tassadar_resumable_multi_slice_promotion;
 mod tassadar_self_installation_gate;
 mod tassadar_trap_exception;
 mod tassadar_wedge_taxonomy;
@@ -71,6 +72,7 @@ pub use tassadar_module_trust_isolation::*;
 pub use tassadar_planner_policy::*;
 pub use tassadar_quantization_truth_envelope::*;
 pub use tassadar_receipt_supervision::*;
+pub use tassadar_resumable_multi_slice_promotion::*;
 pub use tassadar_self_installation_gate::*;
 pub use tassadar_trap_exception::*;
 pub use tassadar_wedge_taxonomy::*;
@@ -474,6 +476,8 @@ pub struct TassadarCapabilityEnvelope {
     /// Provider-facing projection of the served broad internal-compute publication.
     pub broad_internal_compute_profile_publication_receipt:
         TassadarBroadInternalComputeProfilePublicationReceipt,
+    /// Provider-facing receipt for the resumable multi-slice promotion lane.
+    pub resumable_multi_slice_promotion_receipt: TassadarResumableMultiSlicePromotionReceipt,
     /// Backend and quantization deployment truth for the served lane.
     pub quantization_truth_envelope: TassadarDeploymentTruthEnvelope,
     /// Current provider readiness state.
@@ -517,6 +521,20 @@ impl TassadarCapabilityEnvelope {
             TassadarBroadInternalComputeProfilePublicationReceipt::from_publication(
                 &publication.broad_internal_compute_profile_publication,
             );
+        let resumable_multi_slice_promotion_report =
+            psionic_eval::build_tassadar_resumable_multi_slice_promotion_report().map_err(
+                |error| {
+                    TassadarCapabilityEnvelopeError::UnpublishableBroadInternalComputeProfilePublication {
+                        detail: format!(
+                            "provider envelope requires a valid resumable multi-slice promotion report: {error}"
+                        ),
+                    }
+                },
+            )?;
+        let resumable_multi_slice_promotion_receipt =
+            TassadarResumableMultiSlicePromotionReceipt::from_report(
+                &resumable_multi_slice_promotion_report,
+            );
         if broad_internal_compute_profile_publication_receipt
             .current_served_profile_id
             .trim()
@@ -550,6 +568,7 @@ impl TassadarCapabilityEnvelope {
             runtime_backend: publication.runtime_capability.runtime_backend.clone(),
             publication: publication.clone(),
             broad_internal_compute_profile_publication_receipt,
+            resumable_multi_slice_promotion_receipt,
             quantization_truth_envelope,
             readiness,
         })

@@ -190,24 +190,24 @@
       "backend_family": "cpu_reference",
       "toolchain_family": "rustc:rustc 1.92.0 (ded5c06cf 2025-12-08):wasm32-unknown-unknown",
       "machine_class_id": "host_cpu_aarch64",
-      "row_status": "suppressed_drifted_outside_envelope",
+      "row_status": "suppressed_pending_portability_evidence",
       "publication_allowed": false,
-      "evidence_complete": false,
+      "evidence_complete": true,
       "refusal_suite_complete": true,
-      "suppression_reason": "outside_declared_envelope",
-      "note": "profile `tassadar.internal_compute.resumable_multi_slice.v1` is suppressed on `host_cpu_aarch64` because that machine class drifts outside the declared envelope"
+      "suppression_reason": "portability_evidence_incomplete",
+      "note": "profile `tassadar.internal_compute.resumable_multi_slice.v1` remains suppressed on `host_cpu_aarch64` because portability posture or required evidence is still incomplete"
     },
     {
       "profile_id": "tassadar.internal_compute.resumable_multi_slice.v1",
       "backend_family": "cpu_reference",
       "toolchain_family": "rustc:rustc 1.92.0 (ded5c06cf 2025-12-08):wasm32-unknown-unknown",
       "machine_class_id": "host_cpu_x86_64",
-      "row_status": "suppressed_drifted_outside_envelope",
+      "row_status": "suppressed_pending_portability_evidence",
       "publication_allowed": false,
-      "evidence_complete": false,
+      "evidence_complete": true,
       "refusal_suite_complete": true,
-      "suppression_reason": "outside_declared_envelope",
-      "note": "profile `tassadar.internal_compute.resumable_multi_slice.v1` is suppressed on `host_cpu_x86_64` because that machine class drifts outside the declared envelope"
+      "suppression_reason": "portability_evidence_incomplete",
+      "note": "profile `tassadar.internal_compute.resumable_multi_slice.v1` remains suppressed on `host_cpu_x86_64` because portability posture or required evidence is still incomplete"
     },
     {
       "profile_id": "tassadar.internal_compute.resumable_multi_slice.v1",
@@ -216,7 +216,7 @@
       "machine_class_id": "other_host_cpu",
       "row_status": "suppressed_drifted_outside_envelope",
       "publication_allowed": false,
-      "evidence_complete": false,
+      "evidence_complete": true,
       "refusal_suite_complete": true,
       "suppression_reason": "outside_declared_envelope",
       "note": "profile `tassadar.internal_compute.resumable_multi_slice.v1` is suppressed on `other_host_cpu` because that machine class drifts outside the declared envelope"
@@ -309,5 +309,5 @@
   ],
   "claim_boundary": "this report freezes profile-bound portability envelopes for broader internal compute above the Rust-only article baseline. It makes current-host publication, declared-class publication, suppressed portability gaps, and drift outside the declared machine envelope explicit instead of letting one lab machine stand in for broader deployment truth",
   "summary": "Broad internal-compute portability now records published_rows=2, suppressed_rows=22, published_profiles=1, suppressed_profiles=8, current_host=`host_cpu_aarch64`.",
-  "report_digest": "fb47310ebea0f260d4bb841a148e2e81d3892658ed5119f45dbcc88083efa182"
+  "report_digest": "faa2ad78fbd357ce63918ad914c11d9812b4b9abfaadbc4427cec91227319c7b"
 }

@@ -168,7 +168,7 @@ pub fn build_tassadar_broad_internal_compute_route_policy_report(
             &publication_report,
             "route.resumable_multi_slice.checkpoint",
             "tassadar.internal_compute.resumable_multi_slice.v1",
-            TassadarInternalComputeExactnessPosture::Planned,
+            TassadarInternalComputeExactnessPosture::ExactRouteBounded,
             TassadarBroadInternalComputeCheckpointPosture::ResumableRequired,
             TassadarInternalComputeImportPosture::NoImportsOnly,
             TassadarBroadInternalComputePortabilityEnvelope::DeclaredCpuMatrix,

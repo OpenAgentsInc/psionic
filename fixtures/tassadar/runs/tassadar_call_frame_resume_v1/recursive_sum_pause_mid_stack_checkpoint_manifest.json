@@ -1,0 +1,70 @@
+{
+  "stream_id": "tassadar-call-frame-resume://recursive_sum_pause_mid_stack.checkpoint.v1",
+  "subject": "checkpoint",
+  "object_digest": "8526b6314985d121b5669d13cdbc7827bdc473a6581ffb156db9b432c4bed580",
+  "total_bytes": 855,
+  "chunk_bytes": 96,
+  "encoding": "raw_binary",
+  "provenance_digest": "c7bb10ba790fe4a6da920be513df03b979e4dedc33bf0c5d94324177c4a276d3",
+  "checkpoint_binding": {
+    "checkpoint_family": "tassadar.call_frame_resume.v1",
+    "checkpoint_ref": "checkpoint://tassadar.call_frame_resume/recursive_sum_pause_mid_stack.checkpoint.v1",
+    "step": 5
+  },
+  "chunks": [
+    {
+      "index": 0,
+      "offset": 0,
+      "length": 96,
+      "chunk_digest": "70794b66a4f7291db323bebfb00f40503ac0646248281190b1c8900484bd07bc"
+    },
+    {
+      "index": 1,
+      "offset": 96,
+      "length": 96,
+      "chunk_digest": "6f1f549038e204fd3055df1350a8fdd19bbc89d4d2eef38c523a0bbc126048e0"
+    },
+    {
+      "index": 2,
+      "offset": 192,
+      "length": 96,
+      "chunk_digest": "728e5c4dadc2c6a6b6df44b0ae8b855b2838739765cf2c7da6f28d7c142549af"
+    },
+    {
+      "index": 3,
+      "offset": 288,
+      "length": 96,
+      "chunk_digest": "de7dda43909b20cf4fe5959f9318105a8f2fc36cc4fc5090bda97c9575d05d37"
+    },
+    {
+      "index": 4,
+      "offset": 384,
+      "length": 96,
+      "chunk_digest": "aa70756cc11b04c2320f382fa47ceee72727fc165d1c4c40c2e115f90034df73"
+    },
+    {
+      "index": 5,
+      "offset": 480,
+      "length": 96,
+      "chunk_digest": "91acb46986fea3a5a70f7adeb633b60e10534e13677795df0fbe766e0922e896"
+    },
+    {
+      "index": 6,
+      "offset": 576,
+      "length": 96,
+      "chunk_digest": "56ba56c1afedb8678eaad3ba274a362b12563a67b0a8bbff13f5e78e27914bdc"
+    },
+    {
+      "index": 7,
+      "offset": 672,
+      "length": 96,
+      "chunk_digest": "3e2a151022e3fcee6cb734761a2948c4bebda68721a4e4136054146cde2dbd44"
+    },
+    {
+      "index": 8,
+      "offset": 768,
+      "length": 87,
+      "chunk_digest": "2d1cf78a1c1a860943cf289604633230522e1dfbe21d0d4ed097b55cd766cd2f"
+    }
+  ]
+}

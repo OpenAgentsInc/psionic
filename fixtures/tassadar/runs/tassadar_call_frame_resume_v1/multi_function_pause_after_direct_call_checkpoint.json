@@ -1,0 +1,31 @@
+{
+  "checkpoint_id": "multi_function_pause_after_direct_call.checkpoint.v1",
+  "program_id": "tassadar.call_frames.multi_function.v1",
+  "profile_id": "tassadar.internal_compute.resumable_multi_slice.v1",
+  "paused_after_step_count": 4,
+  "next_step_index": 4,
+  "frame_stack": [
+    {
+      "function_index": 0,
+      "function_name": "entry",
+      "pc": 3,
+      "locals": [],
+      "operand_stack": []
+    },
+    {
+      "function_index": 1,
+      "function_name": "sum_of_squares",
+      "pc": 1,
+      "locals": [
+        3,
+        4
+      ],
+      "operand_stack": [
+        3
+      ]
+    }
+  ],
+  "frame_stack_digest": "3a286620614946382694600a84d272f16dd7b22f6d57d0adeb92b422eaac1032",
+  "replay_identity": "33c04af0cf91fc7f84151b3e3ac4d9c45574e22e23ddc074f58a59911235adc2",
+  "checkpoint_digest": "a5dab21507df9cca59ac94230ec4d710b56854087d3b4b0afd33ec33fa383db6"
+}

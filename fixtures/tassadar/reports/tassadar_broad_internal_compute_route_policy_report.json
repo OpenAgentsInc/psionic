@@ -80,17 +80,17 @@
     {
       "route_policy_id": "route.resumable_multi_slice.checkpoint",
       "target_profile_id": "tassadar.internal_compute.resumable_multi_slice.v1",
-      "required_exactness_posture": "planned",
+      "required_exactness_posture": "exact_route_bounded",
       "required_checkpoint_posture": "resumable_required",
       "required_import_posture": "no_imports_only",
       "required_portability_envelope": "declared_cpu_matrix",
       "required_abi_shape_id": "resumable_slice_abi",
       "required_runtime_support_id": "resumable_execution",
-      "publication_status": "failed",
-      "decision_status": "refused",
-      "world_mount_binding_status": "refused_pending_profile_evidence",
-      "accepted_outcome_binding_status": "refused_pending_profile_evidence",
-      "note": "route `route.resumable_multi_slice.checkpoint` refuses profile `tassadar.internal_compute.resumable_multi_slice.v1` because the named profile is still blocked on missing evidence or a non-green broader claim posture"
+      "publication_status": "suppressed",
+      "decision_status": "suppressed",
+      "world_mount_binding_status": "requires_profile_specific_mount_policy",
+      "accepted_outcome_binding_status": "requires_profile_specific_accepted_outcome_template",
+      "note": "route `route.resumable_multi_slice.checkpoint` points at profile `tassadar.internal_compute.resumable_multi_slice.v1` but keeps it suppressed until the named profile's broader portability and public publication posture turn green"
     },
     {
       "route_policy_id": "route.portable_broad_family.declared_matrix",
@@ -124,8 +124,8 @@
     }
   ],
   "selected_route_count": 1,
-  "suppressed_route_count": 3,
-  "refused_route_count": 4,
+  "suppressed_route_count": 4,
+  "refused_route_count": 3,
   "generated_from_refs": [
     "fixtures/tassadar/reports/tassadar_broad_internal_compute_profile_publication_report.json",
     "fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json",
@@ -137,6 +137,6 @@
   "nexus_dependency_marker": "nexus remains the owner of canonical accepted-outcome issuance and settlement-qualified closure outside standalone psionic",
   "compute_market_dependency_marker": "compute-market remains the owner of canonical quote publication, buyer matching, and market-wide broad-profile exposure outside standalone psionic",
   "claim_boundary": "this router report selects among named internal-compute profiles by explicit exactness, checkpoint, import, ABI-shape, runtime-support, and portability criteria. It preserves selected, suppressed, and refused profile routes explicitly instead of flattening wider computation into one generic exact-compute lane",
-  "summary": "Broad internal-compute route policy now records selected_routes=1, suppressed_routes=3, refused_routes=4, current_served_profile=`tassadar.internal_compute.article_closeout.v1`.",
-  "report_digest": "228cb683a7f82424ce25d27638812366440b82c7ca6eb3d3f2c5bca5f76df93e"
+  "summary": "Broad internal-compute route policy now records selected_routes=1, suppressed_routes=4, refused_routes=3, current_served_profile=`tassadar.internal_compute.article_closeout.v1`.",
+  "report_digest": "f333f629b388422629216de3038f807af70d21f3a4b1a068cfafc249ba029681"
 }

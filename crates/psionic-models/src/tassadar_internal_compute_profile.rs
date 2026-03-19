@@ -17,6 +17,8 @@ const TASSADAR_ARTICLE_ABI_CLOSURE_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_article_abi_closure_report.json";
 const TASSADAR_GENERALIZED_ABI_FAMILY_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json";
+const TASSADAR_RESUMABLE_MULTI_SLICE_PROMOTION_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_resumable_multi_slice_promotion_report.json";
 const TASSADAR_HUNGARIAN_10X10_ARTICLE_REPRODUCER_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_hungarian_10x10_article_reproducer_report.json";
 const TASSADAR_SUDOKU_9X9_ARTICLE_REPRODUCER_REPORT_REF: &str =
@@ -409,27 +411,43 @@ impl TassadarInternalComputeProfileLadderPublication {
             ),
             TassadarInternalComputeProfileSpec::new(
                 TassadarInternalComputeProfileId::ResumableMultiSliceV1,
-                TassadarInternalComputeProfileStatus::Planned,
+                TassadarInternalComputeProfileStatus::Implemented,
                 vec![String::from("tassadar.wasm.resumable_multi_slice.v1")],
-                vec![String::from("checkpointed_multi_slice_execution")],
+                vec![
+                    String::from("call_frame_resume_execution"),
+                    String::from("checkpointed_multi_slice_execution"),
+                ],
                 vec![String::from("resumable_slice_abi")],
                 vec![String::from("i32_integer_family")],
-                vec![String::from("checkpoint_memory_delta_receipts")],
                 vec![
+                    String::from("call_frame_checkpoint_receipts"),
+                    String::from("checkpoint_memory_delta_receipts"),
+                ],
+                vec![
+                    String::from("call_frame_resume_manifests"),
                     String::from("checkpoint_objects"),
+                    String::from("frame_stack_checkpoint_objects"),
                     String::from("memory_delta_receipts"),
                     String::from("resumable_execution"),
                 ],
                 TassadarInternalComputeImportPosture::NoImportsOnly,
-                TassadarInternalComputeExactnessPosture::Planned,
+                TassadarInternalComputeExactnessPosture::ExactRouteBounded,
                 TassadarInternalComputePortabilityPosture::Planned,
-                Vec::new(),
+                current_supported_machine_class_ids.clone(),
                 vec![
                     TassadarInternalComputeRefusalClass::BroadHostImportUnsupported,
                     TassadarInternalComputeRefusalClass::NonCpuBackendUnsupported,
                 ],
-                vec![String::from("issue://OpenAgentsInc/psionic/177")],
-                "resumable multi-slice execution stays red until checkpoint, delta-receipt, and resume truth exists",
+                vec![
+                    String::from(TASSADAR_RESUMABLE_MULTI_SLICE_PROMOTION_REPORT_REF),
+                    String::from(
+                        "fixtures/tassadar/reports/tassadar_dynamic_memory_resume_report.json",
+                    ),
+                    String::from(
+                        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+                    ),
+                ],
+                "resumable multi-slice execution is now benchmarked as a separate implemented profile over frame-stack checkpoints, linear-memory checkpoints, datastream-backed continuation manifests, and exact fresh-versus-resumed parity. It remains non-portable and non-promoted until portability evidence and a broader publication gate go green",
             ),
             TassadarInternalComputeProfileSpec::new(
                 TassadarInternalComputeProfileId::PortableBroadFamilyV1,

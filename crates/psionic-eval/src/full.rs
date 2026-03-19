@@ -42,6 +42,8 @@ mod tassadar_broad_internal_compute_portability;
 mod tassadar_broad_internal_compute_profile_publication;
 #[path = "tassadar_call_frames.rs"]
 mod tassadar_call_frames;
+#[path = "tassadar_resumable_multi_slice_promotion.rs"]
+mod tassadar_resumable_multi_slice_promotion;
 #[path = "tassadar_clrs_wasm_bridge.rs"]
 mod tassadar_clrs_wasm_bridge;
 #[path = "tassadar_compile_pipeline_matrix.rs"]
@@ -208,6 +210,7 @@ pub use tassadar_broad_internal_compute_acceptance_gate::*;
 pub use tassadar_broad_internal_compute_portability::*;
 pub use tassadar_broad_internal_compute_profile_publication::*;
 pub use tassadar_call_frames::*;
+pub use tassadar_resumable_multi_slice_promotion::*;
 pub use tassadar_clrs_wasm_bridge::*;
 pub use tassadar_compile_pipeline_matrix::*;
 pub use tassadar_compiled_distillation::*;

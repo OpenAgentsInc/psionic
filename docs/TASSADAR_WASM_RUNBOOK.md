@@ -213,7 +213,37 @@ Expected outcome:
   widen the current served claim beyond
   `tassadar.internal_compute.article_closeout.v1`
 
-### 3B.1. Deterministic import/effect taxonomy, receipts, and replay limits
+### 3B.1. Call-frame and memory exact checkpoint/resume promotion
+
+```bash
+cargo run -p psionic-eval --example tassadar_resumable_multi_slice_promotion_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_resumable_multi_slice_promotion_report.json`
+- `fixtures/tassadar/runs/tassadar_call_frame_resume_v1/tassadar_call_frame_resume_bundle.json`
+
+Expected outcome:
+
+- one machine-readable joined promotion report now binds the call-frame
+  resume lane to the earlier execution-checkpoint and dynamic-memory resume
+  lanes
+- exact fresh-versus-resumed parity is explicit for seeded recursive and
+  multi-function call-heavy programs
+- persisted continuation artifacts now exist as checkpoint JSON plus
+  datastream-manifest pairs under
+  `fixtures/tassadar/runs/tassadar_call_frame_resume_v1`
+- resume safety is explicit: profile mismatches, stale checkpoints, and
+  oversized state refuse with typed reasons
+- the named profile `tassadar.internal_compute.resumable_multi_slice.v1` is
+  now benchmarked and implemented in the internal-compute ladder, but it
+  remains non-portable and non-promoted until broader portability evidence
+  exists
+- this does not widen the current served claim beyond
+  `tassadar.internal_compute.article_closeout.v1`
+
+### 3B.2. Deterministic import/effect taxonomy, receipts, and replay limits
 
 ```bash
 cargo run -p psionic-router --example tassadar_effect_route_policy_report

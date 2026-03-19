@@ -1,0 +1,30 @@
+{
+  "checkpoint_id": "recursive_sum_pause_mid_stack.checkpoint.v1",
+  "program_id": "tassadar.call_frames.recursive_sum.v1",
+  "profile_id": "tassadar.internal_compute.resumable_multi_slice.v1",
+  "paused_after_step_count": 5,
+  "next_step_index": 5,
+  "frame_stack": [
+    {
+      "function_index": 0,
+      "function_name": "entry",
+      "pc": 2,
+      "locals": [],
+      "operand_stack": []
+    },
+    {
+      "function_index": 1,
+      "function_name": "recursive_sum",
+      "pc": 3,
+      "locals": [
+        5
+      ],
+      "operand_stack": [
+        5
+      ]
+    }
+  ],
+  "frame_stack_digest": "9b1288f5cb4e4e6dde2f06d27d0bfe5097c7f567654ba9c3a20c803c9d7ab623",
+  "replay_identity": "ed019672b215158dfd58b55f6e7885d9253478674a94675e2810f597ac6365ec",
+  "checkpoint_digest": "c7bb10ba790fe4a6da920be513df03b979e4dedc33bf0c5d94324177c4a276d3"
+}

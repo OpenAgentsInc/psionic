@@ -92,6 +92,8 @@ pub struct TassadarExecutorCapabilityPublication {
     /// Broad internal-compute profile publication and current route selection.
     pub broad_internal_compute_profile_publication:
         crate::TassadarBroadInternalComputeProfilePublication,
+    /// Resumable multi-slice promotion report bound to the served lane.
+    pub resumable_multi_slice_promotion_report_ref: String,
     /// Machine-readable workload capability matrix for the served lane.
     pub workload_capability_matrix: TassadarWorkloadCapabilityMatrix,
     /// Backend and quantization deployment truth carried through served publication.
@@ -498,6 +500,13 @@ impl LocalTassadarExecutorService {
                     }
                 },
             )?;
+        psionic_eval::build_tassadar_resumable_multi_slice_promotion_report().map_err(|error| {
+            TassadarExecutorCapabilityPublicationError::InvalidBroadInternalComputeProfilePublication {
+                detail: format!(
+                    "invalid resumable multi-slice promotion report: {error}"
+                ),
+            }
+        })?;
         Ok(TassadarExecutorCapabilityPublication {
             product_id: String::from(EXECUTOR_TRACE_PRODUCT_ID),
             model_descriptor: fixture.descriptor().clone(),
@@ -515,6 +524,9 @@ impl LocalTassadarExecutorService {
                 psionic_eval::TASSADAR_BROAD_INTERNAL_COMPUTE_ACCEPTANCE_GATE_REPORT_REF,
             ),
             broad_internal_compute_profile_publication,
+            resumable_multi_slice_promotion_report_ref: String::from(
+                psionic_eval::TASSADAR_RESUMABLE_MULTI_SLICE_PROMOTION_REPORT_REF,
+            ),
             workload_capability_matrix,
             quantization_truth_envelope,
         })
@@ -5511,6 +5523,12 @@ mod tests {
             encoded["broad_internal_compute_profile_publication"]["route_policy_report_ref"],
             serde_json::json!(
                 "fixtures/tassadar/reports/tassadar_broad_internal_compute_route_policy_report.json"
+            )
+        );
+        assert_eq!(
+            encoded["resumable_multi_slice_promotion_report_ref"],
+            serde_json::json!(
+                "fixtures/tassadar/reports/tassadar_resumable_multi_slice_promotion_report.json"
             )
         );
         assert_eq!(
