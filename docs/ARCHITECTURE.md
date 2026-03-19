@@ -915,6 +915,17 @@ The current scope is:
   insufficient evidence, and portability mismatch, and zero default-served
   packages; this is not arbitrary package discovery, arbitrary dependency
   solving, or broad served internal-compute publication
+- the current cross-profile link compatibility artifacts are
+  `fixtures/tassadar/reports/tassadar_cross_profile_link_compatibility_report.json`,
+  `fixtures/tassadar/runs/tassadar_cross_profile_link_compatibility_v1/tassadar_cross_profile_link_compatibility_bundle.json`,
+  `fixtures/tassadar/reports/tassadar_cross_profile_link_route_policy_report.json`,
+  and `fixtures/tassadar/reports/tassadar_cross_profile_link_eval_report.json`,
+  which freeze one bounded internal software-platform compatibility lane with
+  explicit exact cross-profile linking, explicit downgrade planning, and typed
+  portability/effect-boundary refusal across named profiles; this remains
+  non-served with `served_publication_allowed = false`, so it is not arbitrary
+  profile composition, implicit portability lifting, or broad served internal
+  compute publication
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

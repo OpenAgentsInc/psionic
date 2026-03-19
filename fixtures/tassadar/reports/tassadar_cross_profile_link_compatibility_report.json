@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.cross_profile_link_compatibility.report.v1",
+  "portability_envelope_id": "cpu_reference_current_host",
+  "case_reports": [
+    {
+      "case_id": "compat.session_process_to_spill_tape.exact.v1",
+      "producer_profile_id": "tassadar.internal_compute.session_process.v1",
+      "consumer_profile_id": "tassadar.internal_compute.spill_tape_store.v1",
+      "requested_link_shape_id": "session_checkpoint_spill_adapter_v1",
+      "semantic_window_id": "tassadar.current_host.process_checkpoint_window.v1",
+      "requested_portability_envelope_id": "cpu_reference_current_host",
+      "status": "exact",
+      "planned_profile_ids": [
+        "tassadar.internal_compute.session_process.v1",
+        "tassadar.internal_compute.spill_tape_store.v1"
+      ],
+      "adapter_stack_id": "session_checkpoint_spill_adapter_v1",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+        "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+      ],
+      "note": "deterministic session transcripts may link to the bounded spill-backed continuation lane through one explicit checkpoint adapter without widening either profile into a generic process runtime"
+    },
+    {
+      "case_id": "compat.generalized_abi_to_component_model.downgrade.v1",
+      "producer_profile_id": "tassadar.internal_compute.generalized_abi.v1",
+      "consumer_profile_id": "tassadar.internal_compute.component_model_abi.v1",
+      "requested_link_shape_id": "generalized_heap_multi_value_to_component_manifest_v1",
+      "semantic_window_id": "tassadar.wasm.generalized_abi.v1",
+      "requested_portability_envelope_id": "cpu_reference_current_host",
+      "status": "downgraded",
+      "planned_profile_ids": [
+        "tassadar.internal_compute.component_model_abi.v1"
+      ],
+      "adapter_stack_id": "generalized_abi_to_component_manifest_adapter_v1",
+      "downgrade_target_profile_id": "tassadar.internal_compute.component_model_abi.v1",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json",
+        "fixtures/tassadar/reports/tassadar_internal_component_abi_report.json",
+        "fixtures/tassadar/reports/tassadar_component_linking_profile_report.json"
+      ],
+      "note": "generalized multi-value heap results stay linkable only by downgrading into one explicit component-model manifest adapter instead of silently pretending the broader ABI is native on both sides"
+    },
+    {
+      "case_id": "compat.spill_tape_to_portable_broad_family.refusal.v1",
+      "producer_profile_id": "tassadar.internal_compute.spill_tape_store.v1",
+      "consumer_profile_id": "tassadar.internal_compute.portable_broad_family.v1",
+      "requested_link_shape_id": "spill_segment_portable_process_snapshot_v1",
+      "semantic_window_id": "tassadar.portable_broad_family.window.v1",
+      "requested_portability_envelope_id": "cpu_reference_current_host",
+      "status": "refused",
+      "planned_profile_ids": [],
+      "refusal_reason": "portability_envelope_mismatch",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+        "fixtures/tassadar/reports/tassadar_broad_internal_compute_portability_report.json"
+      ],
+      "note": "spill-backed continuation artifacts remain current-host cpu-reference objects and refuse silent widening into portable broad-family process state"
+    },
+    {
+      "case_id": "compat.session_process_to_deterministic_import.refusal.v1",
+      "producer_profile_id": "tassadar.internal_compute.session_process.v1",
+      "consumer_profile_id": "tassadar.internal_compute.deterministic_import_subset.v1",
+      "requested_link_shape_id": "interactive_event_import_resume_v1",
+      "semantic_window_id": "tassadar.deterministic_import_resume.window.v1",
+      "requested_portability_envelope_id": "cpu_reference_current_host",
+      "status": "refused",
+      "planned_profile_ids": [],
+      "refusal_reason": "effect_boundary_mismatch",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+        "fixtures/tassadar/reports/tassadar_effect_safe_resume_report.json",
+        "fixtures/tassadar/reports/tassadar_simulator_effect_profile_report.json"
+      ],
+      "note": "interactive session turns do not inherit deterministic-import resume authority, so cross-profile linking refuses instead of flattening effect-safe replay into generic interaction closure"
+    }
+  ],
+  "exact_case_count": 1,
+  "downgraded_case_count": 1,
+  "refused_case_count": 2,
+  "routeable_case_ids": [
+    "compat.session_process_to_spill_tape.exact.v1",
+    "compat.generalized_abi_to_component_model.downgrade.v1"
+  ],
+  "claim_boundary": "this compiler-owned report freezes one bounded cross-profile linking lane over named profiles, explicit downgrade targets, and typed compatibility refusal. It does not claim arbitrary profile composition, implicit portability lifting, or broader served publication",
+  "summary": "Cross-profile link compatibility report freezes 4 cases across exact=1, downgraded=1, refused=2, routeable=2.",
+  "report_digest": "629db7a8caa0d56bd1f01d65d285ff5eed469fea9ed5109a9a226f972090d6b0"
+}

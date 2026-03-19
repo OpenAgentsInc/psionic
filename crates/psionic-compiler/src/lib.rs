@@ -3,6 +3,7 @@
 mod tassadar_article_abi;
 mod tassadar_clrs_wasm_bridge;
 mod tassadar_component_linking_profile;
+mod tassadar_cross_profile_link_compatibility;
 mod tassadar_exception_profile;
 mod tassadar_float_semantics;
 mod tassadar_generalized_abi;
@@ -49,6 +50,7 @@ use thiserror::Error;
 pub use tassadar_article_abi::*;
 pub use tassadar_clrs_wasm_bridge::*;
 pub use tassadar_component_linking_profile::*;
+pub use tassadar_cross_profile_link_compatibility::*;
 pub use tassadar_exception_profile::*;
 pub use tassadar_float_semantics::*;
 pub use tassadar_generalized_abi::*;

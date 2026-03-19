@@ -1258,6 +1258,32 @@ Expected outcome:
 - explicit benchmark-gated served-publication posture without widening this
   lane into a default served software platform
 
+### 26. Cross-profile linking, downgrade planning, and compatibility refusal
+
+```bash
+cargo run -p psionic-compiler --example tassadar_cross_profile_link_compatibility_report
+cargo run -p psionic-runtime --example tassadar_cross_profile_link_compatibility_bundle
+cargo run -p psionic-router --example tassadar_cross_profile_link_route_policy_report
+cargo run -p psionic-eval --example tassadar_cross_profile_link_eval_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_cross_profile_link_compatibility_report.json`
+- `fixtures/tassadar/runs/tassadar_cross_profile_link_compatibility_v1/tassadar_cross_profile_link_compatibility_bundle.json`
+- `fixtures/tassadar/reports/tassadar_cross_profile_link_route_policy_report.json`
+- `fixtures/tassadar/reports/tassadar_cross_profile_link_eval_report.json`
+
+Expected outcome:
+
+- one bounded cross-profile software-platform compatibility lane
+- one exact session-process -> spill-tape link under the current-host
+  cpu-reference envelope
+- one explicit generalized-ABI -> component-model downgrade plan that
+  preserves deterministic parity
+- explicit refusal on portability-envelope and effect-boundary mismatches
+- explicit non-served posture with `served_publication_allowed = false`
+
 ## Validation Commands
 
 Run the focused report checks after the flow:

@@ -146,6 +146,12 @@ Current honest posture:
   `package.verifier_search_stack.v1`, while keeping ambiguous solver,
   insufficient-evidence, and portability-mismatch requests on explicit refusal
   paths and leaving the default served package lane empty
+- the repo now also has one bounded cross-profile link-compatibility lane with
+  committed compiler, runtime, router, eval, and provider-facing surfaces that
+  preserve one exact session-process -> spill-tape link, one explicit
+  generalized-ABI -> component-model downgrade plan, and typed refusal on
+  portability-envelope and effect-boundary mismatches while keeping
+  `served_publication_allowed = false`
 - broader profiles above that remain benchmarked, suppressed, refused, or
   unpromoted unless their explicit gates are green
 
@@ -173,9 +179,9 @@ Issue-state note:
 
 - `TAS-103` through `TAS-124` are already implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-125` through `TAS-134` are now implemented and tracked in
+- `TAS-125` through `TAS-135` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-135` and runs through
+- the current open GitHub backlog begins at `TAS-136` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs
