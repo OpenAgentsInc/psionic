@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.program_family_frontier.summary.v1",
+  "eval_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.program_family_frontier.report.v1",
+    "publication_digest": "cd089156b849b4951f44247174bc883d390c6554339d53dc9a395705fbc54343",
+    "contract_ref": "dataset://openagents/tassadar/program_family_frontier",
+    "contract_digest": "b3ee29434cd60c042d65d68c509fbb57fe88336bd1a610d1689f2a7fb3ff0a69",
+    "evidence_bundle_ref": "fixtures/tassadar/runs/tassadar_program_family_frontier_v1/program_family_frontier_bundle.json",
+    "evidence_bundle_digest": "4cbe9a812715a4624c546a93f800b033d844062b8605401eca030eb5cc37b2e2",
+    "architecture_summaries": [
+      {
+        "architecture_family": "compiled_exact_reference",
+        "mean_in_family_exactness_bps": 9520,
+        "mean_held_out_exactness_bps": 9000,
+        "mean_refusal_calibration_bps": 9885,
+        "mean_normalized_cost_units": 321,
+        "held_out_efficiency_bps_per_cost_unit": 28
+      },
+      {
+        "architecture_family": "learned_structured_memory",
+        "mean_in_family_exactness_bps": 7600,
+        "mean_held_out_exactness_bps": 5350,
+        "mean_refusal_calibration_bps": 8028,
+        "mean_normalized_cost_units": 165,
+        "held_out_efficiency_bps_per_cost_unit": 32
+      },
+      {
+        "architecture_family": "verifier_attached_hybrid",
+        "mean_in_family_exactness_bps": 8820,
+        "mean_held_out_exactness_bps": 7600,
+        "mean_refusal_calibration_bps": 8728,
+        "mean_normalized_cost_units": 226,
+        "held_out_efficiency_bps_per_cost_unit": 33
+      }
+    ],
+    "held_out_family_ladder": [
+      {
+        "workload_family": "held_out_virtual_machine",
+        "best_architecture": "compiled_exact_reference",
+        "compiled_exact_reference_bps": 9100,
+        "learned_structured_memory_bps": 5600,
+        "verifier_attached_hybrid_bps": 7800,
+        "hybrid_gain_vs_learned_bps": 2200,
+        "note": "learned failure `instruction_dispatch_collapse` vs hybrid failure `trace_reentry_budget`"
+      },
+      {
+        "workload_family": "held_out_message_orchestrator",
+        "best_architecture": "compiled_exact_reference",
+        "compiled_exact_reference_bps": 8900,
+        "learned_structured_memory_bps": 5100,
+        "verifier_attached_hybrid_bps": 7400,
+        "hybrid_gain_vs_learned_bps": 2300,
+        "note": "learned failure `mailbox_order_collapse` vs hybrid failure `mailbox_budget_retry_noise`"
+      }
+    ],
+    "failure_mode_taxonomy": {
+      "cross_module_handle_alias": 1,
+      "frontier_trace_collapse": 1,
+      "instruction_dispatch_collapse": 1,
+      "link_contract_retry_noise": 1,
+      "mailbox_budget_retry_noise": 1,
+      "mailbox_order_collapse": 1,
+      "none_exact_anchor": 7,
+      "package_dependency_alias": 1,
+      "replay_challenge_budget_exhaustion": 1,
+      "resume_receipt_rebind_drift": 1,
+      "solver_backtrack_budget": 1,
+      "stack_alias_on_long_branch": 1,
+      "trace_reentry_budget": 1,
+      "verifier_budget_exhaustion": 1,
+      "verifier_retry_budget": 1
+    },
+    "fragile_held_out_on_learned": [
+      "held_out_virtual_machine",
+      "held_out_message_orchestrator"
+    ],
+    "hybrid_recoverable_families": [
+      "held_out_virtual_machine",
+      "held_out_message_orchestrator"
+    ],
+    "claim_boundary": "this report keeps program-family transfer bounded to the named benchmark suite and explicit architecture families. It does not promote broad internal compute, arbitrary Wasm, or served capability; held-out-family misses and verifier-budget limits remain explicit instead of being smoothed into generic success rates",
+    "summary": "Program-family frontier compares 3 architecture families across 2 held-out ladder rows, with 2 learned-fragile held-out families and 2 hybrid-recoverable held-out families.",
+    "report_digest": "510f26d8297d7e430ae6eef4fcb2d6eb829b3e15ed392f15220a74a2b0206d8c"
+  },
+  "compiled_anchor_families": [
+    "held_out_virtual_machine",
+    "held_out_message_orchestrator"
+  ],
+  "hybrid_frontier_families": [
+    "held_out_virtual_machine",
+    "held_out_message_orchestrator"
+  ],
+  "learned_only_in_family_families": [
+    "kernel_state_machine",
+    "linked_program_bundle",
+    "multi_module_package_workflow"
+  ],
+  "held_out_break_families": [
+    "held_out_virtual_machine",
+    "held_out_message_orchestrator"
+  ],
+  "cost_efficient_hybrid_families": [
+    "held_out_virtual_machine",
+    "held_out_message_orchestrator"
+  ],
+  "claim_boundary": "this summary interprets the committed program-family frontier as a research-only transfer map. It keeps compiled anchors, hybrid recoverability, and learned held-out breaks explicit instead of promoting any lane into broad practical internal computation or served capability",
+  "summary": "Program-family frontier summary marks 2 compiled anchor families, 2 hybrid frontier families, 3 learned-only in-family families, and 2 held-out break families.",
+  "report_digest": "7bcf3b53cf31bba9871d8eb0e7b0c438bfb4979a624053612ac3e61005109c10"
+}

@@ -947,6 +947,18 @@ The current scope is:
   depth, and heap-cell limits across baseline versus structured-memory
   variants; this is not broad learned process ownership, arbitrary Wasm, or
   broader served internal compute promotion
+- the current program-family frontier artifacts are
+  `fixtures/tassadar/runs/tassadar_program_family_frontier_v1/program_family_frontier_bundle.json`,
+  `fixtures/tassadar/reports/tassadar_program_family_frontier_report.json`,
+  and `fixtures/tassadar/reports/tassadar_program_family_frontier_summary.json`,
+  which freeze one research-only cross-family transfer map over kernel-state,
+  search-process, linked-program, effectful-resume, multi-module-workflow,
+  and held-out virtual-machine/message-orchestrator workloads with explicit
+  held-out-family ladder rows, failure-mode taxonomy, and normalized
+  cost-versus-frontier comparisons across compiled exact, learned structured
+  memory, and verifier-attached hybrid architectures; this is not broad
+  internal compute, arbitrary Wasm, or broader served internal compute
+  promotion
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

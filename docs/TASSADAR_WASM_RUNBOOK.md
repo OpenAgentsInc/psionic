@@ -1335,6 +1335,24 @@ Expected outcome:
 - no broad learned process ownership, arbitrary Wasm, or served
   internal-compute promotion
 
+Read:
+
+- `fixtures/tassadar/runs/tassadar_program_family_frontier_v1/program_family_frontier_bundle.json`
+- `fixtures/tassadar/reports/tassadar_program_family_frontier_report.json`
+- `fixtures/tassadar/reports/tassadar_program_family_frontier_summary.json`
+
+Expected outcome:
+
+- one research-only program-family frontier over kernel-state, search-process,
+  linked-program, effectful-resume, multi-module-workflow, and held-out
+  virtual-machine/message-orchestrator workloads
+- explicit held-out-family ladder rows, failure-mode taxonomy, and normalized
+  cost-versus-frontier comparisons across compiled exact, learned
+  structured-memory, and verifier-attached hybrid architecture families
+- learned held-out fragility and hybrid recoverability remain explicit
+- no broad internal compute, arbitrary Wasm, or served internal-compute
+  promotion
+
 ## Validation Commands
 
 Run the focused report checks after the flow:

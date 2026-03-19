@@ -1,0 +1,379 @@
+{
+  "contract": {
+    "abi_version": "psionic.tassadar.program_family_frontier.v1",
+    "contract_ref": "dataset://openagents/tassadar/program_family_frontier",
+    "version": "2026.03.19",
+    "architecture_families": [
+      "compiled_exact_reference",
+      "learned_structured_memory",
+      "verifier_attached_hybrid"
+    ],
+    "workload_rows": [
+      {
+        "workload_family": "kernel_state_machine",
+        "split": "in_family",
+        "compared_architectures": [
+          "compiled_exact_reference",
+          "learned_structured_memory",
+          "verifier_attached_hybrid"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_call_frame_report.json",
+          "fixtures/tassadar/reports/tassadar_workload_capability_frontier_report.json"
+        ],
+        "claim_boundary": "kernel-state rows remain a bounded family-transfer anchor and do not imply arbitrary low-level program closure"
+      },
+      {
+        "workload_family": "search_process_machine",
+        "split": "in_family",
+        "compared_architectures": [
+          "compiled_exact_reference",
+          "learned_structured_memory",
+          "verifier_attached_hybrid"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_search_native_executor_report.json",
+          "fixtures/tassadar/reports/tassadar_process_object_report.json"
+        ],
+        "claim_boundary": "search-process rows remain bounded to verifier-shaped seeded workloads rather than broad open-ended search ownership"
+      },
+      {
+        "workload_family": "linked_program_bundle",
+        "split": "in_family",
+        "compared_architectures": [
+          "compiled_exact_reference",
+          "learned_structured_memory",
+          "verifier_attached_hybrid"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_linked_program_bundle_eval_report.json",
+          "fixtures/tassadar/reports/tassadar_cross_profile_link_eval_report.json"
+        ],
+        "claim_boundary": "linked-program rows remain bounded to the named internal-compute bundle graphs and do not imply arbitrary linking closure"
+      },
+      {
+        "workload_family": "effectful_resume_graph",
+        "split": "in_family",
+        "compared_architectures": [
+          "compiled_exact_reference",
+          "learned_structured_memory",
+          "verifier_attached_hybrid"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_effectful_replay_audit_report.json",
+          "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json"
+        ],
+        "claim_boundary": "effectful-resume rows stay inside the bounded replay and lifecycle envelope and do not widen effect-safe execution by inheritance"
+      },
+      {
+        "workload_family": "multi_module_package_workflow",
+        "split": "in_family",
+        "compared_architectures": [
+          "compiled_exact_reference",
+          "learned_structured_memory",
+          "verifier_attached_hybrid"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_internal_compute_package_manager_eval_report.json",
+          "fixtures/tassadar/reports/tassadar_linked_program_bundle_eval_report.json"
+        ],
+        "claim_boundary": "multi-module workflow rows remain tied to the explicit package-manager and linked-program benchmark families rather than arbitrary package ecosystems"
+      },
+      {
+        "workload_family": "held_out_virtual_machine",
+        "split": "held_out_family",
+        "compared_architectures": [
+          "compiled_exact_reference",
+          "learned_structured_memory",
+          "verifier_attached_hybrid"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_learned_call_stack_heap_suite_report.json",
+          "fixtures/tassadar/reports/tassadar_search_native_executor_report.json"
+        ],
+        "claim_boundary": "held-out virtual-machine rows measure cross-family generalization only and do not widen any learned or hybrid lane into broad virtual-machine ownership"
+      },
+      {
+        "workload_family": "held_out_message_orchestrator",
+        "split": "held_out_family",
+        "compared_architectures": [
+          "compiled_exact_reference",
+          "learned_structured_memory",
+          "verifier_attached_hybrid"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json",
+          "fixtures/tassadar/reports/tassadar_cross_profile_link_eval_report.json"
+        ],
+        "claim_boundary": "held-out message-orchestrator rows remain an explicit held-out ladder and do not imply general interactive process closure"
+      }
+    ],
+    "evaluation_axes": [
+      "later_window_exactness_bps",
+      "final_output_exactness_bps",
+      "refusal_calibration_bps",
+      "normalized_cost_units",
+      "held_out_family_frontier_rank"
+    ],
+    "evidence_bundle_ref": "fixtures/tassadar/runs/tassadar_program_family_frontier_v1/program_family_frontier_bundle.json",
+    "report_ref": "fixtures/tassadar/reports/tassadar_program_family_frontier_report.json",
+    "summary_report_ref": "fixtures/tassadar/reports/tassadar_program_family_frontier_summary.json",
+    "contract_digest": "b3ee29434cd60c042d65d68c509fbb57fe88336bd1a610d1689f2a7fb3ff0a69"
+  },
+  "case_reports": [
+    {
+      "case_id": "kernel_state_machine.compiled_exact_reference",
+      "architecture_family": "compiled_exact_reference",
+      "workload_family": "kernel_state_machine",
+      "split": "in_family",
+      "later_window_exactness_bps": 9800,
+      "final_output_exactness_bps": 9900,
+      "refusal_calibration_bps": 9900,
+      "normalized_cost_units": 320,
+      "dominant_failure_mode": "none_exact_anchor",
+      "note": "compiled exact reference remains the anchor on seeded kernel-state machines"
+    },
+    {
+      "case_id": "kernel_state_machine.learned_structured_memory",
+      "architecture_family": "learned_structured_memory",
+      "workload_family": "kernel_state_machine",
+      "split": "in_family",
+      "later_window_exactness_bps": 8400,
+      "final_output_exactness_bps": 8900,
+      "refusal_calibration_bps": 8200,
+      "normalized_cost_units": 150,
+      "dominant_failure_mode": "stack_alias_on_long_branch",
+      "note": "learned structured memory keeps seeded kernel-state reuse workable but below compiled exactness"
+    },
+    {
+      "case_id": "kernel_state_machine.verifier_attached_hybrid",
+      "architecture_family": "verifier_attached_hybrid",
+      "workload_family": "kernel_state_machine",
+      "split": "in_family",
+      "later_window_exactness_bps": 9100,
+      "final_output_exactness_bps": 9500,
+      "refusal_calibration_bps": 8900,
+      "normalized_cost_units": 210,
+      "dominant_failure_mode": "verifier_budget_exhaustion",
+      "note": "verifier attachment recovers most kernel-state exactness without claiming general closure"
+    },
+    {
+      "case_id": "search_process_machine.compiled_exact_reference",
+      "architecture_family": "compiled_exact_reference",
+      "workload_family": "search_process_machine",
+      "split": "in_family",
+      "later_window_exactness_bps": 9600,
+      "final_output_exactness_bps": 9800,
+      "refusal_calibration_bps": 9900,
+      "normalized_cost_units": 330,
+      "dominant_failure_mode": "none_exact_anchor",
+      "note": "compiled exact reference remains green on the seeded search-process family"
+    },
+    {
+      "case_id": "search_process_machine.learned_structured_memory",
+      "architecture_family": "learned_structured_memory",
+      "workload_family": "search_process_machine",
+      "split": "in_family",
+      "later_window_exactness_bps": 7300,
+      "final_output_exactness_bps": 8100,
+      "refusal_calibration_bps": 8000,
+      "normalized_cost_units": 160,
+      "dominant_failure_mode": "frontier_trace_collapse",
+      "note": "learned lane drifts once search frontier reuse widens past the seeded trace regime"
+    },
+    {
+      "case_id": "search_process_machine.verifier_attached_hybrid",
+      "architecture_family": "verifier_attached_hybrid",
+      "workload_family": "search_process_machine",
+      "split": "in_family",
+      "later_window_exactness_bps": 8900,
+      "final_output_exactness_bps": 9300,
+      "refusal_calibration_bps": 8700,
+      "normalized_cost_units": 220,
+      "dominant_failure_mode": "verifier_retry_budget",
+      "note": "verifier-attached hybrid retains strong seeded search behavior at lower cost than the compiled anchor"
+    },
+    {
+      "case_id": "linked_program_bundle.compiled_exact_reference",
+      "architecture_family": "compiled_exact_reference",
+      "workload_family": "linked_program_bundle",
+      "split": "in_family",
+      "later_window_exactness_bps": 9500,
+      "final_output_exactness_bps": 9700,
+      "refusal_calibration_bps": 9800,
+      "normalized_cost_units": 310,
+      "dominant_failure_mode": "none_exact_anchor",
+      "note": "compiled exact reference stays green on linked bundle graphs under the named package set"
+    },
+    {
+      "case_id": "linked_program_bundle.learned_structured_memory",
+      "architecture_family": "learned_structured_memory",
+      "workload_family": "linked_program_bundle",
+      "split": "in_family",
+      "later_window_exactness_bps": 7700,
+      "final_output_exactness_bps": 8400,
+      "refusal_calibration_bps": 8100,
+      "normalized_cost_units": 155,
+      "dominant_failure_mode": "cross_module_handle_alias",
+      "note": "learned lane keeps bounded link patterns but loses precision once module handle pressure widens"
+    },
+    {
+      "case_id": "linked_program_bundle.verifier_attached_hybrid",
+      "architecture_family": "verifier_attached_hybrid",
+      "workload_family": "linked_program_bundle",
+      "split": "in_family",
+      "later_window_exactness_bps": 8700,
+      "final_output_exactness_bps": 9100,
+      "refusal_calibration_bps": 8800,
+      "normalized_cost_units": 225,
+      "dominant_failure_mode": "link_contract_retry_noise",
+      "note": "hybrid verifier attachment recovers most linked-bundle behavior while preserving explicit retry limits"
+    },
+    {
+      "case_id": "effectful_resume_graph.compiled_exact_reference",
+      "architecture_family": "compiled_exact_reference",
+      "workload_family": "effectful_resume_graph",
+      "split": "in_family",
+      "later_window_exactness_bps": 9400,
+      "final_output_exactness_bps": 9600,
+      "refusal_calibration_bps": 9900,
+      "normalized_cost_units": 300,
+      "dominant_failure_mode": "none_exact_anchor",
+      "note": "compiled exact reference remains the safe anchor on seeded effectful resume graphs"
+    },
+    {
+      "case_id": "effectful_resume_graph.learned_structured_memory",
+      "architecture_family": "learned_structured_memory",
+      "workload_family": "effectful_resume_graph",
+      "split": "in_family",
+      "later_window_exactness_bps": 7100,
+      "final_output_exactness_bps": 7900,
+      "refusal_calibration_bps": 8300,
+      "normalized_cost_units": 165,
+      "dominant_failure_mode": "resume_receipt_rebind_drift",
+      "note": "learned lane remains sensitive to effect receipt rebinding on resumable graphs"
+    },
+    {
+      "case_id": "effectful_resume_graph.verifier_attached_hybrid",
+      "architecture_family": "verifier_attached_hybrid",
+      "workload_family": "effectful_resume_graph",
+      "split": "in_family",
+      "later_window_exactness_bps": 8600,
+      "final_output_exactness_bps": 9000,
+      "refusal_calibration_bps": 8900,
+      "normalized_cost_units": 215,
+      "dominant_failure_mode": "replay_challenge_budget_exhaustion",
+      "note": "hybrid verifier attachment preserves most effect-safe replay behavior under explicit verifier budgets"
+    },
+    {
+      "case_id": "multi_module_package_workflow.compiled_exact_reference",
+      "architecture_family": "compiled_exact_reference",
+      "workload_family": "multi_module_package_workflow",
+      "split": "in_family",
+      "later_window_exactness_bps": 9300,
+      "final_output_exactness_bps": 9500,
+      "refusal_calibration_bps": 9900,
+      "normalized_cost_units": 305,
+      "dominant_failure_mode": "none_exact_anchor",
+      "note": "compiled exact reference remains green on the seeded multi-module package workflows"
+    },
+    {
+      "case_id": "multi_module_package_workflow.learned_structured_memory",
+      "architecture_family": "learned_structured_memory",
+      "workload_family": "multi_module_package_workflow",
+      "split": "in_family",
+      "later_window_exactness_bps": 7500,
+      "final_output_exactness_bps": 8200,
+      "refusal_calibration_bps": 8000,
+      "normalized_cost_units": 170,
+      "dominant_failure_mode": "package_dependency_alias",
+      "note": "learned lane remains usable in-family but loses package-edge discipline under wider dependency reuse"
+    },
+    {
+      "case_id": "multi_module_package_workflow.verifier_attached_hybrid",
+      "architecture_family": "verifier_attached_hybrid",
+      "workload_family": "multi_module_package_workflow",
+      "split": "in_family",
+      "later_window_exactness_bps": 8800,
+      "final_output_exactness_bps": 9100,
+      "refusal_calibration_bps": 8700,
+      "normalized_cost_units": 230,
+      "dominant_failure_mode": "solver_backtrack_budget",
+      "note": "verifier-attached hybrid keeps most seeded workflow behavior while making backtrack ceilings explicit"
+    },
+    {
+      "case_id": "held_out_virtual_machine.compiled_exact_reference",
+      "architecture_family": "compiled_exact_reference",
+      "workload_family": "held_out_virtual_machine",
+      "split": "held_out_family",
+      "later_window_exactness_bps": 9100,
+      "final_output_exactness_bps": 9300,
+      "refusal_calibration_bps": 9900,
+      "normalized_cost_units": 340,
+      "dominant_failure_mode": "none_exact_anchor",
+      "note": "compiled exact reference remains the honest upper anchor on the held-out virtual-machine family"
+    },
+    {
+      "case_id": "held_out_virtual_machine.learned_structured_memory",
+      "architecture_family": "learned_structured_memory",
+      "workload_family": "held_out_virtual_machine",
+      "split": "held_out_family",
+      "later_window_exactness_bps": 5600,
+      "final_output_exactness_bps": 6800,
+      "refusal_calibration_bps": 7900,
+      "normalized_cost_units": 175,
+      "dominant_failure_mode": "instruction_dispatch_collapse",
+      "note": "learned lane collapses on held-out virtual-machine dispatch patterns and leans on refusal calibration"
+    },
+    {
+      "case_id": "held_out_virtual_machine.verifier_attached_hybrid",
+      "architecture_family": "verifier_attached_hybrid",
+      "workload_family": "held_out_virtual_machine",
+      "split": "held_out_family",
+      "later_window_exactness_bps": 7800,
+      "final_output_exactness_bps": 8500,
+      "refusal_calibration_bps": 8600,
+      "normalized_cost_units": 240,
+      "dominant_failure_mode": "trace_reentry_budget",
+      "note": "verifier-attached hybrid recovers a usable held-out virtual-machine regime without matching the compiled anchor"
+    },
+    {
+      "case_id": "held_out_message_orchestrator.compiled_exact_reference",
+      "architecture_family": "compiled_exact_reference",
+      "workload_family": "held_out_message_orchestrator",
+      "split": "held_out_family",
+      "later_window_exactness_bps": 8900,
+      "final_output_exactness_bps": 9200,
+      "refusal_calibration_bps": 9900,
+      "normalized_cost_units": 345,
+      "dominant_failure_mode": "none_exact_anchor",
+      "note": "compiled exact reference remains the safe anchor on the held-out message-orchestrator family"
+    },
+    {
+      "case_id": "held_out_message_orchestrator.learned_structured_memory",
+      "architecture_family": "learned_structured_memory",
+      "workload_family": "held_out_message_orchestrator",
+      "split": "held_out_family",
+      "later_window_exactness_bps": 5100,
+      "final_output_exactness_bps": 6300,
+      "refusal_calibration_bps": 7700,
+      "normalized_cost_units": 180,
+      "dominant_failure_mode": "mailbox_order_collapse",
+      "note": "learned lane remains fragile on held-out message scheduling and depends on explicit refusal posture"
+    },
+    {
+      "case_id": "held_out_message_orchestrator.verifier_attached_hybrid",
+      "architecture_family": "verifier_attached_hybrid",
+      "workload_family": "held_out_message_orchestrator",
+      "split": "held_out_family",
+      "later_window_exactness_bps": 7400,
+      "final_output_exactness_bps": 8100,
+      "refusal_calibration_bps": 8500,
+      "normalized_cost_units": 245,
+      "dominant_failure_mode": "mailbox_budget_retry_noise",
+      "note": "verifier-attached hybrid meaningfully improves the held-out message-orchestrator family while keeping budget limits explicit"
+    }
+  ],
+  "summary": "Program-family frontier freezes 21 workload/architecture cells with explicit held-out-family ladders, failure modes, and normalized cost units.",
+  "report_digest": "4cbe9a812715a4624c546a93f800b033d844062b8605401eca030eb5cc37b2e2"
+}
