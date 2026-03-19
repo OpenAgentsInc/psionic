@@ -473,6 +473,16 @@ impl TassadarCapabilityEnvelope {
         publication: &TassadarExecutorCapabilityPublication,
         readiness: ProviderReadiness,
     ) -> Result<Self, TassadarCapabilityEnvelopeError> {
+        if !publication.internal_compute_profile_claim_check.green {
+            return Err(
+                TassadarCapabilityEnvelopeError::UnpublishableInternalComputeProfileClaim {
+                    detail: publication
+                        .internal_compute_profile_claim_check
+                        .detail
+                        .clone(),
+                },
+            );
+        }
         publication
             .workload_capability_matrix
             .validate_publication()
@@ -505,6 +515,11 @@ impl TassadarCapabilityEnvelope {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TassadarCapabilityEnvelopeError {
+    /// The served internal-compute profile claim was not publishable.
+    UnpublishableInternalComputeProfileClaim {
+        /// Plain-text validation detail.
+        detail: String,
+    },
     /// The served matrix is not benchmark-gated enough for provider publication.
     UnpublishableWorkloadMatrix {
         /// Plain-text validation detail.
@@ -589,6 +604,28 @@ impl TassadarPlannerRouteCapabilityEnvelope {
                 },
             );
         }
+        if route_descriptor
+            .internal_compute_profile_id
+            .trim()
+            .is_empty()
+        {
+            return Err(
+                TassadarPlannerRouteCapabilityEnvelopeError::MissingInternalComputeProfileId {
+                    route_id: route_descriptor.route_id.clone(),
+                },
+            );
+        }
+        if route_descriptor
+            .internal_compute_profile_claim_digest
+            .trim()
+            .is_empty()
+        {
+            return Err(
+                TassadarPlannerRouteCapabilityEnvelopeError::MissingInternalComputeProfileClaimDigest {
+                    route_id: route_descriptor.route_id.clone(),
+                },
+            );
+        }
         Ok(Self {
             backend_family: String::from(BACKEND_FAMILY),
             product_id: route_descriptor.product_id.clone(),
@@ -630,6 +667,16 @@ pub enum TassadarPlannerRouteCapabilityEnvelopeError {
     },
     /// No benchmark gate was attached to the route descriptor.
     MissingBenchmarkGate {
+        /// Stable route identifier.
+        route_id: String,
+    },
+    /// The route descriptor did not publish a named internal-compute profile id.
+    MissingInternalComputeProfileId {
+        /// Stable route identifier.
+        route_id: String,
+    },
+    /// The route descriptor did not publish a stable internal-compute claim digest.
+    MissingInternalComputeProfileClaimDigest {
         /// Stable route identifier.
         route_id: String,
     },
@@ -8517,6 +8564,14 @@ mod tests {
             json!("tassadar.wasm.rust_article_family.v1")
         );
         assert_eq!(
+            encoded["publication"]["internal_compute_profile_claim_check"]["claim"]["profile_id"],
+            json!("tassadar.internal_compute.article_closeout.v1")
+        );
+        assert_eq!(
+            encoded["publication"]["internal_compute_profile_claim_check"]["green"],
+            json!(true)
+        );
+        assert_eq!(
             encoded["quantization_truth_envelope"]["active_backend_family"],
             json!("cpu_reference")
         );
@@ -8552,6 +8607,28 @@ mod tests {
         assert!(matches!(
             err,
             TassadarCapabilityEnvelopeError::UnpublishableWorkloadMatrix { .. }
+        ));
+    }
+
+    #[test]
+    fn tassadar_capability_envelope_rejects_unpublishable_internal_compute_profile_claim() {
+        let service = LocalTassadarExecutorService::new()
+            .with_fixture(TassadarExecutorFixture::article_i32_compute_v1());
+        let mut publication = service
+            .capability_publication(Some(TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID))
+            .expect("article capability publication");
+        publication.internal_compute_profile_claim_check.green = false;
+        publication.internal_compute_profile_claim_check.detail =
+            String::from("missing current profile evidence");
+
+        let err = TassadarCapabilityEnvelope::from_executor_capability_publication(
+            &publication,
+            ProviderReadiness::ready("article lane ready"),
+        )
+        .expect_err("provider envelope should reject an unpublishable profile claim");
+        assert!(matches!(
+            err,
+            TassadarCapabilityEnvelopeError::UnpublishableInternalComputeProfileClaim { .. }
         ));
     }
 
@@ -8642,6 +8719,10 @@ mod tests {
                     TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID
                 );
                 assert_eq!(
+                    selection.route_descriptor.internal_compute_profile_id,
+                    "tassadar.internal_compute.article_closeout.v1"
+                );
+                assert_eq!(
                     selection
                         .wasm_capability
                         .expect("module-class-aware route selection")
@@ -8714,6 +8795,57 @@ mod tests {
         assert!(matches!(
             err,
             TassadarPlannerRouteCapabilityEnvelopeError::MissingBenchmarkGate { .. }
+        ));
+    }
+
+    #[test]
+    fn tassadar_planner_route_capability_envelope_rejects_missing_internal_compute_profile_id() {
+        let router = LocalTassadarPlannerRouter::new().with_executor_service(
+            LocalTassadarExecutorService::new()
+                .with_fixture(TassadarExecutorFixture::article_i32_compute_v1()),
+        );
+        let mut route_descriptor = router
+            .route_capability_descriptor(Some(
+                TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID,
+            ))
+            .expect("planner route descriptor should publish");
+        route_descriptor.internal_compute_profile_id.clear();
+
+        let err = TassadarPlannerRouteCapabilityEnvelope::from_route_descriptor(
+            &route_descriptor,
+            ProviderReadiness::ready("planner route ready"),
+        )
+        .expect_err("provider route envelope should reject missing internal profile id");
+        assert!(matches!(
+            err,
+            TassadarPlannerRouteCapabilityEnvelopeError::MissingInternalComputeProfileId { .. }
+        ));
+    }
+
+    #[test]
+    fn tassadar_planner_route_capability_envelope_rejects_missing_internal_compute_profile_claim_digest()
+     {
+        let router = LocalTassadarPlannerRouter::new().with_executor_service(
+            LocalTassadarExecutorService::new()
+                .with_fixture(TassadarExecutorFixture::article_i32_compute_v1()),
+        );
+        let mut route_descriptor = router
+            .route_capability_descriptor(Some(
+                TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID,
+            ))
+            .expect("planner route descriptor should publish");
+        route_descriptor
+            .internal_compute_profile_claim_digest
+            .clear();
+
+        let err = TassadarPlannerRouteCapabilityEnvelope::from_route_descriptor(
+            &route_descriptor,
+            ProviderReadiness::ready("planner route ready"),
+        )
+        .expect_err("provider route envelope should reject missing internal profile claim digest");
+        assert!(matches!(
+            err,
+            TassadarPlannerRouteCapabilityEnvelopeError::MissingInternalComputeProfileClaimDigest { .. }
         ));
     }
 

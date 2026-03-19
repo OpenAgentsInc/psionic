@@ -6,10 +6,14 @@ use std::{
 
 use psionic_models::{
     TassadarExecutorContractError, TassadarExecutorFixture, TassadarExecutorModelDescriptor,
-    TassadarModuleExecutionCapabilityPublication,
+    TassadarInternalComputeProfileClaimCheckResult,
+    TassadarInternalComputeProfileLadderPublication, TassadarModuleExecutionCapabilityPublication,
     TassadarRustArticleProfileCompletenessPublication, TassadarTraceTokenizer,
     TassadarWorkloadCapabilityMatrix, TassadarWorkloadCapabilityMatrixError,
     TassadarWorkloadCapabilityRow, TassadarWorkloadSupportPosture,
+    check_tassadar_internal_compute_profile_claim,
+    tassadar_current_served_internal_compute_profile_claim,
+    tassadar_internal_compute_profile_ladder_publication,
     tassadar_rust_article_profile_completeness_publication,
 };
 use psionic_research::{
@@ -75,6 +79,10 @@ pub struct TassadarExecutorCapabilityPublication {
     pub module_execution_capability: TassadarModuleExecutionCapabilityPublication,
     /// Rust-to-Wasm article profile completeness matrix for the served lane.
     pub rust_article_profile_completeness: TassadarRustArticleProfileCompletenessPublication,
+    /// Named post-article internal-compute profile ladder.
+    pub internal_compute_profile_ladder: TassadarInternalComputeProfileLadderPublication,
+    /// Claim-check result for the named served internal-compute profile.
+    pub internal_compute_profile_claim_check: TassadarInternalComputeProfileClaimCheckResult,
     /// Machine-readable workload capability matrix for the served lane.
     pub workload_capability_matrix: TassadarWorkloadCapabilityMatrix,
     /// Backend and quantization deployment truth carried through served publication.
@@ -127,6 +135,12 @@ pub enum TassadarExecutorCapabilityPublicationError {
     #[error("invalid Rust-only article runtime closeout report: {detail}")]
     InvalidRustOnlyArticleRuntimeCloseout {
         /// Machine-readable detail for the failed projection.
+        detail: String,
+    },
+    /// The named internal-compute profile claim was not publishable.
+    #[error("invalid internal-compute profile claim: {detail}")]
+    InvalidInternalComputeProfileClaim {
+        /// Machine-readable detail for the failed claim.
         detail: String,
     },
 }
@@ -441,6 +455,19 @@ impl LocalTassadarExecutorService {
                     error,
                 }
             })?;
+        let internal_compute_profile_ladder =
+            tassadar_internal_compute_profile_ladder_publication();
+        let internal_compute_profile_claim_check = check_tassadar_internal_compute_profile_claim(
+            &internal_compute_profile_ladder,
+            tassadar_current_served_internal_compute_profile_claim(),
+        );
+        if !internal_compute_profile_claim_check.green {
+            return Err(
+                TassadarExecutorCapabilityPublicationError::InvalidInternalComputeProfileClaim {
+                    detail: internal_compute_profile_claim_check.detail.clone(),
+                },
+            );
+        }
         let runtime_capability = fixture.runtime_capability_report();
         let quantization_truth_envelope = crate::build_tassadar_served_quantization_truth_envelope(
             runtime_capability.runtime_backend.as_str(),
@@ -455,6 +482,8 @@ impl LocalTassadarExecutorService {
             module_execution_capability: fixture.module_execution_capability_publication(),
             rust_article_profile_completeness:
                 tassadar_rust_article_profile_completeness_publication(),
+            internal_compute_profile_ladder,
+            internal_compute_profile_claim_check,
             workload_capability_matrix,
             quantization_truth_envelope,
         })
@@ -1853,6 +1882,15 @@ impl LocalTassadarPlannerRouter {
             format!("tassadar.planner_executor_route.{model_id}.v0"),
             model_id,
             benchmark_report_ref,
+            publication
+                .internal_compute_profile_claim_check
+                .claim
+                .profile_id
+                .clone(),
+            publication
+                .internal_compute_profile_claim_check
+                .claim_digest
+                .clone(),
             publication.workload_capability_matrix.matrix_digest.clone(),
             wasm_capability_matrix,
             decode_capabilities,
@@ -5379,6 +5417,20 @@ mod tests {
             )
         );
         assert_eq!(
+            encoded["internal_compute_profile_ladder"]["report_ref"],
+            serde_json::json!(
+                "fixtures/tassadar/reports/tassadar_internal_compute_profile_ladder_report.json"
+            )
+        );
+        assert_eq!(
+            encoded["internal_compute_profile_claim_check"]["claim"]["profile_id"],
+            serde_json::json!("tassadar.internal_compute.article_closeout.v1")
+        );
+        assert_eq!(
+            encoded["internal_compute_profile_claim_check"]["green"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
             encoded["quantization_truth_envelope"]["active_backend_family"],
             serde_json::json!("cpu_reference")
         );
@@ -6071,6 +6123,11 @@ mod tests {
             descriptor.model_id,
             TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID
         );
+        assert_eq!(
+            descriptor.internal_compute_profile_id,
+            "tassadar.internal_compute.article_closeout.v1"
+        );
+        assert!(!descriptor.internal_compute_profile_claim_digest.is_empty());
         let reference_linear = descriptor
             .decode_capabilities
             .iter()

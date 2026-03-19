@@ -5,8 +5,13 @@ use psionic_data::{
     TassadarClrsLengthBucket, TassadarClrsTrajectoryFamily, TassadarModuleScaleWorkloadFamily,
 };
 use psionic_models::{
-    tassadar_rust_article_profile_completeness_publication,
+    TassadarInternalComputeProfileClaimCheckResult,
+    TassadarInternalComputeProfileLadderPublication,
     TassadarRustArticleProfileCompletenessPublication,
+    check_tassadar_internal_compute_profile_claim,
+    tassadar_current_served_internal_compute_profile_claim,
+    tassadar_internal_compute_profile_ladder_publication,
+    tassadar_rust_article_profile_completeness_publication,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -33,6 +38,10 @@ const TASSADAR_METADATA_PLANNED_TARGETS_KEY: &str = "tassadar.planned_workload_t
 const TASSADAR_METADATA_BENCHMARK_PACKAGE_SET_KEY: &str = "tassadar.benchmark_package_set";
 const TASSADAR_METADATA_COMPILE_PIPELINE_MATRIX_KEY: &str = "tassadar.compile_pipeline_matrix";
 const TASSADAR_METADATA_RUST_ARTICLE_PROFILE_KEY: &str = "tassadar.rust_article_profile";
+const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_LADDER_KEY: &str =
+    "tassadar.internal_compute_profile_ladder";
+const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_CLAIM_KEY: &str =
+    "tassadar.internal_compute_profile_claim";
 const TASSADAR_METADATA_WASM_CONFORMANCE_KEY: &str = "tassadar.wasm_conformance";
 const TASSADAR_METADATA_MODULE_SCALE_WORKLOAD_SUITE_KEY: &str =
     "tassadar.module_scale_workload_suite";
@@ -694,6 +703,11 @@ impl TassadarEnvironmentSpec {
             compile_pipeline_matrix_binding: self.compile_pipeline_matrix_binding.clone(),
             rust_article_profile_completeness:
                 tassadar_rust_article_profile_completeness_publication(),
+            internal_compute_profile_ladder: tassadar_internal_compute_profile_ladder_publication(),
+            internal_compute_profile_claim_check: check_tassadar_internal_compute_profile_claim(
+                &tassadar_internal_compute_profile_ladder_publication(),
+                tassadar_current_served_internal_compute_profile_claim(),
+            ),
             wasm_conformance_binding: self.wasm_conformance_binding.clone(),
             module_scale_workload_suite_binding: self.module_scale_workload_suite_binding.clone(),
             clrs_wasm_bridge_binding: self.clrs_wasm_bridge_binding.clone(),
@@ -918,6 +932,20 @@ impl TassadarEnvironmentSpec {
             serde_json::to_value(tassadar_rust_article_profile_completeness_publication())
                 .unwrap_or(Value::Null),
         );
+        let internal_compute_profile_ladder =
+            tassadar_internal_compute_profile_ladder_publication();
+        metadata.insert(
+            String::from(TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_LADDER_KEY),
+            serde_json::to_value(&internal_compute_profile_ladder).unwrap_or(Value::Null),
+        );
+        metadata.insert(
+            String::from(TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_CLAIM_KEY),
+            serde_json::to_value(check_tassadar_internal_compute_profile_claim(
+                &internal_compute_profile_ladder,
+                tassadar_current_served_internal_compute_profile_claim(),
+            ))
+            .unwrap_or(Value::Null),
+        );
         metadata.insert(
             String::from(TASSADAR_METADATA_WASM_CONFORMANCE_KEY),
             serde_json::to_value(&self.wasm_conformance_binding).unwrap_or(Value::Null),
@@ -965,10 +993,9 @@ impl TassadarEnvironmentSpec {
                     pin_alias: self.package_refs.benchmark_pin_alias.clone(),
                     surfaces: vec![EnvironmentUsageSurface::Benchmark],
                     required_workloads: vec![EnvironmentWorkloadClass::ValidatorBenchmark],
-                    required_benchmark_profiles: vec![self
-                        .package_refs
-                        .benchmark_profile_ref
-                        .clone()],
+                    required_benchmark_profiles: vec![
+                        self.package_refs.benchmark_profile_ref.clone(),
+                    ],
                 },
             ],
         }
@@ -1002,6 +1029,10 @@ pub struct TassadarEnvironmentBundle {
     pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
     /// Rust-to-Wasm article profile completeness publication.
     pub rust_article_profile_completeness: TassadarRustArticleProfileCompletenessPublication,
+    /// Named post-article internal-compute profile ladder publication.
+    pub internal_compute_profile_ladder: TassadarInternalComputeProfileLadderPublication,
+    /// Current environment-bound internal-compute claim-check result.
+    pub internal_compute_profile_claim_check: TassadarInternalComputeProfileClaimCheckResult,
     /// Wasm conformance binding.
     pub wasm_conformance_binding: TassadarWasmConformanceBinding,
     /// Optional module-scale workload-suite binding.
@@ -1041,9 +1072,7 @@ pub enum TassadarEnvironmentError {
     #[error("Tassadar environment spec is missing the benchmark dataset binding")]
     MissingBenchmarkDataset,
     /// Missing benchmark package-set ref.
-    #[error(
-        "Tassadar environment spec is missing `benchmark_package_set_binding.package_set_ref`"
-    )]
+    #[error("Tassadar environment spec is missing `benchmark_package_set_binding.package_set_ref`")]
     MissingBenchmarkPackageSetRef,
     /// Missing benchmark package-set version.
     #[error(
@@ -1091,9 +1120,7 @@ pub enum TassadarEnvironmentError {
     #[error("Tassadar environment spec includes an empty Wasm conformance case family id")]
     InvalidWasmConformanceCaseFamilyId,
     /// Missing module-scale suite ref.
-    #[error(
-        "Tassadar environment spec is missing `module_scale_workload_suite_binding.suite_ref`"
-    )]
+    #[error("Tassadar environment spec is missing `module_scale_workload_suite_binding.suite_ref`")]
     MissingModuleScaleSuiteRef,
     /// Missing module-scale suite version.
     #[error(
@@ -1452,6 +1479,25 @@ mod tests {
             bundle
                 .benchmark_package
                 .metadata
+                .get(TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_LADDER_KEY)
+                .and_then(|value| value.get("report_ref"))
+                .and_then(Value::as_str),
+            Some("fixtures/tassadar/reports/tassadar_internal_compute_profile_ladder_report.json")
+        );
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
+                .get(TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_CLAIM_KEY)
+                .and_then(|value| value.get("claim"))
+                .and_then(|value| value.get("profile_id"))
+                .and_then(Value::as_str),
+            Some("tassadar.internal_compute.article_closeout.v1")
+        );
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
                 .get(TASSADAR_METADATA_WASM_CONFORMANCE_KEY)
                 .and_then(|value| value.get("report_ref"))
                 .and_then(Value::as_str),
@@ -1470,12 +1516,17 @@ mod tests {
             bundle.rust_article_profile_completeness.report_ref,
             "fixtures/tassadar/reports/tassadar_rust_article_profile_completeness_report.json"
         );
+        assert_eq!(
+            bundle.internal_compute_profile_ladder.report_ref,
+            "fixtures/tassadar/reports/tassadar_internal_compute_profile_ladder_report.json"
+        );
+        assert!(bundle.internal_compute_profile_claim_check.green);
         Ok(())
     }
 
     #[test]
-    fn tassadar_environment_bundle_carries_optional_module_scale_suite_binding(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn tassadar_environment_bundle_carries_optional_module_scale_suite_binding()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut spec = sample_spec();
         spec.module_scale_workload_suite_binding = Some(TassadarModuleScaleWorkloadSuiteBinding {
             suite_ref: String::from("benchmark-suite://openagents/tassadar/module_scale"),
@@ -1518,8 +1569,8 @@ mod tests {
     }
 
     #[test]
-    fn tassadar_environment_bundle_carries_optional_clrs_wasm_bridge_binding(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn tassadar_environment_bundle_carries_optional_clrs_wasm_bridge_binding()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut spec = sample_spec();
         spec.clrs_wasm_bridge_binding = Some(TassadarClrsWasmBridgeBinding {
             bridge_ref: String::from("benchmark-bridge://openagents/tassadar/clrs_wasm"),

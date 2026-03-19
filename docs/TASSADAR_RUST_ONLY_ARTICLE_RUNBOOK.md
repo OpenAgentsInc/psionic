@@ -210,6 +210,15 @@ bounded Wasm surfaces are still green.
 
 ## Claim Boundary
 
+The current named internal-compute profile for this path is:
+
+- `tassadar.internal_compute.article_closeout.v1`
+
+The canonical ladder and current claim-check artifacts are:
+
+- `fixtures/tassadar/reports/tassadar_internal_compute_profile_ladder_report.json`
+- `fixtures/tassadar/reports/tassadar_internal_compute_profile_ladder_summary.json`
+
 This runbook closes operator procedure only. It does not widen the current
 claim surface beyond the committed Rust-only article workloads, runtime floors,
 and direct proof receipts already cited by the acceptance gate.

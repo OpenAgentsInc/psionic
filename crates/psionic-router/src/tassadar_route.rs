@@ -246,6 +246,10 @@ pub struct TassadarPlannerExecutorRouteDescriptor {
     pub model_id: String,
     /// Stable benchmark report backing the served route.
     pub benchmark_report_ref: String,
+    /// Named internal-compute profile exported by the route.
+    pub internal_compute_profile_id: String,
+    /// Stable claim digest for the named internal-compute profile exported by the route.
+    pub internal_compute_profile_claim_digest: String,
     /// Stable digest of the served workload capability matrix.
     pub workload_capability_digest: String,
     /// Routeable Wasm capability matrix for explicit module-class routing.
@@ -267,6 +271,8 @@ impl TassadarPlannerExecutorRouteDescriptor {
         route_id: impl Into<String>,
         model_id: impl Into<String>,
         benchmark_report_ref: impl Into<String>,
+        internal_compute_profile_id: impl Into<String>,
+        internal_compute_profile_claim_digest: impl Into<String>,
         workload_capability_digest: impl Into<String>,
         wasm_capability_matrix: TassadarPlannerExecutorWasmCapabilityMatrix,
         mut decode_capabilities: Vec<TassadarPlannerExecutorDecodeCapability>,
@@ -282,6 +288,8 @@ impl TassadarPlannerExecutorRouteDescriptor {
             executor_product_id: String::from(TASSADAR_EXECUTOR_TRACE_PRODUCT_ID),
             model_id: model_id.into(),
             benchmark_report_ref: benchmark_report_ref.into(),
+            internal_compute_profile_id: internal_compute_profile_id.into(),
+            internal_compute_profile_claim_digest: internal_compute_profile_claim_digest.into(),
             workload_capability_digest: workload_capability_digest.into(),
             wasm_capability_matrix,
             decode_capabilities,
@@ -1141,6 +1149,8 @@ mod tests {
             route_id,
             model_id,
             "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+            "tassadar.internal_compute.article_closeout.v1",
+            "claim-digest",
             "matrix-digest",
             wasm_capability_matrix(),
             decode_capabilities,
