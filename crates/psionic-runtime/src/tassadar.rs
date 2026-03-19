@@ -2916,7 +2916,7 @@ impl TassadarRustToWasmCompileConfig {
     /// Returns the canonical config for the parameter-ABI Rust fixture.
     #[must_use]
     pub fn canonical_param_abi_kernel() -> Self {
-        Self::canonical("tassadar_param_abi_kernel", ["add_one"])
+        Self::canonical("tassadar_param_abi_kernel", ["add_one", "pair_add"])
     }
 
     /// Returns the canonical config for the pointer-based micro-kernel fixture.
@@ -2928,7 +2928,10 @@ impl TassadarRustToWasmCompileConfig {
     /// Returns the canonical config for the pointer-length heap-input fixture.
     #[must_use]
     pub fn canonical_heap_sum_kernel() -> Self {
-        Self::canonical("tassadar_heap_sum_kernel", ["heap_sum_i32"])
+        Self::canonical(
+            "tassadar_heap_sum_kernel",
+            ["heap_sum_i32", "dot_i32", "sum_and_max_into_buffer"],
+        )
     }
 
     /// Returns the canonical config for the long-loop article fixture.
@@ -11108,7 +11111,7 @@ mod tests {
                     .wasm_binary_summary()
                     .expect("successful compile should publish a Wasm summary")
                     .exported_functions,
-                vec![String::from("add_one")]
+                vec![String::from("add_one"), String::from("pair_add")]
             );
         } else {
             assert!(receipt.refusal().is_some());

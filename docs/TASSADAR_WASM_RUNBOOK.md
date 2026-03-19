@@ -82,6 +82,10 @@ Expected outcome:
 - the multi-export, memory-lookup, parameter-ABI, micro-kernel, heap-input,
   long-loop, Hungarian, and Sudoku Rust fixtures all compile successfully to
   committed Wasm outputs with stable source/toolchain/config/output lineage
+- the `param_abi_fixture` and `heap_sum_article` source-canon rows now also
+  freeze the admitted generalized-ABI exports `pair_add`, `dot_i32`, and
+  `sum_and_max_into_buffer` instead of leaving the widened entrypoint surface
+  implicit
 - this report is the article-closure frontend anchor; it does not by itself
   imply arbitrary Rust closure or arbitrary Wasm lowering
 
@@ -127,7 +131,35 @@ Expected outcome:
   the generic Wasm-text or generic normalized-module lowering path now admits
   arbitrary parameterized exports
 
-### 3A. Hungarian-10x10 Rust-only article reproducer
+### 3A. Generalized ABI family
+
+```bash
+cargo run -p psionic-eval --example tassadar_generalized_abi_family_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json`
+
+Expected outcome:
+
+- one machine-readable exact/refused report over the widened generalized
+  i32-first ABI family
+- exact multi-param scalar `i32, i32 -> i32` closure for `pair_add`
+- exact multiple pointer-length input closure for `dot_i32`
+- exact caller-owned result-code-plus-output-buffer closure for
+  `sum_and_max_into_buffer`
+- exact bounded multi-export program-shape closure for `pair_sum` and
+  `local_double`
+- explicit refusal on short output buffers, aliased output buffers,
+  floating-point params, multi-result returns, host-handle callbacks, and
+  callee-allocated returned buffers
+- this is a benchmarked broader ABI family, not the current promoted
+  article-closeout claim; the served internal-compute claim remains
+  `tassadar.internal_compute.article_closeout.v1` even though the ladder now
+  records `tassadar.internal_compute.generalized_abi.v1` as implemented
+
+### 3B. Hungarian-10x10 Rust-only article reproducer
 
 ```bash
 cargo run -p psionic-research --example tassadar_hungarian_10x10_article_reproducer
@@ -151,7 +183,7 @@ Expected outcome:
 - this closes one concrete matching workload only; it does not yet imply
   hard-Sudoku or multi-million-step article closure
 
-### 3B. Sudoku-9x9 Rust-only article reproducer
+### 3C. Sudoku-9x9 Rust-only article reproducer
 
 ```bash
 cargo run -p psionic-research --example tassadar_sudoku_9x9_article_reproducer
@@ -174,7 +206,7 @@ Expected outcome:
 - this closes one concrete backtracking-search workload family only; it does
   not yet imply Hungarian or multi-million-step article closure
 
-### 3C. Rust-only article runtime closeout
+### 3D. Rust-only article runtime closeout
 
 ```bash
 cargo run -p psionic-eval --example tassadar_article_runtime_closeout_report
@@ -198,7 +230,7 @@ Expected outcome:
 - one served publication path now exists for this closeout summary, but it is
   benchmark-only and does not widen the generic served Wasm capability matrix
 
-### 3D. Direct model-weight execution proof
+### 3E. Direct model-weight execution proof
 
 ```bash
 cargo run -p psionic-serve --example tassadar_direct_model_weight_execution_proof_report

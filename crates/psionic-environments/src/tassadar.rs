@@ -5,11 +5,11 @@ use psionic_data::{
     TassadarClrsLengthBucket, TassadarClrsTrajectoryFamily, TassadarModuleScaleWorkloadFamily,
 };
 use psionic_models::{
-    TassadarInternalComputeProfileClaimCheckResult,
+    TassadarGeneralizedAbiPublication, TassadarInternalComputeProfileClaimCheckResult,
     TassadarInternalComputeProfileLadderPublication,
     TassadarRustArticleProfileCompletenessPublication,
     check_tassadar_internal_compute_profile_claim,
-    tassadar_current_served_internal_compute_profile_claim,
+    tassadar_current_served_internal_compute_profile_claim, tassadar_generalized_abi_publication,
     tassadar_internal_compute_profile_ladder_publication,
     tassadar_rust_article_profile_completeness_publication,
 };
@@ -38,6 +38,7 @@ const TASSADAR_METADATA_PLANNED_TARGETS_KEY: &str = "tassadar.planned_workload_t
 const TASSADAR_METADATA_BENCHMARK_PACKAGE_SET_KEY: &str = "tassadar.benchmark_package_set";
 const TASSADAR_METADATA_COMPILE_PIPELINE_MATRIX_KEY: &str = "tassadar.compile_pipeline_matrix";
 const TASSADAR_METADATA_RUST_ARTICLE_PROFILE_KEY: &str = "tassadar.rust_article_profile";
+const TASSADAR_METADATA_GENERALIZED_ABI_FAMILY_KEY: &str = "tassadar.generalized_abi_family";
 const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_LADDER_KEY: &str =
     "tassadar.internal_compute_profile_ladder";
 const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_CLAIM_KEY: &str =
@@ -703,6 +704,7 @@ impl TassadarEnvironmentSpec {
             compile_pipeline_matrix_binding: self.compile_pipeline_matrix_binding.clone(),
             rust_article_profile_completeness:
                 tassadar_rust_article_profile_completeness_publication(),
+            generalized_abi_family: tassadar_generalized_abi_publication(),
             internal_compute_profile_ladder: tassadar_internal_compute_profile_ladder_publication(),
             internal_compute_profile_claim_check: check_tassadar_internal_compute_profile_claim(
                 &tassadar_internal_compute_profile_ladder_publication(),
@@ -932,6 +934,10 @@ impl TassadarEnvironmentSpec {
             serde_json::to_value(tassadar_rust_article_profile_completeness_publication())
                 .unwrap_or(Value::Null),
         );
+        metadata.insert(
+            String::from(TASSADAR_METADATA_GENERALIZED_ABI_FAMILY_KEY),
+            serde_json::to_value(tassadar_generalized_abi_publication()).unwrap_or(Value::Null),
+        );
         let internal_compute_profile_ladder =
             tassadar_internal_compute_profile_ladder_publication();
         metadata.insert(
@@ -1029,6 +1035,8 @@ pub struct TassadarEnvironmentBundle {
     pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
     /// Rust-to-Wasm article profile completeness publication.
     pub rust_article_profile_completeness: TassadarRustArticleProfileCompletenessPublication,
+    /// Generalized ABI family publication.
+    pub generalized_abi_family: TassadarGeneralizedAbiPublication,
     /// Named post-article internal-compute profile ladder publication.
     pub internal_compute_profile_ladder: TassadarInternalComputeProfileLadderPublication,
     /// Current environment-bound internal-compute claim-check result.
@@ -1479,6 +1487,15 @@ mod tests {
             bundle
                 .benchmark_package
                 .metadata
+                .get(TASSADAR_METADATA_GENERALIZED_ABI_FAMILY_KEY)
+                .and_then(|value| value.get("family_id"))
+                .and_then(Value::as_str),
+            Some("tassadar.rust_generalized_abi.v1")
+        );
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
                 .get(TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_LADDER_KEY)
                 .and_then(|value| value.get("report_ref"))
                 .and_then(Value::as_str),
@@ -1519,6 +1536,10 @@ mod tests {
         assert_eq!(
             bundle.internal_compute_profile_ladder.report_ref,
             "fixtures/tassadar/reports/tassadar_internal_compute_profile_ladder_report.json"
+        );
+        assert_eq!(
+            bundle.generalized_abi_family.report_ref,
+            "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json"
         );
         assert!(bundle.internal_compute_profile_claim_check.green);
         Ok(())

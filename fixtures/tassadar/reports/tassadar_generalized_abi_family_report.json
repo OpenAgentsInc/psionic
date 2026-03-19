@@ -1,0 +1,317 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.generalized_abi.family_report.v1",
+  "publication": {
+    "schema_version": 1,
+    "publication_id": "tassadar.generalized_abi.publication.v1",
+    "status": "implemented",
+    "claim_class": "compiled_bounded_exactness",
+    "family_id": "tassadar.rust_generalized_abi.v1",
+    "report_ref": "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json",
+    "source_case_ids": [
+      "heap_sum_article",
+      "multi_export_exact",
+      "param_abi_fixture"
+    ],
+    "supported_program_shape_ids": [
+      "bounded_multi_export_program_shape",
+      "multi_param_i32_to_single_i32_return",
+      "multiple_pointer_length_inputs_to_single_i32_return",
+      "result_code_plus_output_buffer_i32"
+    ],
+    "supported_runtime_support_ids": [
+      "bounded_multi_export_program_shape",
+      "caller_owned_output_buffers",
+      "core_pointer_arithmetic",
+      "direct_scalar_i32_entrypoints",
+      "local_frame_helpers",
+      "panic_abort_loop_only"
+    ],
+    "ownership_rules": [
+      "caller_owns_all_input_buffers",
+      "caller_owns_all_output_buffers",
+      "output_buffers_must_not_alias_other_regions",
+      "callee_allocated_returned_buffers_are_refused",
+      "free_or_host_handle_callbacks_are_refused"
+    ],
+    "refused_shape_ids": [
+      "floating_point_param_abi",
+      "multi_result_return_abi",
+      "host_handle_or_callback_abi",
+      "callee_allocated_returned_buffer",
+      "dynamic_runtime_or_std_alloc"
+    ],
+    "target_surfaces": [
+      "crates/psionic-ir",
+      "crates/psionic-compiler",
+      "crates/psionic-runtime",
+      "crates/psionic-models",
+      "crates/psionic-environments",
+      "crates/psionic-eval",
+      "crates/psionic-serve"
+    ],
+    "validation_refs": [
+      "fixtures/tassadar/reports/tassadar_rust_source_canon_report.json",
+      "fixtures/tassadar/reports/tassadar_article_abi_closure_report.json",
+      "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json"
+    ],
+    "claim_boundary": "this publication widens the bounded ABI story from the article-only direct ABI slice to one reusable generalized i32-first family over multi-param scalar entrypoints, multiple pointer-length inputs, caller-owned result-code-plus-output-buffer shapes, and bounded multi-export program shapes. It does not claim floating-point closure, multi-result returns, host-handle imports, callee-allocated returned buffers, arbitrary runtime support, or arbitrary Wasm ABI closure",
+    "publication_digest": "6444c0a87158a3d91fa3593d12fd0550cbb31e0989d210a0ed8afe719c6b595f"
+  },
+  "generated_from_refs": [
+    "fixtures/tassadar/reports/tassadar_article_abi_closure_report.json",
+    "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json",
+    "fixtures/tassadar/reports/tassadar_rust_source_canon_report.json",
+    "fixtures/tassadar/sources/tassadar_heap_sum_kernel.rs",
+    "fixtures/tassadar/sources/tassadar_multi_export_kernel.rs",
+    "fixtures/tassadar/sources/tassadar_param_abi_kernel.rs"
+  ],
+  "exact_case_count": 5,
+  "refusal_case_count": 7,
+  "cases": [
+    {
+      "case_id": "multi_param_i32_exact",
+      "source_case_id": "param_abi_fixture",
+      "source_ref": "fixtures/tassadar/sources/tassadar_param_abi_kernel.rs",
+      "export_name": "pair_add",
+      "program_shape_id": "multi_param_i32_to_single_i32_return",
+      "runtime_support_ids": [
+        "direct_scalar_i32_entrypoints",
+        "panic_abort_loop_only"
+      ],
+      "status": "exact",
+      "returned_value": 42,
+      "execution_digest": "893f5427b22bba4077163ced1841cd839a4225cd3d81f1c195cabcc21ea72608",
+      "trace_step_count": 4,
+      "artifact_digest": "0890c785e822b8ea56352ff80ab710170d3a668de522f99e3f65f9c7a5cae022",
+      "invocation_args": [
+        20,
+        22
+      ],
+      "heap_byte_len": 0
+    },
+    {
+      "case_id": "multiple_pointer_length_inputs_exact",
+      "source_case_id": "heap_sum_article",
+      "source_ref": "fixtures/tassadar/sources/tassadar_heap_sum_kernel.rs",
+      "export_name": "dot_i32",
+      "program_shape_id": "multiple_pointer_length_inputs_to_single_i32_return",
+      "runtime_support_ids": [
+        "core_pointer_arithmetic",
+        "panic_abort_loop_only"
+      ],
+      "status": "exact",
+      "returned_value": 32,
+      "execution_digest": "7aa00daa5ab66502230fa9315d5672ca2fc3873b127e19da8257e5078a6ce51d",
+      "trace_step_count": 67,
+      "artifact_digest": "0848a200a08e7e05bb9cc95505645df5db58739181984a4b67c92dd6c170e784",
+      "invocation_args": [
+        0,
+        12,
+        3
+      ],
+      "heap_byte_len": 24
+    },
+    {
+      "case_id": "multiple_pointer_length_inputs_out_of_range_refusal",
+      "source_case_id": "heap_sum_article",
+      "source_ref": "fixtures/tassadar/sources/tassadar_heap_sum_kernel.rs",
+      "export_name": "dot_i32",
+      "program_shape_id": "multiple_pointer_length_inputs_to_single_i32_return",
+      "runtime_support_ids": [
+        "core_pointer_arithmetic",
+        "panic_abort_loop_only"
+      ],
+      "status": "refused",
+      "artifact_digest": "0848a200a08e7e05bb9cc95505645df5db58739181984a4b67c92dd6c170e784",
+      "invocation_args": [
+        0,
+        16,
+        3
+      ],
+      "heap_byte_len": 24,
+      "refusal_kind": "memory_region_out_of_range",
+      "refusal_detail": "generalized ABI memory region `right_input` overflows the invocation heap: pointer=16 length=3 element_width_bytes=4 heap_len=24"
+    },
+    {
+      "case_id": "result_code_plus_output_buffer_exact",
+      "source_case_id": "heap_sum_article",
+      "source_ref": "fixtures/tassadar/sources/tassadar_heap_sum_kernel.rs",
+      "export_name": "sum_and_max_into_buffer",
+      "program_shape_id": "result_code_plus_output_buffer_i32",
+      "runtime_support_ids": [
+        "caller_owned_output_buffers",
+        "panic_abort_loop_only"
+      ],
+      "status": "exact",
+      "returned_value": 0,
+      "execution_digest": "fb9371937293f03bccd4fa0cd134775d99e654571802e1adaa49ab052b602a1c",
+      "trace_step_count": 102,
+      "artifact_digest": "faaf829f9659a8ae59c69f1c94a2ff594e2879d0dda53c60b974e095aaa2e390",
+      "invocation_args": [
+        0,
+        4,
+        16,
+        2
+      ],
+      "heap_byte_len": 24,
+      "output_regions": [
+        {
+          "region_id": "output_values",
+          "role": "output",
+          "pointer": 16,
+          "length": 2,
+          "element_width_bytes": 4,
+          "words": [
+            19,
+            9
+          ],
+          "region_digest": "b04d5d2b93c457b7e641d5b997c131706cd5fadccc0559982248ed2568265624"
+        }
+      ]
+    },
+    {
+      "case_id": "result_code_plus_output_buffer_short_output_refusal",
+      "source_case_id": "heap_sum_article",
+      "source_ref": "fixtures/tassadar/sources/tassadar_heap_sum_kernel.rs",
+      "export_name": "sum_and_max_into_buffer",
+      "program_shape_id": "result_code_plus_output_buffer_i32",
+      "runtime_support_ids": [
+        "caller_owned_output_buffers",
+        "panic_abort_loop_only"
+      ],
+      "status": "refused",
+      "artifact_digest": "faaf829f9659a8ae59c69f1c94a2ff594e2879d0dda53c60b974e095aaa2e390",
+      "invocation_args": [
+        0,
+        4,
+        16,
+        1
+      ],
+      "heap_byte_len": 20,
+      "refusal_kind": "memory_region_too_short",
+      "refusal_detail": "generalized ABI memory region `output_values` length 1 is shorter than the minimum 2"
+    },
+    {
+      "case_id": "result_code_plus_output_buffer_alias_refusal",
+      "source_case_id": "heap_sum_article",
+      "source_ref": "fixtures/tassadar/sources/tassadar_heap_sum_kernel.rs",
+      "export_name": "sum_and_max_into_buffer",
+      "program_shape_id": "result_code_plus_output_buffer_i32",
+      "runtime_support_ids": [
+        "caller_owned_output_buffers",
+        "panic_abort_loop_only"
+      ],
+      "status": "refused",
+      "artifact_digest": "faaf829f9659a8ae59c69f1c94a2ff594e2879d0dda53c60b974e095aaa2e390",
+      "invocation_args": [
+        0,
+        4,
+        8,
+        2
+      ],
+      "heap_byte_len": 24,
+      "refusal_kind": "aliased_memory_regions",
+      "refusal_detail": "generalized ABI output region `output_values` aliases region `input_values`, which is forbidden under caller-owned output-buffer rules"
+    },
+    {
+      "case_id": "bounded_multi_export_pair_sum_exact",
+      "source_case_id": "multi_export_exact",
+      "source_ref": "fixtures/tassadar/sources/tassadar_multi_export_kernel.rs",
+      "export_name": "pair_sum",
+      "program_shape_id": "bounded_multi_export_program_shape",
+      "runtime_support_ids": [
+        "bounded_multi_export_program_shape",
+        "panic_abort_loop_only"
+      ],
+      "status": "exact",
+      "returned_value": 5,
+      "execution_digest": "8b8dca55a3cde65beeabfda617497ccd0b1fcf195428470762a259f4734f73e5",
+      "trace_step_count": 4,
+      "artifact_digest": "4cb708518a918db9248ee92b4df7e63e2a240309fcfa6fbd74f97552acf8d335",
+      "invocation_args": [],
+      "heap_byte_len": 0
+    },
+    {
+      "case_id": "bounded_multi_export_local_double_exact",
+      "source_case_id": "multi_export_exact",
+      "source_ref": "fixtures/tassadar/sources/tassadar_multi_export_kernel.rs",
+      "export_name": "local_double",
+      "program_shape_id": "bounded_multi_export_program_shape",
+      "runtime_support_ids": [
+        "bounded_multi_export_program_shape",
+        "local_frame_helpers",
+        "panic_abort_loop_only"
+      ],
+      "status": "exact",
+      "returned_value": 14,
+      "execution_digest": "2a7d41e833f7def1ae472bd28c65c1a6f220794b5ff858437a0610003348e76a",
+      "trace_step_count": 6,
+      "artifact_digest": "d65db2eec6f1b66b5f56c01c7b58a74cd38c68811570b74edd854340c9c761d5",
+      "invocation_args": [],
+      "heap_byte_len": 0
+    },
+    {
+      "case_id": "floating_point_param_refusal",
+      "source_case_id": "param_abi_fixture",
+      "source_ref": "fixtures/tassadar/sources/tassadar_param_abi_kernel.rs",
+      "export_name": "add_one_f32",
+      "program_shape_id": "floating_point_param_abi",
+      "runtime_support_ids": [
+        "panic_abort_loop_only"
+      ],
+      "status": "refused",
+      "invocation_args": [],
+      "heap_byte_len": 0,
+      "refusal_kind": "unsupported_param_kind",
+      "refusal_detail": "generalized ABI fixture `unsupported_float_param` declares unsupported param 0 kind `F32`"
+    },
+    {
+      "case_id": "multi_result_return_refusal",
+      "source_case_id": "param_abi_fixture",
+      "source_ref": "fixtures/tassadar/sources/tassadar_param_abi_kernel.rs",
+      "export_name": "pair_sum_and_diff",
+      "program_shape_id": "multi_result_return_abi",
+      "runtime_support_ids": [
+        "panic_abort_loop_only"
+      ],
+      "status": "refused",
+      "invocation_args": [],
+      "heap_byte_len": 0,
+      "refusal_kind": "unsupported_result_kind",
+      "refusal_detail": "generalized ABI fixture `unsupported_multi_result` declares unsupported result kind `MultiI32Pair`"
+    },
+    {
+      "case_id": "host_handle_param_refusal",
+      "source_case_id": "param_abi_fixture",
+      "source_ref": "fixtures/tassadar/sources/tassadar_param_abi_kernel.rs",
+      "export_name": "use_host_handle",
+      "program_shape_id": "host_handle_or_callback_abi",
+      "runtime_support_ids": [
+        "panic_abort_loop_only"
+      ],
+      "status": "refused",
+      "invocation_args": [],
+      "heap_byte_len": 0,
+      "refusal_kind": "unsupported_param_kind",
+      "refusal_detail": "generalized ABI fixture `unsupported_host_handle` declares unsupported param 0 kind `HostHandle`"
+    },
+    {
+      "case_id": "callee_allocated_returned_buffer_refusal",
+      "source_case_id": "heap_sum_article",
+      "source_ref": "fixtures/tassadar/sources/tassadar_heap_sum_kernel.rs",
+      "export_name": "callee_allocated_buffer",
+      "program_shape_id": "callee_allocated_returned_buffer",
+      "runtime_support_ids": [
+        "panic_abort_loop_only"
+      ],
+      "status": "refused",
+      "invocation_args": [],
+      "heap_byte_len": 0,
+      "refusal_kind": "unsupported_result_kind",
+      "refusal_detail": "generalized ABI fixture `unsupported_returned_buffer` declares unsupported result kind `BufferPointerAndLength`"
+    }
+  ],
+  "claim_boundary": "this report widens the bounded ABI story to a reusable generalized family over multi-param scalar entrypoints, multiple pointer-length inputs, caller-owned result-code-plus-output-buffer shapes, and bounded multi-export program shapes. It keeps floating-point params, multi-result returns, host-handle callbacks, callee-allocated returned buffers, aliasing output buffers, and arbitrary runtime support explicit as refusals",
+  "report_digest": "316b78b661b73a998d66c0fed32eb053b93b7be3ce79a7df921c232d8770f216"
+}

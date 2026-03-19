@@ -13,6 +13,8 @@ const TASSADAR_RUST_ARTICLE_PROFILE_COMPLETENESS_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_rust_article_profile_completeness_report.json";
 const TASSADAR_ARTICLE_ABI_CLOSURE_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_article_abi_closure_report.json";
+const TASSADAR_GENERALIZED_ABI_FAMILY_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json";
 const TASSADAR_HUNGARIAN_10X10_ARTICLE_REPRODUCER_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_hungarian_10x10_article_reproducer_report.json";
 const TASSADAR_SUDOKU_9X9_ARTICLE_REPRODUCER_REPORT_REF: &str =
@@ -252,30 +254,48 @@ impl TassadarInternalComputeProfileLadderPublication {
             ),
             TassadarInternalComputeProfileSpec::new(
                 TassadarInternalComputeProfileId::GeneralizedAbiV1,
-                TassadarInternalComputeProfileStatus::Planned,
-                vec![String::from(
-                    TassadarWasmProfileId::ArticleI32ComputeV1.as_str(),
-                )],
-                vec![String::from("article_control_and_memory_core")],
+                TassadarInternalComputeProfileStatus::Implemented,
+                vec![
+                    String::from(TassadarWasmProfileId::ArticleI32ComputeV1.as_str()),
+                    String::from("tassadar.wasm.generalized_abi.v1"),
+                ],
+                vec![
+                    String::from("article_control_and_memory_core"),
+                    String::from("multi_export_program_shape"),
+                    String::from("caller_owned_output_buffers"),
+                ],
                 vec![
                     String::from("multi_param_i32_entrypoints"),
                     String::from("multiple_pointer_length_inputs"),
                     String::from("heap_output_return_contracts"),
+                    String::from("result_code_plus_output_buffer_shapes"),
+                    String::from("bounded_multi_export_program_shapes"),
                 ],
                 vec![String::from("i32_integer_family")],
-                vec![String::from("byte_addressed_linear_memory_v2")],
-                vec![String::from("abi_surface_generalization")],
+                vec![
+                    String::from("byte_addressed_linear_memory_v2"),
+                    String::from("caller_owned_output_regions"),
+                ],
+                vec![
+                    String::from("panic_abort_loop_only"),
+                    String::from("caller_owned_output_buffers"),
+                    String::from("local_frame_helpers"),
+                ],
                 TassadarInternalComputeImportPosture::NoImportsOnly,
-                TassadarInternalComputeExactnessPosture::Planned,
+                TassadarInternalComputeExactnessPosture::ExactRouteBounded,
                 TassadarInternalComputePortabilityPosture::Planned,
-                Vec::new(),
+                current_supported_machine_class_ids.clone(),
                 vec![
                     TassadarInternalComputeRefusalClass::BroadHostImportUnsupported,
                     TassadarInternalComputeRefusalClass::WiderNumericDataLayoutUnsupported,
                     TassadarInternalComputeRefusalClass::NonCpuBackendUnsupported,
                 ],
-                vec![String::from("issue://OpenAgentsInc/psionic/176")],
-                "generalized i32-first ABI widening remains a separate future profile and must not be inferred from article-closeout success",
+                vec![
+                    String::from(TASSADAR_RUST_SOURCE_CANON_REPORT_REF),
+                    String::from(TASSADAR_ARTICLE_ABI_CLOSURE_REPORT_REF),
+                    String::from(TASSADAR_GENERALIZED_ABI_FAMILY_REPORT_REF),
+                ],
+                "generalized i32-first ABI widening is now benchmarked as a separate implemented profile over multi-param scalar entrypoints, multiple pointer-length inputs, caller-owned output buffers, and bounded multi-export program shapes. It remains bounded and must not be widened into floating-point, host-import, callee-allocation, or arbitrary runtime-support claims",
             ),
             TassadarInternalComputeProfileSpec::new(
                 TassadarInternalComputeProfileId::WiderNumericDataLayoutV1,
@@ -691,13 +711,18 @@ mod tests {
         );
         assert_eq!(
             generalized_abi.status,
-            TassadarInternalComputeProfileStatus::Planned
+            TassadarInternalComputeProfileStatus::Implemented
         );
+        assert!(article_profile
+            .required_evidence_refs
+            .contains(&String::from(
+                "fixtures/tassadar/reports/tassadar_rust_only_article_closeout_audit_report.json"
+            )));
         assert!(
-            article_profile
+            generalized_abi
                 .required_evidence_refs
                 .contains(&String::from(
-                    "fixtures/tassadar/reports/tassadar_rust_only_article_closeout_audit_report.json"
+                    "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json"
                 ))
         );
     }
@@ -750,8 +775,8 @@ mod tests {
     fn claim_checker_rejects_planned_profiles() {
         let publication = tassadar_internal_compute_profile_ladder_publication();
         let claim = super::TassadarInternalComputeProfileClaim::new(
-            TassadarInternalComputeProfileId::GeneralizedAbiV1.as_str(),
-            vec![String::from("issue://OpenAgentsInc/psionic/176")],
+            TassadarInternalComputeProfileId::RuntimeSupportSubsetV1.as_str(),
+            vec![String::from("issue://OpenAgentsInc/psionic/180")],
             Vec::new(),
             Vec::new(),
         );

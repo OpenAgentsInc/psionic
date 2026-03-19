@@ -138,14 +138,15 @@
       "case_id": "param_abi_fixture",
       "workload_family_id": "rust.param_abi_kernel",
       "source_ref": "fixtures/tassadar/sources/tassadar_param_abi_kernel.rs",
-      "source_digest": "05ab4311617d98fa2b3ff7c731dbadc8e3e375e7c830df70acddfcf2a599a14f",
-      "compile_config_digest": "90bf9c40d30e9343c1272b1b5cde442d4619e288bff3104bc304f715c5e42be3",
+      "source_digest": "9b30b596db6706ecd0125aa43a0b0bf694343f0ce9401db982e477085a0ae205",
+      "compile_config_digest": "347cb479af44b3ce37fa66a810bc5d5fca6a4a128ac4f9b967edc800994726a6",
       "compile_pipeline_features": [
         "compiler_binary:rustc",
         "crate_name:tassadar_param_abi_kernel",
         "crate_type:cdylib",
         "edition:2024",
         "export:add_one",
+        "export:pair_add",
         "metadata:tassadar_param_abi_kernel",
         "optimization:3",
         "panic:abort",
@@ -161,23 +162,25 @@
           "crate_type:cdylib",
           "edition:2024",
           "export:add_one",
+          "export:pair_add",
           "metadata:tassadar_param_abi_kernel",
           "optimization:3",
           "panic:abort",
           "target:wasm32-unknown-unknown"
         ]
       },
-      "toolchain_digest": "504b61d96001f8c9ff327ba47c6a47cc647776239d2befafdbe9ab7bad9dbefc",
-      "receipt_digest": "a3369320750f4c5f6d619f8949d9126191c87445bffcbae3d594e489bb408871",
+      "toolchain_digest": "c8e7d94b8cb5f3ffb3731d7cffc8ef96a5d28bd1d5184f10d0ad604a2be3a567",
+      "receipt_digest": "549961977b060d8e3d1302a627134082cb69ebb5d419fd26af7c12d2b233d88b",
       "status": "compiled",
       "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_param_abi_kernel.wasm",
-      "wasm_binary_digest": "e2d90115284bde4482b1f71d316d82b78f65496498db6d165fc55ce55df11bdf",
+      "wasm_binary_digest": "13983a84ab4032835e382dadb647bf636ce5298a69224768d7d3e11b43e49186",
       "wasm_binary_summary": {
-        "byte_len": 391,
+        "byte_len": 427,
         "exported_functions": [
-          "add_one"
+          "add_one",
+          "pair_add"
         ],
-        "function_count": 1,
+        "function_count": 2,
         "imported_function_count": 0,
         "memory_count": 1,
         "custom_sections": [
@@ -244,14 +247,16 @@
       "case_id": "heap_sum_article",
       "workload_family_id": "rust.heap_sum_article",
       "source_ref": "fixtures/tassadar/sources/tassadar_heap_sum_kernel.rs",
-      "source_digest": "f52e128b41230086fd643bf6e17ef302deed93d74562c419525d5db9c3618c1a",
-      "compile_config_digest": "afef7c37f0ae9bc779690adb1e0da1a95d168f5a364a9e64e60e0b01d5b4ca7e",
+      "source_digest": "6ce5d9449cbab790a42c80730ebf51d0a8f17c6b03bb58c9edf676e1eb23d69e",
+      "compile_config_digest": "6b16fe38d0181a1cffb972fa84f8a3ad00591e18676de2d72bdcb3e13a171729",
       "compile_pipeline_features": [
         "compiler_binary:rustc",
         "crate_name:tassadar_heap_sum_kernel",
         "crate_type:cdylib",
         "edition:2024",
+        "export:dot_i32",
         "export:heap_sum_i32",
+        "export:sum_and_max_into_buffer",
         "metadata:tassadar_heap_sum_kernel",
         "optimization:3",
         "panic:abort",
@@ -266,24 +271,28 @@
           "crate_name:tassadar_heap_sum_kernel",
           "crate_type:cdylib",
           "edition:2024",
+          "export:dot_i32",
           "export:heap_sum_i32",
+          "export:sum_and_max_into_buffer",
           "metadata:tassadar_heap_sum_kernel",
           "optimization:3",
           "panic:abort",
           "target:wasm32-unknown-unknown"
         ]
       },
-      "toolchain_digest": "c2c789acb63ab77a1114b67533da65921df394b9cf3589047abcae5e27541bcb",
-      "receipt_digest": "7f79aa371610c9a02d4752844fb930a922131bbf66b143f15d0e996e1928ed93",
+      "toolchain_digest": "2d91b7722dacc1d587daa22b97a0a56ab561efb6dc335e8da346d310d562a373",
+      "receipt_digest": "2bb628918e109cf5d38834849e8623a4edc5d1736ba2d3248f05e40ea11d5c16",
       "status": "compiled",
       "wasm_binary_ref": "fixtures/tassadar/wasm/tassadar_heap_sum_kernel.wasm",
-      "wasm_binary_digest": "8e72168f9b445db5b8d61961c95972bd743a5806ff48462ccfe2a68f82668a11",
+      "wasm_binary_digest": "391155d876ffeb13c24dd8f9110cb3ca3374901c48748d178212840c4d2f751a",
       "wasm_binary_summary": {
-        "byte_len": 575,
+        "byte_len": 1222,
         "exported_functions": [
-          "heap_sum_i32"
+          "dot_i32",
+          "heap_sum_i32",
+          "sum_and_max_into_buffer"
         ],
-        "function_count": 1,
+        "function_count": 3,
         "imported_function_count": 0,
         "memory_count": 1,
         "custom_sections": [
@@ -454,5 +463,5 @@
     }
   ],
   "claim_boundary": "this report freezes the Rust-only frontend canon for the Tassadar article-closure path. It proves explicit Rust-source, toolchain, compile-config, and Wasm-output lineage for the committed kernel, heap-input, long-loop, Hungarian, and Sudoku fixtures, and it excludes the older C-source receipt from the article-closure path. It does not by itself imply generic Rust frontend closure, bounded-lane lowering coverage, or arbitrary Wasm execution support.",
-  "report_digest": "9d0b3a54ff8fa8833d7b55d4e9943f0dbdae9c3c71a40fe9a1ead956b5dcc94b"
+  "report_digest": "6efc2e4105f44f69ed197d5e32370fdbe9462d80089d5abcc7d5a7ddcc735ee7"
 }

@@ -2,6 +2,7 @@
 
 mod autodiff;
 mod tassadar_article_abi;
+mod tassadar_generalized_abi;
 mod tassadar_locality_scratchpad;
 mod tassadar_mixed_trajectory;
 mod tassadar_module_manifest;
@@ -25,6 +26,7 @@ use thiserror::Error;
 
 pub use autodiff::*;
 pub use tassadar_article_abi::*;
+pub use tassadar_generalized_abi::*;
 pub use tassadar_locality_scratchpad::*;
 pub use tassadar_mixed_trajectory::*;
 pub use tassadar_module_manifest::*;

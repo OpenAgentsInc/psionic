@@ -70,14 +70,16 @@ mod tassadar_executor_benchmark;
 mod tassadar_executor_eval;
 #[path = "tassadar_executor_hull_benchmark.rs"]
 mod tassadar_executor_hull_benchmark;
+#[path = "tassadar_generalized_abi.rs"]
+mod tassadar_generalized_abi;
 #[path = "tassadar_hungarian_10x10_compiled_executor.rs"]
 mod tassadar_hungarian_10x10_compiled_executor;
 #[path = "tassadar_hungarian_compiled_executor.rs"]
 mod tassadar_hungarian_compiled_executor;
-#[path = "tassadar_internal_compute_profile_ladder.rs"]
-mod tassadar_internal_compute_profile_ladder;
 #[path = "tassadar_installed_module_evidence.rs"]
 mod tassadar_installed_module_evidence;
+#[path = "tassadar_internal_compute_profile_ladder.rs"]
+mod tassadar_internal_compute_profile_ladder;
 #[path = "tassadar_internal_external_delegation.rs"]
 mod tassadar_internal_external_delegation;
 #[path = "tassadar_kernel_module_scaling.rs"]
@@ -206,10 +208,11 @@ pub use tassadar_executor_baseline_comparison::*;
 pub use tassadar_executor_benchmark::*;
 pub use tassadar_executor_eval::*;
 pub use tassadar_executor_hull_benchmark::*;
+pub use tassadar_generalized_abi::*;
 pub use tassadar_hungarian_10x10_compiled_executor::*;
 pub use tassadar_hungarian_compiled_executor::*;
-pub use tassadar_internal_compute_profile_ladder::*;
 pub use tassadar_installed_module_evidence::*;
+pub use tassadar_internal_compute_profile_ladder::*;
 pub use tassadar_internal_external_delegation::*;
 pub use tassadar_kernel_module_scaling::*;
 pub use tassadar_latency_evidence_tradeoff::*;

@@ -214,6 +214,15 @@ The current named internal-compute profile for this path is:
 
 - `tassadar.internal_compute.article_closeout.v1`
 
+The ladder now also records:
+
+- `tassadar.internal_compute.generalized_abi.v1` as implemented but
+  non-promoted
+
+That broader generalized-ABI rung is benchmarked and challengeable, but it is
+not the current served Rust-only article claim and is therefore out of scope
+for this closeout runbook.
+
 The canonical ladder and current claim-check artifacts are:
 
 - `fixtures/tassadar/reports/tassadar_internal_compute_profile_ladder_report.json`

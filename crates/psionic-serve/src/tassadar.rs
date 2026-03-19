@@ -6,13 +6,13 @@ use std::{
 
 use psionic_models::{
     TassadarExecutorContractError, TassadarExecutorFixture, TassadarExecutorModelDescriptor,
-    TassadarInternalComputeProfileClaimCheckResult,
+    TassadarGeneralizedAbiPublication, TassadarInternalComputeProfileClaimCheckResult,
     TassadarInternalComputeProfileLadderPublication, TassadarModuleExecutionCapabilityPublication,
     TassadarRustArticleProfileCompletenessPublication, TassadarTraceTokenizer,
     TassadarWorkloadCapabilityMatrix, TassadarWorkloadCapabilityMatrixError,
     TassadarWorkloadCapabilityRow, TassadarWorkloadSupportPosture,
     check_tassadar_internal_compute_profile_claim,
-    tassadar_current_served_internal_compute_profile_claim,
+    tassadar_current_served_internal_compute_profile_claim, tassadar_generalized_abi_publication,
     tassadar_internal_compute_profile_ladder_publication,
     tassadar_rust_article_profile_completeness_publication,
 };
@@ -79,6 +79,8 @@ pub struct TassadarExecutorCapabilityPublication {
     pub module_execution_capability: TassadarModuleExecutionCapabilityPublication,
     /// Rust-to-Wasm article profile completeness matrix for the served lane.
     pub rust_article_profile_completeness: TassadarRustArticleProfileCompletenessPublication,
+    /// Generalized ABI family publication for the served lane.
+    pub generalized_abi_family: TassadarGeneralizedAbiPublication,
     /// Named post-article internal-compute profile ladder.
     pub internal_compute_profile_ladder: TassadarInternalComputeProfileLadderPublication,
     /// Claim-check result for the named served internal-compute profile.
@@ -482,6 +484,7 @@ impl LocalTassadarExecutorService {
             module_execution_capability: fixture.module_execution_capability_publication(),
             rust_article_profile_completeness:
                 tassadar_rust_article_profile_completeness_publication(),
+            generalized_abi_family: tassadar_generalized_abi_publication(),
             internal_compute_profile_ladder,
             internal_compute_profile_claim_check,
             workload_capability_matrix,
@@ -5414,6 +5417,16 @@ mod tests {
             encoded["rust_article_profile_completeness"]["report_ref"],
             serde_json::json!(
                 "fixtures/tassadar/reports/tassadar_rust_article_profile_completeness_report.json"
+            )
+        );
+        assert_eq!(
+            encoded["generalized_abi_family"]["family_id"],
+            serde_json::json!("tassadar.rust_generalized_abi.v1")
+        );
+        assert_eq!(
+            encoded["generalized_abi_family"]["report_ref"],
+            serde_json::json!(
+                "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json"
             )
         );
         assert_eq!(
