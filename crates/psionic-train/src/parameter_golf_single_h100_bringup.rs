@@ -37,6 +37,8 @@ pub const PARAMETER_GOLF_SINGLE_H100_DATASET_REF: &str = "dataset://parameter-go
 pub const PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION: &str = "2026.03.18";
 /// Stable tokenizer variant label for the public single-H100 bring-up lane.
 pub const PARAMETER_GOLF_SINGLE_H100_VARIANT: &str = "sp1024";
+/// Maximum number of sequences included in the bounded CPU reference-loss probe.
+pub const PARAMETER_GOLF_SINGLE_H100_REFERENCE_LOSS_PROBE_MAX_SEQUENCES: usize = 8;
 
 /// Stable machine thresholds for the Rust-native single-H100 bring-up lane.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -185,7 +187,11 @@ pub struct ParameterGolfSingleH100ReferenceMicrobatchProbe {
     pub batch_size: usize,
     /// Sequence length per row.
     pub sequence_length: usize,
-    /// CPU-reference mean loss over the materialized microbatch.
+    /// Number of leading sequences included in the bounded CPU reference-loss probe.
+    pub loss_probe_sequence_count: usize,
+    /// Number of tokens included in the bounded CPU reference-loss probe.
+    pub loss_probe_token_count: u64,
+    /// CPU-reference mean loss over the bounded prefix of the materialized microbatch.
     pub mean_loss: f32,
 }
 
@@ -440,9 +446,10 @@ fn build_report(
     }
     if let Some(probe) = &reference_microbatch_probe {
         drift_notes.push(format!(
-            "The current single-H100 bring-up command materialized the first real training window ({}) and computed a CPU reference mean loss of {:.8}, but it does not yet execute the CUDA baseline training loop.",
+            "The current single-H100 bring-up command materialized the first real training window ({}) and computed a bounded CPU reference mean loss of {:.8} over the first {} sequence(s), but it does not yet execute the CUDA baseline training loop.",
             probe.window_id,
             probe.mean_loss,
+            probe.loss_probe_sequence_count,
         ));
     } else {
         drift_notes.push(String::from(
@@ -488,7 +495,7 @@ fn build_report(
         &reference_microbatch_probe,
     ) {
         String::from(
-            "This report proves the Rust-native single-H100 bring-up command owns the challenge dataset, tokenizer identity, local CUDA machine-admission truth, baseline model contract, one real first-microbatch CPU reference-loss probe, observed bring-up wallclock, and explicit CUDA blocker truth. It does not claim successful Psionic CUDA training execution or a produced model artifact while the current command remains a validation-and-refusal seam.",
+            "This report proves the Rust-native single-H100 bring-up command owns the challenge dataset, tokenizer identity, local CUDA machine-admission truth, baseline model contract, one real first-microbatch materialization plus a bounded CPU reference-loss probe over its leading sequences, observed bring-up wallclock, and explicit CUDA blocker truth. It does not claim successful Psionic CUDA training execution or a produced model artifact while the current command remains a validation-and-refusal seam.",
         )
     } else {
         String::from(
@@ -588,7 +595,11 @@ fn build_reference_microbatch_probe(
     }
     let (input_ids, target_ids) =
         training_batch_from_window_tokens(tokens.as_slice(), &config.geometry)?;
-    let mean_loss = baseline_model.loss(input_ids.as_slice(), target_ids.as_slice())?;
+    let (loss_probe_inputs, loss_probe_targets) =
+        bounded_reference_loss_probe_batch(input_ids.as_slice(), target_ids.as_slice());
+    let loss_probe_sequence_count = loss_probe_inputs.len();
+    let mean_loss =
+        baseline_model.loss(loss_probe_inputs.as_slice(), loss_probe_targets.as_slice())?;
     Ok(Some(ParameterGolfSingleH100ReferenceMicrobatchProbe {
         window_id: window.window_id,
         contract_digest: window.contract_digest,
@@ -599,6 +610,9 @@ fn build_reference_microbatch_probe(
         ),
         batch_size: input_ids.len(),
         sequence_length: config.geometry.train_sequence_length,
+        loss_probe_sequence_count,
+        loss_probe_token_count: (loss_probe_sequence_count * config.geometry.train_sequence_length)
+            as u64,
         mean_loss,
     }))
 }
@@ -637,6 +651,19 @@ fn training_batch_from_window_tokens(
         );
     }
     Ok((input_ids, target_ids))
+}
+
+fn bounded_reference_loss_probe_batch(
+    input_ids: &[Vec<u32>],
+    target_ids: &[Vec<u32>],
+) -> (Vec<Vec<u32>>, Vec<Vec<u32>>) {
+    let loss_probe_sequence_count = input_ids
+        .len()
+        .min(PARAMETER_GOLF_SINGLE_H100_REFERENCE_LOSS_PROBE_MAX_SEQUENCES);
+    (
+        input_ids[..loss_probe_sequence_count].to_vec(),
+        target_ids[..loss_probe_sequence_count].to_vec(),
+    )
 }
 
 fn report_claims_reference_probe(
@@ -824,12 +851,12 @@ mod tests {
     };
 
     use super::{
-        build_parameter_golf_single_h100_bringup_report, device_matches_single_h100,
-        machine_observation_from_inventory, training_batch_from_window_tokens,
-        write_parameter_golf_single_h100_bringup_report, ParameterGolfSingleH100BringupConfig,
-        ParameterGolfSingleH100BringupDisposition, ParameterGolfSingleH100ChallengeThresholds,
-        ParameterGolfSingleH100ExecutionPosture, PARAMETER_GOLF_SINGLE_H100_DATASET_REF,
-        PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION,
+        bounded_reference_loss_probe_batch, build_parameter_golf_single_h100_bringup_report,
+        device_matches_single_h100, machine_observation_from_inventory,
+        training_batch_from_window_tokens, write_parameter_golf_single_h100_bringup_report,
+        ParameterGolfSingleH100BringupConfig, ParameterGolfSingleH100BringupDisposition,
+        ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100ExecutionPosture,
+        PARAMETER_GOLF_SINGLE_H100_DATASET_REF, PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION,
     };
     use crate::ParameterGolfBatchGeometry;
 
@@ -1065,6 +1092,28 @@ mod tests {
         assert_eq!(input_ids.last(), Some(&vec![29, 30, 31, 32]));
         assert_eq!(target_ids.last(), Some(&vec![30, 31, 32, 33]));
         Ok(())
+    }
+
+    #[test]
+    fn bounded_reference_loss_probe_batch_caps_the_cpu_probe_prefix() {
+        let input_ids = (0_u32..12_u32)
+            .map(|row| vec![row, row + 100])
+            .collect::<Vec<_>>();
+        let target_ids = (0_u32..12_u32)
+            .map(|row| vec![row + 1, row + 101])
+            .collect::<Vec<_>>();
+
+        let (probe_inputs, probe_targets) =
+            bounded_reference_loss_probe_batch(input_ids.as_slice(), target_ids.as_slice());
+
+        assert_eq!(
+            probe_inputs.len(),
+            super::PARAMETER_GOLF_SINGLE_H100_REFERENCE_LOSS_PROBE_MAX_SEQUENCES
+        );
+        assert_eq!(probe_targets.len(), probe_inputs.len());
+        assert_eq!(probe_inputs.first(), Some(&vec![0, 100]));
+        assert_eq!(probe_inputs.last(), Some(&vec![7, 107]));
+        assert_eq!(probe_targets.last(), Some(&vec![8, 108]));
     }
 
     fn sample_cuda_device(
