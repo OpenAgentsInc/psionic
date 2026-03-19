@@ -126,19 +126,11 @@
   "optimizer_plan_digest": "554cecb74ff631024d7d20ae49b1e162bda4fd2e64d9aeef1dc2245bc7f741ef",
   "psionic_entrypoint": "cargo run -q -p psionic-train --bin parameter_golf_single_h100_bringup -- /home/christopherdavid/code/parameter-golf/data/datasets/fineweb10B_sp1024 /home/christopherdavid/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model",
   "upstream_reference_entrypoint": "RUN_ID=parameter-golf-single-h100-bringup DATA_PATH=/home/christopherdavid/code/parameter-golf/data/datasets/fineweb10B_sp1024 TOKENIZER_PATH=/home/christopherdavid/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model VOCAB_SIZE=1024 torchrun --standalone --nproc_per_node=1 train_gpt.py",
-  "cuda_training_capability_report_digest": "738a85a3add0635e2335aebac21a65223ca0a8a061f13a4ac056e0466bd38653",
-  "challenge_kernel_blockers": [
-    "cuda_bf16_train_graph_and_optimizer_surface"
-  ],
-  "cuda_blocker_refusal": {
-    "code": "unsupported_backend_capability",
-    "scope": "runtime",
-    "subject": "parameter_golf_cuda_training",
-    "detail": "parameter golf CUDA challenge closure still has explicit blockers: cuda_bf16_train_graph_and_optimizer_surface"
-  },
-  "started_at_ms": 1773961677365,
-  "finished_at_ms": 1773961693368,
-  "observed_wallclock_ms": 16002,
+  "cuda_training_capability_report_digest": "c47d04068512084c53437c56e9c1250ef48563fe5edec6aaa71a2798cbf5bddf",
+  "challenge_kernel_blockers": [],
+  "started_at_ms": 1773962822520,
+  "finished_at_ms": 1773962837479,
+  "observed_wallclock_ms": 14958,
   "execution_posture": "contract_validation_only",
   "disposition": "refused_machine_contract",
   "refusal": {
@@ -148,12 +140,11 @@
     "detail": "single-H100 bring-up requires at least 1 non-MIG `H100` device(s) on backend `cuda` but found 0 matching device(s) among: NVIDIA GeForce RTX 4080"
   },
   "drift_notes": [
-    "cuda_bf16_train_graph_and_optimizer_surface: Do not treat the first BF16 runtime seam as proof that the public CUDA lane already owns broad BF16 train-graph, backward, or optimizer execution.",
     "Observed CUDA backend health was Ready with 1 discovered CUDA device(s); 0 matched the single-H100 contract.",
     "The current local machine does not satisfy the single-H100 contract: single-H100 bring-up requires at least 1 non-MIG `H100` device(s) on backend `cuda` but found 0 matching device(s) among: NVIDIA GeForce RTX 4080",
     "The current single-H100 bring-up command validates dataset, tokenizer, model, optimizer, and blocker truth only; it does not yet execute the real baseline training loop.",
     "final_val_loss, final_val_bpb, and compressed_model_bytes are absent because no training artifact was produced by this command."
   ],
   "claim_boundary": "This report proves the Rust-native single-H100 bring-up command owns the challenge dataset, tokenizer identity, local CUDA machine-admission truth, baseline model contract, observed bring-up wallclock, and explicit CUDA blocker truth. It does not claim successful Psionic training execution or a produced model artifact while the current command remains a validation-and-refusal seam.",
-  "report_digest": "f29a9b55f6fc9ff76d5e130fe5701809f4f3db197da266f7ff480b2a9c92b3ce"
+  "report_digest": "7a0a12c40db8bf9d1e4adbee003809bb0b997ab44d5f37d64bf18fe625143c8b"
 }

@@ -368,10 +368,7 @@
       "axes": [],
       "stages": []
     },
-    "training_capability_report_digest": "738a85a3add0635e2335aebac21a65223ca0a8a061f13a4ac056e0466bd38653",
-    "challenge_kernel_blockers": [
-      "cuda_bf16_train_graph_and_optimizer_surface"
-    ],
+    "training_capability_report_digest": "c47d04068512084c53437c56e9c1250ef48563fe5edec6aaa71a2798cbf5bddf",
     "disposition": "refused",
     "refusal": {
       "refusal_kind": "device_inventory_mismatch",
@@ -379,12 +376,11 @@
       "fallback_benchmark_ref": "benchmark://openagents/psionic/parameter_golf/challenge_review"
     },
     "boundary_notes": [
-      "The current exported-folder evidence is bound to a local review host rather than challenge-matching 8xH100 inventory, so the challenge receipt remains an explicit refusal.",
-      "cuda_bf16_train_graph_and_optimizer_surface: Do not treat the first BF16 runtime seam as proof that the public CUDA lane already owns broad BF16 train-graph, backward, or optimizer execution."
+      "The current exported-folder evidence is bound to a local review host rather than challenge-matching 8xH100 inventory, so the challenge receipt remains an explicit refusal."
     ],
     "claim_boundary": "exact 8xH100 DDP-style topology, communication, wallclock, and memory receipts are explicit, but challenge-ready CUDA kernel and runtime widening remains a separate closure item",
-    "receipt_digest": "9aea78c9ccdde81fe800fa0294195105ed31f2225571a6be73253afc5d6acca8"
+    "receipt_digest": "5e019c3a263a0e3adf0f09d1050c59dfbf4e0ad7c8270af7e664aad7faded21b"
   },
   "claim_boundary": "This report binds the exact exported submission folder to one real folder-local entrypoint replay, the preserved bounded wallclock/memory/artifact receipts, and one measured-or-refused 8xH100 challenge receipt. The committed evidence is still a local review-host refusal rather than true 8xH100 success.",
-  "report_digest": "2ae8f1c404f407fb22274c1785867473e5a61e829e930fdbcdb5eccf0652d100"
+  "report_digest": "0d1fe2a5ce5574e23a67870865ba03c1287a4f51cc499194294b1ac71827fdbb"
 }

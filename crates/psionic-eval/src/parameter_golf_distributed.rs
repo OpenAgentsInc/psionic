@@ -352,9 +352,7 @@ mod tests {
                 ],
             },
             training_capability_report_digest: String::from("cuda-coverage-digest"),
-            challenge_kernel_blockers: vec![String::from(
-                "cuda_bf16_train_graph_and_optimizer_surface",
-            )],
+            challenge_kernel_blockers: Vec::new(),
             disposition: ParameterGolfDistributedLaneDisposition::Measured,
             timing: Some(ParameterGolfDistributedTimingReceipt {
                 measurement_posture: String::from("observed_step_wallclock"),

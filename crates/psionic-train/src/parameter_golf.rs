@@ -4,7 +4,10 @@ use psionic_models::ParameterGolfModelDescriptor;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{TrainingOptimizerConfig, TrainingParameterClass};
+use crate::{
+    apply_training_optimizer_step, TrainingOptimizerConfig, TrainingOptimizerState,
+    TrainingOptimizerStepReport, TrainingParameterClass, TrainingPrecisionMode,
+};
 
 /// Stable control-tensor patterns copied from the current public `train_gpt.py`.
 pub const PARAMETER_GOLF_CONTROL_TENSOR_NAME_PATTERNS: &[&str] = &[
@@ -98,8 +101,7 @@ impl ParameterGolfTrainingHyperparameters {
             return self.muon_momentum;
         }
         let fraction = (step as f32 / self.muon_momentum_warmup_steps as f32).min(1.0);
-        ((1.0 - fraction) * self.muon_momentum_warmup_start)
-            + (fraction * self.muon_momentum)
+        ((1.0 - fraction) * self.muon_momentum_warmup_start) + (fraction * self.muon_momentum)
     }
 
     /// Returns the public warmdown multiplier for one step and elapsed wallclock.
@@ -231,6 +233,41 @@ pub enum ParameterGolfTrainError {
     #[error("parameter golf CUDA Muon runtime failed: {message}")]
     MuonCudaRuntime {
         /// Stable runtime failure detail.
+        message: String,
+    },
+    /// A bounded BF16 master-weight step received mismatched parameter and
+    /// gradient lengths.
+    #[error(
+        "parameter golf BF16 master-weight step expected gradient length {parameter_len} but found {gradient_len}"
+    )]
+    Bf16MasterWeightGradientLengthMismatch {
+        /// Parameter element count.
+        parameter_len: usize,
+        /// Gradient element count.
+        gradient_len: usize,
+    },
+    /// A bounded BF16 master-weight step received mismatched train-visible and
+    /// master-weight lengths.
+    #[error(
+        "parameter golf BF16 master-weight step expected master-weight length {parameter_len} but found {master_weight_len}"
+    )]
+    Bf16MasterWeightLengthMismatch {
+        /// Train-visible parameter element count.
+        parameter_len: usize,
+        /// Master-weight element count.
+        master_weight_len: usize,
+    },
+    /// The bounded public CUDA BF16 master-weight runtime failed.
+    #[error("parameter golf CUDA BF16 master-weight runtime failed: {message}")]
+    Bf16MasterWeightCudaRuntime {
+        /// Stable runtime failure detail.
+        message: String,
+    },
+    /// The reusable optimizer surface refused the bounded BF16 master-weight
+    /// step.
+    #[error("parameter golf BF16 master-weight optimizer step failed: {message}")]
+    Bf16MasterWeightOptimizer {
+        /// Stable optimizer failure detail.
         message: String,
     },
 }
@@ -425,6 +462,26 @@ pub struct ParameterGolfMuonStepReceipt {
     pub update_values: Vec<f32>,
 }
 
+/// Inspectable result of one bounded BF16 train-visible, FP32-master optimizer
+/// step on the public CUDA lane.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfBf16MasterWeightStepReceipt {
+    /// Precision used for train-visible parameter buffers.
+    pub parameter_precision: TrainingPrecisionMode,
+    /// Precision used for train-visible gradient buffers.
+    pub gradient_precision: TrainingPrecisionMode,
+    /// Precision used for master weights.
+    pub master_weight_precision: TrainingPrecisionMode,
+    /// Precision used for optimizer state.
+    pub optimizer_state_precision: TrainingPrecisionMode,
+    /// Whether the step stages BF16 values through CUDA buffers explicitly.
+    pub used_cuda_bf16_buffers: bool,
+    /// Whether the current implementation still orchestrates the step on the host.
+    pub host_orchestrated: bool,
+    /// Reusable optimizer-step report for the FP32 master-weight update.
+    pub step_report: TrainingOptimizerStepReport,
+}
+
 /// Applies one exact Muon step over one matrix-shaped parameter tensor.
 pub fn apply_parameter_golf_muon_step(
     parameter_values: &mut [f32],
@@ -471,6 +528,62 @@ pub fn apply_parameter_golf_cuda_muon_step(
             )
         },
     )
+}
+
+/// Applies one bounded public CUDA BF16 master-weight optimizer step by staging
+/// train-visible parameter and gradient buffers through CUDA `bf16` storage,
+/// running the reusable optimizer surface on FP32 master weights, and then
+/// re-materializing the train-visible parameter view through CUDA `bf16`
+/// buffers.
+pub fn apply_parameter_golf_cuda_bf16_master_weight_optimizer_step(
+    train_visible_parameter_values: &mut [f32],
+    master_weight_values: &mut [f32],
+    gradient_values: &[f32],
+    optimizer: &TrainingOptimizerConfig,
+    optimizer_state: &mut TrainingOptimizerState,
+    step_number: u64,
+) -> Result<ParameterGolfBf16MasterWeightStepReceipt, ParameterGolfTrainError> {
+    if train_visible_parameter_values.len() != gradient_values.len() {
+        return Err(
+            ParameterGolfTrainError::Bf16MasterWeightGradientLengthMismatch {
+                parameter_len: train_visible_parameter_values.len(),
+                gradient_len: gradient_values.len(),
+            },
+        );
+    }
+    if train_visible_parameter_values.len() != master_weight_values.len() {
+        return Err(ParameterGolfTrainError::Bf16MasterWeightLengthMismatch {
+            parameter_len: train_visible_parameter_values.len(),
+            master_weight_len: master_weight_values.len(),
+        });
+    }
+
+    let mut backend = CudaBackend::new();
+    let staged_parameter_values = stage_cuda_bf16_values(&mut backend, master_weight_values)?;
+    train_visible_parameter_values.copy_from_slice(staged_parameter_values.as_slice());
+    let staged_gradient_values = stage_cuda_bf16_values(&mut backend, gradient_values)?;
+    let step_report = apply_training_optimizer_step(
+        master_weight_values,
+        staged_gradient_values.as_slice(),
+        optimizer,
+        optimizer_state,
+        step_number,
+    )
+    .map_err(|error| ParameterGolfTrainError::Bf16MasterWeightOptimizer {
+        message: error.to_string(),
+    })?;
+    let updated_train_visible_values = stage_cuda_bf16_values(&mut backend, master_weight_values)?;
+    train_visible_parameter_values.copy_from_slice(updated_train_visible_values.as_slice());
+
+    Ok(ParameterGolfBf16MasterWeightStepReceipt {
+        parameter_precision: TrainingPrecisionMode::Bf16,
+        gradient_precision: TrainingPrecisionMode::Bf16,
+        master_weight_precision: TrainingPrecisionMode::Fp32,
+        optimizer_state_precision: TrainingPrecisionMode::Fp32,
+        used_cuda_bf16_buffers: true,
+        host_orchestrated: true,
+        step_report,
+    })
 }
 
 fn apply_parameter_golf_muon_step_with_orthogonalizer<F>(
@@ -552,7 +665,10 @@ fn zeropower_via_newtonschulz5_cuda(
             shape: vec![rows, cols],
         });
     }
-    let mut x = values.iter().map(|value| round_bf16(*value)).collect::<Vec<_>>();
+    let mut x = values
+        .iter()
+        .map(|value| round_bf16(*value))
+        .collect::<Vec<_>>();
     let norm = round_bf16(norm_l2(x.as_slice()));
     let denom = round_bf16(norm + epsilon);
     for value in &mut x {
@@ -624,7 +740,10 @@ fn zeropower_via_newtonschulz5(
             shape: vec![rows, cols],
         });
     }
-    let mut x = values.iter().map(|value| round_bf16(*value)).collect::<Vec<_>>();
+    let mut x = values
+        .iter()
+        .map(|value| round_bf16(*value))
+        .collect::<Vec<_>>();
     let norm = round_bf16(norm_l2(x.as_slice()));
     let denom = round_bf16(norm + epsilon);
     for value in &mut x {
@@ -639,7 +758,13 @@ fn zeropower_via_newtonschulz5(
     let (a, b, c) = (3.4445_f32, -4.7750_f32, 2.0315_f32);
     for _ in 0..steps {
         let x_t = transpose(x.as_slice(), work_rows, work_cols);
-        let a_matrix = matmul_bf16(x.as_slice(), x_t.as_slice(), work_rows, work_cols, work_rows);
+        let a_matrix = matmul_bf16(
+            x.as_slice(),
+            x_t.as_slice(),
+            work_rows,
+            work_cols,
+            work_rows,
+        );
         let c_times_a = a_matrix
             .iter()
             .map(|value| round_bf16(c * value))
@@ -675,13 +800,7 @@ fn zeropower_via_newtonschulz5(
     })
 }
 
-fn matmul_bf16(
-    left: &[f32],
-    right: &[f32],
-    rows: usize,
-    inner: usize,
-    cols: usize,
-) -> Vec<f32> {
+fn matmul_bf16(left: &[f32], right: &[f32], rows: usize, inner: usize, cols: usize) -> Vec<f32> {
     let mut output = vec![0.0_f32; rows * cols];
     for row in 0..rows {
         for col in 0..cols {
@@ -753,6 +872,27 @@ fn matmul_bf16_cuda(
 
 fn muon_cuda_runtime_error(message: impl Into<String>) -> ParameterGolfTrainError {
     ParameterGolfTrainError::MuonCudaRuntime {
+        message: message.into(),
+    }
+}
+
+fn stage_cuda_bf16_values(
+    backend: &mut CudaBackend,
+    values: &[f32],
+) -> Result<Vec<f32>, ParameterGolfTrainError> {
+    let mut buffer = backend
+        .bf16_buffer(values.len())
+        .map_err(|error| bf16_master_weight_cuda_runtime_error(error.to_string()))?;
+    buffer
+        .write_bf16_from_f32(values)
+        .map_err(|error| bf16_master_weight_cuda_runtime_error(error.to_string()))?;
+    buffer
+        .read_bf16_to_f32()
+        .map_err(|error| bf16_master_weight_cuda_runtime_error(error.to_string()))
+}
+
+fn bf16_master_weight_cuda_runtime_error(message: impl Into<String>) -> ParameterGolfTrainError {
+    ParameterGolfTrainError::Bf16MasterWeightCudaRuntime {
         message: message.into(),
     }
 }
@@ -874,19 +1014,21 @@ mod tests {
             .iter()
             .find(|group| group.kind == ParameterGolfOptimizerGroupKind::ScalarControlAdam)
             .expect("scalar group should exist");
-        assert_eq!(token_group.tensor_names, fixture.expected_groups.token_embedding);
+        assert_eq!(
+            token_group.tensor_names,
+            fixture.expected_groups.token_embedding
+        );
         assert_eq!(matrix_group.tensor_names, fixture.expected_groups.matrix);
         assert_eq!(scalar_group.tensor_names, fixture.expected_groups.scalar);
         assert_eq!(
             fixture.expected_groups.head_learning_rate,
             fixture.hyperparameters.head_lr
         );
-        assert!(
-            plan.groups
-                .iter()
-                .filter(|group| group.kind == ParameterGolfOptimizerGroupKind::UntiedLmHeadAdam)
-                .all(|group| group.tensor_names == fixture.expected_groups.head)
-        );
+        assert!(plan
+            .groups
+            .iter()
+            .filter(|group| group.kind == ParameterGolfOptimizerGroupKind::UntiedLmHeadAdam)
+            .all(|group| group.tensor_names == fixture.expected_groups.head));
         match &token_group.execution {
             ParameterGolfOptimizerExecution::Adam { optimizer } => {
                 assert_eq!(
@@ -916,7 +1058,8 @@ mod tests {
         }
         assert_eq!(
             plan.total_parameter_count,
-            model.descriptor()
+            model
+                .descriptor()
                 .weights
                 .tensors
                 .iter()
@@ -935,11 +1078,7 @@ mod tests {
             parameter.as_mut_slice(),
             &[case.rows, case.cols],
             case.gradient.as_slice(),
-            &ParameterGolfMuonConfig::new(
-                case.learning_rate,
-                case.momentum,
-                case.backend_steps,
-            ),
+            &ParameterGolfMuonConfig::new(case.learning_rate, case.momentum, case.backend_steps),
             &mut state,
         )
         .expect("muon step should compute");
@@ -1022,6 +1161,108 @@ mod tests {
             &actual_receipt.update_values,
             &expected_receipt.update_values,
             5e-4,
+        );
+    }
+
+    #[test]
+    fn cuda_bf16_master_weight_step_matches_cpu_reference_case_when_available() {
+        let backend = CudaBackend::new();
+        let Some(_) = backend.selected_device() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return;
+        };
+
+        let mut optimizer = TrainingOptimizerConfig::adamw(0.05, 0.9, 0.95, 1e-8);
+        optimizer.weight_decay = 0.1;
+        let initial_master_weights = vec![0.5_f32, -1.25, 0.75, 1.5, -0.8, 0.2, 1.1, -0.4];
+        let gradients = vec![0.3_f32, -0.7, 1.2, -0.4, 0.5, -1.1, 0.9, -0.2];
+        let step_number = 3_u64;
+
+        let mut expected_master_weights = initial_master_weights.clone();
+        let expected_gradients = gradients
+            .iter()
+            .copied()
+            .map(round_bf16)
+            .collect::<Vec<_>>();
+        let mut expected_state =
+            TrainingOptimizerState::new(optimizer.kind, gradients.len(), optimizer.momentum);
+        let expected_step_report = apply_training_optimizer_step(
+            expected_master_weights.as_mut_slice(),
+            expected_gradients.as_slice(),
+            &optimizer,
+            &mut expected_state,
+            step_number,
+        )
+        .expect("cpu master-weight step should compute");
+        let expected_train_visible = expected_master_weights
+            .iter()
+            .copied()
+            .map(round_bf16)
+            .collect::<Vec<_>>();
+
+        let mut actual_train_visible = vec![0.0_f32; gradients.len()];
+        let mut actual_master_weights = initial_master_weights.clone();
+        let mut actual_state =
+            TrainingOptimizerState::new(optimizer.kind, gradients.len(), optimizer.momentum);
+        let actual_receipt = apply_parameter_golf_cuda_bf16_master_weight_optimizer_step(
+            actual_train_visible.as_mut_slice(),
+            actual_master_weights.as_mut_slice(),
+            gradients.as_slice(),
+            &optimizer,
+            &mut actual_state,
+            step_number,
+        )
+        .expect("cuda bf16 master-weight step should compute");
+
+        assert_eq!(
+            actual_receipt.parameter_precision,
+            TrainingPrecisionMode::Bf16
+        );
+        assert_eq!(
+            actual_receipt.gradient_precision,
+            TrainingPrecisionMode::Bf16
+        );
+        assert_eq!(
+            actual_receipt.master_weight_precision,
+            TrainingPrecisionMode::Fp32
+        );
+        assert_eq!(
+            actual_receipt.optimizer_state_precision,
+            TrainingPrecisionMode::Fp32
+        );
+        assert!(actual_receipt.used_cuda_bf16_buffers);
+        assert!(actual_receipt.host_orchestrated);
+        assert_eq!(
+            actual_receipt.step_report.optimizer,
+            expected_step_report.optimizer
+        );
+        assert_eq!(
+            actual_receipt.step_report.step_number,
+            expected_step_report.step_number
+        );
+        assert_close(&actual_master_weights, &expected_master_weights, 1e-6);
+        assert_close(&actual_train_visible, &expected_train_visible, 1e-6);
+        assert_eq!(actual_state, expected_state);
+        assert_close(
+            &actual_receipt.step_report.update_values,
+            &expected_step_report.update_values,
+            1e-6,
+        );
+        assert!(
+            (actual_receipt.step_report.update_norm_l2 - expected_step_report.update_norm_l2).abs()
+                < 1e-6
+        );
+        assert!(
+            (actual_receipt.step_report.parameter_norm_l2_before
+                - expected_step_report.parameter_norm_l2_before)
+                .abs()
+                < 1e-6
+        );
+        assert!(
+            (actual_receipt.step_report.parameter_norm_l2_after
+                - expected_step_report.parameter_norm_l2_after)
+                .abs()
+                < 1e-6
         );
     }
 

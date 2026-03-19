@@ -471,7 +471,7 @@ Turn the PR-ready submission surface into a genuine record-candidate runtime.
 
 | ID | Status | Proposed GitHub issue title | Description |
 | --- | --- | --- | --- |
-| `PGOLF-601` / [#188](https://github.com/OpenAgentsInc/psionic/issues/188) | open (2026-03-19) | `Psionic Parameter Golf: retire the remaining baseline CUDA blockers on the public submission path` | Umbrella runtime-closure issue for the remaining public CUDA baseline blockers. This stays open while the narrower execution issues below land and until the repo can honestly stop listing the current BF16 blocker on the actual submission path. |
+| `PGOLF-601` / [#188](https://github.com/OpenAgentsInc/psionic/issues/188) | done (2026-03-19) | `Psionic Parameter Golf: retire the remaining baseline CUDA blockers on the public submission path` | The canonical CUDA coverage report no longer carries any family-level blocker ids on the public submission path. Broader end-to-end trainer, hardware-evidence, and promotion work remains tracked separately under `PGOLF-604`, `PGOLF-602`, and `PGOLF-609`. |
 | `PGOLF-615` / [#259](https://github.com/OpenAgentsInc/psionic/issues/259) | done (2026-03-19) | `Psionic Parameter Golf: widen public CUDA execution for mul and RMSNorm` | `psionic-backend-cuda` now executes dense contiguous `f32` `mul` and backend-specialized `rms_norm` through the public `ExecutionBackend` path, validates those plan steps explicitly, and advertises runtime RMSNorm extension support honestly. This widens the real forward CUDA surface for residual-control tensors and RMSNorm without claiming backward or full train-path closure. |
 | `PGOLF-616` / [#260](https://github.com/OpenAgentsInc/psionic/issues/260) | done (2026-03-19) | `Psionic Parameter Golf: add RMSNorm autodiff and reference-eval support` | `psionic-ir` now evaluates `rms_norm` through the dense `f32` reference path, builds bounded reverse-mode RMSNorm backward graphs instead of refusing them, and keeps the other backend-extension gradient families explicitly unsupported. The repo now owns real train-visible RMSNorm graph semantics above the backend while leaving public CUDA backward execution for `PGOLF-617`. |
 | `PGOLF-617` / [#261](https://github.com/OpenAgentsInc/psionic/issues/261) | done (2026-03-19) | `Psionic Parameter Golf: widen public CUDA execution for RMSNorm backward graphs` | `psionic-backend-cuda` now executes bounded dense contiguous `f32` RMSNorm forward plus the dedicated RMSNorm backward graph ops across batched rows through the public runtime path, with end-to-end CUDA backward-graph tests and updated coverage truth that retire the explicit RMSNorm blocker without implying BF16, decoder-block, residual-mix, or optimizer closure. |
@@ -479,7 +479,7 @@ Turn the PR-ready submission surface into a genuine record-candidate runtime.
 | `PGOLF-622` / [#266](https://github.com/OpenAgentsInc/psionic/issues/266) | done (2026-03-19) | `Psionic Parameter Golf: add public reverse-mode support for the RoPE/GQA decoder block` | `psionic-ir` now lowers bounded decoder reverse-mode gradients through dedicated `rotary_embedding_backward` plus `scaled_dot_product_attention_{query,key,value}_backward` ops, evaluates that path on the dense `f32` reference surface, and keeps RoPE table gradients explicitly unsupported. The canonical coverage truth now retires the old reverse-mode blocker and narrows the remaining attention blocker to public CUDA backward-runtime execution. |
 | `PGOLF-624` / [#268](https://github.com/OpenAgentsInc/psionic/issues/268) | done (2026-03-19) | `Psionic Parameter Golf: add public CUDA execution for decoder-block backward graphs` | `psionic-backend-cuda` now executes bounded decoder backward graphs for `rotary_embedding_backward` and `scaled_dot_product_attention_{query,key,value}_backward` on CUDA device buffers through a host-orchestrated dense `f32` runtime, with end-to-end backward-graph parity tests against the dense reference path. The canonical coverage truth now retires the explicit decoder backward-runtime blocker without claiming fused, fully device-resident, or challenge-speed decoder training closure. |
 | `PGOLF-619` / [#263](https://github.com/OpenAgentsInc/psionic/issues/263) | done (2026-03-19) | `Psionic Parameter Golf: add public CUDA BF16 train-visible execution posture` | `psionic-backend-cuda` now owns dense BF16 buffer residency plus bounded row-major BF16xBF16-to-F32 matmul execution through the public CUDA submission path, and the canonical coverage truth now narrows the BF16 blocker from a vague precision-policy contract to the remaining train-graph and optimizer surface tracked by `PGOLF-623`. |
-| `PGOLF-623` / [#267](https://github.com/OpenAgentsInc/psionic/issues/267) | open (2026-03-19) | `Psionic Parameter Golf: widen public CUDA BF16 train graph and optimizer execution` | Follow the first bounded BF16 runtime seam with broader train-graph, backward, and optimizer closure so the remaining BF16 blocker narrows beyond the current graph-and-optimizer gap. |
+| `PGOLF-623` / [#267](https://github.com/OpenAgentsInc/psionic/issues/267) | done (2026-03-19) | `Psionic Parameter Golf: widen public CUDA BF16 train graph and optimizer execution` | `psionic-train` now owns one bounded host-orchestrated CUDA BF16 master-weight optimizer step over BF16 train-visible parameter and gradient buffers with FP32 master weights and FP32 optimizer state. The canonical coverage truth now retires the last family-level BF16 blocker without claiming generic BF16 graph execution, fused optimizer kernels, or challenge-speed mixed-precision trainer closure. |
 | `PGOLF-620` / [#264](https://github.com/OpenAgentsInc/psionic/issues/264) | done (2026-03-19) | `Psionic Parameter Golf: add public CUDA Muon optimizer execution` | `psionic-train` now owns one bounded public CUDA Muon step for the baseline matrix-shaped parameter groups, offloading the Newton-Schulz BF16 matmul family to the public CUDA dense surface while keeping transpose, norm, and scalar orchestration explicit in Rust. The canonical coverage truth now retires the explicit Muon blocker without claiming fused or fully device-resident trainer closure. |
 | `PGOLF-621` / [#265](https://github.com/OpenAgentsInc/psionic/issues/265) | done (2026-03-19) | `Psionic Parameter Golf: add public CUDA residual-mix train-path execution` | `psionic-backend-cuda` now proves one bounded Parameter Golf residual-mix training graph end to end on CUDA, including reverse-mode gradients over dense contiguous full-shape residual-control tensors, and the canonical coverage truth now retires the explicit residual-mix blocker without claiming generic broadcast or fused decoder closure. |
 | `PGOLF-602` / [#189](https://github.com/OpenAgentsInc/psionic/issues/189) | open (2026-03-18) | `Psionic Parameter Golf: capture real 8xH100 run bundles from the exported submission entrypoint` | The repo should preserve run bundles, train logs, wallclock receipts, memory receipts, and artifact-size receipts emitted by the real exported submission folder on actual `8xH100` hardware instead of only by the internal benchmark or receipt path. |
@@ -593,7 +593,7 @@ work instead of leaving those steps implicit after the local dry-run lane.
 
 ### Phase 7: close real record-track runtime and `8xH100` evidence
 
-- `PGOLF-601` -> retire the remaining public CUDA baseline blockers on the exported submission path
+- `PGOLF-601` -> retired the remaining family-level public CUDA baseline blockers on the exported submission path
 - `PGOLF-615` -> landed dense `f32` `mul` and backend-specialized `rms_norm` forward execution on the public CUDA path
 - `PGOLF-616` -> landed RMSNorm autodiff and reference-eval closure so the train-visible graph now exists above the backend
 - `PGOLF-617` -> landed bounded public CUDA RMSNorm backward-graph execution and retired the explicit RMSNorm blocker
@@ -601,7 +601,7 @@ work instead of leaving those steps implicit after the local dry-run lane.
 - `PGOLF-622` -> landed bounded decoder reverse-mode graph closure above the backend and narrowed the remaining attention blocker to CUDA backward runtime
 - `PGOLF-624` -> landed the bounded host-orchestrated CUDA decoder backward path and retired the explicit attention blocker
 - `PGOLF-619` -> landed the first honest public CUDA BF16 runtime seam and narrowed the remaining BF16 blocker to train-graph and optimizer closure
-- `PGOLF-623` -> widen the public CUDA BF16 train graph and optimizer path beyond the first bounded runtime seam
+- `PGOLF-623` -> landed the bounded host-orchestrated CUDA BF16 master-weight optimizer step and retired the last family-level BF16 blocker
 - `PGOLF-620` -> landed the bounded public CUDA Muon step and retired the explicit optimizer blocker
 - `PGOLF-621` -> landed the bounded public CUDA residual-mix train path and retired the explicit residual blocker
 - `PGOLF-603` -> landed folder-local replay verification plus exported-folder run-evidence reports for metrics, wallclock, and artifact bytes
@@ -642,8 +642,8 @@ precise about what is true on 2026-03-18:
 - Psionic already has strong reusable train, eval, model, tokenizer, and
   distributed substrate
 - Psionic now owns the challenge oracle, the public baseline path, and the
-  bounded local-reference plus distributed receipt lanes, but it still keeps
-  the remaining CUDA train-path blockers explicit
+  bounded local-reference plus distributed receipt lanes, and the canonical
+  CUDA coverage report no longer carries family-level blocker ids
 - Psionic now also has a first honest non-record runtime package and a
   maintainer-facing export path for the public non-record repo surface, plus
   exported-folder replay evidence, typed promotion posture, one deterministic
@@ -656,10 +656,9 @@ precise about what is true on 2026-03-18:
   explicitly research-only until new results are measured
 - the first truthful result should be parity against `train_gpt.py`, not a new
   architecture
-- the next real work is no longer "more bootstrap closure"; it is retiring the
-  remaining public CUDA baseline blockers on the exported path and then
-  capturing reproducible `8xH100` evidence from the exported folder path that
-  now exists
+- the next real work is no longer "more bootstrap closure"; it is turning the
+  Rust-native single-H100 seam into the actual trainer path and then capturing
+  reproducible `8xH100` evidence from the exported folder path that now exists
 - record-track claims still stay blocked until that path is implemented,
   measured, and promoted, even though the blocked contract is now documented
   and machine-readable

@@ -918,7 +918,7 @@ mod tests {
     }
 
     #[test]
-    fn single_h100_bringup_report_surfaces_dataset_and_current_cuda_refusal(
+    fn single_h100_bringup_report_surfaces_dataset_and_current_readiness_posture(
     ) -> Result<(), Box<dyn Error>> {
         let dataset = sample_dataset_root();
         let tokenizer_path = dataset.path.join("fineweb_1024_bpe.model");
@@ -946,40 +946,40 @@ mod tests {
             report.execution_posture,
             ParameterGolfSingleH100ExecutionPosture::ContractValidationOnly
         );
-        assert!(report.reference_microbatch_probe.is_none());
         assert!(matches!(
             report.disposition,
             ParameterGolfSingleH100BringupDisposition::RefusedMachineContract
-                | ParameterGolfSingleH100BringupDisposition::RefusedCudaBlockers
+                | ParameterGolfSingleH100BringupDisposition::ReadyToAttempt
         ));
-        assert!(report.refusal.is_some());
-        assert!(report
-            .challenge_kernel_blockers
-            .contains(&String::from(
-                "cuda_bf16_train_graph_and_optimizer_surface"
-            )));
+        assert!(report.challenge_kernel_blockers.is_empty());
+        assert!(report.cuda_blocker_refusal.is_none());
         assert_eq!(
             report.machine_thresholds,
             ParameterGolfSingleH100ChallengeThresholds::challenge_h100()
         );
         assert!(report.matching_h100_device_count <= report.observed_cuda_devices.len());
         if report.machine_contract_satisfied {
+            assert!(report.reference_microbatch_probe.is_some());
             assert_eq!(
                 report.disposition,
-                ParameterGolfSingleH100BringupDisposition::RefusedCudaBlockers
+                ParameterGolfSingleH100BringupDisposition::ReadyToAttempt
             );
+            assert!(report.refusal.is_none());
+            assert!(report.ready_to_attempt());
         } else {
+            assert!(report.reference_microbatch_probe.is_none());
             assert_eq!(
                 report.disposition,
                 ParameterGolfSingleH100BringupDisposition::RefusedMachineContract
             );
+            assert!(report.refusal.is_some());
             assert!(report
                 .refusal
                 .as_ref()
                 .is_some_and(|refusal| refusal.subject.as_deref()
                     == Some("parameter_golf_single_h100_machine")));
+            assert!(!report.ready_to_attempt());
         }
-        assert!(report.cuda_blocker_refusal.is_some());
         assert!(report.observed_wallclock_ms > 0);
         assert!(report.finished_at_ms >= report.started_at_ms);
         assert!(report.final_val_loss.is_none());
@@ -989,7 +989,6 @@ mod tests {
             .drift_notes
             .iter()
             .any(|note| note.contains("does not yet execute the real baseline training loop")));
-        assert!(!report.ready_to_attempt());
         assert_eq!(report.baseline_model_config.vocab_size, 1024);
         assert_eq!(report.geometry, config.geometry);
         assert_eq!(report.hyperparameters, config.hyperparameters);

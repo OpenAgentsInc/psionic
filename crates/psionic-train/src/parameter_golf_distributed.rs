@@ -975,11 +975,9 @@ mod tests {
             "muon_matrix_update_all_reduce"
         );
         assert!(!receipt.training_capability_report_digest.is_empty());
-        assert!(receipt
-            .challenge_kernel_blockers
-            .contains(&String::from("cuda_bf16_train_graph_and_optimizer_surface")));
-        assert_eq!(receipt.challenge_kernel_blockers.len(), 1);
-        assert!(receipt
+        assert!(receipt.challenge_kernel_blockers.is_empty());
+        assert!(!receipt.boundary_notes.is_empty());
+        assert!(!receipt
             .boundary_notes
             .iter()
             .any(|note| note.contains("cuda_bf16_train_graph_and_optimizer_surface")));

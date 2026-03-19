@@ -122,14 +122,13 @@ challenge cache with:
 
 That is the current honest single-H100 parity result: the command has been run
 against the real public cache, but it still refuses before training because the
-local review host is not a qualifying H100 machine and the public CUDA blocker
-set is still not retired.
+local review host is not a qualifying H100 machine.
 
-On a qualifying non-MIG H100 machine, the command now goes one step further
-before refusal: it materializes the exact first challenge microbatch from the
-cached FineWeb `sp1024` shards and computes a bounded CPU-reference mean loss
-for a small leading prefix of that window. That is still not a CUDA training
-claim.
+On a qualifying non-MIG H100 machine, the command now becomes
+`ready_to_attempt`: it materializes the exact first challenge microbatch from
+the cached FineWeb `sp1024` shards and computes a bounded CPU-reference mean
+loss for a small leading prefix of that window. That is still not a CUDA
+training claim.
 
 ## Current Honest Boundary
 
@@ -152,14 +151,14 @@ Instead, it does one narrower but important job:
 - on a qualifying H100, it proves the Rust path can materialize the first real
   challenge microbatch and evaluate a bounded prefix of that microbatch with
   the CPU reference model
-- it refuses explicitly while the current CUDA blocker list is still non-empty
 - it preserves the exact dataset or tokenizer or model or blocker truth that
   later work must reuse instead of rebuilding from memory
 
 That is the intended bridge to `PGOLF-604`, `PGOLF-605`, and the existing
 `PGOLF-601` and `PGOLF-602` work:
 
-- `PGOLF-601` / `#188` retires the remaining public CUDA blockers
+- `PGOLF-601` / `#188` retired the explicit family-level public CUDA blocker
+  list in the canonical coverage report
 - `PGOLF-604` / `#194` turns the bring-up seam into a real Psionic-native
   single-H100 trainer path
 - `PGOLF-605` / `#195` preserves the machine-readable single-H100 parity or

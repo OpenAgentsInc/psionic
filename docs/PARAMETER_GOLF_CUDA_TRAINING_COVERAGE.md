@@ -73,8 +73,19 @@ the baseline mixed-precision lane:
 - dense BF16 buffer residency on the public CUDA dense surface
 - bounded row-major BF16xBF16-to-F32 matmul execution through cuBLAS
 
-That narrows the BF16 blocker from "no public BF16 runtime primitive" to the
-remaining BF16 train-graph and optimizer surface.
+That first BF16 runtime seam is now followed by one bounded public CUDA BF16
+master-weight optimizer step over train-visible BF16 parameter and gradient
+buffers:
+
+- train-visible parameter buffers are staged through CUDA `bf16` storage
+- train-visible gradient buffers are staged through CUDA `bf16` storage
+- optimizer math runs through the shared FP32 reusable optimizer surface on
+  FP32 master weights and FP32 optimizer state
+- updated train-visible parameter values are re-materialized through CUDA
+  `bf16` storage instead of being implied
+
+That retires the last family-level BF16 blocker from the canonical coverage
+report while keeping the mixed-precision boundary honest.
 
 `psionic-train` now also owns one bounded public CUDA Muon step over the same
 matrix-shaped parameter groups used by the baseline optimizer split:
@@ -90,9 +101,9 @@ That retires the explicit "no public CUDA Muon path" blocker while preserving
 the boundary that the current step is still host-orchestrated around CUDA
 matmuls.
 
-That means the remaining CUDA train-path blockers are now machine-readable on
-the same benchmark seam that already carries topology, communication,
-wallclock, and memory facts.
+That means the canonical CUDA train-path blocker list is now empty on the same
+benchmark seam that already carries topology, communication, wallclock, and
+memory facts.
 
 ## Covered Requirement Families
 
@@ -105,9 +116,7 @@ The report now keeps the following families explicit:
 - Muon optimizer support on CUDA
 - post-train int8 plus zlib export or roundtrip support
 
-The current canonical blocker set is:
-
-- `cuda_bf16_train_graph_and_optimizer_surface`
+The current canonical blocker set is empty.
 
 ## Current Honest Boundary
 
@@ -126,26 +135,19 @@ Today it keeps these truths separate:
   - one bounded host-orchestrated CUDA decoder backward path is real on the
     public lane for `rotary_embedding_backward` plus
     `scaled_dot_product_attention_{query,key,value}_backward`
+  - one bounded host-orchestrated CUDA BF16 master-weight optimizer step over
+    BF16 train-visible parameter and gradient buffers with FP32 master weights
+    and FP32 optimizer state is real on the public lane
   - one bounded host-orchestrated CUDA Muon step is real on the public lane
   - post-train quantized export or roundtrip support is real
-- `partial`
-  - BF16 policy plus one bounded BF16 runtime primitive seam now has an
-    explicit substrate or refusal contract
-  - the public CUDA execution backend now genuinely owns dense `f32`
-    pointwise `mul`, bounded dense contiguous `f32` RMSNorm forward and
-    backward execution, one bounded residual-mix graph, one bounded
-    causal RoPE/GQA decoder-block forward path, one bounded decoder reverse-mode
-    graph seam on the dense `f32` reference path, one bounded host-orchestrated
-    CUDA decoder backward path, and one bounded BF16 matmul primitive, but the
-    full BF16 train graph or optimizer runtime is still narrower than the
-    Parameter Golf challenge lane
 
 This is the intended contract for the issue: do not hide missing CUDA kernels
 behind broader model or distributed receipts.
 
-The distributed receipt now links back to this exact blocker list by digest.
-That keeps the `8xH100` lane reviewable without pretending the public CUDA
-surface is already fully widened.
+The distributed receipt now links back to this exact coverage report by
+digest, and that keeps the `8xH100` lane reviewable without pretending the
+public CUDA surface is already a fused, fully device-resident, or
+challenge-speed trainer.
 
 ## Why This Matters
 
@@ -162,9 +164,13 @@ Without this report, the repo could say all of these misleading things:
 - one bounded RMSNorm closure means the whole decoder block now trains on CUDA
 - one bounded full-shape residual-mix graph means generic broadcast or fused
   decoder closure now exists
+- one bounded host-orchestrated CUDA BF16 master-weight step means generic
+  BF16 graph execution, fused optimizer kernels, or challenge-speed
+  mixed-precision closure is done
 - one bounded host-orchestrated CUDA Muon step means fused or fully
   device-resident optimizer closure is done
 - artifact quantization means train-time low-precision closure is done
 
 The new report prevents that. It turns the remaining CUDA blockers into one
-stable typed contract that later runtime or backend work can actually retire.
+stable typed contract that runtime or backend work can retire without
+over-claiming the full trainer.

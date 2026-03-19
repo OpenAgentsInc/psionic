@@ -162,15 +162,15 @@ pub fn builtin_parameter_golf_cuda_training_capability_report(
             ParameterGolfCudaTrainingCoverageCase {
                 case_id: String::from("cuda_bf16_train_graph_and_optimizer_surface"),
                 family: ParameterGolfCudaTrainingFamily::Precision,
-                status: ParameterGolfCudaTrainingCoverageStatus::Partial,
+                status: ParameterGolfCudaTrainingCoverageStatus::ImplementedEarly,
                 required_scope: String::from(
                     "the public 8xH100 baseline requires BF16 train-visible parameters and gradients with FP32 optimizer or master-weight posture",
                 ),
                 current_surface: String::from(
-                    "the distributed 8xH100 receipt lane now encodes an explicit BF16-forward or FP32-master precision policy, and the public CUDA runtime now owns BF16 dense buffer residency plus bounded BF16xBF16-to-F32 matmul execution on the same row-major surface already used for mixed-precision baseline primitives",
+                    "the distributed 8xH100 receipt lane now encodes an explicit BF16-forward or FP32-master precision policy, the public CUDA runtime now owns BF16 dense buffer residency plus bounded BF16xBF16-to-F32 matmul execution on the same row-major surface already used for mixed-precision baseline primitives, and psionic-train now owns one bounded host-orchestrated CUDA BF16 master-weight optimizer step over BF16 train-visible parameter and gradient buffers with FP32 master weights and FP32 optimizer state",
                 ),
                 boundary_note: String::from(
-                    "Do not treat the first BF16 runtime seam as proof that the public CUDA lane already owns broad BF16 train-graph, backward, or optimizer execution.",
+                    "Do not treat the bounded host-orchestrated BF16 master-weight step as proof that generic BF16 graph execution, fused optimizer kernels, or challenge-speed mixed-precision trainer closure is already done.",
                 ),
             },
             ParameterGolfCudaTrainingCoverageCase {
@@ -265,7 +265,7 @@ where
 mod tests {
     use std::error::Error;
 
-    use psionic_core::{builtin_quantization_capability_semantics_report, PsionicRefusalCode};
+    use psionic_core::builtin_quantization_capability_semantics_report;
     use psionic_ir::builtin_advanced_operator_program_matrix_report;
 
     use crate::{
@@ -291,7 +291,15 @@ mod tests {
             report.cases.last().expect("quantization case").status,
             ParameterGolfCudaTrainingCoverageStatus::ImplementedEarly
         );
-        assert_eq!(report.blocking_case_ids.len(), 1);
+        assert!(report
+            .cases
+            .iter()
+            .all(|case| case.status == ParameterGolfCudaTrainingCoverageStatus::ImplementedEarly));
+        assert!(report.blocking_case_ids.is_empty());
+        assert!(!report
+            .blocking_case_ids
+            .iter()
+            .any(|case_id| case_id == "cuda_bf16_train_graph_and_optimizer_surface"));
         assert!(!report
             .blocking_case_ids
             .iter()
@@ -315,19 +323,8 @@ mod tests {
     fn parameter_golf_cuda_training_capability_report_refuses_full_challenge_closure(
     ) -> Result<(), Box<dyn Error>> {
         let report = builtin_parameter_golf_cuda_training_capability_report()?;
-        let refusal = report
-            .challenge_readiness_refusal()
-            .expect("current report should stay blocked");
-        assert_eq!(
-            refusal.code,
-            PsionicRefusalCode::UnsupportedBackendCapability
-        );
-        assert!(refusal
-            .detail
-            .contains("cuda_bf16_train_graph_and_optimizer_surface"));
-        assert!(!refusal
-            .detail
-            .contains("cuda_rope_gqa_decoder_block_backward_runtime"));
+        let refusal = report.challenge_readiness_refusal();
+        assert!(refusal.is_none());
         Ok(())
     }
 }
