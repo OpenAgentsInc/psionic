@@ -1580,7 +1580,7 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
 - **[docs/PARAMETER_GOLF_PR_SUBMISSION_FLOW.md](docs/PARAMETER_GOLF_PR_SUBMISSION_FLOW.md)** — canonical Parameter Golf promotion receipt, final PR-bundle, and local challenge-clone dry-run contract.
 - **[docs/PARAMETER_GOLF_ARCHITECTURE_EXPERIMENT_QUEUE.md](docs/PARAMETER_GOLF_ARCHITECTURE_EXPERIMENT_QUEUE.md)** — canonical concrete post-parity architecture queue for shared-depth, stronger parameter-tying, and restricted-attention evidence.
 - **[docs/PARAMETER_GOLF_RESTRICTED_ATTENTION_REPORT.md](docs/PARAMETER_GOLF_RESTRICTED_ATTENTION_REPORT.md)** — canonical restricted-attention evidence record on one committed `seq_len=1024` challenge-format validation slice, including the current negative-evidence result for a fixed `256`-token window.
-- **[docs/PARAMETER_GOLF_EXTERNAL_NON_RECORD_PR.md](docs/PARAMETER_GOLF_EXTERNAL_NON_RECORD_PR.md)** — canonical record of the first real upstream non-record PR, including the exact folder identity, verifier digests, and current maintainer-facing accounting-question status.
+- **[docs/PARAMETER_GOLF_EXTERNAL_NON_RECORD_PR.md](docs/PARAMETER_GOLF_EXTERNAL_NON_RECORD_PR.md)** — canonical historical record of the first external non-record PR, including the exact folder identity, verifier digests, closed-PR state, and the current local blocked posture for counted-runtime ambiguity.
 - **[docs/ROADMAP_FM.md](docs/ROADMAP_FM.md)** — Apple FM lane roadmap and API coverage.
 - **[docs/ROADMAP_PARAMETERGOLF.md](docs/ROADMAP_PARAMETERGOLF.md)** — Parameter Golf lane roadmap for challenge-oracle parity, compact decoder training, artifact accounting, and submission packaging inside Psionic.
 - `scripts/check-parameter-golf-acceptance.sh` and

@@ -528,18 +528,19 @@ weakening baseline or record-track claim posture.
 
 ### Goal
 
-Carry the first real upstream non-record PR, upstream accounting clarification,
-and later record-candidate campaign as explicit tracked work instead of leaving
-those steps implicit after the local dry-run lane.
+Carry the historical external non-record PR record, the local blocked
+accounting posture, and the later record-candidate campaign as explicit tracked
+work instead of leaving those steps implicit after the local dry-run lane.
 
 ### Issues
 
 | ID | Status | Proposed GitHub issue title | Description |
 | --- | --- | --- | --- |
 | `PGOLF-606` / [#250](https://github.com/OpenAgentsInc/psionic/issues/250) | open (2026-03-19) | `Psionic Parameter Golf: promote the acceptance matrix and claim posture after the public runtime path closes` | This stays open until `PGOLF-601`, `PGOLF-602`, and `PGOLF-604` close; only then can the acceptance matrix, accounting doc, and machine-readable report be promoted honestly. |
-| `PGOLF-607` / [#251](https://github.com/OpenAgentsInc/psionic/issues/251) | done (2026-03-19) | `Psionic Parameter Golf: submit and track the first real external non-record PR against openai/parameter-golf` | Psionic has now opened `https://github.com/openai/parameter-golf/pull/119`, preserved the exact fork commit and record-folder tree hash in `fixtures/parameter_golf/reports/parameter_golf_external_non_record_pr.json`, and documented the live external submission path in `docs/PARAMETER_GOLF_EXTERNAL_NON_RECORD_PR.md`. |
-| `PGOLF-608` / [#252](https://github.com/OpenAgentsInc/psionic/issues/252) | open (2026-03-19) | `Psionic Parameter Golf: capture maintainer-facing resolution on counted Rust runtime and build-dependency posture` | The counted-runtime question is now asked on the live upstream PR at `https://github.com/openai/parameter-golf/pull/119#issuecomment-4092766684`, but the issue stays open until an explicit maintainer answer, ambiguity statement, or refusal exists. |
+| `PGOLF-607` / [#251](https://github.com/OpenAgentsInc/psionic/issues/251) | done (2026-03-19) | `Psionic Parameter Golf: submit and track the first real external non-record PR against openai/parameter-golf` | Psionic now preserves the first real external non-record PR as historical evidence only: `https://github.com/openai/parameter-golf/pull/119` was opened and then closed on 2026-03-19, and the exact fork commit, record-folder tree hash, and verifier digests remain frozen in `fixtures/parameter_golf/reports/parameter_golf_external_non_record_pr.json`. |
+| `PGOLF-608` / [#252](https://github.com/OpenAgentsInc/psionic/issues/252) | done (2026-03-19) | `Psionic Parameter Golf: capture maintainer-facing resolution on counted Rust runtime and build-dependency posture` | This issue is intentionally retired under the outbound-contribution ban. Psionic no longer tracks a live maintainer-facing counted-runtime question inside this repo; the canonical docs now preserve the unresolved accounting ambiguity as explicit local blocked posture instead. |
 | `PGOLF-609` / [#253](https://github.com/OpenAgentsInc/psionic/issues/253) | open (2026-03-19) | `Psionic Parameter Golf: freeze one real record-candidate config and run campaign` | This stays blocked on the real public runtime path and real `8xH100` evidence rather than on the earlier non-record packaging and PR mechanics. |
+| `PGOLF-614` / [#258](https://github.com/OpenAgentsInc/psionic/issues/258) | done (2026-03-19) | `Psionic Parameter Golf: replace stale external-PR claims with repo-local blocked posture` | Psionic now updates the canonical docs and machine-readable receipt to reflect that the first external non-record PR is closed historical evidence, not a live workflow, and that counted-runtime ambiguity remains explicitly blocked locally unless the user directs new outbound action. |
 
 ## Current Execution Order
 
@@ -603,8 +604,9 @@ those steps implicit after the local dry-run lane.
 
 ### Phase 10: run the first real external submission loop
 
-- `PGOLF-607` -> landed the first real upstream non-record PR and the repo-owned receipt for its exact fork commit, tree hash, and verifier digests
-- `PGOLF-608` -> the counted-runtime question is now asked on the live upstream PR, but it still needs an explicit answer or refusal
+- `PGOLF-607` -> landed the first external non-record PR receipt; that PR is now closed and preserved as historical evidence only
+- `PGOLF-608` -> retired the live-upstream accounting-question lane under the outbound-contribution ban; the ambiguity now stays blocked locally instead
+- `PGOLF-614` -> landed the stale external-PR cleanup and repo-local blocked posture in the canonical docs and receipt
 - `PGOLF-606` -> acceptance-matrix promotion stays blocked on the real public runtime and evidence issues
 - `PGOLF-609` -> record-candidate campaign stays blocked on the real public runtime and `8xH100` evidence issues
 

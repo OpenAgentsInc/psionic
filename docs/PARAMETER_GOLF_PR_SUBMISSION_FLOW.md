@@ -107,13 +107,18 @@ The current promotion receipt remains a refusal for the bounded non-record
 bundle. That is the intended claim boundary until stronger record evidence
 actually exists.
 
-## First External PR
+## Historical External PR Record
 
-The first real upstream non-record PR is now open at:
+The first real external non-record PR was:
 
 - `https://github.com/openai/parameter-golf/pull/119`
+- state: `closed`
+- closed at: `2026-03-19T19:46:39Z`
 
-The canonical repo-owned record for that PR now lives at:
+The canonical repo-owned record for that historical PR now lives at:
 
 - `docs/PARAMETER_GOLF_EXTERNAL_NON_RECORD_PR.md`
 - `fixtures/parameter_golf/reports/parameter_golf_external_non_record_pr.json`
+
+It is not an active workflow. New external PRs or maintainer-facing questions
+require explicit user direction first.

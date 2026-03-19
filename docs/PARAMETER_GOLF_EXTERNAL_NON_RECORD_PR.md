@@ -1,21 +1,28 @@
 # Psionic Parameter Golf External Non-Record PR
 
-> Status: canonical `PGOLF-607` / `#251` first real external non-record PR
-> record, updated 2026-03-19 after opening
-> `https://github.com/openai/parameter-golf/pull/119`.
+> Status: canonical `PGOLF-607` / `#251` historical external non-record PR
+> record, updated 2026-03-19 after
+> `https://github.com/openai/parameter-golf/pull/119` was closed on
+> 2026-03-19.
 
-This document records the first real upstream Parameter Golf submission loop
-for Psionic's non-record lane.
+This document records the first real external Parameter Golf submission loop
+for Psionic's non-record lane as historical evidence only.
 
 It exists so the exact folder, fork branch, PR URL, verifier evidence, and
-maintainer-facing accounting question do not live only in GitHub comments or
+the earlier counted-runtime question do not live only in GitHub comments or
 terminal history.
+
+It is not a live workflow. The PR is closed, and Psionic now treats outbound
+PRs, issues, and maintainer-facing comments as forbidden unless the user
+explicitly directs them.
 
 ## What Landed
 
-Psionic has now opened one real upstream non-record PR:
+Psionic opened one real upstream non-record PR, and that PR is now closed:
 
 - upstream PR: `https://github.com/openai/parameter-golf/pull/119`
+- PR state: `closed`
+- closed at: `2026-03-19T19:46:39Z`
 - upstream repo: `openai/parameter-golf`
 - fork branch: `OpenAgentsInc:psionic-non-record-runtime-replay-v2`
 - submitted folder:
@@ -34,37 +41,44 @@ The receipt freezes:
 - the canonical Psionic local-clone dry-run report digest
 - the staged-folder compatibility-verifier digest
 - the staged-folder replay-verifier digest
-- the PR URL and current PR state
+- the PR URL, closed state, and close timestamp
 
 That means later external submissions can start from one committed reference
 instead of reconstructing the first submission path from memory.
 
-## Maintainer-Facing Accounting Question
+## Current Accounting Posture
 
-The first upstream submission also carries the explicit counted-runtime
-question that still blocks `PGOLF-608` / `#252` from closing.
+The first external submission also carried one counted-runtime question, but
+that question is now only a historical artifact from a closed PR.
 
-That question is now asked on the live PR:
+Preserved historical link:
 
 - `https://github.com/openai/parameter-golf/pull/119#issuecomment-4092766684`
 
 Current posture:
 
-- the question is asked
-- no maintainer answer exists yet
-- Psionic still keeps record-track accounting posture blocked on explicit
-  upstream response rather than assumption
+- no maintainer answer exists
+- the PR that carried the question is closed
+- Psionic no longer tracks a live maintainer-facing clarification lane inside
+  this repo because outbound contributions now require explicit user direction
+- counted-runtime and build-dependency posture therefore remain explicitly
+  unresolved and locally blocked rather than “awaiting” a reply that Psionic is
+  not currently allowed to pursue
 
 ## Current Honest Boundary
 
-This closes the first real external non-record PR loop only.
+This preserves the first real external non-record PR loop as historical
+evidence only.
 
 It does not claim:
 
+- an active upstream review path
 - maintainer acceptance
 - record-track readiness
 - counted-runtime rule clarity
 - real `8xH100` success
 
-The PR stays explicitly non-record until stronger evidence and upstream rule
-clarity actually exist.
+Any future external PR or maintainer-facing accounting question now requires
+explicit user direction first. Until that happens, the repo should preserve the
+current ambiguity and blocked posture locally instead of pretending there is a
+live upstream path.

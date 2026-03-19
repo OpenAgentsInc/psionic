@@ -11,14 +11,16 @@
   "upstream_repo": "openai/parameter-golf",
   "pr_number": 119,
   "pr_url": "https://github.com/openai/parameter-golf/pull/119",
-  "pr_state": "open",
+  "pr_state": "closed",
+  "pr_closed_at": "2026-03-19T19:46:39Z",
   "final_pr_bundle_report_digest": "56b86d5c0d5c0c9e201ba1eac91c2bee7c14b5fcb4056ae9e2317ce17bfe7881",
   "local_clone_dry_run_report_digest": "e386e35c3e18db434f7187c0abfdaa969257fa2a9a4d4f364e90b8ac4902629e",
   "staged_record_folder_compatibility_digest": "6b0997cb375b5ee319ec590e74706c61fe549b656931f9a9a7ba1c959e257297",
   "staged_replay_verification_digest": "66dc80376e4c447a8dc74b9eeacfd6aaecb9b49ab0515e157370b7801e9e37fd",
   "entrypoint_dry_run_exit_code": 0,
   "counted_runtime_question_comment_url": "https://github.com/openai/parameter-golf/pull/119#issuecomment-4092766684",
-  "counted_runtime_question_status": "awaiting_upstream_answer",
-  "maintainer_feedback_summary": "No maintainer feedback exists yet as of 2026-03-19. The first upstream non-record PR is open and the counted-runtime question is now asked directly on the PR.",
-  "claim_boundary": "This artifact records the first real external non-record PR only. It does not claim record-track readiness, maintainer acceptance, or counted-runtime rule closure."
+  "counted_runtime_question_status": "historical_closed_no_answer",
+  "maintainer_feedback_summary": "No maintainer feedback existed before the PR was closed on 2026-03-19. Psionic preserves the historical question link, but outbound contributions now require explicit user direction, so counted-runtime posture remains unresolved and locally blocked rather than awaiting an active upstream reply.",
+  "outbound_contribution_posture": "explicit_user_direction_required",
+  "claim_boundary": "This artifact records the first real external non-record PR as closed historical evidence only. It does not claim an active upstream path, record-track readiness, maintainer acceptance, or counted-runtime rule closure."
 }
