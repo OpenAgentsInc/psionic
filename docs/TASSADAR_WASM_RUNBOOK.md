@@ -15,6 +15,10 @@ It exists to answer a narrow question:
 > from a clean checkout, what should I run to verify the real bounded Wasm lane
 > and how should I interpret success, refusal, and drift?
 
+If the narrower question is "what one command reproduces the full current
+Rust-only article path end to end?", use
+`docs/TASSADAR_RUST_ONLY_ARTICLE_RUNBOOK.md` instead.
+
 ## Scope
 
 This runbook covers the current repo-owned bounded Wasm flow only:

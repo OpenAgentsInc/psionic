@@ -28,6 +28,7 @@ mod tassadar_module_catalog;
 mod tassadar_module_installation;
 mod tassadar_module_library;
 mod tassadar_quantization_truth_envelope;
+mod tassadar_rust_only_article_reproduction;
 
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -100,6 +101,7 @@ pub use tassadar_module_catalog::*;
 pub use tassadar_module_installation::*;
 pub use tassadar_module_library::*;
 pub use tassadar_quantization_truth_envelope::*;
+pub use tassadar_rust_only_article_reproduction::*;
 use thiserror::Error;
 
 /// Human-readable crate ownership summary.

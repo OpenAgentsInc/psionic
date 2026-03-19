@@ -22,6 +22,8 @@ clustered execution, and machine-legible execution truth.
   behavior.
 - `docs/INFERENCE_ENGINE.md` is the canonical inference-engine completion doc.
 - `docs/TRAIN_SYSTEM.md` is the canonical training subsystem spec.
+- `docs/TASSADAR_RUST_ONLY_ARTICLE_RUNBOOK.md` is the canonical one-command
+  operator guide for the Rust-only Tassadar article reproduction path.
 - research audits explain direction and rationale, but they are not the
   authoritative current-state spec.
 
@@ -696,6 +698,17 @@ Current posture:
   operator-facing artifact that closes the current "inside the model weights"
   claim only for those committed workloads rather than for undeclared routes or
   future workloads
+- the repo now also carries one canonical Rust-only article reproduction
+  harness report at
+  `fixtures/tassadar/reports/tassadar_rust_only_article_reproduction_report.json`,
+  emitted by
+  `cargo run -p psionic-serve --example tassadar_rust_only_article_reproduction`
+  and wrapped by
+  `./scripts/check-tassadar-rust-only-article-reproduction.sh`; it turns the
+  current Rust-only article path into one executable operator procedure over
+  source canon, profile completeness, ABI closure, Hungarian, Sudoku,
+  million-step runtime closeout, and direct model-weight proof surfaces without
+  widening the claim beyond those committed workloads and receipts
 - the repo now also carries one canonical Tassadar C-to-Wasm compile receipt at
   `fixtures/tassadar/reports/tassadar_c_to_wasm_compile_receipt.json`, emitted
   by `cargo run -p psionic-runtime --example tassadar_c_to_wasm_compile_receipt`;

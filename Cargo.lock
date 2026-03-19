@@ -3896,6 +3896,7 @@ dependencies = [
  "psionic-catalog",
  "psionic-compiler",
  "psionic-core",
+ "psionic-eval",
  "psionic-ir",
  "psionic-models",
  "psionic-provider",

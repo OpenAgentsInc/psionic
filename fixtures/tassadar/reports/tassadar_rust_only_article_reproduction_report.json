@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.rust_only_article_reproduction.v1",
+  "script_ref": "scripts/check-tassadar-rust-only-article-reproduction.sh",
+  "runbook_ref": "docs/TASSADAR_RUST_ONLY_ARTICLE_RUNBOOK.md",
+  "harness_command": "./scripts/check-tassadar-rust-only-article-reproduction.sh",
+  "component_count": 8,
+  "green_component_count": 8,
+  "canonical_case_ids": [
+    "hungarian_10x10_test_a",
+    "sudoku_9x9_test_a",
+    "long_loop_kernel",
+    "sudoku_v0_test_a",
+    "hungarian_matching"
+  ],
+  "long_horizon_workload_ids": [
+    "rust.long_loop_kernel",
+    "rust.state_machine_kernel"
+  ],
+  "components": [
+    {
+      "component_id": "rust_source_canon",
+      "artifact_refs": [
+        "fixtures/tassadar/reports/tassadar_rust_source_canon_report.json"
+      ],
+      "validation_command": "cargo run -p psionic-eval --example tassadar_rust_source_canon_report",
+      "green": true,
+      "detail": "compiled_cases=6/6 across [\"micro_wasm_article\", \"param_abi_fixture\", \"heap_sum_article\", \"long_loop_article\", \"hungarian_10x10_article\", \"sudoku_9x9_article\"]"
+    },
+    {
+      "component_id": "rust_article_profile_completeness",
+      "artifact_refs": [
+        "fixtures/tassadar/reports/tassadar_rust_article_profile_completeness_report.json"
+      ],
+      "validation_command": "cargo run -p psionic-eval --example tassadar_rust_article_profile_completeness_report",
+      "green": true,
+      "detail": "supported_rows=6 refused_rows=5 source_case_ids=8"
+    },
+    {
+      "component_id": "article_abi_closure",
+      "artifact_refs": [
+        "fixtures/tassadar/reports/tassadar_article_abi_closure_report.json"
+      ],
+      "validation_command": "cargo run -p psionic-eval --example tassadar_article_abi_closure_report",
+      "green": true,
+      "detail": "exact_cases=3/3 refusal_cases=3/3"
+    },
+    {
+      "component_id": "hungarian_10x10_article_reproducer",
+      "artifact_refs": [
+        "fixtures/tassadar/runs/hungarian_10x10_article_reproducer_v1",
+        "fixtures/tassadar/reports/tassadar_hungarian_10x10_article_reproducer_report.json"
+      ],
+      "validation_command": "cargo run -p psionic-research --example tassadar_hungarian_10x10_article_reproducer",
+      "green": true,
+      "detail": "exact_trace_match=true final_output_match=true halt_match=true fallback_observed=false"
+    },
+    {
+      "component_id": "sudoku_9x9_article_reproducer",
+      "artifact_refs": [
+        "fixtures/tassadar/reports/tassadar_sudoku_9x9_article_reproducer_report.json"
+      ],
+      "validation_command": "cargo run -p psionic-research --example tassadar_sudoku_9x9_article_reproducer",
+      "green": true,
+      "detail": "canonical_case=sudoku_9x9_test_a corpus_cases=4 fallback_observed=false"
+    },
+    {
+      "component_id": "article_runtime_closeout",
+      "artifact_refs": [
+        "fixtures/tassadar/runs/article_runtime_closeout_v1/article_runtime_closeout_bundle.json",
+        "fixtures/tassadar/reports/tassadar_article_runtime_closeout_report.json"
+      ],
+      "validation_command": "cargo run -p psionic-eval --example tassadar_article_runtime_closeout_report",
+      "green": true,
+      "detail": "exact_horizons=4 floor_passes=4 floor_refusals=0"
+    },
+    {
+      "component_id": "article_runtime_closeout_summary",
+      "artifact_refs": [
+        "fixtures/tassadar/reports/tassadar_article_runtime_closeout_summary.json"
+      ],
+      "validation_command": "cargo run -p psionic-research --example tassadar_article_runtime_closeout_summary",
+      "green": true,
+      "detail": "green_workload_families=2/2"
+    },
+    {
+      "component_id": "direct_model_weight_execution_proof",
+      "artifact_refs": [
+        "fixtures/tassadar/reports/tassadar_direct_model_weight_execution_proof_report.json"
+      ],
+      "validation_command": "cargo run -p psionic-serve --example tassadar_direct_model_weight_execution_proof_report",
+      "green": true,
+      "detail": "direct_cases=3 fallback_free_cases=3 zero_external_call_cases=3"
+    }
+  ],
+  "all_components_green": true,
+  "claim_boundary": "this harness report closes operator procedure only for the committed Rust-only article path by proving that one command can regenerate the current source canon, profile boundary, ABI closure, Hungarian reproducer, Sudoku reproducer, million-step runtime closeout, and direct model-weight proof surfaces. It does not widen the claim beyond those committed workloads, routes, and proof receipts.",
+  "summary": "Rust-only article reproduction now runs in one command with green_components=8/8 across source canon, profile boundary, ABI closure, Hungarian, Sudoku, million-step runtime, runtime summary, and direct proof surfaces.",
+  "report_digest": "379a37ef04768dd51f0f23633595507b792f5e7ddfdbe492994317ddee65326c"
+}
