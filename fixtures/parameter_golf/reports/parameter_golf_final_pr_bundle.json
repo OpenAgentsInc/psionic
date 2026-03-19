@@ -66,8 +66,8 @@
     },
     {
       "relative_path": "psionic_parameter_golf_submission_run_evidence.json",
-      "size_bytes": 16075,
-      "sha256_digest": "7b19f93fa77c21622dab919f9f19719ec3eaba6013ce89d799e91d042dc34945"
+      "size_bytes": 15801,
+      "sha256_digest": "44d02b8473338be2ccb577919228fcb8cd7533694c1f69bc4e1e1c4b4b95ad51"
     },
     {
       "relative_path": "runtime/parameter_golf_local_reference_fixture.json",
@@ -111,5 +111,5 @@
     "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/PSIONIC_PARAMETER_GOLF_PR_CHECKLIST.md"
   ],
   "claim_boundary": "This bundle is PR-ready for the current non-record lane only. It adds the exact records/... folder plus maintainer-facing evidence and checklist text, but the included promotion receipt still refuses record promotion until true record-track evidence exists.",
-  "report_digest": "8fdad326211e37c716d89b355ba6c1d4d8d4d7f51066d2e858ea32d11159d03b"
+  "report_digest": "4c94979bcd9b5530a33c6f040929cedc870a7bd19680e5d876e4e997f6fb7f96"
 }

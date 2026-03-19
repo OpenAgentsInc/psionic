@@ -3,13 +3,13 @@ use psionic_collectives::{
 };
 use psionic_core::{DType, Device, DeviceKind, Shape, TensorSpec};
 use psionic_eval::{
-    PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF, PARAMETER_GOLF_DISTRIBUTED_8XH100_BENCHMARK_REF,
-    PARAMETER_GOLF_DISTRIBUTED_8XH100_CLAIM_BOUNDARY, ParameterGolfDistributedChallengeThresholds,
-    ParameterGolfDistributedCommunicationReceipt,
+    ParameterGolfDistributedChallengeThresholds, ParameterGolfDistributedCommunicationReceipt,
     ParameterGolfDistributedCommunicationStageReceipt, ParameterGolfDistributedLaneDisposition,
     ParameterGolfDistributedLaneRefusal, ParameterGolfDistributedLaneRefusalKind,
     ParameterGolfDistributedMemoryReceipt, ParameterGolfDistributedThroughputReceipt,
     ParameterGolfDistributedTimingReceipt, ParameterGolfDistributedTopologyReceipt,
+    PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF, PARAMETER_GOLF_DISTRIBUTED_8XH100_BENCHMARK_REF,
+    PARAMETER_GOLF_DISTRIBUTED_8XH100_CLAIM_BOUNDARY,
 };
 use psionic_ir::GraphError;
 use psionic_models::ParameterGolfModelDescriptor;
@@ -24,6 +24,7 @@ use sha2::Digest;
 use thiserror::Error;
 
 use crate::{
+    builtin_parameter_golf_cuda_training_capability_report, parameter_golf_optimizer_plan,
     DistributedOptimizerContract, DistributedOptimizerError, DistributedOptimizerGroupContract,
     DistributedOptimizerRun, DistributedTrainingMemoryBudget, OptimizerStateResidency,
     ParameterGolfBatchGeometry, ParameterGolfOptimizerExecution, ParameterGolfTrainError,
@@ -34,7 +35,6 @@ use crate::{
     TrainingOptimizerStateShardKind, TrainingOptimizerStateShardLayout,
     TrainingParameterGroupState, TrainingParameterShardKind, TrainingParameterShardLayout,
     TrainingPrecisionPolicy, TrainingShardPlacement, TrainingShardRange, TrainingTensorBuffer,
-    builtin_parameter_golf_cuda_training_capability_report, parameter_golf_optimizer_plan,
 };
 
 /// Stable version identifier for the distributed `8xH100` receipt lane.
@@ -192,15 +192,13 @@ pub fn benchmark_parameter_golf_distributed_8xh100(
         topology_digest,
         all_devices_match_required_model,
     };
-    let axes = vec![
-        TrainingDeviceMeshAxis::new(
-            "dp",
-            TrainingDeviceMeshAxisKind::DataParallel,
-            config.geometry.world_size,
-        )
-        .with_collective_group_size(config.geometry.world_size)
-        .with_detail("matches WORLD_SIZE=8 DDP replica axis from train_gpt.py"),
-    ];
+    let axes = vec![TrainingDeviceMeshAxis::new(
+        "dp",
+        TrainingDeviceMeshAxisKind::DataParallel,
+        config.geometry.world_size,
+    )
+    .with_collective_group_size(config.geometry.world_size)
+    .with_detail("matches WORLD_SIZE=8 DDP replica axis from train_gpt.py")];
     let matrix_parameter_count = optimizer_plan
         .groups
         .iter()
@@ -691,11 +689,13 @@ fn build_collective_sync_plan(
     world_size: usize,
 ) -> Result<psionic_collectives::CollectiveSyncExecutionPlan, ParameterGolfDistributedLaneError> {
     let mesh_id = "mesh.parameter_golf.8xh100.contract";
-    let axes = vec![
-        TrainingDeviceMeshAxis::new("dp", TrainingDeviceMeshAxisKind::DataParallel, world_size)
-            .with_collective_group_size(world_size)
-            .with_detail("single data-parallel axis for the public 8xH100 lane"),
-    ];
+    let axes = vec![TrainingDeviceMeshAxis::new(
+        "dp",
+        TrainingDeviceMeshAxisKind::DataParallel,
+        world_size,
+    )
+    .with_collective_group_size(world_size)
+    .with_detail("single data-parallel axis for the public 8xH100 lane")];
     let mut planner = ElasticCollectivePlanner::new(
         mesh_id,
         "cuda",
@@ -822,10 +822,10 @@ mod tests {
     };
 
     use crate::{
-        PARAMETER_GOLF_DISTRIBUTED_8XH100_VERSION, ParameterGolfBatchGeometry,
+        benchmark_parameter_golf_distributed_8xh100, ParameterGolfBatchGeometry,
         ParameterGolfDistributed8xH100Config, ParameterGolfDistributedLaneError,
         ParameterGolfDistributedStepObservation, ParameterGolfTrainingHyperparameters,
-        benchmark_parameter_golf_distributed_8xh100,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_VERSION,
     };
     use psionic_eval::{
         ParameterGolfDistributedLaneDisposition, ParameterGolfDistributedLaneRefusalKind,
@@ -975,36 +975,29 @@ mod tests {
             "muon_matrix_update_all_reduce"
         );
         assert!(!receipt.training_capability_report_digest.is_empty());
-        assert!(
-            receipt
-                .challenge_kernel_blockers
-                .contains(&String::from(
-                    "cuda_bf16_train_graph_and_optimizer_surface"
-                ))
-        );
-        assert!(receipt.boundary_notes.iter().any(|note| {
-            note.contains("cuda_rope_gqa_decoder_block_backward_runtime")
-                || note.contains("cuda_bf16_train_graph_and_optimizer_surface")
-        }));
-        assert!(
-            receipt
-                .timing
-                .as_ref()
-                .is_some_and(|timing| timing.within_wallclock_cap)
-        );
-        assert!(
-            receipt
-                .memory
-                .as_ref()
-                .is_some_and(|memory| memory.within_device_budget)
-        );
+        assert!(receipt
+            .challenge_kernel_blockers
+            .contains(&String::from("cuda_bf16_train_graph_and_optimizer_surface")));
+        assert_eq!(receipt.challenge_kernel_blockers.len(), 1);
+        assert!(receipt
+            .boundary_notes
+            .iter()
+            .any(|note| note.contains("cuda_bf16_train_graph_and_optimizer_surface")));
+        assert!(receipt
+            .timing
+            .as_ref()
+            .is_some_and(|timing| timing.within_wallclock_cap));
+        assert!(receipt
+            .memory
+            .as_ref()
+            .is_some_and(|memory| memory.within_device_budget));
         assert!(receipt.refusal.is_none());
         Ok(())
     }
 
     #[test]
-    fn parameter_golf_distributed_8xh100_lane_refuses_non_h100_inventory()
-    -> Result<(), Box<dyn Error>> {
+    fn parameter_golf_distributed_8xh100_lane_refuses_non_h100_inventory(
+    ) -> Result<(), Box<dyn Error>> {
         let model = sample_model()?;
         let devices = (0..8).map(sample_non_h100_device).collect::<Vec<_>>();
         let receipt = benchmark_parameter_golf_distributed_8xh100(
@@ -1027,8 +1020,8 @@ mod tests {
     }
 
     #[test]
-    fn parameter_golf_distributed_8xh100_lane_refuses_when_wallclock_exceeds_cap()
-    -> Result<(), Box<dyn Error>> {
+    fn parameter_golf_distributed_8xh100_lane_refuses_when_wallclock_exceeds_cap(
+    ) -> Result<(), Box<dyn Error>> {
         let model = sample_model()?;
         let devices = (0..8).map(sample_h100_device).collect::<Vec<_>>();
         let mut config = measured_config();
@@ -1054,8 +1047,8 @@ mod tests {
     }
 
     #[test]
-    fn parameter_golf_distributed_8xh100_lane_rejects_invalid_geometry()
-    -> Result<(), Box<dyn Error>> {
+    fn parameter_golf_distributed_8xh100_lane_rejects_invalid_geometry(
+    ) -> Result<(), Box<dyn Error>> {
         let model = sample_model()?;
         let devices = (0..8).map(sample_h100_device).collect::<Vec<_>>();
         let mut config = measured_config();

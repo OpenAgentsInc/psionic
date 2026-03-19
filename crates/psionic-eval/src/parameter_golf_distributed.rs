@@ -294,12 +294,12 @@ mod tests {
     };
 
     use crate::{
-        PARAMETER_GOLF_DISTRIBUTED_8XH100_BENCHMARK_REF,
-        PARAMETER_GOLF_DISTRIBUTED_8XH100_CLAIM_BOUNDARY,
         ParameterGolfDistributedChallengeThresholds, ParameterGolfDistributedCommunicationReceipt,
         ParameterGolfDistributedCommunicationStageReceipt, ParameterGolfDistributedLaneDisposition,
         ParameterGolfDistributedMemoryReceipt, ParameterGolfDistributedThroughputReceipt,
         ParameterGolfDistributedTimingReceipt, ParameterGolfDistributedTopologyReceipt,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_BENCHMARK_REF,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_CLAIM_BOUNDARY,
     };
 
     #[test]
@@ -324,10 +324,12 @@ mod tests {
                 communication_class: ClusterCommunicationClass::TensorCollectiveMesh,
                 transport: ClusterTransportClass::Loopback,
                 mesh_id: String::from("mesh.parameter_golf.8xh100"),
-                axes: vec![
-                    TrainingDeviceMeshAxis::new("dp", TrainingDeviceMeshAxisKind::DataParallel, 8)
-                        .with_collective_group_size(8),
-                ],
+                axes: vec![TrainingDeviceMeshAxis::new(
+                    "dp",
+                    TrainingDeviceMeshAxisKind::DataParallel,
+                    8,
+                )
+                .with_collective_group_size(8)],
                 stages: vec![
                     ParameterGolfDistributedCommunicationStageReceipt {
                         stage_id: String::from("ddp_gradient_all_reduce"),
@@ -350,10 +352,9 @@ mod tests {
                 ],
             },
             training_capability_report_digest: String::from("cuda-coverage-digest"),
-            challenge_kernel_blockers: vec![
-                String::from("cuda_bf16_train_graph_and_optimizer_surface"),
-                String::from("cuda_rope_gqa_decoder_block_backward_runtime"),
-            ],
+            challenge_kernel_blockers: vec![String::from(
+                "cuda_bf16_train_graph_and_optimizer_surface",
+            )],
             disposition: ParameterGolfDistributedLaneDisposition::Measured,
             timing: Some(ParameterGolfDistributedTimingReceipt {
                 measurement_posture: String::from("observed_step_wallclock"),

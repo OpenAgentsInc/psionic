@@ -108,7 +108,6 @@ The report now keeps the following families explicit:
 The current canonical blocker set is:
 
 - `cuda_bf16_train_graph_and_optimizer_surface`
-- `cuda_rope_gqa_decoder_block_backward_runtime`
 
 ## Current Honest Boundary
 
@@ -124,19 +123,22 @@ Today it keeps these truths separate:
   - bounded dense `f32` decoder reverse-mode graph semantics are real on the
     reference path for non-interleaved RoPE plus causal grouped-query
     attention
+  - one bounded host-orchestrated CUDA decoder backward path is real on the
+    public lane for `rotary_embedding_backward` plus
+    `scaled_dot_product_attention_{query,key,value}_backward`
   - one bounded host-orchestrated CUDA Muon step is real on the public lane
   - post-train quantized export or roundtrip support is real
 - `partial`
-  - BF16 policy plus one bounded BF16 runtime primitive seam and one bounded
-    decoder backward-runtime gap now have explicit substrate or refusal
-    contracts
+  - BF16 policy plus one bounded BF16 runtime primitive seam now has an
+    explicit substrate or refusal contract
   - the public CUDA execution backend now genuinely owns dense `f32`
     pointwise `mul`, bounded dense contiguous `f32` RMSNorm forward and
     backward execution, one bounded residual-mix graph, one bounded
     causal RoPE/GQA decoder-block forward path, one bounded decoder reverse-mode
-    graph seam on the dense `f32` reference path, and one bounded BF16 matmul
-    primitive, but the full BF16 train graph or decoder-block CUDA backward
-    runtime is still narrower than the Parameter Golf challenge lane
+    graph seam on the dense `f32` reference path, one bounded host-orchestrated
+    CUDA decoder backward path, and one bounded BF16 matmul primitive, but the
+    full BF16 train graph or optimizer runtime is still narrower than the
+    Parameter Golf challenge lane
 
 This is the intended contract for the issue: do not hide missing CUDA kernels
 behind broader model or distributed receipts.
@@ -155,6 +157,8 @@ Without this report, the repo could say all of these misleading things:
   CUDA
 - one bounded decoder reverse-mode graph seam means direct CUDA backward
   execution now exists for that block
+- one bounded host-orchestrated CUDA decoder backward path means fused or
+  challenge-speed decoder training closure is done
 - one bounded RMSNorm closure means the whole decoder block now trains on CUDA
 - one bounded full-shape residual-mix graph means generic broadcast or fused
   decoder closure now exists
