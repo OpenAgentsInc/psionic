@@ -937,6 +937,16 @@ The current scope is:
   this remains operator-only with `served_publication_allowed = false`, so it
   is not arbitrary cluster failover, arbitrary revision migration, or broad
   served internal compute publication
+- the current learned call-stack/heap suite artifacts are
+  `fixtures/tassadar/runs/tassadar_learned_call_stack_heap_suite_v1/learned_call_stack_heap_suite_bundle.json`,
+  `fixtures/tassadar/reports/tassadar_learned_call_stack_heap_suite_report.json`,
+  and `fixtures/tassadar/reports/tassadar_learned_call_stack_heap_suite_summary.json`,
+  which freeze one research-only learned benchmark suite over recursive,
+  parser-frame, heap-allocator, resumable-process, and held-out-family
+  workloads with explicit later-window exactness, refusal calibration, call
+  depth, and heap-cell limits across baseline versus structured-memory
+  variants; this is not broad learned process ownership, arbitrary Wasm, or
+  broader served internal compute promotion
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

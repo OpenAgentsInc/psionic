@@ -124,6 +124,8 @@ mod tassadar_internal_compute_profile_ladder;
 mod tassadar_internal_external_delegation;
 #[path = "tassadar_kernel_module_scaling.rs"]
 mod tassadar_kernel_module_scaling;
+#[path = "tassadar_learned_call_stack_heap_suite.rs"]
+mod tassadar_learned_call_stack_heap_suite;
 #[path = "tassadar_latency_evidence_tradeoff.rs"]
 mod tassadar_latency_evidence_tradeoff;
 #[path = "tassadar_learnability_gap.rs"]
@@ -305,6 +307,7 @@ pub use tassadar_internal_compute_package_manager::*;
 pub use tassadar_internal_compute_profile_ladder::*;
 pub use tassadar_internal_external_delegation::*;
 pub use tassadar_kernel_module_scaling::*;
+pub use tassadar_learned_call_stack_heap_suite::*;
 pub use tassadar_latency_evidence_tradeoff::*;
 pub use tassadar_learnability_gap::*;
 pub use tassadar_linked_program_bundle::*;

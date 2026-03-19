@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.learned_call_stack_heap_suite.summary.v1",
+  "eval_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.learned_call_stack_heap_suite.report.v1",
+    "publication_digest": "b9da4d2ba295e3417c382d4e5fc596f5062fb9c425eb49133b465fde47828289",
+    "contract_ref": "dataset://openagents/tassadar/learned_call_stack_heap_suite",
+    "contract_digest": "a0aa76ef5b00d50832c20a30030fc0b2732eae93b228b6f653e36b16d3117b98",
+    "evidence_bundle_ref": "fixtures/tassadar/runs/tassadar_learned_call_stack_heap_suite_v1/learned_call_stack_heap_suite_bundle.json",
+    "evidence_bundle_digest": "e9e26ec90bf62ed007bf924f6280970ed7102c3c32c98afb088dc3371bf0a69f",
+    "variant_summaries": [
+      {
+        "model_variant": "baseline_transformer",
+        "mean_later_window_exactness_bps": 6342,
+        "mean_final_output_exactness_bps": 7457,
+        "mean_refusal_calibration_bps": 7600,
+        "held_out_mean_exactness_bps": 4050,
+        "max_supported_call_depth": 14,
+        "max_supported_heap_cells": 160
+      },
+      {
+        "model_variant": "structured_memory",
+        "mean_later_window_exactness_bps": 7942,
+        "mean_final_output_exactness_bps": 8714,
+        "mean_refusal_calibration_bps": 8371,
+        "held_out_mean_exactness_bps": 6700,
+        "max_supported_call_depth": 28,
+        "max_supported_heap_cells": 320
+      }
+    ],
+    "workload_summaries": [
+      {
+        "workload_family": "recursive_evaluator",
+        "split": "in_family",
+        "better_variant": "structured_memory",
+        "structured_gain_vs_baseline_bps": 1000,
+        "baseline_later_window_exactness_bps": 7700,
+        "structured_later_window_exactness_bps": 8700,
+        "refusal_gain_vs_baseline_bps": 800,
+        "note": "baseline failure `deep_frame_alias` vs structured failure `residual_frame_noise`"
+      },
+      {
+        "workload_family": "parser_frame_machine",
+        "split": "in_family",
+        "better_variant": "structured_memory",
+        "structured_gain_vs_baseline_bps": 1000,
+        "baseline_later_window_exactness_bps": 7900,
+        "structured_later_window_exactness_bps": 8900,
+        "refusal_gain_vs_baseline_bps": 800,
+        "note": "baseline failure `frame_pop_order_drift` vs structured failure `late_reduce_noise`"
+      },
+      {
+        "workload_family": "bump_allocator_heap",
+        "split": "in_family",
+        "better_variant": "structured_memory",
+        "structured_gain_vs_baseline_bps": 1200,
+        "baseline_later_window_exactness_bps": 7400,
+        "structured_later_window_exactness_bps": 8600,
+        "refusal_gain_vs_baseline_bps": 800,
+        "note": "baseline failure `heap_cursor_alias` vs structured failure `allocation_pointer_noise`"
+      },
+      {
+        "workload_family": "free_list_allocator_heap",
+        "split": "in_family",
+        "better_variant": "structured_memory",
+        "structured_gain_vs_baseline_bps": 1300,
+        "baseline_later_window_exactness_bps": 6900,
+        "structured_later_window_exactness_bps": 8200,
+        "refusal_gain_vs_baseline_bps": 800,
+        "note": "baseline failure `free_list_alias` vs structured failure `recycle_slot_noise`"
+      },
+      {
+        "workload_family": "resumable_process_heap",
+        "split": "in_family",
+        "better_variant": "structured_memory",
+        "structured_gain_vs_baseline_bps": 1400,
+        "baseline_later_window_exactness_bps": 6400,
+        "structured_later_window_exactness_bps": 7800,
+        "refusal_gain_vs_baseline_bps": 400,
+        "note": "baseline failure `resume_heap_state_drift` vs structured failure `checkpoint_rebind_noise`"
+      },
+      {
+        "workload_family": "held_out_continuation_machine",
+        "split": "held_out_family",
+        "better_variant": "structured_memory",
+        "structured_gain_vs_baseline_bps": 2700,
+        "baseline_later_window_exactness_bps": 4200,
+        "structured_later_window_exactness_bps": 6900,
+        "refusal_gain_vs_baseline_bps": 900,
+        "note": "baseline failure `held_out_continuation_collapse` vs structured failure `continuation_reentry_noise`"
+      },
+      {
+        "workload_family": "held_out_allocator_scheduler",
+        "split": "held_out_family",
+        "better_variant": "structured_memory",
+        "structured_gain_vs_baseline_bps": 2600,
+        "baseline_later_window_exactness_bps": 3900,
+        "structured_later_window_exactness_bps": 6500,
+        "refusal_gain_vs_baseline_bps": 900,
+        "note": "baseline failure `allocator_scheduler_collapse` vs structured failure `scheduler_heap_noise`"
+      }
+    ],
+    "held_out_fragile_on_baseline": [
+      "held_out_continuation_machine",
+      "held_out_allocator_scheduler"
+    ],
+    "structured_recoverable_workloads": [
+      "held_out_continuation_machine",
+      "held_out_allocator_scheduler"
+    ],
+    "call_stack_heavy_workloads": [
+      "recursive_evaluator",
+      "parser_frame_machine",
+      "resumable_process_heap",
+      "held_out_continuation_machine",
+      "held_out_allocator_scheduler"
+    ],
+    "heap_heavy_workloads": [
+      "bump_allocator_heap",
+      "free_list_allocator_heap",
+      "resumable_process_heap",
+      "held_out_allocator_scheduler"
+    ],
+    "claim_boundary": "this report compares two learned call-stack/heap variants on seeded in-family and held-out-family workloads. It keeps held-out failures, later-window drift, and refusal calibration explicit instead of promoting the learned lane into broad process or general compute closure",
+    "summary": "Learned call-stack/heap suite compares 2 variants across 7 workloads, with 2 baseline-fragile held-out workloads and 2 structured-recoverable workloads.",
+    "report_digest": "b9a59116487cec0ffeafc823afbe78ba1bf678b22604bc1cda922e97539b53b9"
+  },
+  "strong_in_family_workloads": [
+    "recursive_evaluator",
+    "parser_frame_machine",
+    "bump_allocator_heap",
+    "free_list_allocator_heap"
+  ],
+  "held_out_recoverable_workloads": [
+    "held_out_continuation_machine",
+    "held_out_allocator_scheduler"
+  ],
+  "call_stack_dominant_breaks": [
+    "recursive_evaluator",
+    "parser_frame_machine",
+    "held_out_continuation_machine"
+  ],
+  "heap_dominant_breaks": [
+    "bump_allocator_heap",
+    "free_list_allocator_heap",
+    "resumable_process_heap",
+    "held_out_allocator_scheduler"
+  ],
+  "refusal_sensitive_workloads": [
+    "recursive_evaluator",
+    "parser_frame_machine",
+    "bump_allocator_heap",
+    "free_list_allocator_heap",
+    "held_out_continuation_machine",
+    "held_out_allocator_scheduler"
+  ],
+  "claim_boundary": "this summary is a research interpretation over the committed learned call-stack/heap suite. It keeps in-family strength, held-out recovery, and break classes explicit instead of promoting the learned lane into broad practical internal computation",
+  "summary": "Learned call-stack/heap summary marks 4 strong in-family workloads, 2 held-out recoverable workloads, 3 call-stack dominant breaks, and 4 heap dominant breaks.",
+  "report_digest": "57315fb057f6d5879e4d73e77cce972a2c0f9d5863c31700f85527a64d6f2b39"
+}

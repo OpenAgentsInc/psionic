@@ -1,0 +1,301 @@
+{
+  "contract": {
+    "abi_version": "psionic.tassadar.learned_call_stack_heap_suite.v1",
+    "contract_ref": "dataset://openagents/tassadar/learned_call_stack_heap_suite",
+    "version": "2026.03.19",
+    "model_variants": [
+      "baseline_transformer",
+      "structured_memory"
+    ],
+    "workload_rows": [
+      {
+        "workload_family": "recursive_evaluator",
+        "split": "in_family",
+        "compared_model_variants": [
+          "baseline_transformer",
+          "structured_memory"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_call_frame_report.json",
+          "fixtures/tassadar/reports/tassadar_learnability_gap_report.json"
+        ],
+        "claim_boundary": "recursive evaluator coverage remains a bounded learned-stack benchmark and does not imply general recursion closure"
+      },
+      {
+        "workload_family": "parser_frame_machine",
+        "split": "in_family",
+        "compared_model_variants": [
+          "baseline_transformer",
+          "structured_memory"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_call_frame_report.json",
+          "fixtures/tassadar/reports/tassadar_process_object_report.json"
+        ],
+        "claim_boundary": "parser-frame coverage remains bounded to the learned benchmark suite rather than broad parser execution closure"
+      },
+      {
+        "workload_family": "bump_allocator_heap",
+        "split": "in_family",
+        "compared_model_variants": [
+          "baseline_transformer",
+          "structured_memory"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_process_object_report.json",
+          "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json"
+        ],
+        "claim_boundary": "bump-allocator coverage remains a bounded heap benchmark and does not imply arbitrary allocator semantics"
+      },
+      {
+        "workload_family": "free_list_allocator_heap",
+        "split": "in_family",
+        "compared_model_variants": [
+          "baseline_transformer",
+          "structured_memory"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+          "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json"
+        ],
+        "claim_boundary": "free-list coverage remains bounded to the explicit heap benchmark family and does not widen portability or process claims"
+      },
+      {
+        "workload_family": "resumable_process_heap",
+        "split": "in_family",
+        "compared_model_variants": [
+          "baseline_transformer",
+          "structured_memory"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_process_object_report.json",
+          "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json"
+        ],
+        "claim_boundary": "resumable-process heap coverage remains bounded to seeded process-style benchmarks rather than general interactive process closure"
+      },
+      {
+        "workload_family": "held_out_continuation_machine",
+        "split": "held_out_family",
+        "compared_model_variants": [
+          "baseline_transformer",
+          "structured_memory"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_search_native_executor_report.json",
+          "fixtures/tassadar/reports/tassadar_learnability_gap_report.json"
+        ],
+        "claim_boundary": "held-out continuation-machine coverage measures generalization only and does not promote the learned lane into broad process ownership"
+      },
+      {
+        "workload_family": "held_out_allocator_scheduler",
+        "split": "held_out_family",
+        "compared_model_variants": [
+          "baseline_transformer",
+          "structured_memory"
+        ],
+        "authority_refs": [
+          "fixtures/tassadar/reports/tassadar_search_native_executor_report.json",
+          "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json"
+        ],
+        "claim_boundary": "held-out allocator-scheduler coverage remains a bounded generalization check with explicit refusal sensitivity"
+      }
+    ],
+    "evaluation_axes": [
+      "later_window_exactness_bps",
+      "final_output_exactness_bps",
+      "refusal_calibration_bps",
+      "max_call_depth",
+      "max_heap_cells"
+    ],
+    "evidence_bundle_ref": "fixtures/tassadar/runs/tassadar_learned_call_stack_heap_suite_v1/learned_call_stack_heap_suite_bundle.json",
+    "report_ref": "fixtures/tassadar/reports/tassadar_learned_call_stack_heap_suite_report.json",
+    "summary_report_ref": "fixtures/tassadar/reports/tassadar_learned_call_stack_heap_suite_summary.json",
+    "contract_digest": "a0aa76ef5b00d50832c20a30030fc0b2732eae93b228b6f653e36b16d3117b98"
+  },
+  "case_reports": [
+    {
+      "case_id": "recursive_evaluator.baseline_transformer",
+      "model_variant": "baseline_transformer",
+      "workload_family": "recursive_evaluator",
+      "split": "in_family",
+      "later_window_exactness_bps": 7700,
+      "final_output_exactness_bps": 8500,
+      "refusal_calibration_bps": 7800,
+      "max_call_depth": 12,
+      "max_heap_cells": 32,
+      "dominant_failure_mode": "deep_frame_alias",
+      "note": "baseline handles shallow recursion but drifts on deeper frame reuse"
+    },
+    {
+      "case_id": "recursive_evaluator.structured_memory",
+      "model_variant": "structured_memory",
+      "workload_family": "recursive_evaluator",
+      "split": "in_family",
+      "later_window_exactness_bps": 8700,
+      "final_output_exactness_bps": 9200,
+      "refusal_calibration_bps": 8600,
+      "max_call_depth": 24,
+      "max_heap_cells": 64,
+      "dominant_failure_mode": "residual_frame_noise",
+      "note": "structured memory preserves deeper recursive frame reuse on the seeded evaluator family"
+    },
+    {
+      "case_id": "parser_frame_machine.baseline_transformer",
+      "model_variant": "baseline_transformer",
+      "workload_family": "parser_frame_machine",
+      "split": "in_family",
+      "later_window_exactness_bps": 7900,
+      "final_output_exactness_bps": 8600,
+      "refusal_calibration_bps": 8000,
+      "max_call_depth": 14,
+      "max_heap_cells": 24,
+      "dominant_failure_mode": "frame_pop_order_drift",
+      "note": "baseline parser frames remain usable in-family but lose later-window stack discipline"
+    },
+    {
+      "case_id": "parser_frame_machine.structured_memory",
+      "model_variant": "structured_memory",
+      "workload_family": "parser_frame_machine",
+      "split": "in_family",
+      "later_window_exactness_bps": 8900,
+      "final_output_exactness_bps": 9300,
+      "refusal_calibration_bps": 8800,
+      "max_call_depth": 28,
+      "max_heap_cells": 48,
+      "dominant_failure_mode": "late_reduce_noise",
+      "note": "structured memory improves parser-frame stability without promoting broad parser closure"
+    },
+    {
+      "case_id": "bump_allocator_heap.baseline_transformer",
+      "model_variant": "baseline_transformer",
+      "workload_family": "bump_allocator_heap",
+      "split": "in_family",
+      "later_window_exactness_bps": 7400,
+      "final_output_exactness_bps": 8200,
+      "refusal_calibration_bps": 7700,
+      "max_call_depth": 8,
+      "max_heap_cells": 96,
+      "dominant_failure_mode": "heap_cursor_alias",
+      "note": "baseline bump allocation keeps shallow heap state but loses later-window cursor precision"
+    },
+    {
+      "case_id": "bump_allocator_heap.structured_memory",
+      "model_variant": "structured_memory",
+      "workload_family": "bump_allocator_heap",
+      "split": "in_family",
+      "later_window_exactness_bps": 8600,
+      "final_output_exactness_bps": 9100,
+      "refusal_calibration_bps": 8500,
+      "max_call_depth": 12,
+      "max_heap_cells": 224,
+      "dominant_failure_mode": "allocation_pointer_noise",
+      "note": "structured memory widens seeded heap-cell coverage on bump allocation"
+    },
+    {
+      "case_id": "free_list_allocator_heap.baseline_transformer",
+      "model_variant": "baseline_transformer",
+      "workload_family": "free_list_allocator_heap",
+      "split": "in_family",
+      "later_window_exactness_bps": 6900,
+      "final_output_exactness_bps": 7800,
+      "refusal_calibration_bps": 7600,
+      "max_call_depth": 7,
+      "max_heap_cells": 128,
+      "dominant_failure_mode": "free_list_alias",
+      "note": "baseline free-list behavior stays fragile once heap reuse widens"
+    },
+    {
+      "case_id": "free_list_allocator_heap.structured_memory",
+      "model_variant": "structured_memory",
+      "workload_family": "free_list_allocator_heap",
+      "split": "in_family",
+      "later_window_exactness_bps": 8200,
+      "final_output_exactness_bps": 8900,
+      "refusal_calibration_bps": 8400,
+      "max_call_depth": 12,
+      "max_heap_cells": 256,
+      "dominant_failure_mode": "recycle_slot_noise",
+      "note": "structured memory keeps allocator reuse more stable on the seeded free-list family"
+    },
+    {
+      "case_id": "resumable_process_heap.baseline_transformer",
+      "model_variant": "baseline_transformer",
+      "workload_family": "resumable_process_heap",
+      "split": "in_family",
+      "later_window_exactness_bps": 6400,
+      "final_output_exactness_bps": 7300,
+      "refusal_calibration_bps": 7900,
+      "max_call_depth": 10,
+      "max_heap_cells": 160,
+      "dominant_failure_mode": "resume_heap_state_drift",
+      "note": "baseline process-style heap handling is workable but later-window resume state still drifts"
+    },
+    {
+      "case_id": "resumable_process_heap.structured_memory",
+      "model_variant": "structured_memory",
+      "workload_family": "resumable_process_heap",
+      "split": "in_family",
+      "later_window_exactness_bps": 7800,
+      "final_output_exactness_bps": 8600,
+      "refusal_calibration_bps": 8300,
+      "max_call_depth": 20,
+      "max_heap_cells": 320,
+      "dominant_failure_mode": "checkpoint_rebind_noise",
+      "note": "structured memory improves resumable process heap stability while keeping refusal posture explicit"
+    },
+    {
+      "case_id": "held_out_continuation_machine.baseline_transformer",
+      "model_variant": "baseline_transformer",
+      "workload_family": "held_out_continuation_machine",
+      "split": "held_out_family",
+      "later_window_exactness_bps": 4200,
+      "final_output_exactness_bps": 6100,
+      "refusal_calibration_bps": 7200,
+      "max_call_depth": 6,
+      "max_heap_cells": 48,
+      "dominant_failure_mode": "held_out_continuation_collapse",
+      "note": "baseline later-window generalization collapses on the held-out continuation machine family"
+    },
+    {
+      "case_id": "held_out_continuation_machine.structured_memory",
+      "model_variant": "structured_memory",
+      "workload_family": "held_out_continuation_machine",
+      "split": "held_out_family",
+      "later_window_exactness_bps": 6900,
+      "final_output_exactness_bps": 8100,
+      "refusal_calibration_bps": 8100,
+      "max_call_depth": 18,
+      "max_heap_cells": 96,
+      "dominant_failure_mode": "continuation_reentry_noise",
+      "note": "structured memory recovers a usable held-out continuation regime without closing the gap entirely"
+    },
+    {
+      "case_id": "held_out_allocator_scheduler.baseline_transformer",
+      "model_variant": "baseline_transformer",
+      "workload_family": "held_out_allocator_scheduler",
+      "split": "held_out_family",
+      "later_window_exactness_bps": 3900,
+      "final_output_exactness_bps": 5700,
+      "refusal_calibration_bps": 7000,
+      "max_call_depth": 5,
+      "max_heap_cells": 64,
+      "dominant_failure_mode": "allocator_scheduler_collapse",
+      "note": "baseline held-out allocator scheduling remains fragile and relies on refusal calibration"
+    },
+    {
+      "case_id": "held_out_allocator_scheduler.structured_memory",
+      "model_variant": "structured_memory",
+      "workload_family": "held_out_allocator_scheduler",
+      "split": "held_out_family",
+      "later_window_exactness_bps": 6500,
+      "final_output_exactness_bps": 7800,
+      "refusal_calibration_bps": 7900,
+      "max_call_depth": 16,
+      "max_heap_cells": 144,
+      "dominant_failure_mode": "scheduler_heap_noise",
+      "note": "structured memory improves held-out allocator scheduling but still stops short of broad process ownership"
+    }
+  ],
+  "summary": "Learned call-stack/heap suite freezes 14 workload/variant cells with explicit held-out families and later-window exactness gaps.",
+  "report_digest": "e9e26ec90bf62ed007bf924f6280970ed7102c3c32c98afb088dc3371bf0a69f"
+}

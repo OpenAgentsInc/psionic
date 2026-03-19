@@ -1309,6 +1309,32 @@ Expected outcome:
   rollback lineage
 - explicit operator-only posture with `served_publication_allowed = false`
 
+### 28. Learned call-stack and heap suite
+
+```bash
+cargo run -p psionic-train --example tassadar_learned_call_stack_heap_suite
+cargo run -p psionic-eval --example tassadar_learned_call_stack_heap_suite_report
+cargo run -p psionic-research --example tassadar_learned_call_stack_heap_suite_summary
+```
+
+Read:
+
+- `fixtures/tassadar/runs/tassadar_learned_call_stack_heap_suite_v1/learned_call_stack_heap_suite_bundle.json`
+- `fixtures/tassadar/reports/tassadar_learned_call_stack_heap_suite_report.json`
+- `fixtures/tassadar/reports/tassadar_learned_call_stack_heap_suite_summary.json`
+
+Expected outcome:
+
+- one research-only learned benchmark suite over recursive, parser-frame,
+  heap-allocator, resumable-process, and held-out-family workloads
+- explicit later-window exactness, refusal calibration, max call depth, and
+  max heap-cell limits across baseline versus structured-memory learned
+  variants
+- held-out-family fragility on the baseline lane and structured recoverability
+  on the bounded suite remain explicit
+- no broad learned process ownership, arbitrary Wasm, or served
+  internal-compute promotion
+
 ## Validation Commands
 
 Run the focused report checks after the flow:
