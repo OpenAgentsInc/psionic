@@ -10,6 +10,8 @@ pub struct TassadarLinkedProgramBundleReceipt {
     pub rollback_case_count: u32,
     pub refused_case_count: u32,
     pub shared_state_case_count: u32,
+    pub start_order_exact_case_count: u32,
+    pub graph_valid_case_count: u32,
     pub exact_bundle_ids: Vec<String>,
     pub rollback_bundle_ids: Vec<String>,
     pub refused_bundle_ids: Vec<String>,
@@ -46,16 +48,20 @@ impl TassadarLinkedProgramBundleReceipt {
             rollback_case_count: report.rollback_case_count,
             refused_case_count: report.refused_case_count,
             shared_state_case_count: report.shared_state_case_count,
+            start_order_exact_case_count: report.start_order_exact_case_count,
+            graph_valid_case_count: report.graph_valid_case_count,
             exact_bundle_ids,
             rollback_bundle_ids,
             refused_bundle_ids,
             detail: format!(
-                "linked-program bundle receipt `{}` currently exposes {} exact bundles, {} rollback bundles, {} refused bundles, and {} shared-state cases",
+                "linked-program bundle receipt `{}` currently exposes {} exact bundles, {} rollback bundles, {} refused bundles, {} shared-state cases, {} graph-valid cases, and {} start-order-exact cases",
                 report.report_id,
                 report.exact_case_count,
                 report.rollback_case_count,
                 report.refused_case_count,
                 report.shared_state_case_count,
+                report.graph_valid_case_count,
+                report.start_order_exact_case_count,
             ),
         }
     }
@@ -75,10 +81,10 @@ mod tests {
         assert_eq!(receipt.rollback_case_count, 1);
         assert_eq!(receipt.refused_case_count, 1);
         assert_eq!(receipt.shared_state_case_count, 2);
-        assert!(receipt
-            .rollback_bundle_ids
-            .contains(&String::from(
-                "tassadar.linked_program_bundle.parser_allocator_rollback.v1"
-            )));
+        assert_eq!(receipt.graph_valid_case_count, 3);
+        assert_eq!(receipt.start_order_exact_case_count, 3);
+        assert!(receipt.rollback_bundle_ids.contains(&String::from(
+            "tassadar.linked_program_bundle.parser_allocator_rollback.v1"
+        )));
     }
 }

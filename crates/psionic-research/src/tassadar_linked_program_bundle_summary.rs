@@ -5,10 +5,10 @@ use std::{
 };
 
 use psionic_eval::{
-    TASSADAR_LINKED_PROGRAM_BUNDLE_EVAL_REPORT_REF, TassadarLinkedProgramBundleEvalReport,
+    TassadarLinkedProgramBundleEvalReport, TASSADAR_LINKED_PROGRAM_BUNDLE_EVAL_REPORT_REF,
 };
 use psionic_runtime::TassadarLinkedProgramBundlePosture;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -26,6 +26,8 @@ pub struct TassadarLinkedProgramBundleSummaryReport {
     pub rollback_bundle_ids: Vec<String>,
     pub refused_bundle_ids: Vec<String>,
     pub shared_state_bundle_ids: Vec<String>,
+    pub start_safe_bundle_ids: Vec<String>,
+    pub graph_valid_bundle_ids: Vec<String>,
     pub runtime_support_classes: Vec<String>,
     pub claim_boundary: String,
     pub summary: String,
@@ -81,6 +83,20 @@ pub fn build_tassadar_linked_program_bundle_summary_report(
         .filter(|case| !case.shared_state_module_refs.is_empty())
         .map(|case| case.bundle_descriptor.bundle_id.clone())
         .collect::<Vec<_>>();
+    let start_safe_bundle_ids = eval_report
+        .runtime_report
+        .case_reports
+        .iter()
+        .filter(|case| case.start_order_replay_exact)
+        .map(|case| case.bundle_descriptor.bundle_id.clone())
+        .collect::<Vec<_>>();
+    let graph_valid_bundle_ids = eval_report
+        .runtime_report
+        .case_reports
+        .iter()
+        .filter(|case| case.graph_shape_valid)
+        .map(|case| case.bundle_descriptor.bundle_id.clone())
+        .collect::<Vec<_>>();
     let runtime_support_classes = eval_report
         .runtime_support_classes
         .iter()
@@ -96,6 +112,8 @@ pub fn build_tassadar_linked_program_bundle_summary_report(
         rollback_bundle_ids,
         refused_bundle_ids,
         shared_state_bundle_ids,
+        start_safe_bundle_ids,
+        graph_valid_bundle_ids,
         runtime_support_classes,
         claim_boundary: String::from(
             "this summary keeps bounded linked-program bundle winners, rollback paths, refused shapes, shared-state posture, and runtime-support classes explicit. It does not turn bundle reuse into arbitrary program growth or unrestricted helper installation claims",
@@ -104,11 +122,13 @@ pub fn build_tassadar_linked_program_bundle_summary_report(
         report_digest: String::new(),
     };
     report.summary = format!(
-        "Linked-program bundle summary marks {} exact bundles, {} rollback bundles, {} refused bundles, {} shared-state bundles, and {} runtime-support classes.",
+        "Linked-program bundle summary marks {} exact bundles, {} rollback bundles, {} refused bundles, {} shared-state bundles, {} start-safe bundles, {} graph-valid bundles, and {} runtime-support classes.",
         report.exact_bundle_ids.len(),
         report.rollback_bundle_ids.len(),
         report.refused_bundle_ids.len(),
         report.shared_state_bundle_ids.len(),
+        report.start_safe_bundle_ids.len(),
+        report.graph_valid_bundle_ids.len(),
         report.runtime_support_classes.len(),
     );
     report.report_digest = stable_digest(
@@ -158,11 +178,9 @@ fn read_repo_json<T: DeserializeOwned>(
     relative_path: &str,
 ) -> Result<T, TassadarLinkedProgramBundleSummaryError> {
     let path = repo_root().join(relative_path);
-    let bytes = fs::read(&path).map_err(|error| {
-        TassadarLinkedProgramBundleSummaryError::Read {
-            path: path.display().to_string(),
-            error,
-        }
+    let bytes = fs::read(&path).map_err(|error| TassadarLinkedProgramBundleSummaryError::Read {
+        path: path.display().to_string(),
+        error,
     })?;
     serde_json::from_slice(&bytes).map_err(|error| {
         TassadarLinkedProgramBundleSummaryError::Deserialize {
@@ -182,33 +200,34 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        TASSADAR_LINKED_PROGRAM_BUNDLE_SUMMARY_REPORT_REF, TassadarLinkedProgramBundleSummaryReport,
         build_tassadar_linked_program_bundle_summary_report, read_repo_json,
         tassadar_linked_program_bundle_summary_report_path,
         write_tassadar_linked_program_bundle_summary_report,
+        TassadarLinkedProgramBundleSummaryReport,
+        TASSADAR_LINKED_PROGRAM_BUNDLE_SUMMARY_REPORT_REF,
     };
 
     #[test]
     fn linked_program_bundle_summary_marks_exact_rollback_refused_and_shared_state_bundles() {
         let report = build_tassadar_linked_program_bundle_summary_report().expect("summary");
-        assert!(report
-            .exact_bundle_ids
-            .contains(&String::from(
-                "tassadar.linked_program_bundle.vm_checksum_parser.v1"
-            )));
-        assert!(report
-            .rollback_bundle_ids
-            .contains(&String::from(
-                "tassadar.linked_program_bundle.parser_allocator_rollback.v1"
-            )));
-        assert!(report
-            .refused_bundle_ids
-            .contains(&String::from(
-                "tassadar.linked_program_bundle.shared_state_gap.v1"
-            )));
+        assert!(report.exact_bundle_ids.contains(&String::from(
+            "tassadar.linked_program_bundle.vm_checksum_parser.v1"
+        )));
+        assert!(report.rollback_bundle_ids.contains(&String::from(
+            "tassadar.linked_program_bundle.parser_allocator_rollback.v1"
+        )));
+        assert!(report.refused_bundle_ids.contains(&String::from(
+            "tassadar.linked_program_bundle.shared_state_gap.v1"
+        )));
         assert!(report
             .runtime_support_classes
             .contains(&String::from("checkpoint_backtrack")));
+        assert!(report.start_safe_bundle_ids.contains(&String::from(
+            "tassadar.linked_program_bundle.checkpoint_backtrack.v1"
+        )));
+        assert!(report.graph_valid_bundle_ids.contains(&String::from(
+            "tassadar.linked_program_bundle.vm_checksum_parser.v1"
+        )));
     }
 
     #[test]

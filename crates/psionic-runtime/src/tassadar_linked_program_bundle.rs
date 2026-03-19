@@ -69,6 +69,29 @@ pub struct TassadarLinkedProgramBundleModule {
     pub benchmark_lineage_refs: Vec<String>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarLinkedProgramBundleEdgeKind {
+    HelperFeedsPrimary,
+    HelperDependsOnPrimaryState,
+    SharedStateBridge,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarLinkedProgramBundleGraphEdge {
+    pub from_module_ref: String,
+    pub to_module_ref: String,
+    pub edge_kind: TassadarLinkedProgramBundleEdgeKind,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarLinkedProgramStartSemantics {
+    HelpersBeforePrimary,
+    PrimaryBeforeHelpers,
+    RefusedUnsupportedCycle,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TassadarLinkedProgramBundleDescriptor {
     pub bundle_id: String,
@@ -76,6 +99,9 @@ pub struct TassadarLinkedProgramBundleDescriptor {
     pub consumer_family: String,
     pub trust_posture: TassadarModuleTrustPosture,
     pub modules: Vec<TassadarLinkedProgramBundleModule>,
+    pub graph_edges: Vec<TassadarLinkedProgramBundleGraphEdge>,
+    pub start_semantics: TassadarLinkedProgramStartSemantics,
+    pub start_module_refs: Vec<String>,
     pub benchmark_lineage_refs: Vec<String>,
     pub claim_boundary: String,
     pub descriptor_digest: String,
@@ -88,6 +114,9 @@ impl TassadarLinkedProgramBundleDescriptor {
         consumer_family: impl Into<String>,
         trust_posture: TassadarModuleTrustPosture,
         modules: Vec<TassadarLinkedProgramBundleModule>,
+        graph_edges: Vec<TassadarLinkedProgramBundleGraphEdge>,
+        start_semantics: TassadarLinkedProgramStartSemantics,
+        start_module_refs: Vec<String>,
         benchmark_lineage_refs: Vec<String>,
         claim_boundary: impl Into<String>,
     ) -> Self {
@@ -97,12 +126,17 @@ impl TassadarLinkedProgramBundleDescriptor {
             consumer_family: consumer_family.into(),
             trust_posture,
             modules,
+            graph_edges,
+            start_semantics,
+            start_module_refs,
             benchmark_lineage_refs,
             claim_boundary: claim_boundary.into(),
             descriptor_digest: String::new(),
         };
-        descriptor.descriptor_digest =
-            stable_digest(b"psionic_tassadar_linked_program_bundle_descriptor|", &descriptor);
+        descriptor.descriptor_digest = stable_digest(
+            b"psionic_tassadar_linked_program_bundle_descriptor|",
+            &descriptor,
+        );
         descriptor
     }
 }
@@ -139,8 +173,11 @@ pub struct TassadarLinkedProgramBundleCaseReport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rollback_detail: Option<String>,
     pub benchmark_lineage_complete: bool,
+    pub helper_lineage_complete: bool,
     pub exact_outputs_preserved: bool,
     pub exact_trace_match: bool,
+    pub graph_shape_valid: bool,
+    pub start_order_replay_exact: bool,
     pub dependency_graph_digest: String,
     pub note: String,
 }
@@ -154,6 +191,9 @@ pub struct TassadarLinkedProgramBundleRuntimeReport {
     pub refused_case_count: u32,
     pub shared_state_case_count: u32,
     pub benchmark_lineage_complete_case_count: u32,
+    pub helper_lineage_complete_case_count: u32,
+    pub graph_valid_case_count: u32,
+    pub start_order_exact_case_count: u32,
     pub case_reports: Vec<TassadarLinkedProgramBundleCaseReport>,
     pub claim_boundary: String,
     pub summary: String,
@@ -212,6 +252,24 @@ pub fn seeded_tassadar_linked_program_bundles() -> Vec<TassadarLinkedProgramBund
                 ),
             ],
             vec![
+                edge(
+                    "parser_helper_core@1.0.0",
+                    "vm_dispatch_core@1.0.0",
+                    TassadarLinkedProgramBundleEdgeKind::HelperFeedsPrimary,
+                ),
+                edge(
+                    "checksum_helper_core@1.0.0",
+                    "vm_dispatch_core@1.0.0",
+                    TassadarLinkedProgramBundleEdgeKind::HelperFeedsPrimary,
+                ),
+            ],
+            TassadarLinkedProgramStartSemantics::HelpersBeforePrimary,
+            vec![
+                String::from("parser_helper_core@1.0.0"),
+                String::from("checksum_helper_core@1.0.0"),
+                String::from("vm_dispatch_core@1.0.0"),
+            ],
+            vec![
                 String::from("fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"),
                 String::from("fixtures/tassadar/reports/tassadar_module_link_eval_report.json"),
             ],
@@ -247,6 +305,29 @@ pub fn seeded_tassadar_linked_program_bundles() -> Vec<TassadarLinkedProgramBund
                     TassadarLinkedProgramStatePosture::ModuleLocalState,
                     &["fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"],
                 ),
+            ],
+            vec![
+                edge(
+                    "checkpoint_backtrack_core@1.0.0",
+                    "search_frontier_core@1.0.0",
+                    TassadarLinkedProgramBundleEdgeKind::HelperDependsOnPrimaryState,
+                ),
+                edge(
+                    "search_frontier_core@1.0.0",
+                    "checkpoint_backtrack_core@1.0.0",
+                    TassadarLinkedProgramBundleEdgeKind::SharedStateBridge,
+                ),
+                edge(
+                    "bounded_allocator_core@1.0.0",
+                    "search_frontier_core@1.0.0",
+                    TassadarLinkedProgramBundleEdgeKind::HelperFeedsPrimary,
+                ),
+            ],
+            TassadarLinkedProgramStartSemantics::PrimaryBeforeHelpers,
+            vec![
+                String::from("search_frontier_core@1.0.0"),
+                String::from("checkpoint_backtrack_core@1.0.0"),
+                String::from("bounded_allocator_core@1.0.0"),
             ],
             vec![
                 String::from("fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"),
@@ -286,6 +367,24 @@ pub fn seeded_tassadar_linked_program_bundles() -> Vec<TassadarLinkedProgramBund
                 ),
             ],
             vec![
+                edge(
+                    "parser_helper_core@1.1.0-candidate",
+                    "parsing_pipeline_core@1.0.0",
+                    TassadarLinkedProgramBundleEdgeKind::HelperFeedsPrimary,
+                ),
+                edge(
+                    "bounded_allocator_core@1.0.0",
+                    "parsing_pipeline_core@1.0.0",
+                    TassadarLinkedProgramBundleEdgeKind::HelperFeedsPrimary,
+                ),
+            ],
+            TassadarLinkedProgramStartSemantics::HelpersBeforePrimary,
+            vec![
+                String::from("parser_helper_core@1.1.0-candidate"),
+                String::from("bounded_allocator_core@1.0.0"),
+                String::from("parsing_pipeline_core@1.0.0"),
+            ],
+            vec![
                 String::from("fixtures/tassadar/reports/tassadar_module_link_runtime_report.json"),
                 String::from("fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"),
             ],
@@ -322,6 +421,24 @@ pub fn seeded_tassadar_linked_program_bundles() -> Vec<TassadarLinkedProgramBund
                     &[],
                 ),
             ],
+            vec![
+                edge(
+                    "parser_helper_core@1.0.0",
+                    "stateful_vm_core@1.0.0",
+                    TassadarLinkedProgramBundleEdgeKind::SharedStateBridge,
+                ),
+                edge(
+                    "checksum_helper_core@1.0.0",
+                    "stateful_vm_core@1.0.0",
+                    TassadarLinkedProgramBundleEdgeKind::SharedStateBridge,
+                ),
+            ],
+            TassadarLinkedProgramStartSemantics::RefusedUnsupportedCycle,
+            vec![
+                String::from("stateful_vm_core@1.0.0"),
+                String::from("parser_helper_core@1.0.0"),
+                String::from("checksum_helper_core@1.0.0"),
+            ],
             vec![String::from("fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json")],
             "shared-state runtime-support bundles stay refused when shared state or benchmark lineage is not fully visible at bundle scale",
         ),
@@ -329,7 +446,8 @@ pub fn seeded_tassadar_linked_program_bundles() -> Vec<TassadarLinkedProgramBund
 }
 
 #[must_use]
-pub fn build_tassadar_linked_program_bundle_runtime_report() -> TassadarLinkedProgramBundleRuntimeReport {
+pub fn build_tassadar_linked_program_bundle_runtime_report(
+) -> TassadarLinkedProgramBundleRuntimeReport {
     let descriptors = seeded_tassadar_linked_program_bundles();
     let case_reports = vec![
         build_case(
@@ -340,6 +458,9 @@ pub fn build_tassadar_linked_program_bundle_runtime_report() -> TassadarLinkedPr
             TassadarLinkedProgramBundlePosture::Exact,
             None,
             None,
+            true,
+            true,
+            true,
             true,
             true,
             true,
@@ -356,6 +477,9 @@ pub fn build_tassadar_linked_program_bundle_runtime_report() -> TassadarLinkedPr
             true,
             true,
             true,
+            true,
+            true,
+            true,
             "checkpoint plus backtrack plus allocator support remains exact when shared bundle state stays visible in the receipt",
         ),
         build_case(
@@ -367,6 +491,9 @@ pub fn build_tassadar_linked_program_bundle_runtime_report() -> TassadarLinkedPr
             None,
             Some("parser_helper_core@1.1.0-candidate rolled back to parser_helper_core@1.0.0 because the candidate helper lacks published active benchmark lineage"),
             true,
+            true,
+            true,
+            false,
             true,
             true,
             "helper-module rollback stays explicit at bundle scale instead of silently drifting across runtime-support helper versions",
@@ -382,6 +509,9 @@ pub fn build_tassadar_linked_program_bundle_runtime_report() -> TassadarLinkedPr
             false,
             false,
             false,
+            false,
+            false,
+            false,
             "shared-state bundle refuses because helper-module benchmark lineage is incomplete and the shared-state receipt would otherwise be ambiguous",
         ),
     ];
@@ -393,21 +523,30 @@ pub fn build_tassadar_linked_program_bundle_runtime_report() -> TassadarLinkedPr
         refused_case_count: case_reports.iter().filter(|case| case.posture == TassadarLinkedProgramBundlePosture::Refused).count() as u32,
         shared_state_case_count: case_reports.iter().filter(|case| !case.shared_state_module_refs.is_empty()).count() as u32,
         benchmark_lineage_complete_case_count: case_reports.iter().filter(|case| case.benchmark_lineage_complete).count() as u32,
+        helper_lineage_complete_case_count: case_reports.iter().filter(|case| case.helper_lineage_complete).count() as u32,
+        graph_valid_case_count: case_reports.iter().filter(|case| case.graph_shape_valid).count() as u32,
+        start_order_exact_case_count: case_reports.iter().filter(|case| case.start_order_replay_exact).count() as u32,
         case_reports,
         claim_boundary: String::from("this runtime report freezes bounded linked-program bundles with explicit helper-module roles, runtime-support classes, module-local versus shared bundle state posture, rollback detail, and benchmark lineage. It does not imply arbitrary software growth, arbitrary install closure, or unrestricted self-extension"),
         summary: String::new(),
         report_digest: String::new(),
     };
     report.summary = format!(
-        "Linked-program bundle runtime report covers {} cases with exact={}, rollback={}, refused={}, shared_state_cases={}, and lineage_complete_cases={}.",
+        "Linked-program bundle runtime report covers {} cases with exact={}, rollback={}, refused={}, shared_state_cases={}, lineage_complete_cases={}, helper_lineage_complete_cases={}, graph_valid_cases={}, and start_order_exact_cases={}.",
         report.case_reports.len(),
         report.exact_case_count,
         report.rollback_case_count,
         report.refused_case_count,
         report.shared_state_case_count,
         report.benchmark_lineage_complete_case_count,
+        report.helper_lineage_complete_case_count,
+        report.graph_valid_case_count,
+        report.start_order_exact_case_count,
     );
-    report.report_digest = stable_digest(b"psionic_tassadar_linked_program_bundle_runtime_report|", &report);
+    report.report_digest = stable_digest(
+        b"psionic_tassadar_linked_program_bundle_runtime_report|",
+        &report,
+    );
     report
 }
 
@@ -418,19 +557,24 @@ pub fn tassadar_linked_program_bundle_runtime_report_path() -> PathBuf {
 
 pub fn write_tassadar_linked_program_bundle_runtime_report(
     output_path: impl AsRef<Path>,
-) -> Result<TassadarLinkedProgramBundleRuntimeReport, TassadarLinkedProgramBundleRuntimeReportError> {
+) -> Result<TassadarLinkedProgramBundleRuntimeReport, TassadarLinkedProgramBundleRuntimeReportError>
+{
     let output_path = output_path.as_ref();
     if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent).map_err(|error| TassadarLinkedProgramBundleRuntimeReportError::CreateDir {
-            path: parent.display().to_string(),
-            error,
+        fs::create_dir_all(parent).map_err(|error| {
+            TassadarLinkedProgramBundleRuntimeReportError::CreateDir {
+                path: parent.display().to_string(),
+                error,
+            }
         })?;
     }
     let report = build_tassadar_linked_program_bundle_runtime_report();
     let json = serde_json::to_string_pretty(&report)?;
-    fs::write(output_path, format!("{json}\n")).map_err(|error| TassadarLinkedProgramBundleRuntimeReportError::Write {
-        path: output_path.display().to_string(),
-        error,
+    fs::write(output_path, format!("{json}\n")).map_err(|error| {
+        TassadarLinkedProgramBundleRuntimeReportError::Write {
+            path: output_path.display().to_string(),
+            error,
+        }
     })?;
     Ok(report)
 }
@@ -438,7 +582,8 @@ pub fn write_tassadar_linked_program_bundle_runtime_report(
 #[cfg(test)]
 pub fn load_tassadar_linked_program_bundle_runtime_report(
     path: impl AsRef<Path>,
-) -> Result<TassadarLinkedProgramBundleRuntimeReport, TassadarLinkedProgramBundleRuntimeReportError> {
+) -> Result<TassadarLinkedProgramBundleRuntimeReport, TassadarLinkedProgramBundleRuntimeReportError>
+{
     read_json(path)
 }
 
@@ -451,12 +596,21 @@ fn build_case(
     refusal_reason: Option<TassadarLinkedProgramBundleRefusalReason>,
     rollback_detail: Option<&str>,
     benchmark_lineage_complete: bool,
+    helper_lineage_complete: bool,
     exact_outputs_preserved: bool,
     exact_trace_match: bool,
+    graph_shape_valid: bool,
+    start_order_replay_exact: bool,
     note: &str,
 ) -> TassadarLinkedProgramBundleCaseReport {
-    let requested_module_refs = requested_module_refs.iter().map(|value| String::from(*value)).collect::<Vec<_>>();
-    let selected_module_refs = selected_module_refs.iter().map(|value| String::from(*value)).collect::<Vec<_>>();
+    let requested_module_refs = requested_module_refs
+        .iter()
+        .map(|value| String::from(*value))
+        .collect::<Vec<_>>();
+    let selected_module_refs = selected_module_refs
+        .iter()
+        .map(|value| String::from(*value))
+        .collect::<Vec<_>>();
     let helper_module_refs = bundle_descriptor
         .modules
         .iter()
@@ -471,18 +625,26 @@ fn build_case(
     let local_state_module_refs = bundle_descriptor
         .modules
         .iter()
-        .filter(|module| module.state_posture == TassadarLinkedProgramStatePosture::ModuleLocalState)
+        .filter(|module| {
+            module.state_posture == TassadarLinkedProgramStatePosture::ModuleLocalState
+        })
         .map(|module| module.module_ref.clone())
         .collect::<Vec<_>>();
     let shared_state_module_refs = bundle_descriptor
         .modules
         .iter()
-        .filter(|module| module.state_posture == TassadarLinkedProgramStatePosture::SharedBundleState)
+        .filter(|module| {
+            module.state_posture == TassadarLinkedProgramStatePosture::SharedBundleState
+        })
         .map(|module| module.module_ref.clone())
         .collect::<Vec<_>>();
     let dependency_graph_digest = stable_digest(
         b"psionic_tassadar_linked_program_bundle_dependency_graph|",
-        &(&bundle_descriptor.bundle_id, &requested_module_refs, &selected_module_refs),
+        &(
+            &bundle_descriptor.bundle_id,
+            &requested_module_refs,
+            &selected_module_refs,
+        ),
     );
     TassadarLinkedProgramBundleCaseReport {
         case_id: String::from(case_id),
@@ -497,10 +659,25 @@ fn build_case(
         refusal_reason,
         rollback_detail: rollback_detail.map(String::from),
         benchmark_lineage_complete,
+        helper_lineage_complete,
         exact_outputs_preserved,
         exact_trace_match,
+        graph_shape_valid,
+        start_order_replay_exact,
         dependency_graph_digest,
         note: String::from(note),
+    }
+}
+
+fn edge(
+    from_module_ref: &str,
+    to_module_ref: &str,
+    edge_kind: TassadarLinkedProgramBundleEdgeKind,
+) -> TassadarLinkedProgramBundleGraphEdge {
+    TassadarLinkedProgramBundleGraphEdge {
+        from_module_ref: String::from(from_module_ref),
+        to_module_ref: String::from(to_module_ref),
+        edge_kind,
     }
 }
 
@@ -518,7 +695,10 @@ fn module(
         role,
         runtime_support_class,
         state_posture,
-        benchmark_lineage_refs: benchmark_lineage_refs.iter().map(|value| String::from(*value)).collect(),
+        benchmark_lineage_refs: benchmark_lineage_refs
+            .iter()
+            .map(|value| String::from(*value))
+            .collect(),
     }
 }
 
@@ -535,13 +715,18 @@ fn read_json<T: DeserializeOwned>(
     path: impl AsRef<Path>,
 ) -> Result<T, TassadarLinkedProgramBundleRuntimeReportError> {
     let path = path.as_ref();
-    let bytes = fs::read(path).map_err(|error| TassadarLinkedProgramBundleRuntimeReportError::Read {
-        path: path.display().to_string(),
-        error,
-    })?;
-    serde_json::from_slice(&bytes).map_err(|error| TassadarLinkedProgramBundleRuntimeReportError::Deserialize {
-        path: path.display().to_string(),
-        error,
+    let bytes =
+        fs::read(path).map_err(
+            |error| TassadarLinkedProgramBundleRuntimeReportError::Read {
+                path: path.display().to_string(),
+                error,
+            },
+        )?;
+    serde_json::from_slice(&bytes).map_err(|error| {
+        TassadarLinkedProgramBundleRuntimeReportError::Deserialize {
+            path: path.display().to_string(),
+            error,
+        }
     })
 }
 
@@ -556,8 +741,8 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 mod tests {
     use super::{
         build_tassadar_linked_program_bundle_runtime_report,
-        load_tassadar_linked_program_bundle_runtime_report,
-        seeded_tassadar_linked_program_bundles, tassadar_linked_program_bundle_runtime_report_path,
+        load_tassadar_linked_program_bundle_runtime_report, seeded_tassadar_linked_program_bundles,
+        tassadar_linked_program_bundle_runtime_report_path,
         write_tassadar_linked_program_bundle_runtime_report, TassadarLinkedProgramBundlePosture,
     };
 
@@ -567,7 +752,10 @@ mod tests {
         assert_eq!(bundles.len(), 4);
         assert!(bundles.iter().any(|bundle| {
             bundle.bundle_id == "tassadar.linked_program_bundle.checkpoint_backtrack.v1"
-                && bundle.modules.iter().any(|module| module.runtime_support_class.is_some())
+                && bundle
+                    .modules
+                    .iter()
+                    .any(|module| module.runtime_support_class.is_some())
         }));
     }
 
@@ -579,9 +767,13 @@ mod tests {
         assert_eq!(report.refused_case_count, 1);
         assert_eq!(report.shared_state_case_count, 2);
         assert_eq!(report.benchmark_lineage_complete_case_count, 3);
+        assert_eq!(report.helper_lineage_complete_case_count, 3);
+        assert_eq!(report.graph_valid_case_count, 3);
+        assert_eq!(report.start_order_exact_case_count, 3);
         assert!(report.case_reports.iter().any(|case| {
             case.case_id == "bundle.shared_state_gap.refused.v1"
                 && case.posture == TassadarLinkedProgramBundlePosture::Refused
+                && !case.graph_shape_valid
         }));
     }
 
@@ -597,9 +789,12 @@ mod tests {
 
     #[test]
     fn write_linked_program_bundle_runtime_report_persists_current_truth() {
-        let output_path = std::env::temp_dir().join("tassadar_linked_program_bundle_runtime_report.json");
-        let report = write_tassadar_linked_program_bundle_runtime_report(&output_path).expect("report");
-        let persisted = load_tassadar_linked_program_bundle_runtime_report(&output_path).expect("persisted");
+        let output_path =
+            std::env::temp_dir().join("tassadar_linked_program_bundle_runtime_report.json");
+        let report =
+            write_tassadar_linked_program_bundle_runtime_report(&output_path).expect("report");
+        let persisted =
+            load_tassadar_linked_program_bundle_runtime_report(&output_path).expect("persisted");
         assert_eq!(persisted, report);
         std::fs::remove_file(output_path).expect("temp report should be removable");
     }

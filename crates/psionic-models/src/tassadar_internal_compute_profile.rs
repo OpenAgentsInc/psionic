@@ -23,6 +23,12 @@ const TASSADAR_RESUMABLE_MULTI_SLICE_PROMOTION_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_resumable_multi_slice_promotion_report.json";
 const TASSADAR_EFFECT_SAFE_RESUME_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_effect_safe_resume_report.json";
+const TASSADAR_LINKED_PROGRAM_BUNDLE_RUNTIME_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_linked_program_bundle_runtime_report.json";
+const TASSADAR_LINKED_PROGRAM_BUNDLE_EVAL_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_linked_program_bundle_eval_report.json";
+const TASSADAR_LINKED_PROGRAM_BUNDLE_SUMMARY_REPORT_REF: &str =
+    "fixtures/tassadar/reports/tassadar_linked_program_bundle_summary.json";
 const TASSADAR_HUNGARIAN_10X10_ARTICLE_REPRODUCER_REPORT_REF: &str =
     "fixtures/tassadar/reports/tassadar_hungarian_10x10_article_reproducer_report.json";
 const TASSADAR_SUDOKU_9X9_ARTICLE_REPRODUCER_REPORT_REF: &str =
@@ -357,7 +363,7 @@ impl TassadarInternalComputeProfileLadderPublication {
             ),
             TassadarInternalComputeProfileSpec::new(
                 TassadarInternalComputeProfileId::RuntimeSupportSubsetV1,
-                TassadarInternalComputeProfileStatus::Planned,
+                TassadarInternalComputeProfileStatus::Implemented,
                 vec![
                     String::from(TassadarWasmProfileId::ArticleI32ComputeV1.as_str()),
                     String::from("tassadar.wasm.linked_program_bundle.v1"),
@@ -365,28 +371,39 @@ impl TassadarInternalComputeProfileLadderPublication {
                 vec![
                     String::from("article_control_and_memory_core"),
                     String::from("linked_program_runtime_support"),
+                    String::from("linked_program_start_semantics"),
                 ],
-                vec![String::from("generalized_abi_required")],
+                vec![
+                    String::from("generalized_abi_required"),
+                    String::from("linked_program_bundle_abi"),
+                ],
                 vec![String::from("i32_integer_family")],
                 vec![
                     String::from("byte_addressed_linear_memory_v2"),
+                    String::from("linked_program_start_order"),
                     String::from("runtime_support_module_family"),
                 ],
                 vec![
+                    String::from("helper_lineage_receipts"),
                     String::from("linked_program_bundles"),
+                    String::from("linked_program_start_order_receipts"),
                     String::from("runtime_support_modules"),
                 ],
                 TassadarInternalComputeImportPosture::NoImportsOnly,
-                TassadarInternalComputeExactnessPosture::Planned,
+                TassadarInternalComputeExactnessPosture::ExactRouteBounded,
                 TassadarInternalComputePortabilityPosture::Planned,
-                Vec::new(),
+                current_supported_machine_class_ids.clone(),
                 vec![
                     TassadarInternalComputeRefusalClass::ResumableMultiSliceUnsupported,
                     TassadarInternalComputeRefusalClass::BroadHostImportUnsupported,
                     TassadarInternalComputeRefusalClass::NonCpuBackendUnsupported,
                 ],
-                vec![String::from("issue://OpenAgentsInc/psionic/180")],
-                "linked-program and runtime-support claims remain a separate named rung, not an implied side effect of the current article lane",
+                vec![
+                    String::from(TASSADAR_LINKED_PROGRAM_BUNDLE_EVAL_REPORT_REF),
+                    String::from(TASSADAR_LINKED_PROGRAM_BUNDLE_RUNTIME_REPORT_REF),
+                    String::from(TASSADAR_LINKED_PROGRAM_BUNDLE_SUMMARY_REPORT_REF),
+                ],
+                "linked-program and bounded runtime-support claims are now benchmarked as a separate implemented profile over explicit module graphs, helper lineage, start-order receipts, rollback posture, and module-local versus shared-state bundle rules. The profile remains non-portable and non-promoted until portability evidence and broader publication gates go green",
             ),
             TassadarInternalComputeProfileSpec::new(
                 TassadarInternalComputeProfileId::DeterministicImportSubsetV1,
@@ -619,14 +636,14 @@ impl TassadarInternalComputeProfileClaimCheckResult {
 }
 
 #[must_use]
-pub fn tassadar_internal_compute_profile_ladder_publication()
--> TassadarInternalComputeProfileLadderPublication {
+pub fn tassadar_internal_compute_profile_ladder_publication(
+) -> TassadarInternalComputeProfileLadderPublication {
     TassadarInternalComputeProfileLadderPublication::new()
 }
 
 #[must_use]
-pub fn tassadar_current_served_internal_compute_profile_claim()
--> TassadarInternalComputeProfileClaim {
+pub fn tassadar_current_served_internal_compute_profile_claim(
+) -> TassadarInternalComputeProfileClaim {
     TassadarInternalComputeProfileClaim::new(
         TassadarInternalComputeProfileId::ArticleCloseoutV1.as_str(),
         current_article_closeout_required_evidence_refs(),
@@ -751,10 +768,10 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        TassadarInternalComputeProfileId, TassadarInternalComputeProfileStatus,
-        TassadarInternalComputeRefusalClass, check_tassadar_internal_compute_profile_claim,
+        check_tassadar_internal_compute_profile_claim,
         tassadar_current_served_internal_compute_profile_claim,
-        tassadar_internal_compute_profile_ladder_publication,
+        tassadar_internal_compute_profile_ladder_publication, TassadarInternalComputeProfileId,
+        TassadarInternalComputeProfileStatus, TassadarInternalComputeRefusalClass,
     };
 
     #[test]
@@ -787,13 +804,11 @@ mod tests {
             .contains(&String::from(
                 "fixtures/tassadar/reports/tassadar_rust_only_article_closeout_audit_report.json"
             )));
-        assert!(
-            generalized_abi
-                .required_evidence_refs
-                .contains(&String::from(
-                    "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json"
-                ))
-        );
+        assert!(generalized_abi
+            .required_evidence_refs
+            .contains(&String::from(
+                "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json"
+            )));
         assert!(wider_numeric.required_evidence_refs.contains(&String::from(
             "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json"
         )));
@@ -826,25 +841,21 @@ mod tests {
         let result = check_tassadar_internal_compute_profile_claim(&publication, claim);
 
         assert!(!result.green);
-        assert!(
-            result
-                .failed_requirement_ids
-                .iter()
-                .any(|failure| failure.starts_with("missing_required_evidence:"))
-        );
+        assert!(result
+            .failed_requirement_ids
+            .iter()
+            .any(|failure| failure.starts_with("missing_required_evidence:")));
         assert!(result.failed_requirement_ids.contains(&String::from(
             "unsupported_machine_class_claimed:other_host_cpu"
         )));
-        assert!(
-            result
-                .failed_requirement_ids
-                .iter()
-                .any(|failure| failure.starts_with("missing_refusal_class:"))
-        );
+        assert!(result
+            .failed_requirement_ids
+            .iter()
+            .any(|failure| failure.starts_with("missing_refusal_class:")));
     }
 
     #[test]
-    fn claim_checker_rejects_planned_profiles() {
+    fn claim_checker_rejects_incomplete_implemented_profiles() {
         let publication = tassadar_internal_compute_profile_ladder_publication();
         let claim = super::TassadarInternalComputeProfileClaim::new(
             TassadarInternalComputeProfileId::RuntimeSupportSubsetV1.as_str(),
@@ -855,10 +866,13 @@ mod tests {
         let result = check_tassadar_internal_compute_profile_claim(&publication, claim);
 
         assert!(!result.green);
-        assert!(
-            result
-                .failed_requirement_ids
-                .contains(&String::from("profile_not_implemented"))
-        );
+        assert!(result
+            .failed_requirement_ids
+            .iter()
+            .any(|failure| failure.starts_with("missing_required_evidence:")));
+        assert!(result
+            .failed_requirement_ids
+            .iter()
+            .any(|failure| failure.starts_with("missing_refusal_class:")));
     }
 }

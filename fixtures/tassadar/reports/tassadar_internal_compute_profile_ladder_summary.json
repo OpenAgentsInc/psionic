@@ -284,42 +284,52 @@
         },
         {
           "profile_id": "tassadar.internal_compute.runtime_support_subset.v1",
-          "status": "planned",
+          "status": "implemented",
           "admitted_wasm_profile_ids": [
             "tassadar.wasm.article_i32_compute.v1",
             "tassadar.wasm.linked_program_bundle.v1"
           ],
           "admitted_opcode_family_ids": [
             "article_control_and_memory_core",
-            "linked_program_runtime_support"
+            "linked_program_runtime_support",
+            "linked_program_start_semantics"
           ],
           "admitted_abi_shape_ids": [
-            "generalized_abi_required"
+            "generalized_abi_required",
+            "linked_program_bundle_abi"
           ],
           "admitted_numeric_family_ids": [
             "i32_integer_family"
           ],
           "admitted_memory_semantic_ids": [
             "byte_addressed_linear_memory_v2",
+            "linked_program_start_order",
             "runtime_support_module_family"
           ],
           "admitted_runtime_support_ids": [
+            "helper_lineage_receipts",
             "linked_program_bundles",
+            "linked_program_start_order_receipts",
             "runtime_support_modules"
           ],
           "import_posture": "no_imports_only",
-          "exactness_posture": "planned",
+          "exactness_posture": "exact_route_bounded",
           "portability_posture": "planned",
-          "supported_machine_class_ids": [],
+          "supported_machine_class_ids": [
+            "host_cpu_aarch64",
+            "host_cpu_x86_64"
+          ],
           "refusal_classes": [
             "broad_host_import_unsupported",
             "resumable_multi_slice_unsupported",
             "non_cpu_backend_unsupported"
           ],
           "required_evidence_refs": [
-            "issue://OpenAgentsInc/psionic/180"
+            "fixtures/tassadar/reports/tassadar_linked_program_bundle_eval_report.json",
+            "fixtures/tassadar/reports/tassadar_linked_program_bundle_runtime_report.json",
+            "fixtures/tassadar/reports/tassadar_linked_program_bundle_summary.json"
           ],
-          "detail": "linked-program and runtime-support claims remain a separate named rung, not an implied side effect of the current article lane"
+          "detail": "linked-program and bounded runtime-support claims are now benchmarked as a separate implemented profile over explicit module graphs, helper lineage, start-order receipts, rollback posture, and module-local versus shared-state bundle rules. The profile remains non-portable and non-promoted until portability evidence and broader publication gates go green"
         },
         {
           "profile_id": "tassadar.internal_compute.wider_numeric_data_layout.v1",
@@ -374,7 +384,7 @@
         }
       ],
       "claim_boundary": "this ladder prevents vague `supports Rust/Wasm` language by requiring every public internal-compute claim to cite one named profile with explicit admitted features, refusal classes, portability posture, and evidence requirements",
-      "publication_digest": "804ec828a3537d41c4d0a2e4c419f7f20cc7d7e4b97e2d156c3e900ea5f0d3e6"
+      "publication_digest": "72ffac4c99b1a55e9737057533bbf38ed48187485f031bb459ed56c11b036494"
     },
     "current_served_claim_check": {
       "checker_id": "tassadar.internal_compute_profile_claim_checker.v1",
@@ -410,14 +420,14 @@
       "claim_digest": "10df43985e072b5bcdfe4975a3809c46703dab1097b7b2bdcece32a8ed83819d"
     },
     "claim_boundary": "this report freezes the named post-article internal-compute profile ladder plus the current served claim-check result. It exists to stop vague Rust/Wasm language from outrunning the actual evidence-backed claim",
-    "summary": "internal-compute profile ladder now records implemented_profiles=5, planned_profiles=3, current_claim_green=true, and current_profile_id=`tassadar.internal_compute.article_closeout.v1`.",
-    "report_digest": "082a987a0a160a506e56f905e838d0e6055a84603583e0f7771006e78ef4bb17"
+    "summary": "internal-compute profile ladder now records implemented_profiles=6, planned_profiles=2, current_claim_green=true, and current_profile_id=`tassadar.internal_compute.article_closeout.v1`.",
+    "report_digest": "e586f6632c7fb8d71c641a7528c462620dd4e14c7c8f266ce27cf06e1ec00d0b"
   },
   "green": true,
-  "implemented_profile_count": 5,
-  "planned_profile_count": 3,
+  "implemented_profile_count": 6,
+  "planned_profile_count": 2,
   "current_profile_id": "tassadar.internal_compute.article_closeout.v1",
   "claim_boundary": "this summary mirrors the internal-compute profile ladder report only. It exists to keep the named-profile posture operator-readable without widening the claim boundary",
-  "summary": "internal-compute profile ladder summary now records green=true, implemented_profiles=5, planned_profiles=3, current_profile_id=`tassadar.internal_compute.article_closeout.v1`.",
-  "report_digest": "08231afb96884eb3134497d4087ae7f79b42f82ab91eb4bde46c20bc12313ca4"
+  "summary": "internal-compute profile ladder summary now records green=true, implemented_profiles=6, planned_profiles=2, current_profile_id=`tassadar.internal_compute.article_closeout.v1`.",
+  "report_digest": "a66ea6e503c75100bdba45cabbbe379c9add4f50dcf1a58840c29f1958d4c10a"
 }

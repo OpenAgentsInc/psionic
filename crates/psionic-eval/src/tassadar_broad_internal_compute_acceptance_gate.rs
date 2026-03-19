@@ -8,15 +8,15 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use psionic_models::{
-    TassadarInternalComputePortabilityPosture, TassadarInternalComputeProfileStatus,
     tassadar_internal_compute_profile_ladder_publication,
+    TassadarInternalComputePortabilityPosture, TassadarInternalComputeProfileStatus,
 };
 
 use crate::{
-    TASSADAR_RUST_ONLY_ARTICLE_ACCEPTANCE_GATE_V2_REPORT_REF,
     build_tassadar_broad_internal_compute_portability_report,
     TassadarBroadInternalComputePortabilityReportError,
     TassadarRustOnlyArticleAcceptanceGateV2Report,
+    TASSADAR_RUST_ONLY_ARTICLE_ACCEPTANCE_GATE_V2_REPORT_REF,
 };
 
 pub const TASSADAR_BROAD_INTERNAL_COMPUTE_ACCEPTANCE_GATE_REPORT_REF: &str =
@@ -76,15 +76,13 @@ pub enum TassadarBroadInternalComputeAcceptanceGateReportError {
     },
 }
 
-pub fn build_tassadar_broad_internal_compute_acceptance_gate_report(
-) -> Result<
+pub fn build_tassadar_broad_internal_compute_acceptance_gate_report() -> Result<
     TassadarBroadInternalComputeAcceptanceGateReport,
     TassadarBroadInternalComputeAcceptanceGateReportError,
 > {
     let portability_report = build_tassadar_broad_internal_compute_portability_report()?;
-    let article_baseline_gate: TassadarRustOnlyArticleAcceptanceGateV2Report = read_repo_json(
-        repo_root().join(TASSADAR_RUST_ONLY_ARTICLE_ACCEPTANCE_GATE_V2_REPORT_REF),
-    )?;
+    let article_baseline_gate: TassadarRustOnlyArticleAcceptanceGateV2Report =
+        read_repo_json(repo_root().join(TASSADAR_RUST_ONLY_ARTICLE_ACCEPTANCE_GATE_V2_REPORT_REF))?;
     let ladder = tassadar_internal_compute_profile_ladder_publication();
     let repo_root = repo_root();
 
@@ -227,8 +225,7 @@ pub fn write_tassadar_broad_internal_compute_acceptance_gate_report(
         })?;
     }
     let report = build_tassadar_broad_internal_compute_acceptance_gate_report()?;
-    let bytes =
-        serde_json::to_vec_pretty(&report).expect("broad internal compute gate serializes");
+    let bytes = serde_json::to_vec_pretty(&report).expect("broad internal compute gate serializes");
     fs::write(output_path, bytes).map_err(|error| {
         TassadarBroadInternalComputeAcceptanceGateReportError::Write {
             path: output_path.display().to_string(),
@@ -296,26 +293,23 @@ fn read_repo_json<T: serde::de::DeserializeOwned>(
 #[cfg(test)]
 mod tests {
     use super::{
-        TassadarBroadInternalComputeAcceptanceStatus,
         build_tassadar_broad_internal_compute_acceptance_gate_report,
         load_tassadar_broad_internal_compute_acceptance_gate_report,
         tassadar_broad_internal_compute_acceptance_gate_report_path,
+        TassadarBroadInternalComputeAcceptanceStatus,
     };
 
     #[test]
     fn broad_internal_compute_acceptance_gate_keeps_article_green_and_broader_profiles_blocked() {
-        let report = build_tassadar_broad_internal_compute_acceptance_gate_report().expect("report");
-        assert!(report
-            .green_profile_ids
-            .contains(&String::from(
-                "tassadar.internal_compute.article_closeout.v1"
-            )));
-        assert!(report
-            .suppressed_profile_ids
-            .contains(&String::from(
-                "tassadar.internal_compute.generalized_abi.v1"
-            )));
-        assert!(report.failed_profile_ids.contains(&String::from(
+        let report =
+            build_tassadar_broad_internal_compute_acceptance_gate_report().expect("report");
+        assert!(report.green_profile_ids.contains(&String::from(
+            "tassadar.internal_compute.article_closeout.v1"
+        )));
+        assert!(report.suppressed_profile_ids.contains(&String::from(
+            "tassadar.internal_compute.generalized_abi.v1"
+        )));
+        assert!(report.suppressed_profile_ids.contains(&String::from(
             "tassadar.internal_compute.runtime_support_subset.v1"
         )));
         assert!(!report.overall_green);
@@ -326,8 +320,8 @@ mod tests {
     }
 
     #[test]
-    fn broad_internal_compute_acceptance_gate_matches_committed_truth()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn broad_internal_compute_acceptance_gate_matches_committed_truth(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let expected = build_tassadar_broad_internal_compute_acceptance_gate_report()?;
         let committed = load_tassadar_broad_internal_compute_acceptance_gate_report(
             tassadar_broad_internal_compute_acceptance_gate_report_path(),

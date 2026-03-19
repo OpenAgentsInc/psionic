@@ -6,6 +6,9 @@
   "refused_case_count": 1,
   "shared_state_case_count": 2,
   "benchmark_lineage_complete_case_count": 3,
+  "helper_lineage_complete_case_count": 3,
+  "graph_valid_case_count": 3,
+  "start_order_exact_case_count": 3,
   "case_reports": [
     {
       "case_id": "bundle.vm_checksum_parser.exact.v1",
@@ -45,12 +48,30 @@
             ]
           }
         ],
+        "graph_edges": [
+          {
+            "from_module_ref": "parser_helper_core@1.0.0",
+            "to_module_ref": "vm_dispatch_core@1.0.0",
+            "edge_kind": "helper_feeds_primary"
+          },
+          {
+            "from_module_ref": "checksum_helper_core@1.0.0",
+            "to_module_ref": "vm_dispatch_core@1.0.0",
+            "edge_kind": "helper_feeds_primary"
+          }
+        ],
+        "start_semantics": "helpers_before_primary",
+        "start_module_refs": [
+          "parser_helper_core@1.0.0",
+          "checksum_helper_core@1.0.0",
+          "vm_dispatch_core@1.0.0"
+        ],
         "benchmark_lineage_refs": [
           "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
           "fixtures/tassadar/reports/tassadar_module_link_eval_report.json"
         ],
         "claim_boundary": "vm-dispatch plus parser plus checksum is a bounded linked-program bundle with helper lineage and module-local state posture made explicit",
-        "descriptor_digest": "fcb1b9b5106e2f41a27e6a4f0ab7c7c72536ef91f43507c365e9b14d69ca52d5"
+        "descriptor_digest": "1f4226aefdab992a7497c9e8d6ffe0d12101cd75836a14998436227d45124c14"
       },
       "requested_module_refs": [
         "vm_dispatch_core@1.0.0",
@@ -78,8 +99,11 @@
       "shared_state_module_refs": [],
       "posture": "exact",
       "benchmark_lineage_complete": true,
+      "helper_lineage_complete": true,
       "exact_outputs_preserved": true,
       "exact_trace_match": true,
+      "graph_shape_valid": true,
+      "start_order_replay_exact": true,
       "dependency_graph_digest": "c225cd23d5873e345d7bd3010b9bed99c055b1ed2023b178847a55f1ca312f71",
       "note": "module-local helper parser and checksum support remain exact when helper lineage and state posture are fully explicit"
     },
@@ -121,12 +145,35 @@
             ]
           }
         ],
+        "graph_edges": [
+          {
+            "from_module_ref": "checkpoint_backtrack_core@1.0.0",
+            "to_module_ref": "search_frontier_core@1.0.0",
+            "edge_kind": "helper_depends_on_primary_state"
+          },
+          {
+            "from_module_ref": "search_frontier_core@1.0.0",
+            "to_module_ref": "checkpoint_backtrack_core@1.0.0",
+            "edge_kind": "shared_state_bridge"
+          },
+          {
+            "from_module_ref": "bounded_allocator_core@1.0.0",
+            "to_module_ref": "search_frontier_core@1.0.0",
+            "edge_kind": "helper_feeds_primary"
+          }
+        ],
+        "start_semantics": "primary_before_helpers",
+        "start_module_refs": [
+          "search_frontier_core@1.0.0",
+          "checkpoint_backtrack_core@1.0.0",
+          "bounded_allocator_core@1.0.0"
+        ],
         "benchmark_lineage_refs": [
           "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
           "fixtures/tassadar/reports/tassadar_module_link_eval_report.json"
         ],
         "claim_boundary": "checkpoint plus backtrack plus bounded allocator is a bounded linked-program bundle with explicit shared bundle state and exact checkpoint lineage",
-        "descriptor_digest": "f7b4d541f93082a2a257b51f6c28dcd7225e35e592cef9c8f3a6a6ee5bfd617d"
+        "descriptor_digest": "b548d7939f9d51db47e6a66fdde29423bc62f9ca3fc65df55b6b085dffe61a04"
       },
       "requested_module_refs": [
         "search_frontier_core@1.0.0",
@@ -155,8 +202,11 @@
       ],
       "posture": "exact",
       "benchmark_lineage_complete": true,
+      "helper_lineage_complete": true,
       "exact_outputs_preserved": true,
       "exact_trace_match": true,
+      "graph_shape_valid": true,
+      "start_order_replay_exact": true,
       "dependency_graph_digest": "2fbd4235ae8b9b59dabcd2e525a8aaf826b4dfdbe2314514b3d9dc853aacea24",
       "note": "checkpoint plus backtrack plus allocator support remains exact when shared bundle state stays visible in the receipt"
     },
@@ -198,12 +248,30 @@
             ]
           }
         ],
+        "graph_edges": [
+          {
+            "from_module_ref": "parser_helper_core@1.1.0-candidate",
+            "to_module_ref": "parsing_pipeline_core@1.0.0",
+            "edge_kind": "helper_feeds_primary"
+          },
+          {
+            "from_module_ref": "bounded_allocator_core@1.0.0",
+            "to_module_ref": "parsing_pipeline_core@1.0.0",
+            "edge_kind": "helper_feeds_primary"
+          }
+        ],
+        "start_semantics": "helpers_before_primary",
+        "start_module_refs": [
+          "parser_helper_core@1.1.0-candidate",
+          "bounded_allocator_core@1.0.0",
+          "parsing_pipeline_core@1.0.0"
+        ],
         "benchmark_lineage_refs": [
           "fixtures/tassadar/reports/tassadar_module_link_runtime_report.json",
           "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
         ],
         "claim_boundary": "parser plus allocator bundles may roll back helper versions explicitly instead of silently drifting across runtime-support helper candidates",
-        "descriptor_digest": "27af1be69ca0f3eec15ba22d8a04c8f0fa6c5ce538c821637ab9aa1ec7e96c90"
+        "descriptor_digest": "c64935f28f4284efbae8c20360f27ddbe0248b508941b89a9cf746eb948bc821"
       },
       "requested_module_refs": [
         "parsing_pipeline_core@1.0.0",
@@ -232,8 +300,11 @@
       "posture": "rolled_back",
       "rollback_detail": "parser_helper_core@1.1.0-candidate rolled back to parser_helper_core@1.0.0 because the candidate helper lacks published active benchmark lineage",
       "benchmark_lineage_complete": true,
+      "helper_lineage_complete": true,
       "exact_outputs_preserved": true,
-      "exact_trace_match": true,
+      "exact_trace_match": false,
+      "graph_shape_valid": true,
+      "start_order_replay_exact": true,
       "dependency_graph_digest": "997aa8cc64922b914653c044ae95da5e095161275c4353a7c94f1e796f69c264",
       "note": "helper-module rollback stays explicit at bundle scale instead of silently drifting across runtime-support helper versions"
     },
@@ -271,11 +342,29 @@
             "benchmark_lineage_refs": []
           }
         ],
+        "graph_edges": [
+          {
+            "from_module_ref": "parser_helper_core@1.0.0",
+            "to_module_ref": "stateful_vm_core@1.0.0",
+            "edge_kind": "shared_state_bridge"
+          },
+          {
+            "from_module_ref": "checksum_helper_core@1.0.0",
+            "to_module_ref": "stateful_vm_core@1.0.0",
+            "edge_kind": "shared_state_bridge"
+          }
+        ],
+        "start_semantics": "refused_unsupported_cycle",
+        "start_module_refs": [
+          "stateful_vm_core@1.0.0",
+          "parser_helper_core@1.0.0",
+          "checksum_helper_core@1.0.0"
+        ],
         "benchmark_lineage_refs": [
           "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
         ],
         "claim_boundary": "shared-state runtime-support bundles stay refused when shared state or benchmark lineage is not fully visible at bundle scale",
-        "descriptor_digest": "5b5a591218084d2983bb7266768826dd07c729d7e9c01db72338881f64f9d8c8"
+        "descriptor_digest": "1b2f9ac83184123a2c2bc936bb12ba5939eaeb0f2ea8598d27a916346102c3bc"
       },
       "requested_module_refs": [
         "stateful_vm_core@1.0.0",
@@ -300,13 +389,16 @@
       "posture": "refused",
       "refusal_reason": "benchmark_lineage_gap",
       "benchmark_lineage_complete": false,
+      "helper_lineage_complete": false,
       "exact_outputs_preserved": false,
       "exact_trace_match": false,
+      "graph_shape_valid": false,
+      "start_order_replay_exact": false,
       "dependency_graph_digest": "7dcfcd8282b083c83f99e94eee24a5f8d97689c6dfa69606f4c6c5580edd7677",
       "note": "shared-state bundle refuses because helper-module benchmark lineage is incomplete and the shared-state receipt would otherwise be ambiguous"
     }
   ],
   "claim_boundary": "this runtime report freezes bounded linked-program bundles with explicit helper-module roles, runtime-support classes, module-local versus shared bundle state posture, rollback detail, and benchmark lineage. It does not imply arbitrary software growth, arbitrary install closure, or unrestricted self-extension",
-  "summary": "Linked-program bundle runtime report covers 4 cases with exact=2, rollback=1, refused=1, shared_state_cases=2, and lineage_complete_cases=3.",
-  "report_digest": "a1f218657b76aeac4c775e4ed3e4650de54dbeb67dfb70d95f639cb850a7a3c1"
+  "summary": "Linked-program bundle runtime report covers 4 cases with exact=2, rollback=1, refused=1, shared_state_cases=2, lineage_complete_cases=3, helper_lineage_complete_cases=3, graph_valid_cases=3, and start_order_exact_cases=3.",
+  "report_digest": "34c73e97c57c4258dfdcab5d47ea62377fcc4f7481b6bd3c884750ead6856d78"
 }

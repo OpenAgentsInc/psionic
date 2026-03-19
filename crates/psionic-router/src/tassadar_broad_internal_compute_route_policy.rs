@@ -12,12 +12,12 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use psionic_models::{
-    TASSADAR_BROAD_INTERNAL_COMPUTE_PROFILE_PUBLICATION_REPORT_REF,
     TassadarBroadInternalComputeAcceptedOutcomeBindingStatus,
     TassadarBroadInternalComputeProfilePublicationReport,
     TassadarBroadInternalComputeProfilePublicationStatus,
-    TassadarBroadInternalComputeWorldMountBindingStatus,
-    TassadarInternalComputeExactnessPosture, TassadarInternalComputeImportPosture,
+    TassadarBroadInternalComputeWorldMountBindingStatus, TassadarInternalComputeExactnessPosture,
+    TassadarInternalComputeImportPosture,
+    TASSADAR_BROAD_INTERNAL_COMPUTE_PROFILE_PUBLICATION_REPORT_REF,
 };
 
 const REPORT_SCHEMA_VERSION: u16 = 1;
@@ -62,8 +62,7 @@ pub struct TassadarBroadInternalComputeRoutePolicyRow {
     pub publication_status: TassadarBroadInternalComputeProfilePublicationStatus,
     pub decision_status: TassadarBroadInternalComputeRouteDecisionStatus,
     pub world_mount_binding_status: TassadarBroadInternalComputeWorldMountBindingStatus,
-    pub accepted_outcome_binding_status:
-        TassadarBroadInternalComputeAcceptedOutcomeBindingStatus,
+    pub accepted_outcome_binding_status: TassadarBroadInternalComputeAcceptedOutcomeBindingStatus,
     pub note: String,
 }
 
@@ -102,9 +101,10 @@ pub enum TassadarBroadInternalComputeRoutePolicyReportError {
     },
 }
 
-pub fn build_tassadar_broad_internal_compute_route_policy_report(
-) -> Result<TassadarBroadInternalComputeRoutePolicyReport, TassadarBroadInternalComputeRoutePolicyReportError>
-{
+pub fn build_tassadar_broad_internal_compute_route_policy_report() -> Result<
+    TassadarBroadInternalComputeRoutePolicyReport,
+    TassadarBroadInternalComputeRoutePolicyReportError,
+> {
     let publication_report: TassadarBroadInternalComputeProfilePublicationReport = read_json(
         repo_root().join(TASSADAR_BROAD_INTERNAL_COMPUTE_PROFILE_PUBLICATION_REPORT_REF),
     )?;
@@ -146,12 +146,12 @@ pub fn build_tassadar_broad_internal_compute_route_policy_report(
             &publication_report,
             "route.runtime_support.linked_bundle",
             "tassadar.internal_compute.runtime_support_subset.v1",
-            TassadarInternalComputeExactnessPosture::Planned,
+            TassadarInternalComputeExactnessPosture::ExactRouteBounded,
             TassadarBroadInternalComputeCheckpointPosture::OneShotOnly,
             TassadarInternalComputeImportPosture::NoImportsOnly,
             TassadarBroadInternalComputePortabilityEnvelope::DeclaredCpuMatrix,
-            Some("generalized_abi_required"),
-            Some("runtime_support_modules"),
+            Some("linked_program_bundle_abi"),
+            Some("linked_program_start_order_receipts"),
         ),
         route_row(
             &publication_report,
@@ -200,11 +200,15 @@ pub fn build_tassadar_broad_internal_compute_route_policy_report(
     ];
     let selected_route_count = rows
         .iter()
-        .filter(|row| row.decision_status == TassadarBroadInternalComputeRouteDecisionStatus::Selected)
+        .filter(|row| {
+            row.decision_status == TassadarBroadInternalComputeRouteDecisionStatus::Selected
+        })
         .count() as u32;
     let suppressed_route_count = rows
         .iter()
-        .filter(|row| row.decision_status == TassadarBroadInternalComputeRouteDecisionStatus::Suppressed)
+        .filter(|row| {
+            row.decision_status == TassadarBroadInternalComputeRouteDecisionStatus::Suppressed
+        })
         .count() as u32;
     let refused_route_count = rows.len() as u32 - selected_route_count - suppressed_route_count;
     let mut report = TassadarBroadInternalComputeRoutePolicyReport {
@@ -241,8 +245,10 @@ pub fn build_tassadar_broad_internal_compute_route_policy_report(
         report.refused_route_count,
         report.current_served_profile_id,
     );
-    report.report_digest =
-        stable_digest(b"psionic_tassadar_broad_internal_compute_route_policy_report|", &report);
+    report.report_digest = stable_digest(
+        b"psionic_tassadar_broad_internal_compute_route_policy_report|",
+        &report,
+    );
     Ok(report)
 }
 
@@ -311,8 +317,10 @@ pub fn tassadar_broad_internal_compute_route_policy_report_path() -> PathBuf {
 
 pub fn write_tassadar_broad_internal_compute_route_policy_report(
     output_path: impl AsRef<Path>,
-) -> Result<TassadarBroadInternalComputeRoutePolicyReport, TassadarBroadInternalComputeRoutePolicyReportError>
-{
+) -> Result<
+    TassadarBroadInternalComputeRoutePolicyReport,
+    TassadarBroadInternalComputeRoutePolicyReportError,
+> {
     let output_path = output_path.as_ref();
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
@@ -323,8 +331,8 @@ pub fn write_tassadar_broad_internal_compute_route_policy_report(
         })?;
     }
     let report = build_tassadar_broad_internal_compute_route_policy_report()?;
-    let json =
-        serde_json::to_string_pretty(&report).expect("broad internal compute route policy serializes");
+    let json = serde_json::to_string_pretty(&report)
+        .expect("broad internal compute route policy serializes");
     fs::write(output_path, format!("{json}\n")).map_err(|error| {
         TassadarBroadInternalComputeRoutePolicyReportError::Write {
             path: output_path.display().to_string(),
@@ -336,8 +344,10 @@ pub fn write_tassadar_broad_internal_compute_route_policy_report(
 
 pub fn load_tassadar_broad_internal_compute_route_policy_report(
     path: impl AsRef<Path>,
-) -> Result<TassadarBroadInternalComputeRoutePolicyReport, TassadarBroadInternalComputeRoutePolicyReportError>
-{
+) -> Result<
+    TassadarBroadInternalComputeRoutePolicyReport,
+    TassadarBroadInternalComputeRoutePolicyReportError,
+> {
     read_json(path)
 }
 
@@ -377,11 +387,11 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        TassadarBroadInternalComputeRouteDecisionStatus,
-        TassadarBroadInternalComputeRoutePolicyReportError,
         build_tassadar_broad_internal_compute_route_policy_report,
         load_tassadar_broad_internal_compute_route_policy_report,
         tassadar_broad_internal_compute_route_policy_report_path,
+        TassadarBroadInternalComputeRouteDecisionStatus,
+        TassadarBroadInternalComputeRoutePolicyReportError,
     };
 
     #[test]
@@ -397,17 +407,19 @@ mod tests {
         }));
         assert!(report.rows.iter().any(|row| {
             row.target_profile_id == "tassadar.internal_compute.public_broad_family.v1"
-                && row.decision_status == TassadarBroadInternalComputeRouteDecisionStatus::Suppressed
+                && row.decision_status
+                    == TassadarBroadInternalComputeRouteDecisionStatus::Suppressed
         }));
         assert!(report.rows.iter().any(|row| {
             row.target_profile_id == "tassadar.internal_compute.runtime_support_subset.v1"
-                && row.decision_status == TassadarBroadInternalComputeRouteDecisionStatus::Refused
+                && row.decision_status
+                    == TassadarBroadInternalComputeRouteDecisionStatus::Suppressed
         }));
     }
 
     #[test]
-    fn broad_internal_compute_route_policy_matches_committed_truth()
-    -> Result<(), TassadarBroadInternalComputeRoutePolicyReportError> {
+    fn broad_internal_compute_route_policy_matches_committed_truth(
+    ) -> Result<(), TassadarBroadInternalComputeRoutePolicyReportError> {
         let expected = build_tassadar_broad_internal_compute_route_policy_report()?;
         let committed = load_tassadar_broad_internal_compute_route_policy_report(
             tassadar_broad_internal_compute_route_policy_report_path(),

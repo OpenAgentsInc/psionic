@@ -10,17 +10,15 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use psionic_compiler::{
-    TassadarLinkedProgramBundleCompilerSummary,
-    tassadar_linked_program_bundle_compiler_summaries,
+    tassadar_linked_program_bundle_compiler_summaries, TassadarLinkedProgramBundleCompilerSummary,
 };
 use psionic_router::{
-    TASSADAR_LINKED_PROGRAM_BUNDLE_ROUTE_REPORT_REF, TassadarLinkedProgramBundleRouteKind,
-    build_tassadar_linked_program_bundle_route_report,
+    build_tassadar_linked_program_bundle_route_report, TassadarLinkedProgramBundleRouteKind,
+    TASSADAR_LINKED_PROGRAM_BUNDLE_ROUTE_REPORT_REF,
 };
 use psionic_runtime::{
-    TASSADAR_LINKED_PROGRAM_BUNDLE_RUNTIME_REPORT_REF,
-    TassadarLinkedProgramBundleRuntimeReport, TassadarRuntimeSupportModuleClass,
-    build_tassadar_linked_program_bundle_runtime_report,
+    build_tassadar_linked_program_bundle_runtime_report, TassadarLinkedProgramBundleRuntimeReport,
+    TassadarRuntimeSupportModuleClass, TASSADAR_LINKED_PROGRAM_BUNDLE_RUNTIME_REPORT_REF,
 };
 
 const REPORT_SCHEMA_VERSION: u16 = 1;
@@ -45,6 +43,9 @@ pub struct TassadarLinkedProgramBundleEvalReport {
     pub module_local_only_case_count: u32,
     pub shared_state_case_count: u32,
     pub benchmark_lineage_complete_case_count: u32,
+    pub helper_lineage_complete_case_count: u32,
+    pub graph_valid_case_count: u32,
+    pub start_order_exact_case_count: u32,
     pub runtime_support_classes: Vec<TassadarRuntimeSupportModuleClass>,
     pub generated_from_refs: Vec<String>,
     pub claim_boundary: String,
@@ -70,8 +71,7 @@ pub enum TassadarLinkedProgramBundleEvalReportError {
 }
 
 #[must_use]
-pub fn build_tassadar_linked_program_bundle_eval_report() -> TassadarLinkedProgramBundleEvalReport
-{
+pub fn build_tassadar_linked_program_bundle_eval_report() -> TassadarLinkedProgramBundleEvalReport {
     let runtime_report = build_tassadar_linked_program_bundle_runtime_report();
     let route_report = build_tassadar_linked_program_bundle_route_report();
     let compiler_summaries = tassadar_linked_program_bundle_compiler_summaries();
@@ -125,6 +125,9 @@ pub fn build_tassadar_linked_program_bundle_eval_report() -> TassadarLinkedProgr
         shared_state_case_count: runtime_report.shared_state_case_count,
         benchmark_lineage_complete_case_count: runtime_report
             .benchmark_lineage_complete_case_count,
+        helper_lineage_complete_case_count: runtime_report.helper_lineage_complete_case_count,
+        graph_valid_case_count: runtime_report.graph_valid_case_count,
+        start_order_exact_case_count: runtime_report.start_order_exact_case_count,
         runtime_support_classes,
         generated_from_refs,
         runtime_report,
@@ -137,13 +140,16 @@ pub fn build_tassadar_linked_program_bundle_eval_report() -> TassadarLinkedProgr
         report_digest: String::new(),
     };
     report.summary = format!(
-        "Linked-program bundle eval report covers exact={}, rollback={}, refused={}, module_local_only={}, shared_state={}, lineage_complete={}, and {} runtime-support classes.",
+        "Linked-program bundle eval report covers exact={}, rollback={}, refused={}, module_local_only={}, shared_state={}, lineage_complete={}, helper_lineage_complete={}, graph_valid={}, start_order_exact={}, and {} runtime-support classes.",
         report.exact_case_count,
         report.rollback_case_count,
         report.refused_case_count,
         report.module_local_only_case_count,
         report.shared_state_case_count,
         report.benchmark_lineage_complete_case_count,
+        report.helper_lineage_complete_case_count,
+        report.graph_valid_case_count,
+        report.start_order_exact_case_count,
         report.runtime_support_classes.len(),
     );
     report.report_digest = stable_digest(
@@ -201,12 +207,11 @@ fn read_json<T: DeserializeOwned>(
     path: impl AsRef<Path>,
 ) -> Result<T, TassadarLinkedProgramBundleEvalReportError> {
     let path = path.as_ref();
-    let bytes = fs::read(path).map_err(|error| {
-        TassadarLinkedProgramBundleEvalReportError::Read {
+    let bytes =
+        fs::read(path).map_err(|error| TassadarLinkedProgramBundleEvalReportError::Read {
             path: path.display().to_string(),
             error,
-        }
-    })?;
+        })?;
     serde_json::from_slice(&bytes).map_err(|error| {
         TassadarLinkedProgramBundleEvalReportError::Deserialize {
             path: path.display().to_string(),
@@ -241,6 +246,9 @@ mod tests {
         assert_eq!(report.shared_state_route_count, 1);
         assert_eq!(report.rollback_route_count, 1);
         assert_eq!(report.refused_route_count, 1);
+        assert_eq!(report.helper_lineage_complete_case_count, 3);
+        assert_eq!(report.graph_valid_case_count, 3);
+        assert_eq!(report.start_order_exact_case_count, 3);
         assert_eq!(report.compiler_summaries.len(), 4);
         assert!(report
             .runtime_support_classes

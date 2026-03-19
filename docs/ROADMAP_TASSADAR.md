@@ -62,9 +62,9 @@ Current dependency spine:
 
 Issue-state note:
 
-- `TAS-103` through `TAS-108` are already implemented and tracked in
+- `TAS-103` through `TAS-109` are already implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-109` and runs through
+- the current open GitHub backlog begins at `TAS-110` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs

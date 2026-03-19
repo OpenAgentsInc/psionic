@@ -27,6 +27,7 @@ This runbook covers the current repo-owned bounded Wasm flow only:
 - Rust-to-Wasm article profile completeness matrix
 - bounded Rust-only article ABI closure
 - checkpointed multi-slice execution receipts
+- linked module-graph and start-order runtime-support receipts
 - memory ABI v2 bulk-memory exactness
 - bounded dynamic-memory pause-and-resume receipts
 - Rust-only article runtime closeout
@@ -302,6 +303,39 @@ Expected outcome:
   remains non-portable and non-promoted until broader portability evidence
   exists
 - this does not widen the current served claim beyond
+  `tassadar.internal_compute.article_closeout.v1`
+
+### 3B.4. Linked module graphs, start semantics, and bounded runtime support
+
+```bash
+cargo run -p psionic-runtime --example tassadar_linked_program_bundle_runtime_report
+cargo run -p psionic-eval --example tassadar_linked_program_bundle_eval_report
+cargo run -p psionic-research --example tassadar_linked_program_bundle_summary
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_linked_program_bundle_runtime_report.json`
+- `fixtures/tassadar/reports/tassadar_linked_program_bundle_eval_report.json`
+- `fixtures/tassadar/reports/tassadar_linked_program_bundle_summary.json`
+
+Expected outcome:
+
+- one runtime-owned report now freezes explicit bundle graph edges,
+  helper-module lineage, start-order semantics, and typed refusal for
+  unsupported shared-state cycles
+- the admitted exact and rollback cases now keep helper lineage, graph-shape
+  validity, and start-order replay parity machine-legible instead of leaving
+  bundle topology implicit
+- the research summary now names which bundles are graph-valid and start-safe
+  under the current bounded runtime-support subset
+- the named profile `tassadar.internal_compute.runtime_support_subset.v1` is
+  now benchmarked and implemented in the internal-compute ladder, but it
+  remains non-portable and non-promoted until broader portability and public
+  publication gates go green
+- this widens real linked-program behavior only inside the explicit bounded
+  bundle family; it does not imply arbitrary linked software growth, general
+  import/runtime-support closure, or a widened current served claim beyond
   `tassadar.internal_compute.article_closeout.v1`
 
 ### 3C. Hungarian-10x10 Rust-only article reproducer

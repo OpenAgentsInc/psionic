@@ -50,17 +50,17 @@
     {
       "route_policy_id": "route.runtime_support.linked_bundle",
       "target_profile_id": "tassadar.internal_compute.runtime_support_subset.v1",
-      "required_exactness_posture": "planned",
+      "required_exactness_posture": "exact_route_bounded",
       "required_checkpoint_posture": "one_shot_only",
       "required_import_posture": "no_imports_only",
       "required_portability_envelope": "declared_cpu_matrix",
-      "required_abi_shape_id": "generalized_abi_required",
-      "required_runtime_support_id": "runtime_support_modules",
-      "publication_status": "failed",
-      "decision_status": "refused",
-      "world_mount_binding_status": "refused_pending_profile_evidence",
-      "accepted_outcome_binding_status": "refused_pending_profile_evidence",
-      "note": "route `route.runtime_support.linked_bundle` refuses profile `tassadar.internal_compute.runtime_support_subset.v1` because the named profile is still blocked on missing evidence or a non-green broader claim posture"
+      "required_abi_shape_id": "linked_program_bundle_abi",
+      "required_runtime_support_id": "linked_program_start_order_receipts",
+      "publication_status": "suppressed",
+      "decision_status": "suppressed",
+      "world_mount_binding_status": "requires_profile_specific_mount_policy",
+      "accepted_outcome_binding_status": "requires_profile_specific_accepted_outcome_template",
+      "note": "route `route.runtime_support.linked_bundle` points at profile `tassadar.internal_compute.runtime_support_subset.v1` but keeps it suppressed until the named profile's broader portability and public publication posture turn green"
     },
     {
       "route_policy_id": "route.deterministic_import.subset",
@@ -124,8 +124,8 @@
     }
   ],
   "selected_route_count": 1,
-  "suppressed_route_count": 5,
-  "refused_route_count": 2,
+  "suppressed_route_count": 6,
+  "refused_route_count": 1,
   "generated_from_refs": [
     "fixtures/tassadar/reports/tassadar_broad_internal_compute_profile_publication_report.json",
     "fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json",
@@ -137,6 +137,6 @@
   "nexus_dependency_marker": "nexus remains the owner of canonical accepted-outcome issuance and settlement-qualified closure outside standalone psionic",
   "compute_market_dependency_marker": "compute-market remains the owner of canonical quote publication, buyer matching, and market-wide broad-profile exposure outside standalone psionic",
   "claim_boundary": "this router report selects among named internal-compute profiles by explicit exactness, checkpoint, import, ABI-shape, runtime-support, and portability criteria. It preserves selected, suppressed, and refused profile routes explicitly instead of flattening wider computation into one generic exact-compute lane",
-  "summary": "Broad internal-compute route policy now records selected_routes=1, suppressed_routes=5, refused_routes=2, current_served_profile=`tassadar.internal_compute.article_closeout.v1`.",
-  "report_digest": "ac0be8e8306f721f16828d4c4eb70cc918d5e098c461482a447d194337816315"
+  "summary": "Broad internal-compute route policy now records selected_routes=1, suppressed_routes=6, refused_routes=1, current_served_profile=`tassadar.internal_compute.article_closeout.v1`.",
+  "report_digest": "e70851e54082ab6e7f7dda7331dc1e01e4f9048b408097144bafe0fe8263e5eb"
 }
