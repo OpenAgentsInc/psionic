@@ -1055,6 +1055,15 @@ The current scope is:
   keeping `TCM.v1`, the universality witness construction, the witness suite,
   the minimal universal-substrate gate, and the final verdict split as pending;
   this is not a Turing-complete or final universality claim
+- the current `TCM.v1` substrate artifacts are
+  `fixtures/tassadar/reports/tassadar_tcm_v1_model.json`,
+  `fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json`,
+  and `docs/audits/2026-03-19-tassadar-tcm-v1-substrate-audit.md`, which
+  freeze one declared universal substrate model over explicit control, memory,
+  continuation, and effect-boundary rows plus one runtime contract binding that
+  model to already landed checkpoint, process-object, spill-tape, and declared
+  effect-profile truth; this still does not prove universal-machine encodings,
+  witness suites, final gates, or served universality posture
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

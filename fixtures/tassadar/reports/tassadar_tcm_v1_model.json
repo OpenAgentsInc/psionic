@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "model_id": "tcm.v1",
+  "computation_style": "bounded small-step resumable machine with persistent state, checkpoint-backed continuation, spill-tape extension, and explicit refusal on out-of-model effects",
+  "control_rows": [
+    {
+      "semantic_id": "conditional_control",
+      "supported": true,
+      "source_profile_ids": [
+        "tassadar.internal_compute.article_closeout.v1",
+        "tassadar.internal_compute.call_stack_and_recursion.v1"
+      ],
+      "note": "the substrate model assumes exact conditional branch, structured loop, and call-frame behavior under declared bounded slices"
+    },
+    {
+      "semantic_id": "indirect_dispatch",
+      "supported": true,
+      "source_profile_ids": [
+        "tassadar.proposal_profile.component_linking_interface_types.v1",
+        "tassadar.internal_compute.component_model_abi.v1"
+      ],
+      "note": "the substrate model includes indirect or table-mediated dispatch only through declared interface and component rows, not implicit host calls"
+    }
+  ],
+  "memory_rows": [
+    {
+      "semantic_id": "mutable_heap_segments",
+      "supported": true,
+      "source_profile_ids": [
+        "tassadar.internal_compute.generalized_abi.v1",
+        "tassadar.internal_compute.spill_tape_store.v1"
+      ],
+      "note": "the substrate model includes mutable heap state with exact byte-addressed mutation and explicit spill-tape extension"
+    },
+    {
+      "semantic_id": "checkpoint_backed_extension",
+      "supported": true,
+      "source_profile_ids": [
+        "tassadar.internal_compute.process_objects.v1",
+        "tassadar.internal_compute.installed_process_lifecycle.v1"
+      ],
+      "note": "state may extend beyond one slice only through persisted checkpoint, process-object, and lifecycle artifacts"
+    }
+  ],
+  "continuation_rows": [
+    {
+      "semantic_id": "bounded_slice_resume",
+      "supported": true,
+      "source_profile_ids": [
+        "tassadar.internal_compute.execution_checkpoint.v1",
+        "tassadar.internal_compute.spill_tape_store.v1"
+      ],
+      "note": "the substrate model is explicitly resumable rather than infinite in-core; continuation happens by exact slice resume with persisted state"
+    },
+    {
+      "semantic_id": "persistent_process_identity",
+      "supported": true,
+      "source_profile_ids": [
+        "tassadar.internal_compute.process_objects.v1",
+        "tassadar.internal_compute.session_process.v1"
+      ],
+      "note": "the substrate model includes stable process identity, tape head, and work-queue facts across resumptions"
+    }
+  ],
+  "effect_boundary_rows": [
+    {
+      "semantic_id": "declared_effect_profiles_only",
+      "supported": true,
+      "source_profile_ids": [
+        "tassadar.effect_profile.virtual_fs_mounts.v1",
+        "tassadar.effect_profile.simulator_backed_io.v1"
+      ],
+      "note": "effectful behavior is only in-model when it stays inside declared simulator or virtual-fs profiles with replay and refusal truth"
+    },
+    {
+      "semantic_id": "ambient_host_effects_refused",
+      "supported": true,
+      "source_profile_ids": [
+        "tassadar.effect_profile.replay_challenge_receipts.v1",
+        "tassadar.effect_profile.async_lifecycle.v1"
+      ],
+      "note": "ambient host power does not count as part of TCM.v1; undeclared host effects must refuse explicitly"
+    }
+  ],
+  "unsupported_feature_families": [
+    "ambient host io",
+    "implicit public publication",
+    "undeclared semantic-window widening",
+    "arbitrary Wasm execution"
+  ],
+  "theory_scope": "TCM.v1 is the declared terminal substrate model for Psionic/Tassadar. Universal computation, if claimed later, must be a construction over this explicit substrate rather than over vague broadness language.",
+  "refusal_boundary": "features outside the declared control, memory, continuation, and effect rows are not implicit extensions of TCM.v1. They require either an explicit later semantic row or a typed refusal.",
+  "claim_boundary": "this model declares the substrate only. It does not by itself prove universal-machine encodings, witness suites, final gates, or public served universality posture.",
+  "summary": "TCM.v1 declares control_rows=2, memory_rows=2, continuation_rows=2, effect_rows=2, unsupported_feature_families=4.",
+  "model_digest": "259cab92c74b71b0135d4d2efee3212d4c8efe8ae6a62165f9560cbd509fe3c6"
+}

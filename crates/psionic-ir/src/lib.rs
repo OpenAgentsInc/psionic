@@ -17,6 +17,7 @@ mod tassadar_scratchpad;
 mod tassadar_sparse_rule;
 mod tassadar_state_design;
 mod tassadar_symbolic;
+mod tassadar_universal_substrate_model;
 mod tassadar_wasm_module;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -47,6 +48,7 @@ pub use tassadar_scratchpad::*;
 pub use tassadar_sparse_rule::*;
 pub use tassadar_state_design::*;
 pub use tassadar_symbolic::*;
+pub use tassadar_universal_substrate_model::*;
 pub use tassadar_wasm_module::*;
 
 /// Human-readable crate ownership summary.

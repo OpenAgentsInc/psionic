@@ -95,6 +95,11 @@ Current honest posture:
   exactly which terminal-contract artifacts are still missing; the current
   claim status remains suppressed until `TCM.v1`, the witness construction, the
   witness suite, the minimal gate, and the verdict split all land
+- the repo now also has one declared terminal substrate model `TCM.v1`, with a
+  committed IR model artifact and runtime contract report that bind universal-
+  substrate language to explicit control, memory, continuation, and
+  effect-boundary rows; this is the substrate declaration only, not yet the
+  witness construction or final universality gate
 - the repo now also has one research-only shared-memory and threads profile
   with a deterministic scheduler envelope, explicit sandbox boundary truth,
   and typed refusal on host-nondeterministic scheduling plus relaxed
@@ -206,7 +211,7 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-125` through `TAS-146` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-151` and runs through
+- the current open GitHub backlog begins at `TAS-152` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs
