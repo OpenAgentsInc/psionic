@@ -5434,6 +5434,14 @@ mod tests {
             serde_json::json!(true)
         );
         assert_eq!(
+            encoded["module_execution_capability"]["runtime_capability"]["supports_active_element_segments"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            encoded["module_execution_capability"]["runtime_capability"]["supports_start_function_instantiation"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
             encoded["module_execution_capability"]["runtime_capability"]["host_import_boundary"]["unsupported_host_call_refusal"],
             serde_json::json!("unsupported_host_import")
         );

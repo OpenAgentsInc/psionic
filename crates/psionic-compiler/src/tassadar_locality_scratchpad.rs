@@ -1,17 +1,17 @@
 use psionic_ir::{
-    format_tassadar_sequence_with_scratchpad, tassadar_locality_preserving_scratchpad_passes,
-    tassadar_symbolic_program_examples, TassadarLocalityScratchpadPass,
-    TassadarLocalityScratchpadTraceFamily, TassadarScratchpadEncoding,
-    TassadarScratchpadFormattedSequence, TassadarScratchpadFormatConfig,
-    TassadarSymbolicBinaryOp, TassadarSymbolicExpr, TassadarSymbolicOperand,
-    TassadarSymbolicStatement,
+    TassadarLocalityScratchpadPass, TassadarLocalityScratchpadTraceFamily,
+    TassadarScratchpadEncoding, TassadarScratchpadFormatConfig,
+    TassadarScratchpadFormattedSequence, TassadarSymbolicBinaryOp, TassadarSymbolicExpr,
+    TassadarSymbolicOperand, TassadarSymbolicStatement, format_tassadar_sequence_with_scratchpad,
+    tassadar_locality_preserving_scratchpad_passes, tassadar_symbolic_program_examples,
 };
 use psionic_runtime::{
+    TassadarHostImportStubKind, TassadarModuleExecutionError, TassadarModuleFrameTransition,
+    TassadarModuleTraceEvent, TassadarModuleTraceV2Artifact, TassadarStructuredControlBinaryOp,
     build_tassadar_module_trace_v2_artifact, execute_tassadar_module_execution_program,
-    tassadar_seeded_module_call_indirect_program, tassadar_seeded_module_deterministic_import_program,
-    tassadar_seeded_module_global_state_program, TassadarHostImportStubKind,
-    TassadarModuleExecutionError, TassadarModuleFrameTransition, TassadarModuleTraceEvent,
-    TassadarModuleTraceV2Artifact, TassadarStructuredControlBinaryOp,
+    tassadar_seeded_module_call_indirect_program,
+    tassadar_seeded_module_deterministic_import_program,
+    tassadar_seeded_module_global_state_program,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -92,8 +92,10 @@ impl TassadarLocalityScratchpadCompilation {
             candidate_sequence,
             compilation_digest: String::new(),
         };
-        compilation.compilation_digest =
-            stable_digest(b"psionic_tassadar_locality_scratchpad_compilation|", &compilation);
+        compilation.compilation_digest = stable_digest(
+            b"psionic_tassadar_locality_scratchpad_compilation|",
+            &compilation,
+        );
         Ok(compilation)
     }
 }
@@ -128,8 +130,8 @@ pub enum TassadarLocalityScratchpadCompileError {
 }
 
 /// Builds the seeded same-program locality-preserving scratchpad compilations.
-pub fn compile_tassadar_locality_preserving_scratchpad_cases(
-) -> Result<Vec<TassadarLocalityScratchpadCompilation>, TassadarLocalityScratchpadCompileError> {
+pub fn compile_tassadar_locality_preserving_scratchpad_cases()
+-> Result<Vec<TassadarLocalityScratchpadCompilation>, TassadarLocalityScratchpadCompileError> {
     let passes = tassadar_locality_preserving_scratchpad_passes();
     let symbolic_pass = pass_for_family(
         passes.as_slice(),
@@ -181,16 +183,18 @@ fn pass_for_family(
         .iter()
         .find(|pass| pass.trace_family == trace_family)
         .cloned()
-        .ok_or(
-            TassadarLocalityScratchpadCompileError::MissingPassForTraceFamily { trace_family },
-        )
+        .ok_or(TassadarLocalityScratchpadCompileError::MissingPassForTraceFamily { trace_family })
 }
 
-fn module_trace_cases(
-) -> Result<Vec<(String, String, String, Vec<String>, Vec<String>)>, TassadarLocalityScratchpadCompileError>
-{
+fn module_trace_cases() -> Result<
+    Vec<(String, String, String, Vec<String>, Vec<String>)>,
+    TassadarLocalityScratchpadCompileError,
+> {
     let cases = vec![
-        ("module_global_state_trace", tassadar_seeded_module_global_state_program()),
+        (
+            "module_global_state_trace",
+            tassadar_seeded_module_global_state_program(),
+        ),
         (
             "module_call_indirect_trace",
             tassadar_seeded_module_call_indirect_program(),
@@ -323,20 +327,53 @@ fn module_trace_tokens(artifact: &TassadarModuleTraceV2Artifact) -> Vec<String> 
 
 fn module_trace_event_tokens(event: &TassadarModuleTraceEvent) -> Vec<String> {
     match event {
+        TassadarModuleTraceEvent::ElementSegmentApplied {
+            element_segment_index,
+            table_index,
+            offset,
+            ..
+        } => vec![
+            String::from("element_segment_applied"),
+            element_segment_index.to_string(),
+            table_index.to_string(),
+            offset.to_string(),
+        ],
         TassadarModuleTraceEvent::ConstPush { value } => {
             vec![String::from("const_push"), value.to_string()]
         }
         TassadarModuleTraceEvent::LocalGet { local_index, value } => {
-            vec![String::from("local_get"), local_index.to_string(), value.to_string()]
+            vec![
+                String::from("local_get"),
+                local_index.to_string(),
+                value.to_string(),
+            ]
         }
         TassadarModuleTraceEvent::LocalSet { local_index, value } => {
-            vec![String::from("local_set"), local_index.to_string(), value.to_string()]
+            vec![
+                String::from("local_set"),
+                local_index.to_string(),
+                value.to_string(),
+            ]
         }
-        TassadarModuleTraceEvent::GlobalGet { global_index, value } => {
-            vec![String::from("global_get"), global_index.to_string(), value.to_string()]
+        TassadarModuleTraceEvent::GlobalGet {
+            global_index,
+            value,
+        } => {
+            vec![
+                String::from("global_get"),
+                global_index.to_string(),
+                value.to_string(),
+            ]
         }
-        TassadarModuleTraceEvent::GlobalSet { global_index, value } => {
-            vec![String::from("global_set"), global_index.to_string(), value.to_string()]
+        TassadarModuleTraceEvent::GlobalSet {
+            global_index,
+            value,
+        } => {
+            vec![
+                String::from("global_set"),
+                global_index.to_string(),
+                value.to_string(),
+            ]
         }
         TassadarModuleTraceEvent::BinaryOp {
             op,
@@ -350,6 +387,9 @@ fn module_trace_event_tokens(event: &TassadarModuleTraceEvent) -> Vec<String> {
             right.to_string(),
             result.to_string(),
         ],
+        TassadarModuleTraceEvent::Call { function_index } => {
+            vec![String::from("call"), function_index.to_string()]
+        }
         TassadarModuleTraceEvent::CallIndirect {
             table_index,
             selector,
@@ -444,8 +484,8 @@ fn stable_digest<T>(prefix: &[u8], value: &T) -> String
 where
     T: Serialize,
 {
-    let encoded =
-        serde_json::to_vec(value).expect("locality-preserving scratchpad compilation should serialize");
+    let encoded = serde_json::to_vec(value)
+        .expect("locality-preserving scratchpad compilation should serialize");
     let mut hasher = Sha256::new();
     hasher.update(prefix);
     hasher.update(encoded);
@@ -462,14 +502,16 @@ mod tests {
     fn locality_scratchpad_compilations_cover_symbolic_and_module_trace_families() {
         let cases = compile_tassadar_locality_preserving_scratchpad_cases()
             .expect("locality-preserving scratchpad cases should compile");
-        assert!(cases
-            .iter()
-            .any(|case| case.trace_family == TassadarLocalityScratchpadTraceFamily::SymbolicStraightLine));
-        assert!(cases
-            .iter()
-            .any(|case| case.trace_family == TassadarLocalityScratchpadTraceFamily::ModuleTraceV2));
-        assert!(cases
-            .iter()
-            .all(|case| !case.compilation_digest.is_empty()));
+        assert!(
+            cases.iter().any(|case| case.trace_family
+                == TassadarLocalityScratchpadTraceFamily::SymbolicStraightLine)
+        );
+        assert!(
+            cases
+                .iter()
+                .any(|case| case.trace_family
+                    == TassadarLocalityScratchpadTraceFamily::ModuleTraceV2)
+        );
+        assert!(cases.iter().all(|case| !case.compilation_digest.is_empty()));
     }
 }

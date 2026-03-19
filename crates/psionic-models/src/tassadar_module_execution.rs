@@ -38,11 +38,12 @@ pub fn tassadar_module_execution_capability_publication(
         seeded_case_ids: vec![
             String::from("global_state_parity"),
             String::from("call_indirect_dispatch"),
+            String::from("instantiation_start_and_elements"),
             String::from("deterministic_import_stub"),
             String::from("unsupported_host_import_refusal"),
         ],
         claim_boundary: String::from(
-            "this publication covers bounded module execution with i32 globals, funcref tables, zero-parameter indirect calls, and deterministic host-import stubs only; arbitrary host calls and arbitrary Wasm remain explicitly unsupported",
+            "this publication covers bounded module execution with i32 globals, funcref tables, active element-segment instantiation, zero-parameter start functions, zero-parameter direct and indirect calls, and deterministic host-import stubs only; arbitrary host calls and arbitrary Wasm remain explicitly unsupported",
         ),
     }
 }
@@ -70,8 +71,19 @@ mod tests {
             publication.model_id,
             TassadarExecutorFixture::ARTICLE_I32_COMPUTE_MODEL_ID
         );
+        assert!(
+            publication
+                .runtime_capability
+                .supports_active_element_segments
+        );
+        assert!(
+            publication
+                .runtime_capability
+                .supports_start_function_instantiation
+        );
+        assert!(publication.runtime_capability.supports_direct_calls);
         assert!(publication.runtime_capability.supports_call_indirect);
-        assert_eq!(publication.seeded_case_ids.len(), 4);
+        assert_eq!(publication.seeded_case_ids.len(), 5);
         assert_eq!(publication.claim_class, "capability_truth");
     }
 }

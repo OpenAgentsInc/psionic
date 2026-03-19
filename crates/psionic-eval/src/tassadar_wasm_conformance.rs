@@ -54,7 +54,7 @@ impl TassadarWasmConformanceReport {
             case_family_ids,
             cases,
             claim_boundary: String::from(
-                "this report differentially checks the current bounded module-execution lane against a real Wasm reference authority over curated and deterministically generated cases; exact success and trap parity are only claimed for the current supported i32 global/table/call_indirect subset, while unsupported host-import behavior remains an explicit runtime refusal boundary instead of arbitrary Wasm closure",
+                "this report differentially checks the current bounded module-execution lane against a real Wasm reference authority over curated and deterministically generated cases; exact success and trap parity are only claimed for the current supported i32 global/table/direct-call/call_indirect/start-instantiation subset, while unsupported host-import behavior remains an explicit runtime refusal boundary instead of arbitrary Wasm closure",
             ),
             report_digest: String::new(),
         };
@@ -162,12 +162,19 @@ mod tests {
         let report =
             build_tassadar_wasm_conformance_report().expect("Wasm conformance report should build");
         assert_eq!(report.reference_authority_id, "wasmi.reference.v1");
-        assert_eq!(report.cases.len(), 11);
+        assert_eq!(report.cases.len(), 12);
         assert!(
             report
                 .cases
                 .iter()
                 .any(|case| case.family_id == "curated.global_state"
+                    && case.status == TassadarModuleDifferentialStatus::ExactSuccess)
+        );
+        assert!(
+            report
+                .cases
+                .iter()
+                .any(|case| case.family_id == "curated.instantiation"
                     && case.status == TassadarModuleDifferentialStatus::ExactSuccess)
         );
         assert!(

@@ -2,18 +2,23 @@ use std::{convert::TryFrom, path::Path};
 
 use psionic_ir::{
     TassadarNormalizedWasmConstExpr, TassadarNormalizedWasmDataMode,
-    TassadarNormalizedWasmInstruction, TassadarNormalizedWasmModule,
-    TassadarNormalizedWasmModuleError, TassadarNormalizedWasmValueType,
+    TassadarNormalizedWasmGlobalMutability, TassadarNormalizedWasmInstruction,
+    TassadarNormalizedWasmModule, TassadarNormalizedWasmModuleError,
+    TassadarNormalizedWasmTableElementKind, TassadarNormalizedWasmValueType,
     encode_tassadar_normalized_wasm_module, parse_tassadar_normalized_wasm_module,
 };
 use psionic_runtime::{
     TassadarCToWasmCompileConfig, TassadarCToWasmCompileReceipt, TassadarCompileRefusal,
     TassadarCompilerToolchainIdentity, TassadarCpuReferenceRunner, TassadarExecutionRefusal,
-    TassadarInstruction, TassadarProgram, TassadarProgramArtifact, TassadarProgramArtifactError,
-    TassadarProgramSourceIdentity, TassadarProgramSourceKind, TassadarRustToWasmCompileConfig,
-    TassadarRustToWasmCompileReceipt, TassadarTraceAbi, TassadarWasmProfile,
-    compile_tassadar_c_source_to_wasm_receipt, compile_tassadar_rust_source_to_wasm_receipt,
-    summarize_tassadar_wasm_binary, tassadar_trace_abi_for_profile_id,
+    TassadarInstruction, TassadarModuleElementSegment, TassadarModuleExecutionProgram,
+    TassadarModuleFunction, TassadarModuleGlobal, TassadarModuleGlobalMutability,
+    TassadarModuleInstruction, TassadarModuleTable, TassadarModuleTableElementKind,
+    TassadarModuleValueType, TassadarProgram, TassadarProgramArtifact,
+    TassadarProgramArtifactError, TassadarProgramSourceIdentity, TassadarProgramSourceKind,
+    TassadarRustToWasmCompileConfig, TassadarRustToWasmCompileReceipt, TassadarTraceAbi,
+    TassadarWasmProfile, compile_tassadar_c_source_to_wasm_receipt,
+    compile_tassadar_rust_source_to_wasm_receipt, summarize_tassadar_wasm_binary,
+    tassadar_trace_abi_for_profile_id,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -982,6 +987,371 @@ fn compile_tassadar_normalized_wasm_module_to_artifact_bundle_with_source(
     ))
 }
 
+/// Failure while lowering one normalized Wasm export into the bounded
+/// module-execution runtime lane.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum TassadarWasmModuleExecutionLoweringError {
+    /// The normalized module was invalid.
+    #[error(transparent)]
+    Module(#[from] TassadarNormalizedWasmModuleError),
+    /// The requested export was missing or not a function export.
+    #[error("module-execution lowering is missing function export `{export_name}`")]
+    MissingFunctionExport { export_name: String },
+    /// The current module-execution lane still refuses imported functions.
+    #[error("module-execution lowering still refuses imported function {function_index}")]
+    ImportedFunctionUnsupported { function_index: u32 },
+    /// The current module-execution lane still refuses memories and data segments.
+    #[error("module-execution lowering still refuses memories or data segments")]
+    UnsupportedMemorySurface,
+    /// One function declared unsupported parameters.
+    #[error(
+        "module-execution lowering requires zero-parameter functions, but function {function_index} declared {param_count}"
+    )]
+    UnsupportedParamCount {
+        function_index: u32,
+        param_count: usize,
+    },
+    /// One function declared unsupported result types.
+    #[error(
+        "module-execution lowering requires result_count <= 1 with i32-only returns for function {function_index}"
+    )]
+    UnsupportedResultTypes { function_index: u32 },
+    /// One local type is unsupported.
+    #[error(
+        "module-execution lowering requires i32 locals, but function {function_index} used `{local_type:?}`"
+    )]
+    UnsupportedLocalType {
+        function_index: u32,
+        local_type: TassadarNormalizedWasmValueType,
+    },
+    /// One global type or initializer is unsupported.
+    #[error(
+        "module-execution lowering requires i32 globals with bounded const init for global {global_index}: {detail}"
+    )]
+    UnsupportedGlobal { global_index: u32, detail: String },
+    /// One table shape is unsupported.
+    #[error(
+        "module-execution lowering requires bounded funcref tables for table {table_index}: {detail}"
+    )]
+    UnsupportedTable { table_index: u32, detail: String },
+    /// One element segment was unsupported.
+    #[error("module-execution lowering refused element segment {element_index}: {detail}")]
+    UnsupportedElementSegment { element_index: u32, detail: String },
+    /// One instruction is unsupported in the bounded module-execution lane.
+    #[error(
+        "module-execution lowering refused instruction `{opcode}` in function {function_index}"
+    )]
+    UnsupportedInstruction { function_index: u32, opcode: String },
+    /// The lowered runtime program failed validation.
+    #[error(transparent)]
+    RuntimeProgram(#[from] psionic_runtime::TassadarModuleExecutionError),
+}
+
+/// Lowers one normalized Wasm function export into the bounded module-execution runtime lane.
+pub fn compile_tassadar_normalized_wasm_module_export_to_module_execution_program(
+    source_name: impl Into<String>,
+    normalized_module: &TassadarNormalizedWasmModule,
+    export_name: &str,
+) -> Result<TassadarModuleExecutionProgram, TassadarWasmModuleExecutionLoweringError> {
+    normalized_module.validate_internal_consistency()?;
+    if !normalized_module.memories.is_empty() || !normalized_module.data_segments.is_empty() {
+        return Err(TassadarWasmModuleExecutionLoweringError::UnsupportedMemorySurface);
+    }
+    let (export, _) = normalized_module
+        .exported_function_by_name(export_name)
+        .ok_or_else(
+            || TassadarWasmModuleExecutionLoweringError::MissingFunctionExport {
+                export_name: export_name.to_string(),
+            },
+        )?;
+    if normalized_module
+        .functions
+        .iter()
+        .any(|function| function.imported_function())
+    {
+        let function_index = normalized_module
+            .functions
+            .iter()
+            .find(|function| function.imported_function())
+            .map_or(0, |function| function.function_index);
+        return Err(
+            TassadarWasmModuleExecutionLoweringError::ImportedFunctionUnsupported {
+                function_index,
+            },
+        );
+    }
+
+    let mut lowered_globals = Vec::with_capacity(normalized_module.globals.len());
+    for global in &normalized_module.globals {
+        let initial_value = match global.init_expr {
+            TassadarNormalizedWasmConstExpr::I32Const { value } => value,
+            TassadarNormalizedWasmConstExpr::GlobalGet { global_index } => lowered_globals
+                .get(global_index as usize)
+                .map(|global: &TassadarModuleGlobal| global.initial_value)
+                .ok_or_else(
+                    || TassadarWasmModuleExecutionLoweringError::UnsupportedGlobal {
+                        global_index: global.global_index,
+                        detail: format!("global.get init {global_index} is not yet resolvable"),
+                    },
+                )?,
+        };
+        if global.value_type != TassadarNormalizedWasmValueType::I32 {
+            return Err(
+                TassadarWasmModuleExecutionLoweringError::UnsupportedGlobal {
+                    global_index: global.global_index,
+                    detail: format!("value type {:?}", global.value_type),
+                },
+            );
+        }
+        lowered_globals.push(TassadarModuleGlobal {
+            global_index: global.global_index,
+            value_type: TassadarModuleValueType::I32,
+            mutability: match global.mutability {
+                TassadarNormalizedWasmGlobalMutability::Const => {
+                    TassadarModuleGlobalMutability::Const
+                }
+                TassadarNormalizedWasmGlobalMutability::Mutable => {
+                    TassadarModuleGlobalMutability::Mutable
+                }
+            },
+            initial_value,
+        });
+    }
+
+    let lowered_tables = normalized_module
+        .tables
+        .iter()
+        .map(|table| {
+            if table.element_kind != TassadarNormalizedWasmTableElementKind::Funcref {
+                return Err(TassadarWasmModuleExecutionLoweringError::UnsupportedTable {
+                    table_index: table.table_index,
+                    detail: String::from("non-funcref table"),
+                });
+            }
+            if table.max_entries.map_or(table.min_entries, |max| max) > 64 {
+                return Err(TassadarWasmModuleExecutionLoweringError::UnsupportedTable {
+                    table_index: table.table_index,
+                    detail: String::from("table exceeds 64-entry bounded lane"),
+                });
+            }
+            let entry_count = table.max_entries.unwrap_or(table.min_entries) as usize;
+            Ok(TassadarModuleTable {
+                table_index: table.table_index,
+                element_kind: TassadarModuleTableElementKind::Funcref,
+                min_entries: table.min_entries,
+                max_entries: table.max_entries,
+                elements: vec![None; entry_count],
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let lowered_functions = normalized_module
+        .functions
+        .iter()
+        .map(|function| lower_module_execution_function(normalized_module, function))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let lowered_element_segments = normalized_module
+        .element_segments
+        .iter()
+        .map(|segment| {
+            let offset = match segment.offset_expr {
+                TassadarNormalizedWasmConstExpr::I32Const { value } if value >= 0 => value as u32,
+                TassadarNormalizedWasmConstExpr::I32Const { value } => {
+                    return Err(
+                        TassadarWasmModuleExecutionLoweringError::UnsupportedElementSegment {
+                            element_index: segment.element_index,
+                            detail: format!("negative offset {value}"),
+                        },
+                    );
+                }
+                TassadarNormalizedWasmConstExpr::GlobalGet { global_index } => {
+                    return Err(
+                        TassadarWasmModuleExecutionLoweringError::UnsupportedElementSegment {
+                            element_index: segment.element_index,
+                            detail: format!("global.get offset {global_index}"),
+                        },
+                    );
+                }
+            };
+            Ok(TassadarModuleElementSegment {
+                element_segment_index: segment.element_index,
+                table_index: segment.table_index,
+                offset,
+                elements: segment.function_indices.iter().copied().map(Some).collect(),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut program = TassadarModuleExecutionProgram::new(
+        format!(
+            "tassadar.wasm_module_execution.{}.{}.program.v1",
+            &normalized_module.module_digest[..12],
+            sanitize_label(export_name)
+        ),
+        export.index,
+        (lowered_functions.len() as u32).saturating_add(4),
+        lowered_globals,
+        lowered_tables,
+        Vec::new(),
+        lowered_functions,
+    )
+    .with_element_segments(lowered_element_segments);
+    if let Some(start_function_index) = normalized_module.start_function_index {
+        program = program.with_start_function_index(start_function_index);
+    }
+    let _ = source_name.into();
+    program.validate()?;
+    Ok(program)
+}
+
+fn lower_module_execution_function(
+    module: &TassadarNormalizedWasmModule,
+    function: &psionic_ir::TassadarNormalizedWasmFunction,
+) -> Result<TassadarModuleFunction, TassadarWasmModuleExecutionLoweringError> {
+    let body = function.body.as_ref().ok_or(
+        TassadarWasmModuleExecutionLoweringError::ImportedFunctionUnsupported {
+            function_index: function.function_index,
+        },
+    )?;
+    let signature = &module.types[function.type_index as usize];
+    if !signature.params.is_empty() {
+        return Err(
+            TassadarWasmModuleExecutionLoweringError::UnsupportedParamCount {
+                function_index: function.function_index,
+                param_count: signature.params.len(),
+            },
+        );
+    }
+    if signature.results.len() > 1
+        || signature
+            .results
+            .iter()
+            .any(|result| *result != TassadarNormalizedWasmValueType::I32)
+    {
+        return Err(
+            TassadarWasmModuleExecutionLoweringError::UnsupportedResultTypes {
+                function_index: function.function_index,
+            },
+        );
+    }
+    for local in &body.locals {
+        if *local != TassadarNormalizedWasmValueType::I32 {
+            return Err(
+                TassadarWasmModuleExecutionLoweringError::UnsupportedLocalType {
+                    function_index: function.function_index,
+                    local_type: *local,
+                },
+            );
+        }
+    }
+
+    let mut instructions = Vec::new();
+    for instruction in &body.instructions {
+        match instruction {
+            TassadarNormalizedWasmInstruction::I32Const { value } => {
+                instructions.push(TassadarModuleInstruction::I32Const { value: *value });
+            }
+            TassadarNormalizedWasmInstruction::LocalGet { local_index } => {
+                instructions.push(TassadarModuleInstruction::LocalGet {
+                    local_index: *local_index,
+                });
+            }
+            TassadarNormalizedWasmInstruction::LocalSet { local_index } => {
+                instructions.push(TassadarModuleInstruction::LocalSet {
+                    local_index: *local_index,
+                });
+            }
+            TassadarNormalizedWasmInstruction::LocalTee { local_index } => {
+                instructions.push(TassadarModuleInstruction::LocalSet {
+                    local_index: *local_index,
+                });
+                instructions.push(TassadarModuleInstruction::LocalGet {
+                    local_index: *local_index,
+                });
+            }
+            TassadarNormalizedWasmInstruction::GlobalGet { global_index } => {
+                instructions.push(TassadarModuleInstruction::GlobalGet {
+                    global_index: *global_index,
+                });
+            }
+            TassadarNormalizedWasmInstruction::GlobalSet { global_index } => {
+                instructions.push(TassadarModuleInstruction::GlobalSet {
+                    global_index: *global_index,
+                });
+            }
+            TassadarNormalizedWasmInstruction::I32Add => {
+                instructions.push(TassadarModuleInstruction::BinaryOp {
+                    op: psionic_runtime::TassadarStructuredControlBinaryOp::Add,
+                });
+            }
+            TassadarNormalizedWasmInstruction::I32Sub => {
+                instructions.push(TassadarModuleInstruction::BinaryOp {
+                    op: psionic_runtime::TassadarStructuredControlBinaryOp::Sub,
+                });
+            }
+            TassadarNormalizedWasmInstruction::I32Mul => {
+                instructions.push(TassadarModuleInstruction::BinaryOp {
+                    op: psionic_runtime::TassadarStructuredControlBinaryOp::Mul,
+                });
+            }
+            TassadarNormalizedWasmInstruction::I32LtS => {
+                instructions.push(TassadarModuleInstruction::BinaryOp {
+                    op: psionic_runtime::TassadarStructuredControlBinaryOp::LtS,
+                });
+            }
+            TassadarNormalizedWasmInstruction::Call { function_index } => {
+                instructions.push(TassadarModuleInstruction::Call {
+                    function_index: *function_index,
+                });
+            }
+            TassadarNormalizedWasmInstruction::CallIndirect {
+                type_index,
+                table_index,
+            } => {
+                let signature = &module.types[*type_index as usize];
+                if !signature.params.is_empty()
+                    || signature.results.len() > 1
+                    || signature
+                        .results
+                        .iter()
+                        .any(|result| *result != TassadarNormalizedWasmValueType::I32)
+                {
+                    return Err(
+                        TassadarWasmModuleExecutionLoweringError::UnsupportedInstruction {
+                            function_index: function.function_index,
+                            opcode: String::from("call_indirect"),
+                        },
+                    );
+                }
+                instructions.push(TassadarModuleInstruction::CallIndirect {
+                    table_index: *table_index,
+                });
+            }
+            TassadarNormalizedWasmInstruction::Return => {
+                instructions.push(TassadarModuleInstruction::Return);
+            }
+            other => {
+                return Err(
+                    TassadarWasmModuleExecutionLoweringError::UnsupportedInstruction {
+                        function_index: function.function_index,
+                        opcode: other.mnemonic().to_string(),
+                    },
+                );
+            }
+        }
+    }
+
+    Ok(TassadarModuleFunction::new(
+        function.function_index,
+        format!("f{}", function.function_index),
+        0,
+        body.locals.len(),
+        signature.results.len() as u8,
+        instructions,
+    ))
+}
+
 fn lower_function_export(
     module: &TassadarNormalizedWasmModule,
     export_name: &str,
@@ -1103,6 +1473,17 @@ fn lower_function_export(
                 runtime_instructions.push(TassadarInstruction::LocalSet { local });
                 runtime_instructions.push(TassadarInstruction::LocalGet { local });
                 stack.push(PendingValue::StackValue);
+            }
+            TassadarNormalizedWasmInstruction::GlobalGet { .. }
+            | TassadarNormalizedWasmInstruction::GlobalSet { .. }
+            | TassadarNormalizedWasmInstruction::CallIndirect { .. } => {
+                return Err(
+                    TassadarWasmModuleArtifactBundleError::UnsupportedInstruction {
+                        export_name: export_name.to_string(),
+                        function_index,
+                        opcode: instruction.mnemonic().to_string(),
+                    },
+                );
             }
             TassadarNormalizedWasmInstruction::I32Add
             | TassadarNormalizedWasmInstruction::I32Sub
@@ -1625,17 +2006,21 @@ mod tests {
     use std::path::PathBuf;
 
     use psionic_ir::{
-        encode_tassadar_normalized_wasm_module, tassadar_seeded_multi_function_module,
+        encode_tassadar_normalized_wasm_module, tassadar_seeded_instantiation_module,
+        tassadar_seeded_multi_function_module,
     };
     use psionic_runtime::{
         TassadarCToWasmCompileConfig, TassadarCompileRefusal, TassadarCpuReferenceRunner,
-        TassadarWasmProfile, tassadar_canonical_c_source_path, tassadar_canonical_wasm_binary_path,
+        TassadarWasmProfile, execute_tassadar_module_execution_program,
+        tassadar_canonical_c_source_path, tassadar_canonical_wasm_binary_path,
     };
 
     use super::{
         TassadarCSourceArtifactBundlePipelineError, TassadarWasmModuleArtifactBundle,
-        TassadarWasmModuleArtifactBundleError, TassadarWasmTextArtifactBundlePipelineError,
-        TassadarWasmTextCompileConfig, compile_tassadar_c_source_to_artifact_bundle,
+        TassadarWasmModuleArtifactBundleError, TassadarWasmModuleExecutionLoweringError,
+        TassadarWasmTextArtifactBundlePipelineError, TassadarWasmTextCompileConfig,
+        compile_tassadar_c_source_to_artifact_bundle,
+        compile_tassadar_normalized_wasm_module_export_to_module_execution_program,
         compile_tassadar_normalized_wasm_module_to_artifact_bundle,
         compile_tassadar_wasm_binary_module_to_artifact_bundle,
         compile_tassadar_wasm_text_to_artifact_bundle,
@@ -1716,6 +2101,36 @@ mod tests {
             bundle.normalized_module.exported_function_names(),
             vec![String::from("pair_sum"), String::from("local_double")]
         );
+    }
+
+    #[test]
+    fn wasm_module_execution_lowering_runs_instantiation_exactly() {
+        let module = tassadar_seeded_instantiation_module().expect("seeded module should build");
+        let program = compile_tassadar_normalized_wasm_module_export_to_module_execution_program(
+            "seeded://tassadar/wasm/instantiation_v1",
+            &module,
+            "entry",
+        )
+        .expect("module-execution lowering should succeed");
+        let execution =
+            execute_tassadar_module_execution_program(&program).expect("lowered program executes");
+        assert_eq!(execution.returned_value, Some(42));
+        assert_eq!(execution.final_globals, vec![31]);
+    }
+
+    #[test]
+    fn wasm_module_execution_lowering_refuses_memory_surface() {
+        let module = tassadar_seeded_multi_function_module().expect("seeded module should build");
+        let error = compile_tassadar_normalized_wasm_module_export_to_module_execution_program(
+            "seeded://tassadar/wasm/multi_function_v1",
+            &module,
+            "pair_sum",
+        )
+        .expect_err("memory-bearing module should stay outside module-execution lowering");
+        assert!(matches!(
+            error,
+            TassadarWasmModuleExecutionLoweringError::UnsupportedMemorySurface
+        ));
     }
 
     #[test]

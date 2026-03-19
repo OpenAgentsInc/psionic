@@ -765,6 +765,7 @@ fn apply_trace_event(
 ) -> Result<(), TassadarModuleTraceReplayError> {
     let top_function_index = frames.last().map(|frame| frame.function_index);
     match &step.event {
+        TassadarModuleTraceEvent::ElementSegmentApplied { .. } => {}
         TassadarModuleTraceEvent::ConstPush { value } => {
             let frame = current_frame_mut(frames, step.step_index)?;
             frame.operand_stack.push(*value);
@@ -905,6 +906,23 @@ fn apply_trace_event(
             frame.operand_stack.push(replay_result);
             frame.pc = frame.pc.saturating_add(1);
         }
+        TassadarModuleTraceEvent::Call { function_index } => {
+            let frame = current_frame_mut(frames, step.step_index)?;
+            frame.pc = frame.pc.saturating_add(1);
+            let function = program
+                .functions
+                .get(*function_index as usize)
+                .ok_or_else(|| TassadarModuleTraceReplayError::Drift {
+                    step_index: step.step_index,
+                    detail: format!("call target function {function_index} is missing"),
+                })?;
+            frames.push(ReplayFrame {
+                function_index: function.function_index,
+                pc: 0,
+                locals: vec![0; function.local_count],
+                operand_stack: Vec::new(),
+            });
+        }
         TassadarModuleTraceEvent::CallIndirect {
             table_index,
             selector,
@@ -935,10 +953,10 @@ fn apply_trace_event(
                     detail: format!("call_indirect referenced missing table {table_index}"),
                 }
             })?;
-            let resolved = table
-                .elements
+            let resolved = instantiated_table_elements(program, table)
                 .get(*selector as usize)
-                .and_then(|entry| *entry)
+                .copied()
+                .flatten()
                 .ok_or_else(|| TassadarModuleTraceReplayError::Drift {
                     step_index: step.step_index,
                     detail: String::from("call_indirect selector did not resolve during replay"),
@@ -1087,6 +1105,27 @@ fn apply_trace_event(
         }
     }
     Ok(())
+}
+
+fn instantiated_table_elements(
+    program: &TassadarModuleExecutionProgram,
+    table: &crate::TassadarModuleTable,
+) -> Vec<Option<u32>> {
+    let mut elements = table.elements.clone();
+    for segment in &program.element_segments {
+        if segment.table_index != table.table_index {
+            continue;
+        }
+        let start = segment.offset as usize;
+        let end = start + segment.elements.len();
+        if end > elements.len() {
+            continue;
+        }
+        for (slot, function_index) in segment.elements.iter().enumerate() {
+            elements[start + slot] = *function_index;
+        }
+    }
+    elements
 }
 
 fn current_frame_mut(

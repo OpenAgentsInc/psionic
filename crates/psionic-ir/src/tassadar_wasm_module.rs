@@ -2,14 +2,18 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use wasm_encoder::{
-    CodeSection, ConstExpr, DataSection, DataSegment, DataSegmentMode, EntityType, ExportKind,
-    ExportSection, Function, FunctionSection, ImportSection, Instruction, MemArg, MemorySection,
-    Module, TypeSection, ValType,
+    CodeSection, ConstExpr, DataSection, DataSegment, DataSegmentMode, ElementMode, ElementSection,
+    Elements, EntityType, ExportKind, ExportSection, Function, FunctionSection, GlobalSection,
+    GlobalType, ImportSection, Instruction, MemArg, MemorySection, Module, StartSection,
+    TableSection, TableType, TypeSection, ValType,
 };
-use wasmparser::{DataKind, Encoding, ExternalKind, Operator, Parser, Payload, TypeRef};
+use wasmparser::{
+    DataKind, ElementItems, ElementKind, Encoding, ExternalKind, Operator, Parser, Payload,
+    RefType, TypeRef,
+};
 
 const TASSADAR_NORMALIZED_WASM_MODULE_SCHEMA_VERSION: u16 = 1;
-const TASSADAR_NORMALIZED_WASM_MODULE_CLAIM_BOUNDARY: &str = "normalized Wasm module ingress preserves explicit type, function, export, memory, data-segment, and code-body structure for the current bounded core module slice only; lowering support stays narrower and does not imply arbitrary Wasm closure";
+const TASSADAR_NORMALIZED_WASM_MODULE_CLAIM_BOUNDARY: &str = "normalized Wasm module ingress preserves explicit type, function, table, global, export, start, element-segment, memory, data-segment, and code-body structure for the current bounded core module slice only; lowering support stays narrower and does not imply arbitrary Wasm closure";
 
 /// One normalized core Wasm value type accepted by the bounded Tassadar module
 /// ingress lane.
@@ -163,6 +167,51 @@ impl TassadarNormalizedWasmMemory {
     }
 }
 
+/// Mutability posture for one normalized core Wasm global.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarNormalizedWasmGlobalMutability {
+    /// Immutable global.
+    Const,
+    /// Mutable global.
+    Mutable,
+}
+
+/// One normalized defined Wasm global.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarNormalizedWasmGlobal {
+    /// Stable global index.
+    pub global_index: u32,
+    /// Global value type.
+    pub value_type: TassadarNormalizedWasmValueType,
+    /// Global mutability posture.
+    pub mutability: TassadarNormalizedWasmGlobalMutability,
+    /// Constant initializer for the global.
+    pub init_expr: TassadarNormalizedWasmConstExpr,
+}
+
+/// Table element kind admitted by the normalized IR.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TassadarNormalizedWasmTableElementKind {
+    /// Function references.
+    Funcref,
+}
+
+/// One normalized defined Wasm table.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarNormalizedWasmTable {
+    /// Stable table index.
+    pub table_index: u32,
+    /// Table element kind.
+    pub element_kind: TassadarNormalizedWasmTableElementKind,
+    /// Minimum declared entries.
+    pub min_entries: u32,
+    /// Optional maximum declared entries.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_entries: Option<u32>,
+}
+
 /// One normalized constant expression accepted in active data segments.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -203,6 +252,16 @@ pub enum TassadarNormalizedWasmInstruction {
         /// Local index.
         local_index: u32,
     },
+    /// Read one global.
+    GlobalGet {
+        /// Global index.
+        global_index: u32,
+    },
+    /// Write one global.
+    GlobalSet {
+        /// Global index.
+        global_index: u32,
+    },
     /// Signed `i32` less-than comparison.
     I32LtS,
     /// Integer addition.
@@ -236,6 +295,13 @@ pub enum TassadarNormalizedWasmInstruction {
         /// Target function index.
         function_index: u32,
     },
+    /// Indirect function call through one table.
+    CallIndirect {
+        /// Referenced function type.
+        type_index: u32,
+        /// Target table index.
+        table_index: u32,
+    },
     /// Explicit return.
     Return,
     /// Drop one stack value.
@@ -251,6 +317,8 @@ impl TassadarNormalizedWasmInstruction {
             Self::LocalGet { .. } => "local.get",
             Self::LocalSet { .. } => "local.set",
             Self::LocalTee { .. } => "local.tee",
+            Self::GlobalGet { .. } => "global.get",
+            Self::GlobalSet { .. } => "global.set",
             Self::I32LtS => "i32.lt_s",
             Self::I32Add => "i32.add",
             Self::I32Sub => "i32.sub",
@@ -259,6 +327,7 @@ impl TassadarNormalizedWasmInstruction {
             Self::I32Load { .. } => "i32.load",
             Self::I32Store { .. } => "i32.store",
             Self::Call { .. } => "call",
+            Self::CallIndirect { .. } => "call_indirect",
             Self::Return => "return",
             Self::Drop => "drop",
         }
@@ -364,6 +433,19 @@ pub enum TassadarNormalizedWasmDataMode {
     },
 }
 
+/// One normalized active function element segment.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarNormalizedWasmElementSegment {
+    /// Stable element index.
+    pub element_index: u32,
+    /// Target table index.
+    pub table_index: u32,
+    /// Offset constant expression.
+    pub offset_expr: TassadarNormalizedWasmConstExpr,
+    /// Function indices written into the table.
+    pub function_indices: Vec<u32>,
+}
+
 /// Canonical normalized Wasm module IR for the bounded Tassadar ingress lane.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TassadarNormalizedWasmModule {
@@ -373,10 +455,22 @@ pub struct TassadarNormalizedWasmModule {
     pub types: Vec<TassadarNormalizedWasmFunctionType>,
     /// Ordered function index space including imports.
     pub functions: Vec<TassadarNormalizedWasmFunction>,
+    /// Ordered defined table section.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tables: Vec<TassadarNormalizedWasmTable>,
     /// Ordered memory index space including imports.
     pub memories: Vec<TassadarNormalizedWasmMemory>,
+    /// Ordered defined global section.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub globals: Vec<TassadarNormalizedWasmGlobal>,
     /// Ordered export section.
     pub exports: Vec<TassadarNormalizedWasmExport>,
+    /// Optional start function index.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_function_index: Option<u32>,
+    /// Ordered active element segments.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub element_segments: Vec<TassadarNormalizedWasmElementSegment>,
     /// Ordered data segments.
     pub data_segments: Vec<TassadarNormalizedWasmDataSegment>,
     /// Explicit claim boundary for the normalized IR.
@@ -394,12 +488,42 @@ impl TassadarNormalizedWasmModule {
         exports: Vec<TassadarNormalizedWasmExport>,
         data_segments: Vec<TassadarNormalizedWasmDataSegment>,
     ) -> Result<Self, TassadarNormalizedWasmModuleError> {
+        Self::new_full(
+            types,
+            functions,
+            Vec::new(),
+            memories,
+            Vec::new(),
+            exports,
+            None,
+            Vec::new(),
+            data_segments,
+        )
+    }
+
+    /// Creates one validated normalized module including the extended bounded
+    /// table/global/start/element surface.
+    pub fn new_full(
+        types: Vec<TassadarNormalizedWasmFunctionType>,
+        functions: Vec<TassadarNormalizedWasmFunction>,
+        tables: Vec<TassadarNormalizedWasmTable>,
+        memories: Vec<TassadarNormalizedWasmMemory>,
+        globals: Vec<TassadarNormalizedWasmGlobal>,
+        exports: Vec<TassadarNormalizedWasmExport>,
+        start_function_index: Option<u32>,
+        element_segments: Vec<TassadarNormalizedWasmElementSegment>,
+        data_segments: Vec<TassadarNormalizedWasmDataSegment>,
+    ) -> Result<Self, TassadarNormalizedWasmModuleError> {
         let mut module = Self {
             schema_version: TASSADAR_NORMALIZED_WASM_MODULE_SCHEMA_VERSION,
             types,
             functions,
+            tables,
             memories,
+            globals,
             exports,
+            start_function_index,
+            element_segments,
             data_segments,
             claim_boundary: String::from(TASSADAR_NORMALIZED_WASM_MODULE_CLAIM_BOUNDARY),
             module_digest: String::new(),
@@ -407,6 +531,46 @@ impl TassadarNormalizedWasmModule {
         module.validate_internal_consistency()?;
         module.module_digest = stable_digest(b"tassadar_normalized_wasm_module|", &module);
         Ok(module)
+    }
+
+    /// Binds defined tables to the normalized module.
+    #[must_use]
+    pub fn with_tables(mut self, tables: Vec<TassadarNormalizedWasmTable>) -> Self {
+        self.tables = tables;
+        self.refresh_digest();
+        self
+    }
+
+    /// Binds defined globals to the normalized module.
+    #[must_use]
+    pub fn with_globals(mut self, globals: Vec<TassadarNormalizedWasmGlobal>) -> Self {
+        self.globals = globals;
+        self.refresh_digest();
+        self
+    }
+
+    /// Binds one optional start function to the normalized module.
+    #[must_use]
+    pub fn with_start_function_index(mut self, start_function_index: u32) -> Self {
+        self.start_function_index = Some(start_function_index);
+        self.refresh_digest();
+        self
+    }
+
+    /// Binds active element segments to the normalized module.
+    #[must_use]
+    pub fn with_element_segments(
+        mut self,
+        element_segments: Vec<TassadarNormalizedWasmElementSegment>,
+    ) -> Self {
+        self.element_segments = element_segments;
+        self.refresh_digest();
+        self
+    }
+
+    fn refresh_digest(&mut self) {
+        self.module_digest.clear();
+        self.module_digest = stable_digest(b"tassadar_normalized_wasm_module|", self);
     }
 
     /// Returns one function export by stable export name.
@@ -512,6 +676,33 @@ impl TassadarNormalizedWasmModule {
                 }
             }
         }
+        for (expected_index, table) in self.tables.iter().enumerate() {
+            if table.table_index != expected_index as u32 {
+                return Err(TassadarNormalizedWasmModuleError::NonCanonicalTableIndex {
+                    expected: expected_index as u32,
+                    actual: table.table_index,
+                });
+            }
+        }
+        for (expected_index, global) in self.globals.iter().enumerate() {
+            if global.global_index != expected_index as u32 {
+                return Err(TassadarNormalizedWasmModuleError::NonCanonicalGlobalIndex {
+                    expected: expected_index as u32,
+                    actual: global.global_index,
+                });
+            }
+            if let TassadarNormalizedWasmConstExpr::GlobalGet { global_index } = global.init_expr
+                && global_index as usize >= self.globals.len()
+            {
+                return Err(
+                    TassadarNormalizedWasmModuleError::GlobalInitIndexOutOfRange {
+                        global_index: global.global_index,
+                        referenced_global_index: global_index,
+                        global_count: self.globals.len(),
+                    },
+                );
+            }
+        }
         for export in &self.exports {
             match export.kind {
                 TassadarNormalizedWasmExportKind::Function
@@ -539,6 +730,46 @@ impl TassadarNormalizedWasmModule {
                 _ => {}
             }
         }
+        if let Some(start_function_index) = self.start_function_index
+            && start_function_index as usize >= self.functions.len()
+        {
+            return Err(
+                TassadarNormalizedWasmModuleError::StartFunctionIndexOutOfRange {
+                    start_function_index,
+                    function_count: self.functions.len(),
+                },
+            );
+        }
+        for (expected_index, segment) in self.element_segments.iter().enumerate() {
+            if segment.element_index != expected_index as u32 {
+                return Err(
+                    TassadarNormalizedWasmModuleError::NonCanonicalElementIndex {
+                        expected: expected_index as u32,
+                        actual: segment.element_index,
+                    },
+                );
+            }
+            if segment.table_index as usize >= self.tables.len() {
+                return Err(
+                    TassadarNormalizedWasmModuleError::ElementTableIndexOutOfRange {
+                        element_index: segment.element_index,
+                        table_index: segment.table_index,
+                        table_count: self.tables.len(),
+                    },
+                );
+            }
+            for function_index in &segment.function_indices {
+                if *function_index as usize >= self.functions.len() {
+                    return Err(
+                        TassadarNormalizedWasmModuleError::ElementFunctionIndexOutOfRange {
+                            element_index: segment.element_index,
+                            function_index: *function_index,
+                            function_count: self.functions.len(),
+                        },
+                    );
+                }
+            }
+        }
         for (expected_index, segment) in self.data_segments.iter().enumerate() {
             if segment.data_index != expected_index as u32 {
                 return Err(TassadarNormalizedWasmModuleError::NonCanonicalDataIndex {
@@ -555,6 +786,64 @@ impl TassadarNormalizedWasmModule {
                             memory_count: self.memories.len(),
                         },
                     );
+                }
+            }
+        }
+        for function in self
+            .functions
+            .iter()
+            .filter(|function| function.body.is_some())
+        {
+            let body = function.body.as_ref().expect("filtered above");
+            for instruction in &body.instructions {
+                match instruction {
+                    TassadarNormalizedWasmInstruction::Call { function_index }
+                        if *function_index as usize >= self.functions.len() =>
+                    {
+                        return Err(
+                            TassadarNormalizedWasmModuleError::InstructionFunctionIndexOutOfRange {
+                                function_index: function.function_index,
+                                referenced_function_index: *function_index,
+                                referenced_function_count: self.functions.len(),
+                            },
+                        );
+                    }
+                    TassadarNormalizedWasmInstruction::GlobalGet { global_index }
+                    | TassadarNormalizedWasmInstruction::GlobalSet { global_index }
+                        if *global_index as usize >= self.globals.len() =>
+                    {
+                        return Err(
+                            TassadarNormalizedWasmModuleError::InstructionGlobalIndexOutOfRange {
+                                function_index: function.function_index,
+                                global_index: *global_index,
+                                global_count: self.globals.len(),
+                            },
+                        );
+                    }
+                    TassadarNormalizedWasmInstruction::CallIndirect {
+                        type_index,
+                        table_index,
+                    } => {
+                        if *type_index as usize >= self.types.len() {
+                            return Err(
+                                TassadarNormalizedWasmModuleError::FunctionTypeIndexOutOfRange {
+                                    function_index: function.function_index,
+                                    type_index: *type_index,
+                                    type_count: self.types.len(),
+                                },
+                            );
+                        }
+                        if *table_index as usize >= self.tables.len() {
+                            return Err(
+                                TassadarNormalizedWasmModuleError::InstructionTableIndexOutOfRange {
+                                    function_index: function.function_index,
+                                    table_index: *table_index,
+                                    table_count: self.tables.len(),
+                                },
+                            );
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -657,6 +946,15 @@ pub enum TassadarNormalizedWasmModuleError {
         /// Actual stored index.
         actual: u32,
     },
+    /// One table row drifted from canonical sequential indexing.
+    #[error("non-canonical table index: expected {expected}, got {actual}")]
+    NonCanonicalTableIndex { expected: u32, actual: u32 },
+    /// One global row drifted from canonical sequential indexing.
+    #[error("non-canonical global index: expected {expected}, got {actual}")]
+    NonCanonicalGlobalIndex { expected: u32, actual: u32 },
+    /// One element-segment row drifted from canonical sequential indexing.
+    #[error("non-canonical element index: expected {expected}, got {actual}")]
+    NonCanonicalElementIndex { expected: u32, actual: u32 },
     /// One data row drifted from canonical sequential indexing.
     #[error("non-canonical data index: expected {expected}, got {actual}")]
     NonCanonicalDataIndex {
@@ -737,6 +1035,68 @@ pub enum TassadarNormalizedWasmModuleError {
         /// Memory count in the module.
         memory_count: usize,
     },
+    /// One global initializer referenced a missing global.
+    #[error(
+        "global {global_index} init expr references global {referenced_global_index}, but only {global_count} globals are present"
+    )]
+    GlobalInitIndexOutOfRange {
+        global_index: u32,
+        referenced_global_index: u32,
+        global_count: usize,
+    },
+    /// The start function referenced a missing function.
+    #[error(
+        "start function {start_function_index} is out of range for function_count={function_count}"
+    )]
+    StartFunctionIndexOutOfRange {
+        start_function_index: u32,
+        function_count: usize,
+    },
+    /// One element segment referenced a missing table.
+    #[error(
+        "element segment {element_index} references table {table_index}, but only {table_count} tables are present"
+    )]
+    ElementTableIndexOutOfRange {
+        element_index: u32,
+        table_index: u32,
+        table_count: usize,
+    },
+    /// One element segment referenced a missing function.
+    #[error(
+        "element segment {element_index} references function {function_index}, but only {function_count} functions are present"
+    )]
+    ElementFunctionIndexOutOfRange {
+        element_index: u32,
+        function_index: u32,
+        function_count: usize,
+    },
+    /// One instruction referenced a missing function.
+    #[error(
+        "function {function_index} references function {referenced_function_index}, but only {referenced_function_count} functions are present"
+    )]
+    InstructionFunctionIndexOutOfRange {
+        function_index: u32,
+        referenced_function_index: u32,
+        referenced_function_count: usize,
+    },
+    /// One instruction referenced a missing global.
+    #[error(
+        "function {function_index} references global {global_index}, but only {global_count} globals are present"
+    )]
+    InstructionGlobalIndexOutOfRange {
+        function_index: u32,
+        global_index: u32,
+        global_count: usize,
+    },
+    /// One instruction referenced a missing table.
+    #[error(
+        "function {function_index} references table {table_index}, but only {table_count} tables are present"
+    )]
+    InstructionTableIndexOutOfRange {
+        function_index: u32,
+        table_index: u32,
+        table_count: usize,
+    },
 }
 
 /// Parses one Wasm binary into the normalized module IR.
@@ -745,10 +1105,14 @@ pub fn parse_tassadar_normalized_wasm_module(
 ) -> Result<TassadarNormalizedWasmModule, TassadarNormalizedWasmModuleError> {
     let mut types = Vec::new();
     let mut functions = Vec::new();
+    let mut tables = Vec::new();
     let mut memories = Vec::new();
+    let mut globals = Vec::new();
     let mut exports = Vec::new();
     let mut declared_function_type_indices = Vec::new();
     let mut code_bodies = Vec::new();
+    let mut start_function_index = None;
+    let mut element_segments = Vec::new();
     let mut data_segments = Vec::new();
 
     for payload in Parser::new(0).parse_all(bytes) {
@@ -819,6 +1183,12 @@ pub fn parse_tassadar_normalized_wasm_module(
                     declared_function_type_indices.push(function_type_index.map_err(binary_error)?);
                 }
             }
+            Payload::TableSection(reader) => {
+                for table in reader {
+                    let table = table.map_err(binary_error)?;
+                    tables.push(normalize_table(table, tables.len() as u32)?);
+                }
+            }
             Payload::MemorySection(reader) => {
                 for memory in reader {
                     let memory = memory.map_err(binary_error)?;
@@ -827,6 +1197,12 @@ pub fn parse_tassadar_normalized_wasm_module(
                         memory_index,
                         normalize_memory_type(memory),
                     ));
+                }
+            }
+            Payload::GlobalSection(reader) => {
+                for global in reader {
+                    let global = global.map_err(binary_error)?;
+                    globals.push(normalize_global(global, globals.len() as u32)?);
                 }
             }
             Payload::ExportSection(reader) => {
@@ -847,6 +1223,18 @@ pub fn parse_tassadar_normalized_wasm_module(
                         kind,
                         export.index,
                     ));
+                }
+            }
+            Payload::StartSection { func, .. } => {
+                start_function_index = Some(func);
+            }
+            Payload::ElementSection(reader) => {
+                for element in reader {
+                    let element = element.map_err(binary_error)?;
+                    element_segments.push(normalize_element_segment(
+                        element,
+                        element_segments.len() as u32,
+                    )?);
                 }
             }
             Payload::CodeSectionEntry(body) => {
@@ -879,29 +1267,9 @@ pub fn parse_tassadar_normalized_wasm_module(
                 }
             }
             Payload::CustomSection(_) | Payload::CodeSectionStart { .. } | Payload::End(_) => {}
-            Payload::TableSection(_) => {
-                return Err(TassadarNormalizedWasmModuleError::UnsupportedSection {
-                    section: String::from("table"),
-                });
-            }
             Payload::TagSection(_) => {
                 return Err(TassadarNormalizedWasmModuleError::UnsupportedSection {
                     section: String::from("tag"),
-                });
-            }
-            Payload::GlobalSection(_) => {
-                return Err(TassadarNormalizedWasmModuleError::UnsupportedSection {
-                    section: String::from("global"),
-                });
-            }
-            Payload::StartSection { .. } => {
-                return Err(TassadarNormalizedWasmModuleError::UnsupportedSection {
-                    section: String::from("start"),
-                });
-            }
-            Payload::ElementSection(_) => {
-                return Err(TassadarNormalizedWasmModuleError::UnsupportedSection {
-                    section: String::from("element"),
                 });
             }
             Payload::DataCountSection { .. } => {
@@ -934,7 +1302,17 @@ pub fn parse_tassadar_normalized_wasm_module(
         ));
     }
 
-    TassadarNormalizedWasmModule::new(types, functions, memories, exports, data_segments)
+    TassadarNormalizedWasmModule::new_full(
+        types,
+        functions,
+        tables,
+        memories,
+        globals,
+        exports,
+        start_function_index,
+        element_segments,
+        data_segments,
+    )
 }
 
 /// Encodes one validated normalized module back into canonical Wasm bytes.
@@ -1003,6 +1381,14 @@ pub fn encode_tassadar_normalized_wasm_module(
         encoded.section(&function_section);
     }
 
+    let mut table_section = TableSection::new();
+    for table in &module.tables {
+        table_section.table(encode_table_type(table)?);
+    }
+    if !table_section.is_empty() {
+        encoded.section(&table_section);
+    }
+
     let mut memory_section = MemorySection::new();
     for memory in module
         .memories
@@ -1013,6 +1399,17 @@ pub fn encode_tassadar_normalized_wasm_module(
     }
     if !memory_section.is_empty() {
         encoded.section(&memory_section);
+    }
+
+    let mut global_section = GlobalSection::new();
+    for global in &module.globals {
+        global_section.global(
+            encode_global_type(global)?,
+            &encode_const_expr(&global.init_expr),
+        );
+    }
+    if !global_section.is_empty() {
+        encoded.section(&global_section);
     }
 
     let mut export_section = ExportSection::new();
@@ -1028,6 +1425,28 @@ pub fn encode_tassadar_normalized_wasm_module(
     }
     if !export_section.is_empty() {
         encoded.section(&export_section);
+    }
+
+    if let Some(start_function_index) = module.start_function_index {
+        encoded.section(&StartSection {
+            function_index: start_function_index,
+        });
+    }
+
+    let mut element_section = ElementSection::new();
+    for element in &module.element_segments {
+        element_section.segment(wasm_encoder::ElementSegment {
+            mode: ElementMode::Active {
+                table: Some(element.table_index),
+                offset: &encode_const_expr(&element.offset_expr),
+            },
+            elements: Elements::Functions(std::borrow::Cow::Owned(
+                element.function_indices.clone(),
+            )),
+        });
+    }
+    if !element_section.is_empty() {
+        encoded.section(&element_section);
     }
 
     let mut code_section = CodeSection::new();
@@ -1168,6 +1587,116 @@ pub fn tassadar_seeded_multi_function_module()
     )
 }
 
+/// Returns one canonical seeded module covering globals, tables, active
+/// element segments, start, direct call, and indirect call.
+pub fn tassadar_seeded_instantiation_module()
+-> Result<TassadarNormalizedWasmModule, TassadarNormalizedWasmModuleError> {
+    TassadarNormalizedWasmModule::new_full(
+        vec![
+            TassadarNormalizedWasmFunctionType {
+                type_index: 0,
+                params: Vec::new(),
+                results: vec![TassadarNormalizedWasmValueType::I32],
+            },
+            TassadarNormalizedWasmFunctionType {
+                type_index: 1,
+                params: Vec::new(),
+                results: Vec::new(),
+            },
+        ],
+        vec![
+            TassadarNormalizedWasmFunction::defined(
+                0,
+                0,
+                TassadarNormalizedWasmFunctionBody::new(
+                    Vec::new(),
+                    vec![
+                        TassadarNormalizedWasmInstruction::GlobalGet { global_index: 0 },
+                        TassadarNormalizedWasmInstruction::I32Const { value: 1 },
+                        TassadarNormalizedWasmInstruction::CallIndirect {
+                            type_index: 0,
+                            table_index: 0,
+                        },
+                        TassadarNormalizedWasmInstruction::I32Add,
+                        TassadarNormalizedWasmInstruction::Return,
+                    ],
+                ),
+            ),
+            TassadarNormalizedWasmFunction::defined(
+                1,
+                1,
+                TassadarNormalizedWasmFunctionBody::new(
+                    Vec::new(),
+                    vec![
+                        TassadarNormalizedWasmInstruction::Call { function_index: 4 },
+                        TassadarNormalizedWasmInstruction::Return,
+                    ],
+                ),
+            ),
+            TassadarNormalizedWasmFunction::defined(
+                2,
+                0,
+                TassadarNormalizedWasmFunctionBody::new(
+                    Vec::new(),
+                    vec![
+                        TassadarNormalizedWasmInstruction::I32Const { value: 9 },
+                        TassadarNormalizedWasmInstruction::Return,
+                    ],
+                ),
+            ),
+            TassadarNormalizedWasmFunction::defined(
+                3,
+                0,
+                TassadarNormalizedWasmFunctionBody::new(
+                    Vec::new(),
+                    vec![
+                        TassadarNormalizedWasmInstruction::I32Const { value: 11 },
+                        TassadarNormalizedWasmInstruction::Return,
+                    ],
+                ),
+            ),
+            TassadarNormalizedWasmFunction::defined(
+                4,
+                1,
+                TassadarNormalizedWasmFunctionBody::new(
+                    Vec::new(),
+                    vec![
+                        TassadarNormalizedWasmInstruction::I32Const { value: 31 },
+                        TassadarNormalizedWasmInstruction::GlobalSet { global_index: 0 },
+                        TassadarNormalizedWasmInstruction::Return,
+                    ],
+                ),
+            ),
+        ],
+        vec![TassadarNormalizedWasmTable {
+            table_index: 0,
+            element_kind: TassadarNormalizedWasmTableElementKind::Funcref,
+            min_entries: 3,
+            max_entries: Some(3),
+        }],
+        Vec::new(),
+        vec![TassadarNormalizedWasmGlobal {
+            global_index: 0,
+            value_type: TassadarNormalizedWasmValueType::I32,
+            mutability: TassadarNormalizedWasmGlobalMutability::Mutable,
+            init_expr: TassadarNormalizedWasmConstExpr::I32Const { value: 1 },
+        }],
+        vec![TassadarNormalizedWasmExport::new(
+            "entry",
+            TassadarNormalizedWasmExportKind::Function,
+            0,
+        )],
+        Some(1),
+        vec![TassadarNormalizedWasmElementSegment {
+            element_index: 0,
+            table_index: 0,
+            offset_expr: TassadarNormalizedWasmConstExpr::I32Const { value: 0 },
+            function_indices: vec![2, 3, 2],
+        }],
+        Vec::new(),
+    )
+}
+
 fn normalize_import(
     module: &str,
     name: &str,
@@ -1248,6 +1777,12 @@ fn parse_function_body(
             Operator::LocalTee { local_index } => {
                 instructions.push(TassadarNormalizedWasmInstruction::LocalTee { local_index });
             }
+            Operator::GlobalGet { global_index } => {
+                instructions.push(TassadarNormalizedWasmInstruction::GlobalGet { global_index });
+            }
+            Operator::GlobalSet { global_index } => {
+                instructions.push(TassadarNormalizedWasmInstruction::GlobalSet { global_index });
+            }
             Operator::I32Add => instructions.push(TassadarNormalizedWasmInstruction::I32Add),
             Operator::I32Sub => instructions.push(TassadarNormalizedWasmInstruction::I32Sub),
             Operator::I32Mul => instructions.push(TassadarNormalizedWasmInstruction::I32Mul),
@@ -1269,6 +1804,15 @@ fn parse_function_body(
             }
             Operator::Call { function_index } => {
                 instructions.push(TassadarNormalizedWasmInstruction::Call { function_index });
+            }
+            Operator::CallIndirect {
+                type_index,
+                table_index,
+            } => {
+                instructions.push(TassadarNormalizedWasmInstruction::CallIndirect {
+                    type_index,
+                    table_index,
+                });
             }
             Operator::Return => instructions.push(TassadarNormalizedWasmInstruction::Return),
             Operator::Drop => instructions.push(TassadarNormalizedWasmInstruction::Drop),
@@ -1348,6 +1892,81 @@ fn normalize_memory_type(memory_type: wasmparser::MemoryType) -> TassadarNormali
     }
 }
 
+fn normalize_table(
+    table: wasmparser::Table<'_>,
+    table_index: u32,
+) -> Result<TassadarNormalizedWasmTable, TassadarNormalizedWasmModuleError> {
+    if !matches!(table.init, wasmparser::TableInit::RefNull) {
+        return Err(TassadarNormalizedWasmModuleError::UnsupportedSection {
+            section: String::from("table_init_expr"),
+        });
+    }
+    if table.ty.element_type != RefType::FUNCREF || table.ty.table64 || table.ty.shared {
+        return Err(TassadarNormalizedWasmModuleError::UnsupportedSection {
+            section: String::from("table_type"),
+        });
+    }
+    Ok(TassadarNormalizedWasmTable {
+        table_index,
+        element_kind: TassadarNormalizedWasmTableElementKind::Funcref,
+        min_entries: table.ty.initial as u32,
+        max_entries: table.ty.maximum.map(|value| value as u32),
+    })
+}
+
+fn normalize_global(
+    global: wasmparser::Global<'_>,
+    global_index: u32,
+) -> Result<TassadarNormalizedWasmGlobal, TassadarNormalizedWasmModuleError> {
+    Ok(TassadarNormalizedWasmGlobal {
+        global_index,
+        value_type: normalize_value_type(global.ty.content_type)?,
+        mutability: if global.ty.mutable {
+            TassadarNormalizedWasmGlobalMutability::Mutable
+        } else {
+            TassadarNormalizedWasmGlobalMutability::Const
+        },
+        init_expr: parse_const_expr(&global.init_expr, format!("global_{global_index}"))?,
+    })
+}
+
+fn normalize_element_segment(
+    element: wasmparser::Element<'_>,
+    element_index: u32,
+) -> Result<TassadarNormalizedWasmElementSegment, TassadarNormalizedWasmModuleError> {
+    let (table_index, offset_expr) = match element.kind {
+        ElementKind::Active {
+            table_index,
+            offset_expr,
+        } => (
+            table_index.unwrap_or(0),
+            parse_const_expr(&offset_expr, format!("element_{element_index}"))?,
+        ),
+        ElementKind::Passive | ElementKind::Declared => {
+            return Err(TassadarNormalizedWasmModuleError::UnsupportedSection {
+                section: String::from("passive_or_declared_element"),
+            });
+        }
+    };
+    let function_indices = match element.items {
+        ElementItems::Functions(reader) => reader
+            .into_iter()
+            .map(|function_index| function_index.map_err(binary_error))
+            .collect::<Result<Vec<_>, _>>()?,
+        ElementItems::Expressions(_, _) => {
+            return Err(TassadarNormalizedWasmModuleError::UnsupportedSection {
+                section: String::from("element_expressions"),
+            });
+        }
+    };
+    Ok(TassadarNormalizedWasmElementSegment {
+        element_index,
+        table_index,
+        offset_expr,
+        function_indices,
+    })
+}
+
 fn encode_memory_type(memory_type: &TassadarNormalizedWasmMemoryType) -> wasm_encoder::MemoryType {
     wasm_encoder::MemoryType {
         minimum: memory_type.minimum_pages,
@@ -1356,6 +1975,34 @@ fn encode_memory_type(memory_type: &TassadarNormalizedWasmMemoryType) -> wasm_en
         shared: memory_type.shared,
         page_size_log2: memory_type.page_size_log2,
     }
+}
+
+fn encode_table_type(
+    table: &TassadarNormalizedWasmTable,
+) -> Result<TableType, TassadarNormalizedWasmModuleError> {
+    let element_type = match table.element_kind {
+        TassadarNormalizedWasmTableElementKind::Funcref => wasm_encoder::RefType::FUNCREF,
+    };
+    Ok(TableType {
+        element_type,
+        table64: false,
+        minimum: u64::from(table.min_entries),
+        maximum: table.max_entries.map(u64::from),
+        shared: false,
+    })
+}
+
+fn encode_global_type(
+    global: &TassadarNormalizedWasmGlobal,
+) -> Result<GlobalType, TassadarNormalizedWasmModuleError> {
+    Ok(GlobalType {
+        val_type: encode_value_type(global.value_type)?,
+        mutable: matches!(
+            global.mutability,
+            TassadarNormalizedWasmGlobalMutability::Mutable
+        ),
+        shared: false,
+    })
 }
 
 fn encode_instruction(instruction: &TassadarNormalizedWasmInstruction, function: &mut Function) {
@@ -1371,6 +2018,12 @@ fn encode_instruction(instruction: &TassadarNormalizedWasmInstruction, function:
         }
         TassadarNormalizedWasmInstruction::LocalTee { local_index } => {
             function.instruction(&Instruction::LocalTee(*local_index));
+        }
+        TassadarNormalizedWasmInstruction::GlobalGet { global_index } => {
+            function.instruction(&Instruction::GlobalGet(*global_index));
+        }
+        TassadarNormalizedWasmInstruction::GlobalSet { global_index } => {
+            function.instruction(&Instruction::GlobalSet(*global_index));
         }
         TassadarNormalizedWasmInstruction::I32LtS => {
             function.instruction(&Instruction::I32LtS);
@@ -1412,6 +2065,15 @@ fn encode_instruction(instruction: &TassadarNormalizedWasmInstruction, function:
         TassadarNormalizedWasmInstruction::Call { function_index } => {
             function.instruction(&Instruction::Call(*function_index));
         }
+        TassadarNormalizedWasmInstruction::CallIndirect {
+            type_index,
+            table_index,
+        } => {
+            function.instruction(&Instruction::CallIndirect {
+                type_index: *type_index,
+                table_index: *table_index,
+            });
+        }
         TassadarNormalizedWasmInstruction::Return => {
             function.instruction(&Instruction::Return);
         }
@@ -1447,7 +2109,8 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 mod tests {
     use super::{
         TassadarNormalizedWasmModuleError, encode_tassadar_normalized_wasm_module,
-        parse_tassadar_normalized_wasm_module, tassadar_seeded_multi_function_module,
+        parse_tassadar_normalized_wasm_module, tassadar_seeded_instantiation_module,
+        tassadar_seeded_multi_function_module,
     };
 
     #[test]
@@ -1465,6 +2128,20 @@ mod tests {
     }
 
     #[test]
+    fn normalized_wasm_module_roundtrips_instantiation_sections() {
+        let module = tassadar_seeded_instantiation_module().expect("seeded module should build");
+        let encoded =
+            encode_tassadar_normalized_wasm_module(&module).expect("seeded module should encode");
+        let reparsed =
+            parse_tassadar_normalized_wasm_module(&encoded).expect("encoded module should parse");
+        assert_eq!(reparsed, module);
+        assert_eq!(reparsed.tables.len(), 1);
+        assert_eq!(reparsed.globals.len(), 1);
+        assert_eq!(reparsed.start_function_index, Some(1));
+        assert_eq!(reparsed.element_segments.len(), 1);
+    }
+
+    #[test]
     fn normalized_wasm_module_rejects_malformed_binary() {
         let error = parse_tassadar_normalized_wasm_module(&[0x00, 0x61, 0x73])
             .expect_err("truncated bytes should refuse");
@@ -1475,7 +2152,7 @@ mod tests {
     }
 
     #[test]
-    fn normalized_wasm_module_rejects_unsupported_sections() {
+    fn normalized_wasm_module_rejects_unsupported_export_kinds() {
         let mut module = wasm_encoder::Module::new();
         let mut types = wasm_encoder::TypeSection::new();
         types.ty().function(
@@ -1499,6 +2176,10 @@ mod tests {
         );
         module.section(&globals);
 
+        let mut exports = wasm_encoder::ExportSection::new();
+        exports.export("g0", wasm_encoder::ExportKind::Global, 0);
+        module.section(&exports);
+
         let mut code = wasm_encoder::CodeSection::new();
         let mut function = wasm_encoder::Function::new(Vec::<(u32, wasm_encoder::ValType)>::new());
         function.instruction(&wasm_encoder::Instruction::End);
@@ -1508,11 +2189,12 @@ mod tests {
         let encoded = module.finish();
 
         let error = parse_tassadar_normalized_wasm_module(&encoded)
-            .expect_err("global section should be outside the bounded IR");
+            .expect_err("global exports should remain outside the bounded IR");
         assert_eq!(
             error,
-            TassadarNormalizedWasmModuleError::UnsupportedSection {
-                section: String::from("global"),
+            TassadarNormalizedWasmModuleError::UnsupportedExportKind {
+                export_name: String::from("g0"),
+                kind: String::from("Global"),
             }
         );
     }

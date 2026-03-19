@@ -8,6 +8,7 @@
     "curated.call_indirect_trap",
     "curated.deterministic_import",
     "curated.global_state",
+    "curated.instantiation",
     "curated.unsupported_host_import",
     "generated.call_indirect",
     "generated.call_indirect_trap",
@@ -53,6 +54,29 @@
         "terminal_kind": "returned",
         "returned_value": 222,
         "final_globals": []
+      }
+    },
+    {
+      "case_id": "module_instantiation_exact",
+      "family_id": "curated.instantiation",
+      "origin": "curated",
+      "status": "exact_success",
+      "program_digest": "1e7714fe0aea38758429a89ff9ae5acdd2a709720c8ed8b7950e8ad1fc84ddb7",
+      "reference_module_source_digest": "6700d1a7b5218af6bb40c6d4f46c0b6b1b9976681a4c719b6bd537e5d2551d73",
+      "runtime_terminal_kind": "returned",
+      "runtime_returned_value": 42,
+      "runtime_final_globals": [
+        31
+      ],
+      "runtime_execution_digest": "b0e3a86e803b5b71843acbea3645521856d38bd7df94599e09f20fe7d329e0dd",
+      "reference_execution": {
+        "authority_id": "wasmi.reference.v1",
+        "reference_module_source_digest": "6700d1a7b5218af6bb40c6d4f46c0b6b1b9976681a4c719b6bd537e5d2551d73",
+        "terminal_kind": "returned",
+        "returned_value": 42,
+        "final_globals": [
+          31
+        ]
       }
     },
     {
@@ -228,6 +252,6 @@
       }
     }
   ],
-  "claim_boundary": "this report differentially checks the current bounded module-execution lane against a real Wasm reference authority over curated and deterministically generated cases; exact success and trap parity are only claimed for the current supported i32 global/table/call_indirect subset, while unsupported host-import behavior remains an explicit runtime refusal boundary instead of arbitrary Wasm closure",
-  "report_digest": "a96a2a68d730ffb8670264291a29f747b50e38ac9fda30a7e082635290f69d85"
+  "claim_boundary": "this report differentially checks the current bounded module-execution lane against a real Wasm reference authority over curated and deterministically generated cases; exact success and trap parity are only claimed for the current supported i32 global/table/direct-call/call_indirect/start-instantiation subset, while unsupported host-import behavior remains an explicit runtime refusal boundary instead of arbitrary Wasm closure",
+  "report_digest": "4416f30866b638a713aa4136da4d48b0d59a764b4b5f9d7d3bd454c9b2e40005"
 }

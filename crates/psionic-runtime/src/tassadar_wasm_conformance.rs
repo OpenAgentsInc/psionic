@@ -5,12 +5,12 @@ use thiserror::Error;
 use wasmi::{Engine, Error as WasmiError, Linker, Module, Store, Val};
 
 use crate::{
-    TassadarHostImportStub, TassadarModuleExecutionError, TassadarModuleExecutionProgram,
-    TassadarModuleGlobalMutability, TassadarModuleInstruction, TassadarModuleTable,
-    TassadarStructuredControlBinaryOp, execute_tassadar_module_execution_program,
-    tassadar_seeded_module_call_indirect_program,
+    TassadarHostImportStub, TassadarModuleElementSegment, TassadarModuleExecutionError,
+    TassadarModuleExecutionProgram, TassadarModuleGlobalMutability, TassadarModuleInstruction,
+    TassadarModuleTable, TassadarStructuredControlBinaryOp,
+    execute_tassadar_module_execution_program, tassadar_seeded_module_call_indirect_program,
     tassadar_seeded_module_deterministic_import_program,
-    tassadar_seeded_module_global_state_program,
+    tassadar_seeded_module_global_state_program, tassadar_seeded_module_instantiation_program,
     tassadar_seeded_module_unsupported_host_import_program,
 };
 
@@ -217,17 +217,28 @@ impl TassadarModuleExecutionError {
             Self::GlobalIndexDrift { .. } => "global_index_drift",
             Self::TableIndexDrift { .. } => "table_index_drift",
             Self::ImportIndexDrift { .. } => "import_index_drift",
+            Self::ElementSegmentIndexDrift { .. } => "element_segment_index_drift",
             Self::UnsupportedParamCount { .. } => "unsupported_param_count",
             Self::UnsupportedResultCount { .. } => "unsupported_result_count",
             Self::LocalCountTooSmall { .. } => "local_count_too_small",
             Self::LocalOutOfRange { .. } => "local_out_of_range",
             Self::UnsupportedGlobalValueType { .. } => "unsupported_global_value_type",
             Self::GlobalOutOfRange { .. } => "global_out_of_range",
+            Self::MissingStartFunction { .. } => "missing_start_function",
+            Self::UnsupportedStartFunctionSignature { .. } => {
+                "unsupported_start_function_signature"
+            }
             Self::ImmutableGlobalWrite { .. } => "immutable_global_write",
             Self::TableOutOfRange { .. } => "table_out_of_range",
             Self::TableBelowMinimum { .. } => "table_below_minimum",
             Self::TableAboveMaximum { .. } => "table_above_maximum",
             Self::TableFunctionOutOfRange { .. } => "table_function_out_of_range",
+            Self::ElementSegmentTableOutOfRange { .. } => "element_segment_table_out_of_range",
+            Self::ElementSegmentOutOfRange { .. } => "element_segment_out_of_range",
+            Self::ElementSegmentFunctionOutOfRange { .. } => {
+                "element_segment_function_out_of_range"
+            }
+            Self::DirectCallFunctionOutOfRange { .. } => "direct_call_function_out_of_range",
             Self::TableSelectorOutOfRange { .. } => "table_selector_out_of_range",
             Self::EmptyTableEntry { .. } => "empty_table_entry",
             Self::ImportOutOfRange { .. } => "import_out_of_range",
@@ -329,6 +340,12 @@ pub fn tassadar_curated_wasm_conformance_cases() -> Vec<TassadarWasmConformanceC
             family_id: String::from("curated.call_indirect"),
             origin: TassadarWasmConformanceCaseOrigin::Curated,
             program: tassadar_seeded_module_call_indirect_program(),
+        },
+        TassadarWasmConformanceCase {
+            case_id: String::from("module_instantiation_exact"),
+            family_id: String::from("curated.instantiation"),
+            origin: TassadarWasmConformanceCaseOrigin::Curated,
+            program: tassadar_seeded_module_instantiation_program(),
         },
         TassadarWasmConformanceCase {
             case_id: String::from("module_deterministic_import_exact"),
@@ -545,7 +562,8 @@ fn translate_tassadar_module_execution_program_to_wat(
     }
 
     for table in &program.tables {
-        for element in &table.elements {
+        let instantiated_elements = instantiated_table_elements(program, table)?;
+        for element in &instantiated_elements {
             if element.is_none() {
                 return Err(
                     TassadarWasmReferenceTranslationError::SparseTableUnsupported {
@@ -564,6 +582,8 @@ fn translate_tassadar_module_execution_program_to_wat(
         let functions = table
             .elements
             .iter()
+            .enumerate()
+            .map(|(index, _)| instantiated_elements[index])
             .flatten()
             .map(|function_index| format!("$f{function_index}"))
             .collect::<Vec<_>>()
@@ -630,6 +650,10 @@ fn translate_tassadar_module_execution_program_to_wat(
         lines.push(String::from("  )"));
     }
 
+    if let Some(start_function_index) = program.start_function_index {
+        lines.push(format!("  (start $f{start_function_index})"));
+    }
+
     lines.push(String::from(")"));
     Ok(lines.join("\n"))
 }
@@ -653,6 +677,9 @@ fn render_instruction(
             Ok(format!("global.set $g{global_index}"))
         }
         TassadarModuleInstruction::BinaryOp { op } => Ok(render_binary_op(*op).to_string()),
+        TassadarModuleInstruction::Call { function_index } => {
+            Ok(format!("call $f{function_index}"))
+        }
         TassadarModuleInstruction::CallIndirect { table_index } => {
             let table = &program.tables[*table_index as usize];
             let result_count = table_result_count(program, table)?;
@@ -674,8 +701,11 @@ fn table_result_count(
     table: &TassadarModuleTable,
 ) -> Result<u8, TassadarWasmReferenceTranslationError> {
     let mut result_count = None;
-    for function_index in table.elements.iter().flatten() {
-        let function = &program.functions[*function_index as usize];
+    for function_index in instantiated_table_elements(program, table)?
+        .into_iter()
+        .flatten()
+    {
+        let function = &program.functions[function_index as usize];
         if function.result_count > 1 {
             return Err(
                 TassadarWasmReferenceTranslationError::UnsupportedResultCount {
@@ -697,6 +727,38 @@ fn table_result_count(
         }
     }
     Ok(result_count.unwrap_or(0))
+}
+
+fn instantiated_table_elements(
+    program: &TassadarModuleExecutionProgram,
+    table: &TassadarModuleTable,
+) -> Result<Vec<Option<u32>>, TassadarWasmReferenceTranslationError> {
+    let mut elements = table.elements.clone();
+    for TassadarModuleElementSegment {
+        table_index,
+        offset,
+        elements: segment_elements,
+        ..
+    } in &program.element_segments
+    {
+        if *table_index != table.table_index {
+            continue;
+        }
+        let start = *offset as usize;
+        let end = start + segment_elements.len();
+        if end > elements.len() {
+            return Err(TassadarWasmReferenceTranslationError::ProgramInvalid {
+                detail: format!(
+                    "element segment writes beyond table {} during reference translation",
+                    table.table_index
+                ),
+            });
+        }
+        for (slot, function_index) in segment_elements.iter().enumerate() {
+            elements[start + slot] = *function_index;
+        }
+    }
+    Ok(elements)
 }
 
 fn result_type_id(result_count: u8) -> &'static str {
@@ -879,6 +941,7 @@ mod tests {
             .filter(|case| {
                 case.family_id == "curated.global_state"
                     || case.family_id == "curated.call_indirect"
+                    || case.family_id == "curated.instantiation"
                     || case.family_id == "curated.deterministic_import"
             })
         {

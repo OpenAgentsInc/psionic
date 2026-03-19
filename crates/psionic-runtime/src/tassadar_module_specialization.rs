@@ -1163,6 +1163,15 @@ fn lower_defined_function(
                         }
                     }
                 }
+                TassadarNormalizedWasmInstruction::GlobalGet { .. }
+                | TassadarNormalizedWasmInstruction::GlobalSet { .. }
+                | TassadarNormalizedWasmInstruction::CallIndirect { .. } => {
+                    return Err(TassadarModuleSpecializationError::UnsupportedInstruction {
+                        export_name: context.export_name.to_string(),
+                        function_index,
+                        opcode: instruction.mnemonic().to_string(),
+                    });
+                }
                 TassadarNormalizedWasmInstruction::I32Add
                 | TassadarNormalizedWasmInstruction::I32Sub
                 | TassadarNormalizedWasmInstruction::I32Mul

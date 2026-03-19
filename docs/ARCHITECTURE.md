@@ -833,14 +833,18 @@ The current scope is:
   instead of pretending numeric closure already jumped from tiny i32 kernels
   to arbitrary Wasm
 - landed module-boundary bar: `psionic-runtime` now owns a bounded
-  module-execution contract with explicit i32 globals, funcref tables,
-  bounded `call_indirect`, deterministic import stubs, and typed refusal for
-  unsupported host calls; `psionic-models` now publishes that boundary as a
-  repo-facing module-capability publication; `psionic-serve` and
-  `psionic-provider` now carry the same module-support and host-import refusal
-  facts through the served capability path; and `psionic-sandbox` now exposes
-  a sandbox-facing import-boundary contract instead of leaving host-import
-  posture implicit
+  module-execution contract with explicit i32 globals, funcref tables, active
+  element-segment instantiation, zero-parameter start-function execution,
+  zero-parameter direct calls, bounded `call_indirect`, deterministic import
+  stubs, and typed refusal for unsupported host calls; `psionic-ir` now owns
+  the matching normalized Wasm-module structure for globals, tables, start
+  sections, and active element segments; `psionic-compiler` now lowers that
+  admitted module slice into validated module-execution programs; `psionic-models`
+  now publishes that boundary as a repo-facing module-capability publication;
+  `psionic-serve` and `psionic-provider` now carry the same module-support and
+  host-import refusal facts through the served capability path; and
+  `psionic-sandbox` now exposes a sandbox-facing import-boundary contract
+  instead of leaving host-import posture implicit
 - landed exactness/refusal evidence bar: `psionic-runtime` now owns a shared
   `TassadarExactnessRefusalReport` contract that records exact, mismatch, and
   refused posture above current selection diagnostics and trace/output/halt

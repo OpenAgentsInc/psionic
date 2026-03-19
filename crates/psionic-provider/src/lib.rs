@@ -528,11 +528,13 @@ impl TassadarCapabilityEnvelope {
             || !broad_internal_compute_profile_publication_receipt
                 .published_profile_ids
                 .contains(
-                    &broad_internal_compute_profile_publication_receipt
-                        .current_served_profile_id,
+                    &broad_internal_compute_profile_publication_receipt.current_served_profile_id,
                 )
             || broad_internal_compute_profile_publication_receipt.current_served_profile_id
-                != publication.internal_compute_profile_claim_check.claim.profile_id
+                != publication
+                    .internal_compute_profile_claim_check
+                    .claim
+                    .profile_id
         {
             return Err(
                 TassadarCapabilityEnvelopeError::UnpublishableBroadInternalComputeProfilePublication {
@@ -8600,6 +8602,14 @@ mod tests {
         );
         assert_eq!(
             encoded["publication"]["module_execution_capability"]["runtime_capability"]["supports_call_indirect"],
+            json!(true)
+        );
+        assert_eq!(
+            encoded["publication"]["module_execution_capability"]["runtime_capability"]["supports_active_element_segments"],
+            json!(true)
+        );
+        assert_eq!(
+            encoded["publication"]["module_execution_capability"]["runtime_capability"]["supports_start_function_instantiation"],
             json!(true)
         );
         assert_eq!(

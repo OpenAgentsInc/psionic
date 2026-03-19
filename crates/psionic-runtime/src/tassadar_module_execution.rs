@@ -61,6 +61,19 @@ pub struct TassadarModuleTable {
     pub elements: Vec<Option<u32>>,
 }
 
+/// One active element segment in the bounded module-execution lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarModuleElementSegment {
+    /// Stable segment index.
+    pub element_segment_index: u32,
+    /// Target table index.
+    pub table_index: u32,
+    /// Table offset at which elements are written.
+    pub offset: u32,
+    /// Function indices written into the table in order.
+    pub elements: Vec<Option<u32>>,
+}
+
 /// Stub kinds admitted at the host-import boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -115,6 +128,12 @@ pub struct TassadarModuleExecutionCapabilityReport {
     pub supports_tables: bool,
     /// Table element kind admitted today.
     pub supported_table_element_kind: TassadarModuleTableElementKind,
+    /// Whether active element-segment instantiation is supported.
+    pub supports_active_element_segments: bool,
+    /// Whether explicit start-function execution is supported.
+    pub supports_start_function_instantiation: bool,
+    /// Whether direct in-module calls are supported.
+    pub supports_direct_calls: bool,
     /// Whether bounded indirect calls are supported.
     pub supports_call_indirect: bool,
     /// Maximum table entries admitted by the bounded lane.
@@ -135,6 +154,9 @@ pub fn tassadar_module_execution_capability_report() -> TassadarModuleExecutionC
         supported_global_value_types: vec![TassadarModuleValueType::I32],
         supports_tables: true,
         supported_table_element_kind: TassadarModuleTableElementKind::Funcref,
+        supports_active_element_segments: true,
+        supports_start_function_instantiation: true,
+        supports_direct_calls: true,
         supports_call_indirect: true,
         max_table_entries: 64,
         host_import_boundary: TassadarHostImportCapabilityBoundary {
@@ -147,7 +169,7 @@ pub fn tassadar_module_execution_capability_report() -> TassadarModuleExecutionC
             ),
         },
         claim_boundary: String::from(
-            "bounded module execution covers i32 globals, funcref tables, zero-parameter indirect calls, and deterministic import stubs only; memories, arbitrary signatures, and arbitrary host calls remain out of scope",
+            "bounded module execution covers i32 globals, funcref tables, active element-segment instantiation, zero-parameter start functions, zero-parameter direct and indirect calls, and deterministic import stubs only; memories, arbitrary signatures, and arbitrary host calls remain out of scope",
         ),
     }
 }
@@ -212,6 +234,8 @@ pub enum TassadarModuleInstruction {
     BinaryOp {
         op: TassadarStructuredControlBinaryOp,
     },
+    /// Call one declared function directly.
+    Call { function_index: u32 },
     /// Resolve one table slot and call the referenced function.
     CallIndirect { table_index: u32 },
     /// Invoke one host import stub.
@@ -272,6 +296,12 @@ pub struct TassadarModuleExecutionProgram {
     pub globals: Vec<TassadarModuleGlobal>,
     /// Declared tables in stable index order.
     pub tables: Vec<TassadarModuleTable>,
+    /// Active element segments applied during instantiation.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub element_segments: Vec<TassadarModuleElementSegment>,
+    /// Optional zero-parameter start function executed before the entry export.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_function_index: Option<u32>,
     /// Declared host import stubs in stable index order.
     pub imports: Vec<TassadarHostImportStub>,
     /// Declared functions in stable index order.
@@ -296,9 +326,28 @@ impl TassadarModuleExecutionProgram {
             max_call_depth,
             globals,
             tables,
+            element_segments: Vec::new(),
+            start_function_index: None,
             imports,
             functions,
         }
+    }
+
+    /// Binds active element segments to the program.
+    #[must_use]
+    pub fn with_element_segments(
+        mut self,
+        element_segments: Vec<TassadarModuleElementSegment>,
+    ) -> Self {
+        self.element_segments = element_segments;
+        self
+    }
+
+    /// Binds one optional start function to the program.
+    #[must_use]
+    pub fn with_start_function_index(mut self, start_function_index: u32) -> Self {
+        self.start_function_index = Some(start_function_index);
+        self
     }
 
     /// Validates the public bounded module surface.
@@ -318,6 +367,24 @@ impl TassadarModuleExecutionProgram {
                 entry_function_index: self.entry_function_index,
                 param_count: entry.param_count,
             });
+        }
+        if let Some(start_function_index) = self.start_function_index {
+            let start = self
+                .functions
+                .iter()
+                .find(|function| function.function_index == start_function_index)
+                .ok_or(TassadarModuleExecutionError::MissingStartFunction {
+                    start_function_index,
+                })?;
+            if start.param_count != 0 || start.result_count != 0 {
+                return Err(
+                    TassadarModuleExecutionError::UnsupportedStartFunctionSignature {
+                        start_function_index,
+                        param_count: start.param_count,
+                        result_count: start.result_count,
+                    },
+                );
+            }
         }
 
         for (expected_index, global) in self.globals.iter().enumerate() {
@@ -365,6 +432,44 @@ impl TassadarModuleExecutionProgram {
                         function_index: *function_index,
                         function_count: self.functions.len(),
                     });
+                }
+            }
+        }
+
+        for (expected_index, segment) in self.element_segments.iter().enumerate() {
+            if segment.element_segment_index != expected_index as u32 {
+                return Err(TassadarModuleExecutionError::ElementSegmentIndexDrift {
+                    expected: expected_index as u32,
+                    actual: segment.element_segment_index,
+                });
+            }
+            let table = self.tables.get(segment.table_index as usize).ok_or(
+                TassadarModuleExecutionError::ElementSegmentTableOutOfRange {
+                    element_segment_index: segment.element_segment_index,
+                    table_index: segment.table_index,
+                    table_count: self.tables.len(),
+                },
+            )?;
+            let end = segment.offset as usize + segment.elements.len();
+            if end > table.elements.len() {
+                return Err(TassadarModuleExecutionError::ElementSegmentOutOfRange {
+                    element_segment_index: segment.element_segment_index,
+                    table_index: segment.table_index,
+                    offset: segment.offset,
+                    segment_len: segment.elements.len(),
+                    table_len: table.elements.len(),
+                });
+            }
+            for function_index in segment.elements.iter().flatten() {
+                if *function_index as usize >= self.functions.len() {
+                    return Err(
+                        TassadarModuleExecutionError::ElementSegmentFunctionOutOfRange {
+                            element_segment_index: segment.element_segment_index,
+                            table_index: segment.table_index,
+                            function_index: *function_index,
+                            function_count: self.functions.len(),
+                        },
+                    );
                 }
             }
         }
@@ -430,6 +535,14 @@ impl TassadarModuleExecutionProgram {
                             global_count: self.globals.len(),
                         });
                     }
+                    TassadarModuleInstruction::Call { function_index }
+                        if *function_index as usize >= self.functions.len() =>
+                    {
+                        return Err(TassadarModuleExecutionError::DirectCallFunctionOutOfRange {
+                            function_index: *function_index,
+                            function_count: self.functions.len(),
+                        });
+                    }
                     TassadarModuleInstruction::CallIndirect { table_index }
                         if *table_index as usize >= self.tables.len() =>
                     {
@@ -473,6 +586,13 @@ pub struct TassadarModuleFrameSnapshot {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TassadarModuleTraceEvent {
+    /// One active element segment was applied during instantiation.
+    ElementSegmentApplied {
+        element_segment_index: u32,
+        table_index: u32,
+        offset: u32,
+        elements: Vec<Option<u32>>,
+    },
     /// One constant was pushed.
     ConstPush { value: i32 },
     /// One local was read.
@@ -490,6 +610,8 @@ pub enum TassadarModuleTraceEvent {
         right: i32,
         result: i32,
     },
+    /// One direct call pushed a new frame.
+    Call { function_index: u32 },
     /// One indirect call pushed a new frame.
     CallIndirect {
         table_index: u32,
@@ -591,6 +713,9 @@ pub enum TassadarModuleExecutionError {
     /// One import index drifted from stable order.
     #[error("module-execution import index drifted: expected {expected}, got {actual}")]
     ImportIndexDrift { expected: u32, actual: u32 },
+    /// One element segment index drifted from stable order.
+    #[error("module-execution element-segment index drifted: expected {expected}, got {actual}")]
+    ElementSegmentIndexDrift { expected: u32, actual: u32 },
     /// One function declared unsupported parameters.
     #[error(
         "module-execution function {function_index} declares unsupported param_count={param_count}"
@@ -639,6 +764,18 @@ pub enum TassadarModuleExecutionError {
         global_index: u32,
         global_count: usize,
     },
+    /// The declared start function was missing.
+    #[error("module-execution start function {start_function_index} is missing")]
+    MissingStartFunction { start_function_index: u32 },
+    /// The declared start function had an unsupported signature.
+    #[error(
+        "module-execution start function {start_function_index} requires param_count=0 and result_count=0, got param_count={param_count}, result_count={result_count}"
+    )]
+    UnsupportedStartFunctionSignature {
+        start_function_index: u32,
+        param_count: u8,
+        result_count: u8,
+    },
     /// One constant global was written.
     #[error("module-execution global {global_index} is const and cannot be written")]
     ImmutableGlobalWrite { global_index: u32 },
@@ -672,6 +809,44 @@ pub enum TassadarModuleExecutionError {
     )]
     TableFunctionOutOfRange {
         table_index: u32,
+        function_index: u32,
+        function_count: usize,
+    },
+    /// One element segment referenced a missing table.
+    #[error(
+        "module-execution element segment {element_segment_index} references table {table_index} out of range (table_count={table_count})"
+    )]
+    ElementSegmentTableOutOfRange {
+        element_segment_index: u32,
+        table_index: u32,
+        table_count: usize,
+    },
+    /// One element segment exceeded the declared table length.
+    #[error(
+        "module-execution element segment {element_segment_index} writes {segment_len} entries at offset {offset} into table {table_index} of length {table_len}"
+    )]
+    ElementSegmentOutOfRange {
+        element_segment_index: u32,
+        table_index: u32,
+        offset: u32,
+        segment_len: usize,
+        table_len: usize,
+    },
+    /// One element segment referenced a missing function.
+    #[error(
+        "module-execution element segment {element_segment_index} references function {function_index} out of range (function_count={function_count})"
+    )]
+    ElementSegmentFunctionOutOfRange {
+        element_segment_index: u32,
+        table_index: u32,
+        function_index: u32,
+        function_count: usize,
+    },
+    /// One direct call referenced a missing function.
+    #[error(
+        "module-execution direct call referenced function {function_index} out of range (function_count={function_count})"
+    )]
+    DirectCallFunctionOutOfRange {
         function_index: u32,
         function_count: usize,
     },
@@ -724,8 +899,71 @@ pub fn execute_tassadar_module_execution_program(
 ) -> Result<TassadarModuleExecution, TassadarModuleExecutionError> {
     program.validate()?;
     let mut state = ModuleExecutionState::new(program)?;
-    let mut halt_reason = TassadarModuleExecutionHaltReason::Returned;
-    let returned_value;
+    instantiate_tables(program, &mut state)?;
+
+    if let Some(start_function_index) = program.start_function_index {
+        let _ = execute_module_root_call(program, &mut state, start_function_index)?;
+    }
+
+    let (returned_value, halt_reason) =
+        execute_module_root_call(program, &mut state, program.entry_function_index)?;
+
+    Ok(TassadarModuleExecution {
+        program_id: program.program_id.clone(),
+        steps: state.steps,
+        returned_value,
+        final_globals: state.globals,
+        halt_reason,
+    })
+}
+
+fn instantiate_tables(
+    program: &TassadarModuleExecutionProgram,
+    state: &mut ModuleExecutionState,
+) -> Result<(), TassadarModuleExecutionError> {
+    for segment in &program.element_segments {
+        let table_count = state.tables.len();
+        let table = state.tables.get_mut(segment.table_index as usize).ok_or(
+            TassadarModuleExecutionError::ElementSegmentTableOutOfRange {
+                element_segment_index: segment.element_segment_index,
+                table_index: segment.table_index,
+                table_count,
+            },
+        )?;
+        let start = segment.offset as usize;
+        let end = start + segment.elements.len();
+        if end > table.len() {
+            return Err(TassadarModuleExecutionError::ElementSegmentOutOfRange {
+                element_segment_index: segment.element_segment_index,
+                table_index: segment.table_index,
+                offset: segment.offset,
+                segment_len: segment.elements.len(),
+                table_len: table.len(),
+            });
+        }
+        for (offset, function_index) in segment.elements.iter().enumerate() {
+            table[start + offset] = *function_index;
+        }
+        state.push_step(
+            program,
+            TassadarModuleTraceEvent::ElementSegmentApplied {
+                element_segment_index: segment.element_segment_index,
+                table_index: segment.table_index,
+                offset: segment.offset,
+                elements: segment.elements.clone(),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn execute_module_root_call(
+    program: &TassadarModuleExecutionProgram,
+    state: &mut ModuleExecutionState,
+    root_function_index: u32,
+) -> Result<(Option<i32>, TassadarModuleExecutionHaltReason), TassadarModuleExecutionError> {
+    let root = &program.functions[root_function_index as usize];
+    state.frames.push(ModuleFrame::new(root));
 
     while !state.frames.is_empty() {
         if state.step_index >= TASSADAR_MODULE_EXECUTION_MAX_STEPS {
@@ -754,8 +992,6 @@ pub fn execute_tassadar_module_execution_program(
                 )?;
                 continue;
             }
-            halt_reason = TassadarModuleExecutionHaltReason::FellOffEnd;
-            returned_value = value;
             state.push_step(
                 program,
                 TassadarModuleTraceEvent::Return {
@@ -764,13 +1000,7 @@ pub fn execute_tassadar_module_execution_program(
                     implicit: true,
                 },
             )?;
-            return Ok(TassadarModuleExecution {
-                program_id: program.program_id.clone(),
-                steps: state.steps,
-                returned_value,
-                final_globals: state.globals,
-                halt_reason,
-            });
+            return Ok((value, TassadarModuleExecutionHaltReason::FellOffEnd));
         }
 
         let instruction = function.instructions[state.frames[current_index].pc].clone();
@@ -890,44 +1120,47 @@ pub fn execute_tassadar_module_execution_program(
                     },
                 )?;
             }
+            TassadarModuleInstruction::Call {
+                function_index: target_function_index,
+            } => {
+                push_call_frame(program, state, current_index, target_function_index)?;
+                state.push_step(
+                    program,
+                    TassadarModuleTraceEvent::Call {
+                        function_index: target_function_index,
+                    },
+                )?;
+            }
             TassadarModuleInstruction::CallIndirect { table_index } => {
                 let selector = pop_operand(
                     &mut state.frames[current_index],
                     function_index,
                     "call_indirect",
                 )?;
-                let table = program.tables.get(table_index as usize).ok_or(
+                let table = state.tables.get(table_index as usize).ok_or(
                     TassadarModuleExecutionError::TableOutOfRange {
                         table_index,
-                        table_count: program.tables.len(),
+                        table_count: state.tables.len(),
                     },
                 )?;
-                let function_index = table
-                    .elements
+                let target_function_index = table
                     .get(selector as usize)
                     .ok_or(TassadarModuleExecutionError::TableSelectorOutOfRange {
                         table_index,
                         selector,
-                        entry_count: table.elements.len(),
+                        entry_count: table.len(),
                     })?
                     .ok_or(TassadarModuleExecutionError::EmptyTableEntry {
                         table_index,
                         selector,
                     })?;
-                if state.frames.len() >= program.max_call_depth as usize {
-                    return Err(TassadarModuleExecutionError::CallDepthExceeded {
-                        max_call_depth: program.max_call_depth,
-                    });
-                }
-                let target = &program.functions[function_index as usize];
-                state.frames[current_index].pc += 1;
-                state.frames.push(ModuleFrame::new(target));
+                push_call_frame(program, state, current_index, target_function_index)?;
                 state.push_step(
                     program,
                     TassadarModuleTraceEvent::CallIndirect {
                         table_index,
                         selector,
-                        function_index,
+                        function_index: target_function_index,
                     },
                 )?;
             }
@@ -983,7 +1216,6 @@ pub fn execute_tassadar_module_execution_program(
                     )?;
                     continue;
                 }
-                returned_value = value;
                 state.push_step(
                     program,
                     TassadarModuleTraceEvent::Return {
@@ -992,24 +1224,35 @@ pub fn execute_tassadar_module_execution_program(
                         implicit: false,
                     },
                 )?;
-                return Ok(TassadarModuleExecution {
-                    program_id: program.program_id.clone(),
-                    steps: state.steps,
-                    returned_value,
-                    final_globals: state.globals,
-                    halt_reason,
-                });
+                return Ok((value, TassadarModuleExecutionHaltReason::Returned));
             }
         }
     }
 
-    Ok(TassadarModuleExecution {
-        program_id: program.program_id.clone(),
-        steps: state.steps,
-        returned_value: None,
-        final_globals: state.globals,
-        halt_reason: TassadarModuleExecutionHaltReason::Returned,
-    })
+    Ok((None, TassadarModuleExecutionHaltReason::Returned))
+}
+
+fn push_call_frame(
+    program: &TassadarModuleExecutionProgram,
+    state: &mut ModuleExecutionState,
+    caller_frame_index: usize,
+    target_function_index: u32,
+) -> Result<(), TassadarModuleExecutionError> {
+    if state.frames.len() >= program.max_call_depth as usize {
+        return Err(TassadarModuleExecutionError::CallDepthExceeded {
+            max_call_depth: program.max_call_depth,
+        });
+    }
+    let target = program
+        .functions
+        .get(target_function_index as usize)
+        .ok_or(TassadarModuleExecutionError::DirectCallFunctionOutOfRange {
+            function_index: target_function_index,
+            function_count: program.functions.len(),
+        })?;
+    state.frames[caller_frame_index].pc += 1;
+    state.frames.push(ModuleFrame::new(target));
+    Ok(())
 }
 
 /// Returns one seeded global-state parity program.
@@ -1102,6 +1345,101 @@ pub fn tassadar_seeded_module_call_indirect_program() -> TassadarModuleExecution
     )
 }
 
+/// Returns one seeded instantiation program over active element segments and a
+/// start function.
+#[must_use]
+pub fn tassadar_seeded_module_instantiation_program() -> TassadarModuleExecutionProgram {
+    TassadarModuleExecutionProgram::new(
+        "tassadar.module_execution.instantiation.v1",
+        0,
+        8,
+        vec![TassadarModuleGlobal {
+            global_index: 0,
+            value_type: TassadarModuleValueType::I32,
+            mutability: TassadarModuleGlobalMutability::Mutable,
+            initial_value: 1,
+        }],
+        vec![TassadarModuleTable {
+            table_index: 0,
+            element_kind: TassadarModuleTableElementKind::Funcref,
+            min_entries: 3,
+            max_entries: Some(3),
+            elements: vec![Some(2), None, None],
+        }],
+        Vec::new(),
+        vec![
+            TassadarModuleFunction::new(
+                0,
+                "entry",
+                0,
+                0,
+                1,
+                vec![
+                    TassadarModuleInstruction::GlobalGet { global_index: 0 },
+                    TassadarModuleInstruction::I32Const { value: 1 },
+                    TassadarModuleInstruction::CallIndirect { table_index: 0 },
+                    TassadarModuleInstruction::BinaryOp {
+                        op: TassadarStructuredControlBinaryOp::Add,
+                    },
+                    TassadarModuleInstruction::Return,
+                ],
+            ),
+            TassadarModuleFunction::new(
+                1,
+                "start",
+                0,
+                0,
+                0,
+                vec![
+                    TassadarModuleInstruction::Call { function_index: 4 },
+                    TassadarModuleInstruction::Return,
+                ],
+            ),
+            TassadarModuleFunction::new(
+                2,
+                "slot_zero",
+                0,
+                0,
+                1,
+                vec![
+                    TassadarModuleInstruction::I32Const { value: 9 },
+                    TassadarModuleInstruction::Return,
+                ],
+            ),
+            TassadarModuleFunction::new(
+                3,
+                "slot_one",
+                0,
+                0,
+                1,
+                vec![
+                    TassadarModuleInstruction::I32Const { value: 11 },
+                    TassadarModuleInstruction::Return,
+                ],
+            ),
+            TassadarModuleFunction::new(
+                4,
+                "init_global",
+                0,
+                0,
+                0,
+                vec![
+                    TassadarModuleInstruction::I32Const { value: 31 },
+                    TassadarModuleInstruction::GlobalSet { global_index: 0 },
+                    TassadarModuleInstruction::Return,
+                ],
+            ),
+        ],
+    )
+    .with_element_segments(vec![TassadarModuleElementSegment {
+        element_segment_index: 0,
+        table_index: 0,
+        offset: 1,
+        elements: vec![Some(3), Some(2)],
+    }])
+    .with_start_function_index(1)
+}
+
 /// Returns one seeded deterministic-import program.
 #[must_use]
 pub fn tassadar_seeded_module_deterministic_import_program() -> TassadarModuleExecutionProgram {
@@ -1187,6 +1525,7 @@ impl ModuleFrame {
 
 struct ModuleExecutionState {
     globals: Vec<i32>,
+    tables: Vec<Vec<Option<u32>>>,
     frames: Vec<ModuleFrame>,
     steps: Vec<TassadarModuleTraceStep>,
     step_index: usize,
@@ -1194,14 +1533,18 @@ struct ModuleExecutionState {
 
 impl ModuleExecutionState {
     fn new(program: &TassadarModuleExecutionProgram) -> Result<Self, TassadarModuleExecutionError> {
-        let entry = &program.functions[program.entry_function_index as usize];
         Ok(Self {
             globals: program
                 .globals
                 .iter()
                 .map(|global| global.initial_value)
                 .collect(),
-            frames: vec![ModuleFrame::new(entry)],
+            tables: program
+                .tables
+                .iter()
+                .map(|table| table.elements.clone())
+                .collect(),
+            frames: Vec::new(),
             steps: Vec::new(),
             step_index: 0,
         })
@@ -1326,7 +1669,7 @@ mod tests {
         execute_tassadar_module_execution_program, tassadar_module_execution_capability_report,
         tassadar_seeded_module_call_indirect_program,
         tassadar_seeded_module_deterministic_import_program,
-        tassadar_seeded_module_global_state_program,
+        tassadar_seeded_module_global_state_program, tassadar_seeded_module_instantiation_program,
         tassadar_seeded_module_unsupported_host_import_program,
     };
 
@@ -1334,6 +1677,9 @@ mod tests {
     fn module_execution_capability_report_is_machine_legible() {
         let report = tassadar_module_execution_capability_report();
         assert!(report.supports_globals);
+        assert!(report.supports_active_element_segments);
+        assert!(report.supports_start_function_instantiation);
+        assert!(report.supports_direct_calls);
         assert!(report.supports_call_indirect);
         assert_eq!(
             report.supported_global_value_types,
@@ -1369,6 +1715,22 @@ mod tests {
         assert!(execution.steps.iter().any(|step| matches!(
             step.event,
             super::TassadarModuleTraceEvent::CallIndirect { .. }
+        )));
+    }
+
+    #[test]
+    fn module_execution_instantiation_applies_start_and_elements_exactly() {
+        let program = tassadar_seeded_module_instantiation_program();
+        let execution = execute_tassadar_module_execution_program(&program).expect("execute");
+        assert_eq!(execution.returned_value, Some(42));
+        assert_eq!(execution.final_globals, vec![31]);
+        assert!(execution.steps.iter().any(|step| matches!(
+            step.event,
+            super::TassadarModuleTraceEvent::ElementSegmentApplied { .. }
+        )));
+        assert!(execution.steps.iter().any(|step| matches!(
+            step.event,
+            super::TassadarModuleTraceEvent::Call { function_index: 4 }
         )));
     }
 
