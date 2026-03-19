@@ -39,6 +39,7 @@ const TASSADAR_METADATA_BENCHMARK_PACKAGE_SET_KEY: &str = "tassadar.benchmark_pa
 const TASSADAR_METADATA_COMPILE_PIPELINE_MATRIX_KEY: &str = "tassadar.compile_pipeline_matrix";
 const TASSADAR_METADATA_RUST_ARTICLE_PROFILE_KEY: &str = "tassadar.rust_article_profile";
 const TASSADAR_METADATA_GENERALIZED_ABI_FAMILY_KEY: &str = "tassadar.generalized_abi_family";
+const TASSADAR_METADATA_EXECUTION_CHECKPOINT_KEY: &str = "tassadar.execution_checkpoint";
 const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_LADDER_KEY: &str =
     "tassadar.internal_compute_profile_ladder";
 const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_CLAIM_KEY: &str =
@@ -201,6 +202,81 @@ impl TassadarCompilePipelineMatrixBinding {
             return Err(TassadarEnvironmentError::InvalidCompilePipelineSourceFamilyId);
         }
         Ok(())
+    }
+}
+
+/// Public checkpointed multi-slice execution binding reused by Tassadar
+/// environment bundles.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutionCheckpointBinding {
+    /// Stable execution-checkpoint report reference.
+    pub report_ref: String,
+    /// Stable execution-checkpoint report identifier.
+    pub report_id: String,
+    /// Stable run-bundle reference carrying persisted continuation artifacts.
+    pub run_bundle_ref: String,
+    /// Stable checkpoint-family identifier.
+    pub checkpoint_family_id: String,
+    /// Workload families covered by the committed report.
+    pub workload_family_ids: Vec<String>,
+}
+
+impl TassadarExecutionCheckpointBinding {
+    /// Returns a stable digest over the binding.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let encoded = serde_json::to_vec(self)
+            .expect("Tassadar execution-checkpoint binding should serialize");
+        let digest = sha2::Sha256::digest(encoded.as_slice());
+        hex::encode(digest)
+    }
+
+    /// Validates that the binding is explicit.
+    pub fn validate(&self) -> Result<(), TassadarEnvironmentError> {
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingExecutionCheckpointReportRef);
+        }
+        if self.report_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingExecutionCheckpointReportId);
+        }
+        if self.run_bundle_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingExecutionCheckpointRunBundleRef);
+        }
+        if self.checkpoint_family_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingExecutionCheckpointFamilyId);
+        }
+        if self.workload_family_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingExecutionCheckpointWorkloadFamilies);
+        }
+        if self
+            .workload_family_ids
+            .iter()
+            .any(|workload_family_id| workload_family_id.trim().is_empty())
+        {
+            return Err(TassadarEnvironmentError::InvalidExecutionCheckpointWorkloadFamilyId);
+        }
+        Ok(())
+    }
+}
+
+/// Returns the canonical checkpointed multi-slice execution binding reused by
+/// Tassadar environment surfaces.
+#[must_use]
+pub fn default_tassadar_execution_checkpoint_binding() -> TassadarExecutionCheckpointBinding {
+    TassadarExecutionCheckpointBinding {
+        report_ref: String::from(
+            "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+        ),
+        report_id: String::from("tassadar.execution_checkpoint.report.v1"),
+        run_bundle_ref: String::from(
+            "fixtures/tassadar/runs/tassadar_execution_checkpoint_v1/tassadar_execution_checkpoint_bundle.json",
+        ),
+        checkpoint_family_id: String::from("tassadar.execution_checkpoint.v1"),
+        workload_family_ids: vec![
+            String::from("long_loop_kernel"),
+            String::from("state_machine_accumulator"),
+            String::from("search_frontier_kernel"),
+        ],
     }
 }
 
@@ -608,6 +684,8 @@ pub struct TassadarEnvironmentSpec {
     pub benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding,
     /// Public compile-pipeline matrix binding.
     pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
+    /// Public checkpointed multi-slice execution binding.
+    pub execution_checkpoint_binding: TassadarExecutionCheckpointBinding,
     /// Public Wasm conformance binding.
     pub wasm_conformance_binding: TassadarWasmConformanceBinding,
     /// Optional public module-scale workload-suite binding.
@@ -702,6 +780,7 @@ impl TassadarEnvironmentSpec {
             exactness_contract: self.exactness_contract.clone(),
             benchmark_package_set_binding: self.benchmark_package_set_binding.clone(),
             compile_pipeline_matrix_binding: self.compile_pipeline_matrix_binding.clone(),
+            execution_checkpoint_binding: self.execution_checkpoint_binding.clone(),
             rust_article_profile_completeness:
                 tassadar_rust_article_profile_completeness_publication(),
             generalized_abi_family: tassadar_generalized_abi_publication(),
@@ -746,6 +825,7 @@ impl TassadarEnvironmentSpec {
         self.exactness_contract.validate()?;
         self.benchmark_package_set_binding.validate()?;
         self.compile_pipeline_matrix_binding.validate()?;
+        self.execution_checkpoint_binding.validate()?;
         self.wasm_conformance_binding.validate()?;
         if let Some(binding) = &self.module_scale_workload_suite_binding {
             binding.validate()?;
@@ -938,6 +1018,10 @@ impl TassadarEnvironmentSpec {
             String::from(TASSADAR_METADATA_GENERALIZED_ABI_FAMILY_KEY),
             serde_json::to_value(tassadar_generalized_abi_publication()).unwrap_or(Value::Null),
         );
+        metadata.insert(
+            String::from(TASSADAR_METADATA_EXECUTION_CHECKPOINT_KEY),
+            serde_json::to_value(&self.execution_checkpoint_binding).unwrap_or(Value::Null),
+        );
         let internal_compute_profile_ladder =
             tassadar_internal_compute_profile_ladder_publication();
         metadata.insert(
@@ -1033,6 +1117,8 @@ pub struct TassadarEnvironmentBundle {
     pub benchmark_package_set_binding: TassadarBenchmarkPackageSetBinding,
     /// Compile-pipeline matrix binding.
     pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
+    /// Checkpointed multi-slice execution binding.
+    pub execution_checkpoint_binding: TassadarExecutionCheckpointBinding,
     /// Rust-to-Wasm article profile completeness publication.
     pub rust_article_profile_completeness: TassadarRustArticleProfileCompletenessPublication,
     /// Generalized ABI family publication.
@@ -1110,6 +1196,28 @@ pub enum TassadarEnvironmentError {
     /// Invalid compile-pipeline matrix source family id.
     #[error("Tassadar environment spec includes an empty compile-pipeline source family id")]
     InvalidCompilePipelineSourceFamilyId,
+    /// Missing execution-checkpoint report ref.
+    #[error("Tassadar environment spec is missing `execution_checkpoint_binding.report_ref`")]
+    MissingExecutionCheckpointReportRef,
+    /// Missing execution-checkpoint report id.
+    #[error("Tassadar environment spec is missing `execution_checkpoint_binding.report_id`")]
+    MissingExecutionCheckpointReportId,
+    /// Missing execution-checkpoint run-bundle ref.
+    #[error("Tassadar environment spec is missing `execution_checkpoint_binding.run_bundle_ref`")]
+    MissingExecutionCheckpointRunBundleRef,
+    /// Missing execution-checkpoint family id.
+    #[error(
+        "Tassadar environment spec is missing `execution_checkpoint_binding.checkpoint_family_id`"
+    )]
+    MissingExecutionCheckpointFamilyId,
+    /// Missing execution-checkpoint workload coverage.
+    #[error(
+        "Tassadar environment spec is missing `execution_checkpoint_binding.workload_family_ids`"
+    )]
+    MissingExecutionCheckpointWorkloadFamilies,
+    /// Invalid execution-checkpoint workload family id.
+    #[error("Tassadar environment spec includes an empty execution-checkpoint workload family id")]
+    InvalidExecutionCheckpointWorkloadFamilyId,
     /// Missing Wasm conformance report ref.
     #[error("Tassadar environment spec is missing `wasm_conformance_binding.report_ref`")]
     MissingWasmConformanceReportRef,
@@ -1376,6 +1484,21 @@ mod tests {
                     String::from("c_source.toolchain_unavailable"),
                 ],
             },
+            execution_checkpoint_binding: TassadarExecutionCheckpointBinding {
+                report_ref: String::from(
+                    "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+                ),
+                report_id: String::from("tassadar.execution_checkpoint.report.v1"),
+                run_bundle_ref: String::from(
+                    "fixtures/tassadar/runs/tassadar_execution_checkpoint_v1/tassadar_execution_checkpoint_bundle.json",
+                ),
+                checkpoint_family_id: String::from("tassadar.execution_checkpoint.v1"),
+                workload_family_ids: vec![
+                    String::from("long_loop_kernel"),
+                    String::from("state_machine_accumulator"),
+                    String::from("search_frontier_kernel"),
+                ],
+            },
             wasm_conformance_binding: TassadarWasmConformanceBinding {
                 report_ref: String::from(
                     "fixtures/tassadar/reports/tassadar_wasm_conformance_report.json",
@@ -1496,6 +1619,15 @@ mod tests {
             bundle
                 .benchmark_package
                 .metadata
+                .get(TASSADAR_METADATA_EXECUTION_CHECKPOINT_KEY)
+                .and_then(|value| value.get("report_ref"))
+                .and_then(Value::as_str),
+            Some("fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json")
+        );
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
                 .get(TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_LADDER_KEY)
                 .and_then(|value| value.get("report_ref"))
                 .and_then(Value::as_str),
@@ -1540,6 +1672,10 @@ mod tests {
         assert_eq!(
             bundle.generalized_abi_family.report_ref,
             "fixtures/tassadar/reports/tassadar_generalized_abi_family_report.json"
+        );
+        assert_eq!(
+            bundle.execution_checkpoint_binding.run_bundle_ref,
+            "fixtures/tassadar/runs/tassadar_execution_checkpoint_v1/tassadar_execution_checkpoint_bundle.json"
         );
         assert!(bundle.internal_compute_profile_claim_check.green);
         Ok(())

@@ -25,10 +25,9 @@ use thiserror::Error;
 
 use crate::{
     BenchmarkAggregationKind, BenchmarkCase, BenchmarkPackage, BenchmarkPackageKey,
-    BenchmarkVerificationPolicy, TassadarBenchmarkError, TassadarReferenceFixtureSuite,
-    TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF,
-    TASSADAR_COMPILE_PIPELINE_MATRIX_REPORT_REF,
-    TASSADAR_WASM_CONFORMANCE_REPORT_REF,
+    BenchmarkVerificationPolicy, TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF,
+    TASSADAR_COMPILE_PIPELINE_MATRIX_REPORT_REF, TASSADAR_WASM_CONFORMANCE_REPORT_REF,
+    TassadarBenchmarkError, TassadarReferenceFixtureSuite,
 };
 
 /// Stable environment ref for the compiled kernel-suite eval package.
@@ -591,8 +590,8 @@ pub fn tassadar_compiled_kernel_suite_program_artifacts(
         .collect()
 }
 
-pub fn build_tassadar_compiled_kernel_suite_corpus(
-) -> Result<TassadarCompiledKernelSuiteCorpus, TassadarCompiledKernelSuiteEvalError> {
+pub fn build_tassadar_compiled_kernel_suite_corpus()
+-> Result<TassadarCompiledKernelSuiteCorpus, TassadarCompiledKernelSuiteEvalError> {
     let fixture = TassadarExecutorFixture::article_i32_compute_v1();
     let mut cases = Vec::new();
     let mut artifacts = Vec::new();
@@ -877,8 +876,8 @@ pub fn build_tassadar_compiled_kernel_suite_scaling_report(
 }
 
 #[must_use]
-pub fn build_tassadar_compiled_kernel_suite_claim_boundary_report(
-) -> TassadarCompiledKernelSuiteClaimBoundaryReport {
+pub fn build_tassadar_compiled_kernel_suite_claim_boundary_report()
+-> TassadarCompiledKernelSuiteClaimBoundaryReport {
     TassadarCompiledKernelSuiteClaimBoundaryReport::new()
 }
 
@@ -967,6 +966,8 @@ fn build_tassadar_compiled_kernel_suite_environment_bundle(
             summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
         },
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
+        execution_checkpoint_binding:
+            psionic_environments::default_tassadar_execution_checkpoint_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
         module_scale_workload_suite_binding: None,
         clrs_wasm_bridge_binding: None,
@@ -1393,13 +1394,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
+        TassadarCompiledKernelFamilyId, TassadarCompiledKernelSuiteLaneClaimStatus,
         build_tassadar_compiled_kernel_suite,
         build_tassadar_compiled_kernel_suite_claim_boundary_report,
         build_tassadar_compiled_kernel_suite_compatibility_report,
         build_tassadar_compiled_kernel_suite_corpus,
         build_tassadar_compiled_kernel_suite_exactness_report,
-        build_tassadar_compiled_kernel_suite_scaling_report, TassadarCompiledKernelFamilyId,
-        TassadarCompiledKernelSuiteLaneClaimStatus,
+        build_tassadar_compiled_kernel_suite_scaling_report,
     };
     use psionic_runtime::{TassadarClaimClass, TassadarExecutorDecodeMode};
 
@@ -1426,8 +1427,8 @@ mod tests {
     }
 
     #[test]
-    fn compiled_kernel_suite_compatibility_matches_expected_surface(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn compiled_kernel_suite_compatibility_matches_expected_surface()
+    -> Result<(), Box<dyn std::error::Error>> {
         let corpus = build_tassadar_compiled_kernel_suite_corpus()?;
         let report = build_tassadar_compiled_kernel_suite_compatibility_report(&corpus)?;
         assert_eq!(report.total_check_count, 48);
@@ -1437,8 +1438,8 @@ mod tests {
     }
 
     #[test]
-    fn compiled_kernel_suite_scaling_report_tracks_each_family(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn compiled_kernel_suite_scaling_report_tracks_each_family()
+    -> Result<(), Box<dyn std::error::Error>> {
         let corpus = build_tassadar_compiled_kernel_suite_corpus()?;
         let report = build_tassadar_compiled_kernel_suite_scaling_report(
             &corpus,
@@ -1452,15 +1453,19 @@ mod tests {
             .find(|family| family.family_id == TassadarCompiledKernelFamilyId::BackwardLoopKernel)
             .expect("loop family");
         assert_eq!(loop_family.regimes.len(), 3);
-        assert!(loop_family
-            .regimes
-            .windows(2)
-            .all(|pair| pair[0].trace_step_count < pair[1].trace_step_count));
-        assert!(report
-            .family_reports
-            .iter()
-            .flat_map(|family| family.regimes.iter())
-            .all(|regime| regime.exactness_bps == 10_000));
+        assert!(
+            loop_family
+                .regimes
+                .windows(2)
+                .all(|pair| pair[0].trace_step_count < pair[1].trace_step_count)
+        );
+        assert!(
+            report
+                .family_reports
+                .iter()
+                .flat_map(|family| family.regimes.iter())
+                .all(|regime| regime.exactness_bps == 10_000)
+        );
         Ok(())
     }
 

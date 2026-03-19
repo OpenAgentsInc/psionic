@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 const KV_CACHE_CHECKPOINT_FAMILY_PREFIX: &str = "serve.kv_cache";
+const TASSADAR_EXECUTION_CHECKPOINT_FAMILY_PREFIX: &str = "tassadar.execution_checkpoint";
 
 /// High-level subject being delivered over the data plane.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -173,6 +174,17 @@ impl DatastreamCheckpointBinding {
     pub const fn with_step(mut self, step: u64) -> Self {
         self.step = Some(step);
         self
+    }
+
+    /// Creates a checkpoint binding for one Tassadar execution checkpoint.
+    #[must_use]
+    pub fn tassadar_execution_checkpoint(checkpoint_id: impl AsRef<str>, step: u64) -> Self {
+        let checkpoint_id = checkpoint_id.as_ref();
+        Self::new("tassadar.execution_checkpoint.v1")
+            .with_checkpoint_ref(format!(
+                "checkpoint://tassadar.execution_checkpoint/{checkpoint_id}"
+            ))
+            .with_step(step)
     }
 }
 
@@ -690,6 +702,28 @@ pub struct DatastreamManifestRef {
     pub mirrors: Vec<DatastreamMirrorLocator>,
 }
 
+/// Explicit locator for one persisted Tassadar execution checkpoint artifact.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutionCheckpointLocator {
+    /// Stable stream identifier.
+    pub stream_id: String,
+    /// Stable manifest digest.
+    pub manifest_digest: String,
+    /// Stable checkpoint reference.
+    pub checkpoint_ref: String,
+    /// Stable checkpoint family.
+    pub checkpoint_family: String,
+    /// Logical step carried by the checkpoint binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step: Option<u64>,
+    /// Stable digest over the serialized checkpoint payload.
+    pub object_digest: String,
+    /// Total serialized checkpoint bytes.
+    pub total_bytes: u64,
+    /// Plain-language locator detail.
+    pub detail: String,
+}
+
 impl DatastreamManifestRef {
     /// Exports this manifest reference as an explicit datastream-backed KV locator.
     pub fn kv_cache_external_locator(
@@ -733,6 +767,52 @@ impl DatastreamManifestRef {
             self.total_bytes,
         )
         .with_detail(detail))
+    }
+
+    /// Exports this manifest reference as a typed Tassadar execution-checkpoint locator.
+    pub fn tassadar_execution_checkpoint_locator(
+        &self,
+    ) -> Result<TassadarExecutionCheckpointLocator, DatastreamTransferError> {
+        let checkpoint_binding = self.checkpoint_binding.as_ref().ok_or_else(|| {
+            DatastreamTransferError::TassadarExecutionCheckpointContractInvalid {
+                stream_id: self.stream_id.clone(),
+                subject: self.subject,
+                checkpoint_family: None,
+            }
+        })?;
+        if self.subject != DatastreamSubjectKind::Checkpoint
+            || !checkpoint_binding
+                .checkpoint_family
+                .starts_with(TASSADAR_EXECUTION_CHECKPOINT_FAMILY_PREFIX)
+        {
+            return Err(
+                DatastreamTransferError::TassadarExecutionCheckpointContractInvalid {
+                    stream_id: self.stream_id.clone(),
+                    subject: self.subject,
+                    checkpoint_family: Some(checkpoint_binding.checkpoint_family.clone()),
+                },
+            );
+        }
+        Ok(TassadarExecutionCheckpointLocator {
+            stream_id: self.stream_id.clone(),
+            manifest_digest: self.manifest_digest.clone(),
+            checkpoint_ref: checkpoint_binding
+                .checkpoint_ref
+                .clone()
+                .unwrap_or_default(),
+            checkpoint_family: checkpoint_binding.checkpoint_family.clone(),
+            step: checkpoint_binding.step,
+            object_digest: self.object_digest.clone(),
+            total_bytes: self.total_bytes,
+            detail: format!(
+                "tassadar execution checkpoint locator via family `{}` ref `{}`",
+                checkpoint_binding.checkpoint_family,
+                checkpoint_binding
+                    .checkpoint_ref
+                    .as_deref()
+                    .unwrap_or_default(),
+            ),
+        })
     }
 
     fn policy_weight_binding(
@@ -1158,6 +1238,15 @@ pub enum DatastreamTransferError {
         "datastream `{stream_id}` is not a valid KV-cache contract: subject `{subject:?}`, checkpoint family `{checkpoint_family:?}`"
     )]
     KvCacheContractInvalid {
+        stream_id: String,
+        subject: DatastreamSubjectKind,
+        checkpoint_family: Option<String>,
+    },
+    /// The manifest reference is not a valid Tassadar execution-checkpoint contract.
+    #[error(
+        "datastream `{stream_id}` is not a valid Tassadar execution-checkpoint contract: subject `{subject:?}`, checkpoint family `{checkpoint_family:?}`"
+    )]
+    TassadarExecutionCheckpointContractInvalid {
         stream_id: String,
         subject: DatastreamSubjectKind,
         checkpoint_family: Option<String>,
@@ -1943,6 +2032,60 @@ mod tests {
                 stream_id: String::from("dataset-17"),
                 subject: DatastreamSubjectKind::TokenizedCorpus,
                 checkpoint_family: None,
+            }
+        );
+    }
+
+    #[test]
+    fn checkpoint_manifest_can_export_tassadar_execution_checkpoint_locator()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = br#"{"checkpoint_id":"alpha"}"#.to_vec();
+        let manifest = super::DatastreamManifest::from_bytes(
+            "tassadar-checkpoint-17",
+            DatastreamSubjectKind::Checkpoint,
+            &payload,
+            8,
+            DatastreamEncoding::RawBinary,
+        )
+        .with_checkpoint_binding(
+            DatastreamCheckpointBinding::tassadar_execution_checkpoint("alpha", 17),
+        );
+
+        let locator = manifest
+            .manifest_ref()
+            .tassadar_execution_checkpoint_locator()?;
+        assert_eq!(locator.stream_id, "tassadar-checkpoint-17");
+        assert_eq!(locator.manifest_digest, manifest.stable_digest());
+        assert_eq!(
+            locator.checkpoint_ref,
+            "checkpoint://tassadar.execution_checkpoint/alpha"
+        );
+        assert_eq!(locator.step, Some(17));
+        assert_eq!(locator.object_digest, manifest.object_digest);
+        Ok(())
+    }
+
+    #[test]
+    fn non_tassadar_checkpoint_manifest_is_refused_as_execution_checkpoint_locator() {
+        let manifest = super::DatastreamManifest::from_bytes(
+            "checkpoint-train-17",
+            DatastreamSubjectKind::Checkpoint,
+            b"weights",
+            4,
+            DatastreamEncoding::RawBinary,
+        )
+        .with_checkpoint_binding(DatastreamCheckpointBinding::new("train.decoder").with_step(17));
+
+        let error = manifest
+            .manifest_ref()
+            .tassadar_execution_checkpoint_locator()
+            .expect_err("non-Tassadar checkpoint manifest should be refused");
+        assert_eq!(
+            error,
+            DatastreamTransferError::TassadarExecutionCheckpointContractInvalid {
+                stream_id: String::from("checkpoint-train-17"),
+                subject: DatastreamSubjectKind::Checkpoint,
+                checkpoint_family: Some(String::from("train.decoder")),
             }
         );
     }

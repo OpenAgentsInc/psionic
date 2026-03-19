@@ -1,0 +1,32 @@
+{
+  "checkpoint_id": "tassadar.search_frontier_kernel.checkpoint.slice_0000",
+  "workload_family": "search_frontier_kernel",
+  "program_id": "tassadar.program.search_frontier_kernel.v1",
+  "profile_id": "tassadar.internal_compute.checkpoint_resume.v1",
+  "slice_index": 0,
+  "next_step_index": 3,
+  "call_frame_position": 3,
+  "trace_position": 3,
+  "state_bytes": 24,
+  "page_size_bytes": 16,
+  "memory_digest": "25eab9b8d0db53c41f4660b17e9529f6638934cc3894ee1e025d06e0e4d50ec2",
+  "state_blob_hex": "0a00000003000000050000004a0000000300000000000000",
+  "dirty_pages": [
+    {
+      "page_index": 0,
+      "before_digest": "80d1223239d5f1213e62a9b2b048bac8fd0a536e5baef931a778a0488d0c6945",
+      "after_digest": "d2bea3f901541e6e3a1988248d73c0a7a8252d7fbf12a4f47a036ed0a0d6f8fb",
+      "changed_bytes": 4
+    },
+    {
+      "page_index": 1,
+      "before_digest": "04396636f7e2c399c77df45135320cf6f85d60c87b496fd929f0e3446ffe76c3",
+      "after_digest": "9dfe3845241449618a602e2ee25407409665ab5a28eec7c451b7684125517c1a",
+      "changed_bytes": 1
+    }
+  ],
+  "effect_state_digest": "1d2c5b203fcfb7a13100a4320677075dc4d123e8fd330ec7fdc11047c9cd62ce",
+  "replay_identity": "d761fa3b78e187c48716af1156dfc1c6ec5dbc3bd80dee9ced7a71ca6c96f716",
+  "superseded_by_checkpoint_id": "tassadar.search_frontier_kernel.checkpoint.slice_0001",
+  "checkpoint_digest": "b69e90bf7a547b793af0f09e0aafad1f5812fcddf777b34b3a89bbe18c5819a9"
+}

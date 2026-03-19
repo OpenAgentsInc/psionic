@@ -1,0 +1,26 @@
+{
+  "checkpoint_id": "tassadar.long_loop_kernel.checkpoint.slice_0003",
+  "workload_family": "long_loop_kernel",
+  "program_id": "tassadar.program.long_loop_kernel.v1",
+  "profile_id": "tassadar.internal_compute.checkpoint_resume.v1",
+  "slice_index": 3,
+  "next_step_index": 12,
+  "call_frame_position": 0,
+  "trace_position": 12,
+  "state_bytes": 16,
+  "page_size_bytes": 16,
+  "memory_digest": "d66d35222e85c5ed2e425a9acc6755d4135be6eab3fbb380781a53c7e0cb73c3",
+  "state_blob_hex": "0c000000f00000000e00000000000000",
+  "dirty_pages": [
+    {
+      "page_index": 0,
+      "before_digest": "bdd6b20805a4b0ccc0dbd22b06987fee3199dcbb4a558a200a72269edd4aeeaa",
+      "after_digest": "d66d35222e85c5ed2e425a9acc6755d4135be6eab3fbb380781a53c7e0cb73c3",
+      "changed_bytes": 2
+    }
+  ],
+  "effect_state_digest": "2be099786c680458ab87ea1b894ca1b2e069411ccb88a500439b2f3a56aa7b49",
+  "replay_identity": "f2cd05b5f85a9dacdaa2647361cb56e87d010a88fbfe1bf77dd06afe71cf9783",
+  "supersedes_checkpoint_id": "tassadar.long_loop_kernel.checkpoint.slice_0002",
+  "checkpoint_digest": "efca4bfec5dbbe941c4bdfced25334dbbed857261ec0e4829772d34ea80533dd"
+}

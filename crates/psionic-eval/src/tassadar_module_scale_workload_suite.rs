@@ -519,6 +519,8 @@ fn build_tassadar_module_scale_environment_bundle(
             summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
         },
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
+        execution_checkpoint_binding:
+            psionic_environments::default_tassadar_execution_checkpoint_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
         module_scale_workload_suite_binding: Some(TassadarModuleScaleWorkloadSuiteBinding {
             suite_ref: String::from(suite_contract.suite_ref.clone()),

@@ -26,6 +26,7 @@ This runbook covers the current repo-owned bounded Wasm flow only:
 - Rust-only article frontend canon
 - Rust-to-Wasm article profile completeness matrix
 - bounded Rust-only article ABI closure
+- checkpointed multi-slice execution receipts
 - Rust-only article runtime closeout
 - canonical Rust-only Hungarian-10x10 article reproducer
 - canonical C-to-Wasm compile receipt
@@ -39,6 +40,7 @@ It does not claim:
 
 - arbitrary Wasm closure
 - general parameter-ABI closure
+- generic resumable computation beyond the committed checkpointed workloads
 - broad host-import closure
 - broad C/C++ frontend closure
 
@@ -159,7 +161,34 @@ Expected outcome:
   `tassadar.internal_compute.article_closeout.v1` even though the ladder now
   records `tassadar.internal_compute.generalized_abi.v1` as implemented
 
-### 3B. Hungarian-10x10 Rust-only article reproducer
+### 3B. Checkpointed multi-slice execution receipts
+
+```bash
+cargo run -p psionic-eval --example tassadar_execution_checkpoint_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json`
+- `fixtures/tassadar/runs/tassadar_execution_checkpoint_v1/tassadar_execution_checkpoint_bundle.json`
+
+Expected outcome:
+
+- one machine-readable report and run root now bind the deterministic
+  checkpointed multi-slice execution lane
+- exact fresh-versus-resumed parity is explicit for the seeded
+  `long_loop_kernel`, `state_machine_accumulator`, and
+  `search_frontier_kernel` workloads
+- persisted continuation artifacts now exist as checkpoint JSON plus
+  datastream-manifest pairs under
+  `fixtures/tassadar/runs/tassadar_execution_checkpoint_v1`
+- resume safety is explicit: superseded checkpoints, oversized state,
+  profile mismatches, and effect-state mismatches refuse with typed reasons
+- this is benchmarked effective-unboundedness scaffolding only; it does not
+  widen the current served claim beyond
+  `tassadar.internal_compute.article_closeout.v1`
+
+### 3C. Hungarian-10x10 Rust-only article reproducer
 
 ```bash
 cargo run -p psionic-research --example tassadar_hungarian_10x10_article_reproducer
@@ -183,7 +212,7 @@ Expected outcome:
 - this closes one concrete matching workload only; it does not yet imply
   hard-Sudoku or multi-million-step article closure
 
-### 3C. Sudoku-9x9 Rust-only article reproducer
+### 3D. Sudoku-9x9 Rust-only article reproducer
 
 ```bash
 cargo run -p psionic-research --example tassadar_sudoku_9x9_article_reproducer
@@ -206,7 +235,7 @@ Expected outcome:
 - this closes one concrete backtracking-search workload family only; it does
   not yet imply Hungarian or multi-million-step article closure
 
-### 3D. Rust-only article runtime closeout
+### 3E. Rust-only article runtime closeout
 
 ```bash
 cargo run -p psionic-eval --example tassadar_article_runtime_closeout_report
@@ -230,7 +259,7 @@ Expected outcome:
 - one served publication path now exists for this closeout summary, but it is
   benchmark-only and does not widen the generic served Wasm capability matrix
 
-### 3E. Direct model-weight execution proof
+### 3F. Direct model-weight execution proof
 
 ```bash
 cargo run -p psionic-serve --example tassadar_direct_model_weight_execution_proof_report

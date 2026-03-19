@@ -5,8 +5,8 @@ use std::{
 };
 
 use psionic_compiler::{
-    compile_tassadar_clrs_wasm_bridge_case, tassadar_clrs_wasm_bridge_case_specs,
     TassadarClrsWasmBridgeCaseSpec, TassadarClrsWasmBridgeCompileError,
+    compile_tassadar_clrs_wasm_bridge_case, tassadar_clrs_wasm_bridge_case_specs,
 };
 use psionic_data::{
     DatasetKey, TassadarBenchmarkAxis, TassadarBenchmarkFamily, TassadarClrsAlgorithmFamily,
@@ -26,7 +26,7 @@ use psionic_runtime::{
     TassadarTraceAbi, TassadarWasmBinarySummary, TassadarWasmProfile,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -269,16 +269,16 @@ pub enum TassadarClrsWasmBridgeReportError {
 }
 
 /// Builds the committed CLRS-to-Wasm bridge report.
-pub fn build_tassadar_clrs_wasm_bridge_report(
-) -> Result<TassadarClrsWasmBridgeReport, TassadarClrsWasmBridgeReportError> {
+pub fn build_tassadar_clrs_wasm_bridge_report()
+-> Result<TassadarClrsWasmBridgeReport, TassadarClrsWasmBridgeReportError> {
     let _build_guard = CLRS_WASM_BRIDGE_BUILD_LOCK
         .lock()
         .expect("CLRS-to-Wasm bridge build lock should not be poisoned");
     build_tassadar_clrs_wasm_bridge_report_impl()
 }
 
-fn build_tassadar_clrs_wasm_bridge_report_impl(
-) -> Result<TassadarClrsWasmBridgeReport, TassadarClrsWasmBridgeReportError> {
+fn build_tassadar_clrs_wasm_bridge_report_impl()
+-> Result<TassadarClrsWasmBridgeReport, TassadarClrsWasmBridgeReportError> {
     let profile = TassadarWasmProfile::article_i32_compute_v1();
     let trace_abi = TassadarTraceAbi::article_i32_compute_v1();
     let specs = tassadar_clrs_wasm_bridge_case_specs();
@@ -484,6 +484,8 @@ fn build_tassadar_clrs_wasm_bridge_environment_bundle(
             summary_report_ref: String::from(TASSADAR_BENCHMARK_PACKAGE_SET_SUMMARY_REPORT_REF),
         },
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
+        execution_checkpoint_binding:
+            psionic_environments::default_tassadar_execution_checkpoint_binding(),
         wasm_conformance_binding: standard_wasm_conformance_binding(),
         module_scale_workload_suite_binding: None,
         clrs_wasm_bridge_binding: Some(TassadarClrsWasmBridgeBinding {
@@ -830,14 +832,18 @@ mod tests {
             .expect("CLRS-to-Wasm bridge report should build");
         assert_eq!(report.cases.len(), 2);
         assert_eq!(report.trajectory_comparisons.len(), 2);
-        assert!(report
-            .trajectory_comparisons
-            .iter()
-            .all(|comparison| comparison.output_exact_match));
-        assert!(report
-            .trajectory_comparisons
-            .iter()
-            .any(|comparison| comparison.trajectory_step_delta < 0));
+        assert!(
+            report
+                .trajectory_comparisons
+                .iter()
+                .all(|comparison| comparison.output_exact_match)
+        );
+        assert!(
+            report
+                .trajectory_comparisons
+                .iter()
+                .any(|comparison| comparison.trajectory_step_delta < 0)
+        );
     }
 
     #[test]
