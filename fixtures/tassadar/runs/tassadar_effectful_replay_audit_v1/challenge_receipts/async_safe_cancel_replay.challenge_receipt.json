@@ -1,0 +1,7 @@
+{
+  "challenge_receipt_id": "async_safe_cancel_replay.challenge_receipt",
+  "challenge_surface_id": "nexus://tassadar/challenge/async_safe_cancel",
+  "replay_artifact_digest": "961457eae7db6162a52a527df08092761ada54c0496323c4b49e299d557f4191",
+  "verdict": "challenge_confirmed",
+  "receipt_digest": "5ae819045573d83fb49b71fe392122c567ee78577297c85689b02ad0e58e6010"
+}

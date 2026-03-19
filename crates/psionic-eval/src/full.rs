@@ -72,6 +72,8 @@ mod tassadar_dynamic_memory_resume;
 mod tassadar_effect_safe_resume;
 #[path = "tassadar_effect_taxonomy.rs"]
 mod tassadar_effect_taxonomy;
+#[path = "tassadar_effectful_replay_audit.rs"]
+mod tassadar_effectful_replay_audit;
 #[path = "tassadar_efficient_attention_baseline_matrix.rs"]
 mod tassadar_efficient_attention_baseline_matrix;
 #[path = "tassadar_error_regime_catalog.rs"]
@@ -269,6 +271,7 @@ pub use tassadar_decompilation_fidelity::*;
 pub use tassadar_dynamic_memory_resume::*;
 pub use tassadar_effect_safe_resume::*;
 pub use tassadar_effect_taxonomy::*;
+pub use tassadar_effectful_replay_audit::*;
 pub use tassadar_efficient_attention_baseline_matrix::*;
 pub use tassadar_error_regime_catalog::*;
 pub use tassadar_exactness_refusal_report::*;

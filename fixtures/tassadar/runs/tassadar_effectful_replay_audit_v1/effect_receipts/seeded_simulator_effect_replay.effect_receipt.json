@@ -1,0 +1,7 @@
+{
+  "receipt_id": "seeded_simulator_effect_replay.effect_receipt",
+  "effect_family_id": "sim.network.loopback_fifo_seed_7.v1",
+  "authority_ref": "kernel-policy://tassadar/effect_receipt",
+  "replay_window_steps": 256,
+  "receipt_digest": "d3c15835df0e8bcb5c4f5618a174a6fefd66d3c77e664741dea0421faa41136e"
+}

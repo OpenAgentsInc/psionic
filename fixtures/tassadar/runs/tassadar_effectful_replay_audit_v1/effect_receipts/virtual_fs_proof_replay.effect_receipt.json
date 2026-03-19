@@ -1,0 +1,7 @@
+{
+  "receipt_id": "virtual_fs_proof_replay.effect_receipt",
+  "effect_family_id": "tassadar.effect_profile.virtual_fs_mounts.v1",
+  "authority_ref": "kernel-policy://tassadar/effect_receipt",
+  "replay_window_steps": 96,
+  "receipt_digest": "2a0ece44f147cf38e6c2da1b2005682972fc8bbff91521969525834fa6969a80"
+}

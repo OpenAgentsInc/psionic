@@ -885,6 +885,17 @@ The current scope is:
   callbacks, mid-effect cancellation, and unbounded retry; this is not generic
   async execution, arbitrary external events, or broader served internal
   compute
+- the current effectful replay audit artifacts are
+  `fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/tassadar_effectful_replay_audit_bundle.json`
+  and `fixtures/tassadar/reports/tassadar_effectful_replay_audit_report.json`,
+  plus the persisted effect-receipt and challenge-receipt files under the same
+  run root, which freeze one bounded replay-and-challenge lane with explicit
+  effect receipts, replay digests, challenge receipts, and typed refusal on
+  missing effect evidence, missing challenge evidence, and unsafe effect
+  families; named `kernel-policy` and `nexus` follow-ons remain explicit
+  dependency markers outside standalone psionic, so this is not authority
+  closure, ambient effect admission, or settlement-ready accepted-outcome
+  truth
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

@@ -1181,6 +1181,32 @@ Expected outcome:
 - explicit refusal on open-ended callbacks, mid-effect cancellation, and unbounded retry
 - profile-specific route promotion only for the bounded lifecycle surfaces
 
+### 23. Effectful replay, challenge, and audit receipts
+
+```bash
+cargo run -p psionic-runtime --example tassadar_effectful_replay_audit_bundle
+cargo run -p psionic-eval --example tassadar_effectful_replay_audit_report
+```
+
+Read:
+
+- `fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/tassadar_effectful_replay_audit_bundle.json`
+- `fixtures/tassadar/reports/tassadar_effectful_replay_audit_report.json`
+- effect-receipt and challenge-receipt files under
+  `fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1`
+
+Expected outcome:
+
+- one named bounded replay-and-challenge lane:
+  `tassadar.effect_profile.replay_challenge_receipts.v1`
+- exact replay-and-challenge parity on the seeded simulator, virtual-filesystem,
+  and async-safe-cancel rows
+- explicit refusal on missing effect receipts, missing challenge receipts, and
+  unsafe effect families
+- explicit `kernel-policy` and `nexus` dependency markers on the report rather
+  than silent authority backfill inside standalone psionic
+- zero served publication widening for the effectful replay lane
+
 ## Validation Commands
 
 Run the focused report checks after the flow:

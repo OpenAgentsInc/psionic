@@ -122,6 +122,15 @@ Current honest posture:
   cancellation rows while keeping open-ended callbacks, mid-effect
   cancellation, and unbounded retry on explicit refusal paths and leaving the
   default served async lane empty
+- the repo now also has one bounded effectful replay-and-challenge lane
+  `tassadar.effect_profile.replay_challenge_receipts.v1`, with committed
+  runtime and eval artifacts plus provider-facing receipts that bind seeded
+  simulator, virtual-filesystem, and async-safe-cancel replay rows to explicit
+  effect receipts, replay digests, and challenge receipts while keeping
+  missing-effect evidence, missing challenge evidence, and unsafe effect
+  families on explicit refusal paths; named `kernel-policy` and `nexus`
+  follow-ons remain explicit dependency markers outside standalone psionic and
+  the lane stays non-served by design
 - broader profiles above that remain benchmarked, suppressed, refused, or
   unpromoted unless their explicit gates are green
 
@@ -149,9 +158,9 @@ Issue-state note:
 
 - `TAS-103` through `TAS-124` are already implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-125` through `TAS-127` are now implemented and tracked in
+- `TAS-125` through `TAS-132` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-128` and runs through
+- the current open GitHub backlog begins at `TAS-133` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs

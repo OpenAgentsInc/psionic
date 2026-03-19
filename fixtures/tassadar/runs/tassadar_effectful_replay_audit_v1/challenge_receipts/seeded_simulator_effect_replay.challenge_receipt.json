@@ -1,0 +1,7 @@
+{
+  "challenge_receipt_id": "seeded_simulator_effect_replay.challenge_receipt",
+  "challenge_surface_id": "nexus://tassadar/challenge/simulator_loopback",
+  "replay_artifact_digest": "bd1a231af668fdadf53c6740af2dc7f74d98cddafefcb66be60ddb68ebb6edea",
+  "verdict": "challenge_confirmed",
+  "receipt_digest": "2f17105882999987f10d79bbf7c7ce43b27ff192d920a4e25bb4f8b4bf8ae504"
+}

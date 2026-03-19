@@ -1,0 +1,7 @@
+{
+  "challenge_receipt_id": "virtual_fs_proof_replay.challenge_receipt",
+  "challenge_surface_id": "nexus://tassadar/challenge/virtual_fs_read",
+  "replay_artifact_digest": "82c36af217600931736dc85811a99d508f242148ddbe592df4a74ec0a2e47e95",
+  "verdict": "challenge_confirmed",
+  "receipt_digest": "3f6bfbfe9948d3577b3a1397b405076e99e141cbd0d440bf863e10f0750d3fad"
+}

@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.effectful_replay_audit.report.v1",
+  "profile_id": "tassadar.effect_profile.replay_challenge_receipts.v1",
+  "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/tassadar_effectful_replay_audit_bundle.json",
+  "runtime_bundle": {
+    "schema_version": 1,
+    "bundle_id": "tassadar.effectful_replay_audit.bundle.v1",
+    "profile_id": "tassadar.effect_profile.replay_challenge_receipts.v1",
+    "case_receipts": [
+      {
+        "case_id": "seeded_simulator_effect_replay",
+        "process_id": "tassadar.process.search_frontier_kernel.v1",
+        "effect_surface_id": "seeded_network_loopback_case",
+        "status": "exact_replay_and_challenge_parity",
+        "effect_receipt": {
+          "receipt_id": "seeded_simulator_effect_replay.effect_receipt",
+          "effect_family_id": "sim.network.loopback_fifo_seed_7.v1",
+          "authority_ref": "kernel-policy://tassadar/effect_receipt",
+          "replay_window_steps": 256,
+          "receipt_digest": "d3c15835df0e8bcb5c4f5618a174a6fefd66d3c77e664741dea0421faa41136e"
+        },
+        "challenge_receipt": {
+          "challenge_receipt_id": "seeded_simulator_effect_replay.challenge_receipt",
+          "challenge_surface_id": "nexus://tassadar/challenge/simulator_loopback",
+          "replay_artifact_digest": "bd1a231af668fdadf53c6740af2dc7f74d98cddafefcb66be60ddb68ebb6edea",
+          "verdict": "challenge_confirmed",
+          "receipt_digest": "2f17105882999987f10d79bbf7c7ce43b27ff192d920a4e25bb4f8b4bf8ae504"
+        },
+        "replay_artifact_digest": "bd1a231af668fdadf53c6740af2dc7f74d98cddafefcb66be60ddb68ebb6edea",
+        "note": "seeded simulator effects stay replayable and challengeable because both the effect receipt and the challenge verdict are frozen explicitly"
+      },
+      {
+        "case_id": "virtual_fs_proof_replay",
+        "process_id": "tassadar.process.long_loop_kernel.v1",
+        "effect_surface_id": "dictionary_scan_read_only_mount",
+        "status": "exact_replay_and_challenge_parity",
+        "effect_receipt": {
+          "receipt_id": "virtual_fs_proof_replay.effect_receipt",
+          "effect_family_id": "tassadar.effect_profile.virtual_fs_mounts.v1",
+          "authority_ref": "kernel-policy://tassadar/effect_receipt",
+          "replay_window_steps": 96,
+          "receipt_digest": "2a0ece44f147cf38e6c2da1b2005682972fc8bbff91521969525834fa6969a80"
+        },
+        "challenge_receipt": {
+          "challenge_receipt_id": "virtual_fs_proof_replay.challenge_receipt",
+          "challenge_surface_id": "nexus://tassadar/challenge/virtual_fs_read",
+          "replay_artifact_digest": "82c36af217600931736dc85811a99d508f242148ddbe592df4a74ec0a2e47e95",
+          "verdict": "challenge_confirmed",
+          "receipt_digest": "3f6bfbfe9948d3577b3a1397b405076e99e141cbd0d440bf863e10f0750d3fad"
+        },
+        "replay_artifact_digest": "82c36af217600931736dc85811a99d508f242148ddbe592df4a74ec0a2e47e95",
+        "note": "artifact-mounted reads stay replayable and challengeable because the read proof and challenge receipt both bind the same artifact digest"
+      },
+      {
+        "case_id": "async_safe_cancel_replay",
+        "process_id": "tassadar.process.state_machine_accumulator.v1",
+        "effect_surface_id": "safe_boundary_cancellation_job",
+        "status": "exact_replay_and_challenge_parity",
+        "effect_receipt": {
+          "receipt_id": "async_safe_cancel_replay.effect_receipt",
+          "effect_family_id": "tassadar.internal_compute.async_lifecycle.v1",
+          "authority_ref": "kernel-policy://tassadar/effect_receipt",
+          "replay_window_steps": 144,
+          "receipt_digest": "0d6bd502fd5e15d0af2bb8eb76ba444c39f8b550f5457b6f58d5afa31d97a968"
+        },
+        "challenge_receipt": {
+          "challenge_receipt_id": "async_safe_cancel_replay.challenge_receipt",
+          "challenge_surface_id": "nexus://tassadar/challenge/async_safe_cancel",
+          "replay_artifact_digest": "961457eae7db6162a52a527df08092761ada54c0496323c4b49e299d557f4191",
+          "verdict": "challenge_confirmed",
+          "receipt_digest": "5ae819045573d83fb49b71fe392122c567ee78577297c85689b02ad0e58e6010"
+        },
+        "replay_artifact_digest": "961457eae7db6162a52a527df08092761ada54c0496323c4b49e299d557f4191",
+        "note": "safe-boundary cancellation stays replayable and challengeable because the replay digest and challenge verdict both bind the safe checkpoint boundary"
+      },
+      {
+        "case_id": "missing_effect_receipt_refusal",
+        "process_id": "tassadar.process.search_frontier_kernel.v1",
+        "effect_surface_id": "effect_receipt_missing",
+        "status": "exact_refusal_parity",
+        "replay_artifact_digest": "f01c043e87326a00e61dace4cffbe3a6715ceff795b3a2f601e76c80c57d7932",
+        "refusal_reason_id": "missing_effect_receipt",
+        "note": "missing effect receipts remain refused because effectful replay truth cannot be challenged without an explicit effect receipt"
+      },
+      {
+        "case_id": "missing_challenge_receipt_refusal",
+        "process_id": "tassadar.process.long_loop_kernel.v1",
+        "effect_surface_id": "challenge_receipt_missing",
+        "status": "exact_refusal_parity",
+        "replay_artifact_digest": "24ab0a36d8de4912173eb997524ed3fe251c3ae1c1d0e2c95ba4eec4bcbeebab",
+        "refusal_reason_id": "missing_challenge_receipt",
+        "note": "challenge-free effect replay remains refused because effectful replay truth must stay challengeable and audit-ready"
+      },
+      {
+        "case_id": "unsafe_effect_family_refusal",
+        "process_id": "tassadar.process.external_callback.v1",
+        "effect_surface_id": "unsafe_effect_family",
+        "status": "exact_refusal_parity",
+        "replay_artifact_digest": "f537c06a0f748e551070b0f196fbc13d88baeab0b5a730a3d1956bf7f7703dee",
+        "refusal_reason_id": "unsafe_effect_family_out_of_envelope",
+        "note": "unsafe or ambient effect families remain refused because this bundle does not imply arbitrary effectful execution truth"
+      }
+    ],
+    "challengeable_case_count": 3,
+    "refusal_case_count": 3,
+    "replay_safe_effect_family_ids": [
+      "sim.network.loopback_fifo_seed_7.v1",
+      "tassadar.effect_profile.virtual_fs_mounts.v1",
+      "tassadar.internal_compute.async_lifecycle.v1"
+    ],
+    "refused_effect_family_ids": [
+      "challenge_receipt_missing",
+      "effect_receipt_missing",
+      "unsafe_effect_family"
+    ],
+    "kernel_policy_dependency_marker": "kernel-policy owns authority on which mediated effects remain admissible for accepted-outcome use",
+    "nexus_dependency_marker": "nexus owns challenge and audit coordination for effect-aware replay disputes outside standalone psionic",
+    "claim_boundary": "this bundle covers one bounded effectful replay-and-challenge lane with explicit effect receipts, replay digests, and challenge receipts. It keeps missing-effect evidence, missing challenge evidence, and unsafe effect families on explicit refusal paths instead of implying ambient authority closure or market-grade settlement readiness inside standalone psionic",
+    "summary": "Effectful replay audit bundle covers challengeable_cases=3, refusal_cases=3, replay_safe_families=3, refused_families=3.",
+    "bundle_digest": "60815a7ad87a9a8346df742d90642d3b05c7dbf23fdde9eea5db5b06eaeda818"
+  },
+  "case_refs": [
+    {
+      "case_id": "seeded_simulator_effect_replay",
+      "effect_surface_id": "seeded_network_loopback_case",
+      "status": "exact_replay_and_challenge_parity",
+      "has_effect_receipt": true,
+      "has_challenge_receipt": true,
+      "note": "seeded simulator effects stay replayable and challengeable because both the effect receipt and the challenge verdict are frozen explicitly"
+    },
+    {
+      "case_id": "virtual_fs_proof_replay",
+      "effect_surface_id": "dictionary_scan_read_only_mount",
+      "status": "exact_replay_and_challenge_parity",
+      "has_effect_receipt": true,
+      "has_challenge_receipt": true,
+      "note": "artifact-mounted reads stay replayable and challengeable because the read proof and challenge receipt both bind the same artifact digest"
+    },
+    {
+      "case_id": "async_safe_cancel_replay",
+      "effect_surface_id": "safe_boundary_cancellation_job",
+      "status": "exact_replay_and_challenge_parity",
+      "has_effect_receipt": true,
+      "has_challenge_receipt": true,
+      "note": "safe-boundary cancellation stays replayable and challengeable because the replay digest and challenge verdict both bind the safe checkpoint boundary"
+    },
+    {
+      "case_id": "missing_effect_receipt_refusal",
+      "effect_surface_id": "effect_receipt_missing",
+      "status": "exact_refusal_parity",
+      "has_effect_receipt": false,
+      "has_challenge_receipt": false,
+      "refusal_reason_id": "missing_effect_receipt",
+      "note": "missing effect receipts remain refused because effectful replay truth cannot be challenged without an explicit effect receipt"
+    },
+    {
+      "case_id": "missing_challenge_receipt_refusal",
+      "effect_surface_id": "challenge_receipt_missing",
+      "status": "exact_refusal_parity",
+      "has_effect_receipt": false,
+      "has_challenge_receipt": false,
+      "refusal_reason_id": "missing_challenge_receipt",
+      "note": "challenge-free effect replay remains refused because effectful replay truth must stay challengeable and audit-ready"
+    },
+    {
+      "case_id": "unsafe_effect_family_refusal",
+      "effect_surface_id": "unsafe_effect_family",
+      "status": "exact_refusal_parity",
+      "has_effect_receipt": false,
+      "has_challenge_receipt": false,
+      "refusal_reason_id": "unsafe_effect_family_out_of_envelope",
+      "note": "unsafe or ambient effect families remain refused because this bundle does not imply arbitrary effectful execution truth"
+    }
+  ],
+  "challengeable_case_count": 3,
+  "refusal_case_count": 3,
+  "replay_safe_effect_family_ids": [
+    "sim.network.loopback_fifo_seed_7.v1",
+    "tassadar.effect_profile.virtual_fs_mounts.v1",
+    "tassadar.internal_compute.async_lifecycle.v1"
+  ],
+  "refused_effect_family_ids": [
+    "challenge_receipt_missing",
+    "effect_receipt_missing",
+    "unsafe_effect_family"
+  ],
+  "kernel_policy_dependency_marker": "kernel-policy owns authority on which mediated effects remain admissible for accepted-outcome use",
+  "nexus_dependency_marker": "nexus owns challenge and audit coordination for effect-aware replay disputes outside standalone psionic",
+  "generated_from_refs": [
+    "fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/challenge_receipts/async_safe_cancel_replay.challenge_receipt.json",
+    "fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/challenge_receipts/seeded_simulator_effect_replay.challenge_receipt.json",
+    "fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/challenge_receipts/virtual_fs_proof_replay.challenge_receipt.json",
+    "fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/effect_receipts/async_safe_cancel_replay.effect_receipt.json",
+    "fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/effect_receipts/seeded_simulator_effect_replay.effect_receipt.json",
+    "fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/effect_receipts/virtual_fs_proof_replay.effect_receipt.json",
+    "fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/tassadar_effectful_replay_audit_bundle.json"
+  ],
+  "claim_boundary": "this eval report covers one bounded effectful replay-and-challenge lane with explicit effect receipts, replay digests, and challenge receipts. It keeps missing-effect evidence, missing challenge evidence, and unsafe effect families on explicit refusal paths instead of implying authority closure or settlement readiness inside standalone psionic",
+  "summary": "Effectful replay audit report covers challengeable_cases=3, refusal_cases=3, replay_safe_families=3, refused_families=3.",
+  "report_digest": "eef9f54ce5f9c131a5b70ada6f63dbc30ee0c9d201a8cf78dd42a55c26145da5"
+}

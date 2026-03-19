@@ -1,0 +1,7 @@
+{
+  "receipt_id": "async_safe_cancel_replay.effect_receipt",
+  "effect_family_id": "tassadar.internal_compute.async_lifecycle.v1",
+  "authority_ref": "kernel-policy://tassadar/effect_receipt",
+  "replay_window_steps": 144,
+  "receipt_digest": "0d6bd502fd5e15d0af2bb8eb76ba444c39f8b550f5457b6f58d5afa31d97a968"
+}
