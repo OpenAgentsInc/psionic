@@ -1,0 +1,17 @@
+[
+  {
+    "step_index": 0,
+    "value": "send:job_a->job_b:latency=2",
+    "note": "seeded network simulator schedules a bounded send"
+  },
+  {
+    "step_index": 1,
+    "value": "recv:job_b<-job_a:latency=2",
+    "note": "seeded network simulator replays the receive deterministically"
+  },
+  {
+    "step_index": 2,
+    "value": "ack:job_b->job_a:latency=1",
+    "note": "seeded loopback acknowledgment remains replay-stable"
+  }
+]

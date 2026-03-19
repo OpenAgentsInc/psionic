@@ -996,6 +996,8 @@ fn build_tassadar_compiled_kernel_suite_environment_bundle(
             psionic_environments::default_tassadar_spill_tape_store_binding(),
         dynamic_memory_resume_binding:
             psionic_environments::default_tassadar_dynamic_memory_resume_binding(),
+        simulator_effect_profile_binding:
+            psionic_environments::default_tassadar_simulator_effect_profile_binding(),
         memory64_profile_binding: psionic_environments::default_tassadar_memory64_profile_binding(),
         broad_internal_compute_portability_binding: Some(
             psionic_environments::default_tassadar_broad_internal_compute_portability_binding(),

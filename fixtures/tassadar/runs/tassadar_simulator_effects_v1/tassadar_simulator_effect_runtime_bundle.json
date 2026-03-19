@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.simulator_effect.runtime_bundle.v1",
+  "profile_id": "tassadar.effect_profile.simulator_backed_io.v1",
+  "case_receipts": [
+    {
+      "case_id": "seeded_clock_tick_case",
+      "profile_id": "tassadar.effect_profile.simulator_backed_io.v1",
+      "simulator_kind": "clock",
+      "seed_profile_id": "sim.clock.seeded_epoch_250ms.v1",
+      "portability_envelope_id": "cpu_reference_current_host",
+      "status": "exact_replay_parity",
+      "exact_replay_parity": true,
+      "simulator_trace": [
+        {
+          "step_index": 0,
+          "value": "1700000000000",
+          "note": "seeded simulated wall-clock start"
+        },
+        {
+          "step_index": 1,
+          "value": "1700000000250",
+          "note": "seeded 250ms clock tick"
+        },
+        {
+          "step_index": 2,
+          "value": "1700000000500",
+          "note": "seeded 500ms clock tick"
+        }
+      ],
+      "refusal_kinds": [],
+      "note": "seeded clock simulator stays replay-stable because the epoch and tick quantum are frozen explicitly",
+      "receipt_digest": "dbbedc918ab345ffb84f0ec87d0874c345b9ec0fef31631fbc6a640ddd28fec8"
+    },
+    {
+      "case_id": "seeded_randomness_stream_case",
+      "profile_id": "tassadar.effect_profile.simulator_backed_io.v1",
+      "simulator_kind": "randomness",
+      "seed_profile_id": "sim.random.pcg64_seed_42.v1",
+      "portability_envelope_id": "cpu_reference_current_host",
+      "status": "exact_replay_parity",
+      "exact_replay_parity": true,
+      "simulator_trace": [
+        {
+          "step_index": 0,
+          "value": "0x8f5ce2d1",
+          "note": "first seeded pseudo-random draw"
+        },
+        {
+          "step_index": 1,
+          "value": "0x47ab1934",
+          "note": "second seeded pseudo-random draw"
+        },
+        {
+          "step_index": 2,
+          "value": "0xd02c7e58",
+          "note": "third seeded pseudo-random draw"
+        }
+      ],
+      "refusal_kinds": [],
+      "note": "seeded randomness stays replay-stable because the generator family and initial seed are frozen explicitly",
+      "receipt_digest": "8ff6342648bd2a008234b8f648c667428a13cf25fe2c15949fc1d4373fd124ed"
+    },
+    {
+      "case_id": "seeded_network_loopback_case",
+      "profile_id": "tassadar.effect_profile.simulator_backed_io.v1",
+      "simulator_kind": "network_simulator",
+      "seed_profile_id": "sim.network.loopback_fifo_seed_7.v1",
+      "portability_envelope_id": "cpu_reference_current_host",
+      "status": "exact_replay_parity",
+      "exact_replay_parity": true,
+      "simulator_trace": [
+        {
+          "step_index": 0,
+          "value": "send:job_a->job_b:latency=2",
+          "note": "seeded network simulator schedules a bounded send"
+        },
+        {
+          "step_index": 1,
+          "value": "recv:job_b<-job_a:latency=2",
+          "note": "seeded network simulator replays the receive deterministically"
+        },
+        {
+          "step_index": 2,
+          "value": "ack:job_b->job_a:latency=1",
+          "note": "seeded loopback acknowledgment remains replay-stable"
+        }
+      ],
+      "refusal_kinds": [],
+      "note": "seeded loopback-network simulator stays replay-stable because ordering, latencies, and packet shapes are frozen explicitly",
+      "receipt_digest": "b10ade08bfb20466c51334eb496590de7748b03782038bb81933612e0421c102"
+    },
+    {
+      "case_id": "ambient_system_clock_refusal",
+      "profile_id": "tassadar.effect_profile.simulator_backed_io.v1",
+      "simulator_kind": "clock",
+      "seed_profile_id": "host.clock.now",
+      "portability_envelope_id": "cpu_reference_current_host",
+      "status": "exact_refusal_parity",
+      "exact_replay_parity": false,
+      "simulator_trace": [],
+      "refusal_kinds": [
+        "ambient_system_clock_denied"
+      ],
+      "note": "ambient system-clock reads remain refused because they bypass the seeded simulator envelope",
+      "receipt_digest": "232ec7f1d69c38b6a5a2dee39817a2a54820ef224a4da52efc810dae36024725"
+    },
+    {
+      "case_id": "ambient_os_random_refusal",
+      "profile_id": "tassadar.effect_profile.simulator_backed_io.v1",
+      "simulator_kind": "randomness",
+      "seed_profile_id": "host.random.os_entropy",
+      "portability_envelope_id": "cpu_reference_current_host",
+      "status": "exact_refusal_parity",
+      "exact_replay_parity": false,
+      "simulator_trace": [],
+      "refusal_kinds": [
+        "ambient_os_random_denied"
+      ],
+      "note": "ambient OS entropy remains refused because it bypasses the seeded simulator envelope",
+      "receipt_digest": "17b500a85702f6a721a8f06a072d6d11a64db1c2b786f191d8e50fff48e97db3"
+    },
+    {
+      "case_id": "ambient_socket_network_refusal",
+      "profile_id": "tassadar.effect_profile.simulator_backed_io.v1",
+      "simulator_kind": "network_simulator",
+      "seed_profile_id": "host.network.socket_io",
+      "portability_envelope_id": "cpu_reference_current_host",
+      "status": "exact_refusal_parity",
+      "exact_replay_parity": false,
+      "simulator_trace": [],
+      "refusal_kinds": [
+        "ambient_socket_network_denied"
+      ],
+      "note": "ambient socket I/O remains refused because it bypasses the bounded network-simulator envelope",
+      "receipt_digest": "138a4c8e526c31363a81bb0fbf3d345b62495b2dc0d94e5d3f31d8d3c065b5b7"
+    }
+  ],
+  "exact_case_count": 3,
+  "refusal_case_count": 3,
+  "simulator_profile_ids": [
+    "sim.clock.seeded_epoch_250ms.v1",
+    "sim.random.pcg64_seed_42.v1",
+    "sim.network.loopback_fifo_seed_7.v1"
+  ],
+  "portability_envelope_ids": [
+    "cpu_reference_current_host"
+  ],
+  "refused_effect_ids": [
+    "host.clock.now",
+    "host.random.os_entropy",
+    "host.network.socket_io"
+  ],
+  "claim_boundary": "this runtime bundle covers one bounded simulator-backed effect profile with seeded clock, randomness, and loopback-network semantics. It keeps ambient system clock, OS entropy, and socket I/O on explicit refusal paths instead of implying general host interaction",
+  "summary": "Simulator-effect runtime bundle covers exact_cases=3, refusal_rows=3, simulator_profiles=3, portability_envelopes=1.",
+  "bundle_digest": "b309301707d51046e856fef56118100d38c4746cc3ec9392780d58e693a6cf09"
+}

@@ -865,6 +865,16 @@ The current scope is:
   bounds, and explicit refusal on ambient host paths or undeclared mount
   widening; this is not arbitrary host filesystem access, broad effect closure,
   or broader served internal compute
+- the current simulator-backed effect artifacts are
+  `fixtures/tassadar/runs/tassadar_simulator_effects_v1/tassadar_simulator_effect_runtime_bundle.json`,
+  `fixtures/tassadar/reports/tassadar_simulator_effect_sandbox_boundary_report.json`,
+  and `fixtures/tassadar/reports/tassadar_simulator_effect_profile_report.json`,
+  plus the persisted seeded trace files under the same run root, which freeze
+  one bounded simulator-backed effect lane with seeded clock, pseudo-random,
+  and loopback-network semantics on the current-host cpu-reference portability
+  envelope only, with explicit refusal on ambient system clock, OS entropy,
+  and socket I/O; this is not arbitrary host interaction, broad network
+  effects, or broader served internal compute
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

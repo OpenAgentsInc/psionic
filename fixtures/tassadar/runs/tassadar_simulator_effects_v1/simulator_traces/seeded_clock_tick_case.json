@@ -1,0 +1,17 @@
+[
+  {
+    "step_index": 0,
+    "value": "1700000000000",
+    "note": "seeded simulated wall-clock start"
+  },
+  {
+    "step_index": 1,
+    "value": "1700000000250",
+    "note": "seeded 250ms clock tick"
+  },
+  {
+    "step_index": 2,
+    "value": "1700000000500",
+    "note": "seeded 500ms clock tick"
+  }
+]

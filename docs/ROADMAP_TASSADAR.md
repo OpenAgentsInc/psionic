@@ -109,6 +109,12 @@ Current honest posture:
   runtime, sandbox, and eval artifacts plus provider receipts that keep the
   lane challengeable, replay-safe, and non-served while leaving canonical
   mount authority explicitly owned by `world-mounts` outside standalone psionic
+- the repo now also has one bounded simulator-backed effect profile
+  `tassadar.effect_profile.simulator_backed_io.v1`, with committed runtime,
+  sandbox, and eval artifacts plus provider receipts and environment bindings
+  that admit seeded clock, randomness, and loopback-network rows while keeping
+  ambient clock, OS entropy, and socket I/O on explicit refusal paths and
+  leaving the lane non-served by design
 - broader profiles above that remain benchmarked, suppressed, refused, or
   unpromoted unless their explicit gates are green
 

@@ -1,0 +1,17 @@
+[
+  {
+    "step_index": 0,
+    "value": "0x8f5ce2d1",
+    "note": "first seeded pseudo-random draw"
+  },
+  {
+    "step_index": 1,
+    "value": "0x47ab1934",
+    "note": "second seeded pseudo-random draw"
+  },
+  {
+    "step_index": 2,
+    "value": "0xd02c7e58",
+    "note": "third seeded pseudo-random draw"
+  }
+]

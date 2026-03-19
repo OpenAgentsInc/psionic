@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.simulator_effect.sandbox_boundary.report.v1",
+  "profile_id": "tassadar.effect_profile.simulator_backed_io.v1",
+  "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_simulator_effects_v1/tassadar_simulator_effect_runtime_bundle.json",
+  "rows": [
+    {
+      "case_id": "seeded_clock_tick_case",
+      "effect_ref": "sim.clock.seeded_epoch_250ms.v1",
+      "simulator_profile_id": "sim.clock.seeded_epoch_250ms.v1",
+      "status": "allowed_deterministic",
+      "simulator_required": true,
+      "portability_envelope_id": "cpu_reference_current_host",
+      "note": "seeded clock simulator stays replay-stable because the epoch and tick quantum are frozen explicitly"
+    },
+    {
+      "case_id": "seeded_randomness_stream_case",
+      "effect_ref": "sim.random.pcg64_seed_42.v1",
+      "simulator_profile_id": "sim.random.pcg64_seed_42.v1",
+      "status": "allowed_deterministic",
+      "simulator_required": true,
+      "portability_envelope_id": "cpu_reference_current_host",
+      "note": "seeded randomness stays replay-stable because the generator family and initial seed are frozen explicitly"
+    },
+    {
+      "case_id": "seeded_network_loopback_case",
+      "effect_ref": "sim.network.loopback_fifo_seed_7.v1",
+      "simulator_profile_id": "sim.network.loopback_fifo_seed_7.v1",
+      "status": "allowed_deterministic",
+      "simulator_required": true,
+      "portability_envelope_id": "cpu_reference_current_host",
+      "note": "seeded loopback-network simulator stays replay-stable because ordering, latencies, and packet shapes are frozen explicitly"
+    },
+    {
+      "case_id": "ambient_system_clock_refusal",
+      "effect_ref": "host.clock.now",
+      "simulator_profile_id": "host.clock.now",
+      "status": "refused_out_of_envelope",
+      "simulator_required": true,
+      "portability_envelope_id": "cpu_reference_current_host",
+      "refusal_reason_id": "ambientsystemclockdenied",
+      "note": "ambient system-clock reads remain refused because they bypass the seeded simulator envelope"
+    },
+    {
+      "case_id": "ambient_os_random_refusal",
+      "effect_ref": "host.random.os_entropy",
+      "simulator_profile_id": "host.random.os_entropy",
+      "status": "refused_out_of_envelope",
+      "simulator_required": true,
+      "portability_envelope_id": "cpu_reference_current_host",
+      "refusal_reason_id": "ambientosrandomdenied",
+      "note": "ambient OS entropy remains refused because it bypasses the seeded simulator envelope"
+    },
+    {
+      "case_id": "ambient_socket_network_refusal",
+      "effect_ref": "host.network.socket_io",
+      "simulator_profile_id": "host.network.socket_io",
+      "status": "refused_out_of_envelope",
+      "simulator_required": true,
+      "portability_envelope_id": "cpu_reference_current_host",
+      "refusal_reason_id": "ambientsocketnetworkdenied",
+      "note": "ambient socket I/O remains refused because it bypasses the bounded network-simulator envelope"
+    }
+  ],
+  "allowed_simulator_profile_ids": [
+    "sim.clock.seeded_epoch_250ms.v1",
+    "sim.random.pcg64_seed_42.v1",
+    "sim.network.loopback_fifo_seed_7.v1"
+  ],
+  "refused_effect_ids": [
+    "host.clock.now",
+    "host.random.os_entropy",
+    "host.network.socket_io"
+  ],
+  "allowed_case_count": 3,
+  "refused_case_count": 3,
+  "portability_envelope_ids": [
+    "cpu_reference_current_host"
+  ],
+  "claim_boundary": "this sandbox boundary admits only named simulator-backed clock, randomness, and loopback-network profiles. It keeps ambient system clock, OS entropy, and socket I/O on explicit refusal paths instead of implying general host interaction",
+  "summary": "Simulator-effect sandbox boundary freezes allowed_cases=3, refused_cases=3, portability_envelopes=1.",
+  "report_digest": "8420738d11a843b9bd1372f7d46fcf67488eeb19a8f3a5c108dd4465da39c433"
+}

@@ -176,6 +176,8 @@ mod tassadar_search_native_executor;
 mod tassadar_sequence;
 #[path = "tassadar_session_process_profile.rs"]
 mod tassadar_session_process_profile;
+#[path = "tassadar_simulator_effect_profile.rs"]
+mod tassadar_simulator_effect_profile;
 #[path = "tassadar_shared_depth_halting_calibration.rs"]
 mod tassadar_shared_depth_halting_calibration;
 #[path = "tassadar_shared_primitive_transfer.rs"]
@@ -317,6 +319,7 @@ pub use tassadar_rust_source_canon::*;
 pub use tassadar_search_native_executor::*;
 pub use tassadar_sequence::*;
 pub use tassadar_session_process_profile::*;
+pub use tassadar_simulator_effect_profile::*;
 pub use tassadar_shared_depth_halting_calibration::*;
 pub use tassadar_shared_primitive_transfer::*;
 pub use tassadar_simd_profile::*;

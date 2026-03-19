@@ -44,6 +44,7 @@ const TASSADAR_METADATA_EXECUTION_CHECKPOINT_KEY: &str = "tassadar.execution_che
 const TASSADAR_METADATA_PROCESS_OBJECT_KEY: &str = "tassadar.process_object_family";
 const TASSADAR_METADATA_SPILL_TAPE_STORE_KEY: &str = "tassadar.spill_tape_store_profile";
 const TASSADAR_METADATA_DYNAMIC_MEMORY_RESUME_KEY: &str = "tassadar.dynamic_memory_resume";
+const TASSADAR_METADATA_SIMULATOR_EFFECT_PROFILE_KEY: &str = "tassadar.simulator_effect_profile";
 const TASSADAR_METADATA_MEMORY64_PROFILE_KEY: &str = "tassadar.memory64_profile";
 const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_LADDER_KEY: &str =
     "tassadar.internal_compute_profile_ladder";
@@ -537,6 +538,130 @@ pub fn default_tassadar_dynamic_memory_resume_binding() -> TassadarDynamicMemory
         ),
         checkpoint_family_id: String::from("tassadar.dynamic_memory_resume.v1"),
         case_ids: vec![String::from("copy_fill_pause_after_copy")],
+    }
+}
+
+/// Public deterministic simulator-backed effect binding reused by Tassadar
+/// environment bundles.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarSimulatorEffectProfileBinding {
+    /// Stable simulator-effect profile report reference.
+    pub report_ref: String,
+    /// Stable simulator-effect profile report identifier.
+    pub report_id: String,
+    /// Stable run-bundle reference carrying the seeded simulator receipts.
+    pub run_bundle_ref: String,
+    /// Stable named profile identifier.
+    pub profile_id: String,
+    /// Named simulator profiles admitted by the bounded effect surface.
+    pub simulator_profile_ids: Vec<String>,
+    /// Portability envelopes covered by the committed report.
+    pub portability_envelope_ids: Vec<String>,
+    /// Ambient effect ids kept on explicit refusal paths.
+    pub refused_effect_ids: Vec<String>,
+    /// Case identifiers covered by the committed report.
+    pub case_ids: Vec<String>,
+}
+
+impl TassadarSimulatorEffectProfileBinding {
+    /// Returns a stable digest over the binding.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let encoded = serde_json::to_vec(self)
+            .expect("Tassadar simulator-effect profile binding should serialize");
+        let digest = sha2::Sha256::digest(encoded.as_slice());
+        hex::encode(digest)
+    }
+
+    /// Validates that the binding is explicit.
+    pub fn validate(&self) -> Result<(), TassadarEnvironmentError> {
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingSimulatorEffectProfileReportRef);
+        }
+        if self.report_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingSimulatorEffectProfileReportId);
+        }
+        if self.run_bundle_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingSimulatorEffectProfileRunBundleRef);
+        }
+        if self.profile_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingSimulatorEffectProfileId);
+        }
+        if self.simulator_profile_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingSimulatorEffectProfileIds);
+        }
+        if self
+            .simulator_profile_ids
+            .iter()
+            .any(|profile_id| profile_id.trim().is_empty())
+        {
+            return Err(TassadarEnvironmentError::InvalidSimulatorEffectProfileId);
+        }
+        if self.portability_envelope_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingSimulatorEffectPortabilityEnvelopes);
+        }
+        if self
+            .portability_envelope_ids
+            .iter()
+            .any(|envelope_id| envelope_id.trim().is_empty())
+        {
+            return Err(
+                TassadarEnvironmentError::InvalidSimulatorEffectPortabilityEnvelopeId,
+            );
+        }
+        if self.refused_effect_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingSimulatorEffectRefusedEffectIds);
+        }
+        if self
+            .refused_effect_ids
+            .iter()
+            .any(|effect_id| effect_id.trim().is_empty())
+        {
+            return Err(TassadarEnvironmentError::InvalidSimulatorEffectRefusedEffectId);
+        }
+        if self.case_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingSimulatorEffectCaseIds);
+        }
+        if self.case_ids.iter().any(|case_id| case_id.trim().is_empty()) {
+            return Err(TassadarEnvironmentError::InvalidSimulatorEffectCaseId);
+        }
+        Ok(())
+    }
+}
+
+/// Returns the canonical deterministic simulator-backed effect binding reused
+/// by Tassadar environment surfaces.
+#[must_use]
+pub fn default_tassadar_simulator_effect_profile_binding() -> TassadarSimulatorEffectProfileBinding
+{
+    TassadarSimulatorEffectProfileBinding {
+        report_ref: String::from(
+            "fixtures/tassadar/reports/tassadar_simulator_effect_profile_report.json",
+        ),
+        report_id: String::from("tassadar.simulator_effect.profile_report.v1"),
+        run_bundle_ref: String::from(
+            "fixtures/tassadar/runs/tassadar_simulator_effects_v1/tassadar_simulator_effect_runtime_bundle.json",
+        ),
+        profile_id: String::from("tassadar.effect_profile.simulator_backed_io.v1"),
+        simulator_profile_ids: vec![
+            String::from("sim.clock.seeded_epoch_250ms.v1"),
+            String::from("sim.random.pcg64_seed_42.v1"),
+            String::from("sim.network.loopback_fifo_seed_7.v1"),
+        ],
+        portability_envelope_ids: vec![String::from("cpu_reference_current_host")],
+        refused_effect_ids: vec![
+            String::from("host.clock.now"),
+            String::from("host.random.os_entropy"),
+            String::from("host.network.socket_io"),
+        ],
+        case_ids: vec![
+            String::from("seeded_clock_tick_case"),
+            String::from("seeded_randomness_stream_case"),
+            String::from("seeded_network_loopback_case"),
+            String::from("ambient_system_clock_refusal"),
+            String::from("ambient_os_random_refusal"),
+            String::from("ambient_socket_network_refusal"),
+        ],
     }
 }
 
@@ -1465,6 +1590,8 @@ pub struct TassadarEnvironmentSpec {
     pub spill_tape_store_binding: TassadarSpillTapeStoreBinding,
     /// Public dynamic-memory pause-and-resume binding.
     pub dynamic_memory_resume_binding: TassadarDynamicMemoryResumeBinding,
+    /// Public deterministic simulator-backed effect binding.
+    pub simulator_effect_profile_binding: TassadarSimulatorEffectProfileBinding,
     /// Public bounded memory64 continuation binding.
     pub memory64_profile_binding: TassadarMemory64ProfileBinding,
     /// Optional broad internal-compute portability binding.
@@ -1577,6 +1704,7 @@ impl TassadarEnvironmentSpec {
             process_object_binding: self.process_object_binding.clone(),
             spill_tape_store_binding: self.spill_tape_store_binding.clone(),
             dynamic_memory_resume_binding: self.dynamic_memory_resume_binding.clone(),
+            simulator_effect_profile_binding: self.simulator_effect_profile_binding.clone(),
             memory64_profile_binding: self.memory64_profile_binding.clone(),
             broad_internal_compute_portability_binding: self
                 .broad_internal_compute_portability_binding
@@ -1632,6 +1760,7 @@ impl TassadarEnvironmentSpec {
         self.process_object_binding.validate()?;
         self.spill_tape_store_binding.validate()?;
         self.dynamic_memory_resume_binding.validate()?;
+        self.simulator_effect_profile_binding.validate()?;
         self.memory64_profile_binding.validate()?;
         if let Some(binding) = &self.broad_internal_compute_portability_binding {
             binding.validate()?;
@@ -1852,6 +1981,10 @@ impl TassadarEnvironmentSpec {
             serde_json::to_value(&self.dynamic_memory_resume_binding).unwrap_or(Value::Null),
         );
         metadata.insert(
+            String::from(TASSADAR_METADATA_SIMULATOR_EFFECT_PROFILE_KEY),
+            serde_json::to_value(&self.simulator_effect_profile_binding).unwrap_or(Value::Null),
+        );
+        metadata.insert(
             String::from(TASSADAR_METADATA_MEMORY64_PROFILE_KEY),
             serde_json::to_value(&self.memory64_profile_binding).unwrap_or(Value::Null),
         );
@@ -1980,6 +2113,8 @@ pub struct TassadarEnvironmentBundle {
     pub spill_tape_store_binding: TassadarSpillTapeStoreBinding,
     /// Dynamic-memory pause-and-resume binding.
     pub dynamic_memory_resume_binding: TassadarDynamicMemoryResumeBinding,
+    /// Deterministic simulator-backed effect binding.
+    pub simulator_effect_profile_binding: TassadarSimulatorEffectProfileBinding,
     /// Bounded memory64 continuation binding.
     pub memory64_profile_binding: TassadarMemory64ProfileBinding,
     /// Optional broad internal-compute portability binding.
@@ -2175,6 +2310,54 @@ pub enum TassadarEnvironmentError {
     /// Invalid dynamic-memory resume case id.
     #[error("Tassadar environment spec includes an empty dynamic-memory resume case id")]
     InvalidDynamicMemoryResumeCaseId,
+    /// Missing simulator-effect profile report ref.
+    #[error("Tassadar environment spec is missing `simulator_effect_profile_binding.report_ref`")]
+    MissingSimulatorEffectProfileReportRef,
+    /// Missing simulator-effect profile report id.
+    #[error("Tassadar environment spec is missing `simulator_effect_profile_binding.report_id`")]
+    MissingSimulatorEffectProfileReportId,
+    /// Missing simulator-effect profile run-bundle ref.
+    #[error(
+        "Tassadar environment spec is missing `simulator_effect_profile_binding.run_bundle_ref`"
+    )]
+    MissingSimulatorEffectProfileRunBundleRef,
+    /// Missing simulator-effect profile id.
+    #[error("Tassadar environment spec is missing `simulator_effect_profile_binding.profile_id`")]
+    MissingSimulatorEffectProfileId,
+    /// Missing simulator profile ids.
+    #[error(
+        "Tassadar environment spec is missing `simulator_effect_profile_binding.simulator_profile_ids`"
+    )]
+    MissingSimulatorEffectProfileIds,
+    /// Invalid simulator profile id.
+    #[error("Tassadar environment spec includes an empty simulator-effect profile id")]
+    InvalidSimulatorEffectProfileId,
+    /// Missing simulator-effect portability envelopes.
+    #[error(
+        "Tassadar environment spec is missing `simulator_effect_profile_binding.portability_envelope_ids`"
+    )]
+    MissingSimulatorEffectPortabilityEnvelopes,
+    /// Invalid simulator-effect portability envelope id.
+    #[error(
+        "Tassadar environment spec includes an empty simulator-effect portability envelope id"
+    )]
+    InvalidSimulatorEffectPortabilityEnvelopeId,
+    /// Missing simulator-effect refused effect ids.
+    #[error(
+        "Tassadar environment spec is missing `simulator_effect_profile_binding.refused_effect_ids`"
+    )]
+    MissingSimulatorEffectRefusedEffectIds,
+    /// Invalid simulator-effect refused effect id.
+    #[error("Tassadar environment spec includes an empty simulator-effect refused effect id")]
+    InvalidSimulatorEffectRefusedEffectId,
+    /// Missing simulator-effect case ids.
+    #[error(
+        "Tassadar environment spec is missing `simulator_effect_profile_binding.case_ids`"
+    )]
+    MissingSimulatorEffectCaseIds,
+    /// Invalid simulator-effect case id.
+    #[error("Tassadar environment spec includes an empty simulator-effect case id")]
+    InvalidSimulatorEffectCaseId,
     /// Missing memory64 profile report ref.
     #[error("Tassadar environment spec is missing `memory64_profile_binding.report_ref`")]
     MissingMemory64ProfileReportRef,
@@ -2655,6 +2838,7 @@ mod tests {
             process_object_binding: default_tassadar_process_object_binding(),
             spill_tape_store_binding: default_tassadar_spill_tape_store_binding(),
             dynamic_memory_resume_binding: default_tassadar_dynamic_memory_resume_binding(),
+            simulator_effect_profile_binding: default_tassadar_simulator_effect_profile_binding(),
             memory64_profile_binding: default_tassadar_memory64_profile_binding(),
             broad_internal_compute_portability_binding: Some(
                 default_tassadar_broad_internal_compute_portability_binding(),
@@ -2834,6 +3018,15 @@ mod tests {
             bundle
                 .benchmark_package
                 .metadata
+                .get(TASSADAR_METADATA_SIMULATOR_EFFECT_PROFILE_KEY)
+                .and_then(|value| value.get("report_ref"))
+                .and_then(Value::as_str),
+            Some("fixtures/tassadar/reports/tassadar_simulator_effect_profile_report.json")
+        );
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
                 .get(TASSADAR_METADATA_MEMORY64_PROFILE_KEY)
                 .and_then(|value| value.get("report_ref"))
                 .and_then(Value::as_str),
@@ -2944,6 +3137,14 @@ mod tests {
         assert_eq!(
             bundle.dynamic_memory_resume_binding.run_bundle_ref,
             "fixtures/tassadar/runs/tassadar_dynamic_memory_resume_v1/tassadar_dynamic_memory_resume_bundle.json"
+        );
+        assert_eq!(
+            bundle.simulator_effect_profile_binding.run_bundle_ref,
+            "fixtures/tassadar/runs/tassadar_simulator_effects_v1/tassadar_simulator_effect_runtime_bundle.json"
+        );
+        assert_eq!(
+            bundle.simulator_effect_profile_binding.simulator_profile_ids.len(),
+            3
         );
         assert_eq!(
             bundle

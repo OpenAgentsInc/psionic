@@ -1133,6 +1133,31 @@ Expected outcome:
 - explicit refusal on ambient host paths and path-traversal / undeclared-mount widening
 - zero served publication widening for the virtual-filesystem lane
 
+### 21. Deterministic clock, randomness, and network-simulator effect profile
+
+```bash
+cargo run -p psionic-runtime --example tassadar_simulator_effect_runtime_bundle
+cargo run -p psionic-sandbox --example tassadar_simulator_effect_sandbox_boundary_report
+cargo run -p psionic-eval --example tassadar_simulator_effect_profile_report
+```
+
+Read:
+
+- `fixtures/tassadar/runs/tassadar_simulator_effects_v1/tassadar_simulator_effect_runtime_bundle.json`
+- `fixtures/tassadar/reports/tassadar_simulator_effect_sandbox_boundary_report.json`
+- `fixtures/tassadar/reports/tassadar_simulator_effect_profile_report.json`
+- seeded simulator-trace files under
+  `fixtures/tassadar/runs/tassadar_simulator_effects_v1`
+
+Expected outcome:
+
+- one named bounded simulator-backed effect profile:
+  `tassadar.effect_profile.simulator_backed_io.v1`
+- exact replay parity on the seeded clock, pseudo-random, and loopback-network rows
+- explicit allowed-profile truth for the seeded simulator envelope
+- explicit refusal on ambient system clock, OS entropy, and socket I/O
+- zero served publication widening for the simulator-backed effect lane
+
 ## Validation Commands
 
 Run the focused report checks after the flow:
@@ -1205,6 +1230,10 @@ cargo test -p psionic-runtime virtual_fs -- --nocapture
 cargo test -p psionic-sandbox virtual_fs -- --nocapture
 cargo test -p psionic-eval virtual_fs -- --nocapture
 cargo test -p psionic-provider virtual_fs -- --nocapture
+cargo test -p psionic-runtime simulator_effect -- --nocapture
+cargo test -p psionic-sandbox simulator_effect -- --nocapture
+cargo test -p psionic-eval simulator_effect -- --nocapture
+cargo test -p psionic-provider simulator_effect -- --nocapture
 ```
 
 These checks should keep the committed reports and generated truth aligned.
