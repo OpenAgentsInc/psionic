@@ -35,6 +35,16 @@ pub enum TassadarCallFrameInstruction {
         /// Arithmetic family.
         op: TassadarStructuredControlBinaryOp,
     },
+    /// Jump unconditionally to one program counter inside the current function.
+    Jump {
+        /// Target program counter.
+        target_pc: usize,
+    },
+    /// Pop one value and jump when it is zero.
+    JumpIfZero {
+        /// Target program counter.
+        target_pc: usize,
+    },
     /// Call one direct target function.
     Call {
         /// Target function index.
@@ -173,6 +183,16 @@ impl TassadarCallFrameProgram {
                             function_count: self.functions.len(),
                         });
                     }
+                    TassadarCallFrameInstruction::Jump { target_pc }
+                    | TassadarCallFrameInstruction::JumpIfZero { target_pc }
+                        if *target_pc > function.instructions.len() =>
+                    {
+                        return Err(TassadarCallFrameError::ControlTargetOutOfRange {
+                            function_index: function.function_index,
+                            target_pc: *target_pc,
+                            instruction_count: function.instructions.len(),
+                        });
+                    }
                     _ => {}
                 }
             }
@@ -214,6 +234,20 @@ pub enum TassadarCallFrameTraceEvent {
         left: i32,
         right: i32,
         result: i32,
+    },
+    /// One unconditional jump advanced control inside the current frame.
+    Jump {
+        function_index: u32,
+        from_pc: usize,
+        target_pc: usize,
+    },
+    /// One conditional jump tested one value and either jumped or fell through.
+    JumpIfZero {
+        function_index: u32,
+        from_pc: usize,
+        target_pc: usize,
+        value: i32,
+        taken: bool,
     },
     /// One direct call pushed a new frame.
     Call {
@@ -322,6 +356,14 @@ pub enum TassadarCallFrameError {
         function_index: u32,
         target_function_index: u32,
         function_count: usize,
+    },
+    #[error(
+        "function {function_index} branches to missing target pc {target_pc} (instruction_count={instruction_count})"
+    )]
+    ControlTargetOutOfRange {
+        function_index: u32,
+        target_pc: usize,
+        instruction_count: usize,
     },
     #[error(
         "call-frame stack underflow in function {function_index} at pc {pc} for {context}: needed {needed}, available {available}"
@@ -500,6 +542,32 @@ pub fn execute_tassadar_call_frame_program(
                     left,
                     right,
                     result,
+                })?;
+            }
+            TassadarCallFrameInstruction::Jump { target_pc } => {
+                let from_pc = state.frames[current_index].pc;
+                state.frames[current_index].pc = target_pc;
+                state.push_step(TassadarCallFrameTraceEvent::Jump {
+                    function_index,
+                    from_pc,
+                    target_pc,
+                })?;
+            }
+            TassadarCallFrameInstruction::JumpIfZero { target_pc } => {
+                let from_pc = state.frames[current_index].pc;
+                let value = pop_operand(
+                    &mut state.frames[current_index],
+                    function_index,
+                    "jump_if_zero",
+                )?;
+                let taken = value == 0;
+                state.frames[current_index].pc = if taken { target_pc } else { from_pc + 1 };
+                state.push_step(TassadarCallFrameTraceEvent::JumpIfZero {
+                    function_index,
+                    from_pc,
+                    target_pc,
+                    value,
+                    taken,
                 })?;
             }
             TassadarCallFrameInstruction::Call {
@@ -821,13 +889,63 @@ pub fn tassadar_seeded_call_frame_recursion_program() -> TassadarCallFrameProgra
     )
 }
 
+/// Returns a seeded bounded-recursion exactness program with conditional control.
+#[must_use]
+pub fn tassadar_seeded_call_frame_recursive_sum_program() -> TassadarCallFrameProgram {
+    TassadarCallFrameProgram::new(
+        "tassadar.call_frames.recursive_sum.v1",
+        0,
+        8,
+        vec![
+            TassadarCallFrameFunction::new(
+                0,
+                "entry",
+                0,
+                0,
+                1,
+                vec![
+                    TassadarCallFrameInstruction::I32Const { value: 5 },
+                    TassadarCallFrameInstruction::Call { function_index: 1 },
+                    TassadarCallFrameInstruction::Return,
+                ],
+            ),
+            TassadarCallFrameFunction::new(
+                1,
+                "recursive_sum",
+                1,
+                1,
+                1,
+                vec![
+                    TassadarCallFrameInstruction::LocalGet { local_index: 0 },
+                    TassadarCallFrameInstruction::JumpIfZero { target_pc: 9 },
+                    TassadarCallFrameInstruction::LocalGet { local_index: 0 },
+                    TassadarCallFrameInstruction::LocalGet { local_index: 0 },
+                    TassadarCallFrameInstruction::I32Const { value: 1 },
+                    TassadarCallFrameInstruction::BinaryOp {
+                        op: TassadarStructuredControlBinaryOp::Sub,
+                    },
+                    TassadarCallFrameInstruction::Call { function_index: 1 },
+                    TassadarCallFrameInstruction::BinaryOp {
+                        op: TassadarStructuredControlBinaryOp::Add,
+                    },
+                    TassadarCallFrameInstruction::Return,
+                    TassadarCallFrameInstruction::I32Const { value: 0 },
+                    TassadarCallFrameInstruction::Return,
+                ],
+            ),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        TassadarCallFrameError, TassadarCallFrameHaltReason, execute_tassadar_call_frame_program,
-        tassadar_seeded_call_frame_direct_call_program,
+        execute_tassadar_call_frame_program, tassadar_seeded_call_frame_direct_call_program,
         tassadar_seeded_call_frame_multi_function_program,
         tassadar_seeded_call_frame_recursion_program,
+        tassadar_seeded_call_frame_recursive_sum_program, TassadarCallFrameError,
+        TassadarCallFrameFunction, TassadarCallFrameHaltReason, TassadarCallFrameInstruction,
+        TassadarCallFrameProgram,
     };
 
     #[test]
@@ -846,12 +964,10 @@ mod tests {
         )
         .expect("execute");
         assert_eq!(execution.returned_value, Some(25));
-        assert!(
-            execution
-                .steps
-                .iter()
-                .any(|step| step.frame_depth_after == 3)
-        );
+        assert!(execution
+            .steps
+            .iter()
+            .any(|step| step.frame_depth_after == 3));
         assert!(execution.steps.iter().any(|step| {
             step.frame_stack_after
                 .iter()
@@ -867,6 +983,52 @@ mod tests {
         assert!(matches!(
             error,
             TassadarCallFrameError::RecursionDepthExceeded { .. }
+        ));
+    }
+
+    #[test]
+    fn call_frame_program_executes_bounded_recursion_exactly() {
+        let execution = execute_tassadar_call_frame_program(
+            &tassadar_seeded_call_frame_recursive_sum_program(),
+        )
+        .expect("execute");
+        assert_eq!(execution.returned_value, Some(15));
+        assert!(execution.steps.iter().any(|step| {
+            matches!(
+                step.event,
+                super::TassadarCallFrameTraceEvent::JumpIfZero { taken: true, .. }
+            )
+        }));
+        assert!(
+            execution
+                .steps
+                .iter()
+                .map(|step| step.frame_depth_after)
+                .max()
+                .unwrap_or_default()
+                >= 6
+        );
+    }
+
+    #[test]
+    fn call_frame_program_rejects_out_of_range_control_target() {
+        let program = TassadarCallFrameProgram::new(
+            "tassadar.call_frames.bad_jump.v1",
+            0,
+            4,
+            vec![TassadarCallFrameFunction::new(
+                0,
+                "entry",
+                0,
+                0,
+                0,
+                vec![TassadarCallFrameInstruction::Jump { target_pc: 2 }],
+            )],
+        );
+        let error = execute_tassadar_call_frame_program(&program).expect_err("should reject");
+        assert!(matches!(
+            error,
+            TassadarCallFrameError::ControlTargetOutOfRange { .. }
         ));
     }
 }

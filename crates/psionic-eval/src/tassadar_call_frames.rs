@@ -4,12 +4,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use psionic_models::{TassadarCallFramePublication, tassadar_call_frame_publication};
+use psionic_models::{tassadar_call_frame_publication, TassadarCallFramePublication};
 use psionic_runtime::{
-    TassadarCallFrameError, TassadarCallFrameHaltReason, TassadarCallFrameProgram,
     execute_tassadar_call_frame_program, tassadar_seeded_call_frame_direct_call_program,
     tassadar_seeded_call_frame_multi_function_program,
-    tassadar_seeded_call_frame_recursion_program,
+    tassadar_seeded_call_frame_recursion_program, tassadar_seeded_call_frame_recursive_sum_program,
+    TassadarCallFrameError, TassadarCallFrameHaltReason, TassadarCallFrameProgram,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -68,7 +68,7 @@ impl TassadarCallFrameReport {
             publication: tassadar_call_frame_publication(),
             cases,
             claim_boundary: String::from(
-                "this report proves one bounded direct-call multi-function lane with explicit frame-stack traces, exact direct-call replay, multi-function execution, and bounded-recursion refusal; it does not claim call_indirect, imports, host calls, tail calls, or arbitrary Wasm closure",
+                "this report proves one bounded direct-call multi-function lane with explicit frame-stack traces, exact direct-call replay, conditional in-frame control, exact bounded recursion under an explicit depth cap, and typed recursion refusal at the cap; it does not claim call_indirect, imports, host calls, tail calls, or arbitrary Wasm closure",
             ),
             report_digest: String::new(),
         };
@@ -94,8 +94,8 @@ pub enum TassadarCallFrameReportError {
     },
 }
 
-pub fn build_tassadar_call_frame_report()
--> Result<TassadarCallFrameReport, TassadarCallFrameReportError> {
+pub fn build_tassadar_call_frame_report(
+) -> Result<TassadarCallFrameReport, TassadarCallFrameReportError> {
     Ok(TassadarCallFrameReport::new(vec![
         build_exact_case(
             "direct_call_parity",
@@ -104,6 +104,10 @@ pub fn build_tassadar_call_frame_report()
         build_exact_case(
             "multi_function_replay",
             tassadar_seeded_call_frame_multi_function_program(),
+        )?,
+        build_exact_case(
+            "bounded_recursive_exact",
+            tassadar_seeded_call_frame_recursive_sum_program(),
         )?,
         build_refusal_case(
             "bounded_recursion_refusal",
@@ -233,8 +237,8 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        TASSADAR_CALL_FRAME_REPORT_REF, TassadarCallFrameCaseStatus, TassadarCallFrameReport,
         build_tassadar_call_frame_report, repo_root, write_tassadar_call_frame_report,
+        TassadarCallFrameCaseStatus, TassadarCallFrameReport, TASSADAR_CALL_FRAME_REPORT_REF,
     };
 
     fn read_repo_json<T: serde::de::DeserializeOwned>(
@@ -248,13 +252,18 @@ mod tests {
     #[test]
     fn call_frame_report_captures_exact_and_refused_cases() {
         let report = build_tassadar_call_frame_report().expect("report");
-        assert_eq!(report.cases.len(), 3);
-        assert!(
-            report
-                .cases
-                .iter()
-                .any(|case| case.status == TassadarCallFrameCaseStatus::Exact)
-        );
+        assert_eq!(report.cases.len(), 4);
+        assert!(report
+            .cases
+            .iter()
+            .any(|case| case.status == TassadarCallFrameCaseStatus::Exact));
+        let recursive = report
+            .cases
+            .iter()
+            .find(|case| case.case_id == "bounded_recursive_exact")
+            .expect("recursive exact case");
+        assert_eq!(recursive.returned_value, Some(15));
+        assert!(recursive.max_frame_depth >= 6);
         let refusal = report
             .cases
             .iter()

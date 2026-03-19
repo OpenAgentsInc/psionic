@@ -7,6 +7,8 @@
     "status": "implemented",
     "claim_class": "execution_truth_compiled_bounded_exactness",
     "supports_direct_calls": true,
+    "supports_bounded_exact_recursion": true,
+    "supports_conditional_control": true,
     "traces_include_frame_stack": true,
     "max_call_depth": 8,
     "target_surfaces": [
@@ -19,11 +21,11 @@
       "fixtures/tassadar/reports/tassadar_call_frame_report.json"
     ],
     "support_boundaries": [
-      "supports direct function calls with 0 or 1 return values under one bounded frame stack; call_indirect and import boundaries remain separate work",
-      "recursion is bounded by explicit max_call_depth and refuses once that cap would be exceeded",
+      "supports direct function calls with 0 or 1 return values under one bounded frame stack plus conditional in-frame control; call_indirect and import boundaries remain separate work",
+      "exact recursion is supported below explicit max_call_depth and refuses once that cap would be exceeded",
       "this publication does not claim arbitrary Wasm closure, tail calls, host imports, or learned-lane generalization"
     ],
-    "publication_digest": "356f77134cc932474aa5b3c864d8d8e8ecc4fdb7ef7ff7abaa7ccf6a24826346"
+    "publication_digest": "b49cbca6f8203cd384c7fb229e5a3c6ec65efe328878035b7bff11a89fff8ff1"
   },
   "cases": [
     {
@@ -56,6 +58,20 @@
       }
     },
     {
+      "case_id": "bounded_recursive_exact",
+      "status": "exact",
+      "program_id": "tassadar.call_frames.recursive_sum.v1",
+      "returned_value": 15,
+      "halt_reason": "returned",
+      "trace_step_count": 52,
+      "max_frame_depth": 7,
+      "execution_digest": "885e446920f89d078cf1555b1fab3ae23728b9168ec7b3140d69f84d378d17e0",
+      "frame_presence_counts": {
+        "entry": 51,
+        "recursive_sum": 159
+      }
+    },
+    {
       "case_id": "bounded_recursion_refusal",
       "status": "refused",
       "program_id": "tassadar.call_frames.recursion_refusal.v1",
@@ -65,6 +81,6 @@
       "refusal_detail": "bounded recursion refusal: calling function 1 would exceed max_call_depth 3"
     }
   ],
-  "claim_boundary": "this report proves one bounded direct-call multi-function lane with explicit frame-stack traces, exact direct-call replay, multi-function execution, and bounded-recursion refusal; it does not claim call_indirect, imports, host calls, tail calls, or arbitrary Wasm closure",
-  "report_digest": "1439180d5a7436954a0d3ed478b04251ced76f2e60ba2b06eda3e051956db5e3"
+  "claim_boundary": "this report proves one bounded direct-call multi-function lane with explicit frame-stack traces, exact direct-call replay, conditional in-frame control, exact bounded recursion under an explicit depth cap, and typed recursion refusal at the cap; it does not claim call_indirect, imports, host calls, tail calls, or arbitrary Wasm closure",
+  "report_digest": "dbc30764856ae434bf69cfde0bd63938ee8fc71de3ef096cf629107073ca1f74"
 }

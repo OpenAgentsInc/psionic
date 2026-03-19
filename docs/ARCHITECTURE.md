@@ -811,14 +811,16 @@ The current scope is:
   calls, memories, block-result closure, or arbitrary Wasm support
 - landed call-frame execution bar: `psionic-runtime` now owns one bounded
   direct-call multi-function lane with function-local state, real frame-stack
-  execution, replayable frame-stack trace snapshots, and explicit
-  bounded-recursion refusal; `psionic-models` now publishes the same lane as a
-  repo-facing call-frame publication; `psionic-train` now materializes a
-  training-facing suite over direct-call parity, multi-function replay, and
-  recursion refusal; and `psionic-eval` now freezes the current evidence at
-  `fixtures/tassadar/reports/tassadar_call_frame_report.json` instead of
-  keeping multi-function execution trapped behind the old single-frame
-  boundary
+  execution, replayable frame-stack trace snapshots, conditional in-frame
+  control, exact bounded recursion below an explicit depth cap, and explicit
+  recursion refusal at the cap; `psionic-models` now publishes the same lane
+  as a repo-facing call-frame publication with explicit bounded-recursion and
+  conditional-control posture; `psionic-train` now materializes a
+  training-facing suite over direct-call parity, multi-function replay, exact
+  bounded recursion, and recursion refusal; and `psionic-eval` now freezes the
+  current evidence at `fixtures/tassadar/reports/tassadar_call_frame_report.json`
+  instead of keeping multi-function execution trapped behind the old
+  single-frame boundary
 - landed numeric-opcode widening bar: `psionic-data` now publishes a public
   `TassadarNumericOpcodeLadderContract` that keeps i32 core arithmetic,
   comparisons, bit operations, i64 integer work, and floating-point work as

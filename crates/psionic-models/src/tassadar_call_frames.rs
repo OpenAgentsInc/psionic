@@ -25,6 +25,10 @@ pub struct TassadarCallFramePublication {
     pub claim_class: String,
     /// Whether direct multi-function calls are supported.
     pub supports_direct_calls: bool,
+    /// Whether bounded exact recursion succeeds below the declared depth cap.
+    pub supports_bounded_exact_recursion: bool,
+    /// Whether the lane carries explicit in-frame conditional control.
+    pub supports_conditional_control: bool,
     /// Whether full frame-stack snapshots are carried in the trace.
     pub traces_include_frame_stack: bool,
     /// Maximum bounded call depth before recursion is refused.
@@ -47,6 +51,8 @@ impl TassadarCallFramePublication {
             status: TassadarCallFramePublicationStatus::Implemented,
             claim_class: String::from("execution_truth_compiled_bounded_exactness"),
             supports_direct_calls: true,
+            supports_bounded_exact_recursion: true,
+            supports_conditional_control: true,
             traces_include_frame_stack: true,
             max_call_depth: 8,
             target_surfaces: vec![
@@ -58,10 +64,10 @@ impl TassadarCallFramePublication {
             validation_refs: vec![String::from(TASSADAR_CALL_FRAME_REPORT_REF)],
             support_boundaries: vec![
                 String::from(
-                    "supports direct function calls with 0 or 1 return values under one bounded frame stack; call_indirect and import boundaries remain separate work",
+                    "supports direct function calls with 0 or 1 return values under one bounded frame stack plus conditional in-frame control; call_indirect and import boundaries remain separate work",
                 ),
                 String::from(
-                    "recursion is bounded by explicit max_call_depth and refuses once that cap would be exceeded",
+                    "exact recursion is supported below explicit max_call_depth and refuses once that cap would be exceeded",
                 ),
                 String::from(
                     "this publication does not claim arbitrary Wasm closure, tail calls, host imports, or learned-lane generalization",
@@ -90,7 +96,7 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{TassadarCallFramePublicationStatus, tassadar_call_frame_publication};
+    use super::{tassadar_call_frame_publication, TassadarCallFramePublicationStatus};
 
     #[test]
     fn call_frame_publication_is_machine_legible() {
@@ -100,6 +106,8 @@ mod tests {
             TassadarCallFramePublicationStatus::Implemented
         );
         assert!(publication.supports_direct_calls);
+        assert!(publication.supports_bounded_exact_recursion);
+        assert!(publication.supports_conditional_control);
         assert!(publication.traces_include_frame_stack);
         assert_eq!(
             publication.validation_refs,

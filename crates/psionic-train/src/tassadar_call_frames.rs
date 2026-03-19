@@ -1,8 +1,8 @@
 use psionic_runtime::{
-    TassadarCallFrameError, TassadarCallFrameExecution, TassadarCallFrameProgram,
     execute_tassadar_call_frame_program, tassadar_seeded_call_frame_direct_call_program,
     tassadar_seeded_call_frame_multi_function_program,
-    tassadar_seeded_call_frame_recursion_program,
+    tassadar_seeded_call_frame_recursion_program, tassadar_seeded_call_frame_recursive_sum_program,
+    TassadarCallFrameError, TassadarCallFrameExecution, TassadarCallFrameProgram,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -14,6 +14,7 @@ use thiserror::Error;
 pub enum TassadarCallFrameTrainingCaseFamily {
     DirectCallParity,
     MultiFunctionReplay,
+    BoundedRecursiveExact,
     BoundedRecursionRefusal,
 }
 
@@ -63,8 +64,8 @@ pub enum TassadarCallFrameTrainingSuiteError {
     Runtime(#[from] TassadarCallFrameError),
 }
 
-pub fn build_tassadar_call_frame_training_suite()
--> Result<TassadarCallFrameTrainingSuite, TassadarCallFrameTrainingSuiteError> {
+pub fn build_tassadar_call_frame_training_suite(
+) -> Result<TassadarCallFrameTrainingSuite, TassadarCallFrameTrainingSuiteError> {
     Ok(TassadarCallFrameTrainingSuite::new(vec![
         build_exact_case(
             "direct_call_parity",
@@ -77,6 +78,12 @@ pub fn build_tassadar_call_frame_training_suite()
             TassadarCallFrameTrainingCaseFamily::MultiFunctionReplay,
             tassadar_seeded_call_frame_multi_function_program(),
             Some(25),
+        )?,
+        build_exact_case(
+            "bounded_recursive_exact",
+            TassadarCallFrameTrainingCaseFamily::BoundedRecursiveExact,
+            tassadar_seeded_call_frame_recursive_sum_program(),
+            Some(15),
         )?,
         build_refusal_case(
             "bounded_recursion_refusal",
@@ -160,12 +167,12 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{TassadarCallFrameTrainingCaseFamily, build_tassadar_call_frame_training_suite};
+    use super::{build_tassadar_call_frame_training_suite, TassadarCallFrameTrainingCaseFamily};
 
     #[test]
     fn call_frame_training_suite_is_machine_legible() {
         let suite = build_tassadar_call_frame_training_suite().expect("suite");
-        assert_eq!(suite.cases.len(), 3);
+        assert_eq!(suite.cases.len(), 4);
         assert!(!suite.suite_digest.is_empty());
     }
 
@@ -179,6 +186,14 @@ mod tests {
             .expect("multi-function case");
         assert_eq!(multi.observed_return_value, Some(25));
         assert!(multi.max_observed_frame_depth >= 3);
+
+        let recursive = suite
+            .cases
+            .iter()
+            .find(|case| case.family == TassadarCallFrameTrainingCaseFamily::BoundedRecursiveExact)
+            .expect("recursive exact case");
+        assert_eq!(recursive.observed_return_value, Some(15));
+        assert!(recursive.max_observed_frame_depth >= 6);
 
         let refusal = suite
             .cases
