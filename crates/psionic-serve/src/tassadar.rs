@@ -5442,6 +5442,18 @@ mod tests {
             serde_json::json!(true)
         );
         assert_eq!(
+            encoded["module_execution_capability"]["runtime_capability"]["supports_linear_memory"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            encoded["module_execution_capability"]["runtime_capability"]["supports_active_data_segments"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            encoded["module_execution_capability"]["runtime_capability"]["supports_memory_grow"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
             encoded["module_execution_capability"]["runtime_capability"]["host_import_boundary"]["unsupported_host_call_refusal"],
             serde_json::json!("unsupported_host_import")
         );

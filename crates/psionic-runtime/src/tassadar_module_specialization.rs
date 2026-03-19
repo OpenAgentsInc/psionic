@@ -448,7 +448,11 @@ pub fn build_tassadar_module_specialization_plan(
             for instruction in &body.instructions {
                 match instruction {
                     TassadarNormalizedWasmInstruction::I32Load { .. }
-                    | TassadarNormalizedWasmInstruction::I32Store { .. } => {
+                    | TassadarNormalizedWasmInstruction::I32Store { .. }
+                    | TassadarNormalizedWasmInstruction::MemorySize { .. }
+                    | TassadarNormalizedWasmInstruction::MemoryGrow { .. }
+                    | TassadarNormalizedWasmInstruction::MemoryCopy { .. }
+                    | TassadarNormalizedWasmInstruction::MemoryFill { .. } => {
                         has_memory_access = true;
                     }
                     TassadarNormalizedWasmInstruction::Call { function_index } => {
@@ -852,7 +856,11 @@ fn collect_export_reachability(
     for instruction in &body.instructions {
         match instruction {
             TassadarNormalizedWasmInstruction::I32Load { .. }
-            | TassadarNormalizedWasmInstruction::I32Store { .. } => {
+            | TassadarNormalizedWasmInstruction::I32Store { .. }
+            | TassadarNormalizedWasmInstruction::MemorySize { .. }
+            | TassadarNormalizedWasmInstruction::MemoryGrow { .. }
+            | TassadarNormalizedWasmInstruction::MemoryCopy { .. }
+            | TassadarNormalizedWasmInstruction::MemoryFill { .. } => {
                 *contains_memory_access = true;
             }
             TassadarNormalizedWasmInstruction::Call { function_index } => {
@@ -1165,7 +1173,11 @@ fn lower_defined_function(
                 }
                 TassadarNormalizedWasmInstruction::GlobalGet { .. }
                 | TassadarNormalizedWasmInstruction::GlobalSet { .. }
-                | TassadarNormalizedWasmInstruction::CallIndirect { .. } => {
+                | TassadarNormalizedWasmInstruction::CallIndirect { .. }
+                | TassadarNormalizedWasmInstruction::MemorySize { .. }
+                | TassadarNormalizedWasmInstruction::MemoryGrow { .. }
+                | TassadarNormalizedWasmInstruction::MemoryCopy { .. }
+                | TassadarNormalizedWasmInstruction::MemoryFill { .. } => {
                     return Err(TassadarModuleSpecializationError::UnsupportedInstruction {
                         export_name: context.export_name.to_string(),
                         function_index,

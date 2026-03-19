@@ -75,6 +75,10 @@ pub struct TassadarMemoryAbiContract {
     pub supports_memory_size: bool,
     /// Whether `memory.grow` is supported.
     pub supports_memory_grow: bool,
+    /// Whether `memory.copy` is supported.
+    pub supports_memory_copy: bool,
+    /// Whether `memory.fill` is supported.
+    pub supports_memory_fill: bool,
     /// Declared trace strategy for memory state.
     pub trace_mode: TassadarMemoryTraceMode,
 }
@@ -93,6 +97,8 @@ impl TassadarMemoryAbiContract {
             supports_sign_extension: false,
             supports_memory_size: false,
             supports_memory_grow: false,
+            supports_memory_copy: false,
+            supports_memory_fill: false,
             trace_mode: TassadarMemoryTraceMode::FullSnapshots,
         }
     }
@@ -118,6 +124,8 @@ impl TassadarMemoryAbiContract {
             supports_sign_extension: true,
             supports_memory_size: true,
             supports_memory_grow: true,
+            supports_memory_copy: true,
+            supports_memory_fill: true,
             trace_mode: TassadarMemoryTraceMode::DeltaOriented,
         }
     }
@@ -158,6 +166,10 @@ pub enum TassadarLinearMemoryInstruction {
     MemorySize,
     /// Pop one page delta and grow memory if possible.
     MemoryGrow,
+    /// Pop `len`, `src`, and `dst` and copy bytes with memmove semantics.
+    MemoryCopy,
+    /// Pop `len`, `value`, and `dst` and fill bytes with one byte.
+    MemoryFill,
     /// Pop and emit one output value.
     Output,
     /// Halt successfully.
@@ -301,6 +313,24 @@ pub enum TassadarLinearMemoryTraceEvent {
         previous_pages: u32,
         /// Result pushed to the stack.
         result: i32,
+    },
+    /// One `memory.copy` completed.
+    MemoryCopy {
+        /// Destination byte address.
+        dst_address: u32,
+        /// Source byte address.
+        src_address: u32,
+        /// Byte length copied.
+        byte_len: u32,
+    },
+    /// One `memory.fill` completed.
+    MemoryFill {
+        /// Destination byte address.
+        address: u32,
+        /// Repeated byte value.
+        value: u8,
+        /// Byte length filled.
+        byte_len: u32,
     },
     /// One output value was emitted.
     Output {
@@ -539,48 +569,52 @@ pub fn execute_tassadar_linear_memory_program(
             TassadarLinearMemoryInstruction::MemoryGrow => {
                 let requested_pages = pop_stack_value(&mut stack, pc)?;
                 let previous_pages = current_memory_pages(memory.len())?;
-                let result = if requested_pages <= 0 {
+                let result = if requested_pages < 0 {
                     -1
                 } else {
                     let requested_pages = requested_pages as u32;
-                    let Some(new_pages) = previous_pages.checked_add(requested_pages) else {
-                        stack.push(-1);
-                        let result = -1;
-                        let event = TassadarLinearMemoryTraceEvent::MemoryGrow {
-                            requested_pages: requested_pages as i32,
-                            previous_pages,
-                            result,
-                        };
-                        steps.push(TassadarLinearMemoryTraceStep {
-                            step_index,
-                            pc,
-                            next_pc: pc + 1,
-                            instruction,
-                            event,
-                            stack_before,
-                            stack_after: stack.clone(),
-                            memory_byte_deltas,
-                            memory_growth_delta,
-                            memory_size_pages_after: previous_pages,
-                        });
-                        step_index = step_index.saturating_add(1);
-                        pc += 1;
-                        continue;
-                    };
-                    if new_pages > program.max_pages {
-                        -1
+                    if requested_pages == 0 {
+                        i32::try_from(previous_pages).unwrap_or(i32::MAX)
                     } else {
-                        let old_pages = previous_pages;
-                        let new_len = linear_memory_len_bytes(new_pages)?;
-                        let old_len = memory.len();
-                        memory.resize(new_len, 0);
-                        memory_growth_delta = Some(TassadarLinearMemoryGrowthDelta {
-                            previous_pages: old_pages,
-                            new_pages,
-                            added_bytes: u32::try_from(new_len.saturating_sub(old_len))
-                                .unwrap_or(u32::MAX),
-                        });
-                        i32::try_from(old_pages).unwrap_or(i32::MAX)
+                        let Some(new_pages) = previous_pages.checked_add(requested_pages) else {
+                            stack.push(-1);
+                            let result = -1;
+                            let event = TassadarLinearMemoryTraceEvent::MemoryGrow {
+                                requested_pages: requested_pages as i32,
+                                previous_pages,
+                                result,
+                            };
+                            steps.push(TassadarLinearMemoryTraceStep {
+                                step_index,
+                                pc,
+                                next_pc: pc + 1,
+                                instruction,
+                                event,
+                                stack_before,
+                                stack_after: stack.clone(),
+                                memory_byte_deltas,
+                                memory_growth_delta,
+                                memory_size_pages_after: previous_pages,
+                            });
+                            step_index = step_index.saturating_add(1);
+                            pc += 1;
+                            continue;
+                        };
+                        if new_pages > program.max_pages {
+                            -1
+                        } else {
+                            let old_pages = previous_pages;
+                            let new_len = linear_memory_len_bytes(new_pages)?;
+                            let old_len = memory.len();
+                            memory.resize(new_len, 0);
+                            memory_growth_delta = Some(TassadarLinearMemoryGrowthDelta {
+                                previous_pages: old_pages,
+                                new_pages,
+                                added_bytes: u32::try_from(new_len.saturating_sub(old_len))
+                                    .unwrap_or(u32::MAX),
+                            });
+                            i32::try_from(old_pages).unwrap_or(i32::MAX)
+                        }
                     }
                 };
                 stack.push(result);
@@ -589,6 +623,60 @@ pub fn execute_tassadar_linear_memory_program(
                         requested_pages,
                         previous_pages,
                         result,
+                    },
+                    pc + 1,
+                )
+            }
+            TassadarLinearMemoryInstruction::MemoryCopy => {
+                let byte_len = pop_stack_value(&mut stack, pc)? as u32;
+                let src_address = pop_stack_value(&mut stack, pc)? as u32;
+                let dst_address = pop_stack_value(&mut stack, pc)? as u32;
+                let src_base = checked_memory_range_bytes(pc, src_address, byte_len, memory.len())?;
+                let dst_base = checked_memory_range_bytes(pc, dst_address, byte_len, memory.len())?;
+                let copy_bytes = memory[src_base..src_base + byte_len as usize].to_vec();
+                for (offset, byte) in copy_bytes.iter().enumerate() {
+                    let index = dst_base + offset;
+                    let before = memory[index];
+                    memory[index] = *byte;
+                    if before != *byte {
+                        memory_byte_deltas.push(TassadarLinearMemoryByteDelta {
+                            address: dst_address.saturating_add(offset as u32),
+                            before,
+                            after: *byte,
+                        });
+                    }
+                }
+                (
+                    TassadarLinearMemoryTraceEvent::MemoryCopy {
+                        dst_address,
+                        src_address,
+                        byte_len,
+                    },
+                    pc + 1,
+                )
+            }
+            TassadarLinearMemoryInstruction::MemoryFill => {
+                let byte_len = pop_stack_value(&mut stack, pc)? as u32;
+                let value = pop_stack_value(&mut stack, pc)? as u8;
+                let address = pop_stack_value(&mut stack, pc)? as u32;
+                let base = checked_memory_range_bytes(pc, address, byte_len, memory.len())?;
+                for offset in 0..byte_len as usize {
+                    let index = base + offset;
+                    let before = memory[index];
+                    memory[index] = value;
+                    if before != value {
+                        memory_byte_deltas.push(TassadarLinearMemoryByteDelta {
+                            address: address.saturating_add(offset as u32),
+                            before,
+                            after: value,
+                        });
+                    }
+                }
+                (
+                    TassadarLinearMemoryTraceEvent::MemoryFill {
+                        address,
+                        value,
+                        byte_len,
                     },
                     pc + 1,
                 )
@@ -848,6 +936,46 @@ pub fn tassadar_seeded_linear_memory_memcpy_program(
     .with_initial_memory(initial_memory)
 }
 
+/// Returns one seeded copy-and-fill program for the byte-addressed v2 lane.
+#[must_use]
+pub fn tassadar_seeded_linear_memory_copy_fill_program() -> TassadarLinearMemoryProgram {
+    TassadarLinearMemoryProgram::new(
+        "tassadar.memory_abi_v2.copy_fill.v1",
+        1,
+        2,
+        vec![
+            TassadarLinearMemoryInstruction::I32Const { value: 16 },
+            TassadarLinearMemoryInstruction::I32Const { value: 0 },
+            TassadarLinearMemoryInstruction::I32Const { value: 8 },
+            TassadarLinearMemoryInstruction::MemoryCopy,
+            TassadarLinearMemoryInstruction::I32Const { value: 32 },
+            TassadarLinearMemoryInstruction::I32Const { value: 0x7F },
+            TassadarLinearMemoryInstruction::I32Const { value: 4 },
+            TassadarLinearMemoryInstruction::MemoryFill,
+            TassadarLinearMemoryInstruction::I32Load {
+                address: 16,
+                width: TassadarLinearMemoryWidth::I32,
+                signed: false,
+            },
+            TassadarLinearMemoryInstruction::Output,
+            TassadarLinearMemoryInstruction::I32Load {
+                address: 20,
+                width: TassadarLinearMemoryWidth::I32,
+                signed: false,
+            },
+            TassadarLinearMemoryInstruction::Output,
+            TassadarLinearMemoryInstruction::I32Load {
+                address: 32,
+                width: TassadarLinearMemoryWidth::I32,
+                signed: false,
+            },
+            TassadarLinearMemoryInstruction::Output,
+            TassadarLinearMemoryInstruction::Return,
+        ],
+    )
+    .with_initial_memory(vec![1, 2, 3, 4, 5, 6, 7, 8])
+}
+
 fn read_linear_memory(
     memory: &[u8],
     pc: usize,
@@ -876,6 +1004,28 @@ fn checked_memory_range(
             pc,
             address,
             width_bytes,
+            memory_len,
+        });
+    }
+    Ok(base)
+}
+
+fn checked_memory_range_bytes(
+    pc: usize,
+    address: u32,
+    byte_len: u32,
+    memory_len: usize,
+) -> Result<usize, TassadarLinearMemoryExecutionError> {
+    let base = usize::try_from(address)
+        .map_err(|_| TassadarLinearMemoryExecutionError::ByteLengthOverflow)?;
+    let end = base
+        .checked_add(byte_len as usize)
+        .ok_or(TassadarLinearMemoryExecutionError::ByteLengthOverflow)?;
+    if end > memory_len {
+        return Err(TassadarLinearMemoryExecutionError::AddressOutOfRange {
+            pc,
+            address,
+            width_bytes: byte_len,
             memory_len,
         });
     }
@@ -960,6 +1110,7 @@ mod tests {
         TassadarLinearMemoryExecution, TassadarLinearMemoryExecutionError,
         TassadarLinearMemoryHaltReason, TassadarMemoryAbiContract,
         execute_tassadar_linear_memory_program, summarize_tassadar_linear_memory_trace_footprint,
+        tassadar_seeded_linear_memory_copy_fill_program,
         tassadar_seeded_linear_memory_growth_program, tassadar_seeded_linear_memory_memcpy_program,
         tassadar_seeded_linear_memory_sign_extension_program,
         tassadar_seeded_linear_memory_width_parity_program,
@@ -980,6 +1131,8 @@ mod tests {
             Some(super::TASSADAR_LINEAR_MEMORY_PAGE_BYTES)
         );
         assert!(linear.supports_memory_grow);
+        assert!(linear.supports_memory_copy);
+        assert!(linear.supports_memory_fill);
     }
 
     #[test]
@@ -1032,6 +1185,25 @@ mod tests {
         );
         assert!(footprint.delta_trace_bytes < footprint.equivalent_full_snapshot_trace_bytes);
         assert_eq!(footprint.byte_delta_count, 64);
+    }
+
+    #[test]
+    fn linear_memory_abi_v2_copy_and_fill_are_exact() {
+        let execution = execute(&tassadar_seeded_linear_memory_copy_fill_program());
+        assert_eq!(
+            execution.outputs,
+            vec![67_305_985, 134_678_021, 2_139_062_143]
+        );
+        assert_eq!(execution.final_memory[16..24], execution.final_memory[..8]);
+        assert_eq!(execution.final_memory[32..36], [0x7F, 0x7F, 0x7F, 0x7F]);
+        assert!(execution.steps.iter().any(|step| matches!(
+            step.event,
+            super::TassadarLinearMemoryTraceEvent::MemoryCopy { .. }
+        )));
+        assert!(execution.steps.iter().any(|step| matches!(
+            step.event,
+            super::TassadarLinearMemoryTraceEvent::MemoryFill { .. }
+        )));
     }
 
     #[test]

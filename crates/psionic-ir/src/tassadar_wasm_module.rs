@@ -290,6 +290,28 @@ pub enum TassadarNormalizedWasmInstruction {
         /// Target memory index.
         memory_index: u32,
     },
+    /// Push the current memory size in pages.
+    MemorySize {
+        /// Target memory index.
+        memory_index: u32,
+    },
+    /// Pop one page delta and grow the target memory.
+    MemoryGrow {
+        /// Target memory index.
+        memory_index: u32,
+    },
+    /// Pop `len`, `src`, and `dst` and copy bytes with memmove semantics.
+    MemoryCopy {
+        /// Destination memory index.
+        dst_memory_index: u32,
+        /// Source memory index.
+        src_memory_index: u32,
+    },
+    /// Pop `len`, `value`, and `dst` and fill bytes with one byte.
+    MemoryFill {
+        /// Target memory index.
+        memory_index: u32,
+    },
     /// Direct function call.
     Call {
         /// Target function index.
@@ -326,6 +348,10 @@ impl TassadarNormalizedWasmInstruction {
             Self::I32Shl => "i32.shl",
             Self::I32Load { .. } => "i32.load",
             Self::I32Store { .. } => "i32.store",
+            Self::MemorySize { .. } => "memory.size",
+            Self::MemoryGrow { .. } => "memory.grow",
+            Self::MemoryCopy { .. } => "memory.copy",
+            Self::MemoryFill { .. } => "memory.fill",
             Self::Call { .. } => "call",
             Self::CallIndirect { .. } => "call_indirect",
             Self::Return => "return",
@@ -820,6 +846,35 @@ impl TassadarNormalizedWasmModule {
                             },
                         );
                     }
+                    TassadarNormalizedWasmInstruction::I32Load { memory_index, .. }
+                    | TassadarNormalizedWasmInstruction::I32Store { memory_index, .. }
+                    | TassadarNormalizedWasmInstruction::MemorySize { memory_index }
+                    | TassadarNormalizedWasmInstruction::MemoryGrow { memory_index }
+                    | TassadarNormalizedWasmInstruction::MemoryFill { memory_index }
+                        if *memory_index as usize >= self.memories.len() =>
+                    {
+                        return Err(
+                            TassadarNormalizedWasmModuleError::InstructionMemoryIndexOutOfRange {
+                                function_index: function.function_index,
+                                memory_index: *memory_index,
+                                memory_count: self.memories.len(),
+                            },
+                        );
+                    }
+                    TassadarNormalizedWasmInstruction::MemoryCopy {
+                        dst_memory_index,
+                        src_memory_index,
+                    } if *dst_memory_index as usize >= self.memories.len()
+                        || *src_memory_index as usize >= self.memories.len() =>
+                    {
+                        return Err(
+                            TassadarNormalizedWasmModuleError::InstructionMemoryIndexOutOfRange {
+                                function_index: function.function_index,
+                                memory_index: (*dst_memory_index).max(*src_memory_index),
+                                memory_count: self.memories.len(),
+                            },
+                        );
+                    }
                     TassadarNormalizedWasmInstruction::CallIndirect {
                         type_index,
                         table_index,
@@ -1033,6 +1088,15 @@ pub enum TassadarNormalizedWasmModuleError {
         /// Referenced memory index.
         memory_index: u32,
         /// Memory count in the module.
+        memory_count: usize,
+    },
+    /// One instruction referenced a missing memory.
+    #[error(
+        "function {function_index} references memory {memory_index}, but only {memory_count} memories are present"
+    )]
+    InstructionMemoryIndexOutOfRange {
+        function_index: u32,
+        memory_index: u32,
         memory_count: usize,
     },
     /// One global initializer referenced a missing global.
@@ -1697,6 +1761,101 @@ pub fn tassadar_seeded_instantiation_module()
     )
 }
 
+/// Returns one canonical seeded module covering bounded dynamic memory,
+/// active data segments, `memory.copy`, `memory.fill`, `memory.size`, and
+/// `memory.grow`.
+pub fn tassadar_seeded_dynamic_memory_module()
+-> Result<TassadarNormalizedWasmModule, TassadarNormalizedWasmModuleError> {
+    TassadarNormalizedWasmModule::new(
+        vec![TassadarNormalizedWasmFunctionType {
+            type_index: 0,
+            params: Vec::new(),
+            results: vec![TassadarNormalizedWasmValueType::I32],
+        }],
+        vec![TassadarNormalizedWasmFunction::defined(
+            0,
+            0,
+            TassadarNormalizedWasmFunctionBody::new(
+                vec![
+                    TassadarNormalizedWasmValueType::I32,
+                    TassadarNormalizedWasmValueType::I32,
+                    TassadarNormalizedWasmValueType::I32,
+                ],
+                vec![
+                    TassadarNormalizedWasmInstruction::I32Const { value: 8 },
+                    TassadarNormalizedWasmInstruction::I32Const { value: 0 },
+                    TassadarNormalizedWasmInstruction::I32Const { value: 4 },
+                    TassadarNormalizedWasmInstruction::MemoryCopy {
+                        dst_memory_index: 0,
+                        src_memory_index: 0,
+                    },
+                    TassadarNormalizedWasmInstruction::MemorySize { memory_index: 0 },
+                    TassadarNormalizedWasmInstruction::LocalSet { local_index: 0 },
+                    TassadarNormalizedWasmInstruction::I32Const { value: 1 },
+                    TassadarNormalizedWasmInstruction::MemoryGrow { memory_index: 0 },
+                    TassadarNormalizedWasmInstruction::LocalSet { local_index: 1 },
+                    TassadarNormalizedWasmInstruction::MemorySize { memory_index: 0 },
+                    TassadarNormalizedWasmInstruction::LocalSet { local_index: 2 },
+                    TassadarNormalizedWasmInstruction::I32Const { value: 12 },
+                    TassadarNormalizedWasmInstruction::I32Const { value: 7 },
+                    TassadarNormalizedWasmInstruction::I32Const { value: 4 },
+                    TassadarNormalizedWasmInstruction::MemoryFill { memory_index: 0 },
+                    TassadarNormalizedWasmInstruction::I32Const { value: 8 },
+                    TassadarNormalizedWasmInstruction::I32Load {
+                        align: 2,
+                        offset: 0,
+                        memory_index: 0,
+                    },
+                    TassadarNormalizedWasmInstruction::I32Const { value: 12 },
+                    TassadarNormalizedWasmInstruction::I32Load {
+                        align: 2,
+                        offset: 0,
+                        memory_index: 0,
+                    },
+                    TassadarNormalizedWasmInstruction::I32Add,
+                    TassadarNormalizedWasmInstruction::LocalGet { local_index: 0 },
+                    TassadarNormalizedWasmInstruction::I32Add,
+                    TassadarNormalizedWasmInstruction::LocalGet { local_index: 1 },
+                    TassadarNormalizedWasmInstruction::I32Add,
+                    TassadarNormalizedWasmInstruction::LocalGet { local_index: 2 },
+                    TassadarNormalizedWasmInstruction::I32Add,
+                    TassadarNormalizedWasmInstruction::Return,
+                ],
+            ),
+        )],
+        vec![TassadarNormalizedWasmMemory::defined(
+            0,
+            TassadarNormalizedWasmMemoryType {
+                minimum_pages: 1,
+                maximum_pages: Some(3),
+                shared: false,
+                memory64: false,
+                page_size_log2: None,
+            },
+        )],
+        vec![
+            TassadarNormalizedWasmExport::new(
+                "entry",
+                TassadarNormalizedWasmExportKind::Function,
+                0,
+            ),
+            TassadarNormalizedWasmExport::new(
+                "memory",
+                TassadarNormalizedWasmExportKind::Memory,
+                0,
+            ),
+        ],
+        vec![TassadarNormalizedWasmDataSegment::new(
+            0,
+            TassadarNormalizedWasmDataMode::Active {
+                memory_index: 0,
+                offset_expr: TassadarNormalizedWasmConstExpr::I32Const { value: 0 },
+            },
+            vec![1, 2, 3, 4],
+        )],
+    )
+}
+
 fn normalize_import(
     module: &str,
     name: &str,
@@ -1801,6 +1960,24 @@ fn parse_function_body(
                     offset: memarg.offset,
                     memory_index: memarg.memory,
                 });
+            }
+            Operator::MemorySize { mem, .. } => {
+                instructions
+                    .push(TassadarNormalizedWasmInstruction::MemorySize { memory_index: mem });
+            }
+            Operator::MemoryGrow { mem, .. } => {
+                instructions
+                    .push(TassadarNormalizedWasmInstruction::MemoryGrow { memory_index: mem });
+            }
+            Operator::MemoryCopy { dst_mem, src_mem } => {
+                instructions.push(TassadarNormalizedWasmInstruction::MemoryCopy {
+                    dst_memory_index: dst_mem,
+                    src_memory_index: src_mem,
+                });
+            }
+            Operator::MemoryFill { mem } => {
+                instructions
+                    .push(TassadarNormalizedWasmInstruction::MemoryFill { memory_index: mem });
             }
             Operator::Call { function_index } => {
                 instructions.push(TassadarNormalizedWasmInstruction::Call { function_index });
@@ -2062,6 +2239,24 @@ fn encode_instruction(instruction: &TassadarNormalizedWasmInstruction, function:
                 memory_index: *memory_index,
             }));
         }
+        TassadarNormalizedWasmInstruction::MemorySize { memory_index } => {
+            function.instruction(&Instruction::MemorySize(*memory_index));
+        }
+        TassadarNormalizedWasmInstruction::MemoryGrow { memory_index } => {
+            function.instruction(&Instruction::MemoryGrow(*memory_index));
+        }
+        TassadarNormalizedWasmInstruction::MemoryCopy {
+            dst_memory_index,
+            src_memory_index,
+        } => {
+            function.instruction(&Instruction::MemoryCopy {
+                dst_mem: *dst_memory_index,
+                src_mem: *src_memory_index,
+            });
+        }
+        TassadarNormalizedWasmInstruction::MemoryFill { memory_index } => {
+            function.instruction(&Instruction::MemoryFill(*memory_index));
+        }
         TassadarNormalizedWasmInstruction::Call { function_index } => {
             function.instruction(&Instruction::Call(*function_index));
         }
@@ -2109,8 +2304,8 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 mod tests {
     use super::{
         TassadarNormalizedWasmModuleError, encode_tassadar_normalized_wasm_module,
-        parse_tassadar_normalized_wasm_module, tassadar_seeded_instantiation_module,
-        tassadar_seeded_multi_function_module,
+        parse_tassadar_normalized_wasm_module, tassadar_seeded_dynamic_memory_module,
+        tassadar_seeded_instantiation_module, tassadar_seeded_multi_function_module,
     };
 
     #[test]
@@ -2139,6 +2334,30 @@ mod tests {
         assert_eq!(reparsed.globals.len(), 1);
         assert_eq!(reparsed.start_function_index, Some(1));
         assert_eq!(reparsed.element_segments.len(), 1);
+    }
+
+    #[test]
+    fn normalized_wasm_module_roundtrips_dynamic_memory_sections() {
+        let module = tassadar_seeded_dynamic_memory_module().expect("seeded module should build");
+        let encoded =
+            encode_tassadar_normalized_wasm_module(&module).expect("seeded module should encode");
+        let reparsed =
+            parse_tassadar_normalized_wasm_module(&encoded).expect("encoded module should parse");
+        assert_eq!(reparsed, module);
+        assert_eq!(reparsed.memories.len(), 1);
+        assert_eq!(reparsed.data_segments.len(), 1);
+        assert!(
+            reparsed.functions[0]
+                .body
+                .as_ref()
+                .expect("defined body")
+                .instructions
+                .iter()
+                .any(|instruction| matches!(
+                    instruction,
+                    super::TassadarNormalizedWasmInstruction::MemoryCopy { .. }
+                ))
+        );
     }
 
     #[test]

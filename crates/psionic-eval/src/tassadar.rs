@@ -1689,6 +1689,8 @@ fn build_tassadar_environment_bundle(
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         execution_checkpoint_binding:
             psionic_environments::default_tassadar_execution_checkpoint_binding(),
+        dynamic_memory_resume_binding:
+            psionic_environments::default_tassadar_dynamic_memory_resume_binding(),
         broad_internal_compute_portability_binding: Some(
             psionic_environments::default_tassadar_broad_internal_compute_portability_binding(),
         ),
@@ -1926,6 +1928,8 @@ fn build_tassadar_article_class_environment_bundle(
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         execution_checkpoint_binding:
             psionic_environments::default_tassadar_execution_checkpoint_binding(),
+        dynamic_memory_resume_binding:
+            psionic_environments::default_tassadar_dynamic_memory_resume_binding(),
         broad_internal_compute_portability_binding: Some(
             psionic_environments::default_tassadar_broad_internal_compute_portability_binding(),
         ),
@@ -2182,6 +2186,8 @@ fn build_tassadar_sudoku_9x9_environment_bundle(
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         execution_checkpoint_binding:
             psionic_environments::default_tassadar_execution_checkpoint_binding(),
+        dynamic_memory_resume_binding:
+            psionic_environments::default_tassadar_dynamic_memory_resume_binding(),
         broad_internal_compute_portability_binding: Some(
             psionic_environments::default_tassadar_broad_internal_compute_portability_binding(),
         ),
@@ -2427,6 +2433,8 @@ fn build_tassadar_hungarian_v0_environment_bundle(
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         execution_checkpoint_binding:
             psionic_environments::default_tassadar_execution_checkpoint_binding(),
+        dynamic_memory_resume_binding:
+            psionic_environments::default_tassadar_dynamic_memory_resume_binding(),
         broad_internal_compute_portability_binding: Some(
             psionic_environments::default_tassadar_broad_internal_compute_portability_binding(),
         ),
@@ -2673,6 +2681,8 @@ fn build_tassadar_hungarian_10x10_environment_bundle(
         compile_pipeline_matrix_binding: standard_compile_pipeline_matrix_binding(),
         execution_checkpoint_binding:
             psionic_environments::default_tassadar_execution_checkpoint_binding(),
+        dynamic_memory_resume_binding:
+            psionic_environments::default_tassadar_dynamic_memory_resume_binding(),
         broad_internal_compute_portability_binding: Some(
             psionic_environments::default_tassadar_broad_internal_compute_portability_binding(),
         ),

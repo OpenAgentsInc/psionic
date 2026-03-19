@@ -8613,6 +8613,18 @@ mod tests {
             json!(true)
         );
         assert_eq!(
+            encoded["publication"]["module_execution_capability"]["runtime_capability"]["supports_linear_memory"],
+            json!(true)
+        );
+        assert_eq!(
+            encoded["publication"]["module_execution_capability"]["runtime_capability"]["supports_active_data_segments"],
+            json!(true)
+        );
+        assert_eq!(
+            encoded["publication"]["module_execution_capability"]["runtime_capability"]["supports_memory_grow"],
+            json!(true)
+        );
+        assert_eq!(
             encoded["publication"]["module_execution_capability"]["runtime_capability"]["host_import_boundary"]
                 ["unsupported_host_call_refusal"],
             json!("unsupported_host_import")

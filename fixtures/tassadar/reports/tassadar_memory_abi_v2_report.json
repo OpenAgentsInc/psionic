@@ -24,6 +24,8 @@
       "supports_sign_extension": true,
       "supports_memory_size": true,
       "supports_memory_grow": true,
+      "supports_memory_copy": true,
+      "supports_memory_fill": true,
       "trace_mode": "delta_oriented"
     },
     "target_surfaces": [
@@ -37,10 +39,10 @@
     ],
     "support_boundaries": [
       "bounded straight-line immediate-address programs only; structured control flow and call frames remain separate follow-on work",
-      "supports i8/i16/i32 loads and stores plus memory.size and memory.grow; globals, tables, indirect calls, and imports remain outside this publication",
+      "supports i8/i16/i32 loads and stores plus memory.size, memory.grow, memory.copy, and memory.fill; globals, tables, indirect calls, and imports remain outside this publication",
       "trace publication is delta-oriented for byte writes and memory growth instead of full snapshots"
     ],
-    "publication_digest": "10ffa11b7eb0f524cc75dce364035ca2a9b8f5091998354a4f35d9408381b336"
+    "publication_digest": "a5e755de663e1a1f7a7a1a4ff2abf3eb52884a1d56cf17b7d40e07f0e9f7c6e2"
   },
   "cases": [
     {
@@ -62,7 +64,7 @@
       "halt_reason": "returned",
       "final_memory_digest": "ce44e89f257c64750b133b64f9a2f8ea9ce314192352aa68f8e1f2557fcb887a",
       "trace_footprint": {
-        "delta_trace_bytes": 134767,
+        "delta_trace_bytes": 134823,
         "equivalent_full_snapshot_trace_bytes": 1706781,
         "byte_delta_count": 5,
         "memory_grow_event_count": 0
@@ -87,7 +89,7 @@
       "halt_reason": "returned",
       "final_memory_digest": "720f5f3f11b4418af1c3a58c55fe86434217b958a501cee6d0d648fee8748302",
       "trace_footprint": {
-        "delta_trace_bytes": 133589,
+        "delta_trace_bytes": 133645,
         "equivalent_full_snapshot_trace_bytes": 1181553,
         "byte_delta_count": 0,
         "memory_grow_event_count": 0
@@ -114,7 +116,7 @@
       "halt_reason": "returned",
       "final_memory_digest": "66a0e106103cb0602193b02c1a522cb69437048576788696ed35ae301fd85b25",
       "trace_footprint": {
-        "delta_trace_bytes": 265127,
+        "delta_trace_bytes": 265183,
         "equivalent_full_snapshot_trace_bytes": 3016893,
         "byte_delta_count": 0,
         "memory_grow_event_count": 1
@@ -133,13 +135,36 @@
       "halt_reason": "returned",
       "final_memory_digest": "891b5dda05937f878bd1a08b4eb0c9593ccf600879021cb9fa42c3b0548c6d70",
       "trace_footprint": {
-        "delta_trace_bytes": 170933,
+        "delta_trace_bytes": 170989,
         "equivalent_full_snapshot_trace_bytes": 17220497,
         "byte_delta_count": 64,
         "memory_grow_event_count": 0
       }
+    },
+    {
+      "case_id": "copy_fill_exactness",
+      "family": "copy_fill_exactness",
+      "program_id": "tassadar.memory_abi_v2.copy_fill.v1",
+      "expected_outputs": [
+        67305985,
+        134678021,
+        2139062143
+      ],
+      "observed_outputs": [
+        67305985,
+        134678021,
+        2139062143
+      ],
+      "halt_reason": "returned",
+      "final_memory_digest": "38cfb78a7b46a20c7de9c4bec8234fe3507803eee7613b2c78eacedf65f4b1ef",
+      "trace_footprint": {
+        "delta_trace_bytes": 135400,
+        "equivalent_full_snapshot_trace_bytes": 1969199,
+        "byte_delta_count": 12,
+        "memory_grow_event_count": 0
+      }
     }
   ],
-  "claim_boundary": "this report proves one public byte-addressed linear-memory lane with exact i8/i16/i32 width behavior, sign extension, memory.size and memory.grow support, and delta-oriented trace publication on bounded straight-line programs; it does not claim structured control flow, call frames, indirect calls, imports, globals, or full Wasm module closure",
-  "report_digest": "d821bd2ad98f0d169d27ffcb200357b0b774ef5eb29e5c14f7869cf30215b8b9"
+  "claim_boundary": "this report proves one public byte-addressed linear-memory lane with exact i8/i16/i32 width behavior, sign extension, memory.size, memory.grow, memory.copy, and memory.fill support, plus delta-oriented trace publication on bounded straight-line programs; it does not claim structured control flow, call frames, indirect calls, imports, globals, or full Wasm module closure",
+  "report_digest": "66aecdec1f4266e0f7070f3c4e389331a887b320d97857be86ac5487b2aae376"
 }

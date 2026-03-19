@@ -39,11 +39,12 @@ pub fn tassadar_module_execution_capability_publication(
             String::from("global_state_parity"),
             String::from("call_indirect_dispatch"),
             String::from("instantiation_start_and_elements"),
+            String::from("dynamic_memory_growth_copy_fill"),
             String::from("deterministic_import_stub"),
             String::from("unsupported_host_import_refusal"),
         ],
         claim_boundary: String::from(
-            "this publication covers bounded module execution with i32 globals, funcref tables, active element-segment instantiation, zero-parameter start functions, zero-parameter direct and indirect calls, and deterministic host-import stubs only; arbitrary host calls and arbitrary Wasm remain explicitly unsupported",
+            "this publication covers bounded module execution with i32 globals, one bounded linear memory plus active data segments, memory.size, memory.grow, memory.copy, memory.fill, funcref tables, active element-segment instantiation, zero-parameter start functions, zero-parameter direct and indirect calls, and deterministic host-import stubs only; multi-memory, arbitrary host calls, and arbitrary Wasm remain explicitly unsupported",
         ),
     }
 }
@@ -83,7 +84,13 @@ mod tests {
         );
         assert!(publication.runtime_capability.supports_direct_calls);
         assert!(publication.runtime_capability.supports_call_indirect);
-        assert_eq!(publication.seeded_case_ids.len(), 5);
+        assert!(publication.runtime_capability.supports_linear_memory);
+        assert!(publication.runtime_capability.supports_active_data_segments);
+        assert!(publication.runtime_capability.supports_memory_size);
+        assert!(publication.runtime_capability.supports_memory_grow);
+        assert!(publication.runtime_capability.supports_memory_copy);
+        assert!(publication.runtime_capability.supports_memory_fill);
+        assert_eq!(publication.seeded_case_ids.len(), 6);
         assert_eq!(publication.claim_class, "capability_truth");
     }
 }

@@ -761,15 +761,18 @@ The current scope is:
   promoted explicitly
 - landed memory ABI v2 bar: `psionic-runtime` now owns a public
   byte-addressed linear-memory contract with explicit i8/i16/i32 load-store
-  widths, sign extension, `memory.size`, `memory.grow`, and delta-oriented
-  memory tracing; `psionic-models` now publishes the same lane as an explicit
-  repo-facing memory-ABI publication; `psionic-train` now materializes a
-  training-facing supervision suite over width-parity, sign-extension,
-  growth, and memcpy-style trace-regression cases; and `psionic-eval` now
-  freezes the current evidence at
+  widths, sign extension, `memory.size`, `memory.grow`, `memory.copy`,
+  `memory.fill`, and delta-oriented memory tracing; `psionic-models` now
+  publishes the same lane as an explicit repo-facing memory-ABI publication;
+  `psionic-train` now materializes a training-facing supervision suite over
+  width-parity, sign-extension, growth, memcpy-style trace-regression, and
+  copy/fill exactness cases; `psionic-runtime` now also owns a bounded
+  dynamic-memory pause-and-resume bundle over the same ABI; and
+  `psionic-eval` now freezes the current evidence at
   `fixtures/tassadar/reports/tassadar_memory_abi_v2_report.json` instead of
   pretending the old fixed-slot memory ABI was already truthful enough for
-  module-scale Wasm work
+  module-scale Wasm work, while the resumed-memory evidence lives at
+  `fixtures/tassadar/reports/tassadar_dynamic_memory_resume_report.json`
 - landed module-trace ABI v2 bar: `psionic-runtime` now owns explicit legacy
   v1 versus frame-aware delta-oriented v2 module-trace contracts plus v1/v2
   artifacts, deterministic replay from v2 back into the legacy snapshot-heavy
@@ -833,18 +836,21 @@ The current scope is:
   instead of pretending numeric closure already jumped from tiny i32 kernels
   to arbitrary Wasm
 - landed module-boundary bar: `psionic-runtime` now owns a bounded
-  module-execution contract with explicit i32 globals, funcref tables, active
-  element-segment instantiation, zero-parameter start-function execution,
-  zero-parameter direct calls, bounded `call_indirect`, deterministic import
-  stubs, and typed refusal for unsupported host calls; `psionic-ir` now owns
-  the matching normalized Wasm-module structure for globals, tables, start
-  sections, and active element segments; `psionic-compiler` now lowers that
-  admitted module slice into validated module-execution programs; `psionic-models`
-  now publishes that boundary as a repo-facing module-capability publication;
-  `psionic-serve` and `psionic-provider` now carry the same module-support and
-  host-import refusal facts through the served capability path; and
-  `psionic-sandbox` now exposes a sandbox-facing import-boundary contract
-  instead of leaving host-import posture implicit
+  module-execution contract with explicit i32 globals, one bounded linear
+  memory, active data segments, funcref tables, active element-segment
+  instantiation, zero-parameter start-function execution, zero-parameter
+  direct calls, bounded `call_indirect`, `memory.size`, `memory.grow`,
+  `memory.copy`, `memory.fill`, deterministic import stubs, and typed refusal
+  for unsupported host calls or out-of-profile memory shapes; `psionic-ir`
+  now owns the matching normalized Wasm-module structure for globals, tables,
+  memories, data segments, start sections, and active element segments;
+  `psionic-compiler` now lowers that admitted module slice into validated
+  module-execution programs; `psionic-models` now publishes that boundary as a
+  repo-facing module-capability publication; `psionic-serve` and
+  `psionic-provider` now carry the same module-support and host-import refusal
+  facts through the served capability path; and `psionic-sandbox` now exposes
+  a sandbox-facing import-boundary contract instead of leaving host-import
+  posture implicit
 - landed exactness/refusal evidence bar: `psionic-runtime` now owns a shared
   `TassadarExactnessRefusalReport` contract that records exact, mismatch, and
   refused posture above current selection diagnostics and trace/output/halt

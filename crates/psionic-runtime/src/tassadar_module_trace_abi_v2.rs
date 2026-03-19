@@ -567,6 +567,9 @@ pub fn replay_tassadar_module_trace_v2_artifact(
             frame_depth_after: frames.len(),
             event: step.event.clone(),
             globals_after: globals.clone(),
+            memory_byte_deltas: Vec::new(),
+            memory_growth_delta: None,
+            memory_size_pages_after: Vec::new(),
             frame_stack_after: current_snapshots,
         });
     }
@@ -576,6 +579,8 @@ pub fn replay_tassadar_module_trace_v2_artifact(
         steps: replayed_steps,
         returned_value,
         final_globals: globals,
+        final_memory_digests: Vec::new(),
+        final_memory_pages: Vec::new(),
         halt_reason,
     };
     if replayed.execution_digest() != artifact.execution_digest {
@@ -766,6 +771,7 @@ fn apply_trace_event(
     let top_function_index = frames.last().map(|frame| frame.function_index);
     match &step.event {
         TassadarModuleTraceEvent::ElementSegmentApplied { .. } => {}
+        TassadarModuleTraceEvent::DataSegmentApplied { .. } => {}
         TassadarModuleTraceEvent::ConstPush { value } => {
             let frame = current_frame_mut(frames, step.step_index)?;
             frame.operand_stack.push(*value);
@@ -863,6 +869,24 @@ fn apply_trace_event(
             *global = *value;
             frame.pc = frame.pc.saturating_add(1);
         }
+        TassadarModuleTraceEvent::Drop { value } => {
+            let frame = current_frame_mut(frames, step.step_index)?;
+            let popped =
+                frame
+                    .operand_stack
+                    .pop()
+                    .ok_or_else(|| TassadarModuleTraceReplayError::Drift {
+                        step_index: step.step_index,
+                        detail: String::from("drop underflowed the replay operand stack"),
+                    })?;
+            if popped != *value {
+                return Err(TassadarModuleTraceReplayError::Drift {
+                    step_index: step.step_index,
+                    detail: format!("drop expected value {value}, replay saw {popped}"),
+                });
+            }
+            frame.pc = frame.pc.saturating_add(1);
+        }
         TassadarModuleTraceEvent::BinaryOp {
             op,
             left,
@@ -904,6 +928,89 @@ fn apply_trace_event(
                 });
             }
             frame.operand_stack.push(replay_result);
+            frame.pc = frame.pc.saturating_add(1);
+        }
+        TassadarModuleTraceEvent::Load { value, .. } => {
+            let frame = current_frame_mut(frames, step.step_index)?;
+            let _ =
+                frame
+                    .operand_stack
+                    .pop()
+                    .ok_or_else(|| TassadarModuleTraceReplayError::Drift {
+                        step_index: step.step_index,
+                        detail: String::from("load missing dynamic address"),
+                    })?;
+            frame.operand_stack.push(*value);
+            frame.pc = frame.pc.saturating_add(1);
+        }
+        TassadarModuleTraceEvent::Store { value, .. } => {
+            let frame = current_frame_mut(frames, step.step_index)?;
+            let replay_value =
+                frame
+                    .operand_stack
+                    .pop()
+                    .ok_or_else(|| TassadarModuleTraceReplayError::Drift {
+                        step_index: step.step_index,
+                        detail: String::from("store missing value"),
+                    })?;
+            if replay_value != *value {
+                return Err(TassadarModuleTraceReplayError::Drift {
+                    step_index: step.step_index,
+                    detail: format!("store expected value {value}, replay saw {replay_value}"),
+                });
+            }
+            let _ =
+                frame
+                    .operand_stack
+                    .pop()
+                    .ok_or_else(|| TassadarModuleTraceReplayError::Drift {
+                        step_index: step.step_index,
+                        detail: String::from("store missing dynamic address"),
+                    })?;
+            frame.pc = frame.pc.saturating_add(1);
+        }
+        TassadarModuleTraceEvent::MemorySize { pages, .. } => {
+            let frame = current_frame_mut(frames, step.step_index)?;
+            frame
+                .operand_stack
+                .push(i32::try_from(*pages).unwrap_or(i32::MAX));
+            frame.pc = frame.pc.saturating_add(1);
+        }
+        TassadarModuleTraceEvent::MemoryGrow { result, .. } => {
+            let frame = current_frame_mut(frames, step.step_index)?;
+            let _ =
+                frame
+                    .operand_stack
+                    .pop()
+                    .ok_or_else(|| TassadarModuleTraceReplayError::Drift {
+                        step_index: step.step_index,
+                        detail: String::from("memory.grow missing requested delta"),
+                    })?;
+            frame.operand_stack.push(*result);
+            frame.pc = frame.pc.saturating_add(1);
+        }
+        TassadarModuleTraceEvent::MemoryCopy { .. } => {
+            let frame = current_frame_mut(frames, step.step_index)?;
+            for detail in ["memory.copy len", "memory.copy src", "memory.copy dst"] {
+                let _ = frame.operand_stack.pop().ok_or_else(|| {
+                    TassadarModuleTraceReplayError::Drift {
+                        step_index: step.step_index,
+                        detail: String::from(detail),
+                    }
+                })?;
+            }
+            frame.pc = frame.pc.saturating_add(1);
+        }
+        TassadarModuleTraceEvent::MemoryFill { .. } => {
+            let frame = current_frame_mut(frames, step.step_index)?;
+            for detail in ["memory.fill len", "memory.fill value", "memory.fill dst"] {
+                let _ = frame.operand_stack.pop().ok_or_else(|| {
+                    TassadarModuleTraceReplayError::Drift {
+                        step_index: step.step_index,
+                        detail: String::from(detail),
+                    }
+                })?;
+            }
             frame.pc = frame.pc.saturating_add(1);
         }
         TassadarModuleTraceEvent::Call { function_index } => {

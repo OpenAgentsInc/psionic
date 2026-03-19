@@ -8,7 +8,8 @@ use psionic_runtime::{
     TassadarLinearMemoryExecutionError, TassadarLinearMemoryHaltReason,
     TassadarLinearMemoryProgram, TassadarLinearMemoryTraceFootprint,
     execute_tassadar_linear_memory_program, summarize_tassadar_linear_memory_trace_footprint,
-    tassadar_seeded_linear_memory_growth_program, tassadar_seeded_linear_memory_memcpy_program,
+    tassadar_seeded_linear_memory_copy_fill_program, tassadar_seeded_linear_memory_growth_program,
+    tassadar_seeded_linear_memory_memcpy_program,
     tassadar_seeded_linear_memory_sign_extension_program,
     tassadar_seeded_linear_memory_width_parity_program,
 };
@@ -32,6 +33,8 @@ pub enum TassadarMemoryAbiV2CaseFamily {
     MemorySizeAndGrow,
     /// Dense memcpy-style trace regression coverage.
     MemcpyTraceRegression,
+    /// Bulk-memory copy/fill exactness coverage.
+    CopyFillExactness,
 }
 
 /// One repo-facing case report for the memory ABI v2 lane.
@@ -80,7 +83,7 @@ impl TassadarMemoryAbiV2Report {
             publication: tassadar_memory_abi_v2_publication(),
             cases,
             claim_boundary: String::from(
-                "this report proves one public byte-addressed linear-memory lane with exact i8/i16/i32 width behavior, sign extension, memory.size and memory.grow support, and delta-oriented trace publication on bounded straight-line programs; it does not claim structured control flow, call frames, indirect calls, imports, globals, or full Wasm module closure",
+                "this report proves one public byte-addressed linear-memory lane with exact i8/i16/i32 width behavior, sign extension, memory.size, memory.grow, memory.copy, and memory.fill support, plus delta-oriented trace publication on bounded straight-line programs; it does not claim structured control flow, call frames, indirect calls, imports, globals, or full Wasm module closure",
             ),
             report_digest: String::new(),
         };
@@ -156,6 +159,12 @@ pub fn build_tassadar_memory_abi_v2_report()
             TassadarMemoryAbiV2CaseFamily::MemcpyTraceRegression,
             tassadar_seeded_linear_memory_memcpy_program(64),
             vec![190],
+        )?,
+        build_case(
+            "copy_fill_exactness",
+            TassadarMemoryAbiV2CaseFamily::CopyFillExactness,
+            tassadar_seeded_linear_memory_copy_fill_program(),
+            vec![67_305_985, 134_678_021, 2_139_062_143],
         )?,
     ];
     Ok(TassadarMemoryAbiV2Report::new(cases))
@@ -246,7 +255,7 @@ mod tests {
     #[test]
     fn memory_abi_v2_report_captures_seeded_truth() {
         let report = build_tassadar_memory_abi_v2_report().expect("report");
-        assert_eq!(report.cases.len(), 4);
+        assert_eq!(report.cases.len(), 5);
         let memcpy = report
             .cases
             .iter()
@@ -257,6 +266,12 @@ mod tests {
             memcpy.trace_footprint.delta_trace_bytes
                 < memcpy.trace_footprint.equivalent_full_snapshot_trace_bytes
         );
+        let copy_fill = report
+            .cases
+            .iter()
+            .find(|case| case.family == TassadarMemoryAbiV2CaseFamily::CopyFillExactness)
+            .expect("copy/fill case");
+        assert_eq!(copy_fill.expected_outputs, copy_fill.observed_outputs);
     }
 
     #[test]

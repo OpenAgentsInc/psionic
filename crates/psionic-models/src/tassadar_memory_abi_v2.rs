@@ -57,7 +57,7 @@ impl TassadarMemoryAbiV2Publication {
                     "bounded straight-line immediate-address programs only; structured control flow and call frames remain separate follow-on work",
                 ),
                 String::from(
-                    "supports i8/i16/i32 loads and stores plus memory.size and memory.grow; globals, tables, indirect calls, and imports remain outside this publication",
+                    "supports i8/i16/i32 loads and stores plus memory.size, memory.grow, memory.copy, and memory.fill; globals, tables, indirect calls, and imports remain outside this publication",
                 ),
                 String::from(
                     "trace publication is delta-oriented for byte writes and memory growth instead of full snapshots",

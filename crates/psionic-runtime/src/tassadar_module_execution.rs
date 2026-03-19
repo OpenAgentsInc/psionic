@@ -2,9 +2,13 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::{TASSADAR_RUNTIME_BACKEND_ID, TassadarStructuredControlBinaryOp};
+use crate::{
+    TASSADAR_LINEAR_MEMORY_PAGE_BYTES, TASSADAR_RUNTIME_BACKEND_ID,
+    TassadarStructuredControlBinaryOp,
+};
 
 const TASSADAR_MODULE_EXECUTION_MAX_STEPS: usize = 4_096;
+const TASSADAR_MODULE_EXECUTION_MAX_MEMORY_PAGES: u32 = 8;
 
 /// Value types admitted by the bounded module-execution lane.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,6 +78,30 @@ pub struct TassadarModuleElementSegment {
     pub elements: Vec<Option<u32>>,
 }
 
+/// One bounded linear memory admitted by the module-execution lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarModuleMemory {
+    /// Stable memory index.
+    pub memory_index: u32,
+    /// Initial size in Wasm pages.
+    pub initial_pages: u32,
+    /// Maximum admitted size in Wasm pages.
+    pub max_pages: u32,
+}
+
+/// One active data segment admitted by the module-execution lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarModuleDataSegment {
+    /// Stable data-segment index.
+    pub data_segment_index: u32,
+    /// Target memory index.
+    pub memory_index: u32,
+    /// Byte offset inside the target memory.
+    pub offset: u32,
+    /// Raw bytes copied during instantiation.
+    pub bytes: Vec<u8>,
+}
+
 /// Stub kinds admitted at the host-import boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -136,6 +164,22 @@ pub struct TassadarModuleExecutionCapabilityReport {
     pub supports_direct_calls: bool,
     /// Whether bounded indirect calls are supported.
     pub supports_call_indirect: bool,
+    /// Whether one bounded linear memory is supported.
+    pub supports_linear_memory: bool,
+    /// Whether active data-segment instantiation is supported.
+    pub supports_active_data_segments: bool,
+    /// Whether `memory.size` is supported.
+    pub supports_memory_size: bool,
+    /// Whether bounded `memory.grow` is supported.
+    pub supports_memory_grow: bool,
+    /// Whether bounded `memory.copy` is supported.
+    pub supports_memory_copy: bool,
+    /// Whether bounded `memory.fill` is supported.
+    pub supports_memory_fill: bool,
+    /// Maximum number of memories admitted today.
+    pub max_memory_count: u32,
+    /// Maximum number of pages per admitted memory.
+    pub max_memory_pages: u32,
     /// Maximum table entries admitted by the bounded lane.
     pub max_table_entries: u32,
     /// Hard capability boundary for host imports.
@@ -158,6 +202,14 @@ pub fn tassadar_module_execution_capability_report() -> TassadarModuleExecutionC
         supports_start_function_instantiation: true,
         supports_direct_calls: true,
         supports_call_indirect: true,
+        supports_linear_memory: true,
+        supports_active_data_segments: true,
+        supports_memory_size: true,
+        supports_memory_grow: true,
+        supports_memory_copy: true,
+        supports_memory_fill: true,
+        max_memory_count: 1,
+        max_memory_pages: TASSADAR_MODULE_EXECUTION_MAX_MEMORY_PAGES,
         max_table_entries: 64,
         host_import_boundary: TassadarHostImportCapabilityBoundary {
             supported_stub_kinds: vec![TassadarHostImportStubKind::DeterministicI32Const],
@@ -169,7 +221,7 @@ pub fn tassadar_module_execution_capability_report() -> TassadarModuleExecutionC
             ),
         },
         claim_boundary: String::from(
-            "bounded module execution covers i32 globals, funcref tables, active element-segment instantiation, zero-parameter start functions, zero-parameter direct and indirect calls, and deterministic import stubs only; memories, arbitrary signatures, and arbitrary host calls remain out of scope",
+            "bounded module execution covers i32 globals, one bounded linear memory with active data segments, memory.size, memory.grow, memory.copy, memory.fill, funcref tables, active element-segment instantiation, zero-parameter start functions, zero-parameter direct and indirect calls, and deterministic import stubs only; multi-memory, arbitrary signatures, arbitrary imports, and arbitrary host calls remain out of scope",
         ),
     }
 }
@@ -230,10 +282,27 @@ pub enum TassadarModuleInstruction {
     GlobalGet { global_index: u32 },
     /// Pop one value into one global.
     GlobalSet { global_index: u32 },
+    /// Pop and discard one stack value.
+    Drop,
     /// Pop two i32 values and push one result.
     BinaryOp {
         op: TassadarStructuredControlBinaryOp,
     },
+    /// Pop one dynamic base address, read one little-endian i32, and push it.
+    I32Load { memory_index: u32, offset: u32 },
+    /// Pop one value and one dynamic base address and write one little-endian i32.
+    I32Store { memory_index: u32, offset: u32 },
+    /// Push the current memory size in pages.
+    MemorySize { memory_index: u32 },
+    /// Pop one page delta and grow memory if possible.
+    MemoryGrow { memory_index: u32 },
+    /// Pop `len`, `src`, and `dst` and copy bytes with memmove semantics.
+    MemoryCopy {
+        dst_memory_index: u32,
+        src_memory_index: u32,
+    },
+    /// Pop `len`, `value`, and `dst` and fill bytes with the low byte of `value`.
+    MemoryFill { memory_index: u32 },
     /// Call one declared function directly.
     Call { function_index: u32 },
     /// Resolve one table slot and call the referenced function.
@@ -296,9 +365,15 @@ pub struct TassadarModuleExecutionProgram {
     pub globals: Vec<TassadarModuleGlobal>,
     /// Declared tables in stable index order.
     pub tables: Vec<TassadarModuleTable>,
+    /// Declared memories in stable index order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub memories: Vec<TassadarModuleMemory>,
     /// Active element segments applied during instantiation.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub element_segments: Vec<TassadarModuleElementSegment>,
+    /// Active data segments applied during instantiation.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub data_segments: Vec<TassadarModuleDataSegment>,
     /// Optional zero-parameter start function executed before the entry export.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start_function_index: Option<u32>,
@@ -326,11 +401,20 @@ impl TassadarModuleExecutionProgram {
             max_call_depth,
             globals,
             tables,
+            memories: Vec::new(),
             element_segments: Vec::new(),
+            data_segments: Vec::new(),
             start_function_index: None,
             imports,
             functions,
         }
+    }
+
+    /// Binds bounded memories to the program.
+    #[must_use]
+    pub fn with_memories(mut self, memories: Vec<TassadarModuleMemory>) -> Self {
+        self.memories = memories;
+        self
     }
 
     /// Binds active element segments to the program.
@@ -340,6 +424,13 @@ impl TassadarModuleExecutionProgram {
         element_segments: Vec<TassadarModuleElementSegment>,
     ) -> Self {
         self.element_segments = element_segments;
+        self
+    }
+
+    /// Binds active data segments to the program.
+    #[must_use]
+    pub fn with_data_segments(mut self, data_segments: Vec<TassadarModuleDataSegment>) -> Self {
+        self.data_segments = data_segments;
         self
     }
 
@@ -436,6 +527,34 @@ impl TassadarModuleExecutionProgram {
             }
         }
 
+        if self.memories.len() > 1 {
+            return Err(TassadarModuleExecutionError::UnsupportedMemoryCount {
+                memory_count: self.memories.len(),
+            });
+        }
+        for (expected_index, memory) in self.memories.iter().enumerate() {
+            if memory.memory_index != expected_index as u32 {
+                return Err(TassadarModuleExecutionError::MemoryIndexDrift {
+                    expected: expected_index as u32,
+                    actual: memory.memory_index,
+                });
+            }
+            if memory.max_pages < memory.initial_pages {
+                return Err(TassadarModuleExecutionError::MaxPagesBeforeInitial {
+                    memory_index: memory.memory_index,
+                    initial_pages: memory.initial_pages,
+                    max_pages: memory.max_pages,
+                });
+            }
+            if memory.max_pages > TASSADAR_MODULE_EXECUTION_MAX_MEMORY_PAGES {
+                return Err(TassadarModuleExecutionError::MemoryPageLimitExceeded {
+                    memory_index: memory.memory_index,
+                    max_pages: memory.max_pages,
+                    profile_max_pages: TASSADAR_MODULE_EXECUTION_MAX_MEMORY_PAGES,
+                });
+            }
+        }
+
         for (expected_index, segment) in self.element_segments.iter().enumerate() {
             if segment.element_segment_index != expected_index as u32 {
                 return Err(TassadarModuleExecutionError::ElementSegmentIndexDrift {
@@ -471,6 +590,37 @@ impl TassadarModuleExecutionProgram {
                         },
                     );
                 }
+            }
+        }
+
+        for (expected_index, segment) in self.data_segments.iter().enumerate() {
+            if segment.data_segment_index != expected_index as u32 {
+                return Err(TassadarModuleExecutionError::DataSegmentIndexDrift {
+                    expected: expected_index as u32,
+                    actual: segment.data_segment_index,
+                });
+            }
+            let memory = self.memories.get(segment.memory_index as usize).ok_or(
+                TassadarModuleExecutionError::DataSegmentMemoryOutOfRange {
+                    data_segment_index: segment.data_segment_index,
+                    memory_index: segment.memory_index,
+                    memory_count: self.memories.len(),
+                },
+            )?;
+            let memory_len = module_memory_len_bytes(memory.initial_pages)?;
+            let start = usize::try_from(segment.offset)
+                .map_err(|_| TassadarModuleExecutionError::ByteLengthOverflow)?;
+            let end = start
+                .checked_add(segment.bytes.len())
+                .ok_or(TassadarModuleExecutionError::ByteLengthOverflow)?;
+            if end > memory_len {
+                return Err(TassadarModuleExecutionError::DataSegmentOutOfRange {
+                    data_segment_index: segment.data_segment_index,
+                    memory_index: segment.memory_index,
+                    offset: segment.offset,
+                    segment_len: segment.bytes.len(),
+                    memory_len,
+                });
             }
         }
 
@@ -559,6 +709,30 @@ impl TassadarModuleExecutionProgram {
                             import_count: self.imports.len(),
                         });
                     }
+                    TassadarModuleInstruction::I32Load { memory_index, .. }
+                    | TassadarModuleInstruction::I32Store { memory_index, .. }
+                    | TassadarModuleInstruction::MemorySize { memory_index }
+                    | TassadarModuleInstruction::MemoryGrow { memory_index }
+                    | TassadarModuleInstruction::MemoryFill { memory_index }
+                        if *memory_index as usize >= self.memories.len() =>
+                    {
+                        return Err(TassadarModuleExecutionError::MemoryOutOfRange {
+                            memory_index: *memory_index,
+                            memory_count: self.memories.len(),
+                        });
+                    }
+                    TassadarModuleInstruction::MemoryCopy {
+                        dst_memory_index,
+                        src_memory_index,
+                    } if *dst_memory_index as usize >= self.memories.len()
+                        || *src_memory_index as usize >= self.memories.len() =>
+                    {
+                        return Err(TassadarModuleExecutionError::MemoryCopyMemoryOutOfRange {
+                            dst_memory_index: *dst_memory_index,
+                            src_memory_index: *src_memory_index,
+                            memory_count: self.memories.len(),
+                        });
+                    }
                     _ => {}
                 }
             }
@@ -582,6 +756,32 @@ pub struct TassadarModuleFrameSnapshot {
     pub operand_stack: Vec<i32>,
 }
 
+/// One memory-byte delta emitted by the module-execution lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarModuleMemoryByteDelta {
+    /// Target memory index.
+    pub memory_index: u32,
+    /// Byte address touched by the step.
+    pub address: u32,
+    /// Byte value before the step.
+    pub before: u8,
+    /// Byte value after the step.
+    pub after: u8,
+}
+
+/// One memory-growth delta emitted by the module-execution lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarModuleMemoryGrowthDelta {
+    /// Target memory index.
+    pub memory_index: u32,
+    /// Page count before the growth.
+    pub previous_pages: u32,
+    /// Page count after the growth.
+    pub new_pages: u32,
+    /// Byte count added by the growth.
+    pub added_bytes: u32,
+}
+
 /// One trace event in the bounded module-execution lane.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -593,6 +793,13 @@ pub enum TassadarModuleTraceEvent {
         offset: u32,
         elements: Vec<Option<u32>>,
     },
+    /// One active data segment was applied during instantiation.
+    DataSegmentApplied {
+        data_segment_index: u32,
+        memory_index: u32,
+        offset: u32,
+        byte_len: usize,
+    },
     /// One constant was pushed.
     ConstPush { value: i32 },
     /// One local was read.
@@ -603,12 +810,54 @@ pub enum TassadarModuleTraceEvent {
     GlobalGet { global_index: u32, value: i32 },
     /// One global was written.
     GlobalSet { global_index: u32, value: i32 },
+    /// One stack value was dropped.
+    Drop { value: i32 },
     /// One binary operation completed.
     BinaryOp {
         op: TassadarStructuredControlBinaryOp,
         left: i32,
         right: i32,
         result: i32,
+    },
+    /// One linear-memory load completed.
+    Load {
+        memory_index: u32,
+        address: u32,
+        offset: u32,
+        raw_bytes: Vec<u8>,
+        value: i32,
+    },
+    /// One linear-memory store completed.
+    Store {
+        memory_index: u32,
+        address: u32,
+        offset: u32,
+        value: i32,
+        written_bytes: Vec<u8>,
+    },
+    /// One `memory.size` observation completed.
+    MemorySize { memory_index: u32, pages: u32 },
+    /// One `memory.grow` attempt completed.
+    MemoryGrow {
+        memory_index: u32,
+        requested_pages: i32,
+        previous_pages: u32,
+        result: i32,
+    },
+    /// One `memory.copy` completed.
+    MemoryCopy {
+        dst_memory_index: u32,
+        src_memory_index: u32,
+        dst_address: u32,
+        src_address: u32,
+        byte_len: u32,
+    },
+    /// One `memory.fill` completed.
+    MemoryFill {
+        memory_index: u32,
+        address: u32,
+        value: u8,
+        byte_len: u32,
     },
     /// One direct call pushed a new frame.
     Call { function_index: u32 },
@@ -645,6 +894,15 @@ pub struct TassadarModuleTraceStep {
     pub event: TassadarModuleTraceEvent,
     /// Current globals after the step.
     pub globals_after: Vec<i32>,
+    /// Byte deltas emitted by the step.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub memory_byte_deltas: Vec<TassadarModuleMemoryByteDelta>,
+    /// Memory-growth summary when one occurred.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_growth_delta: Option<TassadarModuleMemoryGrowthDelta>,
+    /// Memory size in pages after the step for each admitted memory.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub memory_size_pages_after: Vec<u32>,
     /// Current frame stack after the step.
     pub frame_stack_after: Vec<TassadarModuleFrameSnapshot>,
 }
@@ -671,6 +929,12 @@ pub struct TassadarModuleExecution {
     pub returned_value: Option<i32>,
     /// Final globals in stable index order.
     pub final_globals: Vec<i32>,
+    /// Final memory digests in stable index order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub final_memory_digests: Vec<String>,
+    /// Final memory sizes in pages in stable index order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub final_memory_pages: Vec<u32>,
     /// Terminal halt reason.
     pub halt_reason: TassadarModuleExecutionHaltReason,
 }
@@ -713,9 +977,18 @@ pub enum TassadarModuleExecutionError {
     /// One import index drifted from stable order.
     #[error("module-execution import index drifted: expected {expected}, got {actual}")]
     ImportIndexDrift { expected: u32, actual: u32 },
+    /// The bounded lane currently admits at most one memory.
+    #[error("module-execution currently admits at most one memory, got {memory_count}")]
+    UnsupportedMemoryCount { memory_count: usize },
+    /// One memory index drifted from stable order.
+    #[error("module-execution memory index drifted: expected {expected}, got {actual}")]
+    MemoryIndexDrift { expected: u32, actual: u32 },
     /// One element segment index drifted from stable order.
     #[error("module-execution element-segment index drifted: expected {expected}, got {actual}")]
     ElementSegmentIndexDrift { expected: u32, actual: u32 },
+    /// One data-segment index drifted from stable order.
+    #[error("module-execution data-segment index drifted: expected {expected}, got {actual}")]
+    DataSegmentIndexDrift { expected: u32, actual: u32 },
     /// One function declared unsupported parameters.
     #[error(
         "module-execution function {function_index} declares unsupported param_count={param_count}"
@@ -763,6 +1036,30 @@ pub enum TassadarModuleExecutionError {
     GlobalOutOfRange {
         global_index: u32,
         global_count: usize,
+    },
+    /// One memory declared max_pages below initial_pages.
+    #[error(
+        "module-execution memory {memory_index} declared max_pages={max_pages} below initial_pages={initial_pages}"
+    )]
+    MaxPagesBeforeInitial {
+        memory_index: u32,
+        initial_pages: u32,
+        max_pages: u32,
+    },
+    /// One memory exceeded the bounded profile page cap.
+    #[error(
+        "module-execution memory {memory_index} declared max_pages={max_pages} above bounded profile cap {profile_max_pages}"
+    )]
+    MemoryPageLimitExceeded {
+        memory_index: u32,
+        max_pages: u32,
+        profile_max_pages: u32,
+    },
+    /// One memory index exceeded the declared memory count.
+    #[error("module-execution memory {memory_index} is out of range (memory_count={memory_count})")]
+    MemoryOutOfRange {
+        memory_index: u32,
+        memory_count: usize,
     },
     /// The declared start function was missing.
     #[error("module-execution start function {start_function_index} is missing")]
@@ -842,6 +1139,26 @@ pub enum TassadarModuleExecutionError {
         function_index: u32,
         function_count: usize,
     },
+    /// One data segment referenced a missing memory.
+    #[error(
+        "module-execution data segment {data_segment_index} references memory {memory_index} out of range (memory_count={memory_count})"
+    )]
+    DataSegmentMemoryOutOfRange {
+        data_segment_index: u32,
+        memory_index: u32,
+        memory_count: usize,
+    },
+    /// One data segment exceeded the declared initial memory length.
+    #[error(
+        "module-execution data segment {data_segment_index} writes {segment_len} bytes at offset {offset} into memory {memory_index} of length {memory_len}"
+    )]
+    DataSegmentOutOfRange {
+        data_segment_index: u32,
+        memory_index: u32,
+        offset: u32,
+        segment_len: usize,
+        memory_len: usize,
+    },
     /// One direct call referenced a missing function.
     #[error(
         "module-execution direct call referenced function {function_index} out of range (function_count={function_count})"
@@ -862,6 +1179,15 @@ pub enum TassadarModuleExecutionError {
     /// One indirect call hit an empty table slot.
     #[error("module-execution table {table_index} selector {selector} resolved to an empty slot")]
     EmptyTableEntry { table_index: u32, selector: i32 },
+    /// One `memory.copy` referenced a missing memory.
+    #[error(
+        "module-execution memory.copy referenced dst_memory={dst_memory_index} src_memory={src_memory_index} out of range (memory_count={memory_count})"
+    )]
+    MemoryCopyMemoryOutOfRange {
+        dst_memory_index: u32,
+        src_memory_index: u32,
+        memory_count: usize,
+    },
     /// One import index exceeded the declared import count.
     #[error("module-execution import {import_index} is out of range (import_count={import_count})")]
     ImportOutOfRange {
@@ -885,12 +1211,54 @@ pub enum TassadarModuleExecutionError {
         needed: usize,
         available: usize,
     },
+    /// One byte-addressed memory access exceeded the current memory size.
+    #[error(
+        "module-execution memory access in function {function_index} at pc {pc} exceeded memory {memory_index}: address={address}, width_bytes={width_bytes}, memory_len={memory_len}"
+    )]
+    MemoryAddressOutOfRange {
+        function_index: u32,
+        pc: usize,
+        memory_index: u32,
+        address: u32,
+        width_bytes: u32,
+        memory_len: usize,
+    },
+    /// One `memory.copy` range exceeded the source or destination memory.
+    #[error(
+        "module-execution memory.copy in function {function_index} at pc {pc} exceeded bounds: src_memory={src_memory_index} dst_memory={dst_memory_index} src_address={src_address} dst_address={dst_address} byte_len={byte_len} src_memory_len={src_memory_len} dst_memory_len={dst_memory_len}"
+    )]
+    MemoryCopyOutOfRange {
+        function_index: u32,
+        pc: usize,
+        src_memory_index: u32,
+        dst_memory_index: u32,
+        src_address: u32,
+        dst_address: u32,
+        byte_len: u32,
+        src_memory_len: usize,
+        dst_memory_len: usize,
+    },
+    /// One `memory.fill` range exceeded the current memory.
+    #[error(
+        "module-execution memory.fill in function {function_index} at pc {pc} exceeded bounds: memory={memory_index} address={address} byte_len={byte_len} memory_len={memory_len}"
+    )]
+    MemoryFillOutOfRange {
+        function_index: u32,
+        pc: usize,
+        memory_index: u32,
+        address: u32,
+        byte_len: u32,
+        memory_len: usize,
+    },
     /// Execution exceeded the bounded step limit.
     #[error("module-execution exceeded the step limit of {max_steps}")]
     StepLimitExceeded { max_steps: usize },
     /// Execution exceeded the bounded call-depth limit.
     #[error("module-execution exceeded max_call_depth={max_call_depth}")]
     CallDepthExceeded { max_call_depth: u32 },
+    /// Page arithmetic overflowed the supported host representation.
+    #[error("module-execution byte length overflowed host usize")]
+    ByteLengthOverflow,
 }
 
 /// Executes one validated bounded module-execution program.
@@ -900,6 +1268,7 @@ pub fn execute_tassadar_module_execution_program(
     program.validate()?;
     let mut state = ModuleExecutionState::new(program)?;
     instantiate_tables(program, &mut state)?;
+    instantiate_memories(program, &mut state)?;
 
     if let Some(start_function_index) = program.start_function_index {
         let _ = execute_module_root_call(program, &mut state, start_function_index)?;
@@ -907,12 +1276,20 @@ pub fn execute_tassadar_module_execution_program(
 
     let (returned_value, halt_reason) =
         execute_module_root_call(program, &mut state, program.entry_function_index)?;
+    let final_memory_digests = state
+        .memories
+        .iter()
+        .map(|memory| stable_digest(b"tassadar_module_memory|", memory))
+        .collect();
+    let final_memory_pages = state.memory_sizes_pages()?;
 
     Ok(TassadarModuleExecution {
         program_id: program.program_id.clone(),
         steps: state.steps,
         returned_value,
         final_globals: state.globals,
+        final_memory_digests,
+        final_memory_pages,
         halt_reason,
     })
 }
@@ -951,6 +1328,48 @@ fn instantiate_tables(
                 table_index: segment.table_index,
                 offset: segment.offset,
                 elements: segment.elements.clone(),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn instantiate_memories(
+    program: &TassadarModuleExecutionProgram,
+    state: &mut ModuleExecutionState,
+) -> Result<(), TassadarModuleExecutionError> {
+    for segment in &program.data_segments {
+        let memory_count = state.memories.len();
+        let memory = state
+            .memories
+            .get_mut(segment.memory_index as usize)
+            .ok_or(TassadarModuleExecutionError::DataSegmentMemoryOutOfRange {
+                data_segment_index: segment.data_segment_index,
+                memory_index: segment.memory_index,
+                memory_count,
+            })?;
+        let start = usize::try_from(segment.offset)
+            .map_err(|_| TassadarModuleExecutionError::ByteLengthOverflow)?;
+        let end = start
+            .checked_add(segment.bytes.len())
+            .ok_or(TassadarModuleExecutionError::ByteLengthOverflow)?;
+        if end > memory.len() {
+            return Err(TassadarModuleExecutionError::DataSegmentOutOfRange {
+                data_segment_index: segment.data_segment_index,
+                memory_index: segment.memory_index,
+                offset: segment.offset,
+                segment_len: segment.bytes.len(),
+                memory_len: memory.len(),
+            });
+        }
+        memory[start..end].copy_from_slice(segment.bytes.as_slice());
+        state.push_step(
+            program,
+            TassadarModuleTraceEvent::DataSegmentApplied {
+                data_segment_index: segment.data_segment_index,
+                memory_index: segment.memory_index,
+                offset: segment.offset,
+                byte_len: segment.bytes.len(),
             },
         )?;
     }
@@ -1096,6 +1515,11 @@ fn execute_module_root_call(
                     },
                 )?;
             }
+            TassadarModuleInstruction::Drop => {
+                let value = pop_operand(&mut state.frames[current_index], function_index, "drop")?;
+                state.frames[current_index].pc += 1;
+                state.push_step(program, TassadarModuleTraceEvent::Drop { value })?;
+            }
             TassadarModuleInstruction::BinaryOp { op } => {
                 let right = pop_operand(
                     &mut state.frames[current_index],
@@ -1118,6 +1542,344 @@ fn execute_module_root_call(
                         right,
                         result,
                     },
+                )?;
+            }
+            TassadarModuleInstruction::I32Load {
+                memory_index,
+                offset,
+            } => {
+                let dynamic_address =
+                    pop_operand(&mut state.frames[current_index], function_index, "i32.load")?;
+                let address = effective_memory_address(dynamic_address, offset);
+                let memory = state.memories.get(memory_index as usize).ok_or(
+                    TassadarModuleExecutionError::MemoryOutOfRange {
+                        memory_index,
+                        memory_count: state.memories.len(),
+                    },
+                )?;
+                let raw_bytes = read_module_memory(
+                    memory,
+                    function_index,
+                    state.frames[current_index].pc,
+                    memory_index,
+                    address,
+                )?;
+                let value =
+                    i32::from_le_bytes(raw_bytes.as_slice().try_into().expect("exact 4-byte load"));
+                state.frames[current_index].operand_stack.push(value);
+                state.frames[current_index].pc += 1;
+                state.push_step(
+                    program,
+                    TassadarModuleTraceEvent::Load {
+                        memory_index,
+                        address,
+                        offset,
+                        raw_bytes,
+                        value,
+                    },
+                )?;
+            }
+            TassadarModuleInstruction::I32Store {
+                memory_index,
+                offset,
+            } => {
+                let value = pop_operand(
+                    &mut state.frames[current_index],
+                    function_index,
+                    "i32.store",
+                )?;
+                let dynamic_address = pop_operand(
+                    &mut state.frames[current_index],
+                    function_index,
+                    "i32.store",
+                )?;
+                let address = effective_memory_address(dynamic_address, offset);
+                let memory_len = state
+                    .memories
+                    .get(memory_index as usize)
+                    .map_or(0, Vec::len);
+                let memory_count = state.memories.len();
+                let base = checked_module_memory_range(
+                    function_index,
+                    state.frames[current_index].pc,
+                    memory_index,
+                    address,
+                    4,
+                    memory_len,
+                )?;
+                let memory = state.memories.get_mut(memory_index as usize).ok_or(
+                    TassadarModuleExecutionError::MemoryOutOfRange {
+                        memory_index,
+                        memory_count,
+                    },
+                )?;
+                let written_bytes = value.to_le_bytes().to_vec();
+                let mut memory_byte_deltas = Vec::new();
+                for (byte_offset, byte) in written_bytes.iter().enumerate() {
+                    let index = base + byte_offset;
+                    let before = memory[index];
+                    memory[index] = *byte;
+                    if before != *byte {
+                        memory_byte_deltas.push(TassadarModuleMemoryByteDelta {
+                            memory_index,
+                            address: address.saturating_add(byte_offset as u32),
+                            before,
+                            after: *byte,
+                        });
+                    }
+                }
+                state.frames[current_index].pc += 1;
+                state.push_step_with_memory(
+                    program,
+                    TassadarModuleTraceEvent::Store {
+                        memory_index,
+                        address,
+                        offset,
+                        value,
+                        written_bytes,
+                    },
+                    memory_byte_deltas,
+                    None,
+                )?;
+            }
+            TassadarModuleInstruction::MemorySize { memory_index } => {
+                let memory = state.memories.get(memory_index as usize).ok_or(
+                    TassadarModuleExecutionError::MemoryOutOfRange {
+                        memory_index,
+                        memory_count: state.memories.len(),
+                    },
+                )?;
+                let pages = module_current_memory_pages(memory.len())?;
+                state.frames[current_index]
+                    .operand_stack
+                    .push(i32::try_from(pages).unwrap_or(i32::MAX));
+                state.frames[current_index].pc += 1;
+                state.push_step(
+                    program,
+                    TassadarModuleTraceEvent::MemorySize {
+                        memory_index,
+                        pages,
+                    },
+                )?;
+            }
+            TassadarModuleInstruction::MemoryGrow { memory_index } => {
+                let requested_pages = pop_operand(
+                    &mut state.frames[current_index],
+                    function_index,
+                    "memory.grow",
+                )?;
+                let memory_count = state.memories.len();
+                let memory = state.memories.get_mut(memory_index as usize).ok_or(
+                    TassadarModuleExecutionError::MemoryOutOfRange {
+                        memory_index,
+                        memory_count,
+                    },
+                )?;
+                let previous_pages = module_current_memory_pages(memory.len())?;
+                let max_pages = program.memories[memory_index as usize].max_pages;
+                let mut memory_growth_delta = None;
+                let result = if requested_pages < 0 {
+                    -1
+                } else {
+                    let requested_pages_u32 = requested_pages as u32;
+                    if requested_pages_u32 == 0 {
+                        i32::try_from(previous_pages).unwrap_or(i32::MAX)
+                    } else if let Some(new_pages) = previous_pages.checked_add(requested_pages_u32)
+                    {
+                        if new_pages > max_pages {
+                            -1
+                        } else {
+                            let old_len = memory.len();
+                            let new_len = module_memory_len_bytes(new_pages)?;
+                            memory.resize(new_len, 0);
+                            memory_growth_delta = Some(TassadarModuleMemoryGrowthDelta {
+                                memory_index,
+                                previous_pages,
+                                new_pages,
+                                added_bytes: u32::try_from(new_len.saturating_sub(old_len))
+                                    .unwrap_or(u32::MAX),
+                            });
+                            i32::try_from(previous_pages).unwrap_or(i32::MAX)
+                        }
+                    } else {
+                        -1
+                    }
+                };
+                state.frames[current_index].operand_stack.push(result);
+                state.frames[current_index].pc += 1;
+                state.push_step_with_memory(
+                    program,
+                    TassadarModuleTraceEvent::MemoryGrow {
+                        memory_index,
+                        requested_pages,
+                        previous_pages,
+                        result,
+                    },
+                    Vec::new(),
+                    memory_growth_delta,
+                )?;
+            }
+            TassadarModuleInstruction::MemoryCopy {
+                dst_memory_index,
+                src_memory_index,
+            } => {
+                let byte_len = pop_operand(
+                    &mut state.frames[current_index],
+                    function_index,
+                    "memory.copy",
+                )? as u32;
+                let src_address = pop_operand(
+                    &mut state.frames[current_index],
+                    function_index,
+                    "memory.copy",
+                )? as u32;
+                let dst_address = pop_operand(
+                    &mut state.frames[current_index],
+                    function_index,
+                    "memory.copy",
+                )? as u32;
+                let src_len = state
+                    .memories
+                    .get(src_memory_index as usize)
+                    .map_or(0, Vec::len);
+                let dst_len = state
+                    .memories
+                    .get(dst_memory_index as usize)
+                    .map_or(0, Vec::len);
+                let (src_base, dst_base) = checked_module_copy_ranges(
+                    function_index,
+                    state.frames[current_index].pc,
+                    src_memory_index,
+                    dst_memory_index,
+                    src_address,
+                    dst_address,
+                    byte_len,
+                    src_len,
+                    dst_len,
+                )?;
+                let mut memory_byte_deltas = Vec::new();
+                let memory_count = state.memories.len();
+                if src_memory_index == dst_memory_index {
+                    let memory = state.memories.get_mut(src_memory_index as usize).ok_or(
+                        TassadarModuleExecutionError::MemoryCopyMemoryOutOfRange {
+                            dst_memory_index,
+                            src_memory_index,
+                            memory_count,
+                        },
+                    )?;
+                    let copy_bytes = memory[src_base..src_base + byte_len as usize].to_vec();
+                    for (offset, byte) in copy_bytes.iter().enumerate() {
+                        let index = dst_base + offset;
+                        let before = memory[index];
+                        memory[index] = *byte;
+                        if before != *byte {
+                            memory_byte_deltas.push(TassadarModuleMemoryByteDelta {
+                                memory_index: dst_memory_index,
+                                address: dst_address.saturating_add(offset as u32),
+                                before,
+                                after: *byte,
+                            });
+                        }
+                    }
+                } else {
+                    let copy_bytes = state.memories[src_memory_index as usize]
+                        [src_base..src_base + byte_len as usize]
+                        .to_vec();
+                    let memory = state.memories.get_mut(dst_memory_index as usize).ok_or(
+                        TassadarModuleExecutionError::MemoryCopyMemoryOutOfRange {
+                            dst_memory_index,
+                            src_memory_index,
+                            memory_count,
+                        },
+                    )?;
+                    for (offset, byte) in copy_bytes.iter().enumerate() {
+                        let index = dst_base + offset;
+                        let before = memory[index];
+                        memory[index] = *byte;
+                        if before != *byte {
+                            memory_byte_deltas.push(TassadarModuleMemoryByteDelta {
+                                memory_index: dst_memory_index,
+                                address: dst_address.saturating_add(offset as u32),
+                                before,
+                                after: *byte,
+                            });
+                        }
+                    }
+                }
+                state.frames[current_index].pc += 1;
+                state.push_step_with_memory(
+                    program,
+                    TassadarModuleTraceEvent::MemoryCopy {
+                        dst_memory_index,
+                        src_memory_index,
+                        dst_address,
+                        src_address,
+                        byte_len,
+                    },
+                    memory_byte_deltas,
+                    None,
+                )?;
+            }
+            TassadarModuleInstruction::MemoryFill { memory_index } => {
+                let byte_len = pop_operand(
+                    &mut state.frames[current_index],
+                    function_index,
+                    "memory.fill",
+                )? as u32;
+                let value = pop_operand(
+                    &mut state.frames[current_index],
+                    function_index,
+                    "memory.fill",
+                )? as u8;
+                let address = pop_operand(
+                    &mut state.frames[current_index],
+                    function_index,
+                    "memory.fill",
+                )? as u32;
+                let memory_len = state
+                    .memories
+                    .get(memory_index as usize)
+                    .map_or(0, Vec::len);
+                let base = checked_module_fill_range(
+                    function_index,
+                    state.frames[current_index].pc,
+                    memory_index,
+                    address,
+                    byte_len,
+                    memory_len,
+                )?;
+                let memory_count = state.memories.len();
+                let memory = state.memories.get_mut(memory_index as usize).ok_or(
+                    TassadarModuleExecutionError::MemoryOutOfRange {
+                        memory_index,
+                        memory_count,
+                    },
+                )?;
+                let mut memory_byte_deltas = Vec::new();
+                for offset in 0..byte_len as usize {
+                    let index = base + offset;
+                    let before = memory[index];
+                    memory[index] = value;
+                    if before != value {
+                        memory_byte_deltas.push(TassadarModuleMemoryByteDelta {
+                            memory_index,
+                            address: address.saturating_add(offset as u32),
+                            before,
+                            after: value,
+                        });
+                    }
+                }
+                state.frames[current_index].pc += 1;
+                state.push_step_with_memory(
+                    program,
+                    TassadarModuleTraceEvent::MemoryFill {
+                        memory_index,
+                        address,
+                        value,
+                        byte_len,
+                    },
+                    memory_byte_deltas,
+                    None,
                 )?;
             }
             TassadarModuleInstruction::Call {
@@ -1440,6 +2202,83 @@ pub fn tassadar_seeded_module_instantiation_program() -> TassadarModuleExecution
     .with_start_function_index(1)
 }
 
+/// Returns one seeded dynamic-memory program over one bounded memory.
+#[must_use]
+pub fn tassadar_seeded_module_dynamic_memory_program() -> TassadarModuleExecutionProgram {
+    TassadarModuleExecutionProgram::new(
+        "tassadar.module_execution.dynamic_memory.v1",
+        0,
+        8,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        vec![TassadarModuleFunction::new(
+            0,
+            "entry",
+            0,
+            3,
+            1,
+            vec![
+                TassadarModuleInstruction::I32Const { value: 8 },
+                TassadarModuleInstruction::I32Const { value: 0 },
+                TassadarModuleInstruction::I32Const { value: 4 },
+                TassadarModuleInstruction::MemoryCopy {
+                    dst_memory_index: 0,
+                    src_memory_index: 0,
+                },
+                TassadarModuleInstruction::MemorySize { memory_index: 0 },
+                TassadarModuleInstruction::LocalSet { local_index: 0 },
+                TassadarModuleInstruction::I32Const { value: 1 },
+                TassadarModuleInstruction::MemoryGrow { memory_index: 0 },
+                TassadarModuleInstruction::LocalSet { local_index: 1 },
+                TassadarModuleInstruction::MemorySize { memory_index: 0 },
+                TassadarModuleInstruction::LocalSet { local_index: 2 },
+                TassadarModuleInstruction::I32Const { value: 12 },
+                TassadarModuleInstruction::I32Const { value: 7 },
+                TassadarModuleInstruction::I32Const { value: 4 },
+                TassadarModuleInstruction::MemoryFill { memory_index: 0 },
+                TassadarModuleInstruction::I32Const { value: 8 },
+                TassadarModuleInstruction::I32Load {
+                    memory_index: 0,
+                    offset: 0,
+                },
+                TassadarModuleInstruction::I32Const { value: 12 },
+                TassadarModuleInstruction::I32Load {
+                    memory_index: 0,
+                    offset: 0,
+                },
+                TassadarModuleInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Add,
+                },
+                TassadarModuleInstruction::LocalGet { local_index: 0 },
+                TassadarModuleInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Add,
+                },
+                TassadarModuleInstruction::LocalGet { local_index: 1 },
+                TassadarModuleInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Add,
+                },
+                TassadarModuleInstruction::LocalGet { local_index: 2 },
+                TassadarModuleInstruction::BinaryOp {
+                    op: TassadarStructuredControlBinaryOp::Add,
+                },
+                TassadarModuleInstruction::Return,
+            ],
+        )],
+    )
+    .with_memories(vec![TassadarModuleMemory {
+        memory_index: 0,
+        initial_pages: 1,
+        max_pages: 3,
+    }])
+    .with_data_segments(vec![TassadarModuleDataSegment {
+        data_segment_index: 0,
+        memory_index: 0,
+        offset: 0,
+        bytes: vec![1, 2, 3, 4],
+    }])
+}
+
 /// Returns one seeded deterministic-import program.
 #[must_use]
 pub fn tassadar_seeded_module_deterministic_import_program() -> TassadarModuleExecutionProgram {
@@ -1526,6 +2365,7 @@ impl ModuleFrame {
 struct ModuleExecutionState {
     globals: Vec<i32>,
     tables: Vec<Vec<Option<u32>>>,
+    memories: Vec<Vec<u8>>,
     frames: Vec<ModuleFrame>,
     steps: Vec<TassadarModuleTraceStep>,
     step_index: usize,
@@ -1544,6 +2384,11 @@ impl ModuleExecutionState {
                 .iter()
                 .map(|table| table.elements.clone())
                 .collect(),
+            memories: program
+                .memories
+                .iter()
+                .map(|memory| Ok(vec![0u8; module_memory_len_bytes(memory.initial_pages)?]))
+                .collect::<Result<Vec<_>, TassadarModuleExecutionError>>()?,
             frames: Vec::new(),
             steps: Vec::new(),
             step_index: 0,
@@ -1555,6 +2400,16 @@ impl ModuleExecutionState {
         program: &TassadarModuleExecutionProgram,
         event: TassadarModuleTraceEvent,
     ) -> Result<(), TassadarModuleExecutionError> {
+        self.push_step_with_memory(program, event, Vec::new(), None)
+    }
+
+    fn push_step_with_memory(
+        &mut self,
+        program: &TassadarModuleExecutionProgram,
+        event: TassadarModuleTraceEvent,
+        memory_byte_deltas: Vec<TassadarModuleMemoryByteDelta>,
+        memory_growth_delta: Option<TassadarModuleMemoryGrowthDelta>,
+    ) -> Result<(), TassadarModuleExecutionError> {
         if self.step_index >= TASSADAR_MODULE_EXECUTION_MAX_STEPS {
             return Err(TassadarModuleExecutionError::StepLimitExceeded {
                 max_steps: TASSADAR_MODULE_EXECUTION_MAX_STEPS,
@@ -1565,6 +2420,9 @@ impl ModuleExecutionState {
             frame_depth_after: self.frames.len(),
             event,
             globals_after: self.globals.clone(),
+            memory_byte_deltas,
+            memory_growth_delta,
+            memory_size_pages_after: self.memory_sizes_pages()?,
             frame_stack_after: self
                 .frames
                 .iter()
@@ -1581,6 +2439,13 @@ impl ModuleExecutionState {
         });
         self.step_index = self.step_index.saturating_add(1);
         Ok(())
+    }
+
+    fn memory_sizes_pages(&self) -> Result<Vec<u32>, TassadarModuleExecutionError> {
+        self.memories
+            .iter()
+            .map(|memory| module_current_memory_pages(memory.len()))
+            .collect()
     }
 }
 
@@ -1654,6 +2519,125 @@ fn execute_binary_op(op: TassadarStructuredControlBinaryOp, left: i32, right: i3
     }
 }
 
+fn module_memory_len_bytes(pages: u32) -> Result<usize, TassadarModuleExecutionError> {
+    let bytes = u64::from(pages)
+        .checked_mul(u64::from(TASSADAR_LINEAR_MEMORY_PAGE_BYTES))
+        .ok_or(TassadarModuleExecutionError::ByteLengthOverflow)?;
+    usize::try_from(bytes).map_err(|_| TassadarModuleExecutionError::ByteLengthOverflow)
+}
+
+fn module_current_memory_pages(memory_len: usize) -> Result<u32, TassadarModuleExecutionError> {
+    let page_bytes = usize::try_from(TASSADAR_LINEAR_MEMORY_PAGE_BYTES)
+        .map_err(|_| TassadarModuleExecutionError::ByteLengthOverflow)?;
+    u32::try_from(memory_len / page_bytes)
+        .map_err(|_| TassadarModuleExecutionError::ByteLengthOverflow)
+}
+
+fn effective_memory_address(base: i32, offset: u32) -> u32 {
+    (base as u32).wrapping_add(offset)
+}
+
+fn checked_module_memory_range(
+    function_index: u32,
+    pc: usize,
+    memory_index: u32,
+    address: u32,
+    width_bytes: u32,
+    memory_len: usize,
+) -> Result<usize, TassadarModuleExecutionError> {
+    let base =
+        usize::try_from(address).map_err(|_| TassadarModuleExecutionError::ByteLengthOverflow)?;
+    let end = base
+        .checked_add(width_bytes as usize)
+        .ok_or(TassadarModuleExecutionError::ByteLengthOverflow)?;
+    if end > memory_len {
+        return Err(TassadarModuleExecutionError::MemoryAddressOutOfRange {
+            function_index,
+            pc,
+            memory_index,
+            address,
+            width_bytes,
+            memory_len,
+        });
+    }
+    Ok(base)
+}
+
+fn checked_module_copy_ranges(
+    function_index: u32,
+    pc: usize,
+    src_memory_index: u32,
+    dst_memory_index: u32,
+    src_address: u32,
+    dst_address: u32,
+    byte_len: u32,
+    src_memory_len: usize,
+    dst_memory_len: usize,
+) -> Result<(usize, usize), TassadarModuleExecutionError> {
+    let src_base = usize::try_from(src_address)
+        .map_err(|_| TassadarModuleExecutionError::ByteLengthOverflow)?;
+    let dst_base = usize::try_from(dst_address)
+        .map_err(|_| TassadarModuleExecutionError::ByteLengthOverflow)?;
+    let src_end = src_base
+        .checked_add(byte_len as usize)
+        .ok_or(TassadarModuleExecutionError::ByteLengthOverflow)?;
+    let dst_end = dst_base
+        .checked_add(byte_len as usize)
+        .ok_or(TassadarModuleExecutionError::ByteLengthOverflow)?;
+    if src_end > src_memory_len || dst_end > dst_memory_len {
+        return Err(TassadarModuleExecutionError::MemoryCopyOutOfRange {
+            function_index,
+            pc,
+            src_memory_index,
+            dst_memory_index,
+            src_address,
+            dst_address,
+            byte_len,
+            src_memory_len,
+            dst_memory_len,
+        });
+    }
+    Ok((src_base, dst_base))
+}
+
+fn checked_module_fill_range(
+    function_index: u32,
+    pc: usize,
+    memory_index: u32,
+    address: u32,
+    byte_len: u32,
+    memory_len: usize,
+) -> Result<usize, TassadarModuleExecutionError> {
+    let base =
+        usize::try_from(address).map_err(|_| TassadarModuleExecutionError::ByteLengthOverflow)?;
+    let end = base
+        .checked_add(byte_len as usize)
+        .ok_or(TassadarModuleExecutionError::ByteLengthOverflow)?;
+    if end > memory_len {
+        return Err(TassadarModuleExecutionError::MemoryFillOutOfRange {
+            function_index,
+            pc,
+            memory_index,
+            address,
+            byte_len,
+            memory_len,
+        });
+    }
+    Ok(base)
+}
+
+fn read_module_memory(
+    memory: &[u8],
+    function_index: u32,
+    pc: usize,
+    memory_index: u32,
+    address: u32,
+) -> Result<Vec<u8>, TassadarModuleExecutionError> {
+    let base =
+        checked_module_memory_range(function_index, pc, memory_index, address, 4, memory.len())?;
+    Ok(memory[base..base + 4].to_vec())
+}
+
 fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
     let mut hasher = Sha256::new();
     hasher.update(prefix);
@@ -1669,7 +2653,8 @@ mod tests {
         execute_tassadar_module_execution_program, tassadar_module_execution_capability_report,
         tassadar_seeded_module_call_indirect_program,
         tassadar_seeded_module_deterministic_import_program,
-        tassadar_seeded_module_global_state_program, tassadar_seeded_module_instantiation_program,
+        tassadar_seeded_module_dynamic_memory_program, tassadar_seeded_module_global_state_program,
+        tassadar_seeded_module_instantiation_program,
         tassadar_seeded_module_unsupported_host_import_program,
     };
 
@@ -1681,10 +2666,17 @@ mod tests {
         assert!(report.supports_start_function_instantiation);
         assert!(report.supports_direct_calls);
         assert!(report.supports_call_indirect);
+        assert!(report.supports_linear_memory);
+        assert!(report.supports_active_data_segments);
+        assert!(report.supports_memory_size);
+        assert!(report.supports_memory_grow);
+        assert!(report.supports_memory_copy);
+        assert!(report.supports_memory_fill);
         assert_eq!(
             report.supported_global_value_types,
             vec![TassadarModuleValueType::I32]
         );
+        assert_eq!(report.max_memory_count, 1);
         assert_eq!(
             report.host_import_boundary.supported_stub_kinds,
             vec![TassadarHostImportStubKind::DeterministicI32Const]
@@ -1732,6 +2724,62 @@ mod tests {
             step.event,
             super::TassadarModuleTraceEvent::Call { function_index: 4 }
         )));
+    }
+
+    #[test]
+    fn module_execution_dynamic_memory_is_exact() {
+        let program = tassadar_seeded_module_dynamic_memory_program();
+        let execution = execute_tassadar_module_execution_program(&program).expect("execute");
+        assert_eq!(execution.returned_value, Some(185_207_052));
+        assert_eq!(execution.final_memory_pages, vec![2]);
+        assert_eq!(execution.final_memory_digests.len(), 1);
+        assert!(execution.steps.iter().any(|step| matches!(
+            step.event,
+            super::TassadarModuleTraceEvent::DataSegmentApplied { .. }
+        )));
+        assert!(execution.steps.iter().any(|step| matches!(
+            step.event,
+            super::TassadarModuleTraceEvent::MemoryCopy { .. }
+        )));
+        assert!(execution.steps.iter().any(|step| matches!(
+            step.event,
+            super::TassadarModuleTraceEvent::MemoryFill { .. }
+        )));
+        assert!(execution.steps.iter().any(|step| matches!(
+            step.event,
+            super::TassadarModuleTraceEvent::MemoryGrow { result: 1, .. }
+        )));
+    }
+
+    #[test]
+    fn module_execution_dynamic_memory_refuses_out_of_range_access() {
+        let mut program = tassadar_seeded_module_dynamic_memory_program();
+        program.functions[0].instructions = vec![
+            super::TassadarModuleInstruction::I32Const { value: i32::MAX },
+            super::TassadarModuleInstruction::I32Load {
+                memory_index: 0,
+                offset: 1024,
+            },
+            super::TassadarModuleInstruction::Return,
+        ];
+        let error = execute_tassadar_module_execution_program(&program).expect_err("should refuse");
+        assert!(matches!(
+            error,
+            super::TassadarModuleExecutionError::MemoryAddressOutOfRange { .. }
+        ));
+    }
+
+    #[test]
+    fn module_execution_dynamic_memory_grow_above_max_returns_minus_one() {
+        let mut program = tassadar_seeded_module_dynamic_memory_program();
+        program.functions[0].instructions = vec![
+            super::TassadarModuleInstruction::I32Const { value: 9 },
+            super::TassadarModuleInstruction::MemoryGrow { memory_index: 0 },
+            super::TassadarModuleInstruction::Return,
+        ];
+        let execution = execute_tassadar_module_execution_program(&program).expect("execute");
+        assert_eq!(execution.returned_value, Some(-1));
+        assert_eq!(execution.final_memory_pages, vec![1]);
     }
 
     #[test]

@@ -41,6 +41,7 @@ const TASSADAR_METADATA_COMPILE_PIPELINE_MATRIX_KEY: &str = "tassadar.compile_pi
 const TASSADAR_METADATA_RUST_ARTICLE_PROFILE_KEY: &str = "tassadar.rust_article_profile";
 const TASSADAR_METADATA_GENERALIZED_ABI_FAMILY_KEY: &str = "tassadar.generalized_abi_family";
 const TASSADAR_METADATA_EXECUTION_CHECKPOINT_KEY: &str = "tassadar.execution_checkpoint";
+const TASSADAR_METADATA_DYNAMIC_MEMORY_RESUME_KEY: &str = "tassadar.dynamic_memory_resume";
 const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_LADDER_KEY: &str =
     "tassadar.internal_compute_profile_ladder";
 const TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_CLAIM_KEY: &str =
@@ -284,6 +285,77 @@ pub fn default_tassadar_execution_checkpoint_binding() -> TassadarExecutionCheck
     }
 }
 
+/// Public dynamic-memory pause-and-resume binding reused by Tassadar
+/// environment bundles.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarDynamicMemoryResumeBinding {
+    /// Stable dynamic-memory resume report reference.
+    pub report_ref: String,
+    /// Stable dynamic-memory resume report identifier.
+    pub report_id: String,
+    /// Stable run-bundle reference carrying persisted checkpoints.
+    pub run_bundle_ref: String,
+    /// Stable checkpoint-family identifier.
+    pub checkpoint_family_id: String,
+    /// Case identifiers covered by the committed report.
+    pub case_ids: Vec<String>,
+}
+
+impl TassadarDynamicMemoryResumeBinding {
+    /// Returns a stable digest over the binding.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let encoded = serde_json::to_vec(self)
+            .expect("Tassadar dynamic-memory resume binding should serialize");
+        let digest = sha2::Sha256::digest(encoded.as_slice());
+        hex::encode(digest)
+    }
+
+    /// Validates that the binding is explicit.
+    pub fn validate(&self) -> Result<(), TassadarEnvironmentError> {
+        if self.report_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingDynamicMemoryResumeReportRef);
+        }
+        if self.report_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingDynamicMemoryResumeReportId);
+        }
+        if self.run_bundle_ref.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingDynamicMemoryResumeRunBundleRef);
+        }
+        if self.checkpoint_family_id.trim().is_empty() {
+            return Err(TassadarEnvironmentError::MissingDynamicMemoryResumeFamilyId);
+        }
+        if self.case_ids.is_empty() {
+            return Err(TassadarEnvironmentError::MissingDynamicMemoryResumeCaseIds);
+        }
+        if self
+            .case_ids
+            .iter()
+            .any(|case_id| case_id.trim().is_empty())
+        {
+            return Err(TassadarEnvironmentError::InvalidDynamicMemoryResumeCaseId);
+        }
+        Ok(())
+    }
+}
+
+/// Returns the canonical dynamic-memory pause-and-resume binding reused by
+/// Tassadar environment surfaces.
+#[must_use]
+pub fn default_tassadar_dynamic_memory_resume_binding() -> TassadarDynamicMemoryResumeBinding {
+    TassadarDynamicMemoryResumeBinding {
+        report_ref: String::from(
+            "fixtures/tassadar/reports/tassadar_dynamic_memory_resume_report.json",
+        ),
+        report_id: String::from("tassadar.dynamic_memory_resume.report.v1"),
+        run_bundle_ref: String::from(
+            "fixtures/tassadar/runs/tassadar_dynamic_memory_resume_v1/tassadar_dynamic_memory_resume_bundle.json",
+        ),
+        checkpoint_family_id: String::from("tassadar.dynamic_memory_resume.v1"),
+        case_ids: vec![String::from("copy_fill_pause_after_copy")],
+    }
+}
+
 /// Public architecture-bakeoff binding reused by Tassadar environment bundles.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TassadarArchitectureBakeoffBinding {
@@ -409,8 +481,8 @@ impl TassadarBroadInternalComputePortabilityBinding {
 /// Returns the canonical broader internal-compute portability binding reused by
 /// Tassadar environment surfaces.
 #[must_use]
-pub fn default_tassadar_broad_internal_compute_portability_binding(
-) -> TassadarBroadInternalComputePortabilityBinding {
+pub fn default_tassadar_broad_internal_compute_portability_binding()
+-> TassadarBroadInternalComputePortabilityBinding {
     TassadarBroadInternalComputePortabilityBinding {
         report_ref: String::from(
             "fixtures/tassadar/reports/tassadar_broad_internal_compute_portability_report.json",
@@ -839,6 +911,8 @@ pub struct TassadarEnvironmentSpec {
     pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
     /// Public checkpointed multi-slice execution binding.
     pub execution_checkpoint_binding: TassadarExecutionCheckpointBinding,
+    /// Public dynamic-memory pause-and-resume binding.
+    pub dynamic_memory_resume_binding: TassadarDynamicMemoryResumeBinding,
     /// Optional broad internal-compute portability binding.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub broad_internal_compute_portability_binding:
@@ -941,6 +1015,7 @@ impl TassadarEnvironmentSpec {
             benchmark_package_set_binding: self.benchmark_package_set_binding.clone(),
             compile_pipeline_matrix_binding: self.compile_pipeline_matrix_binding.clone(),
             execution_checkpoint_binding: self.execution_checkpoint_binding.clone(),
+            dynamic_memory_resume_binding: self.dynamic_memory_resume_binding.clone(),
             broad_internal_compute_portability_binding: self
                 .broad_internal_compute_portability_binding
                 .clone(),
@@ -990,6 +1065,7 @@ impl TassadarEnvironmentSpec {
         self.benchmark_package_set_binding.validate()?;
         self.compile_pipeline_matrix_binding.validate()?;
         self.execution_checkpoint_binding.validate()?;
+        self.dynamic_memory_resume_binding.validate()?;
         if let Some(binding) = &self.broad_internal_compute_portability_binding {
             binding.validate()?;
         }
@@ -1192,6 +1268,10 @@ impl TassadarEnvironmentSpec {
             String::from(TASSADAR_METADATA_EXECUTION_CHECKPOINT_KEY),
             serde_json::to_value(&self.execution_checkpoint_binding).unwrap_or(Value::Null),
         );
+        metadata.insert(
+            String::from(TASSADAR_METADATA_DYNAMIC_MEMORY_RESUME_KEY),
+            serde_json::to_value(&self.dynamic_memory_resume_binding).unwrap_or(Value::Null),
+        );
         let internal_compute_profile_ladder =
             tassadar_internal_compute_profile_ladder_publication();
         metadata.insert(
@@ -1301,6 +1381,8 @@ pub struct TassadarEnvironmentBundle {
     pub compile_pipeline_matrix_binding: TassadarCompilePipelineMatrixBinding,
     /// Checkpointed multi-slice execution binding.
     pub execution_checkpoint_binding: TassadarExecutionCheckpointBinding,
+    /// Dynamic-memory pause-and-resume binding.
+    pub dynamic_memory_resume_binding: TassadarDynamicMemoryResumeBinding,
     /// Optional broad internal-compute portability binding.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub broad_internal_compute_portability_binding:
@@ -1407,20 +1489,50 @@ pub enum TassadarEnvironmentError {
     /// Invalid execution-checkpoint workload family id.
     #[error("Tassadar environment spec includes an empty execution-checkpoint workload family id")]
     InvalidExecutionCheckpointWorkloadFamilyId,
+    /// Missing dynamic-memory resume report ref.
+    #[error("Tassadar environment spec is missing `dynamic_memory_resume_binding.report_ref`")]
+    MissingDynamicMemoryResumeReportRef,
+    /// Missing dynamic-memory resume report id.
+    #[error("Tassadar environment spec is missing `dynamic_memory_resume_binding.report_id`")]
+    MissingDynamicMemoryResumeReportId,
+    /// Missing dynamic-memory resume run-bundle ref.
+    #[error("Tassadar environment spec is missing `dynamic_memory_resume_binding.run_bundle_ref`")]
+    MissingDynamicMemoryResumeRunBundleRef,
+    /// Missing dynamic-memory resume family id.
+    #[error(
+        "Tassadar environment spec is missing `dynamic_memory_resume_binding.checkpoint_family_id`"
+    )]
+    MissingDynamicMemoryResumeFamilyId,
+    /// Missing dynamic-memory resume case ids.
+    #[error("Tassadar environment spec is missing `dynamic_memory_resume_binding.case_ids`")]
+    MissingDynamicMemoryResumeCaseIds,
+    /// Invalid dynamic-memory resume case id.
+    #[error("Tassadar environment spec includes an empty dynamic-memory resume case id")]
+    InvalidDynamicMemoryResumeCaseId,
     /// Missing broad portability report ref.
-    #[error("Tassadar environment spec is missing `broad_internal_compute_portability_binding.report_ref`")]
+    #[error(
+        "Tassadar environment spec is missing `broad_internal_compute_portability_binding.report_ref`"
+    )]
     MissingBroadInternalComputePortabilityReportRef,
     /// Missing broad portability report id.
-    #[error("Tassadar environment spec is missing `broad_internal_compute_portability_binding.report_id`")]
+    #[error(
+        "Tassadar environment spec is missing `broad_internal_compute_portability_binding.report_id`"
+    )]
     MissingBroadInternalComputePortabilityReportId,
     /// Missing broad acceptance-gate ref.
-    #[error("Tassadar environment spec is missing `broad_internal_compute_portability_binding.acceptance_gate_ref`")]
+    #[error(
+        "Tassadar environment spec is missing `broad_internal_compute_portability_binding.acceptance_gate_ref`"
+    )]
     MissingBroadInternalComputeAcceptanceGateRef,
     /// Missing broad acceptance-gate id.
-    #[error("Tassadar environment spec is missing `broad_internal_compute_portability_binding.acceptance_gate_id`")]
+    #[error(
+        "Tassadar environment spec is missing `broad_internal_compute_portability_binding.acceptance_gate_id`"
+    )]
     MissingBroadInternalComputeAcceptanceGateId,
     /// Missing broad internal-compute profile ids.
-    #[error("Tassadar environment spec is missing `broad_internal_compute_portability_binding.profile_ids`")]
+    #[error(
+        "Tassadar environment spec is missing `broad_internal_compute_portability_binding.profile_ids`"
+    )]
     MissingBroadInternalComputeProfileIds,
     /// Invalid broad internal-compute profile id.
     #[error("Tassadar environment spec includes an empty broad internal-compute profile id")]
@@ -1432,7 +1544,9 @@ pub enum TassadarEnvironmentError {
     #[error("Tassadar environment spec is missing `architecture_bakeoff_binding.suite_version`")]
     MissingArchitectureBakeoffSuiteVersion,
     /// Missing architecture-bakeoff workload coverage.
-    #[error("Tassadar environment spec is missing `architecture_bakeoff_binding.workload_family_ids`")]
+    #[error(
+        "Tassadar environment spec is missing `architecture_bakeoff_binding.workload_family_ids`"
+    )]
     MissingArchitectureBakeoffWorkloadFamilies,
     /// Invalid architecture-bakeoff workload family id.
     #[error("Tassadar environment spec includes an empty architecture-bakeoff workload family id")]
@@ -1441,7 +1555,9 @@ pub enum TassadarEnvironmentError {
     #[error("Tassadar environment spec is missing `architecture_bakeoff_binding.report_ref`")]
     MissingArchitectureBakeoffReportRef,
     /// Missing architecture-bakeoff summary report ref.
-    #[error("Tassadar environment spec is missing `architecture_bakeoff_binding.summary_report_ref`")]
+    #[error(
+        "Tassadar environment spec is missing `architecture_bakeoff_binding.summary_report_ref`"
+    )]
     MissingArchitectureBakeoffSummaryReportRef,
     /// Missing Wasm conformance report ref.
     #[error("Tassadar environment spec is missing `wasm_conformance_binding.report_ref`")]
@@ -1724,6 +1840,7 @@ mod tests {
                     String::from("search_frontier_kernel"),
                 ],
             },
+            dynamic_memory_resume_binding: default_tassadar_dynamic_memory_resume_binding(),
             broad_internal_compute_portability_binding: Some(
                 default_tassadar_broad_internal_compute_portability_binding(),
             ),
@@ -1857,6 +1974,15 @@ mod tests {
             bundle
                 .benchmark_package
                 .metadata
+                .get(TASSADAR_METADATA_DYNAMIC_MEMORY_RESUME_KEY)
+                .and_then(|value| value.get("report_ref"))
+                .and_then(Value::as_str),
+            Some("fixtures/tassadar/reports/tassadar_dynamic_memory_resume_report.json")
+        );
+        assert_eq!(
+            bundle
+                .benchmark_package
+                .metadata
                 .get(TASSADAR_METADATA_INTERNAL_COMPUTE_PROFILE_LADDER_KEY)
                 .and_then(|value| value.get("report_ref"))
                 .and_then(Value::as_str),
@@ -1879,7 +2005,9 @@ mod tests {
                 .get(TASSADAR_METADATA_BROAD_INTERNAL_COMPUTE_PORTABILITY_KEY)
                 .and_then(|value| value.get("report_ref"))
                 .and_then(Value::as_str),
-            Some("fixtures/tassadar/reports/tassadar_broad_internal_compute_portability_report.json")
+            Some(
+                "fixtures/tassadar/reports/tassadar_broad_internal_compute_portability_report.json"
+            )
         );
         assert_eq!(
             bundle
@@ -1923,6 +2051,10 @@ mod tests {
         assert_eq!(
             bundle.execution_checkpoint_binding.run_bundle_ref,
             "fixtures/tassadar/runs/tassadar_execution_checkpoint_v1/tassadar_execution_checkpoint_bundle.json"
+        );
+        assert_eq!(
+            bundle.dynamic_memory_resume_binding.run_bundle_ref,
+            "fixtures/tassadar/runs/tassadar_dynamic_memory_resume_v1/tassadar_dynamic_memory_resume_bundle.json"
         );
         assert_eq!(
             bundle

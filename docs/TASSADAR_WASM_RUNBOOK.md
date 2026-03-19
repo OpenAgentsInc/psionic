@@ -27,6 +27,8 @@ This runbook covers the current repo-owned bounded Wasm flow only:
 - Rust-to-Wasm article profile completeness matrix
 - bounded Rust-only article ABI closure
 - checkpointed multi-slice execution receipts
+- memory ABI v2 bulk-memory exactness
+- bounded dynamic-memory pause-and-resume receipts
 - Rust-only article runtime closeout
 - canonical Rust-only Hungarian-10x10 article reproducer
 - canonical C-to-Wasm compile receipt
@@ -369,6 +371,48 @@ Expected outcome:
   the committed direct ABI closure now lives in the separate bounded
   Rust-only article ABI report above
 
+### 5A. Memory ABI v2 bulk-memory exactness
+
+```bash
+cargo run -p psionic-eval --example tassadar_memory_abi_v2_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_memory_abi_v2_report.json`
+
+Expected outcome:
+
+- exact width-parity, sign-extension, `memory.size`, and `memory.grow` rows
+- one explicit `copy_fill_exactness` row now freezes exact `memory.copy` and
+  `memory.fill` behavior on the public byte-addressed lane
+- the report still covers only bounded straight-line linear-memory programs; it
+  does not by itself imply full module closure
+
+### 5B. Dynamic-memory pause-and-resume receipts
+
+```bash
+cargo run -p psionic-eval --example tassadar_dynamic_memory_resume_report
+```
+
+Read:
+
+- `fixtures/tassadar/reports/tassadar_dynamic_memory_resume_report.json`
+- `fixtures/tassadar/runs/tassadar_dynamic_memory_resume_v1/tassadar_dynamic_memory_resume_bundle.json`
+
+Expected outcome:
+
+- one machine-readable report and run root now bind the bounded
+  dynamic-memory pause-and-resume lane
+- exact fresh-versus-resumed parity is explicit for the seeded
+  `copy_fill_pause_after_copy` case
+- persisted checkpoint artifacts now exist as checkpoint JSON plus
+  datastream-manifest pairs under
+  `fixtures/tassadar/runs/tassadar_dynamic_memory_resume_v1`
+- this closes resumed-memory parity only for the committed bounded linear
+  memory lane; it does not imply arbitrary Wasm checkpointing or broad served
+  promotion
+
 ### 6. Wasm-module ingress
 
 ```bash
@@ -384,6 +428,10 @@ Expected outcome:
 - the real committed Wasm binary parses, normalizes, and round-trips, but still
   refuses lowering because the exported function takes one parameter
 - the seeded synthetic multi-function module lowers and executes exactly
+- the widened module-execution lane now also has separate targeted test
+  coverage for one admitted dynamic-memory module with active data segments,
+  `memory.size`, `memory.grow`, `memory.copy`, and `memory.fill`, but that
+  bounded module slice is still not equivalent to arbitrary Wasm
 
 ### 7. Differential Wasm conformance
 

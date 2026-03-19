@@ -10,13 +10,13 @@ use psionic_ir::{
 use psionic_runtime::{
     TassadarCToWasmCompileConfig, TassadarCToWasmCompileReceipt, TassadarCompileRefusal,
     TassadarCompilerToolchainIdentity, TassadarCpuReferenceRunner, TassadarExecutionRefusal,
-    TassadarInstruction, TassadarModuleElementSegment, TassadarModuleExecutionProgram,
-    TassadarModuleFunction, TassadarModuleGlobal, TassadarModuleGlobalMutability,
-    TassadarModuleInstruction, TassadarModuleTable, TassadarModuleTableElementKind,
-    TassadarModuleValueType, TassadarProgram, TassadarProgramArtifact,
-    TassadarProgramArtifactError, TassadarProgramSourceIdentity, TassadarProgramSourceKind,
-    TassadarRustToWasmCompileConfig, TassadarRustToWasmCompileReceipt, TassadarTraceAbi,
-    TassadarWasmProfile, compile_tassadar_c_source_to_wasm_receipt,
+    TassadarInstruction, TassadarModuleDataSegment, TassadarModuleElementSegment,
+    TassadarModuleExecutionProgram, TassadarModuleFunction, TassadarModuleGlobal,
+    TassadarModuleGlobalMutability, TassadarModuleInstruction, TassadarModuleMemory,
+    TassadarModuleTable, TassadarModuleTableElementKind, TassadarModuleValueType, TassadarProgram,
+    TassadarProgramArtifact, TassadarProgramArtifactError, TassadarProgramSourceIdentity,
+    TassadarProgramSourceKind, TassadarRustToWasmCompileConfig, TassadarRustToWasmCompileReceipt,
+    TassadarTraceAbi, TassadarWasmProfile, compile_tassadar_c_source_to_wasm_receipt,
     compile_tassadar_rust_source_to_wasm_receipt, summarize_tassadar_wasm_binary,
     tassadar_trace_abi_for_profile_id,
 };
@@ -1000,9 +1000,12 @@ pub enum TassadarWasmModuleExecutionLoweringError {
     /// The current module-execution lane still refuses imported functions.
     #[error("module-execution lowering still refuses imported function {function_index}")]
     ImportedFunctionUnsupported { function_index: u32 },
-    /// The current module-execution lane still refuses memories and data segments.
-    #[error("module-execution lowering still refuses memories or data segments")]
-    UnsupportedMemorySurface,
+    /// One memory shape is unsupported in the bounded module-execution lane.
+    #[error("module-execution lowering refused memory {memory_index}: {detail}")]
+    UnsupportedMemory { memory_index: u32, detail: String },
+    /// One data-segment shape is unsupported in the bounded module-execution lane.
+    #[error("module-execution lowering refused data segment {data_index}: {detail}")]
+    UnsupportedDataSegment { data_index: u32, detail: String },
     /// One function declared unsupported parameters.
     #[error(
         "module-execution lowering requires zero-parameter functions, but function {function_index} declared {param_count}"
@@ -1054,9 +1057,6 @@ pub fn compile_tassadar_normalized_wasm_module_export_to_module_execution_progra
     export_name: &str,
 ) -> Result<TassadarModuleExecutionProgram, TassadarWasmModuleExecutionLoweringError> {
     normalized_module.validate_internal_consistency()?;
-    if !normalized_module.memories.is_empty() || !normalized_module.data_segments.is_empty() {
-        return Err(TassadarWasmModuleExecutionLoweringError::UnsupportedMemorySurface);
-    }
     let (export, _) = normalized_module
         .exported_function_by_name(export_name)
         .ok_or_else(
@@ -1145,6 +1145,70 @@ pub fn compile_tassadar_normalized_wasm_module_export_to_module_execution_progra
         })
         .collect::<Result<Vec<_>, _>>()?;
 
+    let lowered_memories = normalized_module
+        .memories
+        .iter()
+        .map(|memory| {
+            if normalized_module.memories.len() > 1 {
+                return Err(TassadarWasmModuleExecutionLoweringError::UnsupportedMemory {
+                    memory_index: memory.memory_index,
+                    detail: format!(
+                        "module declares {} memories, but the bounded module lane admits one memory at most",
+                        normalized_module.memories.len()
+                    ),
+                });
+            }
+            if memory.imported_memory() {
+                return Err(TassadarWasmModuleExecutionLoweringError::UnsupportedMemory {
+                    memory_index: memory.memory_index,
+                    detail: String::from("imported memories remain out of scope"),
+                });
+            }
+            if memory.memory_type.memory64 {
+                return Err(TassadarWasmModuleExecutionLoweringError::UnsupportedMemory {
+                    memory_index: memory.memory_index,
+                    detail: String::from("memory64 remains out of scope"),
+                });
+            }
+            if memory.memory_type.shared {
+                return Err(TassadarWasmModuleExecutionLoweringError::UnsupportedMemory {
+                    memory_index: memory.memory_index,
+                    detail: String::from("shared memories remain out of scope"),
+                });
+            }
+            if memory.memory_type.page_size_log2.is_some() {
+                return Err(TassadarWasmModuleExecutionLoweringError::UnsupportedMemory {
+                    memory_index: memory.memory_index,
+                    detail: String::from("custom page sizes remain out of scope"),
+                });
+            }
+            let initial_pages = u32::try_from(memory.memory_type.minimum_pages).map_err(|_| {
+                TassadarWasmModuleExecutionLoweringError::UnsupportedMemory {
+                    memory_index: memory.memory_index,
+                    detail: format!(
+                        "minimum_pages {} exceeded u32",
+                        memory.memory_type.minimum_pages
+                    ),
+                }
+            })?;
+            let max_pages = u32::try_from(
+                memory
+                    .memory_type
+                    .maximum_pages
+                    .unwrap_or(memory.memory_type.minimum_pages),
+            )
+            .map_err(|_| TassadarWasmModuleExecutionLoweringError::UnsupportedMemory {
+                memory_index: memory.memory_index,
+                detail: String::from("maximum_pages exceeded u32"),
+            })?;
+            Ok(TassadarModuleMemory {
+                memory_index: memory.memory_index,
+                initial_pages,
+                max_pages,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
     let lowered_functions = normalized_module
         .functions
         .iter()
@@ -1183,6 +1247,56 @@ pub fn compile_tassadar_normalized_wasm_module_export_to_module_execution_progra
         })
         .collect::<Result<Vec<_>, _>>()?;
 
+    let lowered_data_segments = normalized_module
+        .data_segments
+        .iter()
+        .map(|segment| {
+            let (memory_index, offset) = match &segment.mode {
+                TassadarNormalizedWasmDataMode::Passive => {
+                    return Err(
+                        TassadarWasmModuleExecutionLoweringError::UnsupportedDataSegment {
+                            data_index: segment.data_index,
+                            detail: String::from("passive data segments remain out of scope"),
+                        },
+                    );
+                }
+                TassadarNormalizedWasmDataMode::Active {
+                    memory_index,
+                    offset_expr,
+                } => {
+                    let offset = match offset_expr {
+                        TassadarNormalizedWasmConstExpr::I32Const { value } if *value >= 0 => {
+                            *value as u32
+                        }
+                        TassadarNormalizedWasmConstExpr::I32Const { value } => {
+                            return Err(
+                                TassadarWasmModuleExecutionLoweringError::UnsupportedDataSegment {
+                                    data_index: segment.data_index,
+                                    detail: format!("negative offset {value}"),
+                                },
+                            );
+                        }
+                        TassadarNormalizedWasmConstExpr::GlobalGet { global_index } => {
+                            return Err(
+                                TassadarWasmModuleExecutionLoweringError::UnsupportedDataSegment {
+                                    data_index: segment.data_index,
+                                    detail: format!("global.get offset {global_index}"),
+                                },
+                            );
+                        }
+                    };
+                    (*memory_index, offset)
+                }
+            };
+            Ok(TassadarModuleDataSegment {
+                data_segment_index: segment.data_index,
+                memory_index,
+                offset,
+                bytes: segment.bytes.clone(),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
     let mut program = TassadarModuleExecutionProgram::new(
         format!(
             "tassadar.wasm_module_execution.{}.{}.program.v1",
@@ -1196,7 +1310,11 @@ pub fn compile_tassadar_normalized_wasm_module_export_to_module_execution_progra
         Vec::new(),
         lowered_functions,
     )
+    .with_memories(lowered_memories)
     .with_element_segments(lowered_element_segments);
+    if !lowered_data_segments.is_empty() {
+        program = program.with_data_segments(lowered_data_segments);
+    }
     if let Some(start_function_index) = normalized_module.start_function_index {
         program = program.with_start_function_index(start_function_index);
     }
@@ -1300,6 +1418,62 @@ fn lower_module_execution_function(
                     op: psionic_runtime::TassadarStructuredControlBinaryOp::LtS,
                 });
             }
+            TassadarNormalizedWasmInstruction::I32Load {
+                memory_index,
+                offset,
+                ..
+            } => {
+                let offset = u32::try_from(*offset).map_err(|_| {
+                    TassadarWasmModuleExecutionLoweringError::UnsupportedInstruction {
+                        function_index: function.function_index,
+                        opcode: String::from("i32.load"),
+                    }
+                })?;
+                instructions.push(TassadarModuleInstruction::I32Load {
+                    memory_index: *memory_index,
+                    offset,
+                });
+            }
+            TassadarNormalizedWasmInstruction::I32Store {
+                memory_index,
+                offset,
+                ..
+            } => {
+                let offset = u32::try_from(*offset).map_err(|_| {
+                    TassadarWasmModuleExecutionLoweringError::UnsupportedInstruction {
+                        function_index: function.function_index,
+                        opcode: String::from("i32.store"),
+                    }
+                })?;
+                instructions.push(TassadarModuleInstruction::I32Store {
+                    memory_index: *memory_index,
+                    offset,
+                });
+            }
+            TassadarNormalizedWasmInstruction::MemorySize { memory_index } => {
+                instructions.push(TassadarModuleInstruction::MemorySize {
+                    memory_index: *memory_index,
+                });
+            }
+            TassadarNormalizedWasmInstruction::MemoryGrow { memory_index } => {
+                instructions.push(TassadarModuleInstruction::MemoryGrow {
+                    memory_index: *memory_index,
+                });
+            }
+            TassadarNormalizedWasmInstruction::MemoryCopy {
+                dst_memory_index,
+                src_memory_index,
+            } => {
+                instructions.push(TassadarModuleInstruction::MemoryCopy {
+                    dst_memory_index: *dst_memory_index,
+                    src_memory_index: *src_memory_index,
+                });
+            }
+            TassadarNormalizedWasmInstruction::MemoryFill { memory_index } => {
+                instructions.push(TassadarModuleInstruction::MemoryFill {
+                    memory_index: *memory_index,
+                });
+            }
             TassadarNormalizedWasmInstruction::Call { function_index } => {
                 instructions.push(TassadarModuleInstruction::Call {
                     function_index: *function_index,
@@ -1327,6 +1501,9 @@ fn lower_module_execution_function(
                 instructions.push(TassadarModuleInstruction::CallIndirect {
                     table_index: *table_index,
                 });
+            }
+            TassadarNormalizedWasmInstruction::Drop => {
+                instructions.push(TassadarModuleInstruction::Drop);
             }
             TassadarNormalizedWasmInstruction::Return => {
                 instructions.push(TassadarModuleInstruction::Return);
@@ -1476,7 +1653,11 @@ fn lower_function_export(
             }
             TassadarNormalizedWasmInstruction::GlobalGet { .. }
             | TassadarNormalizedWasmInstruction::GlobalSet { .. }
-            | TassadarNormalizedWasmInstruction::CallIndirect { .. } => {
+            | TassadarNormalizedWasmInstruction::CallIndirect { .. }
+            | TassadarNormalizedWasmInstruction::MemorySize { .. }
+            | TassadarNormalizedWasmInstruction::MemoryGrow { .. }
+            | TassadarNormalizedWasmInstruction::MemoryCopy { .. }
+            | TassadarNormalizedWasmInstruction::MemoryFill { .. } => {
                 return Err(
                     TassadarWasmModuleArtifactBundleError::UnsupportedInstruction {
                         export_name: export_name.to_string(),
@@ -2006,8 +2187,9 @@ mod tests {
     use std::path::PathBuf;
 
     use psionic_ir::{
-        encode_tassadar_normalized_wasm_module, tassadar_seeded_instantiation_module,
-        tassadar_seeded_multi_function_module,
+        TassadarNormalizedWasmMemory, TassadarNormalizedWasmMemoryType,
+        encode_tassadar_normalized_wasm_module, tassadar_seeded_dynamic_memory_module,
+        tassadar_seeded_instantiation_module, tassadar_seeded_multi_function_module,
     };
     use psionic_runtime::{
         TassadarCToWasmCompileConfig, TassadarCompileRefusal, TassadarCpuReferenceRunner,
@@ -2119,17 +2301,43 @@ mod tests {
     }
 
     #[test]
-    fn wasm_module_execution_lowering_refuses_memory_surface() {
-        let module = tassadar_seeded_multi_function_module().expect("seeded module should build");
-        let error = compile_tassadar_normalized_wasm_module_export_to_module_execution_program(
-            "seeded://tassadar/wasm/multi_function_v1",
+    fn wasm_module_execution_lowering_runs_dynamic_memory_exactly() {
+        let module = tassadar_seeded_dynamic_memory_module().expect("seeded module should build");
+        let program = compile_tassadar_normalized_wasm_module_export_to_module_execution_program(
+            "seeded://tassadar/wasm/dynamic_memory_v1",
             &module,
-            "pair_sum",
+            "entry",
         )
-        .expect_err("memory-bearing module should stay outside module-execution lowering");
+        .expect("dynamic-memory module should lower");
+        let execution =
+            execute_tassadar_module_execution_program(&program).expect("lowered program executes");
+        assert_eq!(execution.returned_value, Some(185_207_052));
+        assert_eq!(execution.final_memory_pages, vec![2]);
+    }
+
+    #[test]
+    fn wasm_module_execution_lowering_refuses_multi_memory_shape() {
+        let mut module =
+            tassadar_seeded_dynamic_memory_module().expect("seeded module should build");
+        module.memories.push(TassadarNormalizedWasmMemory::defined(
+            1,
+            TassadarNormalizedWasmMemoryType {
+                minimum_pages: 1,
+                maximum_pages: Some(1),
+                shared: false,
+                memory64: false,
+                page_size_log2: None,
+            },
+        ));
+        let error = compile_tassadar_normalized_wasm_module_export_to_module_execution_program(
+            "seeded://tassadar/wasm/multi_memory_v1",
+            &module,
+            "entry",
+        )
+        .expect_err("multi-memory module should refuse");
         assert!(matches!(
             error,
-            TassadarWasmModuleExecutionLoweringError::UnsupportedMemorySurface
+            TassadarWasmModuleExecutionLoweringError::UnsupportedMemory { .. }
         ));
     }
 

@@ -32,14 +32,14 @@ mod tassadar_article_abi;
 mod tassadar_article_cpu_reproducibility;
 #[path = "tassadar_article_runtime_closeout.rs"]
 mod tassadar_article_runtime_closeout;
+#[path = "tassadar_benchmark_package_set.rs"]
+mod tassadar_benchmark_package_set;
 #[path = "tassadar_broad_internal_compute_acceptance_gate.rs"]
 mod tassadar_broad_internal_compute_acceptance_gate;
 #[path = "tassadar_broad_internal_compute_portability.rs"]
 mod tassadar_broad_internal_compute_portability;
 #[path = "tassadar_broad_internal_compute_profile_publication.rs"]
 mod tassadar_broad_internal_compute_profile_publication;
-#[path = "tassadar_benchmark_package_set.rs"]
-mod tassadar_benchmark_package_set;
 #[path = "tassadar_call_frames.rs"]
 mod tassadar_call_frames;
 #[path = "tassadar_clrs_wasm_bridge.rs"]
@@ -60,12 +60,14 @@ mod tassadar_cost_per_correct_job;
 mod tassadar_counterfactual_route_quality;
 #[path = "tassadar_decompilation_fidelity.rs"]
 mod tassadar_decompilation_fidelity;
+#[path = "tassadar_dynamic_memory_resume.rs"]
+mod tassadar_dynamic_memory_resume;
+#[path = "tassadar_effect_taxonomy.rs"]
+mod tassadar_effect_taxonomy;
 #[path = "tassadar_efficient_attention_baseline_matrix.rs"]
 mod tassadar_efficient_attention_baseline_matrix;
 #[path = "tassadar_error_regime_catalog.rs"]
 mod tassadar_error_regime_catalog;
-#[path = "tassadar_effect_taxonomy.rs"]
-mod tassadar_effect_taxonomy;
 #[path = "tassadar_exactness_refusal_report.rs"]
 mod tassadar_exactness_refusal_report;
 #[path = "tassadar_execution_checkpoint.rs"]
@@ -98,12 +100,12 @@ mod tassadar_kernel_module_scaling;
 mod tassadar_latency_evidence_tradeoff;
 #[path = "tassadar_learnability_gap.rs"]
 mod tassadar_learnability_gap;
+#[path = "tassadar_linked_program_bundle.rs"]
+mod tassadar_linked_program_bundle;
 #[path = "tassadar_locality_envelope.rs"]
 mod tassadar_locality_envelope;
 #[path = "tassadar_locality_scratchpad.rs"]
 mod tassadar_locality_scratchpad;
-#[path = "tassadar_linked_program_bundle.rs"]
-mod tassadar_linked_program_bundle;
 #[path = "tassadar_memory_abi_v2.rs"]
 mod tassadar_memory_abi_v2;
 #[path = "tassadar_mixed_trajectory.rs"]
@@ -201,10 +203,10 @@ pub use tassadar_architecture_bakeoff::*;
 pub use tassadar_article_abi::*;
 pub use tassadar_article_cpu_reproducibility::*;
 pub use tassadar_article_runtime_closeout::*;
+pub use tassadar_benchmark_package_set::*;
 pub use tassadar_broad_internal_compute_acceptance_gate::*;
 pub use tassadar_broad_internal_compute_portability::*;
 pub use tassadar_broad_internal_compute_profile_publication::*;
-pub use tassadar_benchmark_package_set::*;
 pub use tassadar_call_frames::*;
 pub use tassadar_clrs_wasm_bridge::*;
 pub use tassadar_compile_pipeline_matrix::*;
@@ -215,12 +217,12 @@ pub use tassadar_conditional_masking_report::*;
 pub use tassadar_cost_per_correct_job::*;
 pub use tassadar_counterfactual_route_quality::*;
 pub use tassadar_decompilation_fidelity::*;
+pub use tassadar_dynamic_memory_resume::*;
+pub use tassadar_effect_taxonomy::*;
 pub use tassadar_efficient_attention_baseline_matrix::*;
 pub use tassadar_error_regime_catalog::*;
-pub use tassadar_effect_taxonomy::*;
 pub use tassadar_exactness_refusal_report::*;
 pub use tassadar_execution_checkpoint::*;
-pub use tassadar_linked_program_bundle::*;
 pub use tassadar_executor_architecture_comparison::*;
 pub use tassadar_executor_baseline_comparison::*;
 pub use tassadar_executor_benchmark::*;
@@ -235,6 +237,7 @@ pub use tassadar_internal_external_delegation::*;
 pub use tassadar_kernel_module_scaling::*;
 pub use tassadar_latency_evidence_tradeoff::*;
 pub use tassadar_learnability_gap::*;
+pub use tassadar_linked_program_bundle::*;
 pub use tassadar_locality_envelope::*;
 pub use tassadar_locality_scratchpad::*;
 pub use tassadar_memory_abi_v2::*;

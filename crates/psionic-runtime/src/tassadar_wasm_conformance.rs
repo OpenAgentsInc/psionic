@@ -217,13 +217,19 @@ impl TassadarModuleExecutionError {
             Self::GlobalIndexDrift { .. } => "global_index_drift",
             Self::TableIndexDrift { .. } => "table_index_drift",
             Self::ImportIndexDrift { .. } => "import_index_drift",
+            Self::UnsupportedMemoryCount { .. } => "unsupported_memory_count",
+            Self::MemoryIndexDrift { .. } => "memory_index_drift",
             Self::ElementSegmentIndexDrift { .. } => "element_segment_index_drift",
+            Self::DataSegmentIndexDrift { .. } => "data_segment_index_drift",
             Self::UnsupportedParamCount { .. } => "unsupported_param_count",
             Self::UnsupportedResultCount { .. } => "unsupported_result_count",
             Self::LocalCountTooSmall { .. } => "local_count_too_small",
             Self::LocalOutOfRange { .. } => "local_out_of_range",
             Self::UnsupportedGlobalValueType { .. } => "unsupported_global_value_type",
             Self::GlobalOutOfRange { .. } => "global_out_of_range",
+            Self::MaxPagesBeforeInitial { .. } => "max_pages_before_initial",
+            Self::MemoryPageLimitExceeded { .. } => "memory_page_limit_exceeded",
+            Self::MemoryOutOfRange { .. } => "memory_out_of_range",
             Self::MissingStartFunction { .. } => "missing_start_function",
             Self::UnsupportedStartFunctionSignature { .. } => {
                 "unsupported_start_function_signature"
@@ -238,15 +244,22 @@ impl TassadarModuleExecutionError {
             Self::ElementSegmentFunctionOutOfRange { .. } => {
                 "element_segment_function_out_of_range"
             }
+            Self::DataSegmentMemoryOutOfRange { .. } => "data_segment_memory_out_of_range",
+            Self::DataSegmentOutOfRange { .. } => "data_segment_out_of_range",
             Self::DirectCallFunctionOutOfRange { .. } => "direct_call_function_out_of_range",
             Self::TableSelectorOutOfRange { .. } => "table_selector_out_of_range",
             Self::EmptyTableEntry { .. } => "empty_table_entry",
+            Self::MemoryCopyMemoryOutOfRange { .. } => "memory_copy_memory_out_of_range",
             Self::ImportOutOfRange { .. } => "import_out_of_range",
             Self::MissingImportRef { .. } => "missing_import_ref",
             Self::UnsupportedHostImport { .. } => "unsupported_host_import",
             Self::StackUnderflow { .. } => "stack_underflow",
+            Self::MemoryAddressOutOfRange { .. } => "memory_address_out_of_range",
+            Self::MemoryCopyOutOfRange { .. } => "memory_copy_out_of_range",
+            Self::MemoryFillOutOfRange { .. } => "memory_fill_out_of_range",
             Self::StepLimitExceeded { .. } => "step_limit_exceeded",
             Self::CallDepthExceeded { .. } => "call_depth_exceeded",
+            Self::ByteLengthOverflow => "byte_length_overflow",
         }
     }
 }
@@ -561,6 +574,22 @@ fn translate_tassadar_module_execution_program_to_wat(
         ));
     }
 
+    for memory in &program.memories {
+        lines.push(format!(
+            "  (memory $mem{} {} {})",
+            memory.memory_index, memory.initial_pages, memory.max_pages
+        ));
+    }
+
+    for data_segment in &program.data_segments {
+        lines.push(format!(
+            "  (data (memory $mem{}) (i32.const {}) \"{}\")",
+            data_segment.memory_index,
+            data_segment.offset,
+            render_wat_bytes(data_segment.bytes.as_slice())
+        ));
+    }
+
     for table in &program.tables {
         let instantiated_elements = instantiated_table_elements(program, table)?;
         for element in &instantiated_elements {
@@ -676,7 +705,38 @@ fn render_instruction(
         TassadarModuleInstruction::GlobalSet { global_index } => {
             Ok(format!("global.set $g{global_index}"))
         }
+        TassadarModuleInstruction::Drop => Ok(String::from("drop")),
         TassadarModuleInstruction::BinaryOp { op } => Ok(render_binary_op(*op).to_string()),
+        TassadarModuleInstruction::I32Load {
+            memory_index,
+            offset,
+        } => Ok(format!(
+            "i32.load offset={} memory $mem{}",
+            offset, memory_index
+        )),
+        TassadarModuleInstruction::I32Store {
+            memory_index,
+            offset,
+        } => Ok(format!(
+            "i32.store offset={} memory $mem{}",
+            offset, memory_index
+        )),
+        TassadarModuleInstruction::MemorySize { memory_index } => {
+            Ok(format!("memory.size $mem{memory_index}"))
+        }
+        TassadarModuleInstruction::MemoryGrow { memory_index } => {
+            Ok(format!("memory.grow $mem{memory_index}"))
+        }
+        TassadarModuleInstruction::MemoryCopy {
+            dst_memory_index,
+            src_memory_index,
+        } => Ok(format!(
+            "memory.copy $mem{} $mem{}",
+            dst_memory_index, src_memory_index
+        )),
+        TassadarModuleInstruction::MemoryFill { memory_index } => {
+            Ok(format!("memory.fill $mem{memory_index}"))
+        }
         TassadarModuleInstruction::Call { function_index } => {
             Ok(format!("call $f{function_index}"))
         }
@@ -694,6 +754,13 @@ fn render_instruction(
         }
         TassadarModuleInstruction::Return => Ok(String::from("return")),
     }
+}
+
+fn render_wat_bytes(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .map(|byte| format!("\\{:02x}", byte))
+        .collect::<String>()
 }
 
 fn table_result_count(

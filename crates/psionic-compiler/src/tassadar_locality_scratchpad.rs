@@ -338,6 +338,18 @@ fn module_trace_event_tokens(event: &TassadarModuleTraceEvent) -> Vec<String> {
             table_index.to_string(),
             offset.to_string(),
         ],
+        TassadarModuleTraceEvent::DataSegmentApplied {
+            data_segment_index,
+            memory_index,
+            offset,
+            byte_len,
+        } => vec![
+            String::from("data_segment_applied"),
+            data_segment_index.to_string(),
+            memory_index.to_string(),
+            offset.to_string(),
+            byte_len.to_string(),
+        ],
         TassadarModuleTraceEvent::ConstPush { value } => {
             vec![String::from("const_push"), value.to_string()]
         }
@@ -375,6 +387,9 @@ fn module_trace_event_tokens(event: &TassadarModuleTraceEvent) -> Vec<String> {
                 value.to_string(),
             ]
         }
+        TassadarModuleTraceEvent::Drop { value } => {
+            vec![String::from("drop"), value.to_string()]
+        }
         TassadarModuleTraceEvent::BinaryOp {
             op,
             left,
@@ -386,6 +401,78 @@ fn module_trace_event_tokens(event: &TassadarModuleTraceEvent) -> Vec<String> {
             left.to_string(),
             right.to_string(),
             result.to_string(),
+        ],
+        TassadarModuleTraceEvent::Load {
+            memory_index,
+            address,
+            offset,
+            value,
+            ..
+        } => vec![
+            String::from("load"),
+            memory_index.to_string(),
+            address.to_string(),
+            offset.to_string(),
+            value.to_string(),
+        ],
+        TassadarModuleTraceEvent::Store {
+            memory_index,
+            address,
+            offset,
+            value,
+            ..
+        } => vec![
+            String::from("store"),
+            memory_index.to_string(),
+            address.to_string(),
+            offset.to_string(),
+            value.to_string(),
+        ],
+        TassadarModuleTraceEvent::MemorySize {
+            memory_index,
+            pages,
+        } => vec![
+            String::from("memory_size"),
+            memory_index.to_string(),
+            pages.to_string(),
+        ],
+        TassadarModuleTraceEvent::MemoryGrow {
+            memory_index,
+            requested_pages,
+            previous_pages,
+            result,
+        } => vec![
+            String::from("memory_grow"),
+            memory_index.to_string(),
+            requested_pages.to_string(),
+            previous_pages.to_string(),
+            result.to_string(),
+        ],
+        TassadarModuleTraceEvent::MemoryCopy {
+            dst_memory_index,
+            src_memory_index,
+            dst_address,
+            src_address,
+            byte_len,
+        } => vec![
+            String::from("memory_copy"),
+            dst_memory_index.to_string(),
+            src_memory_index.to_string(),
+            dst_address.to_string(),
+            src_address.to_string(),
+            byte_len.to_string(),
+        ],
+        TassadarModuleTraceEvent::MemoryFill {
+            memory_index,
+            address,
+            value,
+            byte_len,
+        } => vec![
+            String::from("memory_fill"),
+            memory_index.to_string(),
+            address.to_string(),
+            value.to_string(),
+            byte_len.to_string(),
         ],
         TassadarModuleTraceEvent::Call { function_index } => {
             vec![String::from("call"), function_index.to_string()]
