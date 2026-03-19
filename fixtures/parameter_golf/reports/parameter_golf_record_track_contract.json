@@ -12,10 +12,10 @@
   "baseline_entrypoint_artifact_digest": "988e72c33e71b6e5111b1f79b0cb2af048dfb8fb323b1dc1e9f785d3d8f2f6d1",
   "baseline_model_artifact_digest": "efe272503950104f1557f5c73cad69ce717e60d9b75f05e48d17ffbeb6940af1",
   "baseline_accounting_receipt_digest": "275494441ebe609b39960972d02e8b0f3fcdc192b8644f440f4671d5c29f32c3",
-  "baseline_submission_run_evidence_report_digest": "10a3c40056cb5d717ee8b071c16dc50a76106fab5a9268b0cdc60da23e0e1623",
+  "baseline_submission_run_evidence_report_digest": "c97cde427ceacb895ce980efed4e98d7e8f243318a99e1152e93436bf4b24bdc",
   "baseline_record_folder_replay_verification_report_digest": "66dc80376e4c447a8dc74b9eeacfd6aaecb9b49ab0515e157370b7801e9e37fd",
-  "baseline_final_pr_bundle_report_digest": "5ee549d43446c93d28a4829849c63ba319f07514633a86055d8c0b0aa1c871bf",
-  "baseline_local_clone_dry_run_report_digest": "818beee482f7bb8d7f574a34db06f0b4ad402933ba251242220e30fe4c6d5df4",
+  "baseline_final_pr_bundle_report_digest": "0db41543deec0071a164833923f6509f22291b03e4f95c6c32ebc44be89321d0",
+  "baseline_local_clone_dry_run_report_digest": "f188a36bc378a90f7fdfaf01b7290dc2b9b0738c65c7774bdc8fef0e83fd586f",
   "required_counted_component_ids": [
     "entrypoint_code_bytes",
     "compressed_model_bytes",
@@ -123,5 +123,5 @@
     }
   ],
   "claim_boundary": "record-track contract is now explicit, and the folder-local runtime entrypoint exists, but the current lane remains blocked on defended counted-runtime or build-dependency posture and reproducible 8xH100 challenge-speed execution",
-  "report_digest": "6aa98c8780f71977590974e9a44d8a8e210fc7342cba77802c94065759d28726"
+  "report_digest": "06e1e59db0c2a6c8bd6cb014fdf975cd203eed37e562cd1abe673f85f335b5e4"
 }

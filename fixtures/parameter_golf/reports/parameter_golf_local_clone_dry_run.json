@@ -6,7 +6,7 @@
   "record_folder_relpath": "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2",
   "clone_status_before": "## main...origin/main\n",
   "clone_status_after": "## main...origin/main\n",
-  "final_pr_bundle_report_digest": "5ee549d43446c93d28a4829849c63ba319f07514633a86055d8c0b0aa1c871bf",
+  "final_pr_bundle_report_digest": "0db41543deec0071a164833923f6509f22291b03e4f95c6c32ebc44be89321d0",
   "compatibility_verification": {
     "runner": "scripts/check-parameter-golf-record-folder-compatibility.sh",
     "compatibility_report_digest": "5e1c61255ec8d1595cf0cca15728f4f8377e28e946813957c66a7d5d83d4dfc3",
@@ -130,5 +130,5 @@
   },
   "verdict": "clean_pass",
   "claim_boundary": "This dry run proves that the current generated folder can be staged into a live local parameter-golf clone, reverified there, and cleaned back out without drift. It does not by itself upgrade the bounded non-record lane into record-track readiness.",
-  "report_digest": "818beee482f7bb8d7f574a34db06f0b4ad402933ba251242220e30fe4c6d5df4"
+  "report_digest": "f188a36bc378a90f7fdfaf01b7290dc2b9b0738c65c7774bdc8fef0e83fd586f"
 }

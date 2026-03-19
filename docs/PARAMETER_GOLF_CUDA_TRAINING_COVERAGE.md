@@ -63,6 +63,20 @@ the baseline mixed-precision lane:
 That narrows the BF16 blocker from "no public BF16 runtime primitive" to the
 remaining BF16 train-graph and optimizer surface.
 
+`psionic-train` now also owns one bounded public CUDA Muon step over the same
+matrix-shaped parameter groups used by the baseline optimizer split:
+
+- exact momentum and scale-correction semantics stay shared with the CPU
+  reference step
+- the Newton-Schulz BF16 matmul family now runs through the public CUDA dense
+  surface
+- transpose, norm, and scalar orchestration stay explicit in Rust instead of
+  being hidden behind a fake fused-kernel claim
+
+That retires the explicit "no public CUDA Muon path" blocker while preserving
+the boundary that the current step is still host-orchestrated around CUDA
+matmuls.
+
 That means the remaining CUDA train-path blockers are now machine-readable on
 the same benchmark seam that already carries topology, communication,
 wallclock, and memory facts.
@@ -82,7 +96,6 @@ The current canonical blocker set is:
 
 - `cuda_bf16_train_graph_and_optimizer_surface`
 - `cuda_rope_gqa_decoder_block_reverse_mode`
-- `cuda_muon_optimizer_path`
 
 ## Current Honest Boundary
 
@@ -95,11 +108,11 @@ Today it keeps these truths separate:
     execution is real on the public CUDA path
   - one bounded full-shape residual-mix train graph is real on the public CUDA
     path
+  - one bounded host-orchestrated CUDA Muon step is real on the public lane
   - post-train quantized export or roundtrip support is real
 - `partial`
-  - BF16 policy plus one bounded BF16 runtime primitive seam, bounded RoPE/GQA
-    forward closure, and Muon semantics all have explicit substrate or refusal
-    contracts
+  - BF16 policy plus one bounded BF16 runtime primitive seam and bounded
+    RoPE/GQA forward closure now have explicit substrate or refusal contracts
   - the public CUDA execution backend now genuinely owns dense `f32`
     pointwise `mul`, bounded dense contiguous `f32` RMSNorm forward and
     backward execution, one bounded residual-mix graph, one bounded
@@ -128,7 +141,8 @@ Without this report, the repo could say all of these misleading things:
 - one bounded RMSNorm closure means the whole decoder block now trains on CUDA
 - one bounded full-shape residual-mix graph means generic broadcast or fused
   decoder closure now exists
-- a CPU-reference Muon implementation means the CUDA optimizer surface is done
+- one bounded host-orchestrated CUDA Muon step means fused or fully
+  device-resident optimizer closure is done
 - artifact quantization means train-time low-precision closure is done
 
 The new report prevents that. It turns the remaining CUDA blockers into one

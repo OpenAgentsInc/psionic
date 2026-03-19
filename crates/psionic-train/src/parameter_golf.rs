@@ -1,4 +1,5 @@
 use half::bf16;
+use psionic_backend_cuda::{CudaBackend, CudaCommandStatus, CudaCommandWait};
 use psionic_models::ParameterGolfModelDescriptor;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -226,6 +227,12 @@ pub enum ParameterGolfTrainError {
         /// Invalid tensor shape.
         shape: Vec<usize>,
     },
+    /// The bounded public CUDA Muon runtime failed.
+    #[error("parameter golf CUDA Muon runtime failed: {message}")]
+    MuonCudaRuntime {
+        /// Stable runtime failure detail.
+        message: String,
+    },
 }
 
 /// Builds the current public optimizer split for one Parameter Golf descriptor.
@@ -426,6 +433,57 @@ pub fn apply_parameter_golf_muon_step(
     optimizer: &ParameterGolfMuonConfig,
     optimizer_state: &mut ParameterGolfMuonState,
 ) -> Result<ParameterGolfMuonStepReceipt, ParameterGolfTrainError> {
+    apply_parameter_golf_muon_step_with_orthogonalizer(
+        parameter_values,
+        parameter_shape,
+        gradient_values,
+        optimizer,
+        optimizer_state,
+        zeropower_via_newtonschulz5,
+    )
+}
+
+/// Applies one bounded public CUDA Muon step by offloading the Newton-Schulz
+/// BF16 matmul family to the CUDA dense surface while keeping transpose, norm,
+/// and scalar orchestration explicit in Rust.
+pub fn apply_parameter_golf_cuda_muon_step(
+    parameter_values: &mut [f32],
+    parameter_shape: &[usize],
+    gradient_values: &[f32],
+    optimizer: &ParameterGolfMuonConfig,
+    optimizer_state: &mut ParameterGolfMuonState,
+) -> Result<ParameterGolfMuonStepReceipt, ParameterGolfTrainError> {
+    let mut backend = CudaBackend::new();
+    apply_parameter_golf_muon_step_with_orthogonalizer(
+        parameter_values,
+        parameter_shape,
+        gradient_values,
+        optimizer,
+        optimizer_state,
+        |effective_gradient, rows, cols, steps, epsilon| {
+            zeropower_via_newtonschulz5_cuda(
+                effective_gradient,
+                rows,
+                cols,
+                steps,
+                epsilon,
+                &mut backend,
+            )
+        },
+    )
+}
+
+fn apply_parameter_golf_muon_step_with_orthogonalizer<F>(
+    parameter_values: &mut [f32],
+    parameter_shape: &[usize],
+    gradient_values: &[f32],
+    optimizer: &ParameterGolfMuonConfig,
+    optimizer_state: &mut ParameterGolfMuonState,
+    orthogonalize: F,
+) -> Result<ParameterGolfMuonStepReceipt, ParameterGolfTrainError>
+where
+    F: FnOnce(&[f32], usize, usize, usize, f32) -> Result<Vec<f32>, ParameterGolfTrainError>,
+{
     if parameter_shape.len() != 2 {
         return Err(ParameterGolfTrainError::MuonRequiresMatrix {
             shape: parameter_shape.to_vec(),
@@ -452,7 +510,7 @@ pub fn apply_parameter_golf_muon_step(
         effective_gradient[index] =
             gradient_values[index] + (optimizer.momentum * optimizer_state.momentum_buffer[index]);
     }
-    let orthogonalized_update = zeropower_via_newtonschulz5(
+    let orthogonalized_update = orthogonalize(
         effective_gradient.as_slice(),
         rows,
         cols,
@@ -478,6 +536,79 @@ pub fn apply_parameter_golf_muon_step(
         scale_correction,
         orthogonalized_update,
         update_values,
+    })
+}
+
+fn zeropower_via_newtonschulz5_cuda(
+    values: &[f32],
+    rows: usize,
+    cols: usize,
+    steps: usize,
+    epsilon: f32,
+    backend: &mut CudaBackend,
+) -> Result<Vec<f32>, ParameterGolfTrainError> {
+    if rows == 0 || cols == 0 {
+        return Err(ParameterGolfTrainError::MuonRequiresMatrix {
+            shape: vec![rows, cols],
+        });
+    }
+    let mut x = values.iter().map(|value| round_bf16(*value)).collect::<Vec<_>>();
+    let norm = round_bf16(norm_l2(x.as_slice()));
+    let denom = round_bf16(norm + epsilon);
+    for value in &mut x {
+        *value = round_bf16(*value / denom);
+    }
+    let transposed = rows > cols;
+    let (mut x, work_rows, work_cols) = if transposed {
+        (transpose(x.as_slice(), rows, cols), cols, rows)
+    } else {
+        (x, rows, cols)
+    };
+    let (a, b, c) = (3.4445_f32, -4.7750_f32, 2.0315_f32);
+    for _ in 0..steps {
+        let x_t = transpose(x.as_slice(), work_rows, work_cols);
+        let a_matrix = matmul_bf16_cuda(
+            backend,
+            x.as_slice(),
+            x_t.as_slice(),
+            work_rows,
+            work_cols,
+            work_rows,
+        )?;
+        let c_times_a = a_matrix
+            .iter()
+            .map(|value| round_bf16(c * value))
+            .collect::<Vec<_>>();
+        let c_a_matmul_a = matmul_bf16_cuda(
+            backend,
+            c_times_a.as_slice(),
+            a_matrix.as_slice(),
+            work_rows,
+            work_rows,
+            work_rows,
+        )?;
+        let mut b_matrix = vec![0.0_f32; a_matrix.len()];
+        for index in 0..b_matrix.len() {
+            let scaled_a = round_bf16(b * a_matrix[index]);
+            b_matrix[index] = round_bf16(scaled_a + c_a_matmul_a[index]);
+        }
+        let bx = matmul_bf16_cuda(
+            backend,
+            b_matrix.as_slice(),
+            x.as_slice(),
+            work_rows,
+            work_rows,
+            work_cols,
+        )?;
+        for index in 0..x.len() {
+            let scaled_x = round_bf16(a * x[index]);
+            x[index] = round_bf16(scaled_x + bx[index]);
+        }
+    }
+    Ok(if transposed {
+        transpose(x.as_slice(), work_rows, work_cols)
+    } else {
+        x
     })
 }
 
@@ -564,6 +695,68 @@ fn matmul_bf16(
     output
 }
 
+fn matmul_bf16_cuda(
+    backend: &mut CudaBackend,
+    left: &[f32],
+    right: &[f32],
+    rows: usize,
+    inner: usize,
+    cols: usize,
+) -> Result<Vec<f32>, ParameterGolfTrainError> {
+    if left.len() != rows.saturating_mul(inner) || right.len() != inner.saturating_mul(cols) {
+        return Err(muon_cuda_runtime_error(format!(
+            "parameter golf CUDA Muon matmul shape mismatch: left_len={} right_len={} rows={} inner={} cols={}",
+            left.len(),
+            right.len(),
+            rows,
+            inner,
+            cols
+        )));
+    }
+    let mut left_buffer = backend
+        .bf16_buffer(left.len())
+        .map_err(|error| muon_cuda_runtime_error(error.to_string()))?;
+    left_buffer
+        .write_bf16_from_f32(left)
+        .map_err(|error| muon_cuda_runtime_error(error.to_string()))?;
+    let mut right_buffer = backend
+        .bf16_buffer(right.len())
+        .map_err(|error| muon_cuda_runtime_error(error.to_string()))?;
+    right_buffer
+        .write_bf16_from_f32(right)
+        .map_err(|error| muon_cuda_runtime_error(error.to_string()))?;
+    let output = backend
+        .f32_buffer(rows.saturating_mul(cols))
+        .map_err(|error| muon_cuda_runtime_error(error.to_string()))?;
+    let mut submission = backend
+        .begin_submission()
+        .map_err(|error| muon_cuda_runtime_error(error.to_string()))?;
+    submission
+        .matmul_bf16_to_f32(&left_buffer, &right_buffer, &output, rows, inner, cols)
+        .map_err(|error| muon_cuda_runtime_error(error.to_string()))?;
+    let report = submission
+        .commit(CudaCommandWait::Completed)
+        .map_err(|error| muon_cuda_runtime_error(error.to_string()))?;
+    if report.status != CudaCommandStatus::Completed {
+        return Err(muon_cuda_runtime_error(format!(
+            "parameter golf CUDA Muon matmul did not complete successfully: {:?}",
+            report.status
+        )));
+    }
+    Ok(output
+        .read_f32()
+        .map_err(|error| muon_cuda_runtime_error(error.to_string()))?
+        .into_iter()
+        .map(round_bf16)
+        .collect::<Vec<_>>())
+}
+
+fn muon_cuda_runtime_error(message: impl Into<String>) -> ParameterGolfTrainError {
+    ParameterGolfTrainError::MuonCudaRuntime {
+        message: message.into(),
+    }
+}
+
 fn transpose(values: &[f32], rows: usize, cols: usize) -> Vec<f32> {
     let mut output = vec![0.0_f32; values.len()];
     for row in 0..rows {
@@ -586,7 +779,9 @@ fn norm_l2(values: &[f32]) -> f32 {
 mod tests {
     use std::{fs, path::Path};
 
+    use psionic_backend_cuda::CudaBackend;
     use psionic_models::ParameterGolfReferenceModel;
+    use psionic_runtime::{DeviceDiscovery, HealthStatus};
     use serde::Deserialize;
 
     use super::*;
@@ -774,6 +969,63 @@ mod tests {
     }
 
     #[test]
+    fn cuda_muon_step_matches_cpu_reference_case_when_available() {
+        let backend = CudaBackend::new();
+        let Some(_) = backend.selected_device() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return;
+        };
+
+        let fixture = load_fixture();
+        let case = fixture.muon_case;
+        let optimizer =
+            ParameterGolfMuonConfig::new(case.learning_rate, case.momentum, case.backend_steps);
+
+        let mut expected_parameter = case.parameter.clone();
+        let mut expected_state = ParameterGolfMuonState::zeros(case.rows, case.cols);
+        let expected_receipt = apply_parameter_golf_muon_step(
+            expected_parameter.as_mut_slice(),
+            &[case.rows, case.cols],
+            case.gradient.as_slice(),
+            &optimizer,
+            &mut expected_state,
+        )
+        .expect("cpu muon step should compute");
+
+        let mut actual_parameter = case.parameter.clone();
+        let mut actual_state = ParameterGolfMuonState::zeros(case.rows, case.cols);
+        let actual_receipt = apply_parameter_golf_cuda_muon_step(
+            actual_parameter.as_mut_slice(),
+            &[case.rows, case.cols],
+            case.gradient.as_slice(),
+            &optimizer,
+            &mut actual_state,
+        )
+        .expect("cuda muon step should compute");
+
+        assert_eq!(actual_receipt.backend_steps, expected_receipt.backend_steps);
+        assert!((actual_receipt.learning_rate - expected_receipt.learning_rate).abs() < 1e-9);
+        assert!((actual_receipt.momentum - expected_receipt.momentum).abs() < 1e-9);
+        assert!((actual_receipt.scale_correction - expected_receipt.scale_correction).abs() < 1e-6);
+        assert_close(&actual_parameter, &expected_parameter, 5e-4);
+        assert_close(
+            &actual_state.momentum_buffer,
+            &expected_state.momentum_buffer,
+            1e-6,
+        );
+        assert_close(
+            &actual_receipt.orthogonalized_update,
+            &expected_receipt.orthogonalized_update,
+            5e-4,
+        );
+        assert_close(
+            &actual_receipt.update_values,
+            &expected_receipt.update_values,
+            5e-4,
+        );
+    }
+
+    #[test]
     fn schedule_helpers_match_public_reference_cases() {
         let fixture = load_fixture();
         for case in fixture.schedule_cases.muon_momentum_cases {
@@ -785,6 +1037,16 @@ mod tests {
             hyperparameters.max_wallclock_seconds = case.max_wallclock_seconds_override;
             let actual = hyperparameters.learning_rate_multiplier(case.step, case.elapsed_ms);
             assert!((actual - case.expected).abs() < 1e-6);
+        }
+    }
+
+    fn assert_close(actual: &[f32], expected: &[f32], tolerance: f32) {
+        assert_eq!(actual.len(), expected.len());
+        for (index, (actual, expected)) in actual.iter().zip(expected.iter()).enumerate() {
+            assert!(
+                (actual - expected).abs() <= tolerance,
+                "index {index}: actual={actual} expected={expected}"
+            );
         }
     }
 }

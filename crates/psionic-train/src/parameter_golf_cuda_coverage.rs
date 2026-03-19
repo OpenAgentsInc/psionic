@@ -218,15 +218,15 @@ pub fn builtin_parameter_golf_cuda_training_capability_report()
             ParameterGolfCudaTrainingCoverageCase {
                 case_id: String::from("cuda_muon_optimizer_path"),
                 family: ParameterGolfCudaTrainingFamily::Optimizer,
-                status: ParameterGolfCudaTrainingCoverageStatus::Partial,
+                status: ParameterGolfCudaTrainingCoverageStatus::ImplementedEarly,
                 required_scope: String::from(
                     "the public baseline uses Muon on matrix-shaped transformer parameters under distributed all-reduce",
                 ),
                 current_surface: String::from(
-                    "psionic-train now owns exact CPU Muon reference-step parity and the distributed matrix-update all-reduce contract, but there is still no public CUDA Muon optimizer kernel or runtime path",
+                    "psionic-train now owns exact CPU Muon reference-step parity, the distributed matrix-update all-reduce contract, and one bounded public CUDA Muon step that offloads the Newton-Schulz BF16 matmul family to the CUDA dense surface while keeping transpose, norm, and scalar orchestration explicit in Rust for the same matrix parameter groups",
                 ),
                 boundary_note: String::from(
-                    "Muon semantics are explicit and distributed communication is explicit, but the train-time CUDA optimizer surface is still narrower than the lane contract.",
+                    "Do not treat the bounded host-orchestrated CUDA Muon step as proof that the full trainer is already fused, fully device-resident, or challenge-speed closed.",
                 ),
             },
             ParameterGolfCudaTrainingCoverageCase {
@@ -291,7 +291,7 @@ mod tests {
             report.cases.last().expect("quantization case").status,
             ParameterGolfCudaTrainingCoverageStatus::ImplementedEarly
         );
-        assert_eq!(report.blocking_case_ids.len(), 3);
+        assert_eq!(report.blocking_case_ids.len(), 2);
         assert!(
             !report
                 .blocking_case_ids
@@ -303,6 +303,12 @@ mod tests {
                 .blocking_case_ids
                 .iter()
                 .any(|case_id| case_id == "cuda_residual_mix_train_path")
+        );
+        assert!(
+            !report
+                .blocking_case_ids
+                .iter()
+                .any(|case_id| case_id == "cuda_muon_optimizer_path")
         );
         Ok(())
     }
