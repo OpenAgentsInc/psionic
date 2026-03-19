@@ -6,12 +6,12 @@ artifact-bearing Tassadar phases.
 It is subordinate to:
 
 - `README.md`
-- `docs/ROADMAP_TASSADAR.md`
+- `docs/ROADMAP_TASSADAR.md` (repo-local bridge to the live roadmap)
 - `docs/ROADMAP.md`
 - `docs/ARCHITECTURE.md`
 
-It does not replace the roadmap text. It exists so contributors can answer a
-much narrower question quickly:
+It does not replace the repo-local bridge or the live external roadmap. It
+exists so contributors can answer a much narrower question quickly:
 
 > for one landed Tassadar phase, which committed root, audit, validator, and
 > claim boundary should I cite?
@@ -86,7 +86,8 @@ These roots should stay citeable as negative evidence rather than being erased:
 
 ## Use Rules
 
-- cite `docs/ROADMAP_TASSADAR.md` for dependency order, goals, and open work
+- cite `docs/ROADMAP_TASSADAR.md` for the stable repo-local summary and the
+  pointer to `/Users/christopherdavid/code/alpha/tassadar/tassadar-llm-as-computer-roadmap.md`
 - cite this index when the question is “which exact root, audit, and command
   should I use for the landed phase?”
 - cite `fixtures/tassadar/reports/tassadar_acceptance_report.json` and

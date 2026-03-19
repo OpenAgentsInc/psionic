@@ -748,10 +748,10 @@ Current posture:
   compile-pipeline, ingress, conformance, module-scale, and trap/refusal
   surfaces that should reproduce on a clean checkout
 - public claim discipline for that lane is explicit in
-  `docs/ARCHITECTURE.md`, `docs/ROADMAP_TASSADAR.md`, and
-  `docs/TASSADAR_WASM_RUNBOOK.md`: "supports Wasm" means a named Tassadar
-  profile inside a frozen WebAssembly spec window, not an open-ended claim
-  about the whole moving language
+  `docs/ARCHITECTURE.md`, the bridge notes in
+  `docs/ROADMAP_TASSADAR.md`, and `docs/TASSADAR_WASM_RUNBOOK.md`:
+  "supports Wasm" means a named Tassadar profile inside a frozen WebAssembly
+  spec window, not an open-ended claim about the whole moving language
 - its Phase 8A research family now exists in `psionic-research`, with a typed
   executor-variant family, benchmark/proof/lineage-backed bounded runs, and
   machine-readable sweep records for reproducible same-contract comparisons
@@ -1580,7 +1580,7 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
   `fixtures/parameter_golf/reports/parameter_golf_acceptance_report.json` are
   the canonical checker and machine-readable acceptance artifact for current
   Parameter Golf claim truth.
-- **[docs/ROADMAP_TASSADAR.md](docs/ROADMAP_TASSADAR.md)** — Tassadar lane roadmap from the current bounded executor substrate to article-grade WebAssembly in-model compute.
+- **[docs/ROADMAP_TASSADAR.md](docs/ROADMAP_TASSADAR.md)** — stable repo-local Tassadar roadmap bridge that points to the live external roadmap and preserves the GitHub issue anchor with the current high-level dependency spine.
 - **[docs/ROADMAP_TASSADAR_INDEX.md](docs/ROADMAP_TASSADAR_INDEX.md)** — compact Tassadar phase-to-artifact index for canonical bundle roots, audits, validators, and current claim boundaries.
 - `scripts/check-tassadar-acceptance.sh` and
   `fixtures/tassadar/reports/tassadar_acceptance_report.json` are the canonical
