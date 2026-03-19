@@ -48,9 +48,13 @@ mod parameter_golf;
 mod parameter_golf_benchmark;
 mod parameter_golf_cuda_coverage;
 mod parameter_golf_distributed;
-mod parameter_golf_reference;
+mod parameter_golf_record_folder_compatibility;
 mod parameter_golf_record_track;
+mod parameter_golf_reference;
+mod parameter_golf_single_h100_bringup;
 mod parameter_golf_submission;
+mod parameter_golf_submission_pr;
+mod parameter_golf_submission_runtime;
 mod reference_program;
 mod reliability;
 mod replay_truth;
@@ -130,9 +134,13 @@ pub use parameter_golf::*;
 pub use parameter_golf_benchmark::*;
 pub use parameter_golf_cuda_coverage::*;
 pub use parameter_golf_distributed::*;
-pub use parameter_golf_reference::*;
+pub use parameter_golf_record_folder_compatibility::*;
 pub use parameter_golf_record_track::*;
+pub use parameter_golf_reference::*;
+pub use parameter_golf_single_h100_bringup::*;
 pub use parameter_golf_submission::*;
+pub use parameter_golf_submission_pr::*;
+pub use parameter_golf_submission_runtime::*;
 pub use reference_program::*;
 pub use reliability::*;
 pub use replay_truth::*;
@@ -1060,8 +1068,8 @@ mod tests {
     }
 
     #[test]
-    fn observe_membership_advances_epoch_only_when_truth_changes()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn observe_membership_advances_epoch_only_when_truth_changes(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let stable = cluster_state(&[
             ("worker-a", ClusterMembershipStatus::Ready),
             ("worker-b", ClusterMembershipStatus::Ready),
@@ -1091,8 +1099,8 @@ mod tests {
     }
 
     #[test]
-    fn live_recovery_plan_exposes_recovery_and_late_join_semantics()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn live_recovery_plan_exposes_recovery_and_late_join_semantics(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let state = cluster_state(&[
             ("worker-a", ClusterMembershipStatus::Ready),
             ("worker-b", ClusterMembershipStatus::Ready),
@@ -1135,18 +1143,15 @@ mod tests {
             plan.recovery_context.late_joiner_node_ids,
             vec![String::from("worker-c")]
         );
-        assert!(
-            plan.actions
-                .contains(&TrainingRecoveryAction::ResumeFromDurableCheckpoint)
-        );
-        assert!(
-            plan.actions
-                .contains(&TrainingRecoveryAction::StageCheckpointForLateJoiners)
-        );
-        assert!(
-            plan.actions
-                .contains(&TrainingRecoveryAction::RebalanceWorldSize)
-        );
+        assert!(plan
+            .actions
+            .contains(&TrainingRecoveryAction::ResumeFromDurableCheckpoint));
+        assert!(plan
+            .actions
+            .contains(&TrainingRecoveryAction::StageCheckpointForLateJoiners));
+        assert!(plan
+            .actions
+            .contains(&TrainingRecoveryAction::RebalanceWorldSize));
         assert_eq!(plan.checkpoint_streams.len(), 1);
         assert!(!plan.plan_digest.is_empty());
         Ok(())

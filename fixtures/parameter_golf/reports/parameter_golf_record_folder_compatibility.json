@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "report_id": "parameter_golf.record_folder_compatibility.v1",
+  "compatibility_status": "compatible",
+  "challenge_repo_readme_ref": "README.md",
+  "psionic_parameter_golf_spec_ref": "PSIONIC_PARAMETER_GOLF_SPEC.md",
+  "baseline_submission_package_version": "2026.03.18.non_record_submission.v2",
+  "baseline_submission_id": "2026-03-18_psionic_local_reference_runtime_replay_v2",
+  "baseline_record_folder_relpath": "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2",
+  "required_submission_json_core_keys": [
+    "author",
+    "github_id",
+    "name",
+    "blurb",
+    "date",
+    "val_loss",
+    "val_bpb",
+    "bytes_total",
+    "bytes_code"
+  ],
+  "track_contracts": [
+    {
+      "track_id": "record_10min_16mb",
+      "records_relpath": "records/track_10min_16mb",
+      "psionic_required_submission_json_keys": [],
+      "current_example_readme_ref": "records/track_10min_16mb/2026-03-17_NaiveBaseline/README.md",
+      "detail": "Record-track submissions land under records/track_10min_16mb and currently use the shared top-level file contract without a required submission.json track field in the public example folder."
+    },
+    {
+      "track_id": "non_record_16mb",
+      "records_relpath": "records/track_non_record_16mb",
+      "submission_json_track_value": "non-record-unlimited-compute-16mb",
+      "psionic_required_submission_json_keys": [
+        "track"
+      ],
+      "current_example_readme_ref": "records/track_non_record_16mb/2026-03-18_Quasi10Bfrom50B_SP1024_9x512_KV4_4h_pgut3/README.md",
+      "detail": "Non-record submissions land under records/track_non_record_16mb. Psionic requires the explicit non-record track field so exported folders stay machine-legible about their unlimited-compute posture."
+    }
+  ],
+  "required_top_level_files": [
+    {
+      "file_name": "README.md",
+      "role": "readme",
+      "must_live_at_folder_root": true,
+      "must_be_regular_file": true,
+      "current_psionic_size_bytes": 3387,
+      "detail": "human-readable folder overview required by the public README"
+    },
+    {
+      "file_name": "submission.json",
+      "role": "submission_manifest",
+      "must_live_at_folder_root": true,
+      "must_be_regular_file": true,
+      "current_psionic_size_bytes": 2266,
+      "detail": "machine-readable submission metadata required by the public README"
+    },
+    {
+      "file_name": "train.log",
+      "role": "train_log",
+      "must_live_at_folder_root": true,
+      "must_be_regular_file": true,
+      "current_psionic_size_bytes": 634,
+      "detail": "preserved train log required by the public README"
+    },
+    {
+      "file_name": "train_gpt.py",
+      "role": "entrypoint",
+      "must_live_at_folder_root": true,
+      "must_be_regular_file": true,
+      "current_psionic_size_bytes": 390,
+      "detail": "top-level entrypoint required by the public README and used by the compatibility verifier dry-run"
+    }
+  ],
+  "dependency_posture": "folder_local_self_contained",
+  "public_repo_allows_additional_folder_contents": true,
+  "dependency_detail": "The public README requires a runnable folder rooted at README.md, submission.json, train.log, and train_gpt.py, while also allowing extra shipped dependencies so long as they remain inside the folder and the entrypoint runs without hidden repo, network, or external-download dependencies. Psionic's current non-record bundle therefore remains compatible even though it preserves extra nested benchmark and accounting JSON artifacts alongside the required top-level files.",
+  "current_psionic_extra_submission_paths": [
+    "parameter-golf-local-reference-run/benchmark/parameter_golf_benchmark_package.json",
+    "parameter-golf-local-reference-run/benchmark/parameter_golf_challenge_benchmark_receipt.json",
+    "parameter-golf-local-reference-run/benchmark/parameter_golf_challenge_score_report.json",
+    "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_accounting.json",
+    "parameter-golf-local-reference-run/benchmark/run_bundle.json",
+    "parameter-golf-local-reference-run/step-00002/final_model.int8.ptz",
+    "runtime/parameter_golf_local_reference_fixture.json",
+    "runtime/parameter_golf_submission_runtime",
+    "runtime/parameter_golf_submission_runtime.json"
+  ],
+  "verifier_runner": "scripts/check-parameter-golf-record-folder-compatibility.sh",
+  "verifier_example_command": "scripts/check-parameter-golf-record-folder-compatibility.sh --parameter-golf-root ~/code/parameter-golf --submission-dir /tmp/records/track_non_record_16mb/<submission_id>",
+  "claim_boundary": "This report closes challenge-repo folder compatibility only. It confirms that the current non-record folder carries a real folder-local train_gpt.py launcher plus a shipped Psionic runtime payload, but it does not promote the bounded local-reference replay path into a record-track runtime claim and it does not close counted-runtime or build-dependency posture for stronger future payloads.",
+  "report_digest": "5e1c61255ec8d1595cf0cca15728f4f8377e28e946813957c66a7d5d83d4dfc3"
+}

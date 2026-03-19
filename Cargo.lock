@@ -3926,6 +3926,7 @@ dependencies = [
  "half",
  "hex",
  "psionic-adapters",
+ "psionic-backend-cuda",
  "psionic-cluster",
  "psionic-collectives",
  "psionic-compiler",

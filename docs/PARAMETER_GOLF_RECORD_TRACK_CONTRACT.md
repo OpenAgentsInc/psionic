@@ -27,6 +27,8 @@ The record-track contract now binds together:
 
 - the canonical acceptance report
 - the landed non-record submission package surface
+- the exported-folder evidence and replay-verification reports
+- the promotion receipt plus final PR-bundle and local challenge-clone dry-run reports
 - the committed post-parity research harness
 - the distributed `8xH100` benchmark reference
 
@@ -40,15 +42,17 @@ The current contract now keeps these satisfied surfaces explicit:
 - challenge-oracle parity is landed
 - reproducible record-folder output exists for the non-record lane
 - counted-byte vocabulary is explicit and machine-readable
+- folder-local replay verification is landed
+- maintainer-facing promotion receipt and PR bundle generation are landed
+- local challenge-clone dry run is landed
 
 ## Remaining Blockers
 
-The report keeps three blockers explicit today:
+The report keeps two blockers explicit today:
 
-- the shipped `train_gpt.py` is still the non-record review wrapper, not a true
-  record-track runtime entrypoint
-- no defended counted-runtime story exists yet for a real record-track
-  execution payload
+- the shipped `train_gpt.py` is now a real non-record launcher, but no
+  defended counted-runtime or build-dependency story exists yet for a true
+  record-track execution payload
 - reproducible challenge-speed `8xH100` execution is still not green
 
 So the contract is useful precisely because it does **not** let the repo

@@ -1,28 +1,33 @@
 use std::time::Instant;
 
 use psionic_eval::{
-    BenchmarkPackage, PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF,
-    PARAMETER_GOLF_LOCAL_REFERENCE_CLAIM_BOUNDARY, ParameterGolfArtifactReceiptEntry,
-    ParameterGolfArtifactSizeReceipt, ParameterGolfBundleRoot,
-    ParameterGolfChallengeBenchmarkReceipt, ParameterGolfChallengeScoreReport,
-    ParameterGolfMemoryReceipt, ParameterGolfValidationEvalError, ParameterGolfWallclockReceipt,
     build_parameter_golf_local_reference_benchmark_package, evaluate_parameter_golf_validation,
+    BenchmarkPackage, ParameterGolfArtifactReceiptEntry, ParameterGolfArtifactSizeReceipt,
+    ParameterGolfBundleRoot, ParameterGolfChallengeBenchmarkReceipt,
+    ParameterGolfChallengeScoreReport, ParameterGolfMemoryReceipt,
+    ParameterGolfValidationEvalError, ParameterGolfWallclockReceipt,
+    PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF, PARAMETER_GOLF_LOCAL_REFERENCE_CLAIM_BOUNDARY,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    ParameterGolfCheckpointManifest, ParameterGolfLocalReferenceFixture,
-    ParameterGolfReferenceOptimizerState, ParameterGolfReferenceTrainingConfig,
-    ParameterGolfReferenceTrainingError, ParameterGolfReferenceTrainingOutcome,
-    ParameterGolfTrainingArtifact, restore_parameter_golf_model_from_int8_zlib,
-    restore_parameter_golf_model_from_safetensors, train_parameter_golf_local_reference,
+    restore_parameter_golf_model_from_int8_zlib, restore_parameter_golf_model_from_safetensors,
+    train_parameter_golf_local_reference, ParameterGolfCheckpointManifest,
+    ParameterGolfLocalReferenceFixture, ParameterGolfReferenceOptimizerState,
+    ParameterGolfReferenceTrainingConfig, ParameterGolfReferenceTrainingError,
+    ParameterGolfReferenceTrainingOutcome, ParameterGolfTrainingArtifact,
 };
 
 /// Stable benchmark-package version for the bounded local-reference review lane.
-pub const PARAMETER_GOLF_LOCAL_REFERENCE_BENCHMARK_VERSION: &str =
-    "2026.03.18.local_reference.v1";
+pub const PARAMETER_GOLF_LOCAL_REFERENCE_BENCHMARK_VERSION: &str = "2026.03.18.local_reference.v1";
+/// Frozen training wallclock used by the canonical exported submission bundle.
+pub const PARAMETER_GOLF_LOCAL_REFERENCE_CANONICAL_TRAINING_OBSERVED_MS: u64 = 25_779;
+/// Frozen raw-restore eval wallclock used by the canonical exported submission bundle.
+pub const PARAMETER_GOLF_LOCAL_REFERENCE_CANONICAL_RAW_RESTORE_EVAL_OBSERVED_MS: u64 = 527;
+/// Frozen int8+zlib restore eval wallclock used by the canonical exported submission bundle.
+pub const PARAMETER_GOLF_LOCAL_REFERENCE_CANONICAL_INT8_ZLIB_RESTORE_EVAL_OBSERVED_MS: u64 = 544;
 
 /// Aggregate benchmark bundle for one bounded local-reference run.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -90,7 +95,9 @@ impl ParameterGolfChallengeRunBundle {
             benchmark_ref: String::from(PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF),
             benchmark_package_artifact_ref: benchmark_package_artifact.artifact_ref.clone(),
             benchmark_package_artifact_digest: benchmark_package_artifact.artifact_digest.clone(),
-            challenge_score_report_artifact_ref: challenge_score_report_artifact.artifact_ref.clone(),
+            challenge_score_report_artifact_ref: challenge_score_report_artifact
+                .artifact_ref
+                .clone(),
             challenge_score_report_artifact_digest: challenge_score_report_artifact
                 .artifact_digest
                 .clone(),
@@ -213,9 +220,15 @@ pub fn benchmark_parameter_golf_local_reference(
     let train_bundle_root = ParameterGolfBundleRoot {
         root_ref: format!("bundle://parameter_golf/{}/train", config.run_id),
         artifacts: vec![
-            artifact_entry_from_training_artifact(&training_outcome.initial_checkpoint.manifest_artifact),
-            artifact_entry_from_training_artifact(&training_outcome.initial_checkpoint.weights_artifact),
-            artifact_entry_from_training_artifact(&training_outcome.final_checkpoint.manifest_artifact),
+            artifact_entry_from_training_artifact(
+                &training_outcome.initial_checkpoint.manifest_artifact,
+            ),
+            artifact_entry_from_training_artifact(
+                &training_outcome.initial_checkpoint.weights_artifact,
+            ),
+            artifact_entry_from_training_artifact(
+                &training_outcome.final_checkpoint.manifest_artifact,
+            ),
             artifact_entry_from_training_artifact(&training_outcome.raw_model_artifact),
             artifact_entry_from_training_artifact(&training_outcome.int8_zlib_model_artifact),
         ],
@@ -233,8 +246,12 @@ pub fn benchmark_parameter_golf_local_reference(
     };
 
     let tracked_artifacts = vec![
-        artifact_entry_from_training_artifact(&training_outcome.initial_checkpoint.manifest_artifact),
-        artifact_entry_from_training_artifact(&training_outcome.initial_checkpoint.weights_artifact),
+        artifact_entry_from_training_artifact(
+            &training_outcome.initial_checkpoint.manifest_artifact,
+        ),
+        artifact_entry_from_training_artifact(
+            &training_outcome.initial_checkpoint.weights_artifact,
+        ),
         artifact_entry_from_training_artifact(&training_outcome.final_checkpoint.manifest_artifact),
         artifact_entry_from_training_artifact(&training_outcome.raw_model_artifact),
         artifact_entry_from_training_artifact(&training_outcome.int8_zlib_model_artifact),
@@ -246,9 +263,16 @@ pub fn benchmark_parameter_golf_local_reference(
         artifact_entry_from_training_artifact(&int8_roundtrip_validation_artifact),
     ];
     let artifact_size_receipt = ParameterGolfArtifactSizeReceipt {
-        submission_artifact_ref: training_outcome.int8_zlib_model_artifact.artifact_ref.clone(),
-        submission_artifact_digest: training_outcome.int8_zlib_model_artifact.artifact_digest.clone(),
-        submission_artifact_size_bytes: training_outcome.int8_zlib_model_artifact.bytes.len() as u64,
+        submission_artifact_ref: training_outcome
+            .int8_zlib_model_artifact
+            .artifact_ref
+            .clone(),
+        submission_artifact_digest: training_outcome
+            .int8_zlib_model_artifact
+            .artifact_digest
+            .clone(),
+        submission_artifact_size_bytes: training_outcome.int8_zlib_model_artifact.bytes.len()
+            as u64,
         total_artifact_bytes: tracked_artifacts
             .iter()
             .map(|artifact| artifact.size_bytes)
@@ -268,13 +292,15 @@ pub fn benchmark_parameter_golf_local_reference(
         within_wallclock_cap: wallclock_cap_ms.map(|cap| training_observed_ms <= cap),
         wallclock_cap_ms,
     };
-    let final_manifest_bytes = training_outcome.final_checkpoint.manifest_artifact.bytes.len() as u64;
+    let final_manifest_bytes = training_outcome
+        .final_checkpoint
+        .manifest_artifact
+        .bytes
+        .len() as u64;
     let memory_receipt = ParameterGolfMemoryReceipt {
         measurement_posture: String::from("estimated_tensor_state_bytes"),
         model_parameter_bytes: model_parameter_bytes(&training_outcome.trained_model),
-        optimizer_state_bytes: optimizer_state_bytes(
-            &training_outcome.final_checkpoint.manifest,
-        ),
+        optimizer_state_bytes: optimizer_state_bytes(&training_outcome.final_checkpoint.manifest),
         raw_model_artifact_bytes: training_outcome.raw_model_artifact.bytes.len() as u64,
         int8_zlib_artifact_bytes: training_outcome.int8_zlib_model_artifact.bytes.len() as u64,
         checkpoint_manifest_bytes: final_manifest_bytes,
@@ -289,13 +315,22 @@ pub fn benchmark_parameter_golf_local_reference(
         benchmark_ref: String::from(PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF),
         benchmark_package: benchmark_package.key.clone(),
         run_id: config.run_id.clone(),
-        trained_model_descriptor_digest: training_outcome.trained_model.descriptor().stable_digest(),
+        trained_model_descriptor_digest: training_outcome
+            .trained_model
+            .descriptor()
+            .stable_digest(),
         final_checkpoint_manifest_digest: training_outcome
             .final_checkpoint
             .manifest
             .stable_digest(),
-        submission_artifact_ref: training_outcome.int8_zlib_model_artifact.artifact_ref.clone(),
-        submission_artifact_digest: training_outcome.int8_zlib_model_artifact.artifact_digest.clone(),
+        submission_artifact_ref: training_outcome
+            .int8_zlib_model_artifact
+            .artifact_ref
+            .clone(),
+        submission_artifact_digest: training_outcome
+            .int8_zlib_model_artifact
+            .artifact_digest
+            .clone(),
         score_report: challenge_score_report.clone(),
         wallclock_receipt,
         memory_receipt,
@@ -336,6 +371,54 @@ pub fn benchmark_parameter_golf_local_reference(
         run_bundle,
         run_bundle_artifact,
     })
+}
+
+/// Rewrites one bounded local-reference benchmark bundle onto the frozen canonical
+/// wallclock facts used by the exported submission lane.
+///
+/// The exported-folder evidence lane is reviewed for replay and accounting
+/// stability rather than local host speed, so the canonical submission path pins
+/// these bounded wallclock fields to one committed reference measurement.
+pub fn canonicalize_parameter_golf_local_reference_benchmark_bundle(
+    bundle: &ParameterGolfLocalReferenceBenchmarkBundle,
+) -> Result<ParameterGolfLocalReferenceBenchmarkBundle, ParameterGolfBenchmarkBundleError> {
+    let mut canonical = bundle.clone();
+    canonical
+        .benchmark_receipt
+        .wallclock_receipt
+        .training_observed_ms = PARAMETER_GOLF_LOCAL_REFERENCE_CANONICAL_TRAINING_OBSERVED_MS;
+    canonical
+        .benchmark_receipt
+        .wallclock_receipt
+        .raw_restore_eval_observed_ms =
+        PARAMETER_GOLF_LOCAL_REFERENCE_CANONICAL_RAW_RESTORE_EVAL_OBSERVED_MS;
+    canonical
+        .benchmark_receipt
+        .wallclock_receipt
+        .int8_zlib_restore_eval_observed_ms =
+        PARAMETER_GOLF_LOCAL_REFERENCE_CANONICAL_INT8_ZLIB_RESTORE_EVAL_OBSERVED_MS;
+    canonical.benchmark_receipt_artifact = json_artifact(
+        "parameter_golf_challenge_benchmark_receipt",
+        format!(
+            "{}/benchmark/parameter_golf_challenge_benchmark_receipt.json",
+            canonical.run_bundle.run_id
+        ),
+        &canonical.benchmark_receipt,
+    )?;
+    canonical.run_bundle = ParameterGolfChallengeRunBundle::new(
+        canonical.run_bundle.run_id.clone(),
+        &canonical.benchmark_package_artifact,
+        &canonical.challenge_score_report_artifact,
+        &canonical.benchmark_receipt_artifact,
+        canonical.run_bundle.train_bundle_root.clone(),
+        canonical.run_bundle.eval_bundle_root.clone(),
+    );
+    canonical.run_bundle_artifact = json_artifact(
+        "parameter_golf_run_bundle",
+        format!("{}/benchmark/run_bundle.json", canonical.run_bundle.run_id),
+        &canonical.run_bundle,
+    )?;
+    Ok(canonical)
 }
 
 fn json_artifact<T: Serialize>(
@@ -425,8 +508,7 @@ mod tests {
     use std::error::Error;
 
     use super::{
-        PARAMETER_GOLF_LOCAL_REFERENCE_BENCHMARK_VERSION,
-        benchmark_parameter_golf_local_reference,
+        benchmark_parameter_golf_local_reference, PARAMETER_GOLF_LOCAL_REFERENCE_BENCHMARK_VERSION,
     };
     use crate::{ParameterGolfLocalReferenceFixture, ParameterGolfReferenceTrainingConfig};
 
@@ -449,7 +531,13 @@ mod tests {
             bundle.challenge_score_report.trained_validation,
             bundle.training_outcome.final_validation_eval
         );
-        assert!(bundle.benchmark_receipt.wallclock_receipt.training_observed_ms > 0);
+        assert!(
+            bundle
+                .benchmark_receipt
+                .wallclock_receipt
+                .training_observed_ms
+                > 0
+        );
         assert!(
             bundle
                 .benchmark_receipt
@@ -462,30 +550,28 @@ mod tests {
                 .benchmark_receipt
                 .memory_receipt
                 .estimated_live_bytes_upper_bound
-                > bundle.benchmark_receipt.memory_receipt.model_parameter_bytes
+                > bundle
+                    .benchmark_receipt
+                    .memory_receipt
+                    .model_parameter_bytes
         );
         assert!(!bundle.run_bundle.bundle_digest.is_empty());
-        assert!(
-            bundle
-                .run_bundle
-                .train_bundle_root
-                .artifacts
-                .iter()
-                .any(|artifact| artifact.artifact_ref.ends_with("final_model.int8.ptz"))
-        );
-        assert!(
-            bundle
-                .run_bundle
-                .eval_bundle_root
-                .artifacts
-                .iter()
-                .any(|artifact| artifact
-                    .artifact_ref
-                    .ends_with("parameter_golf_challenge_score_report.json"))
-        );
-        let roundtrip: super::ParameterGolfChallengeRunBundle = serde_json::from_slice(
-            &serde_json::to_vec_pretty(&bundle.run_bundle)?,
-        )?;
+        assert!(bundle
+            .run_bundle
+            .train_bundle_root
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.artifact_ref.ends_with("final_model.int8.ptz")));
+        assert!(bundle
+            .run_bundle
+            .eval_bundle_root
+            .artifacts
+            .iter()
+            .any(|artifact| artifact
+                .artifact_ref
+                .ends_with("parameter_golf_challenge_score_report.json")));
+        let roundtrip: super::ParameterGolfChallengeRunBundle =
+            serde_json::from_slice(&serde_json::to_vec_pretty(&bundle.run_bundle)?)?;
         assert_eq!(roundtrip, bundle.run_bundle);
         Ok(())
     }

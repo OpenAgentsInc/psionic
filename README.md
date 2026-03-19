@@ -1574,13 +1574,25 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
 - **[docs/ACTIVATION_FINGERPRINT_PROOFS.md](docs/ACTIVATION_FINGERPRINT_PROOFS.md)** — activation-fingerprint proof posture, embeddings-first artifact generation, and benchmark semantics.
 - **[docs/PARAMETER_GOLF_ACCOUNTING.md](docs/PARAMETER_GOLF_ACCOUNTING.md)** — canonical Parameter Golf claim-language and artifact-accounting contract for research, non-record, and record-track posture.
 - **[docs/PARAMETER_GOLF_ACCEPTANCE_MATRIX.md](docs/PARAMETER_GOLF_ACCEPTANCE_MATRIX.md)** — canonical Parameter Golf acceptance matrix for oracle parity, trainer parity, throughput closure, packaging readiness, and record-track readiness.
+- **[docs/PARAMETER_GOLF_SINGLE_H100_BRINGUP.md](docs/PARAMETER_GOLF_SINGLE_H100_BRINGUP.md)** — canonical Rust-native Parameter Golf single-H100 bring-up command, report seam, and current refusal boundary.
+- **[docs/PARAMETER_GOLF_RECORD_FOLDER_COMPATIBILITY.md](docs/PARAMETER_GOLF_RECORD_FOLDER_COMPATIBILITY.md)** — canonical Parameter Golf challenge-repo folder-compatibility contract and verifier gate for `records/...` exports.
+- **[docs/PARAMETER_GOLF_EXPORTED_SUBMISSION_EVIDENCE.md](docs/PARAMETER_GOLF_EXPORTED_SUBMISSION_EVIDENCE.md)** — canonical Parameter Golf exported-folder evidence and replay-verification contract for metrics, wallclock, and counted bytes.
+- **[docs/PARAMETER_GOLF_PR_SUBMISSION_FLOW.md](docs/PARAMETER_GOLF_PR_SUBMISSION_FLOW.md)** — canonical Parameter Golf promotion receipt, final PR-bundle, and local challenge-clone dry-run contract.
 - **[docs/ROADMAP_FM.md](docs/ROADMAP_FM.md)** — Apple FM lane roadmap and API coverage.
 - **[docs/ROADMAP_PARAMETERGOLF.md](docs/ROADMAP_PARAMETERGOLF.md)** — Parameter Golf lane roadmap for challenge-oracle parity, compact decoder training, artifact accounting, and submission packaging inside Psionic.
 - `scripts/check-parameter-golf-acceptance.sh` and
   `fixtures/parameter_golf/reports/parameter_golf_acceptance_report.json` are
   the canonical checker and machine-readable acceptance artifact for current
   Parameter Golf claim truth.
-- **[docs/ROADMAP_TASSADAR.md](docs/ROADMAP_TASSADAR.md)** — stable repo-local Tassadar roadmap bridge that points to the live external roadmap and preserves the GitHub issue anchor with the current high-level dependency spine.
+- `scripts/check-parameter-golf-single-h100-bringup.sh` and
+  `fixtures/parameter_golf/reports/parameter_golf_single_h100_bringup.json`
+  are the canonical verifier and machine-readable artifact for current
+  Rust-native Parameter Golf single-H100 bring-up posture.
+- `scripts/check-parameter-golf-record-folder-compatibility.sh` and
+  `fixtures/parameter_golf/reports/parameter_golf_record_folder_compatibility.json`
+  are the canonical verifier and machine-readable artifact for current
+  Parameter Golf challenge-repo folder compatibility.
+- **[docs/ROADMAP_TASSADAR.md](docs/ROADMAP_TASSADAR.md)** — Tassadar lane roadmap from the current bounded executor substrate to article-grade WebAssembly in-model compute.
 - **[docs/ROADMAP_TASSADAR_INDEX.md](docs/ROADMAP_TASSADAR_INDEX.md)** — compact Tassadar phase-to-artifact index for canonical bundle roots, audits, validators, and current claim boundaries.
 - `scripts/check-tassadar-acceptance.sh` and
   `fixtures/tassadar/reports/tassadar_acceptance_report.json` are the canonical

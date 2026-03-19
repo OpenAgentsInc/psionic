@@ -6,12 +6,16 @@
   "target_claim_posture": "record_ready",
   "benchmark_ref": "benchmark://openagents/psionic/parameter_golf/distributed_8xh100",
   "disposition": "blocked",
-  "acceptance_report_digest": "4ae158e997014041e191bbae74a021a6f109d9a28f9b3761899d7e81e32fa676",
-  "research_harness_report_digest": "be4b3548367c5d066be784a5549c6d87bacb99c4d8d626f6acfd1ed48e5fdc93",
-  "baseline_submission_package_version": "2026.03.18.non_record_submission.v1",
-  "baseline_entrypoint_artifact_digest": "4c42817654c78c10db769c978351338e2be537889c8919b6d7d031c2d596aa31",
-  "baseline_model_artifact_digest": "09a4e000349c9dd077ccaee75f54e31fb7e52541969352aad6ac9aaa7c82e931",
-  "baseline_accounting_receipt_digest": "d9658711f0d336dcaa1052185be911e1869707eaecab6897f7400f1c7c5eb62a",
+  "acceptance_report_digest": "14989ffac94a50025a4e02ae5a2a626940e6db7fd48a65eee43460682e6d8e50",
+  "research_harness_report_digest": "9e39b19dff65a081ecfa36c98cbab62189a6845052831a2d35b6f9f0ecb7052e",
+  "baseline_submission_package_version": "2026.03.18.non_record_submission.v2",
+  "baseline_entrypoint_artifact_digest": "988e72c33e71b6e5111b1f79b0cb2af048dfb8fb323b1dc1e9f785d3d8f2f6d1",
+  "baseline_model_artifact_digest": "efe272503950104f1557f5c73cad69ce717e60d9b75f05e48d17ffbeb6940af1",
+  "baseline_accounting_receipt_digest": "275494441ebe609b39960972d02e8b0f3fcdc192b8644f440f4671d5c29f32c3",
+  "baseline_submission_run_evidence_report_digest": "f8c20b44af363900c3f8dc9394578e67a1bc94557f8ad0fa1525f32540c22c35",
+  "baseline_record_folder_replay_verification_report_digest": "66dc80376e4c447a8dc74b9eeacfd6aaecb9b49ab0515e157370b7801e9e37fd",
+  "baseline_final_pr_bundle_report_digest": "56b86d5c0d5c0c9e201ba1eac91c2bee7c14b5fcb4056ae9e2317ce17bfe7881",
+  "baseline_local_clone_dry_run_report_digest": "e386e35c3e18db434f7187c0abfdaa969257fa2a9a4d4f364e90b8ac4902629e",
   "required_counted_component_ids": [
     "entrypoint_code_bytes",
     "compressed_model_bytes",
@@ -31,7 +35,7 @@
     {
       "surface_id": "reproducible_record_folder_output",
       "status": "satisfied",
-      "detail": "psionic-train now ships a typed non-record submission package builder that emits README.md, submission.json, train.log, a runnable train_gpt.py review wrapper, the counted int8+zlib model artifact, preserved benchmark receipts, and a machine-readable counted-byte accounting receipt, plus a writer that materializes the folder contract to disk.",
+      "detail": "psionic-train now ships a typed non-record submission package builder that emits README.md, submission.json, train.log, a root-local train_gpt.py launcher, a shipped Psionic runtime payload plus runtime manifest and fixture, the counted int8+zlib model artifact, preserved benchmark receipts, and a machine-readable counted-byte accounting receipt, plus a writer that materializes the folder contract to disk.",
       "evidence_refs": [
         "docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md",
         "fixtures/parameter_golf/reports/parameter_golf_acceptance_report.json"
@@ -48,18 +52,47 @@
     },
     {
       "surface_id": "record_runtime_entrypoint",
-      "status": "blocked",
-      "detail": "The current shipped train_gpt.py surface is the non-record review wrapper keyed by entrypoint digest `4c42817654c78c10db769c978351338e2be537889c8919b6d7d031c2d596aa31`; it is not yet a real record-track runtime entrypoint.",
+      "status": "satisfied",
+      "detail": "The current shipped train_gpt.py surface is a real non-record submission launcher keyed by entrypoint digest `988e72c33e71b6e5111b1f79b0cb2af048dfb8fb323b1dc1e9f785d3d8f2f6d1`; it execs a shipped Psionic runtime payload, replays the bounded local-reference validation path, and writes a runtime receipt inside the exported folder.",
       "evidence_refs": [
-        "docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md"
+        "docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md",
+        "docs/PARAMETER_GOLF_RECORD_FOLDER_COMPATIBILITY.md"
+      ]
+    },
+    {
+      "surface_id": "folder_local_replay_verification",
+      "status": "satisfied",
+      "detail": "The exported folder now carries a machine-readable replay verifier that replays offline execution, checks final metrics against train.log plus runtime and benchmark receipts, and checks counted bytes against the shipped accounting contract.",
+      "evidence_refs": [
+        "docs/PARAMETER_GOLF_EXPORTED_SUBMISSION_EVIDENCE.md",
+        "fixtures/parameter_golf/reports/parameter_golf_record_folder_replay_verification.json"
+      ]
+    },
+    {
+      "surface_id": "maintainer_facing_pr_bundle",
+      "status": "satisfied",
+      "detail": "Psionic now owns a deterministic final PR-bundle generator with explicit review artifacts, promotion receipt posture, and maintainer-facing checklist text for the live challenge repo.",
+      "evidence_refs": [
+        "docs/PARAMETER_GOLF_PR_SUBMISSION_FLOW.md",
+        "fixtures/parameter_golf/reports/parameter_golf_final_pr_bundle.json"
+      ]
+    },
+    {
+      "surface_id": "local_challenge_clone_dry_run",
+      "status": "satisfied",
+      "detail": "The current generated folder has already been staged into a local parameter-golf clone, verified there, and cleaned back out with a committed dry-run report.",
+      "evidence_refs": [
+        "docs/PARAMETER_GOLF_PR_SUBMISSION_FLOW.md",
+        "fixtures/parameter_golf/reports/parameter_golf_local_clone_dry_run.json"
       ]
     },
     {
       "surface_id": "counted_runtime_story_for_record_track",
       "status": "blocked",
-      "detail": "The repo does not yet ship a defended record-track runtime payload or build-dependency story for a true training/eval entrypoint; only the review-wrapper accounting lane is explicit today.",
+      "detail": "The repo now ships a real non-record runtime payload and counts its exported bytes, but record-track promotion still lacks a fully defended counted-runtime or build-dependency story for the stronger true training/eval payload.",
       "evidence_refs": [
         "docs/PARAMETER_GOLF_ACCOUNTING.md",
+        "docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md",
         "fixtures/parameter_golf/reports/parameter_golf_research_harness_report.json"
       ]
     },
@@ -75,13 +108,6 @@
   ],
   "blockers": [
     {
-      "blocker_id": "record_wrapper_is_review_only",
-      "detail": "The current train_gpt.py package surface is intentionally a review wrapper and cannot be promoted to a record-track runtime claim.",
-      "blocking_surface_ids": [
-        "record_runtime_entrypoint"
-      ]
-    },
-    {
       "blocker_id": "record_runtime_bytes_not_yet_defended",
       "detail": "Record-track promotion still lacks a defended counted-runtime and build-dependency story for the real execution payload.",
       "blocking_surface_ids": [
@@ -96,6 +122,6 @@
       ]
     }
   ],
-  "claim_boundary": "record-track contract is now explicit, but the current lane remains blocked on a real record runtime entrypoint, a defended counted-runtime story, and reproducible 8xH100 challenge-speed execution",
-  "report_digest": "5d19e1671c91ed5042b7fd3532eda50d359bba1d2c0f79fb9d65f6a06958000a"
+  "claim_boundary": "record-track contract is now explicit, and the folder-local runtime entrypoint exists, but the current lane remains blocked on defended counted-runtime or build-dependency posture and reproducible 8xH100 challenge-speed execution",
+  "report_digest": "d74e94add1538a8ef108e9a6e59fbf0958452377e7153f62fb551edc558a8f02"
 }

@@ -18,10 +18,10 @@
       "shipped_wrapper_code_bytes",
       "required_build_dependency_bytes"
     ],
-    "baseline_submission_package_version": "2026.03.18.non_record_submission.v1",
-    "baseline_entrypoint_artifact_digest": "4c42817654c78c10db769c978351338e2be537889c8919b6d7d031c2d596aa31",
-    "baseline_model_artifact_digest": "09a4e000349c9dd077ccaee75f54e31fb7e52541969352aad6ac9aaa7c82e931",
-    "baseline_accounting_receipt_digest": "d9658711f0d336dcaa1052185be911e1869707eaecab6897f7400f1c7c5eb62a"
+    "baseline_submission_package_version": "2026.03.18.non_record_submission.v2",
+    "baseline_entrypoint_artifact_digest": "988e72c33e71b6e5111b1f79b0cb2af048dfb8fb323b1dc1e9f785d3d8f2f6d1",
+    "baseline_model_artifact_digest": "efe272503950104f1557f5c73cad69ce717e60d9b75f05e48d17ffbeb6940af1",
+    "baseline_accounting_receipt_digest": "275494441ebe609b39960972d02e8b0f3fcdc192b8644f440f4671d5c29f32c3"
   },
   "variants": [
     {
@@ -50,11 +50,11 @@
       ],
       "boundary_note": "This is the measured local-reference control for research comparison only; it is not a challenge-speed 8xH100 result.",
       "measured_metrics": {
-        "val_loss": 8.598987579345703,
-        "val_bpb": 9.924573389910272,
-        "bytes_total": 81202,
-        "bytes_code": 2216,
-        "bytes_model_int8_zlib": 78986,
+        "val_loss": 8.598987817764282,
+        "val_bpb": 9.924573665082512,
+        "bytes_total": 956676,
+        "bytes_code": 877718,
+        "bytes_model_int8_zlib": 78958,
         "logical_training_ms": 100
       }
     },
@@ -137,5 +137,5 @@
       "boundary_note": "Compression or quantization changes only belong in this harness when they still report the same counted components and final roundtrip metric as the baseline lane."
     }
   ],
-  "report_digest": "be4b3548367c5d066be784a5549c6d87bacb99c4d8d626f6acfd1ed48e5fdc93"
+  "report_digest": "9e39b19dff65a081ecfa36c98cbab62189a6845052831a2d35b6f9f0ecb7052e"
 }

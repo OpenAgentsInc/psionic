@@ -30,8 +30,9 @@ That is the honest posture on 2026-03-18 because:
 
 - exact challenge-oracle parity is landed
 - the repo now has a real non-record submission-folder output contract with
-  `README.md`, `submission.json`, `train.log`, a `train_gpt.py`-shaped wrapper,
-  and explicit counted-byte accounting
+  `README.md`, `submission.json`, `train.log`, a root-local `train_gpt.py`
+  launcher, a shipped Psionic runtime payload, and explicit counted-byte
+  accounting
 - the baseline single-device trainer is still only a bounded reference path
 - the `8xH100` distributed receipt lane is landed, but distributed-throughput
   closure is still not green
@@ -71,9 +72,12 @@ For Psionic this means:
 
 ### 2. A thin wrapper does not make the runtime free
 
-If `train_gpt.py` is only a launcher that shells out to a large Rust binary or
-to a vendored multi-crate workspace, Psionic must count the shipped runtime
-bytes and helper code bytes needed for evaluation.
+If `train_gpt.py` is only a launcher that shells out to a Rust binary or to a
+vendored multi-crate workspace, Psionic must count the shipped runtime bytes
+and helper code bytes needed for evaluation.
+
+The current non-record export now does exactly that for its shipped runtime
+payload.
 
 The wrapper is acceptable only when:
 

@@ -69,10 +69,11 @@
       "matrix_status": "implemented",
       "issue_refs": [
         "PGOLF-002/#161",
-        "PGOLF-401/#172"
+        "PGOLF-401/#172",
+        "PGOLF-502/#185"
       ],
       "green_definition": "Psionic can emit one self-contained submission folder with explicit artifact-byte accounting, runnable entrypoint shape, record metadata, and preserved receipts.",
-      "current_repo_truth": "psionic-train now ships a typed non-record submission package builder that emits README.md, submission.json, train.log, a runnable train_gpt.py review wrapper, the counted int8+zlib model artifact, preserved benchmark receipts, and a machine-readable counted-byte accounting receipt, plus a writer that materializes the folder contract to disk.",
+      "current_repo_truth": "psionic-train now ships a typed non-record submission package builder that emits README.md, submission.json, train.log, a root-local train_gpt.py launcher, a shipped Psionic runtime payload plus runtime manifest and fixture, the counted int8+zlib model artifact, preserved benchmark receipts, and a machine-readable counted-byte accounting receipt, plus a writer that materializes the folder contract to disk.",
       "boundary_note": "This closes the first honest non-record package only; it does not imply record-track runtime closure or 8xH100 record readiness."
     },
     {
@@ -82,12 +83,17 @@
         "PGOLF-002/#161",
         "PGOLF-302/#170",
         "PGOLF-401/#172",
-        "PGOLF-403/#174"
+        "PGOLF-403/#174",
+        "PGOLF-502/#185",
+        "PGOLF-603/#190",
+        "PGOLF-701/#191",
+        "PGOLF-702/#192",
+        "PGOLF-703/#193"
       ],
       "green_definition": "Psionic can defend a record-track submission under the published challenge rules, including counted code, self-contained evaluation, and reproducible 8xH100 execution.",
-      "current_repo_truth": "Psionic now has a committed blocked record-track contract that binds the acceptance report, non-record package surface, research harness, and distributed benchmark reference together, but it still marks the review-only entrypoint, undefended counted-runtime story, and reproducible challenge-speed 8xH100 execution as explicit blockers.",
+      "current_repo_truth": "Psionic now has a committed blocked record-track contract that binds the acceptance report, non-record package surface, exported-folder evidence and replay verification, typed promotion receipt posture, final PR-bundle generation, local challenge-clone dry run, research harness, and distributed benchmark reference together. The folder-local runtime and maintainer-facing review surfaces are now explicit, but defended counted-runtime or build-dependency posture and reproducible challenge-speed 8xH100 execution remain explicit blockers.",
       "boundary_note": "Treat this as stronger blocked truth, not as green record-track readiness."
     }
   ],
-  "report_digest": "4ae158e997014041e191bbae74a021a6f109d9a28f9b3761899d7e81e32fa676"
+  "report_digest": "14989ffac94a50025a4e02ae5a2a626940e6db7fd48a65eee43460682e6d8e50"
 }

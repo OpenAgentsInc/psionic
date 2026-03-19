@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "report_id": "parameter_golf.final_pr_bundle.v1",
+  "submission_id": "2026-03-18_psionic_local_reference_runtime_replay_v2",
+  "track_id": "non-record-unlimited-compute-16mb",
+  "record_folder_relpath": "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2",
+  "submission_run_evidence_path": "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/psionic_parameter_golf_submission_run_evidence.json",
+  "replay_verification_path": "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/psionic_parameter_golf_record_folder_replay_verification.json",
+  "promotion_receipt_path": "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/psionic_parameter_golf_submission_promotion_receipt.json",
+  "checklist_path": "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/PSIONIC_PARAMETER_GOLF_PR_CHECKLIST.md",
+  "generated_submission_files": [
+    {
+      "relative_path": "PSIONIC_PARAMETER_GOLF_PR_CHECKLIST.md",
+      "size_bytes": 1021,
+      "sha256_digest": "21995cf7c55e9b2d20496830c28558f6a56725d60a497da3bbedcf04c7def201"
+    },
+    {
+      "relative_path": "README.md",
+      "size_bytes": 3387,
+      "sha256_digest": "740aabc951eac44e64bf0e12f7d2cca4ce97bbff9b7fced335f53fea1e54d806"
+    },
+    {
+      "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_benchmark_package.json",
+      "size_bytes": 2164,
+      "sha256_digest": "227ba34432e9e04599fa758a870d4f05ab528533becc761d7fefce0cc15be60d"
+    },
+    {
+      "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_challenge_benchmark_receipt.json",
+      "size_bytes": 11075,
+      "sha256_digest": "1a8389405edfbdf6c90f88a1eed822bcf374e80bfaa4fb6b8492a44a4a8f5ac1"
+    },
+    {
+      "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_challenge_score_report.json",
+      "size_bytes": 2140,
+      "sha256_digest": "8a406e324d688da149a50f209852c050374183563a556f5b5d52df6b6df0e98e"
+    },
+    {
+      "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_accounting.json",
+      "size_bytes": 1991,
+      "sha256_digest": "9177d05a5f80bbd8231c873d3eaa3b341375aaa060fd33c9ea398e51173ab8a4"
+    },
+    {
+      "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_runtime_receipt.json",
+      "size_bytes": 1419,
+      "sha256_digest": "9ade0e84447db43aab97480ff102dba82eb22114bcf6d1364cfecb6b25c66943"
+    },
+    {
+      "relative_path": "parameter-golf-local-reference-run/benchmark/run_bundle.json",
+      "size_bytes": 4681,
+      "sha256_digest": "4b5214c5df0838be6e764c679c1360a772d522b5421f9c266bfdb2dc94e74237"
+    },
+    {
+      "relative_path": "parameter-golf-local-reference-run/step-00002/final_model.int8.ptz",
+      "size_bytes": 78958,
+      "sha256_digest": "016f74f4e958adc56ba26b13e41a316724bf966deebcb44cdf867fe51b065a16"
+    },
+    {
+      "relative_path": "psionic_parameter_golf_record_folder_replay_verification.json",
+      "size_bytes": 3468,
+      "sha256_digest": "ca9ca8d0b100ad2136d62ca7d1c0b8efd398ec9efbad89a20c6755bf73db1198"
+    },
+    {
+      "relative_path": "psionic_parameter_golf_submission_promotion_receipt.json",
+      "size_bytes": 2045,
+      "sha256_digest": "b1d34aeb2f11fc4c750b371c6244e277376b76c9cf4e34788f1218ae13fcb32a"
+    },
+    {
+      "relative_path": "psionic_parameter_golf_submission_run_evidence.json",
+      "size_bytes": 16576,
+      "sha256_digest": "fd7da1a84d8a130936f3b62c46c8c2bf357ba8423cdba200d25c5dc7daa46417"
+    },
+    {
+      "relative_path": "runtime/parameter_golf_local_reference_fixture.json",
+      "size_bytes": 1591,
+      "sha256_digest": "a1e9929d59429fe6d6f668ca2b7677fdc898d59f0f686050c52ffb948736e452"
+    },
+    {
+      "relative_path": "runtime/parameter_golf_submission_runtime",
+      "size_bytes": 877328,
+      "sha256_digest": "555cfb1605d8512c4c075e00462702bc2434adf5d480a7ce6e2c598299203287"
+    },
+    {
+      "relative_path": "runtime/parameter_golf_submission_runtime.json",
+      "size_bytes": 1428,
+      "sha256_digest": "66c8d3ec51a45d0b79773c0eeb2e7dd7e3b79159570245003cea6aff4c6c3130"
+    },
+    {
+      "relative_path": "submission.json",
+      "size_bytes": 2266,
+      "sha256_digest": "0805a65323bceb46bcd85bdd2e5f49765b6a354da971fdadd7667a348bc55e64"
+    },
+    {
+      "relative_path": "train.log",
+      "size_bytes": 634,
+      "sha256_digest": "e7a3c1805c6d5b20b2c005333e3eb06454aed0ee47a2385250dba52ad39ebc70"
+    },
+    {
+      "relative_path": "train_gpt.py",
+      "size_bytes": 390,
+      "sha256_digest": "018c98cebca044ae72c38eed3799b60de46926dff4f6c787d92d2d366562bd39"
+    }
+  ],
+  "required_review_artifacts": [
+    "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/README.md",
+    "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/submission.json",
+    "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/train.log",
+    "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/train_gpt.py",
+    "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/psionic_parameter_golf_submission_run_evidence.json",
+    "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/psionic_parameter_golf_record_folder_replay_verification.json",
+    "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/psionic_parameter_golf_submission_promotion_receipt.json",
+    "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/PSIONIC_PARAMETER_GOLF_PR_CHECKLIST.md"
+  ],
+  "claim_boundary": "This bundle is PR-ready for the current non-record lane only. It adds the exact records/... folder plus maintainer-facing evidence and checklist text, but the included promotion receipt still refuses record promotion until true record-track evidence exists.",
+  "report_digest": "56b86d5c0d5c0c9e201ba1eac91c2bee7c14b5fcb4056ae9e2317ce17bfe7881"
+}

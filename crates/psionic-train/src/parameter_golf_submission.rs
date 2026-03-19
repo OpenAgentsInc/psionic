@@ -9,11 +9,16 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::{ParameterGolfLocalReferenceBenchmarkBundle, ParameterGolfTrainingArtifact};
+use crate::{
+    parameter_golf_submission_runtime_payload_fixture_path,
+    ParameterGolfLocalReferenceBenchmarkBundle, ParameterGolfLocalReferenceFixture,
+    ParameterGolfReferenceTrainingConfig, ParameterGolfSubmissionRuntimeManifest,
+    ParameterGolfTrainingArtifact,
+};
 
-/// Stable version identifier for the first honest non-record submission package.
+/// Stable version identifier for the current non-record submission package.
 pub const PARAMETER_GOLF_NON_RECORD_SUBMISSION_VERSION: &str =
-    "2026.03.18.non_record_submission.v1";
+    "2026.03.18.non_record_submission.v2";
 
 /// Public non-record track identifier used by Parameter Golf.
 pub const PARAMETER_GOLF_NON_RECORD_TRACK_ID: &str = "non-record-unlimited-compute-16mb";
@@ -23,14 +28,22 @@ pub const PARAMETER_GOLF_SUBMISSION_ARTIFACT_CAP_BYTES: u64 = 16_000_000;
 
 /// Explicit claim boundary for the first non-record submission package.
 pub const PARAMETER_GOLF_NON_RECORD_SUBMISSION_CLAIM_BOUNDARY: &str =
-    "first honest non-record submission package only; the shipped train_gpt.py is a review wrapper over preserved Psionic artifacts and explicit counted-byte accounting, not a record-track runtime claim";
+    "current honest non-record submission package only; the shipped train_gpt.py launches a shipped Psionic runtime payload that restores the included int8+zlib artifact and re-runs the bounded local-reference validation path on the shipped fixture, not a record-track runtime claim";
 
 const PARAMETER_GOLF_NON_RECORD_RECORDS_DIR: &str = "records/track_non_record_16mb";
-const PARAMETER_GOLF_ACCOUNTING_COMPONENT_ENTRYPOINT: &str = "entrypoint_code_bytes";
-const PARAMETER_GOLF_ACCOUNTING_COMPONENT_MODEL: &str = "compressed_model_bytes";
-const PARAMETER_GOLF_ACCOUNTING_COMPONENT_RUNTIME: &str = "shipped_runtime_code_bytes";
-const PARAMETER_GOLF_ACCOUNTING_COMPONENT_WRAPPER: &str = "shipped_wrapper_code_bytes";
-const PARAMETER_GOLF_ACCOUNTING_COMPONENT_BUILD_DEPS: &str = "required_build_dependency_bytes";
+const PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF: &str =
+    "runtime/parameter_golf_submission_runtime";
+const PARAMETER_GOLF_RUNTIME_MANIFEST_ARTIFACT_REF: &str =
+    "runtime/parameter_golf_submission_runtime.json";
+const PARAMETER_GOLF_RUNTIME_FIXTURE_ARTIFACT_REF: &str =
+    "runtime/parameter_golf_local_reference_fixture.json";
+pub const PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF: &str =
+    "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_runtime_receipt.json";
+pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_ENTRYPOINT: &str = "entrypoint_code_bytes";
+pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_MODEL: &str = "compressed_model_bytes";
+pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_RUNTIME: &str = "shipped_runtime_code_bytes";
+pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_WRAPPER: &str = "shipped_wrapper_code_bytes";
+pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_BUILD_DEPS: &str = "required_build_dependency_bytes";
 
 /// Human-facing identity fields for one submission package.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -55,7 +68,7 @@ impl ParameterGolfSubmissionIdentity {
         Self {
             author: String::from("Psionic"),
             github_id: String::from("OpenAgentsInc"),
-            name: String::from("Psionic Local-Reference Review"),
+            name: String::from("Psionic Local-Reference Runtime Replay"),
             blurb: None,
             date: String::from("2026-03-18T00:00:00Z"),
         }
@@ -76,7 +89,7 @@ impl ParameterGolfNonRecordSubmissionConfig {
     #[must_use]
     pub fn local_reference_defaults() -> Self {
         Self {
-            submission_id: String::from("2026-03-18_psionic_local_reference_review_v1"),
+            submission_id: String::from("2026-03-18_psionic_local_reference_runtime_replay_v2"),
             identity: ParameterGolfSubmissionIdentity::psionic_local_reference_defaults(),
         }
     }
@@ -186,7 +199,8 @@ impl ParameterGolfSubmissionAccountingReceipt {
             counted_code_bytes,
             compressed_model_bytes,
             total_counted_bytes,
-            within_artifact_cap: total_counted_bytes <= PARAMETER_GOLF_SUBMISSION_ARTIFACT_CAP_BYTES,
+            within_artifact_cap: total_counted_bytes
+                <= PARAMETER_GOLF_SUBMISSION_ARTIFACT_CAP_BYTES,
             claim_boundary: String::from(PARAMETER_GOLF_NON_RECORD_SUBMISSION_CLAIM_BOUNDARY),
             receipt_digest: String::new(),
         };
@@ -257,6 +271,16 @@ pub struct ParameterGolfNonRecordSubmissionManifest {
     pub benchmark_receipt_artifact_ref: String,
     /// Benchmark receipt artifact digest.
     pub benchmark_receipt_artifact_digest: String,
+    /// Runtime manifest artifact path.
+    pub runtime_manifest_artifact_ref: String,
+    /// Runtime manifest artifact digest.
+    pub runtime_manifest_artifact_digest: String,
+    /// Runtime payload artifact path.
+    pub runtime_payload_artifact_ref: String,
+    /// Runtime payload artifact digest.
+    pub runtime_payload_artifact_digest: String,
+    /// Runtime receipt path written by the shipped payload.
+    pub runtime_receipt_artifact_ref: String,
 }
 
 /// File role inside the generated submission folder.
@@ -267,6 +291,9 @@ pub enum ParameterGolfSubmissionFileRole {
     SubmissionManifest,
     TrainLog,
     Entrypoint,
+    RuntimePayload,
+    RuntimeManifest,
+    RuntimeFixture,
     CompressedModel,
     BenchmarkPackage,
     ChallengeScoreReport,
@@ -323,6 +350,10 @@ pub struct ParameterGolfNonRecordSubmissionPackage {
     pub accounting_receipt_path: String,
     /// Benchmark receipt path.
     pub benchmark_receipt_path: String,
+    /// Runtime manifest path.
+    pub runtime_manifest_path: String,
+    /// Runtime payload path.
+    pub runtime_payload_path: String,
     /// Ordered submission-folder files.
     pub files: Vec<ParameterGolfSubmissionFileEntry>,
     /// Stable digest over the package contract.
@@ -335,12 +366,16 @@ impl ParameterGolfNonRecordSubmissionPackage {
         run_id: impl Into<String>,
         accounting_receipt_path: impl Into<String>,
         benchmark_receipt_path: impl Into<String>,
+        runtime_manifest_path: impl Into<String>,
+        runtime_payload_path: impl Into<String>,
         files: Vec<ParameterGolfSubmissionFileEntry>,
     ) -> Self {
         let submission_id = submission_id.into();
         let run_id = run_id.into();
         let accounting_receipt_path = accounting_receipt_path.into();
         let benchmark_receipt_path = benchmark_receipt_path.into();
+        let runtime_manifest_path = runtime_manifest_path.into();
+        let runtime_payload_path = runtime_payload_path.into();
         let mut package = Self {
             schema_version: 1,
             package_version: String::from(PARAMETER_GOLF_NON_RECORD_SUBMISSION_VERSION),
@@ -358,6 +393,8 @@ impl ParameterGolfNonRecordSubmissionPackage {
             submission_manifest_path: String::from("submission.json"),
             accounting_receipt_path,
             benchmark_receipt_path,
+            runtime_manifest_path,
+            runtime_payload_path,
             files,
             package_digest: String::new(),
         };
@@ -413,6 +450,8 @@ pub enum ParameterGolfSubmissionError {
         message: String,
     },
     #[error(transparent)]
+    ReferenceTraining(#[from] crate::ParameterGolfReferenceTrainingError),
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 }
 
@@ -424,28 +463,88 @@ pub fn build_parameter_golf_non_record_submission_bundle(
     config.validate()?;
 
     let run_id = benchmark_bundle.run_bundle.run_id.clone();
+    let fixture = ParameterGolfLocalReferenceFixture::reference()?;
+    let runtime_config = ParameterGolfReferenceTrainingConfig::local_reference();
     let model_artifact = benchmark_bundle
         .training_outcome
         .int8_zlib_model_artifact
         .clone();
     validate_relative_path(model_artifact.artifact_ref.as_str())?;
-    validate_relative_path(benchmark_bundle.benchmark_package_artifact.artifact_ref.as_str())?;
+    validate_relative_path(
+        benchmark_bundle
+            .benchmark_package_artifact
+            .artifact_ref
+            .as_str(),
+    )?;
     validate_relative_path(
         benchmark_bundle
             .challenge_score_report_artifact
             .artifact_ref
             .as_str(),
     )?;
-    validate_relative_path(benchmark_bundle.benchmark_receipt_artifact.artifact_ref.as_str())?;
+    validate_relative_path(
+        benchmark_bundle
+            .benchmark_receipt_artifact
+            .artifact_ref
+            .as_str(),
+    )?;
     validate_relative_path(benchmark_bundle.run_bundle_artifact.artifact_ref.as_str())?;
+    validate_relative_path(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF)?;
+    validate_relative_path(PARAMETER_GOLF_RUNTIME_MANIFEST_ARTIFACT_REF)?;
+    validate_relative_path(PARAMETER_GOLF_RUNTIME_FIXTURE_ARTIFACT_REF)?;
+    validate_relative_path(PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF)?;
+
+    let runtime_payload_artifact = ParameterGolfTrainingArtifact::new(
+        "parameter_golf_submission_runtime_payload",
+        String::from(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF),
+        fs::read(parameter_golf_submission_runtime_payload_fixture_path())?,
+    );
+    let runtime_fixture_artifact = json_artifact(
+        "parameter_golf_local_reference_fixture",
+        String::from(PARAMETER_GOLF_RUNTIME_FIXTURE_ARTIFACT_REF),
+        &fixture,
+    )?;
+    let mut runtime_manifest = ParameterGolfSubmissionRuntimeManifest {
+        schema_version: 1,
+        package_version: String::from(PARAMETER_GOLF_NON_RECORD_SUBMISSION_VERSION),
+        run_id: run_id.clone(),
+        benchmark_ref: String::from(PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF),
+        entrypoint_path: String::from("train_gpt.py"),
+        runtime_payload_path: String::from(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF),
+        submission_manifest_path: String::from("submission.json"),
+        accounting_receipt_path: format!("{run_id}/benchmark/parameter_golf_submission_accounting.json"),
+        fixture_path: String::from(PARAMETER_GOLF_RUNTIME_FIXTURE_ARTIFACT_REF),
+        model_artifact_path: model_artifact.artifact_ref.clone(),
+        runtime_receipt_path: String::from(PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF),
+        sequence_length: runtime_config.geometry.train_sequence_length,
+        validation_batch_tokens: runtime_config.geometry.local_validation_batch_tokens(),
+        expected_val_loss: benchmark_bundle
+            .challenge_score_report
+            .int8_zlib_roundtrip_validation
+            .mean_loss,
+        expected_val_bpb: benchmark_bundle
+            .challenge_score_report
+            .int8_zlib_roundtrip_validation
+            .bits_per_byte,
+        runtime_posture: String::from(
+            "shipped_binary_restores_int8_zlib_artifact_and_replays_bounded_local_reference_validation",
+        ),
+        claim_boundary: String::from(PARAMETER_GOLF_NON_RECORD_SUBMISSION_CLAIM_BOUNDARY),
+        manifest_digest: String::new(),
+    };
+    runtime_manifest.manifest_digest = runtime_manifest.stable_digest();
+    let runtime_manifest_artifact = json_artifact(
+        "parameter_golf_submission_runtime_manifest",
+        String::from(PARAMETER_GOLF_RUNTIME_MANIFEST_ARTIFACT_REF),
+        &runtime_manifest,
+    )?;
 
     let entrypoint_artifact = text_artifact(
         "parameter_golf_submission_entrypoint",
         String::from("train_gpt.py"),
-        render_entrypoint_wrapper(
-            benchmark_bundle.benchmark_receipt_artifact.artifact_ref.as_str(),
-            format!("{run_id}/benchmark/parameter_golf_submission_accounting.json").as_str(),
-            model_artifact.artifact_ref.as_str(),
+        render_entrypoint_launcher(
+            runtime_payload_artifact.artifact_ref.as_str(),
+            runtime_manifest_artifact.artifact_ref.as_str(),
         ),
     );
 
@@ -457,7 +556,7 @@ pub fn build_parameter_golf_non_record_submission_bundle(
                 component_id: String::from(PARAMETER_GOLF_ACCOUNTING_COMPONENT_ENTRYPOINT),
                 size_bytes: entrypoint_artifact.bytes.len() as u64,
                 detail: String::from(
-                    "the package ships one Python-stdlib train_gpt.py review wrapper at the submission root",
+                    "the package ships one Python train_gpt.py launcher at the submission root that execs the shipped Psionic runtime payload",
                 ),
             },
             ParameterGolfSubmissionAccountingComponent {
@@ -469,23 +568,23 @@ pub fn build_parameter_golf_non_record_submission_bundle(
             },
             ParameterGolfSubmissionAccountingComponent {
                 component_id: String::from(PARAMETER_GOLF_ACCOUNTING_COMPONENT_RUNTIME),
-                size_bytes: 0,
+                size_bytes: runtime_payload_artifact.bytes.len() as u64,
                 detail: String::from(
-                    "no Rust binary, vendored workspace, or separate runtime payload is shipped in this first non-record package",
+                    "the package ships one prebuilt Psionic runtime payload that restores the included int8+zlib artifact and replays the bounded local-reference validation path",
                 ),
             },
             ParameterGolfSubmissionAccountingComponent {
                 component_id: String::from(PARAMETER_GOLF_ACCOUNTING_COMPONENT_WRAPPER),
                 size_bytes: 0,
                 detail: String::from(
-                    "no helper wrapper files beyond the top-level train_gpt.py entrypoint are shipped in this package",
+                    "no helper wrapper code beyond the top-level train_gpt.py launcher is shipped in this package",
                 ),
             },
             ParameterGolfSubmissionAccountingComponent {
                 component_id: String::from(PARAMETER_GOLF_ACCOUNTING_COMPONENT_BUILD_DEPS),
                 size_bytes: 0,
                 detail: String::from(
-                    "the review wrapper uses only the Python standard library and requires no build step or vendored dependency tree",
+                    "the package ships a prebuilt runtime payload and requires no build step or vendored dependency tree during execution",
                 ),
             },
         ],
@@ -501,11 +600,14 @@ pub fn build_parameter_golf_non_record_submission_bundle(
         .step_metrics
         .last()
         .map_or(0, |metrics| metrics.global_step);
-    let wallclock_seconds =
-        benchmark_bundle.benchmark_receipt.wallclock_receipt.training_observed_ms as f64 / 1_000.0;
+    let wallclock_seconds = benchmark_bundle
+        .benchmark_receipt
+        .wallclock_receipt
+        .training_observed_ms as f64
+        / 1_000.0;
     let blurb = config.identity.blurb.clone().unwrap_or_else(|| {
         format!(
-            "Psionic non-record submission package for the bounded local-reference lane; it preserves benchmark and accounting receipts, ships a train_gpt.py-shaped review wrapper, and reports the final int8+zlib roundtrip score under the same oracle and counted-byte rules."
+            "Psionic non-record submission package for the bounded local-reference lane; it preserves benchmark and accounting receipts, ships a train_gpt.py launcher plus a prebuilt Psionic runtime payload, and replays the final int8+zlib roundtrip score under the same oracle and counted-byte rules."
         )
     });
     let submission_manifest = ParameterGolfNonRecordSubmissionManifest {
@@ -523,8 +625,14 @@ pub fn build_parameter_golf_non_record_submission_bundle(
             .challenge_score_report
             .int8_zlib_roundtrip_validation
             .bits_per_byte,
-        pre_quant_val_loss: benchmark_bundle.challenge_score_report.trained_validation.mean_loss,
-        pre_quant_val_bpb: benchmark_bundle.challenge_score_report.trained_validation.bits_per_byte,
+        pre_quant_val_loss: benchmark_bundle
+            .challenge_score_report
+            .trained_validation
+            .mean_loss,
+        pre_quant_val_bpb: benchmark_bundle
+            .challenge_score_report
+            .trained_validation
+            .bits_per_byte,
         step_stop,
         wallclock_seconds,
         bytes_total: accounting_receipt.total_counted_bytes,
@@ -537,11 +645,19 @@ pub fn build_parameter_golf_non_record_submission_bundle(
         entrypoint: entrypoint_artifact.artifact_ref.clone(),
         accounting_receipt_artifact_ref: accounting_receipt_artifact.artifact_ref.clone(),
         accounting_receipt_artifact_digest: accounting_receipt_artifact.artifact_digest.clone(),
-        benchmark_receipt_artifact_ref: benchmark_bundle.benchmark_receipt_artifact.artifact_ref.clone(),
+        benchmark_receipt_artifact_ref: benchmark_bundle
+            .benchmark_receipt_artifact
+            .artifact_ref
+            .clone(),
         benchmark_receipt_artifact_digest: benchmark_bundle
             .benchmark_receipt_artifact
             .artifact_digest
             .clone(),
+        runtime_manifest_artifact_ref: runtime_manifest_artifact.artifact_ref.clone(),
+        runtime_manifest_artifact_digest: runtime_manifest_artifact.artifact_digest.clone(),
+        runtime_payload_artifact_ref: runtime_payload_artifact.artifact_ref.clone(),
+        runtime_payload_artifact_digest: runtime_payload_artifact.artifact_digest.clone(),
+        runtime_receipt_artifact_ref: String::from(PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF),
     };
     let submission_manifest_artifact = json_artifact(
         "parameter_golf_submission_manifest",
@@ -569,6 +685,9 @@ pub fn build_parameter_golf_non_record_submission_bundle(
         submission_manifest_artifact,
         train_log_artifact,
         entrypoint_artifact,
+        runtime_payload_artifact,
+        runtime_manifest_artifact,
+        runtime_fixture_artifact,
         model_artifact,
         benchmark_bundle.benchmark_package_artifact.clone(),
         benchmark_bundle.challenge_score_report_artifact.clone(),
@@ -604,7 +723,12 @@ pub fn build_parameter_golf_non_record_submission_bundle(
             "{}/benchmark/parameter_golf_submission_accounting.json",
             benchmark_bundle.run_bundle.run_id
         ),
-        benchmark_bundle.benchmark_receipt_artifact.artifact_ref.as_str(),
+        benchmark_bundle
+            .benchmark_receipt_artifact
+            .artifact_ref
+            .as_str(),
+        String::from(PARAMETER_GOLF_RUNTIME_MANIFEST_ARTIFACT_REF),
+        String::from(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF),
         files,
     );
 
@@ -628,7 +752,32 @@ pub fn write_parameter_golf_non_record_submission_bundle(
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::write(path, artifact.bytes.as_slice())?;
+        fs::write(&path, artifact.bytes.as_slice())?;
+        maybe_make_executable(artifact.artifact_ref.as_str(), &path)?;
+    }
+    Ok(())
+}
+
+fn maybe_make_executable(
+    relative_path: &str,
+    path: &Path,
+) -> Result<(), ParameterGolfSubmissionError> {
+    #[cfg(unix)]
+    {
+        if matches!(
+            relative_path,
+            "train_gpt.py" | PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF
+        ) {
+            use std::os::unix::fs::PermissionsExt;
+
+            let mut permissions = fs::metadata(path)?.permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(path, permissions)?;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (relative_path, path);
     }
     Ok(())
 }
@@ -655,7 +804,30 @@ fn submission_role_and_detail(
         "train_gpt.py" => (
             ParameterGolfSubmissionFileRole::Entrypoint,
             true,
-            String::from("top-level Python-stdlib review wrapper used as the counted entrypoint"),
+            String::from(
+                "top-level Python launcher that execs the shipped Psionic runtime payload",
+            ),
+        ),
+        PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF => (
+            ParameterGolfSubmissionFileRole::RuntimePayload,
+            true,
+            String::from(
+                "shipped Psionic runtime payload used by the top-level train_gpt.py entrypoint",
+            ),
+        ),
+        PARAMETER_GOLF_RUNTIME_MANIFEST_ARTIFACT_REF => (
+            ParameterGolfSubmissionFileRole::RuntimeManifest,
+            false,
+            String::from(
+                "machine-readable runtime manifest consumed by the shipped Psionic payload",
+            ),
+        ),
+        PARAMETER_GOLF_RUNTIME_FIXTURE_ARTIFACT_REF => (
+            ParameterGolfSubmissionFileRole::RuntimeFixture,
+            false,
+            String::from(
+                "shipped bounded local-reference fixture reused by the runtime replay path",
+            ),
         ),
         _ if relative_path.ends_with("final_model.int8.ptz") => (
             ParameterGolfSubmissionFileRole::CompressedModel,
@@ -690,62 +862,22 @@ fn submission_role_and_detail(
     }
 }
 
-fn render_entrypoint_wrapper(
-    benchmark_receipt_ref: &str,
-    accounting_receipt_ref: &str,
-    model_artifact_ref: &str,
-) -> String {
+fn render_entrypoint_launcher(runtime_payload_ref: &str, runtime_manifest_ref: &str) -> String {
     format!(
         r#"#!/usr/bin/env python3
-import json
 from pathlib import Path
+import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parent
-RECEIPT_PATH = ROOT / "{benchmark_receipt_ref}"
-ACCOUNTING_PATH = ROOT / "{accounting_receipt_ref}"
-MODEL_PATH = ROOT / "{model_artifact_ref}"
+RUNTIME_PAYLOAD = ROOT / "{runtime_payload_ref}"
+RUNTIME_MANIFEST = ROOT / "{runtime_manifest_ref}"
 
-submission = json.loads((ROOT / "submission.json").read_text())
-receipt = json.loads(RECEIPT_PATH.read_text())
-accounting = json.loads(ACCOUNTING_PATH.read_text())
-
-if submission["bytes_total"] != accounting["total_counted_bytes"]:
-    raise SystemExit("submission.json bytes_total does not match the accounting receipt")
-if submission["bytes_code"] != accounting["counted_code_bytes"]:
-    raise SystemExit("submission.json bytes_code does not match the accounting receipt")
-if submission["val_bpb"] != receipt["score_report"]["int8_zlib_roundtrip_validation"]["bits_per_byte"]:
-    raise SystemExit("submission.json val_bpb does not match the benchmark receipt")
-if submission["val_loss"] != receipt["score_report"]["int8_zlib_roundtrip_validation"]["mean_loss"]:
-    raise SystemExit("submission.json val_loss does not match the benchmark receipt")
-if MODEL_PATH.stat().st_size != submission["bytes_model_int8_zlib"]:
-    raise SystemExit("compressed model size does not match submission.json")
-
-trained = receipt["score_report"]["trained_validation"]
-roundtrip = receipt["score_report"]["int8_zlib_roundtrip_validation"]
-
-print("psionic_non_record_submission_review track=" + submission["track"] + " run_id=" + submission["run_id"])
-print(
-    "trained_validation val_loss:{{:.8f}} val_bpb:{{:.8f}}".format(
-        trained["mean_loss"], trained["bits_per_byte"]
-    )
-)
-print(
-    "final_int8_zlib_roundtrip_exact val_loss:{{:.8f}} val_bpb:{{:.8f}}".format(
-        roundtrip["mean_loss"], roundtrip["bits_per_byte"]
-    )
-)
-print(
-    "artifact_accounting bytes_total={{}} bytes_code={{}} bytes_model_int8_zlib={{}}".format(
-        submission["bytes_total"],
-        submission["bytes_code"],
-        submission["bytes_model_int8_zlib"],
-    )
-)
-print("claim_boundary=" + submission["claim_boundary"])
+completed = subprocess.run([str(RUNTIME_PAYLOAD), str(RUNTIME_MANIFEST)], cwd=ROOT, check=False)
+sys.exit(completed.returncode)
 "#,
-        benchmark_receipt_ref = benchmark_receipt_ref,
-        accounting_receipt_ref = accounting_receipt_ref,
-        model_artifact_ref = model_artifact_ref,
+        runtime_payload_ref = runtime_payload_ref,
+        runtime_manifest_ref = runtime_manifest_ref,
     )
 }
 
@@ -774,8 +906,14 @@ fn render_train_log(
     let _ = writeln!(
         log,
         "trained_validation_exact val_loss:{:.8} val_bpb:{:.8}",
-        benchmark_bundle.challenge_score_report.trained_validation.mean_loss,
-        benchmark_bundle.challenge_score_report.trained_validation.bits_per_byte,
+        benchmark_bundle
+            .challenge_score_report
+            .trained_validation
+            .mean_loss,
+        benchmark_bundle
+            .challenge_score_report
+            .trained_validation
+            .bits_per_byte,
     );
     let _ = writeln!(
         log,
@@ -805,19 +943,11 @@ fn render_readme(
     );
     let _ = writeln!(
         readme,
-        "This package is intentionally **not** a record-track runtime claim. The shipped `train_gpt.py` is a review wrapper that validates the preserved Psionic benchmark and accounting artifacts, then prints the final metric lines from the included run.\n"
+        "This package is intentionally **not** a record-track runtime claim. The shipped `train_gpt.py` now launches a prebuilt Psionic runtime payload that restores the included int8+zlib model artifact and re-runs the bounded local-reference validation path on the shipped fixture, writing its own runtime receipt inside the folder.\n"
     );
     let _ = writeln!(readme, "Configuration:");
-    let _ = writeln!(
-        readme,
-        "- Track: `{}`",
-        submission_manifest.track
-    );
-    let _ = writeln!(
-        readme,
-        "- Run ID: `{}`",
-        submission_manifest.run_id
-    );
+    let _ = writeln!(readme, "- Track: `{}`", submission_manifest.track);
+    let _ = writeln!(readme, "- Run ID: `{}`", submission_manifest.run_id);
     let _ = writeln!(
         readme,
         "- Claim posture: `{}`",
@@ -835,6 +965,21 @@ fn render_readme(
     );
     let _ = writeln!(
         readme,
+        "- Runtime payload: `{}`",
+        submission_manifest.runtime_payload_artifact_ref
+    );
+    let _ = writeln!(
+        readme,
+        "- Runtime manifest: `{}`",
+        submission_manifest.runtime_manifest_artifact_ref
+    );
+    let _ = writeln!(
+        readme,
+        "- Runtime receipt path: `{}`",
+        submission_manifest.runtime_receipt_artifact_ref
+    );
+    let _ = writeln!(
+        readme,
         "- Validation oracle: `{}`\n",
         submission_manifest.benchmark_ref
     );
@@ -842,8 +987,14 @@ fn render_readme(
     let _ = writeln!(
         readme,
         "- Trained validation: `val_loss = {:.8}`, `val_bpb = {:.8}`",
-        benchmark_bundle.challenge_score_report.trained_validation.mean_loss,
-        benchmark_bundle.challenge_score_report.trained_validation.bits_per_byte,
+        benchmark_bundle
+            .challenge_score_report
+            .trained_validation
+            .mean_loss,
+        benchmark_bundle
+            .challenge_score_report
+            .trained_validation
+            .bits_per_byte,
     );
     let _ = writeln!(
         readme,
@@ -883,6 +1034,21 @@ fn render_readme(
     let _ = writeln!(
         readme,
         "- `{}`",
+        submission_manifest.runtime_payload_artifact_ref
+    );
+    let _ = writeln!(
+        readme,
+        "- `{}`",
+        submission_manifest.runtime_manifest_artifact_ref
+    );
+    let _ = writeln!(
+        readme,
+        "- `{}`",
+        PARAMETER_GOLF_RUNTIME_FIXTURE_ARTIFACT_REF
+    );
+    let _ = writeln!(
+        readme,
+        "- `{}`",
         benchmark_bundle
             .training_outcome
             .int8_zlib_model_artifact
@@ -896,7 +1062,9 @@ fn render_readme(
     let _ = writeln!(
         readme,
         "- `{}`",
-        benchmark_bundle.challenge_score_report_artifact.artifact_ref
+        benchmark_bundle
+            .challenge_score_report_artifact
+            .artifact_ref
     );
     let _ = writeln!(
         readme,
@@ -910,14 +1078,18 @@ fn render_readme(
     );
     let _ = writeln!(
         readme,
+        "- `{}`",
+        submission_manifest.runtime_receipt_artifact_ref
+    );
+    let _ = writeln!(
+        readme,
         "- `{}`\n",
         benchmark_bundle.run_bundle_artifact.artifact_ref
     );
     let _ = writeln!(
         readme,
         "The package root for challenge-repo publication is `{}/{}`.",
-        PARAMETER_GOLF_NON_RECORD_RECORDS_DIR,
-        submission_id
+        PARAMETER_GOLF_NON_RECORD_RECORDS_DIR, submission_id
     );
     readme
 }
@@ -990,21 +1162,26 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::process::Command;
     use std::{error::Error, fs};
 
     use super::{
-        PARAMETER_GOLF_NON_RECORD_SUBMISSION_VERSION, PARAMETER_GOLF_NON_RECORD_TRACK_ID,
         build_parameter_golf_non_record_submission_bundle,
         write_parameter_golf_non_record_submission_bundle,
+        PARAMETER_GOLF_ACCOUNTING_COMPONENT_BUILD_DEPS,
+        PARAMETER_GOLF_ACCOUNTING_COMPONENT_ENTRYPOINT, PARAMETER_GOLF_ACCOUNTING_COMPONENT_MODEL,
+        PARAMETER_GOLF_ACCOUNTING_COMPONENT_RUNTIME, PARAMETER_GOLF_ACCOUNTING_COMPONENT_WRAPPER,
+        PARAMETER_GOLF_NON_RECORD_SUBMISSION_VERSION, PARAMETER_GOLF_NON_RECORD_TRACK_ID,
+        PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF, PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF,
     };
     use crate::{
-        ParameterGolfLocalReferenceFixture, ParameterGolfNonRecordSubmissionConfig,
-        ParameterGolfReferenceTrainingConfig, benchmark_parameter_golf_local_reference,
+        benchmark_parameter_golf_local_reference, ParameterGolfLocalReferenceFixture,
+        ParameterGolfNonRecordSubmissionConfig, ParameterGolfReferenceTrainingConfig,
     };
 
     #[test]
-    fn parameter_golf_non_record_submission_bundle_is_machine_readable_and_writes_folder_contract()
-    -> Result<(), Box<dyn Error>> {
+    fn parameter_golf_non_record_submission_bundle_is_machine_readable_and_writes_folder_contract(
+    ) -> Result<(), Box<dyn Error>> {
         let fixture = ParameterGolfLocalReferenceFixture::reference()?;
         let config = ParameterGolfReferenceTrainingConfig::local_reference();
         let benchmark_bundle = benchmark_parameter_golf_local_reference(&fixture, &config)?;
@@ -1017,14 +1194,20 @@ mod tests {
             submission_bundle.package.package_version,
             PARAMETER_GOLF_NON_RECORD_SUBMISSION_VERSION
         );
-        assert_eq!(submission_bundle.package.track, PARAMETER_GOLF_NON_RECORD_TRACK_ID);
-        assert_eq!(submission_bundle.package.claim_posture, "non_record_submission");
+        assert_eq!(
+            submission_bundle.package.track,
+            PARAMETER_GOLF_NON_RECORD_TRACK_ID
+        );
+        assert_eq!(
+            submission_bundle.package.claim_posture,
+            "non_record_submission"
+        );
         assert_eq!(submission_bundle.package.entrypoint_path, "train_gpt.py");
         assert!(submission_bundle.accounting_receipt.within_artifact_cap);
-        assert!(submission_bundle
-            .submission_manifest
-            .bytes_total
-            == submission_bundle.accounting_receipt.total_counted_bytes);
+        assert!(
+            submission_bundle.submission_manifest.bytes_total
+                == submission_bundle.accounting_receipt.total_counted_bytes
+        );
         assert!(submission_bundle
             .artifact("README.md")
             .is_some_and(|artifact| !artifact.bytes.is_empty()));
@@ -1037,19 +1220,23 @@ mod tests {
         assert!(submission_bundle
             .artifact("train_gpt.py")
             .is_some_and(|artifact| !artifact.bytes.is_empty()));
+        assert!(submission_bundle
+            .artifact(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF)
+            .is_some_and(|artifact| !artifact.bytes.is_empty()));
         assert!(submission_bundle.package.files.iter().any(|file| {
             file.relative_path.ends_with("final_model.int8.ptz") && file.counts_toward_artifact_cap
         }));
 
         let temp_dir = tempfile::tempdir()?;
-        write_parameter_golf_non_record_submission_bundle(
-            &submission_bundle,
-            temp_dir.path(),
-        )?;
+        write_parameter_golf_non_record_submission_bundle(&submission_bundle, temp_dir.path())?;
         assert!(temp_dir.path().join("README.md").is_file());
         assert!(temp_dir.path().join("submission.json").is_file());
         assert!(temp_dir.path().join("train.log").is_file());
         assert!(temp_dir.path().join("train_gpt.py").is_file());
+        assert!(temp_dir
+            .path()
+            .join(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF)
+            .is_file());
         assert!(temp_dir
             .path()
             .join(format!(
@@ -1061,6 +1248,105 @@ mod tests {
         assert!(submission_json.contains("\"track\": \"non-record-unlimited-compute-16mb\""));
         let readme = fs::read_to_string(temp_dir.path().join("README.md"))?;
         assert!(readme.contains("non-record submission package"));
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_non_record_submission_entrypoint_runs_shipped_runtime(
+    ) -> Result<(), Box<dyn Error>> {
+        let fixture = ParameterGolfLocalReferenceFixture::reference()?;
+        let config = ParameterGolfReferenceTrainingConfig::local_reference();
+        let benchmark_bundle = benchmark_parameter_golf_local_reference(&fixture, &config)?;
+        let submission_bundle = build_parameter_golf_non_record_submission_bundle(
+            &benchmark_bundle,
+            &ParameterGolfNonRecordSubmissionConfig::local_reference_defaults(),
+        )?;
+
+        let temp_dir = tempfile::tempdir()?;
+        write_parameter_golf_non_record_submission_bundle(&submission_bundle, temp_dir.path())?;
+
+        let completed = Command::new("python3")
+            .arg("train_gpt.py")
+            .current_dir(temp_dir.path())
+            .output()?;
+        assert!(
+            completed.status.success(),
+            "entrypoint failed: stdout=`{}` stderr=`{}`",
+            String::from_utf8_lossy(&completed.stdout),
+            String::from_utf8_lossy(&completed.stderr),
+        );
+        let stdout = String::from_utf8_lossy(&completed.stdout);
+        assert!(stdout.contains("psionic_non_record_submission_runtime"));
+        assert!(stdout.contains("final_int8_zlib_roundtrip_exact"));
+        assert!(temp_dir
+            .path()
+            .join(PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF)
+            .is_file());
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_non_record_submission_accounting_counts_real_runtime_payload(
+    ) -> Result<(), Box<dyn Error>> {
+        let fixture = ParameterGolfLocalReferenceFixture::reference()?;
+        let config = ParameterGolfReferenceTrainingConfig::local_reference();
+        let benchmark_bundle = benchmark_parameter_golf_local_reference(&fixture, &config)?;
+        let submission_bundle = build_parameter_golf_non_record_submission_bundle(
+            &benchmark_bundle,
+            &ParameterGolfNonRecordSubmissionConfig::local_reference_defaults(),
+        )?;
+
+        let runtime_payload_size = submission_bundle
+            .artifact(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF)
+            .expect("runtime payload artifact should exist")
+            .bytes
+            .len() as u64;
+        let entrypoint_size = submission_bundle
+            .artifact("train_gpt.py")
+            .expect("entrypoint artifact should exist")
+            .bytes
+            .len() as u64;
+        let model_size = benchmark_bundle
+            .training_outcome
+            .int8_zlib_model_artifact
+            .bytes
+            .len() as u64;
+
+        let receipt = &submission_bundle.accounting_receipt;
+        let component_size = |component_id: &str| -> u64 {
+            receipt
+                .counted_components
+                .iter()
+                .find(|component| component.component_id == component_id)
+                .map(|component| component.size_bytes)
+                .expect("counted component should exist")
+        };
+
+        assert_eq!(
+            component_size(PARAMETER_GOLF_ACCOUNTING_COMPONENT_ENTRYPOINT),
+            entrypoint_size
+        );
+        assert_eq!(
+            component_size(PARAMETER_GOLF_ACCOUNTING_COMPONENT_RUNTIME),
+            runtime_payload_size
+        );
+        assert_eq!(
+            component_size(PARAMETER_GOLF_ACCOUNTING_COMPONENT_MODEL),
+            model_size
+        );
+        assert_eq!(
+            component_size(PARAMETER_GOLF_ACCOUNTING_COMPONENT_WRAPPER),
+            0
+        );
+        assert_eq!(
+            component_size(PARAMETER_GOLF_ACCOUNTING_COMPONENT_BUILD_DEPS),
+            0
+        );
+        assert_eq!(
+            receipt.total_counted_bytes,
+            entrypoint_size + runtime_payload_size + model_size
+        );
+        assert!(receipt.within_artifact_cap);
         Ok(())
     }
 }

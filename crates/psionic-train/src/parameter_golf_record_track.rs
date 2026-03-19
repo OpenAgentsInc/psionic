@@ -77,12 +77,20 @@ pub struct ParameterGolfRecordTrackContractReport {
     pub research_harness_report_digest: String,
     /// Baseline non-record package version.
     pub baseline_submission_package_version: String,
-    /// Stable digest of the shipped review-wrapper entrypoint.
+    /// Stable digest of the shipped submission entrypoint.
     pub baseline_entrypoint_artifact_digest: String,
     /// Stable digest of the counted compressed-model artifact.
     pub baseline_model_artifact_digest: String,
     /// Stable digest of the non-record accounting receipt.
     pub baseline_accounting_receipt_digest: String,
+    /// Stable digest of the exported submission run-evidence report.
+    pub baseline_submission_run_evidence_report_digest: String,
+    /// Stable digest of the exported folder replay-verification report.
+    pub baseline_record_folder_replay_verification_report_digest: String,
+    /// Stable digest of the final PR-bundle report.
+    pub baseline_final_pr_bundle_report_digest: String,
+    /// Stable digest of the local challenge-clone dry-run report.
+    pub baseline_local_clone_dry_run_report_digest: String,
     /// Ordered counted-component identifiers carried forward from the package lane.
     pub required_counted_component_ids: Vec<String>,
     /// Ordered required surfaces.
@@ -104,6 +112,10 @@ impl ParameterGolfRecordTrackContractReport {
         baseline_entrypoint_artifact_digest: impl Into<String>,
         baseline_model_artifact_digest: impl Into<String>,
         baseline_accounting_receipt_digest: impl Into<String>,
+        baseline_submission_run_evidence_report_digest: impl Into<String>,
+        baseline_record_folder_replay_verification_report_digest: impl Into<String>,
+        baseline_final_pr_bundle_report_digest: impl Into<String>,
+        baseline_local_clone_dry_run_report_digest: impl Into<String>,
         required_counted_component_ids: Vec<String>,
         required_surfaces: Vec<ParameterGolfRecordTrackRequiredSurface>,
         blockers: Vec<ParameterGolfRecordTrackBlocker>,
@@ -128,16 +140,26 @@ impl ParameterGolfRecordTrackContractReport {
             baseline_entrypoint_artifact_digest: baseline_entrypoint_artifact_digest.into(),
             baseline_model_artifact_digest: baseline_model_artifact_digest.into(),
             baseline_accounting_receipt_digest: baseline_accounting_receipt_digest.into(),
+            baseline_submission_run_evidence_report_digest:
+                baseline_submission_run_evidence_report_digest.into(),
+            baseline_record_folder_replay_verification_report_digest:
+                baseline_record_folder_replay_verification_report_digest.into(),
+            baseline_final_pr_bundle_report_digest:
+                baseline_final_pr_bundle_report_digest.into(),
+            baseline_local_clone_dry_run_report_digest:
+                baseline_local_clone_dry_run_report_digest.into(),
             required_counted_component_ids,
             required_surfaces,
             blockers,
             claim_boundary: String::from(
-                "record-track contract is now explicit, but the current lane remains blocked on a real record runtime entrypoint, a defended counted-runtime story, and reproducible 8xH100 challenge-speed execution",
+                "record-track contract is now explicit, and the folder-local runtime entrypoint exists, but the current lane remains blocked on defended counted-runtime or build-dependency posture and reproducible 8xH100 challenge-speed execution",
             ),
             report_digest: String::new(),
         };
-        report.report_digest =
-            stable_digest(b"psionic_parameter_golf_record_track_contract_report|", &report);
+        report.report_digest = stable_digest(
+            b"psionic_parameter_golf_record_track_contract_report|",
+            &report,
+        );
         report
     }
 }
@@ -191,6 +213,26 @@ struct ResearchHarnessComparisonSurfaceFixture {
     baseline_accounting_receipt_digest: String,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+struct SubmissionRunEvidenceFixture {
+    report_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct ReplayVerificationFixture {
+    report_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct FinalPrBundleFixture {
+    report_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct LocalCloneDryRunFixture {
+    report_digest: String,
+}
+
 /// Builds the committed blocked record-track contract report.
 #[must_use]
 pub fn build_parameter_golf_record_track_contract_report() -> ParameterGolfRecordTrackContractReport
@@ -203,6 +245,22 @@ pub fn build_parameter_golf_record_track_contract_report() -> ParameterGolfRecor
         "../../../fixtures/parameter_golf/reports/parameter_golf_research_harness_report.json"
     ))
     .expect("research harness fixture should decode");
+    let submission_run_evidence: SubmissionRunEvidenceFixture = serde_json::from_str(include_str!(
+        "../../../fixtures/parameter_golf/reports/parameter_golf_submission_run_evidence.json"
+    ))
+    .expect("submission run evidence fixture should decode");
+    let replay_verification: ReplayVerificationFixture = serde_json::from_str(include_str!(
+        "../../../fixtures/parameter_golf/reports/parameter_golf_record_folder_replay_verification.json"
+    ))
+    .expect("record-folder replay fixture should decode");
+    let final_pr_bundle: FinalPrBundleFixture = serde_json::from_str(include_str!(
+        "../../../fixtures/parameter_golf/reports/parameter_golf_final_pr_bundle.json"
+    ))
+    .expect("final PR bundle fixture should decode");
+    let local_clone_dry_run: LocalCloneDryRunFixture = serde_json::from_str(include_str!(
+        "../../../fixtures/parameter_golf/reports/parameter_golf_local_clone_dry_run.json"
+    ))
+    .expect("local clone dry-run fixture should decode");
 
     let oracle = category(&acceptance.categories, "challenge-oracle-parity");
     let packaging = category(&acceptance.categories, "packaging-readiness");
@@ -252,21 +310,58 @@ pub fn build_parameter_golf_record_track_contract_report() -> ParameterGolfRecor
         },
         ParameterGolfRecordTrackRequiredSurface {
             surface_id: String::from("record_runtime_entrypoint"),
-            status: ParameterGolfRecordTrackSurfaceStatus::Blocked,
+            status: ParameterGolfRecordTrackSurfaceStatus::Satisfied,
             detail: format!(
-                "The current shipped train_gpt.py surface is the non-record review wrapper keyed by entrypoint digest `{}`; it is not yet a real record-track runtime entrypoint.",
+                "The current shipped train_gpt.py surface is a real non-record submission launcher keyed by entrypoint digest `{}`; it execs a shipped Psionic runtime payload, replays the bounded local-reference validation path, and writes a runtime receipt inside the exported folder.",
                 research.comparison_surface.baseline_entrypoint_artifact_digest
             ),
-            evidence_refs: vec![String::from("docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md")],
+            evidence_refs: vec![
+                String::from("docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md"),
+                String::from("docs/PARAMETER_GOLF_RECORD_FOLDER_COMPATIBILITY.md"),
+            ],
+        },
+        ParameterGolfRecordTrackRequiredSurface {
+            surface_id: String::from("folder_local_replay_verification"),
+            status: ParameterGolfRecordTrackSurfaceStatus::Satisfied,
+            detail: String::from(
+                "The exported folder now carries a machine-readable replay verifier that replays offline execution, checks final metrics against train.log plus runtime and benchmark receipts, and checks counted bytes against the shipped accounting contract.",
+            ),
+            evidence_refs: vec![
+                String::from("docs/PARAMETER_GOLF_EXPORTED_SUBMISSION_EVIDENCE.md"),
+                String::from("fixtures/parameter_golf/reports/parameter_golf_record_folder_replay_verification.json"),
+            ],
+        },
+        ParameterGolfRecordTrackRequiredSurface {
+            surface_id: String::from("maintainer_facing_pr_bundle"),
+            status: ParameterGolfRecordTrackSurfaceStatus::Satisfied,
+            detail: String::from(
+                "Psionic now owns a deterministic final PR-bundle generator with explicit review artifacts, promotion receipt posture, and maintainer-facing checklist text for the live challenge repo.",
+            ),
+            evidence_refs: vec![
+                String::from("docs/PARAMETER_GOLF_PR_SUBMISSION_FLOW.md"),
+                String::from("fixtures/parameter_golf/reports/parameter_golf_final_pr_bundle.json"),
+            ],
+        },
+        ParameterGolfRecordTrackRequiredSurface {
+            surface_id: String::from("local_challenge_clone_dry_run"),
+            status: ParameterGolfRecordTrackSurfaceStatus::Satisfied,
+            detail: String::from(
+                "The current generated folder has already been staged into a local parameter-golf clone, verified there, and cleaned back out with a committed dry-run report.",
+            ),
+            evidence_refs: vec![
+                String::from("docs/PARAMETER_GOLF_PR_SUBMISSION_FLOW.md"),
+                String::from("fixtures/parameter_golf/reports/parameter_golf_local_clone_dry_run.json"),
+            ],
         },
         ParameterGolfRecordTrackRequiredSurface {
             surface_id: String::from("counted_runtime_story_for_record_track"),
             status: ParameterGolfRecordTrackSurfaceStatus::Blocked,
             detail: String::from(
-                "The repo does not yet ship a defended record-track runtime payload or build-dependency story for a true training/eval entrypoint; only the review-wrapper accounting lane is explicit today.",
+                "The repo now ships a real non-record runtime payload and counts its exported bytes, but record-track promotion still lacks a fully defended counted-runtime or build-dependency story for the stronger true training/eval payload.",
             ),
             evidence_refs: vec![
                 String::from("docs/PARAMETER_GOLF_ACCOUNTING.md"),
+                String::from("docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md"),
                 String::from("fixtures/parameter_golf/reports/parameter_golf_research_harness_report.json"),
             ],
         },
@@ -288,13 +383,6 @@ pub fn build_parameter_golf_record_track_contract_report() -> ParameterGolfRecor
         },
     ];
     let blockers = vec![
-        ParameterGolfRecordTrackBlocker {
-            blocker_id: String::from("record_wrapper_is_review_only"),
-            detail: String::from(
-                "The current train_gpt.py package surface is intentionally a review wrapper and cannot be promoted to a record-track runtime claim.",
-            ),
-            blocking_surface_ids: vec![String::from("record_runtime_entrypoint")],
-        },
         ParameterGolfRecordTrackBlocker {
             blocker_id: String::from("record_runtime_bytes_not_yet_defended"),
             detail: String::from(
@@ -326,6 +414,10 @@ pub fn build_parameter_golf_record_track_contract_report() -> ParameterGolfRecor
         research
             .comparison_surface
             .baseline_accounting_receipt_digest,
+        submission_run_evidence.report_digest,
+        replay_verification.report_digest,
+        final_pr_bundle.report_digest,
+        local_clone_dry_run.report_digest,
         research.comparison_surface.counted_component_ids,
         required_surfaces,
         blockers,
@@ -389,10 +481,12 @@ fn read_repo_json<T: DeserializeOwned>(
         path: path.display().to_string(),
         error,
     })?;
-    serde_json::from_slice(&bytes).map_err(|error| ParameterGolfRecordTrackContractError::Deserialize {
-        artifact_kind: String::from("parameter_golf_record_track_contract_report"),
-        path: path.display().to_string(),
-        error,
+    serde_json::from_slice(&bytes).map_err(|error| {
+        ParameterGolfRecordTrackContractError::Deserialize {
+            artifact_kind: String::from("parameter_golf_record_track_contract_report"),
+            path: path.display().to_string(),
+            error,
+        }
     })
 }
 
@@ -406,23 +500,30 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        PARAMETER_GOLF_RECORD_TRACK_CONTRACT_REPORT_REF,
-        ParameterGolfRecordTrackContractReport, ParameterGolfRecordTrackDisposition,
         build_parameter_golf_record_track_contract_report,
         parameter_golf_record_track_contract_report_path, read_repo_json,
-        write_parameter_golf_record_track_contract_report,
+        write_parameter_golf_record_track_contract_report, ParameterGolfRecordTrackContractReport,
+        ParameterGolfRecordTrackDisposition, ParameterGolfRecordTrackSurfaceStatus,
+        PARAMETER_GOLF_RECORD_TRACK_CONTRACT_REPORT_REF,
     };
 
     #[test]
     fn parameter_golf_record_track_contract_stays_explicitly_blocked() {
         let report = build_parameter_golf_record_track_contract_report();
 
-        assert_eq!(report.disposition, ParameterGolfRecordTrackDisposition::Blocked);
+        assert_eq!(
+            report.disposition,
+            ParameterGolfRecordTrackDisposition::Blocked
+        );
         assert_eq!(report.current_max_claim_posture, "non_record_submission");
         assert!(report
             .blockers
             .iter()
-            .any(|blocker| blocker.blocker_id == "record_wrapper_is_review_only"));
+            .any(|blocker| blocker.blocker_id == "record_runtime_bytes_not_yet_defended"));
+        assert!(report.required_surfaces.iter().any(|surface| {
+            surface.surface_id == "record_runtime_entrypoint"
+                && surface.status == ParameterGolfRecordTrackSurfaceStatus::Satisfied
+        }));
         assert!(report
             .required_surfaces
             .iter()

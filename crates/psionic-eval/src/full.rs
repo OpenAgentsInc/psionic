@@ -18,6 +18,8 @@ mod attnres_training;
 mod parameter_golf_benchmark;
 #[path = "parameter_golf_distributed.rs"]
 mod parameter_golf_distributed;
+#[path = "parameter_golf_promotion.rs"]
+mod parameter_golf_promotion;
 #[path = "parameter_golf_training.rs"]
 mod parameter_golf_training;
 #[path = "tassadar.rs"]
@@ -232,6 +234,7 @@ pub use attnres::*;
 pub use attnres_training::*;
 pub use parameter_golf_benchmark::*;
 pub use parameter_golf_distributed::*;
+pub use parameter_golf_promotion::*;
 pub use parameter_golf_training::*;
 pub use tassadar::*;
 pub use tassadar_approximate_attention_closure_matrix::*;

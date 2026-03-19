@@ -74,7 +74,7 @@ pub struct ParameterGolfResearchComparisonSurface {
     pub counted_component_ids: Vec<String>,
     /// Baseline package version that owns the current accounting posture.
     pub baseline_submission_package_version: String,
-    /// Stable digest of the shipped review wrapper entrypoint.
+    /// Stable digest of the shipped submission entrypoint.
     pub baseline_entrypoint_artifact_digest: String,
     /// Stable digest of the counted compressed-model artifact.
     pub baseline_model_artifact_digest: String,

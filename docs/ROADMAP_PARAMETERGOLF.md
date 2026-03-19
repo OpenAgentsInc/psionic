@@ -229,11 +229,11 @@ Psionic does not yet ship the challenge lane itself:
   communication, wallclock, memory, and explicit refusal truth, but the public
   CUDA train path still carries typed blocker notes for decoder-kernel and
   runtime widening
-- a first honest non-record wrapper and record-folder output contract now
-  exist, but the generated folder is still a review package whose top-level
-  `train_gpt.py` validates preserved Psionic receipts rather than serving as
-  the real challenge runtime entrypoint, so neither record-track nor true
-  challenge-PR submission posture is closed yet
+- a first honest non-record runtime package and record-folder output contract
+  now exist, with a top-level `train_gpt.py` launcher that executes a shipped
+  Psionic payload inside the folder, but the path is still a bounded local-
+  reference replay rather than a promoted record-track runtime, so neither
+  record-track nor true challenge-PR submission posture is closed yet
 
 ## Gap Map
 
@@ -242,11 +242,11 @@ Psionic does not yet ship the challenge lane itself:
 | `psionic-data` | `implemented_early` generic manifests, tokenizer digests, iteration, packing, and distributed feed planning, plus a landed Parameter Golf shard loader, local-dir manifest builder, deterministic token-stream contract, SentencePiece byte-accounting LUT oracle, and frozen parity fixtures for shard loading, validation slicing, `val_loss`, and `val_bpb` parity against the public Python and MLX scripts | wire the data and tokenizer contracts into exact eval receipts and trainer ingestion |
 | `psionic-models` | `implemented_early` model metadata plus bounded model families and runtime tokenizers, now including a landed Parameter Golf reference decoder with tied embeddings, GQA, RoPE, RMSNorm-without-weight, learned residual mixing, skip weights, tanh logit softcap, stable tensor naming, baseline parameter accounting, and a frozen `train_gpt.py` parity fixture at the public `9x512` shape, plus new named-parameter override and export helpers used by the single-device reference trainer | widen the family toward faster train-time or research variants without losing the frozen oracle |
 | `psionic-nn` | `implemented` reusable layers, losses, optimizer shells, and eval-only quantization wrappers | widen or compose the current layer set into a reusable causal-decoder path and add any missing train-time primitive support the lane needs |
-| `psionic-train` | `implemented_early` fixed-budget training core, optimizer math, mixed precision, model IO, checkpoint, and replay truth, plus a landed Parameter Golf lane module for the public optimizer split, baseline schedule helpers, exact Muon reference math, a frozen `train_gpt.py` optimizer parity fixture, a bounded local-reference trainer with challenge batch geometry, grad accumulation, checkpoint or restart state, raw safetensors export, and int8+zlib roundtrip restore, and now a local-reference benchmark bundle builder that emits score, wallclock, memory, artifact-size, and train or eval bundle-root receipts | widen from the CPU reference path to the measured distributed challenge lane and carry the new receipt lane forward to real multi-GPU evidence |
+| `psionic-train` | `implemented_early` fixed-budget training core, optimizer math, mixed precision, model IO, checkpoint, and replay truth, plus a landed Parameter Golf lane module for the public optimizer split, baseline schedule helpers, exact Muon reference math, a frozen `train_gpt.py` optimizer parity fixture, a bounded local-reference trainer with challenge batch geometry, grad accumulation, checkpoint or restart state, raw safetensors export, int8+zlib roundtrip restore, and a local-reference benchmark bundle builder that emits score, wallclock, memory, artifact-size, and train or eval bundle-root receipts plus a shipped non-record runtime replay path | widen from the CPU reference path to the measured distributed challenge lane and carry the new receipt lane forward to real multi-GPU evidence |
 | `psionic-eval` | `implemented_early` benchmark and eval contracts, with a tracking-only lane acceptance checker, a landed Parameter Golf validation eval report used by the local-reference trainer and roundtrip checks, and now a dedicated Parameter Golf benchmark package plus challenge score and receipt contracts | connect the landed receipt lane to real distributed runs, benchmark-package bundles, and leaderboard-facing review without overclaiming local-reference measurements |
 | `psionic-distributed` | `implemented_early` public distributed helpers with reference-emulated public collectives | add the real multi-GPU training path we intend to use for `8xH100`, plus honest topology, communication, and refusal receipts |
 | `psionic-array` and backends | `implemented_early` bounded CPU/Metal/CUDA public surface, with wider CUDA backend kernels below it, and now a landed Parameter Golf CUDA training coverage report that keeps BF16, RoPE or GQA attention, RMSNorm, residual-mix, Muon, and quantized-export requirement families explicit with a stable blocker list | retire the remaining CUDA train-time blockers by widening the public runtime or kernel path needed for competitive small-decoder throughput without overclaiming the public array surface |
-| packaging and compatibility | `implemented_early` for a repo-local review package only | replace the review-wrapper package with a true Psionic submission runtime entrypoint, emit the exact `records/...` folder contract expected by the public challenge repo, add per-file counted-runtime and build-dependency accounting for the shipped payload, and verify that the exported folder compiles and runs offline inside a local `parameter-golf` clone |
+| packaging and compatibility | `implemented_early` for a real non-record runtime package | keep the shipped folder contract honest, add defended counted-runtime and build-dependency posture for stronger payloads, and verify that the exported folder compiles and runs offline inside a local `parameter-golf` clone |
 
 ## Strategy
 
@@ -399,11 +399,11 @@ research without losing the oracle.
 
 | ID | Status | Proposed GitHub issue title | Description |
 | --- | --- | --- | --- |
-| `PGOLF-401` / [#172](https://github.com/OpenAgentsInc/psionic/issues/172) | done (2026-03-18) | `Psionic Parameter Golf: add a non-record submission wrapper and record-folder output contract` | `psionic-train` now ships a typed non-record submission package builder plus folder writer that emit `README.md`, `submission.json`, `train.log`, a runnable `train_gpt.py` review wrapper, preserved benchmark artifacts, and a machine-readable counted-byte accounting receipt without pretending a hidden Rust runtime is free. |
+| `PGOLF-401` / [#172](https://github.com/OpenAgentsInc/psionic/issues/172) | done (2026-03-18) | `Psionic Parameter Golf: add a non-record submission wrapper and record-folder output contract` | `psionic-train` now ships a typed non-record submission package builder plus folder writer that emit `README.md`, `submission.json`, `train.log`, a runnable `train_gpt.py` surface, preserved benchmark artifacts, and a machine-readable counted-byte accounting receipt without pretending a hidden Rust runtime is free. |
 | `PGOLF-402` / [#173](https://github.com/OpenAgentsInc/psionic/issues/173) | done (2026-03-18) | `Psionic Parameter Golf: add a research harness for post-parity architecture and compression variants` | `psionic-research` now ships a committed Parameter Golf research-harness report that freezes one measured baseline control plus explicit shared-depth or recurrent, stronger parameter-tying, and compression or quantization candidate families against the same oracle digests, submission metric, and counted-byte vocabulary used by the landed non-record package. |
-| `PGOLF-403` / [#174](https://github.com/OpenAgentsInc/psionic/issues/174) | done (2026-03-18) | `Psionic Parameter Golf: add a record-track submission contract once public accounting is explicit` | `psionic-train` now ships a committed blocked record-track contract report that binds the acceptance report, non-record package surface, research harness, and distributed benchmark reference together while explicitly refusing promotion beyond `non_record_submission` until the runtime-entrypoint, counted-runtime, and reproducible `8xH100` blockers are retired. |
+| `PGOLF-403` / [#174](https://github.com/OpenAgentsInc/psionic/issues/174) | done (2026-03-18) | `Psionic Parameter Golf: add a record-track submission contract once public accounting is explicit` | `psionic-train` now ships a committed blocked record-track contract report that binds the acceptance report, non-record package surface, research harness, and distributed benchmark reference together while explicitly refusing promotion beyond `non_record_submission` until the counted-runtime and reproducible `8xH100` blockers are retired. |
 
-## Current Blocking Delta To A Real Challenge PR
+## Current Blocking Delta To A Real Record-Track PR
 
 The challenge repo now defines a narrower target than this roadmap originally
 spelled out.
@@ -417,21 +417,21 @@ The current delta is:
 
 | Public challenge requirement | Current Psionic status | Why this still blocks a real PR |
 | --- | --- | --- |
-| PR adds only one new `records/...` folder | Psionic can materialize a review package under a challenge-like folder root | The emitted folder is not yet validated as a drop-in addition inside the live `parameter-golf` repo, and it still carries preserved Psionic benchmark artifacts instead of only the minimal public submission surface. |
-| `train_gpt.py` and any shipped dependencies compile and run within that folder | The current `train_gpt.py` is a Python-stdlib review wrapper | Running the wrapper proves receipt consistency, not that the folder owns real Psionic training, export, and eval execution. |
-| code bytes plus compressed model bytes stay under `16,000,000` | Psionic counts the review wrapper plus model artifact honestly | That is not yet a defended budget for a real runtime payload, helper code, or build dependencies required by an actual submission entrypoint. |
+| PR adds only one new `records/...` folder | Psionic now has a deterministic final PR-bundle generator plus a verifier-backed dry-run against the live `parameter-golf` records contract | This closes the first honest maintainer-facing non-record PR surface, but it is still not a record-track runtime or promotion claim. |
+| `train_gpt.py` and any shipped dependencies compile and run within that folder | The current `train_gpt.py` launches a shipped runtime payload and the exported folder now passes end-to-end dry-runs against the live local challenge repo | This proves folder-local Psionic execution, but not yet a record-track training runtime or challenge-speed execution claim. |
+| code bytes plus compressed model bytes stay under `16,000,000` | Psionic now counts the shipped launcher, runtime payload, and model artifact against the real exported folder | The current non-record payload fits honestly, but the repo still lacks the stronger defended counted-runtime and build-dependency posture needed for record-track promotion. |
 | record-track runs reproduce under `10` minutes on `8xH100` | Psionic has an explicit distributed receipt lane and explicit blocker list | The repo still lacks a promoted submission entrypoint whose folder-local execution has actually produced reproducible record-track evidence on real `8xH100` hardware. |
-| SOTA record PRs carry delta/significance evidence or a systems-only waiver posture | Psionic has no maintainer-facing promotion receipt yet | Even if the runtime and folder path were closed tomorrow, the repo still would not emit the evidence bundle required to justify a record-track PR. |
+| SOTA record PRs carry delta/significance evidence or a systems-only waiver posture | `psionic-eval` now ships a typed maintainer-facing promotion receipt and `psionic-train` now carries it in the final PR bundle | This closes the promotion-evidence mechanics, but the current receipt still refuses record promotion until stronger record-track evidence exists. |
 
 That is the difference between the current truthful posture
 `non_record_submission` and the stronger claim "we can generate a real
-Parameter Golf PR."
+record-track Parameter Golf PR."
 
 ## Epic 5: Challenge-Repo Submission Surface
 
 ### Goal
 
-Turn the current honest review package into a real challenge-compatible
+Turn the current honest runtime package into a real challenge-compatible
 submission folder.
 
 ### Exit Criteria
@@ -447,10 +447,10 @@ submission folder.
 
 | ID | Status | Proposed GitHub issue title | Description |
 | --- | --- | --- | --- |
-| `PGOLF-501` / [#184](https://github.com/OpenAgentsInc/psionic/issues/184) | open (2026-03-18) | `Psionic Parameter Golf: add a challenge-repo record-folder compatibility matrix and external-repo verifier` | `psionic-train` plus `psionic-eval` should own one machine-readable compatibility report that checks the exact `README.md` / `submission.json` / `train.log` / `train_gpt.py` / dependency contract against the current `parameter-golf` repo layout and can dry-run the exported folder inside a local clone instead of assuming the Psionic package root is already challenge-compatible. |
-| `PGOLF-502` / [#185](https://github.com/OpenAgentsInc/psionic/issues/185) | open (2026-03-18) | `Psionic Parameter Golf: replace the non-record review wrapper with a true Psionic submission entrypoint` | The generated `train_gpt.py` must stop being a receipt-review shim and become the real submission entrypoint for Psionic-owned training, export, and eval, while preserving the current oracle and accounting honesty boundaries. |
-| `PGOLF-503` / [#186](https://github.com/OpenAgentsInc/psionic/issues/186) | open (2026-03-18) | `Psionic Parameter Golf: add counted-runtime and build-dependency accounting for the real submission payload` | The repo should emit a per-file or per-payload accounting receipt for every shipped runtime, helper, and build dependency byte required by the real submission entrypoint, and refuse stronger claims the moment the actual payload no longer fits under the public `16,000,000` byte cap. |
-| `PGOLF-504` / [#187](https://github.com/OpenAgentsInc/psionic/issues/187) | open (2026-03-18) | `Psionic Parameter Golf: add a PR-ready non-record export path that runs in the public repo` | Before claiming record-track readiness, Psionic should be able to generate one non-record package that can be copied into `parameter-golf/records/track_non_record_16mb`, run in place, and serve as the first honest maintainer-facing Psionic submission PR surface. |
+| `PGOLF-501` / [#184](https://github.com/OpenAgentsInc/psionic/issues/184) | done (2026-03-18) | `Psionic Parameter Golf: add a challenge-repo record-folder compatibility matrix and external-repo verifier` | `psionic-train` now ships a typed record-folder compatibility report plus `scripts/check-parameter-golf-record-folder-compatibility.sh`, which validate the canonical `README.md` / `submission.json` / `train.log` / `train_gpt.py` contract, keep folder-local dependency posture explicit, and dry-run one exported folder against a local `parameter-golf` clone instead of assuming the Psionic package root is already challenge-compatible. |
+| `PGOLF-502` / [#185](https://github.com/OpenAgentsInc/psionic/issues/185) | done (2026-03-18) | `Psionic Parameter Golf: replace the non-record review wrapper with a true Psionic submission entrypoint` | `psionic-train` now ships a root-local `train_gpt.py` launcher plus a committed Psionic runtime payload, runtime manifest, and runtime fixture so the exported folder executes a real Psionic-owned restore-and-eval path and writes its own runtime receipt instead of relying on a receipt-review shim. |
+| `PGOLF-503` / [#186](https://github.com/OpenAgentsInc/psionic/issues/186) | done (2026-03-18) | `Psionic Parameter Golf: add counted-runtime and build-dependency accounting for the real submission payload` | The exported non-record folder now carries a machine-readable accounting receipt tied to the real shipped launcher and runtime payload bytes, keeps helper and build-dependency posture explicit, and computes the artifact-cap verdict from the actual exported payload instead of the earlier review-wrapper surface. |
+| `PGOLF-504` / [#187](https://github.com/OpenAgentsInc/psionic/issues/187) | done (2026-03-18) | `Psionic Parameter Golf: add a PR-ready non-record export path that runs in the public repo` | `psionic-train` now ships `examples/parameter_golf_non_record_submission_bundle.rs`, which exports the canonical non-record folder directly into `parameter-golf/records/track_non_record_16mb/...`, and the exported folder has already passed a live local-clone dry-run through `scripts/check-parameter-golf-record-folder-compatibility.sh`. |
 
 ## Epic 6: Record-Track Runtime And 8xH100 Closure
 
@@ -473,7 +473,9 @@ Turn the PR-ready submission surface into a genuine record-candidate runtime.
 | --- | --- | --- | --- |
 | `PGOLF-601` / [#188](https://github.com/OpenAgentsInc/psionic/issues/188) | open (2026-03-18) | `Psionic Parameter Golf: retire the remaining baseline CUDA blockers on the public submission path` | Promote the current CUDA training coverage report from "explicit blocker list" to real baseline closure by implementing the missing public train-time runtime or kernel surfaces for BF16, RoPE or GQA attention, RMSNorm, residual mixing, Muon, and quantized export on the actual submission path. |
 | `PGOLF-602` / [#189](https://github.com/OpenAgentsInc/psionic/issues/189) | open (2026-03-18) | `Psionic Parameter Golf: capture real 8xH100 run bundles from the exported submission entrypoint` | The repo should preserve run bundles, train logs, wallclock receipts, memory receipts, and artifact-size receipts emitted by the real exported submission folder on actual `8xH100` hardware instead of only by the internal benchmark or receipt path. |
-| `PGOLF-603` / [#190](https://github.com/OpenAgentsInc/psionic/issues/190) | open (2026-03-18) | `Psionic Parameter Golf: add record-folder-local replay verification for metric, wallclock, and artifact bytes` | Add a replay verifier that runs from the exported folder itself, confirms offline execution, validates the final `submission.json` fields against the emitted log and receipts, and keeps challenge-facing reproducibility facts machine-readable. |
+| `PGOLF-603` / [#190](https://github.com/OpenAgentsInc/psionic/issues/190) | done (2026-03-18) | `Psionic Parameter Golf: add record-folder-local replay verification for metric, wallclock, and artifact bytes` | `psionic-train` now ships exported-folder run-evidence and replay-verification reports plus `scripts/check-parameter-golf-record-folder-replay.sh`, validating `submission.json`, `train.log`, runtime receipts, benchmark receipts, and counted bytes directly from the generated folder while keeping the current measured-or-refused `8xH100` posture explicit. |
+| `PGOLF-604` / [#194](https://github.com/OpenAgentsInc/psionic/issues/194) | open (2026-03-18) | `Psionic Parameter Golf: add a Rust-native 1xH100 baseline trainer entrypoint` | The repo now has a real Rust-native `parameter_golf_single_h100_bringup` command that binds cached FineWeb `sp1024` data, tokenizer identity, explicit local CUDA machine-admission truth, baseline model or optimizer truth, and the current CUDA blocker list into one typed report. The remaining work is to turn that bring-up seam into the actual Psionic-owned single-H100 training path instead of a refusal-bound readiness report. |
+| `PGOLF-605` / [#195](https://github.com/OpenAgentsInc/psionic/issues/195) | done (2026-03-18) | `Psionic Parameter Golf: add Rust-only 1xH100 parity and bring-up evidence for the public baseline` | The repo now ships a committed `parameter_golf_single_h100_bringup.json` report plus `scripts/check-parameter-golf-single-h100-bringup.sh`, both generated from the real downloaded FineWeb `sp1024` cache and tokenizer. The current evidence is an honest refusal with exact dataset, tokenizer, geometry, wallclock, and blocker facts, while preserving explicit absence of final training metrics and artifact bytes because the command still stops at contract validation. |
 
 ## Epic 7: Promotion Gate And PR Submission
 
@@ -494,9 +496,9 @@ record-track submissions.
 
 | ID | Status | Proposed GitHub issue title | Description |
 | --- | --- | --- | --- |
-| `PGOLF-701` / [#191](https://github.com/OpenAgentsInc/psionic/issues/191) | open (2026-03-18) | `Psionic Parameter Golf: add submission-promotion receipts for SOTA delta, significance, and systems-only waiver posture` | `psionic-eval` should emit a maintainer-facing promotion receipt that captures the baseline being compared against, the measured delta in nats or bits per byte, the multi-run significance evidence when required, and the explicit systems-only waiver posture when the README allows it. |
-| `PGOLF-702` / [#192](https://github.com/OpenAgentsInc/psionic/issues/192) | open (2026-03-18) | `Psionic Parameter Golf: add a final PR bundle generator and checklist for parameter-golf/records` | The repo should emit one final PR bundle with the exact files, folder name, metadata, and checklist text needed to open a `parameter-golf` submission PR directly from Psionic-owned artifacts instead of assembling that PR by hand. |
-| `PGOLF-703` / [#193](https://github.com/OpenAgentsInc/psionic/issues/193) | open (2026-03-18) | `Psionic Parameter Golf: dry-run a full Psionic submission against the local parameter-golf clone and preserve the verifier report` | Before claiming the lane is PR-ready, stage one generated folder into the local `~/code/parameter-golf` clone, run the repo-local verifier there, and commit the resulting compatibility report so later changes cannot silently drift away from the live challenge repo contract. |
+| `PGOLF-701` / [#191](https://github.com/OpenAgentsInc/psionic/issues/191) | done (2026-03-18) | `Psionic Parameter Golf: add submission-promotion receipts for SOTA delta, significance, and systems-only waiver posture` | `psionic-eval` now ships a typed promotion receipt that captures the compared baseline, delta in bits or nats per byte, significance posture, systems-only waiver posture, and explicit refusal when the evidence does not support record promotion. |
+| `PGOLF-702` / [#192](https://github.com/OpenAgentsInc/psionic/issues/192) | done (2026-03-18) | `Psionic Parameter Golf: add a final PR bundle generator and checklist for parameter-golf/records` | `psionic-train` now emits one deterministic final PR bundle that contains the exact `records/...` folder, exported-folder evidence and replay reports, promotion receipt, and maintainer-facing checklist text needed to open a public non-record challenge PR directly from Psionic-owned artifacts. |
+| `PGOLF-703` / [#193](https://github.com/OpenAgentsInc/psionic/issues/193) | done (2026-03-18) | `Psionic Parameter Golf: dry-run a full Psionic submission against the local parameter-golf clone and preserve the verifier report` | The repo now stages the generated folder into the live local `~/code/parameter-golf` clone, reruns the compatibility and replay verifiers there, removes the staged folder, checks the clone returns to the original `git status --short --branch`, and preserves the committed dry-run report. |
 
 ## Current Execution Order
 
@@ -526,28 +528,30 @@ record-track submissions.
 
 ### Phase 5: package the lane honestly, then widen research
 
-- `PGOLF-401` -> landed the first honest non-record submission package, counted-byte accounting receipt, review-wrapper entrypoint, and record-folder writer
+- `PGOLF-401` -> landed the first honest non-record submission package, counted-byte accounting receipt, runnable entrypoint surface, and record-folder writer
 - `PGOLF-402` -> landed the committed post-parity research harness report with one measured baseline control and three guarded candidate families on the same oracle and accounting surface
 - `PGOLF-403` -> landed the explicit blocked record-track contract so the remaining runtime, accounting, and `8xH100` blockers are machine-readable
 
-### Phase 6: turn the review package into a real challenge folder
+### Phase 6: turn the runtime package into a real challenge folder
 
-- `PGOLF-501` -> add a compatibility matrix and dry-run verifier against the live `parameter-golf/records/...` contract
-- `PGOLF-502` -> replace the review wrapper with a true Psionic submission entrypoint
-- `PGOLF-503` -> count the actual shipped runtime and build-dependency payload honestly
-- `PGOLF-504` -> land the first PR-ready non-record export path that runs inside the public repo
+- `PGOLF-501` -> landed the compatibility matrix and dry-run verifier against the live `parameter-golf/records/...` contract
+- `PGOLF-502` -> landed the true Psionic non-record submission entrypoint path with a shipped runtime payload and runtime receipt
+- `PGOLF-503` -> landed machine-readable counted-runtime and build-dependency accounting for the real exported payload
+- `PGOLF-504` -> landed the first PR-ready non-record export path that runs inside the public repo
 
 ### Phase 7: close real record-track runtime and `8xH100` evidence
 
 - `PGOLF-601` -> retire the remaining public CUDA baseline blockers on the exported submission path
+- `PGOLF-603` -> landed folder-local replay verification plus exported-folder run-evidence reports for metrics, wallclock, and artifact bytes
+- `PGOLF-604` -> landed the first Rust-native single-H100 bring-up command and report seam; turn that seam into the actual Psionic-native baseline trainer path
+- `PGOLF-605` -> landed the committed single-H100 parity or refusal report plus local-cache verifier for the Rust-native bring-up path
 - `PGOLF-602` -> capture real `8xH100` run bundles from the exported folder itself
-- `PGOLF-603` -> add folder-local replay verification for metrics, wallclock, and artifact bytes
 
 ### Phase 8: promote and submit
 
-- `PGOLF-701` -> add the maintainer-facing promotion receipt for delta, significance, and systems-waiver posture
-- `PGOLF-702` -> emit a final PR bundle and checklist for `parameter-golf/records/...`
-- `PGOLF-703` -> dry-run one full Psionic submission against the local challenge clone and preserve the verifier report
+- `PGOLF-701` -> landed the maintainer-facing promotion receipt for delta, significance, and systems-waiver posture
+- `PGOLF-702` -> landed the deterministic final PR bundle and checklist for `parameter-golf/records/...`
+- `PGOLF-703` -> landed the full local challenge-clone dry run plus committed verifier report
 
 ## Bottom Line
 
@@ -563,20 +567,22 @@ precise about what is true on 2026-03-18:
 - Psionic now owns the challenge oracle, the public baseline path, and the
   bounded local-reference plus distributed receipt lanes, but it still keeps
   the remaining CUDA train-path blockers explicit
-- Psionic now also has a first honest non-record review package, but that is
-  still not the same thing as a challenge-PR-ready folder because the exported
-  `train_gpt.py` is not yet the real runtime entrypoint and the full shipped
-  runtime-byte story is not yet defended
+- Psionic now also has a first honest non-record runtime package and a
+  maintainer-facing export path for the public non-record repo surface, plus
+  exported-folder replay evidence, typed promotion posture, one deterministic
+  PR bundle, and one live local-clone dry run, but that is still not the same
+  thing as a record-track-ready folder because the exported path is a bounded
+  local-reference replay and the stronger shipped runtime-byte story is not yet
+  defended for record-track promotion
 - post-parity architecture and compression work now has a committed research
   harness, but those candidates remain explicitly research-only until new
   results are measured
 - the first truthful result should be parity against `train_gpt.py`, not a new
   architecture
-- the next real work is no longer "more bootstrap closure"; it is replacing
-  the review wrapper with a real submission runtime, validating generated
-  folders inside the live `parameter-golf` repo, counting the actual shipped
-  runtime payload, and then capturing reproducible `8xH100` evidence from that
-  exported folder
+- the next real work is no longer "more bootstrap closure"; it is retiring the
+  remaining public CUDA baseline blockers on the exported path and then
+  capturing reproducible `8xH100` evidence from the exported folder path that
+  now exists
 - record-track claims still stay blocked until that path is implemented,
   measured, and promoted, even though the blocked contract is now documented
   and machine-readable
