@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.multi_memory_profile.runtime_bundle.v1",
+  "profile_id": "tassadar.proposal_profile.multi_memory_routing.v1",
+  "portability_envelope_id": "cpu_reference_current_host",
+  "exact_routing_parity_count": 2,
+  "exact_resume_parity_count": 1,
+  "exact_refusal_parity_count": 1,
+  "case_receipts": [
+    {
+      "case_id": "rodata_heap_output_route",
+      "topology_id": "rodata_heap_output_split",
+      "status": "exact_routing_parity",
+      "routes": [
+        {
+          "memory_id": "rodata",
+          "memory_index": 0,
+          "role_id": "readonly_lookup",
+          "read_bytes": 192,
+          "write_bytes": 0,
+          "route_digest": "8373e241955302bf486e3e00a56b224c9930e818a4a9e8809dad60f748a69c8d"
+        },
+        {
+          "memory_id": "heap_output",
+          "memory_index": 1,
+          "role_id": "mutable_output",
+          "read_bytes": 48,
+          "write_bytes": 64,
+          "route_digest": "29ccaa2e7117df939c4680a708239fd2b54ab3e926585820912e2e12d7107ef1"
+        }
+      ],
+      "exact_route_parity": true,
+      "exact_resume_parity": false,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_memory_abi_v2_report.json",
+        "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+      ],
+      "note": "bounded multi-memory routing keeps immutable lookup bytes and mutable output bytes on separate declared memories instead of hiding topology in lowering",
+      "receipt_digest": "7706fc261e5df285737d346c9ed4562c42db6b2cd75910cfe0d208cd584f6541"
+    },
+    {
+      "case_id": "scratch_heap_checkpoint_route",
+      "topology_id": "scratch_heap_checkpoint_split",
+      "status": "exact_routing_parity",
+      "routes": [
+        {
+          "memory_id": "scratch",
+          "memory_index": 0,
+          "role_id": "scratch_mutable",
+          "read_bytes": 64,
+          "write_bytes": 32,
+          "route_digest": "96f6eafceb9a066964c41a9fe5df433bdfd31c3bc749ee2003b5290781bad881"
+        },
+        {
+          "memory_id": "heap",
+          "memory_index": 1,
+          "role_id": "heap_mutable",
+          "read_bytes": 128,
+          "write_bytes": 96,
+          "route_digest": "863251467d7d65f250503b0c01e503ee7057af92cd0bfb7d5ce7488f2eaac4c4"
+        }
+      ],
+      "checkpoint": {
+        "checkpoint_id": "scratch_heap_checkpoint_route.checkpoint.v1",
+        "profile_id": "tassadar.proposal_profile.multi_memory_routing.v1",
+        "memory_order": [
+          "scratch",
+          "heap"
+        ],
+        "per_memory_digests": [
+          "d2e65ed0fd7f9d7e00f509f4d2b51f843f96365bb3b6fec236d43a7f39be0be1",
+          "0ae7f8dd9f4ed1d9272c5b7fed0f37c52e5731c395d699dfcb8b4e5f6cf5774e"
+        ],
+        "paused_after_step_count": 24,
+        "resumed_suffix_step_count": 24,
+        "checkpoint_digest": "c1944fd099a0015e8194d8efca29e1ee5aab3f705ad98bfa79ad0883a03dbf10"
+      },
+      "exact_route_parity": true,
+      "exact_resume_parity": true,
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_dynamic_memory_resume_report.json",
+        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+      ],
+      "note": "bounded multi-memory replay keeps per-memory order and digest lineage explicit across scratch and heap memories",
+      "receipt_digest": "61fb2fe89489a2f8c07bfcaf7d176cd479eddd9a1f27255119cc37635b9275bb"
+    },
+    {
+      "case_id": "malformed_memory_topology_refusal",
+      "topology_id": "invalid_duplicate_memory_owner",
+      "status": "exact_refusal_parity",
+      "routes": [],
+      "exact_route_parity": false,
+      "exact_resume_parity": false,
+      "refusal_reason_id": "malformed_memory_topology",
+      "benchmark_refs": [
+        "fixtures/tassadar/reports/tassadar_frozen_core_wasm_window_report.json",
+        "fixtures/tassadar/reports/tassadar_memory64_profile_report.json"
+      ],
+      "note": "duplicate or unmapped memory-owner topology remains typed refusal truth instead of widening from the admitted topologies",
+      "receipt_digest": "882c294ce969c847b6cb5f2a77d1936b9d30cce02503f681453c65803efff7fa"
+    }
+  ],
+  "claim_boundary": "this runtime bundle proves one bounded multi-memory routing profile over two explicit topology families plus typed malformed-topology refusal on the current-host cpu-reference lane. It does not claim arbitrary Wasm multi-memory closure, memory64 mixing, generic allocator portability, or broader served publication",
+  "summary": "Multi-memory runtime bundle covers 3 cases with routing_parity=2, resume_parity=1, refusal_parity=1.",
+  "bundle_digest": "37da8a105de50a55a05c08913e641b362517623239635ed661be8f715b0c2a62"
+}

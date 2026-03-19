@@ -917,6 +917,29 @@ Expected outcome:
 - typed datastream resume locators for the successful checkpoint rows
 - explicit backend virtual-address-limit refusal parity
 
+### 12. Bounded multi-memory routing profile
+
+```bash
+cargo run -p psionic-runtime --example tassadar_multi_memory_runtime_bundle
+cargo run -p psionic-eval --example tassadar_multi_memory_profile_report
+```
+
+Read:
+
+- `fixtures/tassadar/runs/tassadar_multi_memory_profile_v1/tassadar_multi_memory_runtime_bundle.json`
+- `fixtures/tassadar/reports/tassadar_multi_memory_profile_report.json`
+
+Expected outcome:
+
+- one named bounded multi-memory profile:
+  `tassadar.proposal_profile.multi_memory_routing.v1`
+- exact routing parity for the `rodata_heap_output_split` topology
+- exact routing and resume parity for the `scratch_heap_checkpoint_split`
+  topology
+- persisted per-memory checkpoint artifacts under
+  `fixtures/tassadar/runs/tassadar_multi_memory_profile_v1`
+- explicit malformed-topology refusal parity
+
 ## Validation Commands
 
 Run the focused report checks after the flow:
@@ -946,6 +969,11 @@ cargo test -p psionic-compiler memory64 -- --nocapture
 cargo test -p psionic-runtime memory64 -- --nocapture
 cargo test -p psionic-datastream memory64 -- --nocapture
 cargo test -p psionic-eval memory64 -- --nocapture
+cargo test -p psionic-ir multi_memory_profile -- --nocapture
+cargo test -p psionic-compiler multi_memory_profile -- --nocapture
+cargo test -p psionic-runtime multi_memory_profile -- --nocapture
+cargo test -p psionic-eval multi_memory_profile -- --nocapture
+cargo test -p psionic-provider multi_memory_profile -- --nocapture
 ```
 
 These checks should keep the committed reports and generated truth aligned.

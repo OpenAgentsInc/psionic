@@ -779,6 +779,15 @@ The current scope is:
   current-host cpu-reference envelope; this is not arbitrary Wasm memory64
   closure, multi-memory support, generic large-heap portability, or broader
   served publication
+- the current multi-memory proposal-profile artifacts are
+  `fixtures/tassadar/reports/tassadar_multi_memory_profile_report.json` and
+  `fixtures/tassadar/runs/tassadar_multi_memory_profile_v1/tassadar_multi_memory_runtime_bundle.json`,
+  which freeze one bounded multi-memory routing profile over the explicit
+  `rodata_heap_output_split` and `scratch_heap_checkpoint_split` topology
+  families, with persisted per-memory checkpoint artifacts and explicit
+  malformed-topology refusal truth on the current-host cpu-reference envelope;
+  this is not arbitrary Wasm multi-memory closure, memory64 plus multi-memory
+  mixing, generic allocator portability, or broader served publication
 - recommended closure order follows the spec and its test families: decode and
   validate first, then integer/control/direct-call core, then linear memory,
   then globals/tables/references/indirect calls, then instantiation/import

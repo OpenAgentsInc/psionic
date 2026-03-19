@@ -64,6 +64,10 @@ Current honest posture:
   sparse single-memory checkpoints above the 4GiB boundary, with committed
   resume artifacts, typed datastream locators, and explicit backend-limit
   refusal truth on the current-host cpu-reference envelope
+- the repo now also has one bounded multi-memory routing profile over two
+  explicit topology families, with committed per-memory checkpoint artifacts
+  and typed malformed-topology refusal truth on the current-host cpu-reference
+  envelope
 - broader profiles above that remain benchmarked, suppressed, refused, or
   unpromoted unless their explicit gates are green
 
@@ -89,9 +93,9 @@ Current dependency spine:
 
 Issue-state note:
 
-- `TAS-103` through `TAS-120` are already implemented and tracked in
+- `TAS-103` through `TAS-121` are already implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-121` and runs through
+- the current open GitHub backlog begins at `TAS-122` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs

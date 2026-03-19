@@ -1,0 +1,15 @@
+{
+  "checkpoint_id": "scratch_heap_checkpoint_route.checkpoint.v1",
+  "profile_id": "tassadar.proposal_profile.multi_memory_routing.v1",
+  "memory_order": [
+    "scratch",
+    "heap"
+  ],
+  "per_memory_digests": [
+    "d2e65ed0fd7f9d7e00f509f4d2b51f843f96365bb3b6fec236d43a7f39be0be1",
+    "0ae7f8dd9f4ed1d9272c5b7fed0f37c52e5731c395d699dfcb8b4e5f6cf5774e"
+  ],
+  "paused_after_step_count": 24,
+  "resumed_suffix_step_count": 24,
+  "checkpoint_digest": "c1944fd099a0015e8194d8efca29e1ee5aab3f705ad98bfa79ad0883a03dbf10"
+}

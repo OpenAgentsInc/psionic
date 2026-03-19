@@ -126,6 +126,8 @@ mod tassadar_memory_abi_v2;
 mod tassadar_mixed_numeric_ladder;
 #[path = "tassadar_mixed_trajectory.rs"]
 mod tassadar_mixed_trajectory;
+#[path = "tassadar_multi_memory_profile.rs"]
+mod tassadar_multi_memory_profile;
 #[path = "tassadar_module_installation_staging.rs"]
 mod tassadar_module_installation_staging;
 #[path = "tassadar_module_linker.rs"]
@@ -272,6 +274,7 @@ pub use tassadar_memory64_profile::*;
 pub use tassadar_memory_abi_v2::*;
 pub use tassadar_mixed_numeric_ladder::*;
 pub use tassadar_mixed_trajectory::*;
+pub use tassadar_multi_memory_profile::*;
 pub use tassadar_module_installation_staging::*;
 pub use tassadar_module_linker::*;
 pub use tassadar_module_promotion_state::*;
