@@ -40,7 +40,7 @@ pub const CRATE_ROLE: &str = "CUDA backend discovery, allocation, and submission
 
 const NVIDIA_SMI_BINARY: &str = "nvidia-smi";
 const INVENTORY_QUERY: &str = concat!(
-    "index,name,pci.bus_id,memory.total,compute_cap,display_attached,",
+    "index,name,pci.bus_id,memory.total,compute_cap,display_mode,",
     "mig.mode.current,persistence_mode,addressing_mode"
 );
 const OFFLINE_NO_DRIVER_MESSAGE: &str =
@@ -7384,7 +7384,7 @@ mod tests {
     #[test]
     fn inventory_row_parses_into_expected_descriptor_inputs() {
         let row = parse_inventory_row(
-            "0, NVIDIA GeForce RTX 4080, 00000000:01:00.0, 16376, 8.9, Yes, [N/A], Disabled, HMM",
+            "0, NVIDIA GeForce RTX 4080, 00000000:01:00.0, 16376, 8.9, Enabled, [N/A], Disabled, HMM",
         )
         .expect("inventory row should parse");
 
