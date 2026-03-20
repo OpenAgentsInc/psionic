@@ -550,7 +550,7 @@
         "github_issue_number": 289,
         "title": "TAS-170: Fixture-to-Transformer parity harness",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-003",
           "BEQ-007"
@@ -838,7 +838,7 @@
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
     "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
-    "report_digest": "0961199d0cffe374850d0199deaf90fd2dc8a50230a6cdaa09f5bd68ab9f062d"
+    "report_digest": "85eeed0a21dee5cade6880ce753dd0760a879d3aaa4a4467109818ae23425319"
   },
   "blocker_count": 7,
   "open_blocker_count": 7,
@@ -864,5 +864,5 @@
   ],
   "claim_boundary": "this summary mirrors the TAS-157 blocker matrix only. It keeps the blocker contract operator-readable, but it does not add evidence or widen the current public claim boundary beyond the underlying matrix",
   "summary": "Article-equivalence blocker matrix summary now records blocker_count=7, open_blocker_count=7, matrix_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "149b138664511889f2dca879cda58be214b13b2cfc95266859b1ff5823424270"
+  "report_digest": "8ca46a4ee8fccc2136cec62a447f89bbbe230a8a97c1bbaca3d2b9660071f029"
 }

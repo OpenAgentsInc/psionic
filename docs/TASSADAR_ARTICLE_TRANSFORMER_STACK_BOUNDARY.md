@@ -218,6 +218,21 @@ That keeps "weights exist" separate from "weight provenance is frozen and
 challengeable" and still does not widen the public claim beyond this bounded
 trained artifact.
 
+`TAS-170` now closes the bounded replacement-certificate tranche on top of the
+same split. `psionic-eval` now compares the historical fixture-backed
+reference-linear lane against the committed trained trace-bound article wrapper
+across the full canonical article corpus in
+`fixtures/tassadar/reports/tassadar_article_fixture_transformer_parity_report.json`,
+requiring routeability, exact trace parity, and exact output and terminal-state
+parity on every declared case while keeping forward-bundle checks explicit only
+for the cases that fit the current model window. `psionic-serve` now projects
+that same result into one narrow served publication at
+`fixtures/tassadar/reports/tassadar_article_transformer_replacement_publication.json`.
+This is the point where the owned Transformer route is certified as the
+replacement bounded truth carrier for the article corpus, but it is still not
+yet the point where direct no-tool proof ownership has moved off the fixture
+lane. That stronger handoff remains the next tranche.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

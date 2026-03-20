@@ -788,10 +788,41 @@ impl TassadarArticleTransformer {
         program: &TassadarProgram,
         execution: &TassadarExecution,
     ) -> Result<TassadarArticleTransformerTraceDomainBatch, TassadarArticleTransformerError> {
+        let batch = self.tokenize_article_trace_domain_unbounded(program, execution)?;
+        if batch.source_token_ids.len() > self.descriptor.config.max_source_positions {
+            return Err(TassadarArticleTransformerError::InvalidConfiguration {
+                component: "tassadar_article_transformer.encode_article_trace_domain",
+                message: format!(
+                    "prompt token count {} exceeds max_source_positions {}",
+                    batch.source_token_ids.len(),
+                    self.descriptor.config.max_source_positions
+                ),
+            });
+        }
+        if batch.target_token_ids.len() > self.descriptor.config.max_target_positions {
+            return Err(TassadarArticleTransformerError::InvalidConfiguration {
+                component: "tassadar_article_transformer.encode_article_trace_domain",
+                message: format!(
+                    "target token count {} exceeds max_target_positions {}",
+                    batch.target_token_ids.len(),
+                    self.descriptor.config.max_target_positions
+                ),
+            });
+        }
+        Ok(batch)
+    }
+
+    /// Tokenizes one article trace-domain example without enforcing the current
+    /// model-context window.
+    pub fn tokenize_article_trace_domain_unbounded(
+        &self,
+        program: &TassadarProgram,
+        execution: &TassadarExecution,
+    ) -> Result<TassadarArticleTransformerTraceDomainBatch, TassadarArticleTransformerError> {
         let binding = self.trace_domain_binding();
         if !binding.source_vocab_compatible || !binding.target_vocab_compatible {
             return Err(TassadarArticleTransformerError::InvalidConfiguration {
-                component: "tassadar_article_transformer.encode_article_trace_domain",
+                component: "tassadar_article_transformer.tokenize_article_trace_domain_unbounded",
                 message: format!(
                     "model vocab sizes source={} target={} do not cover tokenizer vocab size {}",
                     binding.model_source_vocab_size,
@@ -805,7 +836,7 @@ impl TassadarArticleTransformer {
             || !binding.all_required_channels_bound
         {
             return Err(TassadarArticleTransformerError::InvalidConfiguration {
-                component: "tassadar_article_transformer.encode_article_trace_domain",
+                component: "tassadar_article_transformer.tokenize_article_trace_domain_unbounded",
                 message: String::from(
                     "trace-domain binding is incomplete for the canonical prompt/trace/halt or channel surface",
                 ),
@@ -815,26 +846,6 @@ impl TassadarArticleTransformer {
         let tokenized = tokenizer.tokenize_program_and_execution(program, execution);
         let source_tokens = &tokenized.sequence.as_slice()[..tokenized.prompt_token_count];
         let target_tokens = &tokenized.sequence.as_slice()[tokenized.prompt_token_count..];
-        if source_tokens.len() > self.descriptor.config.max_source_positions {
-            return Err(TassadarArticleTransformerError::InvalidConfiguration {
-                component: "tassadar_article_transformer.encode_article_trace_domain",
-                message: format!(
-                    "prompt token count {} exceeds max_source_positions {}",
-                    source_tokens.len(),
-                    self.descriptor.config.max_source_positions
-                ),
-            });
-        }
-        if target_tokens.len() > self.descriptor.config.max_target_positions {
-            return Err(TassadarArticleTransformerError::InvalidConfiguration {
-                component: "tassadar_article_transformer.encode_article_trace_domain",
-                message: format!(
-                    "target token count {} exceeds max_target_positions {}",
-                    target_tokens.len(),
-                    self.descriptor.config.max_target_positions
-                ),
-            });
-        }
         Ok(TassadarArticleTransformerTraceDomainBatch {
             source_shape: vec![1, source_tokens.len()],
             source_token_ids: source_tokens
@@ -860,36 +871,20 @@ impl TassadarArticleTransformer {
         execution: &TassadarExecution,
     ) -> Result<TassadarArticleTransformerTraceDomainRoundtrip, TassadarArticleTransformerError>
     {
-        let binding = self.trace_domain_binding();
         let batch = self.encode_article_trace_domain(program, execution)?;
-        let tokenizer = TassadarTraceTokenizer::new();
-        let prompt_tokens = usize_slice_to_token_ids(&batch.source_token_ids);
-        let target_tokens = usize_slice_to_token_ids(&batch.target_token_ids);
-        let tokenized =
-            tokenizer.compose_prompt_and_target_sequence(&prompt_tokens, &target_tokens);
-        let decoded_trace = tokenizer.decode_article_trace_domain(&tokenized)?;
-        let reconstructed_program = decoded_trace
-            .materialize_program(program.program_id.clone(), program.profile_id.clone());
-        let reconstructed_execution = decoded_trace.materialize_execution(
-            execution.program_id.clone(),
-            execution.profile_id.clone(),
-            execution.runner_id.clone(),
-            execution.trace_abi.clone(),
-        );
-        Ok(TassadarArticleTransformerTraceDomainRoundtrip {
-            binding,
-            batch,
-            prompt_boundary_preserved: decoded_trace.prompt_token_count
-                == reconstructed_prompt_token_count(program, execution),
-            halt_marker_preserved: decoded_trace.halt_reason == execution.halt_reason,
-            roundtrip_exact: decoded_trace.sequence_digest
-                == tokenizer
-                    .tokenize_program_and_execution(program, execution)
-                    .sequence_digest
-                && reconstructed_program == *program
-                && reconstructed_execution == *execution,
-            decoded_trace,
-        })
+        self.roundtrip_from_batch(program, execution, batch)
+    }
+
+    /// Runs one full encode/decode roundtrip over the canonical article trace
+    /// domain without enforcing the current model-context window.
+    pub fn roundtrip_article_trace_domain_unbounded(
+        &self,
+        program: &TassadarProgram,
+        execution: &TassadarExecution,
+    ) -> Result<TassadarArticleTransformerTraceDomainRoundtrip, TassadarArticleTransformerError>
+    {
+        let batch = self.tokenize_article_trace_domain_unbounded(program, execution)?;
+        self.roundtrip_from_batch(program, execution, batch)
     }
 
     /// Returns the embedding-sharing strategy.
@@ -1306,6 +1301,44 @@ impl TassadarArticleTransformer {
             Self::MODEL_MODULE_REF,
             Self::TRANSFORMER_MODULE_REF,
         ))
+    }
+
+    fn roundtrip_from_batch(
+        &self,
+        program: &TassadarProgram,
+        execution: &TassadarExecution,
+        batch: TassadarArticleTransformerTraceDomainBatch,
+    ) -> Result<TassadarArticleTransformerTraceDomainRoundtrip, TassadarArticleTransformerError>
+    {
+        let binding = self.trace_domain_binding();
+        let tokenizer = TassadarTraceTokenizer::new();
+        let prompt_tokens = usize_slice_to_token_ids(&batch.source_token_ids);
+        let target_tokens = usize_slice_to_token_ids(&batch.target_token_ids);
+        let tokenized =
+            tokenizer.compose_prompt_and_target_sequence(&prompt_tokens, &target_tokens);
+        let decoded_trace = tokenizer.decode_article_trace_domain(&tokenized)?;
+        let reconstructed_program = decoded_trace
+            .materialize_program(program.program_id.clone(), program.profile_id.clone());
+        let reconstructed_execution = decoded_trace.materialize_execution(
+            execution.program_id.clone(),
+            execution.profile_id.clone(),
+            execution.runner_id.clone(),
+            execution.trace_abi.clone(),
+        );
+        Ok(TassadarArticleTransformerTraceDomainRoundtrip {
+            binding,
+            batch,
+            prompt_boundary_preserved: decoded_trace.prompt_token_count
+                == reconstructed_prompt_token_count(program, execution),
+            halt_marker_preserved: decoded_trace.halt_reason == execution.halt_reason,
+            roundtrip_exact: decoded_trace.sequence_digest
+                == tokenizer
+                    .tokenize_program_and_execution(program, execution)
+                    .sequence_digest
+                && reconstructed_program == *program
+                && reconstructed_execution == *execution,
+            decoded_trace,
+        })
     }
 
     fn artifact_tensor_rows(

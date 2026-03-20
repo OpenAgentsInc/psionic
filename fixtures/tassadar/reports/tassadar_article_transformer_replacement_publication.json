@@ -1,0 +1,31 @@
+{
+  "product_id": "psionic.executor_trace",
+  "report_ref": "fixtures/tassadar/reports/tassadar_article_fixture_transformer_parity_report.json",
+  "benchmark_report_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+  "lineage_contract_ref": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_lineage_contract.json",
+  "fixture_model_id": "tassadar-executor-article-i32-compute-v0",
+  "transformer_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "supported_case_count": 13,
+  "supported_case_ids": [
+    "micro_wasm_kernel",
+    "branch_heavy_kernel",
+    "memory_heavy_kernel",
+    "long_loop_kernel",
+    "sudoku_v0_train_a",
+    "sudoku_v0_train_b",
+    "sudoku_v0_train_c",
+    "sudoku_v0_train_d",
+    "sudoku_v0_validation_a",
+    "sudoku_v0_validation_b",
+    "sudoku_v0_test_a",
+    "sudoku_v0_test_b",
+    "hungarian_matching"
+  ],
+  "routeable_case_count": 13,
+  "exact_trace_case_count": 13,
+  "exact_output_case_count": 13,
+  "replacement_certified": true,
+  "article_equivalence_green": false,
+  "claim_boundary": "this served publication cites the bounded fixture-to-Transformer parity certificate for the declared article corpus only. It certifies replacement of the old fixture lane as the bounded truth carrier on those workloads, but it does not yet move direct no-tool proof ownership to the Transformer route or widen the broader article-equivalence claim boundary.",
+  "publication_digest": "db62a04a090891e0840bc336eb55873dc888e91044b3e7b3706cd78580cea163"
+}

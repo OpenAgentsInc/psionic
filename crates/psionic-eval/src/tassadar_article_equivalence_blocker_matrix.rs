@@ -827,7 +827,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             289,
             "TAS-170: Fixture-to-Transformer parity harness",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-003", "BEQ-007"],
         ),
         issue_row(
