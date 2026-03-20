@@ -755,7 +755,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             280,
             "TAS-163: Paper-faithful article-Transformer model closure",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-003"],
         ),
         issue_row(

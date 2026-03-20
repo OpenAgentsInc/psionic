@@ -243,17 +243,24 @@ fn interface_rows() -> Vec<TassadarTransformerBoundaryInterfaceRow> {
                 "crates/psionic-transformer/src/lib.rs",
                 "crates/psionic-transformer/src/attention.rs",
                 "crates/psionic-transformer/src/blocks.rs",
+                "crates/psionic-transformer/src/encoder_decoder.rs",
             ],
-            "module state, primitive layers, and reusable transformer attention plus block composition stay split between `psionic-nn` and `psionic-transformer`, with `psionic-transformer` as the architecture anchor",
+            "module state, primitive layers, and reusable transformer attention plus encoder-decoder composition stay split between `psionic-nn` and `psionic-transformer`, with `psionic-transformer` as the architecture anchor",
         ),
         interface_row(
             TassadarTransformerBoundaryInterfaceKind::ModelArtifactFormat,
-            &["crates/psionic-models/src/lib.rs", "crates/psionic-models/src/tassadar_executor_transformer.rs"],
-            "canonical article-model descriptors, weight bundles, and artifact identity stay owned by `psionic-models` and must consume the `psionic-transformer` boundary rather than bypass it",
+            &[
+                "crates/psionic-models/src/lib.rs",
+                "crates/psionic-models/src/tassadar_article_transformer.rs",
+            ],
+            "canonical article-model descriptors, canonical route selection, and later artifact identity stay owned by `psionic-models` and must consume the `psionic-transformer` boundary rather than bypass it",
         ),
         interface_row(
             TassadarTransformerBoundaryInterfaceKind::ForwardPassTraceHooks,
-            &["crates/psionic-models/src/tassadar_executor_transformer.rs", "crates/psionic-runtime/src/tassadar.rs"],
+            &[
+                "crates/psionic-models/src/tassadar_article_transformer.rs",
+                "crates/psionic-runtime/src/tassadar.rs",
+            ],
             "forward-pass trace hooks stay model-owned at the article-model boundary and serialize into runtime-owned trace ABI surfaces instead of inventing a second trace layer",
         ),
         interface_row(
@@ -298,13 +305,13 @@ fn ownership_rows() -> Vec<TassadarTransformerBoundaryOwnershipRow> {
         ),
         ownership_row(
             "psionic-transformer",
-            "crates/psionic-transformer/src/blocks.rs",
-            "canonical reusable transformer architecture boundary plus owned attention, embeddings, feed-forward, residual, and norm block composition above primitive layers and below model artifacts",
+            "crates/psionic-transformer/src/encoder_decoder.rs",
+            "canonical reusable transformer architecture boundary plus owned attention, embeddings, encoder-decoder stack composition, feed-forward, residual, and norm logic above primitive layers and below model artifacts",
         ),
         ownership_row(
             "psionic-models",
-            "crates/psionic-models/src/tassadar_executor_transformer.rs",
-            "canonical article-route model wrapper, config, forward-pass surface, and weight bundle owner",
+            "crates/psionic-models/src/tassadar_article_transformer.rs",
+            "canonical article-route model wrapper, config, route descriptor, and forward-pass surface owner",
         ),
         ownership_row(
             "psionic-runtime",

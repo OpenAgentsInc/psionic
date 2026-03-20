@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "report_id": "tassadar.transformer_block_closure.report.v1",
+  "report_id": "tassadar.article_transformer_model_closure.report.v1",
   "acceptance_gate_tie": {
     "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
     "canonical_boundary_report_ref": "fixtures/tassadar/reports/tassadar_canonical_transformer_stack_boundary_report.json",
-    "tied_requirement_id": "TAS-162",
+    "tied_requirement_id": "TAS-163",
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
@@ -440,66 +440,61 @@
   },
   "case_rows": [
     {
-      "case_id": "embedding_binding",
-      "validation_kind": "embedding_binding",
+      "case_id": "paper_faithful_descriptor",
+      "validation_kind": "paper_faithful_descriptor",
       "passed": true,
-      "detail": "token embeddings and deterministic sinusoidal positional bindings now compose in `psionic-transformer` with the expected [batch, seq, hidden] surface"
+      "detail": "the canonical article wrapper in `psionic-models` now names `Attention Is All You Need` explicitly and records a literal paper-faithful encoder-decoder route with no substitution justification"
     },
     {
-      "case_id": "dropout_training_eval_posture",
-      "validation_kind": "dropout_training_eval_posture",
+      "case_id": "encoder_decoder_forward",
+      "validation_kind": "encoder_decoder_forward",
       "passed": true,
-      "detail": "train-versus-eval posture is explicit and seed-stable for reusable block composition"
+      "detail": "the canonical article route now runs one owned encoder stack plus one owned decoder stack and emits logits from the decoder hidden state with explicit layer-count parity"
     },
     {
-      "case_id": "multi_head_projection_merge",
-      "validation_kind": "multi_head_projection_merge",
+      "case_id": "decoder_mask_enforcement",
+      "validation_kind": "decoder_mask_enforcement",
       "passed": true,
-      "detail": "reusable multi-head projection, attention, and merge now execute in `psionic-transformer` with explicit trace shape [batch, heads, query, key]"
+      "detail": "masked self-attention is now enforced on the canonical article route: changing a future token leaves earlier logits unchanged while the final position still moves"
     },
     {
-      "case_id": "feed_forward_block",
-      "validation_kind": "feed_forward_block",
+      "case_id": "cross_attention_execution",
+      "validation_kind": "cross_attention_execution",
       "passed": true,
-      "detail": "position-wise feed-forward composition now stays reusable in `psionic-transformer` and matches the expected ReLU reference path"
+      "detail": "cross-attention is now part of the canonical article route and the decoder hidden state changes when the encoder sequence changes"
     },
     {
-      "case_id": "residual_and_norm",
-      "validation_kind": "residual_and_norm",
+      "case_id": "logits_projection",
+      "validation_kind": "logits_projection",
       "passed": true,
-      "detail": "residual addition and layer-norm sequencing now live in reusable decoder-block composition rather than ad hoc per-model code"
+      "detail": "the canonical article route now projects decoder hidden states into explicit vocabulary logits inside the owned encoder-decoder model path"
     },
     {
-      "case_id": "deterministic_decoder_block_forward",
-      "validation_kind": "deterministic_decoder_block_forward",
+      "case_id": "embedding_sharing_options",
+      "validation_kind": "embedding_sharing_options",
       "passed": true,
-      "detail": "decoder-block composition stays deterministic in eval posture for repeated reusable forward passes"
+      "detail": "the canonical article wrapper now supports explicit unshared, decoder-tied, and fully shared source/target/output weight-tying options"
     }
   ],
   "boundary_review": {
-    "transformer_cargo_ref": "crates/psionic-transformer/Cargo.toml",
-    "transformer_blocks_module_ref": "crates/psionic-transformer/src/blocks.rs",
-    "nn_cargo_ref": "crates/psionic-nn/Cargo.toml",
-    "nn_optimizers_cargo_ref": "crates/psionic-nn-optimizers/Cargo.toml",
-    "models_executor_module_ref": "crates/psionic-models/src/tassadar_executor_transformer.rs",
-    "direct_nn_dependency": true,
-    "direct_models_dependency": false,
-    "direct_runtime_dependency": false,
-    "nn_depends_on_train": false,
-    "optimizer_interop_split_present": true,
-    "transformer_defines_embeddings": true,
-    "transformer_defines_multi_head_attention": true,
-    "transformer_defines_feed_forward": true,
-    "transformer_defines_decoder_block": true,
-    "models_mentions_owned_block_symbols": false,
+    "transformer_encoder_decoder_module_ref": "crates/psionic-transformer/src/encoder_decoder.rs",
+    "models_article_transformer_module_ref": "crates/psionic-models/src/tassadar_article_transformer.rs",
+    "models_executor_transformer_module_ref": "crates/psionic-models/src/tassadar_executor_transformer.rs",
+    "transformer_defines_encoder_layer": true,
+    "transformer_defines_decoder_layer": true,
+    "transformer_defines_encoder_decoder_transformer": true,
+    "models_define_article_transformer": true,
+    "models_use_owned_encoder_decoder_transformer": true,
+    "models_reference_attention_is_all_you_need": true,
+    "executor_scaffold_mentions_article_transformer": false,
     "passed": true,
-    "detail": "reusable transformer block composition now lives in `psionic-transformer` above `psionic-nn`; `psionic-nn` no longer points back into `psionic-train`, and optimizer interop is split into `psionic-nn-optimizers` so the canonical transformer boundary stays acyclic and model-independent"
+    "detail": "the owned encoder-decoder stack now lives in `psionic-transformer/src/encoder_decoder.rs`, the canonical article wrapper now lives in `psionic-models/src/tassadar_article_transformer.rs`, and the older executor scaffold remains a separate non-canonical lane"
   },
   "all_required_cases_present": true,
   "all_cases_pass": true,
-  "transformer_block_contract_green": true,
+  "article_transformer_contract_green": true,
   "article_equivalence_green": false,
-  "claim_boundary": "this report freezes the reusable transformer block layer only. It proves that embeddings, positional binding, multi-head projection and merge, feed-forward, residual-plus-norm composition, and train versus eval dropout posture now live in `psionic-transformer` above `psionic-nn`, but it does not claim the paper-faithful article model artifact or final article-equivalence route are complete.",
-  "summary": "Transformer block closure now records case_rows=6, all_required_cases_present=true, all_cases_pass=true, boundary_review_passed=true, tied_requirement_satisfied=true, transformer_block_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "7250f28f974a285a6ac771cdb01f2a20778b5606efe3895482de4a1b578d0794"
+  "claim_boundary": "this report freezes the canonical paper-faithful article-Transformer model path only. It proves that `psionic-transformer` now owns the reusable encoder-decoder stack and that `psionic-models` now owns one canonical article wrapper on top of that stack. It does not claim trace-vocabulary closure, artifact-backed lineage, training success, exactness, benchmark parity, or final article-equivalence green status.",
+  "summary": "Article Transformer model closure now records case_rows=6, all_required_cases_present=true, all_cases_pass=true, boundary_review_passed=true, tied_requirement_satisfied=true, article_transformer_contract_green=true, and article_equivalence_green=false.",
+  "report_digest": "d2f672179380fadbaf25d7f9cc6670f2fabc1d9a01a8fc4ad8429bae6fe6cdc4"
 }

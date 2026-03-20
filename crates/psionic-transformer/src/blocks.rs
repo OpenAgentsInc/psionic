@@ -104,6 +104,7 @@ impl SinusoidalPositionalEncoding {
 /// Token embedding plus positional encoding binding.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransformerEmbeddings {
+    vocab_size: usize,
     token_embedding: Embedding,
     positional_encoding: SinusoidalPositionalEncoding,
     dropout: Dropout,
@@ -120,6 +121,7 @@ impl TransformerEmbeddings {
     ) -> Result<Self, TransformerBlockError> {
         let module_id = module_id.into();
         Ok(Self {
+            vocab_size,
             token_embedding: Embedding::from_f32_table(
                 format!("{module_id}.token_embedding"),
                 vocab_size,
@@ -129,6 +131,21 @@ impl TransformerEmbeddings {
             positional_encoding: SinusoidalPositionalEncoding::new(hidden_size, max_positions)?,
             dropout: Dropout::new(format!("{module_id}.dropout"), dropout_probability)?,
         })
+    }
+
+    #[must_use]
+    pub const fn vocab_size(&self) -> usize {
+        self.vocab_size
+    }
+
+    #[must_use]
+    pub const fn hidden_size(&self) -> usize {
+        self.positional_encoding.hidden_size()
+    }
+
+    #[must_use]
+    pub const fn max_positions(&self) -> usize {
+        self.positional_encoding.max_positions()
     }
 
     pub fn forward(
@@ -375,6 +392,16 @@ impl PositionwiseFeedForward {
         let activated = self.activation.forward(&projected)?;
         let output = self.output_projection.forward(&activated)?;
         apply_dropout(&self.dropout, &output, mode, 29)
+    }
+
+    #[must_use]
+    pub const fn hidden_size(&self) -> usize {
+        self.hidden_size
+    }
+
+    #[must_use]
+    pub const fn intermediate_size(&self) -> usize {
+        self.intermediate_size
     }
 }
 

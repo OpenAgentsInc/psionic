@@ -2,12 +2,15 @@
 
 mod attention;
 mod blocks;
+mod encoder_decoder;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub use psionic_nn::{ActivationKind, LayerError, LayerNorm, Linear};
 pub use attention::*;
 pub use blocks::*;
+pub use encoder_decoder::*;
 
 /// Human-readable crate ownership summary.
 pub const CRATE_ROLE: &str = "reusable transformer architecture primitives";

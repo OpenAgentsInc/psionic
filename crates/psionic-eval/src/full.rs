@@ -38,6 +38,8 @@ mod tassadar_article_cpu_reproducibility;
 mod tassadar_article_equivalence_acceptance_gate;
 #[path = "tassadar_article_equivalence_blocker_matrix.rs"]
 mod tassadar_article_equivalence_blocker_matrix;
+#[path = "tassadar_article_transformer_model_closure.rs"]
+mod tassadar_article_transformer_model_closure;
 #[path = "tassadar_article_runtime_closeout.rs"]
 mod tassadar_article_runtime_closeout;
 #[path = "tassadar_async_lifecycle_profile.rs"]
@@ -314,6 +316,7 @@ pub use tassadar_article_abi::*;
 pub use tassadar_article_cpu_reproducibility::*;
 pub use tassadar_article_equivalence_acceptance_gate::*;
 pub use tassadar_article_equivalence_blocker_matrix::*;
+pub use tassadar_article_transformer_model_closure::*;
 pub use tassadar_article_runtime_closeout::*;
 pub use tassadar_async_lifecycle_profile::*;
 pub use tassadar_attention_primitive_mask_closure::*;

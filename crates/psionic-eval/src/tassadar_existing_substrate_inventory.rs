@@ -270,12 +270,13 @@ fn substrate_surface_rows() -> Vec<TassadarExistingSubstrateSurfaceRow> {
                 "crates/psionic-transformer/src/lib.rs",
                 "crates/psionic-transformer/src/attention.rs",
                 "crates/psionic-transformer/src/blocks.rs",
+                "crates/psionic-transformer/src/encoder_decoder.rs",
                 "docs/ARCHITECTURE.md",
             ],
             TassadarExistingSubstrateClassification::ReusableAsIs,
             false,
-            "the dedicated `psionic-transformer` crate now owns reusable decoder and AttnRes architecture primitives plus the owned scaled dot-product attention, embeddings, feed-forward, residual, and norm block path at the intended layering boundary",
-            "the remaining gap is implementing the canonical article stack on top of this boundary, not redefining the boundary itself",
+            "the dedicated `psionic-transformer` crate now owns reusable decoder and AttnRes architecture primitives plus the owned scaled dot-product attention, embeddings, encoder-decoder stack, feed-forward, residual, and norm path at the intended layering boundary",
+            "the remaining gap is now the article-specific vocabulary, artifact, training, and proof route on top of this boundary, not missing reusable Transformer architecture",
         ),
         surface_row(
             "psionic_models_descriptor_and_weight_lineage",
@@ -286,6 +287,16 @@ fn substrate_surface_rows() -> Vec<TassadarExistingSubstrateSurfaceRow> {
             false,
             "shared model descriptors, weight bundle metadata, and artifact-governance wrappers already exist for reusable model families",
             "these surfaces can be reused directly once the canonical article model artifact exists",
+        ),
+        surface_row(
+            "psionic_models_article_transformer_wrapper",
+            "psionic-models",
+            "Canonical article Transformer wrapper",
+            &["crates/psionic-models/src/tassadar_article_transformer.rs"],
+            TassadarExistingSubstrateClassification::ReusableWithExtension,
+            true,
+            "the repo now has one canonical paper-faithful article wrapper that binds the owned encoder-decoder stack, paper reference, and embedding-sharing modes at the `psionic-models` boundary",
+            "the wrapper still needs article trace vocabulary, artifact-backed weights, lineage, and proof-route closure before the final article-equivalence route can turn green",
         ),
         surface_row(
             "psionic_models_attnres_reference_family",
@@ -305,7 +316,7 @@ fn substrate_surface_rows() -> Vec<TassadarExistingSubstrateSurfaceRow> {
             TassadarExistingSubstrateClassification::ReusableWithExtension,
             true,
             "the repo already has executor-transformer configs, weight bundles, forward-pass scaffolding, decode state, KV points, and refusal posture",
-            "the scaffold still needs paper-faithful architecture, owned vocabulary/channel binding, exactness closure, and lineage closure before it can become the canonical article route",
+            "the scaffold is no longer the canonical article route; it remains a separate research and comparison lane beside the paper-faithful article wrapper",
         ),
         surface_row(
             "psionic_models_fixture_backed_article_executor_lane",
@@ -446,11 +457,11 @@ mod tests {
         assert!(report.inventory_contract_green);
         assert!(report.acceptance_gate_tie.tied_requirement_satisfied);
         assert!(!report.article_equivalence_green);
-        assert_eq!(report.surface_count, 10);
-        assert_eq!(report.blocker_surface_count, 5);
+        assert_eq!(report.surface_count, 11);
+        assert_eq!(report.blocker_surface_count, 6);
         assert_eq!(report.non_blocker_surface_count, 5);
         assert_eq!(report.classification_counts[0].count, 4);
-        assert_eq!(report.classification_counts[1].count, 4);
+        assert_eq!(report.classification_counts[1].count, 5);
         assert_eq!(report.classification_counts[2].count, 1);
         assert_eq!(report.classification_counts[3].count, 1);
     }

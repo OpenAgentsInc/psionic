@@ -210,6 +210,22 @@ Current honest posture:
   `psionic-nn-optimizers` split; this tranche is explicitly tied to the final
   acceptance gate while the overall article-equivalence verdict remains
   blocked
+- the repo now also has one canonical paper-faithful article-Transformer
+  model path for the article-equivalence closure wave, with reusable
+  encoder-decoder stack implementation in
+  `crates/psionic-transformer/src/encoder_decoder.rs`, one canonical article
+  wrapper in `crates/psionic-models/src/tassadar_article_transformer.rs`, a
+  committed eval report at
+  `fixtures/tassadar/reports/tassadar_article_transformer_model_closure_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_article_transformer_model_closure_summary.json`,
+  and an audit note that freeze the explicit `Attention Is All You Need`
+  reference, encoder stack, masked decoder, cross-attention, logits
+  projection, and embedding-sharing modes on one owned route while keeping
+  article trace vocabulary, artifact-backed weights, replay receipts, and the
+  final article-equivalence verdict open; this tranche is explicitly tied to
+  the final acceptance gate while the overall article-equivalence verdict
+  remains blocked
 - the repo now also has one research-only shared-memory and threads profile
   with a deterministic scheduler envelope, explicit sandbox boundary truth,
   and typed refusal on host-nondeterministic scheduling plus relaxed

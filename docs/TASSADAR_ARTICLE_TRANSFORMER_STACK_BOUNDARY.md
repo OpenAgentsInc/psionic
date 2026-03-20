@@ -56,29 +56,40 @@ psionic-runtime
   `crates/psionic-transformer/src/lib.rs`
   `crates/psionic-transformer/src/attention.rs`
   `crates/psionic-transformer/src/blocks.rs`
+  `crates/psionic-transformer/src/encoder_decoder.rs`
 - purpose:
   primitive layer semantics plus reusable Transformer attention, embeddings,
-  feed-forward, residual and norm block composition, masking, and
-  probability-trace export stay here; `psionic-transformer` is the
-  architecture anchor
+  feed-forward, residual and norm block composition, encoder-decoder stack
+  assembly, masking, and probability-trace export stay here;
+  `psionic-transformer` is the architecture anchor
 
 ### Model artifact format
 
 - owner modules:
   `crates/psionic-models/src/lib.rs`
-  `crates/psionic-models/src/tassadar_executor_transformer.rs`
+  `crates/psionic-models/src/tassadar_article_transformer.rs`
 - purpose:
-  the canonical article model descriptor, weight bundle, and artifact identity
-  all live in `psionic-models`
+  the canonical article model descriptor, route selection, and later weight
+  artifact identity all live in `psionic-models`
 
 ### Forward-pass trace hooks
 
 - owner modules:
-  `crates/psionic-models/src/tassadar_executor_transformer.rs`
+  `crates/psionic-models/src/tassadar_article_transformer.rs`
   `crates/psionic-runtime/src/tassadar.rs`
 - purpose:
   forward-pass-owned trace hooks are emitted by the model boundary and
   serialized into runtime-owned trace ABI surfaces
+
+## Canonical Wrapper Note
+
+The canonical article wrapper is now
+`crates/psionic-models/src/tassadar_article_transformer.rs`.
+
+The older
+`crates/psionic-models/src/tassadar_executor_transformer.rs`
+remains a separate research and comparison lane. It is not the canonical
+paper-faithful article route.
 
 ### Replay and receipt hooks
 

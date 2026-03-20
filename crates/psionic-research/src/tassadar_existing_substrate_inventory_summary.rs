@@ -189,8 +189,8 @@ mod tests {
         assert!(report.tied_requirement_satisfied);
         assert_eq!(report.acceptance_status, "blocked");
         assert!(!report.article_equivalence_green);
-        assert_eq!(report.surface_count, 10);
-        assert_eq!(report.blocker_surface_count, 5);
+        assert_eq!(report.surface_count, 11);
+        assert_eq!(report.blocker_surface_count, 6);
     }
 
     #[test]

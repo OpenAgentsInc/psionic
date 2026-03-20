@@ -458,7 +458,7 @@
         "github_issue_number": 280,
         "title": "TAS-163: Paper-faithful article-Transformer model closure",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-003"
         ]
@@ -838,7 +838,7 @@
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
     "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
-    "report_digest": "72479ef58a65ead3f7784affad936c936b62291fb08d0044d8176755361db118"
+    "report_digest": "a2674f360c54b4db381e5e4d81a06b3d275e1921b816f5c13fb1fe5a115b9262"
   },
   "blocker_count": 7,
   "open_blocker_count": 7,
@@ -864,5 +864,5 @@
   ],
   "claim_boundary": "this summary mirrors the TAS-157 blocker matrix only. It keeps the blocker contract operator-readable, but it does not add evidence or widen the current public claim boundary beyond the underlying matrix",
   "summary": "Article-equivalence blocker matrix summary now records blocker_count=7, open_blocker_count=7, matrix_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "98c273004de2c1644c9cd53f169627829fcf9ce47c36defbf97083b90f84b99b"
+  "report_digest": "21edaa1fc3e42f35f2383b237b4d88e6de372df726f57d7ddc215ad4aedf7aee"
 }
