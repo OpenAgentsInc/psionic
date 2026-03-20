@@ -1072,8 +1072,18 @@ The current scope is:
   `fixtures/tassadar/reports/tassadar_universal_machine_proof_summary.json`,
   which freeze one explicit witness construction over `TCM.v1` for a
   two-register machine and a single-tape machine with exact runtime parity;
-  this still does not constitute the dedicated witness benchmark suite, the
-  minimal universal-substrate gate, or served universality posture
+  this still does not constitute the minimal universal-substrate gate or served
+  universality posture
+- the current dedicated witness-suite artifacts are
+  `fixtures/tassadar/reports/tassadar_universality_witness_suite_report.json`
+  and
+  `fixtures/tassadar/reports/tassadar_universality_witness_suite_summary.json`,
+  which freeze one benchmark-bound universality witness suite over `TCM.v1`
+  register-machine, tape-machine, vm-style interpreter, session-process, and
+  spill/tape families plus explicit refusal boundaries on VM parameter ABI and
+  open-ended external event loops; this still does not constitute the minimal
+  universal-substrate gate, the theory/operator/served verdict split, served
+  universality posture, or Turing-complete closeout
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

@@ -93,8 +93,8 @@ Current honest posture:
   with committed eval and research artifacts that freeze exactly which
   broadness-adjacent surfaces are already real before the terminal contract and
   exactly which terminal-contract artifacts are still missing; the current
-  claim status remains suppressed until `TCM.v1`, the witness construction, the
-  witness suite, the minimal gate, and the verdict split all land
+  terminal claim remains suppressed until the minimal gate and the verdict
+  split land
 - the repo now also has one declared terminal substrate model `TCM.v1`, with a
   committed IR model artifact and runtime contract report that bind universal-
   substrate language to explicit control, memory, continuation, and
@@ -103,8 +103,14 @@ Current honest posture:
 - the repo now also has one explicit universal-machine witness construction,
   with committed compiler, runtime, eval, and research artifacts for a
   two-register machine and a single-tape machine over `TCM.v1`; this closes the
-  witness-construction step only, not yet the full witness benchmark suite or
-  the final gate
+  witness-construction step only, not yet the final gate
+- the repo now also has one dedicated universality witness benchmark suite,
+  with committed data and environment contracts plus eval and research artifacts
+  covering register-machine, tape-machine, vm-style interpreter, session-
+  process, and spill/tape witness families while keeping VM parameter ABI and
+  open-ended external event loops on explicit refusal boundaries; this still
+  does not constitute the minimal universal-substrate gate, the verdict split,
+  or served universality posture
 - the repo now also has one research-only shared-memory and threads profile
   with a deterministic scheduler envelope, explicit sandbox boundary truth,
   and typed refusal on host-nondeterministic scheduling plus relaxed
@@ -216,7 +222,7 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-125` through `TAS-146` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- the current open GitHub backlog begins at `TAS-153` and runs through
+- the current open GitHub backlog begins at `TAS-154` and runs through
   `TAS-156`
 
 ## Repo-Local Companion Docs

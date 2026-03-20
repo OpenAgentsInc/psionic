@@ -8,6 +8,7 @@
 mod apple_adapter;
 mod tassadar;
 mod tassadar_delegation_benchmark;
+mod tassadar_universality_witness_suite;
 mod tassadar_wedge_taxonomy;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -22,6 +23,7 @@ use thiserror::Error;
 pub use apple_adapter::*;
 pub use tassadar::*;
 pub use tassadar_delegation_benchmark::*;
+pub use tassadar_universality_witness_suite::*;
 pub use tassadar_wedge_taxonomy::*;
 
 /// Human-readable crate ownership summary.

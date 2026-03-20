@@ -1,0 +1,235 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.universality_witness_suite.summary.v1",
+  "eval_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.universality_witness_suite.report.v1",
+    "suite_contract": {
+      "abi_version": "psionic.tassadar.universality_witness_suite.v1",
+      "suite_ref": "dataset://openagents/tassadar/universality_witness_suite",
+      "version": "2026.03.19",
+      "witness_rows": [
+        {
+          "witness_family": "register_machine",
+          "expected_status": "exact",
+          "authority_refs": [
+            "fixtures/tassadar/reports/tassadar_universal_machine_proof_report.json"
+          ],
+          "claim_boundary": "register-machine universality stays bounded to the committed two-register witness over `TCM.v1` rather than implying broader arbitrary-machine closure"
+        },
+        {
+          "witness_family": "tape_machine",
+          "expected_status": "exact",
+          "authority_refs": [
+            "fixtures/tassadar/reports/tassadar_universal_machine_proof_report.json"
+          ],
+          "claim_boundary": "tape-machine universality stays bounded to the committed single-tape witness over `TCM.v1` rather than implying unbounded semantic-window widening"
+        },
+        {
+          "witness_family": "bytecode_vm_interpreter",
+          "expected_status": "exact",
+          "authority_refs": [
+            "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+          ],
+          "claim_boundary": "bytecode-vm interpretation stays bounded to the current deterministic vm-style module family and its explicit parameter-ABI refusal sibling rather than implying arbitrary Wasm or arbitrary interpreter closure"
+        },
+        {
+          "witness_family": "session_process_kernel",
+          "expected_status": "exact",
+          "authority_refs": [
+            "fixtures/tassadar/reports/tassadar_session_process_profile_report.json"
+          ],
+          "claim_boundary": "session-process kernels stay bounded to deterministic echo and counter-turn loops rather than implying open-ended external event processing or generic agent loops"
+        },
+        {
+          "witness_family": "spill_tape_continuation",
+          "expected_status": "exact",
+          "authority_refs": [
+            "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json"
+          ],
+          "claim_boundary": "spill/tape continuation stays bounded to the current-host cpu-reference envelope and explicit segment-store artifacts rather than implying arbitrary persistent memory or async effect closure"
+        },
+        {
+          "witness_family": "bytecode_vm_param_boundary",
+          "expected_status": "refusal_boundary",
+          "authority_refs": [
+            "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+          ],
+          "claim_boundary": "vm-style parameter ABI mismatch remains an explicit refusal boundary inside the witness suite rather than a silent widening to arbitrary call signatures"
+        },
+        {
+          "witness_family": "external_event_loop_boundary",
+          "expected_status": "refusal_boundary",
+          "authority_refs": [
+            "fixtures/tassadar/reports/tassadar_session_process_profile_report.json"
+          ],
+          "claim_boundary": "open-ended external event loops remain an explicit refusal boundary inside the witness suite rather than a silent widening to generic long-running agent processes"
+        }
+      ],
+      "evaluation_axes": [
+        "exact_runtime_parity",
+        "checkpoint_resume_equivalent",
+        "refusal_boundary_held",
+        "runtime_envelope",
+        "evidence_anchor"
+      ],
+      "report_ref": "fixtures/tassadar/reports/tassadar_universality_witness_suite_report.json",
+      "summary_report_ref": "fixtures/tassadar/reports/tassadar_universality_witness_suite_summary.json",
+      "contract_digest": "b2b9561ff235d5a1072ee73b7ed92f9d03c11cd390d0975b7c2942b189f85045"
+    },
+    "suite_binding": {
+      "suite_ref": "dataset://openagents/tassadar/universality_witness_suite",
+      "suite_version": "2026.03.19",
+      "exact_family_ids": [
+        "register_machine",
+        "tape_machine",
+        "bytecode_vm_interpreter",
+        "session_process_kernel",
+        "spill_tape_continuation"
+      ],
+      "refusal_boundary_family_ids": [
+        "bytecode_vm_param_boundary",
+        "external_event_loop_boundary"
+      ],
+      "evaluation_axes": [
+        "exact_runtime_parity",
+        "checkpoint_resume_equivalent",
+        "refusal_boundary_held",
+        "runtime_envelope",
+        "evidence_anchor"
+      ],
+      "report_ref": "fixtures/tassadar/reports/tassadar_universality_witness_suite_report.json",
+      "summary_report_ref": "fixtures/tassadar/reports/tassadar_universality_witness_suite_summary.json"
+    },
+    "generated_from_refs": [
+      "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+      "fixtures/tassadar/reports/tassadar_universal_machine_proof_report.json",
+      "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json",
+      "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+      "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json"
+    ],
+    "family_rows": [
+      {
+        "witness_family": "register_machine",
+        "expected_status": "exact",
+        "satisfied": true,
+        "evidence_anchor_ids": [
+          "tcm.encoding.two_register_counter_loop.v1"
+        ],
+        "exact_runtime_parity": true,
+        "checkpoint_resume_equivalent": true,
+        "refusal_boundary_held": false,
+        "runtime_envelope": "current-host cpu-reference operator envelope with persisted checkpoints, process objects, spill-tape extension, and declared effect profiles only",
+        "note": "the dedicated witness suite keeps the two-register construction as the minimal register-machine anchor over `TCM.v1` exact step and final-state parity"
+      },
+      {
+        "witness_family": "tape_machine",
+        "expected_status": "exact",
+        "satisfied": true,
+        "evidence_anchor_ids": [
+          "tcm.encoding.single_tape_bit_flip.v1"
+        ],
+        "exact_runtime_parity": true,
+        "checkpoint_resume_equivalent": true,
+        "refusal_boundary_held": false,
+        "runtime_envelope": "current-host cpu-reference operator envelope with persisted checkpoints, process objects, spill-tape extension, and declared effect profiles only",
+        "note": "the dedicated witness suite keeps the single-tape construction as the minimal tape-machine anchor over `TCM.v1` exact step and final-state parity"
+      },
+      {
+        "witness_family": "bytecode_vm_interpreter",
+        "expected_status": "exact",
+        "satisfied": true,
+        "evidence_anchor_ids": [
+          "vm_style_dispatch_exact"
+        ],
+        "exact_runtime_parity": true,
+        "refusal_boundary_held": true,
+        "runtime_envelope": "bounded vm-style module family under the current Wasm-text-to-Tassadar lowering lane",
+        "note": "the dedicated witness suite keeps bytecode-vm interpretation bounded to the exact vm-style module case while holding the parameter-ABI sibling on explicit refusal"
+      },
+      {
+        "witness_family": "session_process_kernel",
+        "expected_status": "exact",
+        "satisfied": true,
+        "evidence_anchor_ids": [
+          "deterministic_echo_turn_loop",
+          "stateful_counter_turn_loop"
+        ],
+        "exact_runtime_parity": true,
+        "checkpoint_resume_equivalent": true,
+        "refusal_boundary_held": true,
+        "runtime_envelope": "deterministic finite-turn session-process profile with persisted local state",
+        "note": "the dedicated witness suite keeps process-kernel execution grounded in deterministic echo and counter-turn loops with explicit refusal on open-ended external streams"
+      },
+      {
+        "witness_family": "spill_tape_continuation",
+        "expected_status": "exact",
+        "satisfied": true,
+        "evidence_anchor_ids": [
+          "long_loop_spill_resume",
+          "search_frontier_spill_resume"
+        ],
+        "exact_runtime_parity": true,
+        "checkpoint_resume_equivalent": true,
+        "refusal_boundary_held": true,
+        "runtime_envelope": "current-host cpu-reference spill/tape continuation envelope",
+        "note": "the dedicated witness suite keeps spill/tape continuation grounded in explicit spill-segment and external-tape artifacts rather than implicit persistent-memory claims"
+      },
+      {
+        "witness_family": "bytecode_vm_param_boundary",
+        "expected_status": "refusal_boundary",
+        "satisfied": true,
+        "evidence_anchor_ids": [
+          "vm_style_param_refusal"
+        ],
+        "refusal_boundary_held": true,
+        "runtime_envelope": "bounded vm-style module family under the current Wasm-text-to-Tassadar lowering lane",
+        "note": "the dedicated witness suite keeps vm-style parameter ABI widening on an explicit refusal boundary rather than silently admitting broader call signatures"
+      },
+      {
+        "witness_family": "external_event_loop_boundary",
+        "expected_status": "refusal_boundary",
+        "satisfied": true,
+        "evidence_anchor_ids": [
+          "open_ended_external_event_stream"
+        ],
+        "refusal_boundary_held": true,
+        "runtime_envelope": "deterministic finite-turn session-process profile with persisted local state",
+        "note": "the dedicated witness suite keeps open-ended external event loops on explicit refusal instead of reading process-kernel evidence as generic agent-loop closure"
+      }
+    ],
+    "exact_family_count": 5,
+    "refusal_boundary_count": 2,
+    "overall_green": true,
+    "explicit_non_implications": [
+      "minimal universal-substrate gate",
+      "theory/operator/served verdict split",
+      "served universality posture",
+      "arbitrary Wasm"
+    ],
+    "claim_boundary": "this report closes the dedicated universality witness benchmark suite only. It keeps the benchmark surface bounded to explicit `TCM.v1` witness constructions, vm-style interpreter kernels, session-process kernels, spill/tape continuation, and named refusal boundaries without claiming the minimal universal-substrate gate, the final verdict split, arbitrary Wasm, or served universality posture",
+    "summary": "Universality witness suite report keeps family_rows=7, exact_family_count=5, refusal_boundary_count=2, overall_green=true.",
+    "report_digest": "434f80150c05c44ef7bdf6d126f8e6141e2506e6a4c4da6a5178f5d415ebae3c"
+  },
+  "exact_family_ids": [
+    "register_machine",
+    "tape_machine",
+    "bytecode_vm_interpreter",
+    "session_process_kernel",
+    "spill_tape_continuation"
+  ],
+  "refusal_boundary_family_ids": [
+    "bytecode_vm_param_boundary",
+    "external_event_loop_boundary"
+  ],
+  "allowed_statement": "Psionic/Tassadar now has a dedicated universality witness benchmark suite over `TCM.v1` covering two-register and single-tape witnesses, a deterministic vm-style interpreter family, deterministic session-process kernels, spill/tape continuation, and explicit refusal boundaries on VM parameter ABI and open-ended external event loops.",
+  "explicit_non_implications": [
+    "minimal universal-substrate gate",
+    "theory/operator/served verdict split",
+    "served universality posture",
+    "arbitrary Wasm"
+  ],
+  "claim_boundary": "this summary closes the dedicated witness benchmark suite only. It still does not claim the minimal universal-substrate gate, the theory/operator/served verdict split, served universality posture, arbitrary Wasm, or Turing-complete closeout by itself.",
+  "summary": "Universality witness suite summary keeps exact_family_ids=5, refusal_boundary_family_ids=2, overall_green=true.",
+  "report_digest": "0899de4c3e7f1916649ac85ac126802a894308d8060b8381c0582cf09d7c2660"
+}

@@ -22,6 +22,7 @@ mod tassadar_shared_primitive_transfer;
 mod tassadar_state_design_study;
 mod tassadar_supervision_density;
 mod tassadar_trace_state_ablation;
+mod tassadar_universality_witness_suite;
 mod tassadar_weak_supervision;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -52,6 +53,7 @@ pub use tassadar_shared_primitive_transfer::*;
 pub use tassadar_state_design_study::*;
 pub use tassadar_supervision_density::*;
 pub use tassadar_trace_state_ablation::*;
+pub use tassadar_universality_witness_suite::*;
 pub use tassadar_weak_supervision::*;
 
 /// Human-readable crate ownership summary.

@@ -2611,6 +2611,38 @@ pub enum TassadarEnvironmentError {
     /// Missing CLRS-to-Wasm bridge report ref.
     #[error("Tassadar environment spec is missing `clrs_wasm_bridge_binding.report_ref`")]
     MissingClrsWasmBridgeReportRef,
+    /// Missing universality witness-suite ref.
+    #[error(
+        "Tassadar environment spec is missing `universality_witness_suite_binding.suite_ref`"
+    )]
+    MissingUniversalityWitnessSuiteRef,
+    /// Missing universality witness-suite version.
+    #[error(
+        "Tassadar environment spec is missing `universality_witness_suite_binding.suite_version`"
+    )]
+    MissingUniversalityWitnessSuiteVersion,
+    /// Missing universality witness exact families.
+    #[error("Tassadar environment spec must declare universality witness exact families")]
+    MissingUniversalityWitnessExactFamilies,
+    /// Missing universality witness refusal families.
+    #[error("Tassadar environment spec must declare universality witness refusal families")]
+    MissingUniversalityWitnessRefusalFamilies,
+    /// Missing universality witness evaluation axes.
+    #[error("Tassadar environment spec must declare universality witness evaluation axes")]
+    MissingUniversalityWitnessEvaluationAxes,
+    /// Invalid universality witness evaluation axis.
+    #[error("Tassadar environment spec includes an empty universality witness evaluation axis")]
+    InvalidUniversalityWitnessEvaluationAxis,
+    /// Missing universality witness report ref.
+    #[error(
+        "Tassadar environment spec is missing `universality_witness_suite_binding.report_ref`"
+    )]
+    MissingUniversalityWitnessReportRef,
+    /// Missing universality witness summary ref.
+    #[error(
+        "Tassadar environment spec is missing `universality_witness_suite_binding.summary_report_ref`"
+    )]
+    MissingUniversalityWitnessSummaryRef,
     /// Missing group ref.
     #[error("Tassadar environment refs are missing `group_ref`")]
     MissingGroupRef,
