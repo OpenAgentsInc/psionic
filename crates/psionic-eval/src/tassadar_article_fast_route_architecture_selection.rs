@@ -1033,7 +1033,7 @@ mod tests {
                 .blocked_issue_ids
                 .first()
                 .map(String::as_str),
-            Some("TAS-175")
+            Some("TAS-176")
         );
     }
 

@@ -355,6 +355,23 @@ and no-fallback on the declared canonical article workload families inside the
 current article profile, but throughput-floor closure and the broader final
 article-equivalence claim still remain `TAS-175` and later tranches.
 
+`TAS-175` now closes that throughput-floor tranche on top of the same owned
+route. `psionic-runtime` now commits the bounded
+`fixtures/tassadar/runs/article_fast_route_throughput_v1/article_fast_route_throughput_bundle.json`
+artifact, which measures direct `HullCache` throughput on the committed
+Hungarian article run, the committed `sudoku_9x9_test_a` hard-Sudoku stand-in
+run, and the bounded million-step and multi-million-step kernel set while
+keeping the later Arto and benchmark-wide Sudoku closure explicitly out of
+scope. `psionic-eval` now freezes the joined floor, prerequisite, and
+cross-machine drift contract at
+`fixtures/tassadar/reports/tassadar_article_fast_route_throughput_floor_report.json`,
+and `psionic-research` mirrors the operator-readable summary at
+`fixtures/tassadar/reports/tassadar_article_fast_route_throughput_floor_summary.json`.
+This is the point where the repo now machine-readably says the selected fast
+route clears the declared CPU throughput floor on the bounded committed route,
+but the broader final article-equivalence claim still remains later frontend,
+benchmark, single-run, and weight-ownership tranches.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

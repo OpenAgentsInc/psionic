@@ -8,7 +8,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-175",
       "TAS-176",
       "TAS-177",
       "TAS-178",
@@ -116,5 +115,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this report closes only TAS-174. It proves the selected HullCache fast path is now exact and no-fallback on the declared canonical article workload families inside the current article profile, and that the served article-session plus hybrid route surfaces expose those workloads as direct HullCache executions on the trained Transformer-backed model. It does not yet claim throughput-floor closure or final article-equivalence green status.",
   "summary": "Article fast-route exactness report now records tied_requirement_satisfied=true, implementation_prerequisite_green=true, all_article_workloads_exact=true, article_session_direct_cases=3, hybrid_direct_cases=3, exactness_green=true, and article_equivalence_green=false.",
-  "report_digest": "ba39c5d9971ffd5678716c99ef83af1fb87e64cff5e67a6e94f059cca4ab96a7"
+  "report_digest": "0244e5a0a939bae1b94f91566e246e938d5ab890165b07010406673b8dd15b3a"
 }

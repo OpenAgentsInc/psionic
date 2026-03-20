@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-175",
         "TAS-176",
         "TAS-177",
         "TAS-178",
@@ -120,7 +119,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report closes only TAS-174. It proves the selected HullCache fast path is now exact and no-fallback on the declared canonical article workload families inside the current article profile, and that the served article-session plus hybrid route surfaces expose those workloads as direct HullCache executions on the trained Transformer-backed model. It does not yet claim throughput-floor closure or final article-equivalence green status.",
     "summary": "Article fast-route exactness report now records tied_requirement_satisfied=true, implementation_prerequisite_green=true, all_article_workloads_exact=true, article_session_direct_cases=3, hybrid_direct_cases=3, exactness_green=true, and article_equivalence_green=false.",
-    "report_digest": "ba39c5d9971ffd5678716c99ef83af1fb87e64cff5e67a6e94f059cca4ab96a7"
+    "report_digest": "0244e5a0a939bae1b94f91566e246e938d5ab890165b07010406673b8dd15b3a"
   },
   "tied_requirement_id": "TAS-174",
   "tied_requirement_satisfied": true,
@@ -133,5 +132,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-174 fast-route exactness tranche. It keeps the zero-fallback article-workload closure operator-readable without pretending that TAS-175 throughput closure or final article-equivalence green status are already closed.",
   "summary": "Article fast-route exactness summary now records tied_requirement_satisfied=true, implementation_prerequisite_green=true, all_article_workloads_exact=true, article_session_direct_case_count=3, hybrid_direct_case_count=3, exactness_green=true, and article_equivalence_green=false.",
-  "report_digest": "ad723b04238bb9743304fd449fe731093a1a02d2257b2c7caf9c3704f03fa681"
+  "report_digest": "e8d7459df7400a6687f54bccf8ed7ab3a14b9e93171cb47edf9b745a1dcf4ff5"
 }

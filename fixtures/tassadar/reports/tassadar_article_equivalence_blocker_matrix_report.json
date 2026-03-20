@@ -181,9 +181,9 @@
       "blocker_id": "BEQ-004",
       "category": "fast_route_scope",
       "title": "Canonical fast decode route remains open",
-      "repo_status": "partial",
-      "current_gap_summary": "the article treats logarithmic-time fast decoding as the core technical unlock, but the current public closeout route is still the exact reference-linear CPU lane",
-      "current_public_truth": "the repo already has fast-path runtime and research comparison surfaces, yet none is currently the canonical audited article-equivalence proof route",
+      "repo_status": "implemented",
+      "current_gap_summary": "the selected HullCache fast path now has canonical route selection, owned-model integration, exactness, no-fallback closure, and explicit throughput-floor evidence on the committed article workloads; later issues still own frontend breadth, final demo parity, and benchmark-wide closure",
+      "current_public_truth": "the repo now has one canonical fast-route stack with machine-legible selection, exactness, and throughput-floor artifacts on the bounded committed workloads, while later tranches keep final article-equivalence green status red",
       "closure_requirements": [
         "choose one fast architecture that can become the canonical article route",
         "integrate that fast path into the Transformer-backed article model itself",
@@ -633,7 +633,7 @@
       "github_issue_number": 297,
       "title": "TAS-175: Fast-route throughput floor closeout",
       "issue_role": "implementation",
-      "issue_state": "open",
+      "issue_state": "closed",
       "blocker_ids": [
         "BEQ-004",
         "BEQ-005"
@@ -814,12 +814,11 @@
   "all_issue_refs_point_to_known_blockers": true,
   "matrix_contract_green": true,
   "article_equivalence_green": false,
-  "open_blocker_count": 7,
+  "open_blocker_count": 6,
   "open_blocker_ids": [
     "BEQ-001",
     "BEQ-002",
     "BEQ-003",
-    "BEQ-004",
     "BEQ-005",
     "BEQ-006",
     "BEQ-007"
@@ -833,6 +832,6 @@
     "not proof that hard-Sudoku benchmark closure, no-spill single-run closure, or route-minimality closure already exist"
   ],
   "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
-  "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
-  "report_digest": "4ea9b5d681668fb06617bff55f751e1511866bcfad83a3586deb1d5d439b9d03"
+  "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=6.",
+  "report_digest": "36e094dc7b2c2119b8f32bd03011bf4b9e0f4a73334f149ace26f0ded365e6b6"
 }

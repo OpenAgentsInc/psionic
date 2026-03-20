@@ -66,10 +66,12 @@
             "final_stack": [],
             "halt_reason": "returned"
           },
-          "direct_steps_per_second": 784673.874773211,
+          "direct_steps_per_second": 1561473.9971435394,
           "throughput_floor_steps_per_second": 250000.0,
           "floor_status": "passed",
           "exactness_bps": 10000,
+          "hull_cache_exactness_bps": 10000,
+          "hull_cache_floor_status": "passed",
           "evidence_bundle": {
             "runtime_manifest": {
               "schema_version": 1,
@@ -220,16 +222,16 @@
             "selection_state": "direct",
             "effective_decode_mode": "reference_linear",
             "measurement_posture": "measured",
-            "steps_per_second": 784673.874773211,
-            "note": "reference-linear is the only direct measured runtime lane for the committed Rust-only closeout kernels at these horizons"
+            "steps_per_second": 1561473.9971435394,
+            "note": "reference-linear remains the baseline measured runtime lane for the committed Rust-only closeout kernels at these horizons"
           },
           "hull_cache": {
             "requested_decode_mode": "hull_cache",
-            "selection_state": "fallback",
-            "selection_reason": "hull_cache_control_flow_unsupported",
-            "effective_decode_mode": "reference_linear",
-            "measurement_posture": "selection_only",
-            "note": "HullCache remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+            "selection_state": "direct",
+            "effective_decode_mode": "hull_cache",
+            "measurement_posture": "measured",
+            "steps_per_second": 1380947.3705512255,
+            "note": "HullCache now stays direct and measured on the committed long-horizon kernel digests, so this receipt records fast-route exactness and throughput on that bounded benchmark-only subset"
           },
           "sparse_top_k": {
             "requested_decode_mode": "sparse_top_k",
@@ -239,7 +241,7 @@
             "measurement_posture": "selection_only",
             "note": "SparseTopK remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
           },
-          "note": "long_loop_kernel at `million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor"
+          "note": "long_loop_kernel at `million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor, while HullCache cleared the same floor on the bounded fast-route kernel subset"
         },
         {
           "workload_family": "long_loop_kernel",
@@ -289,10 +291,12 @@
             "final_stack": [],
             "halt_reason": "returned"
           },
-          "direct_steps_per_second": 783277.6474043074,
+          "direct_steps_per_second": 1535848.366351538,
           "throughput_floor_steps_per_second": 250000.0,
           "floor_status": "passed",
           "exactness_bps": 10000,
+          "hull_cache_exactness_bps": 10000,
+          "hull_cache_floor_status": "passed",
           "evidence_bundle": {
             "runtime_manifest": {
               "schema_version": 1,
@@ -443,16 +447,16 @@
             "selection_state": "direct",
             "effective_decode_mode": "reference_linear",
             "measurement_posture": "measured",
-            "steps_per_second": 783277.6474043074,
-            "note": "reference-linear is the only direct measured runtime lane for the committed Rust-only closeout kernels at these horizons"
+            "steps_per_second": 1535848.366351538,
+            "note": "reference-linear remains the baseline measured runtime lane for the committed Rust-only closeout kernels at these horizons"
           },
           "hull_cache": {
             "requested_decode_mode": "hull_cache",
-            "selection_state": "fallback",
-            "selection_reason": "hull_cache_control_flow_unsupported",
-            "effective_decode_mode": "reference_linear",
-            "measurement_posture": "selection_only",
-            "note": "HullCache remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+            "selection_state": "direct",
+            "effective_decode_mode": "hull_cache",
+            "measurement_posture": "measured",
+            "steps_per_second": 1482624.934278032,
+            "note": "HullCache now stays direct and measured on the committed long-horizon kernel digests, so this receipt records fast-route exactness and throughput on that bounded benchmark-only subset"
           },
           "sparse_top_k": {
             "requested_decode_mode": "sparse_top_k",
@@ -462,7 +466,7 @@
             "measurement_posture": "selection_only",
             "note": "SparseTopK remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
           },
-          "note": "long_loop_kernel at `two_million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor"
+          "note": "long_loop_kernel at `two_million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor, while HullCache cleared the same floor on the bounded fast-route kernel subset"
         },
         {
           "workload_family": "state_machine_kernel",
@@ -518,10 +522,12 @@
             "final_stack": [],
             "halt_reason": "returned"
           },
-          "direct_steps_per_second": 755651.4427644741,
+          "direct_steps_per_second": 1441686.7582443096,
           "throughput_floor_steps_per_second": 250000.0,
           "floor_status": "passed",
           "exactness_bps": 10000,
+          "hull_cache_exactness_bps": 10000,
+          "hull_cache_floor_status": "passed",
           "evidence_bundle": {
             "runtime_manifest": {
               "schema_version": 1,
@@ -675,16 +681,16 @@
             "selection_state": "direct",
             "effective_decode_mode": "reference_linear",
             "measurement_posture": "measured",
-            "steps_per_second": 755651.4427644741,
-            "note": "reference-linear is the only direct measured runtime lane for the committed Rust-only closeout kernels at these horizons"
+            "steps_per_second": 1441686.7582443096,
+            "note": "reference-linear remains the baseline measured runtime lane for the committed Rust-only closeout kernels at these horizons"
           },
           "hull_cache": {
             "requested_decode_mode": "hull_cache",
-            "selection_state": "fallback",
-            "selection_reason": "hull_cache_control_flow_unsupported",
-            "effective_decode_mode": "reference_linear",
-            "measurement_posture": "selection_only",
-            "note": "HullCache remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+            "selection_state": "direct",
+            "effective_decode_mode": "hull_cache",
+            "measurement_posture": "measured",
+            "steps_per_second": 1363834.3792703869,
+            "note": "HullCache now stays direct and measured on the committed long-horizon kernel digests, so this receipt records fast-route exactness and throughput on that bounded benchmark-only subset"
           },
           "sparse_top_k": {
             "requested_decode_mode": "sparse_top_k",
@@ -694,7 +700,7 @@
             "measurement_posture": "selection_only",
             "note": "SparseTopK remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
           },
-          "note": "state_machine_kernel at `million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor"
+          "note": "state_machine_kernel at `million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor, while HullCache cleared the same floor on the bounded fast-route kernel subset"
         },
         {
           "workload_family": "state_machine_kernel",
@@ -750,10 +756,12 @@
             "final_stack": [],
             "halt_reason": "returned"
           },
-          "direct_steps_per_second": 750335.343122409,
+          "direct_steps_per_second": 1443216.1108262055,
           "throughput_floor_steps_per_second": 250000.0,
           "floor_status": "passed",
           "exactness_bps": 10000,
+          "hull_cache_exactness_bps": 10000,
+          "hull_cache_floor_status": "passed",
           "evidence_bundle": {
             "runtime_manifest": {
               "schema_version": 1,
@@ -907,16 +915,16 @@
             "selection_state": "direct",
             "effective_decode_mode": "reference_linear",
             "measurement_posture": "measured",
-            "steps_per_second": 750335.343122409,
-            "note": "reference-linear is the only direct measured runtime lane for the committed Rust-only closeout kernels at these horizons"
+            "steps_per_second": 1443216.1108262055,
+            "note": "reference-linear remains the baseline measured runtime lane for the committed Rust-only closeout kernels at these horizons"
           },
           "hull_cache": {
             "requested_decode_mode": "hull_cache",
-            "selection_state": "fallback",
-            "selection_reason": "hull_cache_control_flow_unsupported",
-            "effective_decode_mode": "reference_linear",
-            "measurement_posture": "selection_only",
-            "note": "HullCache remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
+            "selection_state": "direct",
+            "effective_decode_mode": "hull_cache",
+            "measurement_posture": "measured",
+            "steps_per_second": 1391480.440713639,
+            "note": "HullCache now stays direct and measured on the committed long-horizon kernel digests, so this receipt records fast-route exactness and throughput on that bounded benchmark-only subset"
           },
           "sparse_top_k": {
             "requested_decode_mode": "sparse_top_k",
@@ -926,24 +934,24 @@
             "measurement_posture": "selection_only",
             "note": "SparseTopK remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure"
           },
-          "note": "state_machine_kernel at `two_million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor"
+          "note": "state_machine_kernel at `two_million_step` stayed exact against CPU reference and cleared the declared direct-throughput floor, while HullCache cleared the same floor on the bounded fast-route kernel subset"
         }
       ],
       "exact_horizon_count": 4,
       "floor_pass_count": 4,
       "floor_refusal_count": 0,
-      "claim_boundary": "this bundle closes the Rust-only runtime floor only for the committed long-loop and state-machine kernel families at the declared million-step and two-million-step horizons on the direct reference-linear CPU executor path. HullCache and SparseTopK remain explicit fallback-only rows here, and this bundle does not widen served profile closure beyond the committed benchmark lane",
-      "summary": "Rust-only article runtime closeout now freezes 4 exact horizon receipts across 2 workload families with floor_passes=4 and floor_refusals=0.",
-      "bundle_digest": "ff3418c7365d83f192da9bcd96ac4b2e7c7cc504288c2687727b1867af824b57"
+      "claim_boundary": "this bundle closes the Rust-only runtime floor for the committed long-loop and state-machine kernel families at the declared million-step and two-million-step horizons on the direct reference-linear CPU executor path, and it now also records direct measured HullCache throughput on that same bounded kernel set. SparseTopK remains explicit fallback-only here, and this bundle still does not widen served profile closure beyond the committed benchmark lane",
+      "summary": "Rust-only article runtime closeout now freezes 4 exact horizon receipts across 2 workload families with reference_linear_floor_passes=4, reference_linear_floor_refusals=0, and hull_cache_floor_passes=4.",
+      "bundle_digest": "b33950c6338ce176245265e40373e56a681737896a6bef6e7eab230824670990"
     },
     "exact_horizon_count": 4,
     "floor_pass_count": 4,
     "floor_refusal_count": 0,
     "slowest_workload_horizon_id": "state_machine_kernel.two_million_step",
-    "slowest_measured_steps_per_second": 750335.343122409,
-    "claim_boundary": "this eval report summarizes the Rust-only runtime floor only for the committed article-closeout kernel families and horizons. It does not widen generic served profile support, and explicit fallback rows for HullCache and SparseTopK remain part of the reported truth",
+    "slowest_measured_steps_per_second": 1443216.1108262055,
+    "claim_boundary": "this eval report summarizes the Rust-only runtime floor only for the committed article-closeout kernel families and horizons. It keeps reference-linear as the baseline stress anchor, now includes direct measured HullCache companion rows on the bounded long-horizon kernel set, and still does not widen generic served profile support beyond those committed workloads",
     "summary": "Article runtime closeout report now binds 4 exact horizon receipts with floor_passes=4, floor_refusals=0, and stress_anchor=`state_machine_kernel.two_million_step`.",
-    "report_digest": "74bde339040b1d9224f6a7ed1761b131094bb2387b0be7d37cbd6e1f8d9d6dea"
+    "report_digest": "f18147df5a3c1c7d73b3b7dcd13a393bb25c212e2934435bc6cb9cee5cb56ae4"
   },
   "workload_family_ids": [
     "rust.long_loop_kernel",
@@ -954,8 +962,8 @@
     "rust.state_machine_kernel"
   ],
   "slowest_workload_horizon_id": "state_machine_kernel.two_million_step",
-  "slowest_measured_steps_per_second": 750335.343122409,
+  "slowest_measured_steps_per_second": 1443216.1108262055,
   "claim_boundary": "this summary keeps the Rust-only article runtime floor as a research and publication-control surface over the committed long-horizon kernels. It does not turn benchmark-only long-horizon support into generic served profile or hardware-portability claims",
   "summary": "Article runtime closeout summary now keeps 2 workload families green with stress_anchor=`state_machine_kernel.two_million_step`.",
-  "report_digest": "fb8f6779e63ed98ba5cfa89f30c2d520784b5166d81485b5c7e28d7df81715c0"
+  "report_digest": "d3fc9dc0b0397d487e0c3fc629f8439325060bb35daa69394aa689cb9ce3769f"
 }

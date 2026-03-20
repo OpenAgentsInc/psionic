@@ -60,7 +60,7 @@ impl TassadarArticleRuntimeCloseoutReport {
             slowest_measured_steps_per_second: slowest_receipt.direct_steps_per_second,
             bundle,
             claim_boundary: String::from(
-                "this eval report summarizes the Rust-only runtime floor only for the committed article-closeout kernel families and horizons. It does not widen generic served profile support, and explicit fallback rows for HullCache and SparseTopK remain part of the reported truth",
+                "this eval report summarizes the Rust-only runtime floor only for the committed article-closeout kernel families and horizons. It keeps reference-linear as the baseline stress anchor, now includes direct measured HullCache companion rows on the bounded long-horizon kernel set, and still does not widen generic served profile support beyond those committed workloads",
             ),
             summary: String::new(),
             report_digest: String::new(),
@@ -191,6 +191,7 @@ mod tests {
         {
             receipt["direct_steps_per_second"] = serde_json::Value::Null;
             receipt["reference_linear"]["steps_per_second"] = serde_json::Value::Null;
+            receipt["hull_cache"]["steps_per_second"] = serde_json::Value::Null;
         }
         value["bundle"]["bundle_digest"] = serde_json::Value::Null;
         value

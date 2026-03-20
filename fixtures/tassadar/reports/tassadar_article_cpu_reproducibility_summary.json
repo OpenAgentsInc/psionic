@@ -13,14 +13,33 @@
       "generated_from_refs": [
         "fixtures/tassadar/runs/article_runtime_closeout_v1/article_runtime_closeout_bundle.json"
       ],
-      "current_host_machine_class_id": "host_cpu_aarch64",
-      "current_host_os": "macos",
-      "current_host_arch": "aarch64",
+      "current_host_machine_class_id": "host_cpu_x86_64",
+      "current_host_os": "linux",
+      "current_host_arch": "x86_64",
       "rows": [
         {
           "machine_class_id": "host_cpu_aarch64",
           "cpu_family": "aarch64",
-          "os_scope": "macos",
+          "os_scope": "any",
+          "status": "supported_declared_class",
+          "runtime_backend": "cpu",
+          "exactness_posture": "exact_required_declared_class",
+          "exact_horizon_count": 4,
+          "workload_family_ids": [
+            "rust.long_loop_kernel",
+            "rust.state_machine_kernel"
+          ],
+          "floor_posture": "required_declared_class",
+          "throughput_floor_steps_per_second": 250000.0,
+          "floor_pass_count": 4,
+          "floor_refusal_count": 0,
+          "slowest_workload_horizon_id": "state_machine_kernel.two_million_step",
+          "note": "declared supported CPU family `aarch64` inherits the same direct CPU runtime contract and required throughput floor, but it remains an operator portability requirement rather than a measured fact in this checkout."
+        },
+        {
+          "machine_class_id": "host_cpu_x86_64",
+          "cpu_family": "x86_64",
+          "os_scope": "linux",
           "status": "supported_measured_current_host",
           "runtime_backend": "cpu",
           "runtime_identity": {
@@ -47,26 +66,7 @@
           "floor_pass_count": 4,
           "floor_refusal_count": 0,
           "slowest_workload_horizon_id": "state_machine_kernel.two_million_step",
-          "note": "measured current host `aarch64` reproduced the Rust-only article runtime closeout on the direct CPU lane with exact_horizons=4 and floor_passes=4."
-        },
-        {
-          "machine_class_id": "host_cpu_x86_64",
-          "cpu_family": "x86_64",
-          "os_scope": "any",
-          "status": "supported_declared_class",
-          "runtime_backend": "cpu",
-          "exactness_posture": "exact_required_declared_class",
-          "exact_horizon_count": 4,
-          "workload_family_ids": [
-            "rust.long_loop_kernel",
-            "rust.state_machine_kernel"
-          ],
-          "floor_posture": "required_declared_class",
-          "throughput_floor_steps_per_second": 250000.0,
-          "floor_pass_count": 4,
-          "floor_refusal_count": 0,
-          "slowest_workload_horizon_id": "state_machine_kernel.two_million_step",
-          "note": "declared supported CPU family `x86_64` inherits the same direct CPU runtime contract and required throughput floor, but it remains an operator portability requirement rather than a measured fact in this checkout."
+          "note": "measured current host `x86_64` reproduced the Rust-only article runtime closeout on the direct CPU lane with exact_horizons=4 and floor_passes=4."
         },
         {
           "machine_class_id": "other_host_cpu",
@@ -97,12 +97,12 @@
       ],
       "current_host_measured_green": true,
       "claim_boundary": "this matrix closes cross-machine CPU reproducibility only for the Rust-only article runtime path on the canonical host CPU families `x86_64` and `aarch64`. It records current-host exactness and floor posture plus explicit unsupported classes, and it does not imply universal portability, non-CPU backend closure, or success on unmeasured toolchain or machine combinations",
-      "summary": "Rust-only article CPU reproducibility now names current_host=`host_cpu_aarch64` with green_current_host=true, supported_classes=2, unsupported_classes=1.",
-      "matrix_digest": "6ab790e96245cf90a2a0fb7a312e95bb3faf509a9d3ac00fba1afb04b5f6feb7"
+      "summary": "Rust-only article CPU reproducibility now names current_host=`host_cpu_x86_64` with green_current_host=true, supported_classes=2, unsupported_classes=1.",
+      "matrix_digest": "056215b11c1aa0d8008192340e0920adc1dd579d7730d18bce6061a2997df7c1"
     },
     "rust_toolchain_identity": {
       "compiler_family": "rustc",
-      "compiler_version": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+      "compiler_version": "rustc 1.88.0 (6b00bc388 2025-06-23)",
       "target": "wasm32-unknown-unknown",
       "pipeline_features": [
         "compiler_binary:rustc",
@@ -113,7 +113,7 @@
         "target:wasm32-unknown-unknown"
       ]
     },
-    "rust_toolchain_digest": "826d61f7107c3111d4f15fedac5d53a902ac64b4302f0e7ea0b69c86ef819726",
+    "rust_toolchain_digest": "b316cc866d3cce4ba53a5595d1a10f06e27ec759034f5142568b31aaa731a765",
     "rust_toolchain_case_ids": [
       "multi_export_exact",
       "memory_lookup_exact",
@@ -145,14 +145,14 @@
       "other_host_cpu"
     ],
     "claim_boundary": "this report joins the current-host CPU reproducibility matrix to the Rust-only source canon and the optional C-path compile boundary. It closes portability only for the declared x86_64/aarch64 CPU families on the Rust-only article path, keeps the optional C-path toolchain refusal explicit, and does not imply universal portability or non-CPU backend closure",
-    "summary": "Rust-only article CPU reproducibility now binds current_host=`host_cpu_aarch64` with green_current_host=true, supported_classes=2, optional_c_path_status=`CompileRefused`.",
-    "report_digest": "e6ca72c279d7e311b2a616d6c1faa6a6b97ba8ea2935f3bf836709da2595e0df"
+    "summary": "Rust-only article CPU reproducibility now binds current_host=`host_cpu_x86_64` with green_current_host=true, supported_classes=2, optional_c_path_status=`CompileRefused`.",
+    "report_digest": "7d1122039677a89f2d7e1079e78cd895212105f3e12b0af8a27ab6921a09663f"
   },
   "measured_green_machine_class_ids": [
-    "host_cpu_aarch64"
+    "host_cpu_x86_64"
   ],
   "declared_supported_machine_class_ids": [
-    "host_cpu_x86_64"
+    "host_cpu_aarch64"
   ],
   "unsupported_machine_class_ids": [
     "other_host_cpu"
@@ -160,5 +160,5 @@
   "optional_c_path_blocks_rust_only_claim": false,
   "claim_boundary": "this summary turns the Rust-only article CPU reproducibility matrix into operator-facing support language only for the declared CPU classes and the current host. It keeps unsupported classes and the optional non-blocking C-path boundary explicit, and it does not widen claims to other backends or machines",
   "summary": "Article CPU reproducibility summary now records measured_green_classes=1, declared_supported_classes=1, unsupported_classes=1, optional_c_path_blocks_claim=false.",
-  "report_digest": "6e020967957bcfca0e16338ba25238d90ca426068850fd33c484c158d6630a0a"
+  "report_digest": "bbd3cc2af6332fe1aff627f26db20e7a8367f6274c1244cdab81abaa64a18de7"
 }

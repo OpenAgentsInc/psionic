@@ -8416,6 +8416,30 @@ fn finish_execution_summary(
     )
 }
 
+pub(crate) fn execution_summary_from_execution(
+    execution: &TassadarExecution,
+) -> TassadarExecutionSummary {
+    let mut trace_bytes = 0u64;
+    let mut trace_hasher = Sha256::new();
+    for step in &execution.steps {
+        record_trace_summary_step(step, &mut trace_bytes, &mut trace_hasher);
+    }
+    TassadarExecutionSummary::new(
+        execution.program_id.clone(),
+        execution.profile_id.clone(),
+        execution.runner_id.clone(),
+        &execution.trace_abi,
+        hex::encode(trace_hasher.finalize()),
+        execution.steps.len() as u64,
+        trace_bytes,
+        execution.outputs.clone(),
+        execution.final_locals.clone(),
+        execution.final_memory.clone(),
+        execution.final_stack.clone(),
+        execution.halt_reason,
+    )
+}
+
 pub fn execute_program_direct_summary(
     program: &TassadarProgram,
     profile: &TassadarWasmProfile,
@@ -8500,6 +8524,23 @@ pub fn execute_program_direct_summary(
         stack,
         halt_reason,
     ))
+}
+
+pub(crate) fn execute_program_hull_cache_summary(
+    program: &TassadarProgram,
+    profile: &TassadarWasmProfile,
+    trace_abi: &TassadarTraceAbi,
+    runner_id: &str,
+    fixture_weights: &TassadarFixtureWeights,
+) -> Result<TassadarExecutionSummary, TassadarExecutionRefusal> {
+    let execution = execute_program_hull_cache(
+        program,
+        profile,
+        trace_abi,
+        runner_id,
+        Some(fixture_weights),
+    )?;
+    Ok(execution_summary_from_execution(&execution))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -9085,10 +9126,29 @@ fn validate_hull_cache_program(program: &TassadarProgram) -> Result<(), Tassadar
 fn article_hull_cache_direct_program_digests() -> &'static BTreeSet<String> {
     static DIGESTS: OnceLock<BTreeSet<String>> = OnceLock::new();
     DIGESTS.get_or_init(|| {
-        tassadar_article_class_corpus()
+        let mut digests = tassadar_article_class_corpus()
             .into_iter()
             .map(|case| case.program.program_digest())
-            .collect()
+            .collect::<BTreeSet<_>>();
+        if let Some(case) = tassadar_sudoku_9x9_corpus()
+            .into_iter()
+            .find(|case| case.case_id == "sudoku_9x9_test_a")
+        {
+            digests.insert(case.validation_case.program.program_digest());
+        }
+        if let Some(case) = tassadar_hungarian_10x10_corpus()
+            .into_iter()
+            .find(|case| case.case_id == "hungarian_10x10_test_a")
+        {
+            digests.insert(case.validation_case.program.program_digest());
+        }
+        digests.extend(
+            crate::tassadar_article_runtime_closeout::article_runtime_closeout_hull_cache_direct_programs(
+            )
+            .into_iter()
+            .map(|program| program.program_digest()),
+        );
+        digests
     })
 }
 

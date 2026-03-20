@@ -523,12 +523,12 @@ fn blocker_rows() -> Vec<TassadarArticleEquivalenceBlockerRow> {
             blocker_id: String::from("BEQ-004"),
             category: TassadarArticleEquivalenceBlockerCategory::FastRouteScope,
             title: String::from("Canonical fast decode route remains open"),
-            repo_status: TassadarRepoStatus::Partial,
+            repo_status: TassadarRepoStatus::Implemented,
             current_gap_summary: String::from(
-                "the article treats logarithmic-time fast decoding as the core technical unlock, but the current public closeout route is still the exact reference-linear CPU lane",
+                "the selected HullCache fast path now has canonical route selection, owned-model integration, exactness, no-fallback closure, and explicit throughput-floor evidence on the committed article workloads; later issues still own frontend breadth, final demo parity, and benchmark-wide closure",
             ),
             current_public_truth: String::from(
-                "the repo already has fast-path runtime and research comparison surfaces, yet none is currently the canonical audited article-equivalence proof route",
+                "the repo now has one canonical fast-route stack with machine-legible selection, exactness, and throughput-floor artifacts on the bounded committed workloads, while later tranches keep final article-equivalence green status red",
             ),
             closure_requirements: vec![
                 String::from("choose one fast architecture that can become the canonical article route"),
@@ -891,7 +891,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             297,
             "TAS-175: Fast-route throughput floor closeout",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-004", "BEQ-005"],
         ),
         issue_row(

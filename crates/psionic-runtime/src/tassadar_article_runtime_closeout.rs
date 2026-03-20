@@ -13,10 +13,11 @@ use thiserror::Error;
 use crate::{
     TASSADAR_CPU_REFERENCE_RUNNER_ID, TASSADAR_FIXTURE_RUNNER_ID, TassadarBranchMode,
     TassadarExecutionSummary, TassadarExecutionSummaryEvidenceBundle, TassadarExecutorDecodeMode,
-    TassadarExecutorSelectionReason, TassadarExecutorSelectionState, TassadarInstruction,
-    TassadarMillionStepMeasurementPosture, TassadarOpcode, TassadarProgram,
+    TassadarExecutorSelectionReason, TassadarExecutorSelectionState, TassadarFixtureWeights,
+    TassadarInstruction, TassadarMillionStepMeasurementPosture, TassadarOpcode, TassadarProgram,
     TassadarProgramArtifact, TassadarProgramArtifactError, TassadarTraceAbi, TassadarWasmProfile,
     build_tassadar_execution_summary_evidence_bundle, execute_program_direct_summary,
+    execute_program_hull_cache_summary,
 };
 
 const REPORT_SCHEMA_VERSION: u16 = 1;
@@ -116,6 +117,8 @@ pub struct TassadarArticleRuntimeHorizonReceipt {
     pub throughput_floor_steps_per_second: f64,
     pub floor_status: TassadarArticleRuntimeFloorStatus,
     pub exactness_bps: u32,
+    pub hull_cache_exactness_bps: u32,
+    pub hull_cache_floor_status: TassadarArticleRuntimeFloorStatus,
     pub evidence_bundle: TassadarExecutionSummaryEvidenceBundle,
     pub reference_linear: TassadarArticleRuntimeDecodeReceipt,
     pub hull_cache: TassadarArticleRuntimeDecodeReceipt,
@@ -173,17 +176,24 @@ impl TassadarArticleRuntimeCloseoutBundle {
             floor_pass_count,
             floor_refusal_count,
             claim_boundary: String::from(
-                "this bundle closes the Rust-only runtime floor only for the committed long-loop and state-machine kernel families at the declared million-step and two-million-step horizons on the direct reference-linear CPU executor path. HullCache and SparseTopK remain explicit fallback-only rows here, and this bundle does not widen served profile closure beyond the committed benchmark lane",
+                "this bundle closes the Rust-only runtime floor for the committed long-loop and state-machine kernel families at the declared million-step and two-million-step horizons on the direct reference-linear CPU executor path, and it now also records direct measured HullCache throughput on that same bounded kernel set. SparseTopK remains explicit fallback-only here, and this bundle still does not widen served profile closure beyond the committed benchmark lane",
             ),
             summary: String::new(),
             bundle_digest: String::new(),
         };
         bundle.summary = format!(
-            "Rust-only article runtime closeout now freezes {} exact horizon receipts across {} workload families with floor_passes={} and floor_refusals={}.",
+            "Rust-only article runtime closeout now freezes {} exact horizon receipts across {} workload families with reference_linear_floor_passes={}, reference_linear_floor_refusals={}, and hull_cache_floor_passes={}.",
             bundle.horizon_receipts.len(),
             bundle.workload_family_ids.len(),
             bundle.floor_pass_count,
             bundle.floor_refusal_count,
+            bundle
+                .horizon_receipts
+                .iter()
+                .filter(|receipt| {
+                    receipt.hull_cache_floor_status == TassadarArticleRuntimeFloorStatus::Passed
+                })
+                .count(),
         );
         bundle.bundle_digest = stable_digest(
             b"psionic_tassadar_article_runtime_closeout_bundle|",
@@ -290,6 +300,13 @@ fn build_horizon_receipt(
             && cpu_reference_summary.outputs == direct_executor_summary.outputs
             && cpu_reference_summary.halt_reason == direct_executor_summary.halt_reason,
     ) * 10_000;
+    let hull_cache_summary = execute_long_horizon_program_hull_cache_summary(&program)?;
+    let hull_cache_exactness_bps = u32::from(
+        cpu_reference_summary.trace_digest == hull_cache_summary.trace_digest
+            && cpu_reference_summary.behavior_digest == hull_cache_summary.behavior_digest
+            && cpu_reference_summary.outputs == hull_cache_summary.outputs
+            && cpu_reference_summary.halt_reason == hull_cache_summary.halt_reason,
+    ) * 10_000;
     let direct_steps_per_second =
         benchmark_steps_per_second(direct_executor_summary.step_count, || {
             execute_program_direct_summary(
@@ -299,7 +316,16 @@ fn build_horizon_receipt(
                 TASSADAR_FIXTURE_RUNNER_ID,
             )
         })?;
+    let hull_cache_steps_per_second =
+        benchmark_steps_per_second(hull_cache_summary.step_count, || {
+            execute_long_horizon_program_hull_cache_summary(&program)
+        })?;
     let floor_status = if direct_steps_per_second >= throughput_floor_steps_per_second {
+        TassadarArticleRuntimeFloorStatus::Passed
+    } else {
+        TassadarArticleRuntimeFloorStatus::Refused
+    };
+    let hull_cache_floor_status = if hull_cache_steps_per_second >= throughput_floor_steps_per_second {
         TassadarArticleRuntimeFloorStatus::Passed
     } else {
         TassadarArticleRuntimeFloorStatus::Refused
@@ -358,6 +384,8 @@ fn build_horizon_receipt(
         throughput_floor_steps_per_second,
         floor_status,
         exactness_bps,
+        hull_cache_exactness_bps,
+        hull_cache_floor_status,
         evidence_bundle,
         reference_linear: TassadarArticleRuntimeDecodeReceipt {
             requested_decode_mode: TassadarExecutorDecodeMode::ReferenceLinear,
@@ -367,24 +395,31 @@ fn build_horizon_receipt(
             measurement_posture: TassadarMillionStepMeasurementPosture::Measured,
             steps_per_second: Some(direct_steps_per_second),
             note: String::from(
-                "reference-linear is the only direct measured runtime lane for the committed Rust-only closeout kernels at these horizons",
+                "reference-linear remains the baseline measured runtime lane for the committed Rust-only closeout kernels at these horizons",
             ),
         },
         hull_cache: fallback_decode_receipt(
             TassadarExecutorDecodeMode::HullCache,
             &program,
-            "HullCache remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure",
+            Some(hull_cache_steps_per_second),
+            "HullCache now stays direct and measured on the committed long-horizon kernel digests, so this receipt records fast-route exactness and throughput on that bounded benchmark-only subset",
         ),
         sparse_top_k: fallback_decode_receipt(
             TassadarExecutorDecodeMode::SparseTopK,
             &program,
+            None,
             "SparseTopK remains explicit fallback-only on the long-horizon backward-branch kernels, so this receipt records selection truth without claiming direct article-floor closure",
         ),
         note: format!(
-            "{} at `{}` stayed exact against CPU reference and {} the declared direct-throughput floor",
+            "{} at `{}` stayed exact against CPU reference and {} the declared direct-throughput floor, while HullCache {} the same floor on the bounded fast-route kernel subset",
             workload_family.as_str(),
             horizon.as_str(),
             if floor_status == TassadarArticleRuntimeFloorStatus::Passed {
+                "cleared"
+            } else {
+                "missed"
+            },
+            if hull_cache_floor_status == TassadarArticleRuntimeFloorStatus::Passed {
                 "cleared"
             } else {
                 "missed"
@@ -484,28 +519,45 @@ fn program_for(
     }
 }
 
+pub(crate) fn article_runtime_closeout_hull_cache_direct_programs() -> Vec<TassadarProgram> {
+    let profile = long_horizon_profile();
+    let mut programs = Vec::new();
+    for workload_family in [
+        TassadarArticleRuntimeWorkloadFamily::LongLoopKernel,
+        TassadarArticleRuntimeWorkloadFamily::StateMachineKernel,
+    ] {
+        for horizon in [
+            TassadarArticleRuntimeHorizon::MillionStep,
+            TassadarArticleRuntimeHorizon::TwoMillionStep,
+        ] {
+            let (iteration_count, _) = horizon_spec(workload_family, horizon);
+            programs.push(program_for(workload_family, &profile, iteration_count as i32));
+        }
+    }
+    programs
+}
+
 fn fallback_decode_receipt(
     requested_decode_mode: TassadarExecutorDecodeMode,
     program: &TassadarProgram,
+    measured_steps_per_second: Option<f64>,
     note: &str,
 ) -> TassadarArticleRuntimeDecodeReceipt {
+    let measured_direct = measured_steps_per_second.is_some();
     let (selection_state, selection_reason) =
         match requested_decode_mode {
             TassadarExecutorDecodeMode::ReferenceLinear => {
                 (TassadarExecutorSelectionState::Direct, None)
             }
             TassadarExecutorDecodeMode::HullCache => {
-                if program
-                    .instructions
-                    .iter()
-                    .enumerate()
-                    .any(|(pc, instruction)| {
-                        matches!(
-                            instruction,
-                            TassadarInstruction::BrIf { target_pc } if usize::from(*target_pc) <= pc
-                        )
-                    })
-                {
+                if measured_direct {
+                    (TassadarExecutorSelectionState::Direct, None)
+                } else if program.instructions.iter().enumerate().any(|(pc, instruction)| {
+                    matches!(
+                        instruction,
+                        TassadarInstruction::BrIf { target_pc } if usize::from(*target_pc) <= pc
+                    )
+                }) {
                     (
                         TassadarExecutorSelectionState::Fallback,
                         Some(TassadarExecutorSelectionReason::HullCacheControlFlowUnsupported),
@@ -545,10 +597,32 @@ fn fallback_decode_receipt(
                 TassadarExecutorDecodeMode::ReferenceLinear
             },
         ),
-        measurement_posture: TassadarMillionStepMeasurementPosture::SelectionOnly,
-        steps_per_second: None,
+        measurement_posture: if measured_direct {
+            TassadarMillionStepMeasurementPosture::Measured
+        } else {
+            TassadarMillionStepMeasurementPosture::SelectionOnly
+        },
+        steps_per_second: measured_steps_per_second,
         note: String::from(note),
     }
+}
+
+fn execute_long_horizon_program_hull_cache_summary(
+    program: &TassadarProgram,
+) -> Result<TassadarExecutionSummary, crate::TassadarExecutionRefusal> {
+    let profile = long_horizon_profile();
+    let trace_abi = TassadarTraceAbi {
+        profile_id: String::from(LONG_HORIZON_PROFILE_ID),
+        ..TassadarTraceAbi::article_i32_compute_v1()
+    };
+    let fixture_weights = long_horizon_fixture_weights();
+    execute_program_hull_cache_summary(
+        program,
+        &profile,
+        &trace_abi,
+        crate::TASSADAR_HULL_CACHE_RUNNER_ID,
+        &fixture_weights,
+    )
 }
 
 fn long_horizon_profile() -> TassadarWasmProfile {
@@ -561,6 +635,14 @@ fn long_horizon_profile() -> TassadarWasmProfile {
         max_steps: 4_194_304,
         branch_mode: TassadarBranchMode::BrIfNonZero,
         host_output_opcode: true,
+    }
+}
+
+fn long_horizon_fixture_weights() -> TassadarFixtureWeights {
+    TassadarFixtureWeights {
+        profile_id: String::from(LONG_HORIZON_PROFILE_ID),
+        trace_abi_id: String::from("tassadar.trace.v1"),
+        opcode_rules: TassadarFixtureWeights::core_i32_v1().opcode_rules,
     }
 }
 
@@ -619,7 +701,7 @@ mod tests {
         tassadar_article_runtime_closeout_bundle_path,
         write_tassadar_article_runtime_closeout_bundle,
     };
-    use crate::{TassadarExecutorSelectionReason, TassadarExecutorSelectionState};
+    use crate::TassadarExecutorSelectionState;
 
     fn normalized_bundle_value(bundle: &TassadarArticleRuntimeCloseoutBundle) -> serde_json::Value {
         let mut value = serde_json::to_value(bundle).expect("bundle serializes");
@@ -630,6 +712,7 @@ mod tests {
         {
             receipt["direct_steps_per_second"] = serde_json::Value::Null;
             receipt["reference_linear"]["steps_per_second"] = serde_json::Value::Null;
+            receipt["hull_cache"]["steps_per_second"] = serde_json::Value::Null;
         }
         value
     }
@@ -652,9 +735,10 @@ mod tests {
                 && receipt.floor_status == TassadarArticleRuntimeFloorStatus::Passed
         }));
         assert!(bundle.horizon_receipts.iter().all(|receipt| {
-            receipt.hull_cache.selection_state == TassadarExecutorSelectionState::Fallback
-                && receipt.hull_cache.selection_reason
-                    == Some(TassadarExecutorSelectionReason::HullCacheControlFlowUnsupported)
+            receipt.hull_cache.selection_state == TassadarExecutorSelectionState::Direct
+                && receipt.hull_cache.selection_reason.is_none()
+                && receipt.hull_cache_exactness_bps == 10_000
+                && receipt.hull_cache_floor_status == TassadarArticleRuntimeFloorStatus::Passed
                 && receipt.sparse_top_k.selection_state == TassadarExecutorSelectionState::Fallback
         }));
     }
