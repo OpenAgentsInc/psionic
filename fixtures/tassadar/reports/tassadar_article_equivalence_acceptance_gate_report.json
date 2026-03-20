@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
-  "report_id": "tassadar.article_equivalence.blocker_matrix.summary.v1",
+  "report_id": "tassadar.article_equivalence.acceptance_gate.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-article-equivalence-acceptance-gate.sh",
   "blocker_matrix_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json",
   "blocker_matrix_report": {
     "schema_version": 1,
@@ -840,7 +841,687 @@
     "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
     "report_digest": "d5eb170c8aa6b161bfb2ea86b1e30afa949fb8e9713ef2eeab998eea76ead628"
   },
-  "blocker_count": 7,
+  "requirement_rows": [
+    {
+      "requirement_id": "blocker_matrix_contract_frozen",
+      "requirement_kind": "contract",
+      "required_for_green": true,
+      "satisfied": true,
+      "blocker_ids": [
+        "BEQ-001",
+        "BEQ-002",
+        "BEQ-003",
+        "BEQ-004",
+        "BEQ-005",
+        "BEQ-006",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "the blocker matrix itself must stay structurally green so the final article-equivalence bar cannot be narrowed or silently drifted later"
+    },
+    {
+      "requirement_id": "owned_transformer_route_boundary_frozen",
+      "requirement_kind": "prerequisite",
+      "required_for_green": true,
+      "satisfied": true,
+      "blocker_ids": [
+        "BEQ-003"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json",
+        "crates/psionic-transformer/Cargo.toml",
+        "docs/ARCHITECTURE.md"
+      ],
+      "detail": "the owned article-equivalence route must remain anchored on the `psionic-transformer` crate boundary instead of drifting back into a mixed cross-crate implementation"
+    },
+    {
+      "requirement_id": "article_equivalence_blockers_closed",
+      "requirement_kind": "contract",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-001",
+        "BEQ-002",
+        "BEQ-003",
+        "BEQ-004",
+        "BEQ-005",
+        "BEQ-006",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "the blocker matrix must itself turn article-equivalence green; closing issue rows without actually closing the blocker rows is insufficient"
+    },
+    {
+      "requirement_id": "TAS-158",
+      "requirement_kind": "gate",
+      "required_for_green": true,
+      "satisfied": true,
+      "blocker_ids": [
+        "BEQ-001",
+        "BEQ-002",
+        "BEQ-003",
+        "BEQ-004",
+        "BEQ-005",
+        "BEQ-006",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-158 (`TAS-158: Final article-equivalence acceptance gate skeleton`) is closed in the blocker matrix, so this acceptance-gate row is currently satisfied for blocker families BEQ-001, BEQ-002, BEQ-003, BEQ-004, BEQ-005, BEQ-006, BEQ-007."
+    },
+    {
+      "requirement_id": "TAS-159",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-159 (`TAS-159: Existing substrate inventory and reuse boundary`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-160",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-160 (`TAS-160: Canonical Transformer stack boundary`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-161",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-161 (`TAS-161: Attention primitive and mask closure`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-162",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-162 (`TAS-162: Multi-head, feed-forward, residual, and norm block closure`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-163",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-163 (`TAS-163: Paper-faithful article-Transformer model closure`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-164",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-164 (`TAS-164: Training recipe and tiny-task closure`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-165",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-165 (`TAS-165: Transformer forward-pass replay and receipt closure`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-166",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-166 (`TAS-166: Owned Transformer stack audit`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-167",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-167 (`TAS-167: Article trace vocabulary and channel binding for the owned stack`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003, BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-167A",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-167A (`TAS-167A: Prompt, tokenization, and representation invariance gate`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-168",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-168 (`TAS-168: Transformer-backed article model descriptor and weight artifact`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-169",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-169 (`TAS-169: Transformer-backed article model weight production run`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-169A",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-169A (`TAS-169A: Transformer-backed article weight lineage and artifact contract`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003, BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-170",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-170 (`TAS-170: Fixture-to-Transformer parity harness`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003, BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-171",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-171 (`TAS-171: Reference-linear direct-proof closure on the Transformer-backed route`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003, BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-171A",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-005",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-171A (`TAS-171A: Reference-linear Transformer-backed article exactness gate`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003, BEQ-005, BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-171B",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-002",
+        "BEQ-005",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-171B (`TAS-171B: Generalization and anti-memorization gate`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-002, BEQ-005, BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-171C",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-005",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-171C (`TAS-171C: Dataset contamination and evaluation independence audit`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-005, BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-172",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-004"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-172 (`TAS-172: Canonical fast-route architecture selection`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-004 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-173",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-004"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-173 (`TAS-173: Fast-path implementation inside the Transformer-backed model`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-004 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-174",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-004"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-174 (`TAS-174: Fast-route exactness and no-fallback closure`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-004 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-175",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-004",
+        "BEQ-005"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-175 (`TAS-175: Fast-route throughput floor closeout`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-004, BEQ-005 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-176",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-001"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-176 (`TAS-176: Declared article frontend/compiler envelope`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-001 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-177",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-001"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-177 (`TAS-177: Frontend corpus and compile-matrix expansion`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-001 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-178",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-001",
+        "BEQ-005"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-178 (`TAS-178: Article-demo frontend parity`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-001, BEQ-005 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-179",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-002"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-179 (`TAS-179: Declared article interpreter breadth envelope`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-002 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-179A",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-002"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-179A (`TAS-179A: Article interpreter breadth suite and gate`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-002 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-180",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-004",
+        "BEQ-005"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-180 (`TAS-180: Hungarian article demo parity`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-004, BEQ-005 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-181",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-004",
+        "BEQ-005"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-181 (`TAS-181: Arto Inkala and hard-Sudoku benchmark closure`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-004, BEQ-005 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-182",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-005"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-182 (`TAS-182: Article demo and benchmark equivalence gate`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-005 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-183",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-006"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-183 (`TAS-183: Single-run no-spill million-step closure`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-006 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-184",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-184 (`TAS-184: Clean-room weight causality and interpreter ownership gate`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-184A",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-184A (`TAS-184A: KV-cache and activation-state discipline audit`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-185",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-004",
+        "BEQ-005",
+        "BEQ-006",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-185 (`TAS-185: Cross-machine reproducibility matrix`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-004, BEQ-005, BEQ-006, BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-185A",
+      "requirement_kind": "implementation",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-185A (`TAS-185A: Route minimality audit and publication verdict`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-186",
+      "requirement_kind": "final_audit",
+      "required_for_green": true,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-001",
+        "BEQ-002",
+        "BEQ-003",
+        "BEQ-004",
+        "BEQ-005",
+        "BEQ-006",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-186 (`TAS-186: Final article-equivalence claim checker and audit`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-001, BEQ-002, BEQ-003, BEQ-004, BEQ-005, BEQ-006, BEQ-007 until that tranche closes."
+    },
+    {
+      "requirement_id": "TAS-R1",
+      "requirement_kind": "optional_research",
+      "required_for_green": false,
+      "satisfied": false,
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-004",
+        "BEQ-007"
+      ],
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
+      ],
+      "detail": "TAS-R1 (`TAS-R1: Minimal Transformer size for article-equivalent behavior`) remains open as a visible non-blocking research follow-on for blocker families BEQ-003, BEQ-004, BEQ-007; it stays tracked here but does not block the final gate."
+    }
+  ],
+  "total_requirement_count": 41,
+  "required_requirement_count": 40,
+  "passed_required_requirement_count": 3,
+  "required_issue_count": 37,
+  "closed_required_issue_count": 1,
+  "green_requirement_ids": [
+    "blocker_matrix_contract_frozen",
+    "owned_transformer_route_boundary_frozen",
+    "TAS-158"
+  ],
+  "failed_requirement_ids": [
+    "article_equivalence_blockers_closed",
+    "TAS-159",
+    "TAS-160",
+    "TAS-161",
+    "TAS-162",
+    "TAS-163",
+    "TAS-164",
+    "TAS-165",
+    "TAS-166",
+    "TAS-167",
+    "TAS-167A",
+    "TAS-168",
+    "TAS-169",
+    "TAS-169A",
+    "TAS-170",
+    "TAS-171",
+    "TAS-171A",
+    "TAS-171B",
+    "TAS-171C",
+    "TAS-172",
+    "TAS-173",
+    "TAS-174",
+    "TAS-175",
+    "TAS-176",
+    "TAS-177",
+    "TAS-178",
+    "TAS-179",
+    "TAS-179A",
+    "TAS-180",
+    "TAS-181",
+    "TAS-182",
+    "TAS-183",
+    "TAS-184",
+    "TAS-184A",
+    "TAS-185",
+    "TAS-185A",
+    "TAS-186"
+  ],
+  "blocked_issue_ids": [
+    "TAS-159",
+    "TAS-160",
+    "TAS-161",
+    "TAS-162",
+    "TAS-163",
+    "TAS-164",
+    "TAS-165",
+    "TAS-166",
+    "TAS-167",
+    "TAS-167A",
+    "TAS-168",
+    "TAS-169",
+    "TAS-169A",
+    "TAS-170",
+    "TAS-171",
+    "TAS-171A",
+    "TAS-171B",
+    "TAS-171C",
+    "TAS-172",
+    "TAS-173",
+    "TAS-174",
+    "TAS-175",
+    "TAS-176",
+    "TAS-177",
+    "TAS-178",
+    "TAS-179",
+    "TAS-179A",
+    "TAS-180",
+    "TAS-181",
+    "TAS-182",
+    "TAS-183",
+    "TAS-184",
+    "TAS-184A",
+    "TAS-185",
+    "TAS-185A",
+    "TAS-186"
+  ],
+  "blocked_blocker_ids": [
+    "BEQ-001",
+    "BEQ-002",
+    "BEQ-003",
+    "BEQ-004",
+    "BEQ-005",
+    "BEQ-006",
+    "BEQ-007"
+  ],
+  "optional_open_issue_ids": [
+    "TAS-R1"
+  ],
+  "blocker_matrix_contract_green": true,
+  "prerequisite_transformer_boundary_green": true,
+  "blocker_matrix_article_equivalence_green": false,
   "open_blocker_count": 7,
   "open_blocker_ids": [
     "BEQ-001",
@@ -851,18 +1532,10 @@
     "BEQ-006",
     "BEQ-007"
   ],
-  "required_later_issue_count": 38,
-  "matrix_contract_green": true,
+  "acceptance_status": "blocked",
   "article_equivalence_green": false,
-  "current_truth_boundary": "the public repo has a bounded Rust-only article-closeout path, a bounded no-tool direct proof route on committed workloads, and a bounded Turing-complete substrate statement under declared `TCM.v1` semantics; it does not yet have full article-equivalent closure in the article's strongest frontend, fast-route, benchmark, single-run, or clean-room weight-ownership reading",
-  "non_implications": [
-    "not a positive article-equivalence closure claim",
-    "not arbitrary C or arbitrary Wasm ingress closure",
-    "not a generic public interpreter-in-weights claim",
-    "not proof that the fast decode path is already the canonical public route",
-    "not proof that hard-Sudoku benchmark closure, no-spill single-run closure, or route-minimality closure already exist"
-  ],
-  "claim_boundary": "this summary mirrors the TAS-157 blocker matrix only. It keeps the blocker contract operator-readable, but it does not add evidence or widen the current public claim boundary beyond the underlying matrix",
-  "summary": "Article-equivalence blocker matrix summary now records blocker_count=7, open_blocker_count=7, matrix_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "4a9c410946cbb111d1dccdc600ef336c4bcbe44ce45068bb024dcdc869542efc"
+  "public_claim_allowed": false,
+  "claim_boundary": "this is the frozen final acceptance gate for article-equivalent closure. It stays blocked until the blocker-matrix contract remains intact, the owned `psionic-transformer` route boundary remains intact, the blocker matrix itself turns article-equivalence green, and every required TAS tranche from `TAS-158` through `TAS-186` is closed. A green result here is necessary but not sufficient to widen public capability claims, and it still does not imply arbitrary C ingress, arbitrary Wasm ingress, or generic interpreter-in-weights closure outside the declared article envelope.",
+  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=3/40, closed_required_issues=1/37, blocked_issues=36, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
+  "report_digest": "b328c1187c7d16c0bc664d384ee62ce53ed8da5c88515f2b43ad5bd6e8c2ff23"
 }

@@ -153,6 +153,14 @@ Current honest posture:
   article-gap closure bar without widening the current public capability
   surface; the blocker contract is green while article equivalence itself
   remains explicitly red
+- the repo now also has one final article-equivalence acceptance gate skeleton,
+  with a committed eval report at
+  `fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json`,
+  a checker script, a provider-facing receipt, and an audit note that freeze
+  the final red gate over the blocker-matrix contract, the owned
+  `psionic-transformer` route boundary, blocker closure, and every required
+  TAS tranche from `TAS-158` through `TAS-186`; the gate remains intentionally
+  blocked and does not by itself widen public capability claims
 - the repo now also has one research-only shared-memory and threads profile
   with a deterministic scheduler envelope, explicit sandbox boundary truth,
   and typed refusal on host-nondeterministic scheduling plus relaxed

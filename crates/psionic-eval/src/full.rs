@@ -34,6 +34,8 @@ mod tassadar_async_lifecycle_profile;
 mod tassadar_architecture_bakeoff;
 #[path = "tassadar_article_abi.rs"]
 mod tassadar_article_abi;
+#[path = "tassadar_article_equivalence_acceptance_gate.rs"]
+mod tassadar_article_equivalence_acceptance_gate;
 #[path = "tassadar_article_equivalence_blocker_matrix.rs"]
 mod tassadar_article_equivalence_blocker_matrix;
 #[path = "tassadar_article_cpu_reproducibility.rs"]
@@ -302,6 +304,7 @@ pub use tassadar_approximate_attention_closure_matrix::*;
 pub use tassadar_async_lifecycle_profile::*;
 pub use tassadar_architecture_bakeoff::*;
 pub use tassadar_article_abi::*;
+pub use tassadar_article_equivalence_acceptance_gate::*;
 pub use tassadar_article_equivalence_blocker_matrix::*;
 pub use tassadar_article_cpu_reproducibility::*;
 pub use tassadar_article_runtime_closeout::*;

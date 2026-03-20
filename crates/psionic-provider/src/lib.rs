@@ -7,6 +7,7 @@
 
 mod tassadar_accepted_outcome_binding;
 mod tassadar_async_lifecycle_profile;
+mod tassadar_article_equivalence_acceptance_gate;
 mod tassadar_broad_internal_compute_acceptance_gate;
 mod tassadar_broad_general_compute_economic_bridge;
 mod tassadar_broad_family_specialization;
@@ -90,6 +91,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use tassadar_accepted_outcome_binding::*;
 pub use tassadar_async_lifecycle_profile::*;
+pub use tassadar_article_equivalence_acceptance_gate::*;
 pub use tassadar_broad_internal_compute_acceptance_gate::*;
 pub use tassadar_broad_general_compute_economic_bridge::*;
 pub use tassadar_broad_family_specialization::*;

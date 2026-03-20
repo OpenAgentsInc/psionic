@@ -713,7 +713,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             275,
             "TAS-158: Final article-equivalence acceptance gate skeleton",
             TassadarArticleEquivalenceIssueRole::Gate,
-            "open",
+            "closed",
             &[
                 "BEQ-001", "BEQ-002", "BEQ-003", "BEQ-004", "BEQ-005", "BEQ-006", "BEQ-007",
             ],
