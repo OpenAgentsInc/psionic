@@ -13,7 +13,6 @@
       "acceptance_status": "blocked",
       "article_equivalence_green": false,
       "blocked_issue_ids": [
-        "TAS-165",
         "TAS-166",
         "TAS-167",
         "TAS-167A",
@@ -217,7 +216,7 @@
     "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
     "claim_boundary": "this report inventories reusable substrate only. It freezes what can be reused, what needs extension, what stays research-only, and what is still not sufficient for article closure. It does not claim that the owned article-equivalence Transformer stack, the canonical article model artifact, or the final article-equivalence proof route already exist.",
     "summary": "Existing substrate inventory now records surface_count=11, blocker_surface_count=6, non_blocker_surface_count=5, inventory_contract_green=true, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-    "report_digest": "5e1337367f676e6bd164c254aff064131a084f94cb2a2c2bc15577cda0ce47e9"
+    "report_digest": "131713e396c0cab724ef8eda52c1292e1e41e07b4e16db9a7ce4a7b9e1132baf"
   },
   "surface_count": 11,
   "blocker_surface_count": 6,
@@ -247,5 +246,5 @@
   "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
   "claim_boundary": "this summary mirrors the existing-substrate inventory only. It keeps the reusable-substrate boundary operator-readable, but it does not widen the current public article-equivalence claim boundary beyond the underlying inventory report",
   "summary": "Existing substrate inventory summary now records surface_count=11, blocker_surface_count=6, tied_requirement_satisfied=true, acceptance_status=blocked, and article_equivalence_green=false.",
-  "report_digest": "83b7ccb6a2af4238cab983356b1c2b50e3829038c79f097cbfe11ccee39a7cb9"
+  "report_digest": "35e84a3cb67aacf9f5ca76c3420f8de4fd8157fcbe5617ec3d41b3b4d0be02a7"
 }

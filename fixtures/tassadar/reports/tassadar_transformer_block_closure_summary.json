@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-165",
         "TAS-166",
         "TAS-167",
         "TAS-167A",
@@ -57,7 +56,6 @@
         "tied_requirement_satisfied": true,
         "acceptance_status": "blocked",
         "blocked_issue_ids": [
-          "TAS-165",
           "TAS-166",
           "TAS-167",
           "TAS-167A",
@@ -101,7 +99,6 @@
           "acceptance_status": "blocked",
           "article_equivalence_green": false,
           "blocked_issue_ids": [
-            "TAS-165",
             "TAS-166",
             "TAS-167",
             "TAS-167A",
@@ -305,7 +302,7 @@
         "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
         "claim_boundary": "this report inventories reusable substrate only. It freezes what can be reused, what needs extension, what stays research-only, and what is still not sufficient for article closure. It does not claim that the owned article-equivalence Transformer stack, the canonical article model artifact, or the final article-equivalence proof route already exist.",
         "summary": "Existing substrate inventory now records surface_count=11, blocker_surface_count=6, non_blocker_surface_count=5, inventory_contract_green=true, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-        "report_digest": "5e1337367f676e6bd164c254aff064131a084f94cb2a2c2bc15577cda0ce47e9"
+        "report_digest": "131713e396c0cab724ef8eda52c1292e1e41e07b4e16db9a7ce4a7b9e1132baf"
       },
       "interface_rows": [
         {
@@ -437,7 +434,7 @@
       "article_equivalence_green": false,
       "claim_boundary": "this report freezes one explicit canonical Transformer stack boundary for the article-equivalence closure wave. The route is not one monolithic crate; it is one required boundary spanning existing crates with `psionic-transformer` as the architecture anchor, `psionic-models` as the article-model and artifact owner, and `psionic-runtime` as the replay/receipt owner. This does not claim the final article-equivalence stack is complete or green.",
       "summary": "Canonical Transformer stack boundary now records interface_rows=5, dependency_checks=6, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
-      "report_digest": "1bd4f36a7516d7711d6f860cf18f8793624eea3a87f3bd4f4868c5e2a93d011e"
+      "report_digest": "9162a6b08ca228ccf57ecc363606fdfbb130b96057ef5352eea90e42a51bdaa2"
     },
     "case_rows": [
       {
@@ -502,7 +499,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report freezes the reusable transformer block layer only. It proves that embeddings, positional binding, multi-head projection and merge, feed-forward, residual-plus-norm composition, and train versus eval dropout posture now live in `psionic-transformer` above `psionic-nn`, but it does not claim the paper-faithful article model artifact or final article-equivalence route are complete.",
     "summary": "Transformer block closure now records case_rows=6, all_required_cases_present=true, all_cases_pass=true, boundary_review_passed=true, tied_requirement_satisfied=true, transformer_block_contract_green=true, and article_equivalence_green=false.",
-    "report_digest": "72a5c082379266237c32eb5abbbc65ed2c89e53e36e505540cbb8e3d0d61c090"
+    "report_digest": "c6b59cf44253dc35a0aeb313b3139f3498ce989b66f98b02ead8ab203528fa43"
   },
   "case_count": 6,
   "passed_case_count": 6,
@@ -514,5 +511,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors the reusable transformer block closure only. It keeps the block-layer facts operator-readable without widening the current article-equivalence claim boundary.",
   "summary": "Transformer block summary now records case_count=6, passed_case_count=6, boundary_review_passed=true, tied_requirement_satisfied=true, transformer_block_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "6ca78a37b755e56a4b241ded250b66c48f494b5ca3296e1771b5caf596b91c90"
+  "report_digest": "f54956911da6fd991967eb473a7c821b17fe5dad72ac9d528bf9ee4588376bfe"
 }

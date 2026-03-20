@@ -55,7 +55,29 @@ pub struct TassadarArticleTransformerTrainingStepEvidence {
 pub struct TassadarArticleTransformerCheckpointEvidence {
     pub checkpoint_ref: String,
     pub checkpoint_family: String,
+    #[serde(default)]
+    pub stream_id: String,
     pub manifest_digest: String,
+    #[serde(default)]
+    pub object_digest: String,
+    #[serde(default)]
+    pub writer_node_id: String,
+    #[serde(default)]
+    pub membership_epoch: u64,
+    #[serde(default)]
+    pub cluster_state_digest: String,
+    #[serde(default)]
+    pub topology_digest: String,
+    #[serde(default)]
+    pub started_at_ms: u64,
+    #[serde(default)]
+    pub step: u64,
+    #[serde(default)]
+    pub durable_at_ms: u64,
+    #[serde(default)]
+    pub parent_checkpoint_ref: Option<String>,
+    #[serde(default)]
+    pub parent_manifest_digest: Option<String>,
     pub trained_trainable_parameter_digest: String,
     pub restored_trainable_parameter_digest: String,
     pub restore_matches_trained_state: bool,

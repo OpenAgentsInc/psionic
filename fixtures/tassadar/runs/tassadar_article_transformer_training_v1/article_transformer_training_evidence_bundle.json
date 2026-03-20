@@ -1408,11 +1408,22 @@
   "checkpoint": {
     "checkpoint_ref": "tassadar-article-transformer-training-run:step:64",
     "checkpoint_family": "train.tassadar.article_transformer",
+    "stream_id": "tassadar.article_transformer.checkpoint.tassadar-article-transformer-training-run.64",
     "manifest_digest": "fd47a59ec26f11cb5df78d325ca9bff2f12d6577e2ef4d7d395de643fa03263e",
+    "object_digest": "fcab06e606b2229bb5a71d905b85a28e4d055c1eb1c7dca9a3956574a7c93406",
+    "writer_node_id": "psionic.local.cpu_reference",
+    "membership_epoch": 0,
+    "cluster_state_digest": "cluster.local.cpu_reference",
+    "topology_digest": "topology.cpu_reference",
+    "started_at_ms": 1774320002560,
+    "step": 64,
+    "durable_at_ms": 1774320002560,
+    "parent_checkpoint_ref": "tassadar-article-transformer-training-run:step:0",
+    "parent_manifest_digest": "3c9f48897e9860e2462c3bb21486d17b0767b73f683534458584c6133086164d",
     "trained_trainable_parameter_digest": "b29b90c73b16de5f0a737a2eed067ba77a20aec77f6df5ee005a5253cbbfce88",
     "restored_trainable_parameter_digest": "b29b90c73b16de5f0a737a2eed067ba77a20aec77f6df5ee005a5253cbbfce88",
     "restore_matches_trained_state": true
   },
   "claim_boundary": "this evidence bundle covers one bounded article-Transformer training lane over two toy sequence tasks, a finite-difference optimizer loop, and deterministic checkpoint restore on the canonical owned stack. It does not claim full-parameter article training, benchmark parity, or final article-equivalence green status.",
-  "bundle_digest": "23c8e00265c731d46b196d9112876948abb91939e61d9021d1961b9453821222"
+  "bundle_digest": "1def4c4e494164030fadecd43bc31729d85169aeb90ad6d9ae477dbdc330c013"
 }

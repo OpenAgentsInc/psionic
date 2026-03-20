@@ -474,7 +474,7 @@
       "github_issue_number": 282,
       "title": "TAS-165: Transformer forward-pass replay and receipt closure",
       "issue_role": "implementation",
-      "issue_state": "open",
+      "issue_state": "closed",
       "blocker_ids": [
         "BEQ-003"
       ]
@@ -834,5 +834,5 @@
   ],
   "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
   "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
-  "report_digest": "04056c0c0e8c76b955f4fc0cfe5f2b522021b466aa0cc3c6ec517c3de4ce6489"
+  "report_digest": "1346ae150e166a794ce492ca07e6832af509cd160d3e0f2120e7e8b7e4430f7c"
 }

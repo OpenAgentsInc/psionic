@@ -414,7 +414,21 @@ pub fn build_tassadar_article_transformer_training_evidence_bundle(
                 .clone()
                 .unwrap_or_else(|| String::from("missing")),
             checkpoint_family: final_checkpoint.manifest.checkpoint_family.clone(),
+            stream_id: final_checkpoint.checkpoint.stream_id.clone(),
             manifest_digest: final_checkpoint.manifest.stable_digest(),
+            object_digest: final_checkpoint.checkpoint.object_digest.clone(),
+            writer_node_id: final_checkpoint.checkpoint.writer_node_id.clone(),
+            membership_epoch: final_checkpoint.checkpoint.membership_epoch,
+            cluster_state_digest: final_checkpoint.checkpoint.cluster_state_digest.clone(),
+            topology_digest: final_checkpoint.checkpoint.topology_digest.clone(),
+            started_at_ms: final_checkpoint.checkpoint.started_at_ms,
+            step: final_checkpoint.checkpoint.step.unwrap_or(final_checkpoint.manifest.step),
+            durable_at_ms: final_checkpoint
+                .checkpoint
+                .durable_at_ms
+                .unwrap_or(final_checkpoint.checkpoint.started_at_ms),
+            parent_checkpoint_ref: final_checkpoint.manifest.parent_checkpoint_ref.clone(),
+            parent_manifest_digest: final_checkpoint.manifest.parent_manifest_digest.clone(),
             trained_trainable_parameter_digest: outcome
                 .trained_model
                 .trainable_parameter_digest(),

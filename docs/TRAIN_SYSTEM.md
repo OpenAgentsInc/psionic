@@ -348,6 +348,12 @@ closure:
   proves the owned stack is trainable and restorable on bounded tasks, not
   that full article-model training, benchmark parity, or final
   article-equivalence closure are done
+- that same evidence bundle now also preserves the runtime-visible checkpoint
+  reference fields needed by the later forward-pass receipt lane:
+  stream id, object digest, writer identity, cluster and topology digests,
+  logical timing, step, and parent-checkpoint lineage are all committed so
+  later runtime receipts can bind to real checkpoint truth rather than
+  placeholder metadata
 - the eval and research surfaces keep the boundary explicit:
   `psionic-eval` closes `TAS-164` through a dedicated training-closure report,
   while `psionic-research` mirrors that result in a summary without widening

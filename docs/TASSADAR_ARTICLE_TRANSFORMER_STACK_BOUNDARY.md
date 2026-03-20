@@ -127,6 +127,17 @@ keeps reusable encoder-decoder architecture ownership in
 `psionic-train` rather than reabsorbing Transformer ownership into the train
 crate.
 
+`TAS-165` now closes the first runtime receipt lane on top of the same split.
+`psionic-models` now emits one canonical
+`forward_with_runtime_evidence(...)` entrypoint from
+`crates/psionic-models/src/tassadar_article_transformer.rs`, while
+`psionic-runtime` now owns the article-Transformer runtime bundle in
+`crates/psionic-runtime/src/tassadar_article_transformer_forward_pass.rs`.
+That keeps forward-pass trace capture at the model boundary, reusable
+encoder-decoder execution in `psionic-transformer`, and runtime-manifest plus
+proof-bundle ownership in `psionic-runtime` instead of collapsing those
+receipt hooks back into the model crate.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

@@ -1,11 +1,20 @@
 use std::collections::BTreeMap;
 
-use psionic_core::Shape;
+use psionic_core::{Shape, TensorData};
+use psionic_runtime::{
+    build_tassadar_article_transformer_forward_pass_evidence_bundle,
+    TassadarArticleTransformerCheckpointLineage, TassadarArticleTransformerDecodeReceipt,
+    TassadarArticleTransformerForwardPassChannelTrace,
+    TassadarArticleTransformerForwardPassEvidenceBundle,
+    TassadarArticleTransformerForwardPassRunConfig,
+    TassadarArticleTransformerForwardPassTraceArtifact,
+    TassadarArticleTransformerModelArtifactBinding, TassadarArticleTransformerReplayReceipt,
+};
 use psionic_transformer::{
-    ActivationKind, EncoderDecoderTransformer, EncoderDecoderTransformerConfig,
-    EncoderDecoderTransformerError, LayerError, LayerNorm, Linear, MultiHeadAttention,
-    PositionwiseFeedForward, TransformerDecoderLayer, TransformerEmbeddings,
-    TransformerEncoderLayer, TransformerExecutionMode,
+    ActivationKind, AttentionProbabilityTrace, EncoderDecoderTransformer,
+    EncoderDecoderTransformerConfig, EncoderDecoderTransformerError, LayerError, LayerNorm,
+    Linear, MultiHeadAttention, PositionwiseFeedForward, TransformerDecoderLayer,
+    TransformerEmbeddings, TransformerEncoderLayer, TransformerExecutionMode,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -76,6 +85,10 @@ impl TassadarArticleTransformer {
     pub const SOURCE_PAPER_TITLE: &str = "Attention Is All You Need";
     pub const SOURCE_PAPER_REF: &str =
         "~/code/alpha/tassadar/tassadar-research/papers/01-attention-is-all-you-need.pdf";
+    pub const MODEL_MODULE_REF: &str = "crates/psionic-models/src/tassadar_article_transformer.rs";
+    pub const TRANSFORMER_MODULE_REF: &str = "crates/psionic-transformer/src/encoder_decoder.rs";
+    pub const RUNTIME_MODULE_REF: &str =
+        "crates/psionic-runtime/src/tassadar_article_transformer_forward_pass.rs";
     pub const SOURCE_EMBEDDING_PARAMETER_ID: &str = "source_embedding_table";
     pub const TARGET_EMBEDDING_PARAMETER_ID: &str = "target_embedding_table";
     pub const SHARED_EMBEDDING_PARAMETER_ID: &str = "shared_embedding_table";
@@ -406,6 +419,172 @@ impl TassadarArticleTransformer {
         )?)
     }
 
+    /// Returns the digest-bound runtime model artifact identity for the current state.
+    #[must_use]
+    pub fn model_artifact_binding(&self) -> TassadarArticleTransformerModelArtifactBinding {
+        TassadarArticleTransformerModelArtifactBinding::new(
+            self.descriptor.model.model_id.clone(),
+            self.descriptor.model.family.clone(),
+            self.descriptor().stable_digest(),
+            self.trainable_parameter_digest(),
+        )
+    }
+
+    /// Runs one canonical forward pass and binds the result into runtime receipts.
+    pub fn forward_with_runtime_evidence(
+        &self,
+        run_id: impl Into<String>,
+        request_id: impl Into<String>,
+        product_id: impl Into<String>,
+        environment_refs: Vec<String>,
+        source_index_shape: Shape,
+        source_token_ids: &[usize],
+        target_index_shape: Shape,
+        target_token_ids: &[usize],
+        mode: TransformerExecutionMode,
+        checkpoint_lineage: Option<TassadarArticleTransformerCheckpointLineage>,
+    ) -> Result<TassadarArticleTransformerForwardPassEvidenceBundle, TassadarArticleTransformerError>
+    {
+        let request_id = request_id.into();
+        let run_config = TassadarArticleTransformerForwardPassRunConfig::new(
+            run_id,
+            request_id.clone(),
+            product_id,
+            source_index_shape.dims().to_vec(),
+            source_token_ids.to_vec(),
+            target_index_shape.dims().to_vec(),
+            target_token_ids.to_vec(),
+            transformer_execution_mode_label(mode),
+            environment_refs,
+        );
+        let forward_output = self.forward(
+            source_index_shape.clone(),
+            source_token_ids,
+            target_index_shape.clone(),
+            target_token_ids,
+            mode,
+        )?;
+        let trace_artifact =
+            self.trace_artifact_for_forward_output(request_id.as_str(), &forward_output)?;
+        let decode_receipt = TassadarArticleTransformerDecodeReceipt::greedy(
+            format!(
+                "tassadar://article_transformer/decode/{request_id}/{}",
+                trace_artifact.trace_digest
+            ),
+            trace_artifact.logits_digest.clone(),
+            trace_artifact.predicted_token_ids.clone(),
+        );
+        let replay_output = self.forward(
+            source_index_shape,
+            source_token_ids,
+            target_index_shape,
+            target_token_ids,
+            mode,
+        )?;
+        let replay_trace_artifact =
+            self.trace_artifact_for_forward_output(&format!("{request_id}.replay"), &replay_output)?;
+        let replay_receipt = TassadarArticleTransformerReplayReceipt::new(
+            format!(
+                "tassadar://article_transformer/replay/{request_id}/{}",
+                trace_artifact.trace_digest
+            ),
+            trace_artifact.forward_output_digest.clone(),
+            replay_trace_artifact.forward_output_digest,
+            trace_artifact.trace_digest.clone(),
+            replay_trace_artifact.trace_digest,
+        );
+        Ok(build_tassadar_article_transformer_forward_pass_evidence_bundle(
+            format!(
+                "tassadar.article_transformer.forward_pass.bundle.{request_id}"
+            ),
+            Self::MODEL_MODULE_REF,
+            Self::TRANSFORMER_MODULE_REF,
+            Self::RUNTIME_MODULE_REF,
+            self.model_artifact_binding(),
+            run_config,
+            checkpoint_lineage,
+            trace_artifact,
+            decode_receipt,
+            replay_receipt,
+        ))
+    }
+
+    fn trace_artifact_for_forward_output(
+        &self,
+        request_id: &str,
+        forward_output: &psionic_transformer::EncoderDecoderTransformerForwardOutput,
+    ) -> Result<TassadarArticleTransformerForwardPassTraceArtifact, TassadarArticleTransformerError>
+    {
+        let predicted_token_ids = predicted_token_ids_from_logits(
+            forward_output.logits.dims(),
+            &forward_output.logits.data,
+        )?;
+        let encoder_layer_traces = forward_output
+            .encoder_layer_outputs
+            .iter()
+            .enumerate()
+            .map(|(layer_index, layer)| {
+                forward_pass_channel_trace(
+                    format!("encoder_layer_{layer_index}.self_attention"),
+                    "encoder_self_attention",
+                    &layer.self_attention_trace,
+                )
+            })
+            .collect::<Vec<_>>();
+        let decoder_self_attention_traces = forward_output
+            .decoder_layer_outputs
+            .iter()
+            .enumerate()
+            .map(|(layer_index, layer)| {
+                forward_pass_channel_trace(
+                    format!("decoder_layer_{layer_index}.self_attention"),
+                    "decoder_self_attention",
+                    &layer.self_attention_trace,
+                )
+            })
+            .collect::<Vec<_>>();
+        let decoder_cross_attention_traces = forward_output
+            .decoder_layer_outputs
+            .iter()
+            .enumerate()
+            .map(|(layer_index, layer)| {
+                forward_pass_channel_trace(
+                    format!("decoder_layer_{layer_index}.cross_attention"),
+                    "decoder_cross_attention",
+                    &layer.cross_attention_trace,
+                )
+            })
+            .collect::<Vec<_>>();
+        Ok(TassadarArticleTransformerForwardPassTraceArtifact::new(
+            format!(
+                "tassadar://article_transformer/trace/{request_id}/{}",
+                self.descriptor().stable_digest()
+            ),
+            stable_digest(
+                b"psionic_tassadar_article_transformer_forward_output|",
+                forward_output,
+            ),
+            stable_digest(
+                b"psionic_tassadar_article_transformer_encoder_hidden_state|",
+                &forward_output.encoder_hidden_state,
+            ),
+            stable_digest(
+                b"psionic_tassadar_article_transformer_decoder_hidden_state|",
+                &forward_output.decoder_hidden_state,
+            ),
+            stable_digest(
+                b"psionic_tassadar_article_transformer_logits|",
+                &forward_output.logits,
+            ),
+            predicted_token_ids,
+            encoder_layer_traces,
+            decoder_self_attention_traces,
+            decoder_cross_attention_traces,
+            Self::MODEL_MODULE_REF,
+            Self::TRANSFORMER_MODULE_REF,
+        ))
+    }
+
     fn from_weight_parts(
         config: EncoderDecoderTransformerConfig,
         embedding_strategy: TassadarArticleTransformerEmbeddingStrategy,
@@ -640,6 +819,86 @@ fn build_feed_forward(
     )?)
 }
 
+fn forward_pass_channel_trace(
+    channel_id: String,
+    channel_kind: &str,
+    trace: &AttentionProbabilityTrace,
+) -> TassadarArticleTransformerForwardPassChannelTrace {
+    let tensor_shape = trace.tensor_spec().shape().dims().to_vec();
+    TassadarArticleTransformerForwardPassChannelTrace::new(
+        channel_id,
+        channel_kind,
+        tensor_shape.clone(),
+        stable_digest(
+            b"psionic_tassadar_article_transformer_attention_probability_trace|",
+            trace,
+        ),
+        tensor_shape.into_iter().product(),
+    )
+}
+
+fn predicted_token_ids_from_logits(
+    dims: &[usize],
+    data: &TensorData,
+) -> Result<Vec<usize>, TassadarArticleTransformerError> {
+    if dims.len() != 3 {
+        return Err(TassadarArticleTransformerError::InvalidConfiguration {
+            component: "tassadar_article_transformer.forward_with_runtime_evidence",
+            message: format!("expected logits rank 3, found shape {dims:?}"),
+        });
+    }
+    let batch_size = dims[0];
+    let target_len = dims[1];
+    let vocab_size = dims[2];
+    if batch_size == 0 || target_len == 0 || vocab_size == 0 {
+        return Err(TassadarArticleTransformerError::InvalidConfiguration {
+            component: "tassadar_article_transformer.forward_with_runtime_evidence",
+            message: format!("logits dimensions must be non-zero, found shape {dims:?}"),
+        });
+    }
+    let values = match data {
+        TensorData::F32(values) => values.as_slice(),
+        other => {
+            return Err(TassadarArticleTransformerError::InvalidConfiguration {
+                component: "tassadar_article_transformer.forward_with_runtime_evidence",
+                message: format!("expected dense f32 logits, found {other:?}"),
+            });
+        }
+    };
+    let expected_len = batch_size * target_len * vocab_size;
+    if values.len() != expected_len {
+        return Err(TassadarArticleTransformerError::InvalidConfiguration {
+            component: "tassadar_article_transformer.forward_with_runtime_evidence",
+            message: format!(
+                "logits value count {} does not match shape {dims:?} (expected {expected_len})",
+                values.len()
+            ),
+        });
+    }
+    let mut predictions = Vec::with_capacity(batch_size * target_len);
+    for position_index in 0..(batch_size * target_len) {
+        let offset = position_index * vocab_size;
+        let mut best_index = 0usize;
+        let mut best_value = values[offset];
+        for vocab_index in 1..vocab_size {
+            let candidate = values[offset + vocab_index];
+            if candidate > best_value {
+                best_index = vocab_index;
+                best_value = candidate;
+            }
+        }
+        predictions.push(best_index);
+    }
+    Ok(predictions)
+}
+
+fn transformer_execution_mode_label(mode: TransformerExecutionMode) -> String {
+    match mode {
+        TransformerExecutionMode::Eval => String::from("eval"),
+        TransformerExecutionMode::Train { seed } => format!("train_seed_{seed}"),
+    }
+}
+
 fn seeded_values(label: &str, len: usize, scale: f32) -> Vec<f32> {
     (0..len)
         .map(|index| {
@@ -669,6 +928,7 @@ mod tests {
         TassadarArticleTransformerEmbeddingStrategy, TassadarArticleTransformerError,
     };
     use psionic_core::Shape;
+    use psionic_runtime::{TassadarArticleTransformerCheckpointLineage, TrainingCheckpointReference};
     use psionic_transformer::TransformerExecutionMode;
 
     #[test]
@@ -736,6 +996,63 @@ mod tests {
         assert_eq!(output.logits.dims(), &[1, 3, 8]);
         assert_eq!(output.encoder_layer_outputs.len(), 2);
         assert_eq!(output.decoder_layer_outputs.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn article_transformer_forward_runtime_evidence_is_replay_stable(
+    ) -> Result<(), TassadarArticleTransformerError> {
+        let model = TassadarArticleTransformer::canonical_reference()?;
+        let evidence = model.forward_with_runtime_evidence(
+            "run-1",
+            "request-1",
+            "psionic.article_transformer.forward_pass",
+            vec![String::from("fixtures://tassadar/article_transformer")],
+            Shape::new(vec![1, 2]),
+            &[0, 1],
+            Shape::new(vec![1, 3]),
+            &[0, 1, 2],
+            TransformerExecutionMode::Eval,
+            Some(TassadarArticleTransformerCheckpointLineage {
+                checkpoint: TrainingCheckpointReference::new(
+                    "train.tassadar.article_transformer",
+                    "checkpoint-stream",
+                    "checkpoint-manifest-digest",
+                    "checkpoint-object-digest",
+                    "psionic.local.cpu_reference",
+                    0,
+                    "cluster.local.cpu_reference",
+                    "topology.cpu_reference",
+                    42,
+                )
+                .with_checkpoint_ref("checkpoint-ref")
+                .with_step(7)
+                .with_durable_at_ms(42),
+                parent_checkpoint_ref: Some(String::from("parent-checkpoint-ref")),
+                parent_manifest_digest: Some(String::from("parent-manifest-digest")),
+            }),
+        )?;
+
+        assert!(evidence.replay_receipt.deterministic_match);
+        assert_eq!(
+            evidence.proof_bundle.failure_reason,
+            None
+        );
+        assert_eq!(
+            evidence.model_module_ref,
+            TassadarArticleTransformer::MODEL_MODULE_REF
+        );
+        assert_eq!(
+            evidence.transformer_module_ref,
+            TassadarArticleTransformer::TRANSFORMER_MODULE_REF
+        );
+        assert_eq!(
+            evidence.runtime_module_ref,
+            TassadarArticleTransformer::RUNTIME_MODULE_REF
+        );
+        assert_eq!(evidence.trace_artifact.encoder_layer_traces.len(), 2);
+        assert_eq!(evidence.trace_artifact.decoder_self_attention_traces.len(), 2);
+        assert_eq!(evidence.trace_artifact.decoder_cross_attention_traces.len(), 2);
         Ok(())
     }
 }
