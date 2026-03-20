@@ -709,19 +709,23 @@ Current posture:
   source canon, profile completeness, ABI closure, Hungarian, Sudoku,
   million-step runtime closeout, and direct model-weight proof surfaces without
   widening the claim beyond those committed workloads and receipts
-- the repo now also carries one canonical Tassadar C-to-Wasm compile receipt at
+- the repo now also carries one historical non-canonical Tassadar C-to-Wasm
+  compile receipt at
   `fixtures/tassadar/reports/tassadar_c_to_wasm_compile_receipt.json`, emitted
   by `cargo run -p psionic-runtime --example tassadar_c_to_wasm_compile_receipt`;
   it binds one committed C source fixture plus the emitted Wasm binary to
   source/toolchain/config/output digests, projects that success into one
   canonical `TassadarProgramArtifact` lineage contract, and surfaces typed
-  compile refusals instead of hiding toolchain failure behind ad hoc scripts
+  compile refusals instead of hiding toolchain failure behind ad hoc scripts;
+  this receipt is retained as a historical frontend artifact and is not part
+  of the current Rust-only article path
 - the repo now also carries one real Tassadar compile-pipeline matrix at
   `fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json`,
   emitted by `cargo run -p psionic-eval --example tassadar_compile_pipeline_matrix_report`;
   it binds exact Wasm-text multi-export arithmetic and memory-lookup fixtures,
   an explicit Wasm-text parameter-ABI lowering refusal, and a typed
-  missing-toolchain refusal on the C-source path to compile-receipt digests,
+  missing-toolchain refusal on one optional historical C-source row to
+  compile-receipt digests,
   Wasm-module digests, exact lowered export outputs, and typed refusal posture
   for the current bounded source-to-Wasm-to-Tassadar lane; direct parameter
   and pointer-length article entrypoints now close through the separate
@@ -1626,8 +1630,9 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
 - `fixtures/tassadar/reports/tassadar_c_to_wasm_compile_receipt.json`,
   `fixtures/tassadar/sources/tassadar_micro_wasm_kernel.c`, and
   `fixtures/tassadar/wasm/tassadar_micro_wasm_kernel.wasm` are the canonical
-  Tassadar source/toolchain/output lineage artifacts for the repo-owned
-  C-to-Wasm compile path, not the article-closure frontend anchor.
+  Tassadar source/toolchain/output lineage artifacts for the historical
+  repo-owned C-to-Wasm compile path, not the article-closure frontend anchor
+  and not part of the current Rust operator flow.
 - `fixtures/tassadar/reports/tassadar_compile_pipeline_matrix_report.json`,
   `fixtures/tassadar/sources/tassadar_multi_export_kernel.wat`,
   `fixtures/tassadar/sources/tassadar_memory_lookup_kernel.wat`,

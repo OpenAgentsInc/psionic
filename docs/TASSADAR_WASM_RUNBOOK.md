@@ -34,7 +34,6 @@ This runbook covers the current repo-owned bounded Wasm flow only:
 - bounded dynamic-memory pause-and-resume receipts
 - Rust-only article runtime closeout
 - canonical Rust-only Hungarian-10x10 article reproducer
-- canonical C-to-Wasm compile receipt
 - source-to-Wasm-to-Tassadar compile-pipeline matrix
 - frozen core-Wasm window declaration and official harness
 - frozen core-Wasm semantic parity and closure gate
@@ -53,7 +52,7 @@ It does not claim:
 - general parameter-ABI closure
 - generic resumable computation beyond the committed checkpointed workloads
 - broad host-import closure
-- broad C/C++ frontend closure
+- broad Rust or source-language frontend closure
 
 ## Relation To The WebAssembly Spec
 
@@ -111,8 +110,9 @@ Required local baseline:
 
 Optional local baseline:
 
-- `clang` with a working `wasm32-unknown-unknown` target if you want the
-  historical C-source compile receipt to succeed locally
+- no extra frontend toolchain is needed for the canonical Rust/WAT flow
+- `clang` with a working `wasm32-unknown-unknown` target only if you
+  intentionally want to validate the historical C-source appendix locally
 
 If that target is missing, the compile-receipt step should refuse with a typed
 `toolchain_failure`. That is a local toolchain prerequisite failure, not proof
@@ -609,7 +609,7 @@ Expected outcome:
 - this closes the current "inside the model weights" claim only for the named
   workloads and only on the exact route digest in the report
 
-### 4. Optional historical C-to-Wasm compile receipt
+### 4. Historical appendix: optional C-to-Wasm compile receipt
 
 ```bash
 cargo run -p psionic-runtime --example tassadar_c_to_wasm_compile_receipt
@@ -625,7 +625,8 @@ Expected outcome:
   `fixtures/tassadar/sources/tassadar_micro_wasm_kernel.c`
 - or a typed refusal if the local `clang` cannot target
   `wasm32-unknown-unknown`
-- this step is not required for the Rust-only article-closure path
+- this step is historical only and is not part of the canonical Rust-owned
+  article or Wasm operator path
 
 ### 5. Compile-pipeline matrix
 
@@ -641,8 +642,8 @@ Expected outcome:
 
 - exact lowering for the multi-export arithmetic and memory-lookup WAT cases
 - explicit `unsupported_param_count` refusal for the parameter-ABI WAT case
-- explicit toolchain refusal for the C-source path when the local toolchain is
-  unavailable or incomplete
+- explicit toolchain refusal for the optional historical C-source row when the
+  local toolchain is unavailable or incomplete
 - that parameter-ABI refusal is still expected in this generic lowering path;
   the committed direct ABI closure now lives in the separate bounded
   Rust-only article ABI report above
@@ -1804,8 +1805,8 @@ These checks should keep the committed reports and generated truth aligned.
 
 ## How To Interpret Results
 
-- If only the C-to-Wasm receipt refuses and the refusal is a typed local
-  toolchain failure, the bounded Wasm lane can still be healthy.
+- If only the historical C-to-Wasm appendix refuses and the refusal is a typed
+  local toolchain failure, the bounded Wasm lane can still be healthy.
 - If the compile-pipeline matrix loses the exact WAT cases, that is a real
   lowering regression.
 - If the frozen core-Wasm closure gate changes from its current explicit red
@@ -1849,7 +1850,7 @@ These checks should keep the committed reports and generated truth aligned.
 
 ## Cleanup Rule
 
-The compile-receipt step can rewrite
+The historical appendix step can rewrite
 `fixtures/tassadar/reports/tassadar_c_to_wasm_compile_receipt.json` if the
 local toolchain differs from the committed environment.
 
@@ -1872,6 +1873,6 @@ hold:
 - the article runtime closeout bundle, report, and summary reproduce without
   unexpected drift
 - the focused tests above pass
-- any local C-toolchain failure stays typed and explicit instead of silently
-  widening or corrupting the lane
+- any local historical C-toolchain failure stays typed and explicit instead of
+  silently widening or corrupting the lane
 - `git status --short --branch` is clean before you leave the checkout

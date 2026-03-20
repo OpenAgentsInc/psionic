@@ -33,7 +33,7 @@ What it does prove:
 
 What it does not prove:
 
-- the article's explicit arbitrary-C frontend scope
+- arbitrary Rust frontend scope
 - a generic public Wasm-interpreter closure claim
 - full frozen core-Wasm closure
 - broad served/public universality
@@ -136,7 +136,8 @@ Expected outcome on the current measured host:
 - `current_host_measured_green=true`
 - supported classes are exactly `host_cpu_aarch64` and `host_cpu_x86_64`
 - unsupported classes remain explicit under `other_host_cpu`
-- the optional C-path compile row remains non-blocking for the Rust-only claim
+- the historical C-path compile row remains non-blocking and outside the
+  Rust-only claim
 
 ## Acceptance Gate
 

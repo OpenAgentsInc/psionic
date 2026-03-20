@@ -39,8 +39,8 @@ Current honest posture:
   `tassadar.internal_compute.article_closeout.v1`
 - the public repo does have a bounded Rust-only article-closeout path for the
   committed canonical workloads with direct no-tool proof receipts, but that
-  closeout is still route-bound and workload-bound rather than the article's
-  explicit arbitrary-C scope or a generic public Wasm-interpreter claim
+  closeout is still route-bound and workload-bound rather than any broad
+  arbitrary-Rust frontend scope or a generic public Wasm-interpreter claim
 - the current audited article-closeout runtime remains the exact
   reference-linear CPU lane on those committed workloads; faster runtime
   families exist as separate runtime or research surfaces and should not be
