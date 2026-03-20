@@ -17,6 +17,34 @@ It is subordinate to:
 - `docs/TASSADAR_WASM_RUNBOOK.md`
 - `fixtures/tassadar/reports/tassadar_acceptance_report.json`
 
+## What This Runbook Actually Closes
+
+This runbook closes the current bounded Rust-only article flow, not the
+broadest possible reading of the Percepta article headline.
+
+What it does prove:
+
+- one-command reproduction of the committed Rust-only article path
+- direct no-tool execution on the canonical workloads
+  `long_loop_kernel`, `sudoku_v0_test_a`, and `hungarian_matching`
+- direct model-weight proof receipts with zero external calls and no observed
+  fallback on those committed workloads
+- explicit CPU portability on `host_cpu_aarch64` and `host_cpu_x86_64`
+
+What it does not prove:
+
+- arbitrary C frontend closure
+- arbitrary Wasm execution
+- full frozen core-Wasm closure
+- broad served/public universality
+- or that the article's broad fast-attention headline is now the canonical
+  public closeout route
+
+The current audited closeout route remains the exact direct reference-linear
+CPU lane for the committed workloads. Faster runtime families are tracked in
+separate benchmark and research artifacts and should not be silently merged
+into this runbook's claim boundary.
+
 ## Preconditions
 
 Start from a clean checkout:

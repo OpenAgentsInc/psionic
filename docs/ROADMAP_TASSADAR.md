@@ -37,6 +37,15 @@ Current honest posture:
   refusal surfaces
 - the current served profile remains
   `tassadar.internal_compute.article_closeout.v1`
+- the public repo does have a bounded Rust-only article-closeout path for the
+  committed canonical workloads with direct no-tool proof receipts, but that
+  closeout is still route-bound and workload-bound rather than a broad
+  arbitrary C/Wasm claim
+- the current audited article-closeout runtime remains the exact
+  reference-linear CPU lane on those committed workloads; faster runtime
+  families exist as separate runtime or research surfaces and should not be
+  flattened into "the full article fast-attention headline is now the default
+  public route"
 - the frozen core-Wasm lane now has a declared semantic window plus a committed
   closure gate, plus a public acceptance gate and operator runbook-v2 summary;
   the current closure and public-acceptance verdicts remain suppressed with
@@ -225,7 +234,8 @@ Still unclaimed:
 - arbitrary Wasm execution
 - full frozen core-Wasm closure
 - broad practical internal computation as a generally served capability
-- Turing-complete support
+- served/public Turing-complete support
+- the Percepta article headline in its broadest frontend/runtime reading
 
 Current dependency spine:
 
