@@ -296,6 +296,24 @@ the bounded article slice, but it still does not close fast-route promotion,
 benchmark equivalence, single-run no-spill closure, clean-room weight
 causality, or the final article-equivalence claim.
 
+`TAS-172` now closes the fast-route selection tranche on top of the same
+owned route. `psionic-eval` now commits one machine-readable selection report
+at
+`fixtures/tassadar/reports/tassadar_article_fast_route_architecture_selection_report.json`
+that compares the current promoted HullCache runtime lane against the
+artifact-backed recurrent runtime baseline, the research hierarchical-hull
+candidate, and the bounded 2D-head hard-max research lane while keeping
+same-harness exactness, direct-versus-fallback posture, and route-contract fit
+explicit. `psionic-research` now mirrors the operator-readable summary at
+`fixtures/tassadar/reports/tassadar_article_fast_route_architecture_selection_summary.json`.
+This is the point where the repo now machine-readably chooses `HullCache` as
+the canonical fast article route because it is the only fast family that is
+both exact on the current article matrix and already compatible with the
+canonical planner route contract, but it still does not claim that the owned
+Transformer-backed model already runs on that fast path. That integration,
+no-fallback closeout, and throughput-floor closeout remain `TAS-173` through
+`TAS-175`.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

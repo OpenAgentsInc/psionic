@@ -722,7 +722,7 @@ mod tests {
                 .blocked_issue_ids
                 .first()
                 .map(String::as_str),
-            Some("TAS-172")
+            Some("TAS-173")
         );
     }
 

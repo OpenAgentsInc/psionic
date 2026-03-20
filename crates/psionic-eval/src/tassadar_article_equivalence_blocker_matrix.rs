@@ -867,7 +867,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             294,
             "TAS-172: Canonical fast-route architecture selection",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-004"],
         ),
         issue_row(

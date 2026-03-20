@@ -14,7 +14,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-172",
         "TAS-173",
         "TAS-174",
         "TAS-175",
@@ -437,7 +436,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this audit certifies only that the current held-out and adversarial article-envelope evaluation suite stays separated from the current trained weight-production slice by explicit case-id exclusion, token-digest exclusion, prefix-window duplicate checks, generator provenance, and profile-level feature separation. It does not yet certify fast-route promotion, benchmark parity, single-run no-spill closure, clean-room weight causality, route minimality, or final article-equivalence green status.",
     "summary": "Article evaluation-independence audit now records training_case_count=4, evaluation_case_count=6, exact_case_id_overlap_count=0, exact_source_token_overlap_count=0, exact_target_token_overlap_count=0, exact_sequence_overlap_count=0, near_duplicate_pair_count=0, shared_generator_id_count=0, shared_generator_rule_digest_count=0, shared_profile_id_count=0, evaluation_independence_green=true, and article_equivalence_green=false.",
-    "report_digest": "bc6c224f09c6bed0fd9db05d83b4173be972fd28db880338a5400e094a275817"
+    "report_digest": "c952fe5e55c8d9c5d969893de48992ce30c384835831afd009ca7e5de20672c7"
   },
   "tied_requirement_id": "TAS-171C",
   "tied_requirement_satisfied": true,
@@ -456,5 +455,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the dataset-contamination and evaluation-independence audit for the owned reference-linear article route. It keeps the overlap, near-duplicate, generator, and feature-separation counts operator-readable without widening the underlying article-equivalence claim boundary.",
   "summary": "Article evaluation-independence summary now records training_case_count=4, evaluation_case_count=6, exact_case_id_overlap_count=0, exact_source_token_overlap_count=0, exact_target_token_overlap_count=0, exact_sequence_overlap_count=0, near_duplicate_pair_count=0, shared_generator_id_count=0, shared_generator_rule_digest_count=0, shared_profile_id_count=0, evaluation_independence_green=true, and article_equivalence_green=false.",
-  "report_digest": "06ae7bf5ec055ab294ff4779bf1ba526122848fc3999545084560f54906f3522"
+  "report_digest": "7c1f231d16f5acfc18731bf48582cc0a62ba69dc25671e3a68ce90c127c6a1b8"
 }

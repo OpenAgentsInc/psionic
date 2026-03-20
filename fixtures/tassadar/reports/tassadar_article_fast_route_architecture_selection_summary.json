@@ -1,0 +1,596 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.article_fast_route_architecture_selection.summary.v1",
+  "report_ref": "fixtures/tassadar/reports/tassadar_article_fast_route_architecture_selection_report.json",
+  "report": {
+    "schema_version": 1,
+    "report_id": "tassadar.article_fast_route_architecture_selection.v1",
+    "checker_script_ref": "scripts/check-tassadar-article-fast-route-architecture-selection.sh",
+    "acceptance_gate_tie": {
+      "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+      "tied_requirement_id": "TAS-172",
+      "tied_requirement_satisfied": true,
+      "acceptance_status": "blocked",
+      "blocked_issue_ids": [
+        "TAS-173",
+        "TAS-174",
+        "TAS-175",
+        "TAS-176",
+        "TAS-177",
+        "TAS-178",
+        "TAS-179",
+        "TAS-179A",
+        "TAS-180",
+        "TAS-181",
+        "TAS-182",
+        "TAS-183",
+        "TAS-184",
+        "TAS-184A",
+        "TAS-185",
+        "TAS-185A",
+        "TAS-186"
+      ]
+    },
+    "transformer_model_route_anchor_review": {
+      "proof_report_ref": "fixtures/tassadar/reports/tassadar_direct_model_weight_execution_proof_report.json",
+      "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+      "benchmark_report_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+      "route_descriptor_digest": "fd60b5bb9c1e95b1aabf1d1ca4754219fcec4992b1921a56f5eb1411712e5beb",
+      "direct_case_count": 3,
+      "fallback_free_case_count": 3,
+      "zero_external_call_case_count": 3,
+      "passed": true,
+      "detail": "the owned Transformer-backed model `tassadar-article-transformer-trace-bound-trained-v0` already owns one benchmark-gated planner route anchor via the direct-proof report, so TAS-172 can evaluate fast-route fit against a real route identity before TAS-173 integrates the selected fast path into that same owned model boundary"
+    },
+    "exactness_matrix_rows": [
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "micro_wasm_kernel",
+        "evidence_available": true,
+        "claim_class": "compiled_article_class",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime exactness row for MicroWasmKernel: exact_case_count=1 of case_count=1 with note `promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "micro_wasm_kernel",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime exactness row for MicroWasmKernel: exact_case_count=1 of case_count=1 with note `research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "micro_wasm_kernel",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research exactness row for MicroWasmKernel: exact_case_count=1 of case_count=1 with note `research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "branch_heavy_kernel",
+        "evidence_available": true,
+        "claim_class": "compiled_article_class",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime exactness row for BranchHeavyKernel: exact_case_count=1 of case_count=1 with note `promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "branch_heavy_kernel",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime exactness row for BranchHeavyKernel: exact_case_count=1 of case_count=1 with note `research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "branch_heavy_kernel",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research exactness row for BranchHeavyKernel: exact_case_count=1 of case_count=1 with note `research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "memory_heavy_kernel",
+        "evidence_available": true,
+        "claim_class": "compiled_article_class",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime exactness row for MemoryHeavyKernel: exact_case_count=1 of case_count=1 with note `promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "memory_heavy_kernel",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime exactness row for MemoryHeavyKernel: exact_case_count=1 of case_count=1 with note `research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "memory_heavy_kernel",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research exactness row for MemoryHeavyKernel: exact_case_count=1 of case_count=1 with note `research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "long_loop_kernel",
+        "evidence_available": true,
+        "claim_class": "compiled_article_class",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime exactness row for LongLoopKernel: exact_case_count=1 of case_count=1 with note `promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "long_loop_kernel",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime exactness row for LongLoopKernel: exact_case_count=1 of case_count=1 with note `research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "long_loop_kernel",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research exactness row for LongLoopKernel: exact_case_count=1 of case_count=1 with note `research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "sudoku_class",
+        "evidence_available": true,
+        "claim_class": "compiled_article_class",
+        "case_count": 8,
+        "exact_case_count": 8,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime exactness row for SudokuClass: exact_case_count=8 of case_count=8 with note `promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "sudoku_class",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 8,
+        "exact_case_count": 8,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime exactness row for SudokuClass: exact_case_count=8 of case_count=8 with note `research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "sudoku_class",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 8,
+        "exact_case_count": 8,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research exactness row for SudokuClass: exact_case_count=8 of case_count=8 with note `research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "hungarian_matching",
+        "evidence_available": true,
+        "claim_class": "compiled_article_class",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime exactness row for HungarianMatching: exact_case_count=1 of case_count=1 with note `promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "hungarian_matching",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime exactness row for HungarianMatching: exact_case_count=1 of case_count=1 with note `research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "hungarian_matching",
+        "evidence_available": true,
+        "claim_class": "research_only",
+        "case_count": 1,
+        "exact_case_count": 1,
+        "all_cases_exact": true,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research exactness row for HungarianMatching: exact_case_count=1 of case_count=1 with note `research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "two_dimensional_head_hard_max_research",
+        "evidence_available": false,
+        "all_cases_exact": false,
+        "evidence_ref": "crates/psionic-eval/src/tassadar_executor_architecture_comparison.rs",
+        "detail": "the repo only carries the 2D-head hard-max family as a bounded windowed research lane with hull fallback; no committed article-class exactness matrix exists for it yet, so TAS-172 keeps it explicit but disqualifies it from canonical fast-route selection"
+      }
+    ],
+    "direct_fallback_matrix_rows": [
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "micro_wasm_kernel",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime direct-vs-fallback row for MicroWasmKernel: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "micro_wasm_kernel",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime direct-vs-fallback row for MicroWasmKernel: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "micro_wasm_kernel",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research direct-vs-fallback row for MicroWasmKernel: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "branch_heavy_kernel",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime direct-vs-fallback row for BranchHeavyKernel: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "branch_heavy_kernel",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime direct-vs-fallback row for BranchHeavyKernel: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "branch_heavy_kernel",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research direct-vs-fallback row for BranchHeavyKernel: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "memory_heavy_kernel",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime direct-vs-fallback row for MemoryHeavyKernel: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "memory_heavy_kernel",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime direct-vs-fallback row for MemoryHeavyKernel: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "memory_heavy_kernel",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research direct-vs-fallback row for MemoryHeavyKernel: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "long_loop_kernel",
+        "evidence_available": true,
+        "direct_case_count": 0,
+        "fallback_case_count": 1,
+        "refused_case_count": 0,
+        "exact_fallback_decode_mode": "reference_linear",
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime direct-vs-fallback row for LongLoopKernel: direct_case_count=0, fallback_case_count=1, refused_case_count=0, note=`promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "long_loop_kernel",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime direct-vs-fallback row for LongLoopKernel: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "long_loop_kernel",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research direct-vs-fallback row for LongLoopKernel: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "sudoku_class",
+        "evidence_available": true,
+        "direct_case_count": 0,
+        "fallback_case_count": 8,
+        "refused_case_count": 0,
+        "exact_fallback_decode_mode": "reference_linear",
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime direct-vs-fallback row for SudokuClass: direct_case_count=0, fallback_case_count=8, refused_case_count=0, note=`promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "sudoku_class",
+        "evidence_available": true,
+        "direct_case_count": 0,
+        "fallback_case_count": 8,
+        "refused_case_count": 0,
+        "exact_fallback_decode_mode": "reference_linear",
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime direct-vs-fallback row for SudokuClass: direct_case_count=0, fallback_case_count=8, refused_case_count=0, note=`research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "sudoku_class",
+        "evidence_available": true,
+        "direct_case_count": 8,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research direct-vs-fallback row for SudokuClass: direct_case_count=8, fallback_case_count=0, refused_case_count=0, note=`research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "workload_target": "hungarian_matching",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "detail": "hull_cache_runtime direct-vs-fallback row for HungarianMatching: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`promoted HullCache runtime row on the same benchmark package, preserving explicit fallback posture where current control-flow limits still apply`"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "workload_target": "hungarian_matching",
+        "evidence_available": true,
+        "direct_case_count": 0,
+        "fallback_case_count": 1,
+        "refused_case_count": 0,
+        "exact_fallback_decode_mode": "reference_linear",
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "detail": "linear_recurrent_runtime direct-vs-fallback row for HungarianMatching: direct_case_count=0, fallback_case_count=1, refused_case_count=0, note=`research-only artifact-backed recurrent runtime baseline on the same article-class benchmark package; direct on the smaller direct profiles and explicit exact fallback on the larger article-sized profiles`"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "workload_target": "hungarian_matching",
+        "evidence_available": true,
+        "direct_case_count": 1,
+        "fallback_case_count": 0,
+        "refused_case_count": 0,
+        "evidence_ref": "fixtures/tassadar/reports/tassadar_geometric_variant_report.json",
+        "detail": "hierarchical_hull_research direct-vs-fallback row for HungarianMatching: direct_case_count=1, fallback_case_count=0, refused_case_count=0, note=`research-only hierarchical hull candidate posture; any widened exact class here is evidence for follow-on work, not a promoted runtime claim`"
+      },
+      {
+        "candidate_kind": "two_dimensional_head_hard_max_research",
+        "evidence_available": false,
+        "exact_fallback_decode_mode": "reference_linear",
+        "evidence_ref": "crates/psionic-eval/src/tassadar_executor_architecture_comparison.rs",
+        "detail": "the bounded 2D-head hard-max research lane keeps hull fallback explicit inside the research comparison module, but it does not publish an article-class direct-versus-fallback matrix or a canonical decode-mode contract"
+      }
+    ],
+    "routeability_checks": [
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "evidence_kind": "projected_planner_route_descriptor",
+        "transformer_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+        "requested_decode_mode": "hull_cache",
+        "aggregate_route_posture": "fallback_capable",
+        "projected_route_descriptor_digest": "a107ad21e986825075211d6a812e4f5fe6cef51ad3d1b490c4cf1d687ee792df",
+        "benchmark_report_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "module_class_rows": [
+          {
+            "module_class": "micro_wasm_kernel",
+            "routeable": true,
+            "negotiated_route_state": "direct",
+            "effective_decode_mode": "hull_cache",
+            "detail": "projected HullCache route negotiation selected Direct with effective decode HullCache for module class `micro_wasm_kernel`"
+          },
+          {
+            "module_class": "branch_heavy_kernel",
+            "routeable": true,
+            "negotiated_route_state": "direct",
+            "effective_decode_mode": "hull_cache",
+            "detail": "projected HullCache route negotiation selected Direct with effective decode HullCache for module class `branch_heavy_kernel`"
+          },
+          {
+            "module_class": "memory_heavy_kernel",
+            "routeable": true,
+            "negotiated_route_state": "direct",
+            "effective_decode_mode": "hull_cache",
+            "detail": "projected HullCache route negotiation selected Direct with effective decode HullCache for module class `memory_heavy_kernel`"
+          },
+          {
+            "module_class": "long_loop_kernel",
+            "routeable": true,
+            "negotiated_route_state": "fallback",
+            "effective_decode_mode": "reference_linear",
+            "exact_fallback_decode_mode": "reference_linear",
+            "detail": "projected HullCache route negotiation selected Fallback with effective decode ReferenceLinear for module class `long_loop_kernel`"
+          },
+          {
+            "module_class": "sudoku_class",
+            "routeable": true,
+            "negotiated_route_state": "fallback",
+            "effective_decode_mode": "reference_linear",
+            "exact_fallback_decode_mode": "reference_linear",
+            "detail": "projected HullCache route negotiation selected Fallback with effective decode ReferenceLinear for module class `sudoku_class`"
+          },
+          {
+            "module_class": "hungarian_matching",
+            "routeable": true,
+            "negotiated_route_state": "direct",
+            "effective_decode_mode": "hull_cache",
+            "detail": "projected HullCache route negotiation selected Direct with effective decode HullCache for module class `hungarian_matching`"
+          }
+        ],
+        "routeable": true,
+        "direct_module_class_count": 4,
+        "fallback_module_class_count": 2,
+        "detail": "HullCache is the only fast family that already fits the canonical planner route contract: the projected Transformer-backed descriptor stays routeable on all 6 declared article module classes, with 4 direct and 2 explicit reference-linear fallback rows and no hidden fallback."
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "evidence_kind": "decode_mode_missing_from_canonical_route_contract",
+        "transformer_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+        "benchmark_report_ref": "fixtures/tassadar/reports/tassadar_recurrent_fast_path_runtime_baseline.json",
+        "module_class_rows": [],
+        "routeable": false,
+        "direct_module_class_count": 0,
+        "fallback_module_class_count": 0,
+        "detail": "the recurrent runtime baseline is still research-only and the canonical route contract has no recurrent decode-mode identifier. The runtime report keeps its direct families [\"micro_wasm_kernel\", \"branch_heavy_kernel\", \"memory_heavy_kernel\", \"long_loop_kernel\"] and fallback families [\"sudoku_class\", \"hungarian_matching\"] explicit, but TAS-172 cannot promote it as the canonical fast route until a real route-contract surface exists."
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "evidence_kind": "decode_mode_missing_from_canonical_route_contract",
+        "transformer_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+        "benchmark_report_ref": "fixtures/tassadar/reports/tassadar_efficient_attention_baseline_matrix.json",
+        "module_class_rows": [],
+        "routeable": false,
+        "direct_module_class_count": 0,
+        "fallback_module_class_count": 0,
+        "detail": "the hierarchical-hull candidate is faster on some article workloads, but it remains research-only and the canonical planner route contract has no hierarchical-hull decode-mode identifier. TAS-172 therefore records it as evidence, not as the canonical route."
+      },
+      {
+        "candidate_kind": "two_dimensional_head_hard_max_research",
+        "evidence_kind": "bounded_research_window_only",
+        "transformer_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+        "module_class_rows": [],
+        "routeable": false,
+        "direct_module_class_count": 0,
+        "fallback_module_class_count": 0,
+        "detail": "the 2D-head hard-max candidate only exists as a bounded windowed research lane with hull fallback. It is not an article-class route contract, not an article-scale exactness artifact, and not a canonical decode-mode family."
+      }
+    ],
+    "candidate_verdicts": [
+      {
+        "candidate_kind": "hull_cache_runtime",
+        "article_scale_exactness_green": true,
+        "explicit_fallback_boundary": true,
+        "routeability_green": true,
+        "promoted_article_lane": true,
+        "selected": true,
+        "detail": "selected because it is exact on the full article-class matrix, keeps fallback explicit on long-loop and Sudoku, already has a canonical HullCache decode-mode contract, and is the only fast family already promoted on the runtime-facing article lane"
+      },
+      {
+        "candidate_kind": "linear_recurrent_runtime",
+        "article_scale_exactness_green": true,
+        "explicit_fallback_boundary": true,
+        "routeability_green": false,
+        "promoted_article_lane": false,
+        "selected": false,
+        "detail": "rejected because it remains research-only and the canonical route contract has no recurrent decode-mode family even though the runtime baseline is fast and exact on its bounded rows"
+      },
+      {
+        "candidate_kind": "hierarchical_hull_research",
+        "article_scale_exactness_green": true,
+        "explicit_fallback_boundary": true,
+        "routeability_green": false,
+        "promoted_article_lane": false,
+        "selected": false,
+        "detail": "rejected because it remains research-only and lacks a canonical route-contract decode family despite strong same-harness speed and exactness"
+      },
+      {
+        "candidate_kind": "two_dimensional_head_hard_max_research",
+        "article_scale_exactness_green": false,
+        "explicit_fallback_boundary": true,
+        "routeability_green": false,
+        "promoted_article_lane": false,
+        "selected": false,
+        "detail": "rejected because the repo only carries a bounded research lane with hull fallback rather than an article-class fast-route artifact or canonical decode-mode contract"
+      }
+    ],
+    "selected_candidate_kind": "hull_cache_runtime",
+    "fast_route_selection_green": true,
+    "article_equivalence_green": false,
+    "claim_boundary": "this report selects exactly one fast architecture for the canonical article route without pretending that the fast path is already integrated into the owned Transformer-backed model. It keeps same-harness exactness, direct-versus-fallback posture, route-contract fit, promoted runtime truth, and research-only candidates separate so TAS-173 through TAS-175 can close the integration, no-fallback, and throughput tranches explicitly rather than collapsing them into one weak headline.",
+    "summary": "Article fast-route architecture selection now chooses `hull_cache_runtime` as the canonical fast article route with routeable_candidate_count=1, exact_article_matrix_candidate_count=3, selected_direct_module_class_count=4, selected_fallback_module_class_count=2, tied_requirement_satisfied=true, and article_equivalence_green=false.",
+    "report_digest": "7f104bf20fc6354d08f63da3da6cf00f3376c55f4c23c6051a31f12959c51500"
+  },
+  "tied_requirement_id": "TAS-172",
+  "tied_requirement_satisfied": true,
+  "acceptance_status": "blocked",
+  "selected_candidate_kind": "hull_cache_runtime",
+  "routeable_candidate_count": 1,
+  "exact_article_matrix_candidate_count": 3,
+  "selected_direct_module_class_count": 4,
+  "selected_fallback_module_class_count": 2,
+  "fast_route_selection_green": true,
+  "article_equivalence_green": false,
+  "claim_boundary": "this summary mirrors only the TAS-172 fast-route architecture selection. It keeps the chosen fast family, candidate counts, and projected routeability split operator-readable without pretending that TAS-173 through TAS-175 are already closed.",
+  "summary": "Article fast-route selection summary now records selected_candidate_kind=`hull_cache_runtime`, routeable_candidate_count=1, exact_article_matrix_candidate_count=3, selected_direct_module_class_count=4, selected_fallback_module_class_count=2, fast_route_selection_green=true, and article_equivalence_green=false.",
+  "report_digest": "abed1eb12962fa6a28c1ceba910a74f87c6ccc0e796803a58695a840bab7bddd"
+}
