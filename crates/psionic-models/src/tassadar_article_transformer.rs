@@ -3,24 +3,29 @@ use std::collections::BTreeMap;
 use psionic_core::{Shape, TensorData};
 use psionic_runtime::{
     build_tassadar_article_transformer_forward_pass_evidence_bundle,
-    TassadarArticleTransformerCheckpointLineage, TassadarArticleTransformerDecodeReceipt,
-    TassadarArticleTransformerForwardPassChannelTrace,
+    tassadar_article_trace_machine_step_schema, TassadarArticleTraceChannelKind,
+    TassadarArticleTraceMachineStepSchema, TassadarArticleTransformerCheckpointLineage,
+    TassadarArticleTransformerDecodeReceipt, TassadarArticleTransformerForwardPassChannelTrace,
     TassadarArticleTransformerForwardPassEvidenceBundle,
     TassadarArticleTransformerForwardPassRunConfig,
     TassadarArticleTransformerForwardPassTraceArtifact,
     TassadarArticleTransformerModelArtifactBinding, TassadarArticleTransformerReplayReceipt,
+    TassadarExecution, TassadarProgram,
 };
 use psionic_transformer::{
     ActivationKind, AttentionProbabilityTrace, EncoderDecoderTransformer,
-    EncoderDecoderTransformerConfig, EncoderDecoderTransformerError, LayerError, LayerNorm,
-    Linear, MultiHeadAttention, PositionwiseFeedForward, TransformerDecoderLayer,
-    TransformerEmbeddings, TransformerEncoderLayer, TransformerExecutionMode,
+    EncoderDecoderTransformerConfig, EncoderDecoderTransformerError, LayerError, LayerNorm, Linear,
+    MultiHeadAttention, PositionwiseFeedForward, TransformerDecoderLayer, TransformerEmbeddings,
+    TransformerEncoderLayer, TransformerExecutionMode,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::ModelDescriptor;
+use crate::{
+    ModelDescriptor, TassadarArticleTraceDecodeError, TassadarDecodedArticleTraceDomain,
+    TassadarTraceTokenizer, TokenId, TokenizerBoundary,
+};
 
 /// Stable architecture classification for the canonical article Transformer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,6 +73,62 @@ pub struct TassadarArticleTransformerParameterVector {
     pub values: Vec<f32>,
 }
 
+/// One channel binding between the runtime-owned trace schema and tokenizer forms.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarArticleTransformerTraceChannelBindingRow {
+    pub channel_id: String,
+    pub channel_kind: TassadarArticleTraceChannelKind,
+    pub stable_field_id: String,
+    pub token_forms: Vec<String>,
+    pub bound: bool,
+    pub detail: String,
+}
+
+/// Canonical trace-domain binding for the owned article Transformer route.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarArticleTransformerTraceDomainBinding {
+    pub binding_id: String,
+    pub trace_schema: TassadarArticleTraceMachineStepSchema,
+    pub tokenizer_digest: String,
+    pub tokenizer_vocab_size: usize,
+    pub model_source_vocab_size: usize,
+    pub model_target_vocab_size: usize,
+    pub model_max_source_positions: usize,
+    pub model_max_target_positions: usize,
+    pub channel_binding_rows: Vec<TassadarArticleTransformerTraceChannelBindingRow>,
+    pub source_vocab_compatible: bool,
+    pub target_vocab_compatible: bool,
+    pub prompt_trace_boundary_supported: bool,
+    pub halt_boundary_supported: bool,
+    pub all_required_channels_bound: bool,
+    pub summary: String,
+    pub binding_digest: String,
+}
+
+/// One source/target token batch prepared for the canonical article route.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarArticleTransformerTraceDomainBatch {
+    pub source_shape: Vec<usize>,
+    pub source_token_ids: Vec<usize>,
+    pub target_shape: Vec<usize>,
+    pub target_token_ids: Vec<usize>,
+    pub prompt_token_count: usize,
+    pub target_token_count: usize,
+    pub halt_marker: Option<String>,
+    pub sequence_digest: String,
+}
+
+/// One full encode/decode roundtrip over the canonical article trace domain.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarArticleTransformerTraceDomainRoundtrip {
+    pub binding: TassadarArticleTransformerTraceDomainBinding,
+    pub batch: TassadarArticleTransformerTraceDomainBatch,
+    pub decoded_trace: TassadarDecodedArticleTraceDomain,
+    pub prompt_boundary_preserved: bool,
+    pub halt_marker_preserved: bool,
+    pub roundtrip_exact: bool,
+}
+
 /// Canonical article-route model wrapper owned by `psionic-models`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TassadarArticleTransformer {
@@ -81,12 +142,16 @@ pub struct TassadarArticleTransformer {
 
 impl TassadarArticleTransformer {
     pub const MODEL_ID: &str = "tassadar-article-transformer-paper-faithful-v0";
+    pub const TRACE_BOUND_MODEL_ID: &str = "tassadar-article-transformer-trace-bound-v0";
     pub const MODEL_FAMILY: &str = "tassadar_article_transformer";
     pub const SOURCE_PAPER_TITLE: &str = "Attention Is All You Need";
     pub const SOURCE_PAPER_REF: &str =
         "~/code/alpha/tassadar/tassadar-research/papers/01-attention-is-all-you-need.pdf";
     pub const MODEL_MODULE_REF: &str = "crates/psionic-models/src/tassadar_article_transformer.rs";
+    pub const TOKENIZER_MODULE_REF: &str = "crates/psionic-models/src/tassadar_sequence.rs";
     pub const TRANSFORMER_MODULE_REF: &str = "crates/psionic-transformer/src/encoder_decoder.rs";
+    pub const TRACE_SCHEMA_MODULE_REF: &str =
+        "crates/psionic-runtime/src/tassadar_article_trace_schema.rs";
     pub const RUNTIME_MODULE_REF: &str =
         "crates/psionic-runtime/src/tassadar_article_transformer_forward_pass.rs";
     pub const SOURCE_EMBEDDING_PARAMETER_ID: &str = "source_embedding_table";
@@ -143,10 +208,9 @@ impl TassadarArticleTransformer {
                     0.08,
                 ),
             ),
-            TassadarArticleTransformerEmbeddingStrategy::DecoderInputOutputTied => (
-                shared_decoder_table.clone(),
-                shared_decoder_table,
-            ),
+            TassadarArticleTransformerEmbeddingStrategy::DecoderInputOutputTied => {
+                (shared_decoder_table.clone(), shared_decoder_table)
+            }
             TassadarArticleTransformerEmbeddingStrategy::SharedSourceTargetAndOutput => {
                 if config.source_vocab_size != config.target_vocab_size {
                     return Err(TassadarArticleTransformerError::InvalidConfiguration {
@@ -157,7 +221,10 @@ impl TassadarArticleTransformer {
                         ),
                     });
                 }
-                (source_embedding_table.clone(), source_embedding_table.clone())
+                (
+                    source_embedding_table.clone(),
+                    source_embedding_table.clone(),
+                )
             }
         };
         let logits_projection_bias = vec![0.0; config.target_vocab_size];
@@ -179,10 +246,223 @@ impl TassadarArticleTransformer {
         )
     }
 
+    /// Returns a bounded trace-domain config whose vocab exactly matches the
+    /// canonical Tassadar trace tokenizer.
+    #[must_use]
+    pub fn trace_domain_reference_config(
+        tokenizer: &TassadarTraceTokenizer,
+    ) -> EncoderDecoderTransformerConfig {
+        let vocab_size = tokenizer.vocabulary().len();
+        EncoderDecoderTransformerConfig {
+            source_vocab_size: vocab_size,
+            target_vocab_size: vocab_size,
+            hidden_size: 8,
+            feed_forward_size: 16,
+            head_count: 2,
+            encoder_layer_count: 2,
+            decoder_layer_count: 2,
+            max_source_positions: 16_384,
+            max_target_positions: 16_384,
+            dropout_probability_bps: 0,
+        }
+    }
+
+    /// Returns a trace-bound reference model for the canonical article route.
+    pub fn article_trace_domain_reference() -> Result<Self, TassadarArticleTransformerError> {
+        let tokenizer = TassadarTraceTokenizer::new();
+        let config = Self::trace_domain_reference_config(&tokenizer);
+        let mut model = Self::paper_faithful_reference(
+            config,
+            TassadarArticleTransformerEmbeddingStrategy::SharedSourceTargetAndOutput,
+        )?;
+        model.descriptor.model =
+            ModelDescriptor::new(Self::TRACE_BOUND_MODEL_ID, Self::MODEL_FAMILY, "v0");
+        Ok(model)
+    }
+
     /// Returns the public descriptor.
     #[must_use]
     pub fn descriptor(&self) -> &TassadarArticleTransformerDescriptor {
         &self.descriptor
+    }
+
+    /// Returns the canonical trace-domain binding for the current model.
+    #[must_use]
+    pub fn trace_domain_binding(&self) -> TassadarArticleTransformerTraceDomainBinding {
+        let tokenizer = TassadarTraceTokenizer::new();
+        let trace_schema = tassadar_article_trace_machine_step_schema();
+        let channel_binding_rows = trace_domain_channel_binding_rows();
+        let source_vocab_compatible =
+            self.descriptor.config.source_vocab_size >= tokenizer.vocabulary().len();
+        let target_vocab_compatible =
+            self.descriptor.config.target_vocab_size >= tokenizer.vocabulary().len();
+        let prompt_trace_boundary_supported = tokenizer
+            .vocabulary()
+            .tokens()
+            .iter()
+            .any(|token| token == "<trace>");
+        let halt_boundary_supported = tokenizer
+            .vocabulary()
+            .tokens()
+            .iter()
+            .any(|token| token == "<halt>")
+            && tokenizer
+                .vocabulary()
+                .tokens()
+                .iter()
+                .any(|token| token == "<halt_returned>")
+            && tokenizer
+                .vocabulary()
+                .tokens()
+                .iter()
+                .any(|token| token == "<halt_fell_off_end>");
+        let all_required_channels_bound = channel_binding_rows.iter().all(|row| row.bound);
+        let mut binding = TassadarArticleTransformerTraceDomainBinding {
+            binding_id: String::from("tassadar.article_transformer.trace_domain_binding.v1"),
+            trace_schema,
+            tokenizer_digest: tokenizer.stable_digest(),
+            tokenizer_vocab_size: tokenizer.vocabulary().len(),
+            model_source_vocab_size: self.descriptor.config.source_vocab_size,
+            model_target_vocab_size: self.descriptor.config.target_vocab_size,
+            model_max_source_positions: self.descriptor.config.max_source_positions,
+            model_max_target_positions: self.descriptor.config.max_target_positions,
+            channel_binding_rows,
+            source_vocab_compatible,
+            target_vocab_compatible,
+            prompt_trace_boundary_supported,
+            halt_boundary_supported,
+            all_required_channels_bound,
+            summary: String::new(),
+            binding_digest: String::new(),
+        };
+        binding.summary = format!(
+            "Article trace-domain binding now records tokenizer_vocab_size={}, model_source_vocab_size={}, model_target_vocab_size={}, channel_binding_rows={}, source_vocab_compatible={}, target_vocab_compatible={}, prompt_trace_boundary_supported={}, halt_boundary_supported={}, and all_required_channels_bound={}.",
+            binding.tokenizer_vocab_size,
+            binding.model_source_vocab_size,
+            binding.model_target_vocab_size,
+            binding.channel_binding_rows.len(),
+            binding.source_vocab_compatible,
+            binding.target_vocab_compatible,
+            binding.prompt_trace_boundary_supported,
+            binding.halt_boundary_supported,
+            binding.all_required_channels_bound,
+        );
+        binding.binding_digest = stable_digest(
+            b"psionic_tassadar_article_transformer_trace_domain_binding|",
+            &binding,
+        );
+        binding
+    }
+
+    /// Encodes one typed program and execution pair into the canonical
+    /// source/target token split used by the owned article route.
+    pub fn encode_article_trace_domain(
+        &self,
+        program: &TassadarProgram,
+        execution: &TassadarExecution,
+    ) -> Result<TassadarArticleTransformerTraceDomainBatch, TassadarArticleTransformerError> {
+        let binding = self.trace_domain_binding();
+        if !binding.source_vocab_compatible || !binding.target_vocab_compatible {
+            return Err(TassadarArticleTransformerError::InvalidConfiguration {
+                component: "tassadar_article_transformer.encode_article_trace_domain",
+                message: format!(
+                    "model vocab sizes source={} target={} do not cover tokenizer vocab size {}",
+                    binding.model_source_vocab_size,
+                    binding.model_target_vocab_size,
+                    binding.tokenizer_vocab_size
+                ),
+            });
+        }
+        if !binding.prompt_trace_boundary_supported
+            || !binding.halt_boundary_supported
+            || !binding.all_required_channels_bound
+        {
+            return Err(TassadarArticleTransformerError::InvalidConfiguration {
+                component: "tassadar_article_transformer.encode_article_trace_domain",
+                message: String::from(
+                    "trace-domain binding is incomplete for the canonical prompt/trace/halt or channel surface",
+                ),
+            });
+        }
+        let tokenizer = TassadarTraceTokenizer::new();
+        let tokenized = tokenizer.tokenize_program_and_execution(program, execution);
+        let source_tokens = &tokenized.sequence.as_slice()[..tokenized.prompt_token_count];
+        let target_tokens = &tokenized.sequence.as_slice()[tokenized.prompt_token_count..];
+        if source_tokens.len() > self.descriptor.config.max_source_positions {
+            return Err(TassadarArticleTransformerError::InvalidConfiguration {
+                component: "tassadar_article_transformer.encode_article_trace_domain",
+                message: format!(
+                    "prompt token count {} exceeds max_source_positions {}",
+                    source_tokens.len(),
+                    self.descriptor.config.max_source_positions
+                ),
+            });
+        }
+        if target_tokens.len() > self.descriptor.config.max_target_positions {
+            return Err(TassadarArticleTransformerError::InvalidConfiguration {
+                component: "tassadar_article_transformer.encode_article_trace_domain",
+                message: format!(
+                    "target token count {} exceeds max_target_positions {}",
+                    target_tokens.len(),
+                    self.descriptor.config.max_target_positions
+                ),
+            });
+        }
+        Ok(TassadarArticleTransformerTraceDomainBatch {
+            source_shape: vec![1, source_tokens.len()],
+            source_token_ids: source_tokens
+                .iter()
+                .map(|token| token.as_u32() as usize)
+                .collect(),
+            target_shape: vec![1, target_tokens.len()],
+            target_token_ids: target_tokens
+                .iter()
+                .map(|token| token.as_u32() as usize)
+                .collect(),
+            prompt_token_count: tokenized.prompt_token_count,
+            target_token_count: tokenized.target_token_count,
+            halt_marker: tokenizer.extract_halt_marker(tokenized.sequence.as_slice()),
+            sequence_digest: tokenized.sequence_digest,
+        })
+    }
+
+    /// Runs one full encode/decode roundtrip over the canonical article trace domain.
+    pub fn roundtrip_article_trace_domain(
+        &self,
+        program: &TassadarProgram,
+        execution: &TassadarExecution,
+    ) -> Result<TassadarArticleTransformerTraceDomainRoundtrip, TassadarArticleTransformerError>
+    {
+        let binding = self.trace_domain_binding();
+        let batch = self.encode_article_trace_domain(program, execution)?;
+        let tokenizer = TassadarTraceTokenizer::new();
+        let prompt_tokens = usize_slice_to_token_ids(&batch.source_token_ids);
+        let target_tokens = usize_slice_to_token_ids(&batch.target_token_ids);
+        let tokenized =
+            tokenizer.compose_prompt_and_target_sequence(&prompt_tokens, &target_tokens);
+        let decoded_trace = tokenizer.decode_article_trace_domain(&tokenized)?;
+        let reconstructed_program = decoded_trace
+            .materialize_program(program.program_id.clone(), program.profile_id.clone());
+        let reconstructed_execution = decoded_trace.materialize_execution(
+            execution.program_id.clone(),
+            execution.profile_id.clone(),
+            execution.runner_id.clone(),
+            execution.trace_abi.clone(),
+        );
+        Ok(TassadarArticleTransformerTraceDomainRoundtrip {
+            binding,
+            batch,
+            prompt_boundary_preserved: decoded_trace.prompt_token_count
+                == reconstructed_prompt_token_count(program, execution),
+            halt_marker_preserved: decoded_trace.halt_reason == execution.halt_reason,
+            roundtrip_exact: decoded_trace.sequence_digest
+                == tokenizer
+                    .tokenize_program_and_execution(program, execution)
+                    .sequence_digest
+                && reconstructed_program == *program
+                && reconstructed_execution == *execution,
+            decoded_trace,
+        })
     }
 
     /// Returns the embedding-sharing strategy.
@@ -249,13 +529,13 @@ impl TassadarArticleTransformer {
                     values: self.target_embedding_table.clone(),
                 },
             ],
-            TassadarArticleTransformerEmbeddingStrategy::SharedSourceTargetAndOutput => vec![
-                TassadarArticleTransformerParameterVector {
+            TassadarArticleTransformerEmbeddingStrategy::SharedSourceTargetAndOutput => {
+                vec![TassadarArticleTransformerParameterVector {
                     parameter_id: String::from(Self::SHARED_EMBEDDING_PARAMETER_ID),
                     shape: vec![config.source_vocab_size, config.hidden_size],
                     values: self.source_embedding_table.clone(),
-                },
-            ],
+                }]
+            }
         };
         parameters.push(TassadarArticleTransformerParameterVector {
             parameter_id: String::from(Self::LOGITS_PROJECTION_BIAS_PARAMETER_ID),
@@ -295,24 +575,23 @@ impl TassadarArticleTransformer {
         let mut logits_projection_weight = self.logits_projection_weight.clone();
         let mut logits_projection_bias = self.logits_projection_bias.clone();
 
-        let apply_override =
-            |parameter_id: &str,
-             expected_len: usize,
-             target: &mut Vec<f32>,
-             overrides: &BTreeMap<String, Vec<f32>>|
-             -> Result<(), TassadarArticleTransformerError> {
-                if let Some(values) = overrides.get(parameter_id) {
-                    if values.len() != expected_len {
-                        return Err(TassadarArticleTransformerError::InvalidParameterShape {
-                            parameter_id: String::from(parameter_id),
-                            expected_len,
-                            actual_len: values.len(),
-                        });
-                    }
-                    *target = values.clone();
+        let apply_override = |parameter_id: &str,
+                              expected_len: usize,
+                              target: &mut Vec<f32>,
+                              overrides: &BTreeMap<String, Vec<f32>>|
+         -> Result<(), TassadarArticleTransformerError> {
+            if let Some(values) = overrides.get(parameter_id) {
+                if values.len() != expected_len {
+                    return Err(TassadarArticleTransformerError::InvalidParameterShape {
+                        parameter_id: String::from(parameter_id),
+                        expected_len,
+                        actual_len: values.len(),
+                    });
                 }
-                Ok(())
-            };
+                *target = values.clone();
+            }
+            Ok(())
+        };
 
         match self.embedding_strategy() {
             TassadarArticleTransformerEmbeddingStrategy::Unshared => {
@@ -481,8 +760,8 @@ impl TassadarArticleTransformer {
             target_token_ids,
             mode,
         )?;
-        let replay_trace_artifact =
-            self.trace_artifact_for_forward_output(&format!("{request_id}.replay"), &replay_output)?;
+        let replay_trace_artifact = self
+            .trace_artifact_for_forward_output(&format!("{request_id}.replay"), &replay_output)?;
         let replay_receipt = TassadarArticleTransformerReplayReceipt::new(
             format!(
                 "tassadar://article_transformer/replay/{request_id}/{}",
@@ -493,20 +772,20 @@ impl TassadarArticleTransformer {
             trace_artifact.trace_digest.clone(),
             replay_trace_artifact.trace_digest,
         );
-        Ok(build_tassadar_article_transformer_forward_pass_evidence_bundle(
-            format!(
-                "tassadar.article_transformer.forward_pass.bundle.{request_id}"
+        Ok(
+            build_tassadar_article_transformer_forward_pass_evidence_bundle(
+                format!("tassadar.article_transformer.forward_pass.bundle.{request_id}"),
+                Self::MODEL_MODULE_REF,
+                Self::TRANSFORMER_MODULE_REF,
+                Self::RUNTIME_MODULE_REF,
+                self.model_artifact_binding(),
+                run_config,
+                checkpoint_lineage,
+                trace_artifact,
+                decode_receipt,
+                replay_receipt,
             ),
-            Self::MODEL_MODULE_REF,
-            Self::TRANSFORMER_MODULE_REF,
-            Self::RUNTIME_MODULE_REF,
-            self.model_artifact_binding(),
-            run_config,
-            checkpoint_lineage,
-            trace_artifact,
-            decode_receipt,
-            replay_receipt,
-        ))
+        )
     }
 
     fn trace_artifact_for_forward_output(
@@ -662,6 +941,8 @@ pub enum TassadarArticleTransformerError {
     Block(#[from] psionic_transformer::TransformerBlockError),
     #[error(transparent)]
     Layer(#[from] LayerError),
+    #[error(transparent)]
+    TraceDecode(#[from] TassadarArticleTraceDecodeError),
     #[error("component `{component}` invalid configuration: {message}")]
     InvalidConfiguration {
         component: &'static str,
@@ -899,6 +1180,184 @@ fn transformer_execution_mode_label(mode: TransformerExecutionMode) -> String {
     }
 }
 
+fn trace_domain_channel_binding_rows() -> Vec<TassadarArticleTransformerTraceChannelBindingRow> {
+    vec![
+        trace_channel_row(
+            "prompt.locals",
+            TassadarArticleTraceChannelKind::PromptScalar,
+            "locals",
+            &["<locals>"],
+            "the canonical article wrapper binds the runtime-owned local-count prompt scalar to the shared tokenizer field token",
+        ),
+        trace_channel_row(
+            "prompt.memory_slots",
+            TassadarArticleTraceChannelKind::PromptScalar,
+            "memory_slots",
+            &["<memory_slots>"],
+            "the canonical article wrapper binds the runtime-owned memory-slot prompt scalar to the shared tokenizer field token",
+        ),
+        trace_channel_row(
+            "prompt.initial_memory",
+            TassadarArticleTraceChannelKind::MemoryChannel,
+            "initial_memory",
+            &["<initial_memory>", "<list>"],
+            "the canonical article wrapper binds the runtime-owned initial-memory channel to the tokenizer list prefix",
+        ),
+        trace_channel_row(
+            "prompt.instructions",
+            TassadarArticleTraceChannelKind::PromptInstructionStream,
+            "instruction_stream",
+            &[
+                "<op_i32_const>",
+                "<op_local_get>",
+                "<op_local_set>",
+                "<op_i32_add>",
+                "<op_i32_sub>",
+                "<op_i32_mul>",
+                "<op_i32_lt>",
+                "<op_i32_load>",
+                "<op_i32_store>",
+                "<op_br_if>",
+                "<op_output>",
+                "<op_return>",
+            ],
+            "the canonical article wrapper binds the runtime-owned instruction stream to the shared opcode-token family",
+        ),
+        trace_channel_row(
+            "step.step_index",
+            TassadarArticleTraceChannelKind::StepScalar,
+            "step_index",
+            &["<step>", "<step_index>"],
+            "each append-only trace step begins with the shared step-index field token",
+        ),
+        trace_channel_row(
+            "step.pc",
+            TassadarArticleTraceChannelKind::StepScalar,
+            "pc",
+            &["<pc>"],
+            "the current pc scalar binds to the shared pc field token",
+        ),
+        trace_channel_row(
+            "step.next_pc",
+            TassadarArticleTraceChannelKind::StepScalar,
+            "next_pc",
+            &["<next_pc>"],
+            "the next-pc scalar binds to the shared next-pc field token",
+        ),
+        trace_channel_row(
+            "step.instruction",
+            TassadarArticleTraceChannelKind::StepInstruction,
+            "instruction",
+            &[
+                "<op_i32_const>",
+                "<op_local_get>",
+                "<op_local_set>",
+                "<op_i32_add>",
+                "<op_i32_sub>",
+                "<op_i32_mul>",
+                "<op_i32_lt>",
+                "<op_i32_load>",
+                "<op_i32_store>",
+                "<op_br_if>",
+                "<op_output>",
+                "<op_return>",
+            ],
+            "the realized step instruction binds to the same shared opcode-token family as the prompt instruction stream",
+        ),
+        trace_channel_row(
+            "step.event",
+            TassadarArticleTraceChannelKind::StepEvent,
+            "event",
+            &[
+                "<event_const_push>",
+                "<event_local_get>",
+                "<event_local_set>",
+                "<event_binary_add>",
+                "<event_binary_sub>",
+                "<event_binary_mul>",
+                "<event_binary_lt>",
+                "<event_load>",
+                "<event_store>",
+                "<event_branch>",
+                "<event_output>",
+                "<event_return>",
+            ],
+            "the realized machine event binds to the shared event-token family",
+        ),
+        trace_channel_row(
+            "step.stack_before",
+            TassadarArticleTraceChannelKind::StackChannel,
+            "stack_before",
+            &["<stack_before>", "<list>"],
+            "the pre-step operand stack binds to the shared stack-before list token",
+        ),
+        trace_channel_row(
+            "step.stack_after",
+            TassadarArticleTraceChannelKind::StackChannel,
+            "stack_after",
+            &["<stack_after>", "<list>"],
+            "the post-step operand stack binds to the shared stack-after list token",
+        ),
+        trace_channel_row(
+            "step.locals_after",
+            TassadarArticleTraceChannelKind::LocalsChannel,
+            "locals_after",
+            &["<locals_after>", "<list>"],
+            "the post-step locals channel binds to the shared locals-after list token",
+        ),
+        trace_channel_row(
+            "step.memory_after",
+            TassadarArticleTraceChannelKind::MemoryChannel,
+            "memory_after",
+            &["<memory_after>", "<list>"],
+            "the post-step memory channel binds to the shared memory-after list token",
+        ),
+        trace_channel_row(
+            "terminal.halt_reason",
+            TassadarArticleTraceChannelKind::HaltMarker,
+            "halt_reason",
+            &["<halt>", "<halt_returned>", "<halt_fell_off_end>", "<eos>"],
+            "the trace suffix terminates through the shared halt markers before EOS",
+        ),
+    ]
+}
+
+fn trace_channel_row(
+    channel_id: &str,
+    channel_kind: TassadarArticleTraceChannelKind,
+    stable_field_id: &str,
+    token_forms: &[&str],
+    detail: &str,
+) -> TassadarArticleTransformerTraceChannelBindingRow {
+    TassadarArticleTransformerTraceChannelBindingRow {
+        channel_id: String::from(channel_id),
+        channel_kind,
+        stable_field_id: String::from(stable_field_id),
+        token_forms: token_forms
+            .iter()
+            .map(|token| String::from(*token))
+            .collect(),
+        bound: true,
+        detail: String::from(detail),
+    }
+}
+
+fn usize_slice_to_token_ids(tokens: &[usize]) -> Vec<TokenId> {
+    tokens
+        .iter()
+        .map(|token| TokenId(*token as u32))
+        .collect::<Vec<_>>()
+}
+
+fn reconstructed_prompt_token_count(
+    program: &TassadarProgram,
+    execution: &TassadarExecution,
+) -> usize {
+    TassadarTraceTokenizer::new()
+        .tokenize_program_and_execution(program, execution)
+        .prompt_token_count
+}
+
 fn seeded_values(label: &str, len: usize, scale: f32) -> Vec<f32> {
     (0..len)
         .map(|index| {
@@ -928,11 +1387,15 @@ mod tests {
         TassadarArticleTransformerEmbeddingStrategy, TassadarArticleTransformerError,
     };
     use psionic_core::Shape;
-    use psionic_runtime::{TassadarArticleTransformerCheckpointLineage, TrainingCheckpointReference};
+    use psionic_runtime::{
+        tassadar_article_class_corpus, TassadarArticleTransformerCheckpointLineage,
+        TassadarCpuReferenceRunner, TrainingCheckpointReference,
+    };
     use psionic_transformer::TransformerExecutionMode;
 
     #[test]
-    fn article_transformer_descriptor_is_paper_faithful() -> Result<(), TassadarArticleTransformerError> {
+    fn article_transformer_descriptor_is_paper_faithful(
+    ) -> Result<(), TassadarArticleTransformerError> {
         let model = TassadarArticleTransformer::canonical_reference()?;
         let descriptor = model.descriptor();
 
@@ -974,14 +1437,24 @@ mod tests {
             unshared.target_embedding_table(),
             unshared.logits_projection_weight()
         );
-        assert_eq!(tied.target_embedding_table(), tied.logits_projection_weight());
-        assert_eq!(shared.source_embedding_table(), shared.target_embedding_table());
-        assert_eq!(shared.target_embedding_table(), shared.logits_projection_weight());
+        assert_eq!(
+            tied.target_embedding_table(),
+            tied.logits_projection_weight()
+        );
+        assert_eq!(
+            shared.source_embedding_table(),
+            shared.target_embedding_table()
+        );
+        assert_eq!(
+            shared.target_embedding_table(),
+            shared.logits_projection_weight()
+        );
         Ok(())
     }
 
     #[test]
-    fn article_transformer_forward_emits_encoder_decoder_logits() -> Result<(), TassadarArticleTransformerError> {
+    fn article_transformer_forward_emits_encoder_decoder_logits(
+    ) -> Result<(), TassadarArticleTransformerError> {
         let model = TassadarArticleTransformer::canonical_reference()?;
         let output = model.forward(
             Shape::new(vec![1, 2]),
@@ -1034,10 +1507,7 @@ mod tests {
         )?;
 
         assert!(evidence.replay_receipt.deterministic_match);
-        assert_eq!(
-            evidence.proof_bundle.failure_reason,
-            None
-        );
+        assert_eq!(evidence.proof_bundle.failure_reason, None);
         assert_eq!(
             evidence.model_module_ref,
             TassadarArticleTransformer::MODEL_MODULE_REF
@@ -1051,8 +1521,71 @@ mod tests {
             TassadarArticleTransformer::RUNTIME_MODULE_REF
         );
         assert_eq!(evidence.trace_artifact.encoder_layer_traces.len(), 2);
-        assert_eq!(evidence.trace_artifact.decoder_self_attention_traces.len(), 2);
-        assert_eq!(evidence.trace_artifact.decoder_cross_attention_traces.len(), 2);
+        assert_eq!(
+            evidence.trace_artifact.decoder_self_attention_traces.len(),
+            2
+        );
+        assert_eq!(
+            evidence.trace_artifact.decoder_cross_attention_traces.len(),
+            2
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn article_transformer_trace_bound_reference_matches_canonical_tokenizer_vocab(
+    ) -> Result<(), TassadarArticleTransformerError> {
+        let model = TassadarArticleTransformer::article_trace_domain_reference()?;
+        let binding = model.trace_domain_binding();
+
+        assert_eq!(
+            binding.model_source_vocab_size,
+            binding.tokenizer_vocab_size
+        );
+        assert_eq!(
+            binding.model_target_vocab_size,
+            binding.tokenizer_vocab_size
+        );
+        assert!(binding.source_vocab_compatible);
+        assert!(binding.target_vocab_compatible);
+        assert!(binding.prompt_trace_boundary_supported);
+        assert!(binding.halt_boundary_supported);
+        assert!(binding.all_required_channels_bound);
+        assert_eq!(binding.channel_binding_rows.len(), 14);
+        Ok(())
+    }
+
+    #[test]
+    fn article_transformer_trace_bound_reference_roundtrips_article_trace_domain(
+    ) -> Result<(), TassadarArticleTransformerError> {
+        let model = TassadarArticleTransformer::article_trace_domain_reference()?;
+        let case = tassadar_article_class_corpus()
+            .into_iter()
+            .next()
+            .expect("article corpus should not be empty");
+        let execution = TassadarCpuReferenceRunner::for_program(&case.program)
+            .expect("runner")
+            .execute(&case.program)
+            .expect("execution");
+        let roundtrip = model.roundtrip_article_trace_domain(&case.program, &execution)?;
+
+        assert_eq!(roundtrip.batch.source_shape[0], 1);
+        assert_eq!(roundtrip.batch.target_shape[0], 1);
+        assert_eq!(
+            roundtrip.batch.source_shape[1],
+            roundtrip.batch.prompt_token_count
+        );
+        assert_eq!(
+            roundtrip.batch.target_shape[1],
+            roundtrip.batch.target_token_count
+        );
+        assert_eq!(
+            roundtrip.batch.halt_marker.as_deref(),
+            Some("<halt_returned>")
+        );
+        assert!(roundtrip.prompt_boundary_preserved);
+        assert!(roundtrip.halt_marker_preserved);
+        assert!(roundtrip.roundtrip_exact);
         Ok(())
     }
 }

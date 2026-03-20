@@ -787,7 +787,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             284,
             "TAS-167: Article trace vocabulary and channel binding for the owned stack",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-003", "BEQ-007"],
         ),
         issue_row(

@@ -150,6 +150,19 @@ remain explicit non-canonical surfaces, while `psionic-core`,
 `psionic-array`, and `psionic-nn` remain lower substrate rather than
 article-route proof by themselves.
 
+`TAS-167` now adds the runtime-owned machine-step schema for the canonical
+article trace domain in
+`crates/psionic-runtime/src/tassadar_article_trace_schema.rs`
+and binds that schema directly to the shared trace tokenizer in
+`crates/psionic-models/src/tassadar_sequence.rs`
+plus the canonical article wrapper in
+`crates/psionic-models/src/tassadar_article_transformer.rs`.
+That split keeps prompt/trace boundary truth, stack/local/memory channel truth,
+and terminal halt-marker truth explicit at the runtime boundary while leaving
+tokenization and source/target token batching in the model boundary instead of
+collapsing those responsibilities back into the legacy
+`tassadar_executor_transformer.rs` comparison lane.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

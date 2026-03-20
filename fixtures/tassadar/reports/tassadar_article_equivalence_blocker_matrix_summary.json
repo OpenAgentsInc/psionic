@@ -498,7 +498,7 @@
         "github_issue_number": 284,
         "title": "TAS-167: Article trace vocabulary and channel binding for the owned stack",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-003",
           "BEQ-007"
@@ -838,7 +838,7 @@
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
     "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
-    "report_digest": "eafaa9277b1c34e666f12a3c6e8f433e36b4e52a8f22b6f1123f25ed9a854093"
+    "report_digest": "744f83145801b27f60a752b470e968fe07fa50756cd76948073cad6cf0d7acb7"
   },
   "blocker_count": 7,
   "open_blocker_count": 7,
@@ -864,5 +864,5 @@
   ],
   "claim_boundary": "this summary mirrors the TAS-157 blocker matrix only. It keeps the blocker contract operator-readable, but it does not add evidence or widen the current public claim boundary beyond the underlying matrix",
   "summary": "Article-equivalence blocker matrix summary now records blocker_count=7, open_blocker_count=7, matrix_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "8e3e666a23313ee691316fb34624b03e2bda533868169a800d26ad21ca5781ee"
+  "report_digest": "068cb875e5ac52b684d01b6550c25c7c4d2400022f30b6081e2faa60a9cfc86d"
 }

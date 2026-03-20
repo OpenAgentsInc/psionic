@@ -6,6 +6,7 @@ use psionic_runtime::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use thiserror::Error;
 
 use crate::{TokenId, TokenSequence, TokenVocabulary, TokenizerBoundary};
 
@@ -269,6 +270,148 @@ pub struct TassadarDecodedSymbolicSequence {
     pub prompt_token_count: usize,
 }
 
+/// Typed prompt surface reconstructed from the canonical article trace domain.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarDecodedArticleTracePrompt {
+    /// Number of locals declared in the prompt.
+    pub local_count: usize,
+    /// Number of memory slots declared in the prompt.
+    pub memory_slots: usize,
+    /// Initial memory image emitted by the prompt.
+    pub initial_memory: Vec<i32>,
+    /// Ordered instruction stream declared in the prompt.
+    pub instructions: Vec<TassadarInstruction>,
+}
+
+impl TassadarDecodedArticleTracePrompt {
+    /// Materializes one runtime program with an explicit profile id.
+    #[must_use]
+    pub fn materialize_program(
+        &self,
+        program_id: impl Into<String>,
+        profile_id: impl Into<String>,
+    ) -> TassadarProgram {
+        TassadarProgram {
+            program_id: program_id.into(),
+            profile_id: profile_id.into(),
+            local_count: self.local_count,
+            memory_slots: self.memory_slots,
+            initial_memory: self.initial_memory.clone(),
+            instructions: self.instructions.clone(),
+        }
+    }
+}
+
+/// Typed article trace sequence reconstructed from the canonical token domain.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarDecodedArticleTraceDomain {
+    /// Program prompt reconstructed from the prompt prefix.
+    pub prompt: TassadarDecodedArticleTracePrompt,
+    /// Ordered append-only trace steps.
+    pub steps: Vec<TassadarTraceStep>,
+    /// Terminal halt reason.
+    pub halt_reason: TassadarHaltReason,
+    /// Prompt token count reconstructed from the trace-start boundary.
+    pub prompt_token_count: usize,
+    /// Target token count reconstructed from the append-only suffix.
+    pub target_token_count: usize,
+    /// Stable digest over the original token sequence.
+    pub sequence_digest: String,
+}
+
+impl TassadarDecodedArticleTraceDomain {
+    /// Materializes one runtime program with an explicit profile id.
+    #[must_use]
+    pub fn materialize_program(
+        &self,
+        program_id: impl Into<String>,
+        profile_id: impl Into<String>,
+    ) -> TassadarProgram {
+        self.prompt.materialize_program(program_id, profile_id)
+    }
+
+    /// Materializes one runtime execution with explicit identity fields.
+    #[must_use]
+    pub fn materialize_execution(
+        &self,
+        program_id: impl Into<String>,
+        profile_id: impl Into<String>,
+        runner_id: impl Into<String>,
+        trace_abi: psionic_runtime::TassadarTraceAbi,
+    ) -> TassadarExecution {
+        let outputs = self
+            .steps
+            .iter()
+            .filter_map(|step| match step.event {
+                TassadarTraceEvent::Output { value } => Some(value),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let final_locals = self
+            .steps
+            .last()
+            .map(|step| step.locals_after.clone())
+            .unwrap_or_else(|| vec![0; self.prompt.local_count]);
+        let final_memory = self
+            .steps
+            .last()
+            .map(|step| step.memory_after.clone())
+            .unwrap_or_else(|| {
+                let mut memory = self.prompt.initial_memory.clone();
+                memory.resize(self.prompt.memory_slots, 0);
+                memory
+            });
+        let final_stack = self
+            .steps
+            .last()
+            .map(|step| step.stack_after.clone())
+            .unwrap_or_default();
+        TassadarExecution {
+            program_id: program_id.into(),
+            profile_id: profile_id.into(),
+            runner_id: runner_id.into(),
+            trace_abi,
+            steps: self.steps.clone(),
+            outputs,
+            final_locals,
+            final_memory,
+            final_stack,
+            halt_reason: self.halt_reason,
+        }
+    }
+}
+
+/// Typed decode failure for the canonical article trace token domain.
+#[derive(Clone, Debug, Error, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "error_kind")]
+pub enum TassadarArticleTraceDecodeError {
+    #[error("unexpected end of sequence at token index {index} while parsing {context}")]
+    UnexpectedEnd { index: usize, context: String },
+    #[error("unexpected token at index {index}: expected {expected}, found {found}")]
+    UnexpectedToken {
+        index: usize,
+        expected: String,
+        found: String,
+    },
+    #[error(
+        "decoded prompt token count mismatch: encoded {encoded_prompt_token_count}, actual {actual_prompt_token_count}"
+    )]
+    PromptBoundaryMismatch {
+        encoded_prompt_token_count: usize,
+        actual_prompt_token_count: usize,
+    },
+    #[error("failed to fit decoded immediate `{field}` value {value} into target type {target}")]
+    ImmediateOutOfRange {
+        field: String,
+        value: u32,
+        target: String,
+    },
+    #[error(
+        "trailing tokens remain after decoding the canonical article trace domain starting at token index {start_index}"
+    )]
+    TrailingTokens { start_index: usize },
+}
+
 /// Deterministic byte-and-symbol tokenizer for Wasm program plus trace sequences.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TassadarTraceTokenizer {
@@ -487,6 +630,59 @@ impl TassadarTraceTokenizer {
                 .collect(),
             prompt_token_count: tokenized.prompt_token_count,
         }
+    }
+
+    /// Reconstructs the typed article trace domain from one tokenized sequence.
+    pub fn decode_article_trace_domain(
+        &self,
+        tokenized: &TassadarTokenizedExecutionSequence,
+    ) -> Result<TassadarDecodedArticleTraceDomain, TassadarArticleTraceDecodeError> {
+        let tokens = tokenized.sequence.as_slice();
+        let (prompt, mut index, prompt_token_count) = self.parse_program_prompt(tokens)?;
+        if prompt_token_count != tokenized.prompt_token_count {
+            return Err(TassadarArticleTraceDecodeError::PromptBoundaryMismatch {
+                encoded_prompt_token_count: tokenized.prompt_token_count,
+                actual_prompt_token_count: prompt_token_count,
+            });
+        }
+        let mut steps = Vec::new();
+        while tokens.get(index).copied() != Some(self.token_id(HALT_TOKEN)) {
+            let (step, next_index) = self.parse_trace_step(tokens, index)?;
+            steps.push(step);
+            index = next_index;
+        }
+        self.expect_token(tokens, index, HALT_TOKEN)?;
+        index = index.saturating_add(1);
+        let halt_reason = self.parse_halt_reason(tokens, index)?;
+        index = index.saturating_add(1);
+        if tokens.get(index).copied() != Some(self.vocabulary.eos_id()) {
+            return Err(self.unexpected_token(index, "<eos>", tokens.get(index).copied()));
+        }
+        index = index.saturating_add(1);
+        if index != tokens.len() {
+            return Err(TassadarArticleTraceDecodeError::TrailingTokens { start_index: index });
+        }
+        Ok(TassadarDecodedArticleTraceDomain {
+            prompt,
+            steps,
+            halt_reason,
+            prompt_token_count,
+            target_token_count: tokenized.target_token_count,
+            sequence_digest: tokenized.sequence_digest.clone(),
+        })
+    }
+
+    /// Composes one full tokenized sequence from prompt and target token slices.
+    #[must_use]
+    pub fn compose_prompt_and_target_sequence(
+        &self,
+        prompt_tokens: &[TokenId],
+        target_tokens: &[TokenId],
+    ) -> TassadarTokenizedExecutionSequence {
+        let mut sequence = Vec::with_capacity(prompt_tokens.len() + target_tokens.len());
+        sequence.extend_from_slice(prompt_tokens);
+        sequence.extend_from_slice(target_tokens);
+        TassadarTokenizedExecutionSequence::new(TokenSequence::new(sequence), prompt_tokens.len())
     }
 
     /// Extracts output values from one symbolic executor trace.
@@ -881,6 +1077,487 @@ impl TassadarTraceTokenizer {
             TassadarArithmeticOp::Mul => self.token_id(EVENT_BINARY_MUL),
             TassadarArithmeticOp::Lt => self.token_id(EVENT_BINARY_LT),
         }
+    }
+
+    fn expect_token(
+        &self,
+        tokens: &[TokenId],
+        index: usize,
+        expected: &str,
+    ) -> Result<(), TassadarArticleTraceDecodeError> {
+        let Some(token) = tokens.get(index).copied() else {
+            return Err(TassadarArticleTraceDecodeError::UnexpectedEnd {
+                index,
+                context: String::from(expected),
+            });
+        };
+        if token == self.token_id(expected) {
+            return Ok(());
+        }
+        Err(self.unexpected_token(index, expected, Some(token)))
+    }
+
+    fn unexpected_token(
+        &self,
+        index: usize,
+        expected: &str,
+        found: Option<TokenId>,
+    ) -> TassadarArticleTraceDecodeError {
+        TassadarArticleTraceDecodeError::UnexpectedToken {
+            index,
+            expected: String::from(expected),
+            found: self.token_label(found),
+        }
+    }
+
+    fn token_label(&self, token: Option<TokenId>) -> String {
+        token
+            .and_then(|value| self.vocabulary.token(value))
+            .unwrap_or("<end>")
+            .to_string()
+    }
+
+    fn parse_program_prompt(
+        &self,
+        tokens: &[TokenId],
+    ) -> Result<(TassadarDecodedArticleTracePrompt, usize, usize), TassadarArticleTraceDecodeError>
+    {
+        if tokens.first().copied() != Some(self.vocabulary.bos_id()) {
+            return Err(TassadarArticleTraceDecodeError::UnexpectedToken {
+                index: 0,
+                expected: String::from("<bos>"),
+                found: self.token_label(tokens.first().copied()),
+            });
+        }
+        let mut index = 1_usize;
+        self.expect_token(tokens, index, PROGRAM_TOKEN)?;
+        index = index.saturating_add(1);
+        self.expect_token(tokens, index, FIELD_LOCALS)?;
+        let local_count = self.parse_u32_required(tokens, index + 1, "locals")? as usize;
+        index = index.saturating_add(5);
+        self.expect_token(tokens, index, FIELD_MEMORY_SLOTS)?;
+        let memory_slots = self.parse_u32_required(tokens, index + 1, "memory_slots")? as usize;
+        index = index.saturating_add(5);
+        self.expect_token(tokens, index, FIELD_INITIAL_MEMORY)?;
+        let initial_memory_len =
+            self.parse_u32_required(tokens, index + 1, "initial_memory_length")? as usize;
+        index = index.saturating_add(5);
+        let mut initial_memory = Vec::with_capacity(initial_memory_len);
+        for memory_index in 0..initial_memory_len {
+            initial_memory.push(self.parse_i32_required(
+                tokens,
+                index,
+                &format!("initial_memory[{memory_index}]"),
+            )?);
+            index = index.saturating_add(4);
+        }
+        let mut instructions = Vec::new();
+        while tokens.get(index).copied() != Some(self.token_id(TRACE_TOKEN)) {
+            let (instruction, next_index) = self.parse_instruction_required(tokens, index)?;
+            instructions.push(instruction);
+            index = next_index;
+        }
+        self.expect_token(tokens, index, TRACE_TOKEN)?;
+        index = index.saturating_add(1);
+        Ok((
+            TassadarDecodedArticleTracePrompt {
+                local_count,
+                memory_slots,
+                initial_memory,
+                instructions,
+            },
+            index,
+            index,
+        ))
+    }
+
+    fn parse_trace_step(
+        &self,
+        tokens: &[TokenId],
+        index: usize,
+    ) -> Result<(TassadarTraceStep, usize), TassadarArticleTraceDecodeError> {
+        let mut index = index;
+        self.expect_token(tokens, index, STEP_TOKEN)?;
+        index = index.saturating_add(1);
+        self.expect_token(tokens, index, FIELD_STEP_INDEX)?;
+        let step_index = self.parse_u32_required(tokens, index + 1, "step_index")? as usize;
+        index = index.saturating_add(5);
+        self.expect_token(tokens, index, FIELD_PC)?;
+        let pc = self.parse_u32_required(tokens, index + 1, "pc")? as usize;
+        index = index.saturating_add(5);
+        self.expect_token(tokens, index, FIELD_NEXT_PC)?;
+        let next_pc = self.parse_u32_required(tokens, index + 1, "next_pc")? as usize;
+        index = index.saturating_add(5);
+        let (instruction, next_instruction_index) =
+            self.parse_instruction_required(tokens, index)?;
+        index = next_instruction_index;
+        let (event, next_event_index) = self.parse_event_required(tokens, index)?;
+        index = next_event_index;
+        let (stack_before, next_stack_before_index) =
+            self.parse_i32_list_required(tokens, index, FIELD_STACK_BEFORE)?;
+        index = next_stack_before_index;
+        let (stack_after, next_stack_after_index) =
+            self.parse_i32_list_required(tokens, index, FIELD_STACK_AFTER)?;
+        index = next_stack_after_index;
+        let (locals_after, next_locals_after_index) =
+            self.parse_i32_list_required(tokens, index, FIELD_LOCALS_AFTER)?;
+        index = next_locals_after_index;
+        let (memory_after, next_memory_after_index) =
+            self.parse_i32_list_required(tokens, index, FIELD_MEMORY_AFTER)?;
+        index = next_memory_after_index;
+        Ok((
+            TassadarTraceStep {
+                step_index,
+                pc,
+                next_pc,
+                instruction,
+                event,
+                stack_before,
+                stack_after,
+                locals_after,
+                memory_after,
+            },
+            index,
+        ))
+    }
+
+    fn parse_instruction_required(
+        &self,
+        tokens: &[TokenId],
+        index: usize,
+    ) -> Result<(TassadarInstruction, usize), TassadarArticleTraceDecodeError> {
+        let token = tokens.get(index).copied().ok_or_else(|| {
+            TassadarArticleTraceDecodeError::UnexpectedEnd {
+                index,
+                context: String::from("instruction"),
+            }
+        })?;
+        if token == self.token_id(OP_I32_CONST) {
+            return Ok((
+                TassadarInstruction::I32Const {
+                    value: self.parse_i32_required(tokens, index + 1, "instruction.i32_const")?,
+                },
+                index.saturating_add(5),
+            ));
+        }
+        if token == self.token_id(OP_LOCAL_GET) {
+            return Ok((
+                TassadarInstruction::LocalGet {
+                    local: self.parse_u8_required(tokens, index + 1, "instruction.local_get")?,
+                },
+                index.saturating_add(5),
+            ));
+        }
+        if token == self.token_id(OP_LOCAL_SET) {
+            return Ok((
+                TassadarInstruction::LocalSet {
+                    local: self.parse_u8_required(tokens, index + 1, "instruction.local_set")?,
+                },
+                index.saturating_add(5),
+            ));
+        }
+        if token == self.token_id(OP_I32_ADD) {
+            return Ok((TassadarInstruction::I32Add, index.saturating_add(1)));
+        }
+        if token == self.token_id(OP_I32_SUB) {
+            return Ok((TassadarInstruction::I32Sub, index.saturating_add(1)));
+        }
+        if token == self.token_id(OP_I32_MUL) {
+            return Ok((TassadarInstruction::I32Mul, index.saturating_add(1)));
+        }
+        if token == self.token_id(OP_I32_LT) {
+            return Ok((TassadarInstruction::I32Lt, index.saturating_add(1)));
+        }
+        if token == self.token_id(OP_I32_LOAD) {
+            return Ok((
+                TassadarInstruction::I32Load {
+                    slot: self.parse_u8_required(tokens, index + 1, "instruction.i32_load")?,
+                },
+                index.saturating_add(5),
+            ));
+        }
+        if token == self.token_id(OP_I32_STORE) {
+            return Ok((
+                TassadarInstruction::I32Store {
+                    slot: self.parse_u8_required(tokens, index + 1, "instruction.i32_store")?,
+                },
+                index.saturating_add(5),
+            ));
+        }
+        if token == self.token_id(OP_BR_IF) {
+            return Ok((
+                TassadarInstruction::BrIf {
+                    target_pc: self.parse_u16_required(tokens, index + 1, "instruction.br_if")?,
+                },
+                index.saturating_add(5),
+            ));
+        }
+        if token == self.token_id(OP_OUTPUT) {
+            return Ok((TassadarInstruction::Output, index.saturating_add(1)));
+        }
+        if token == self.token_id(OP_RETURN) {
+            return Ok((TassadarInstruction::Return, index.saturating_add(1)));
+        }
+        Err(self.unexpected_token(index, "instruction opcode", Some(token)))
+    }
+
+    fn parse_event_required(
+        &self,
+        tokens: &[TokenId],
+        index: usize,
+    ) -> Result<(TassadarTraceEvent, usize), TassadarArticleTraceDecodeError> {
+        let token = tokens.get(index).copied().ok_or_else(|| {
+            TassadarArticleTraceDecodeError::UnexpectedEnd {
+                index,
+                context: String::from("event"),
+            }
+        })?;
+        if token == self.token_id(EVENT_CONST_PUSH) {
+            return Ok((
+                TassadarTraceEvent::ConstPush {
+                    value: self.parse_i32_required(tokens, index + 1, "event.const_push")?,
+                },
+                index.saturating_add(5),
+            ));
+        }
+        if token == self.token_id(EVENT_LOCAL_GET) {
+            return Ok((
+                TassadarTraceEvent::LocalGet {
+                    local: self.parse_u8_required(tokens, index + 1, "event.local_get.local")?,
+                    value: self.parse_i32_required(tokens, index + 5, "event.local_get.value")?,
+                },
+                index.saturating_add(9),
+            ));
+        }
+        if token == self.token_id(EVENT_LOCAL_SET) {
+            return Ok((
+                TassadarTraceEvent::LocalSet {
+                    local: self.parse_u8_required(tokens, index + 1, "event.local_set.local")?,
+                    value: self.parse_i32_required(tokens, index + 5, "event.local_set.value")?,
+                },
+                index.saturating_add(9),
+            ));
+        }
+        if token == self.token_id(EVENT_BINARY_ADD) {
+            return Ok((
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Add,
+                    left: self.parse_i32_required(tokens, index + 1, "event.binary_add.left")?,
+                    right: self.parse_i32_required(tokens, index + 5, "event.binary_add.right")?,
+                    result: self.parse_i32_required(
+                        tokens,
+                        index + 9,
+                        "event.binary_add.result",
+                    )?,
+                },
+                index.saturating_add(13),
+            ));
+        }
+        if token == self.token_id(EVENT_BINARY_SUB) {
+            return Ok((
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Sub,
+                    left: self.parse_i32_required(tokens, index + 1, "event.binary_sub.left")?,
+                    right: self.parse_i32_required(tokens, index + 5, "event.binary_sub.right")?,
+                    result: self.parse_i32_required(
+                        tokens,
+                        index + 9,
+                        "event.binary_sub.result",
+                    )?,
+                },
+                index.saturating_add(13),
+            ));
+        }
+        if token == self.token_id(EVENT_BINARY_MUL) {
+            return Ok((
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Mul,
+                    left: self.parse_i32_required(tokens, index + 1, "event.binary_mul.left")?,
+                    right: self.parse_i32_required(tokens, index + 5, "event.binary_mul.right")?,
+                    result: self.parse_i32_required(
+                        tokens,
+                        index + 9,
+                        "event.binary_mul.result",
+                    )?,
+                },
+                index.saturating_add(13),
+            ));
+        }
+        if token == self.token_id(EVENT_BINARY_LT) {
+            return Ok((
+                TassadarTraceEvent::BinaryOp {
+                    op: TassadarArithmeticOp::Lt,
+                    left: self.parse_i32_required(tokens, index + 1, "event.binary_lt.left")?,
+                    right: self.parse_i32_required(tokens, index + 5, "event.binary_lt.right")?,
+                    result: self.parse_i32_required(tokens, index + 9, "event.binary_lt.result")?,
+                },
+                index.saturating_add(13),
+            ));
+        }
+        if token == self.token_id(EVENT_LOAD) {
+            return Ok((
+                TassadarTraceEvent::Load {
+                    slot: self.parse_u8_required(tokens, index + 1, "event.load.slot")?,
+                    value: self.parse_i32_required(tokens, index + 5, "event.load.value")?,
+                },
+                index.saturating_add(9),
+            ));
+        }
+        if token == self.token_id(EVENT_STORE) {
+            return Ok((
+                TassadarTraceEvent::Store {
+                    slot: self.parse_u8_required(tokens, index + 1, "event.store.slot")?,
+                    value: self.parse_i32_required(tokens, index + 5, "event.store.value")?,
+                },
+                index.saturating_add(9),
+            ));
+        }
+        if token == self.token_id(EVENT_BRANCH) {
+            return Ok((
+                TassadarTraceEvent::Branch {
+                    condition: self.parse_i32_required(
+                        tokens,
+                        index + 1,
+                        "event.branch.condition",
+                    )?,
+                    taken: self.parse_bool_required(tokens, index + 5)?,
+                    target_pc: self.parse_u32_required(
+                        tokens,
+                        index + 6,
+                        "event.branch.target_pc",
+                    )? as usize,
+                },
+                index.saturating_add(10),
+            ));
+        }
+        if token == self.token_id(EVENT_OUTPUT) {
+            return Ok((
+                TassadarTraceEvent::Output {
+                    value: self.parse_i32_required(tokens, index + 1, "event.output.value")?,
+                },
+                index.saturating_add(5),
+            ));
+        }
+        if token == self.token_id(EVENT_RETURN) {
+            return Ok((TassadarTraceEvent::Return, index.saturating_add(1)));
+        }
+        Err(self.unexpected_token(index, "event opcode", Some(token)))
+    }
+
+    fn parse_halt_reason(
+        &self,
+        tokens: &[TokenId],
+        index: usize,
+    ) -> Result<TassadarHaltReason, TassadarArticleTraceDecodeError> {
+        let token = tokens.get(index).copied().ok_or_else(|| {
+            TassadarArticleTraceDecodeError::UnexpectedEnd {
+                index,
+                context: String::from("halt_reason"),
+            }
+        })?;
+        if token == self.token_id(HALT_RETURNED) {
+            return Ok(TassadarHaltReason::Returned);
+        }
+        if token == self.token_id(HALT_FELL_OFF_END) {
+            return Ok(TassadarHaltReason::FellOffEnd);
+        }
+        Err(self.unexpected_token(index, "halt reason", Some(token)))
+    }
+
+    fn parse_bool_required(
+        &self,
+        tokens: &[TokenId],
+        index: usize,
+    ) -> Result<bool, TassadarArticleTraceDecodeError> {
+        let token = tokens.get(index).copied().ok_or_else(|| {
+            TassadarArticleTraceDecodeError::UnexpectedEnd {
+                index,
+                context: String::from("bool"),
+            }
+        })?;
+        if token == self.token_id(BOOL_TRUE) {
+            return Ok(true);
+        }
+        if token == self.token_id(BOOL_FALSE) {
+            return Ok(false);
+        }
+        Err(self.unexpected_token(index, "bool marker", Some(token)))
+    }
+
+    fn parse_u32_required(
+        &self,
+        tokens: &[TokenId],
+        start: usize,
+        field: &str,
+    ) -> Result<u32, TassadarArticleTraceDecodeError> {
+        self.parse_u32(tokens, start).ok_or_else(|| {
+            TassadarArticleTraceDecodeError::UnexpectedEnd {
+                index: start,
+                context: String::from(field),
+            }
+        })
+    }
+
+    fn parse_i32_required(
+        &self,
+        tokens: &[TokenId],
+        start: usize,
+        field: &str,
+    ) -> Result<i32, TassadarArticleTraceDecodeError> {
+        self.parse_i32(tokens, start).ok_or_else(|| {
+            TassadarArticleTraceDecodeError::UnexpectedEnd {
+                index: start,
+                context: String::from(field),
+            }
+        })
+    }
+
+    fn parse_u8_required(
+        &self,
+        tokens: &[TokenId],
+        start: usize,
+        field: &str,
+    ) -> Result<u8, TassadarArticleTraceDecodeError> {
+        let value = self.parse_u32_required(tokens, start, field)?;
+        u8::try_from(value).map_err(|_| TassadarArticleTraceDecodeError::ImmediateOutOfRange {
+            field: String::from(field),
+            value,
+            target: String::from("u8"),
+        })
+    }
+
+    fn parse_u16_required(
+        &self,
+        tokens: &[TokenId],
+        start: usize,
+        field: &str,
+    ) -> Result<u16, TassadarArticleTraceDecodeError> {
+        let value = self.parse_u32_required(tokens, start, field)?;
+        u16::try_from(value).map_err(|_| TassadarArticleTraceDecodeError::ImmediateOutOfRange {
+            field: String::from(field),
+            value,
+            target: String::from("u16"),
+        })
+    }
+
+    fn parse_i32_list_required(
+        &self,
+        tokens: &[TokenId],
+        index: usize,
+        field_token: &str,
+    ) -> Result<(Vec<i32>, usize), TassadarArticleTraceDecodeError> {
+        self.expect_token(tokens, index, field_token)?;
+        self.expect_token(tokens, index + 1, LIST_TOKEN)?;
+        let values = self
+            .parse_i32_list(tokens, index, field_token)
+            .ok_or_else(|| TassadarArticleTraceDecodeError::UnexpectedEnd {
+                index,
+                context: format!("{field_token}_list"),
+            })?;
+        let next_index = index
+            .saturating_add(6)
+            .saturating_add(values.len().saturating_mul(4));
+        Ok((values, next_index))
     }
 
     fn parse_i32(&self, tokens: &[TokenId], start: usize) -> Option<i32> {
@@ -1321,8 +1998,9 @@ struct ParsedWavefrontStep {
 mod tests {
     use crate::TokenizerBoundary;
     use psionic_runtime::{
-        TassadarCpuReferenceRunner, tassadar_hungarian_10x10_corpus,
+        tassadar_article_class_corpus, tassadar_hungarian_10x10_corpus,
         tassadar_hungarian_v0_corpus, tassadar_sudoku_9x9_corpus, tassadar_sudoku_v0_corpus,
+        TassadarCpuReferenceRunner,
     };
 
     use super::{
@@ -1330,8 +2008,8 @@ mod tests {
     };
 
     #[test]
-    fn tokenizer_roundtrips_symbolic_tokens_for_sudoku_v0_reference_case()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn tokenizer_roundtrips_symbolic_tokens_for_sudoku_v0_reference_case(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let case = tassadar_sudoku_v0_corpus()
             .into_iter()
@@ -1352,6 +2030,58 @@ mod tests {
     }
 
     #[test]
+    fn tokenizer_roundtrips_typed_article_trace_domain_for_article_class_case(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let tokenizer = TassadarTraceTokenizer::new();
+        let case = tassadar_article_class_corpus()
+            .into_iter()
+            .next()
+            .expect("article corpus should not be empty");
+        let execution =
+            TassadarCpuReferenceRunner::for_program(&case.program)?.execute(&case.program)?;
+        let tokenized = tokenizer.tokenize_program_and_execution(&case.program, &execution);
+        let decoded = tokenizer.decode_article_trace_domain(&tokenized)?;
+        let reconstructed_program = decoded.materialize_program(
+            case.program.program_id.clone(),
+            case.program.profile_id.clone(),
+        );
+        let reconstructed_execution = decoded.materialize_execution(
+            execution.program_id.clone(),
+            execution.profile_id.clone(),
+            execution.runner_id.clone(),
+            execution.trace_abi.clone(),
+        );
+
+        assert_eq!(decoded.prompt_token_count, tokenized.prompt_token_count);
+        assert_eq!(decoded.target_token_count, tokenized.target_token_count);
+        assert_eq!(decoded.sequence_digest, tokenized.sequence_digest);
+        assert_eq!(reconstructed_program, case.program);
+        assert_eq!(reconstructed_execution, execution);
+        Ok(())
+    }
+
+    #[test]
+    fn tokenizer_can_recompose_prompt_and_target_sequence_without_drift(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let tokenizer = TassadarTraceTokenizer::new();
+        let case = tassadar_sudoku_v0_corpus()
+            .into_iter()
+            .next()
+            .expect("sudoku corpus should not be empty");
+        let execution = TassadarCpuReferenceRunner::for_program(&case.validation_case.program)?
+            .execute(&case.validation_case.program)?;
+        let tokenized =
+            tokenizer.tokenize_program_and_execution(&case.validation_case.program, &execution);
+        let recomposed = tokenizer.compose_prompt_and_target_sequence(
+            &tokenized.sequence.as_slice()[..tokenized.prompt_token_count],
+            &tokenized.sequence.as_slice()[tokenized.prompt_token_count..],
+        );
+
+        assert_eq!(recomposed, tokenized);
+        Ok(())
+    }
+
+    #[test]
     fn tokenizer_digest_is_stable() {
         let tokenizer = TassadarTraceTokenizer::new();
 
@@ -1360,8 +2090,8 @@ mod tests {
     }
 
     #[test]
-    fn tokenizer_derives_structural_supervision_coverage_for_reference_trace()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn tokenizer_derives_structural_supervision_coverage_for_reference_trace(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let case = tassadar_sudoku_v0_corpus()
             .into_iter()
@@ -1390,8 +2120,8 @@ mod tests {
     }
 
     #[test]
-    fn tokenizer_derives_workload_specific_supervision_for_hungarian_trace()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn tokenizer_derives_workload_specific_supervision_for_hungarian_trace(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let case = tassadar_hungarian_v0_corpus()
             .into_iter()
@@ -1415,8 +2145,8 @@ mod tests {
     }
 
     #[test]
-    fn tokenizer_roundtrips_sudoku_wavefront_outputs_exactly()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn tokenizer_roundtrips_sudoku_wavefront_outputs_exactly(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let case = tassadar_sudoku_9x9_corpus()
             .into_iter()
@@ -1445,8 +2175,8 @@ mod tests {
     }
 
     #[test]
-    fn tokenizer_roundtrips_hungarian_assignment_frontier_outputs_exactly()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn tokenizer_roundtrips_hungarian_assignment_frontier_outputs_exactly(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tokenizer = TassadarTraceTokenizer::new();
         let case = tassadar_hungarian_10x10_corpus()
             .into_iter()

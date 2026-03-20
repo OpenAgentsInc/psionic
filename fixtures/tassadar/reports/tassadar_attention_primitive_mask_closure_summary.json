@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-167",
         "TAS-167A",
         "TAS-168",
         "TAS-169",
@@ -55,7 +54,6 @@
         "tied_requirement_satisfied": true,
         "acceptance_status": "blocked",
         "blocked_issue_ids": [
-          "TAS-167",
           "TAS-167A",
           "TAS-168",
           "TAS-169",
@@ -97,7 +95,6 @@
           "acceptance_status": "blocked",
           "article_equivalence_green": false,
           "blocked_issue_ids": [
-            "TAS-167",
             "TAS-167A",
             "TAS-168",
             "TAS-169",
@@ -299,7 +296,7 @@
         "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
         "claim_boundary": "this report inventories reusable substrate only. It freezes what can be reused, what needs extension, what stays research-only, and what is still not sufficient for article closure. It does not claim that the owned article-equivalence Transformer stack, the canonical article model artifact, or the final article-equivalence proof route already exist.",
         "summary": "Existing substrate inventory now records surface_count=11, blocker_surface_count=6, non_blocker_surface_count=5, inventory_contract_green=true, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-        "report_digest": "baca04ab3b940f6773d36a98475c9d40eb92a5f359e30b6da1b5f08dd49cf6ed"
+        "report_digest": "5576434a0227619dd2a692ea9ece047ce0b7ec0b102a324dcafc62ba9eaf12cc"
       },
       "interface_rows": [
         {
@@ -431,7 +428,7 @@
       "article_equivalence_green": false,
       "claim_boundary": "this report freezes one explicit canonical Transformer stack boundary for the article-equivalence closure wave. The route is not one monolithic crate; it is one required boundary spanning existing crates with `psionic-transformer` as the architecture anchor, `psionic-models` as the article-model and artifact owner, and `psionic-runtime` as the replay/receipt owner. This does not claim the final article-equivalence stack is complete or green.",
       "summary": "Canonical Transformer stack boundary now records interface_rows=5, dependency_checks=6, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
-      "report_digest": "8af42394d231e962165a354ad718d412c05ee029928b1936fc9c221240b47b15"
+      "report_digest": "d28b0ddec17cfb526112cdeec16b833894e60f78330d9cc68225a784f67bbe6f"
     },
     "case_rows": [
       {
@@ -490,7 +487,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report freezes the owned scaled dot-product attention and masking primitive only. It proves that reusable attention math, mask composition, deterministic trace export, and crate ownership now live in `psionic-transformer`, but it does not claim full article-equivalent Transformer closure.",
     "summary": "Attention primitive closure now records case_rows=6, all_required_cases_present=true, all_cases_pass=true, boundary_review_passed=true, tied_requirement_satisfied=true, attention_primitive_contract_green=true, and article_equivalence_green=false.",
-    "report_digest": "65f8ee136094151067d9568b800db0c4a0e09bb6de4f8a68abf61ce95db3487b"
+    "report_digest": "38993609c8cd435bb9b7585c6cefcd32a008df02a4f2daef12d24f9fef9e0968"
   },
   "case_count": 6,
   "passed_case_count": 6,
@@ -502,5 +499,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors the owned attention primitive closure only. It keeps the reusable attention, mask, and trace facts operator-readable without widening the current article-equivalence claim boundary.",
   "summary": "Attention primitive summary now records case_count=6, passed_case_count=6, boundary_review_passed=true, tied_requirement_satisfied=true, attention_primitive_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "dcd263850c12947bb8469e96cf07bb3e5d139fb6e3de05ee2964a7acd64fca25"
+  "report_digest": "8d35713117710b13b3f6d3e6f024497b9070f1340d4edc0b3c6049c2413ccb68"
 }

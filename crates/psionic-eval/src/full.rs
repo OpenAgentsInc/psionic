@@ -40,6 +40,8 @@ mod tassadar_article_equivalence_acceptance_gate;
 mod tassadar_article_equivalence_blocker_matrix;
 #[path = "tassadar_article_runtime_closeout.rs"]
 mod tassadar_article_runtime_closeout;
+#[path = "tassadar_article_trace_vocabulary_binding.rs"]
+mod tassadar_article_trace_vocabulary_binding;
 #[path = "tassadar_article_transformer_forward_pass_closure.rs"]
 mod tassadar_article_transformer_forward_pass_closure;
 #[path = "tassadar_article_transformer_forward_pass_evidence.rs"]
@@ -327,6 +329,7 @@ pub use tassadar_article_cpu_reproducibility::*;
 pub use tassadar_article_equivalence_acceptance_gate::*;
 pub use tassadar_article_equivalence_blocker_matrix::*;
 pub use tassadar_article_runtime_closeout::*;
+pub use tassadar_article_trace_vocabulary_binding::*;
 pub use tassadar_article_transformer_forward_pass_closure::*;
 pub use tassadar_article_transformer_forward_pass_evidence::*;
 pub use tassadar_article_transformer_model_closure::*;
