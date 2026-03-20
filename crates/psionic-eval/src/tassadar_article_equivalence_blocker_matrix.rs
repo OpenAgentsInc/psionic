@@ -422,12 +422,9 @@ fn blocker_rows() -> Vec<TassadarArticleEquivalenceBlockerRow> {
                 "the article claims arbitrary C-code ingress into an in-transformer execution path, while the public repo now declares only one narrower Rust-source-only article frontend/compiler envelope",
             ),
             current_public_truth: String::from(
-                "the repo now has one explicit article frontend/compiler envelope manifest and report over Rust-source-only `rustc` -> `wasm32-unknown-unknown` `#![no_std]` / `#![no_main]` sources, plus committed Rust source canon, Rust-to-Wasm profile completeness, bounded ABI closure, and a green Rust-only article closeout audit, but that remains narrower than the article's frontend rhetoric",
+                "the repo now has one explicit article frontend/compiler envelope manifest and report over Rust-source-only `rustc` -> `wasm32-unknown-unknown` `#![no_std]` / `#![no_main]` sources, plus a broader committed frontend corpus and compile matrix over arithmetic, branch-heavy, state-machine, allocator-backed-memory, Hungarian-like, and Sudoku-like support families with typed refusal and toolchain-failure posture, but the final article-demo frontend parity claim still remains open",
             ),
             closure_requirements: vec![
-                String::from(
-                    "expand the committed source corpus and compile matrix over that envelope",
-                ),
                 String::from(
                     "close the Hungarian and Sudoku demo sources through that declared envelope",
                 ),
@@ -950,7 +947,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             299,
             "TAS-177: Frontend corpus and compile-matrix expansion",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-001"],
         ),
         issue_row(
@@ -1148,7 +1145,8 @@ mod tests {
         assert!(report.prerequisite_transformer_boundary_green);
         assert!(report.matrix_contract_green);
         assert!(!report.article_equivalence_green);
-        assert_eq!(report.open_blocker_count, report.blocker_count);
+        assert_eq!(report.blocker_count, 7);
+        assert_eq!(report.open_blocker_count, 6);
         assert!(report.all_later_issues_covered);
         assert!(report.all_blockers_have_article_line_provenance);
     }

@@ -52,6 +52,8 @@ mod tassadar_article_fast_route_throughput_floor;
 mod tassadar_article_fixture_transformer_parity;
 #[path = "tassadar_article_frontend_compiler_envelope.rs"]
 mod tassadar_article_frontend_compiler_envelope;
+#[path = "tassadar_article_frontend_corpus_compile_matrix.rs"]
+mod tassadar_article_frontend_corpus_compile_matrix;
 #[path = "tassadar_article_representation_invariance_gate.rs"]
 mod tassadar_article_representation_invariance_gate;
 #[path = "tassadar_article_runtime_closeout.rs"]
@@ -361,6 +363,7 @@ pub use tassadar_article_fast_route_implementation::*;
 pub use tassadar_article_fast_route_throughput_floor::*;
 pub use tassadar_article_fixture_transformer_parity::*;
 pub use tassadar_article_frontend_compiler_envelope::*;
+pub use tassadar_article_frontend_corpus_compile_matrix::*;
 pub use tassadar_article_representation_invariance_gate::*;
 pub use tassadar_article_runtime_closeout::*;
 pub use tassadar_article_trace_vocabulary_binding::*;

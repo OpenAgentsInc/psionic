@@ -14,8 +14,8 @@ jq -e '
   and .prerequisite_transformer_boundary_green == true
   and .blocker_matrix_article_equivalence_green == false
   and .public_claim_allowed == false
-  and .closed_required_issue_count == 24
-  and .passed_required_requirement_count == 26
+  and .closed_required_issue_count == 25
+  and .passed_required_requirement_count == 27
   and .open_blocker_count == 6
   and ((.green_requirement_ids | index("TAS-158")) != null)
   and ((.green_requirement_ids | index("TAS-159")) != null)
@@ -24,9 +24,10 @@ jq -e '
   and ((.green_requirement_ids | index("TAS-162")) != null)
   and ((.green_requirement_ids | index("TAS-163")) != null)
   and ((.green_requirement_ids | index("TAS-176")) != null)
+  and ((.green_requirement_ids | index("TAS-177")) != null)
   and ((.failed_requirement_ids | index("article_equivalence_blockers_closed")) != null)
-  and ((.failed_requirement_ids | index("TAS-177")) != null)
+  and ((.failed_requirement_ids | index("TAS-178")) != null)
   and ((.optional_open_issue_ids | index("TAS-R1")) != null)
   and ((.blocked_issue_ids | length) > 0)
-  and (.blocked_issue_ids[0] == "TAS-177")
+  and (.blocked_issue_ids[0] == "TAS-178")
 ' fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json >/dev/null

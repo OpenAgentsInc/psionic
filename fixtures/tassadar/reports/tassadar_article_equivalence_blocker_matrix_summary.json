@@ -59,9 +59,8 @@
         "title": "Declared article-equivalent frontend/compiler ingress remains open",
         "repo_status": "partial",
         "current_gap_summary": "the article claims arbitrary C-code ingress into an in-transformer execution path, while the public repo now declares only one narrower Rust-source-only article frontend/compiler envelope",
-        "current_public_truth": "the repo now has one explicit article frontend/compiler envelope manifest and report over Rust-source-only `rustc` -> `wasm32-unknown-unknown` `#![no_std]` / `#![no_main]` sources, plus committed Rust source canon, Rust-to-Wasm profile completeness, bounded ABI closure, and a green Rust-only article closeout audit, but that remains narrower than the article's frontend rhetoric",
+        "current_public_truth": "the repo now has one explicit article frontend/compiler envelope manifest and report over Rust-source-only `rustc` -> `wasm32-unknown-unknown` `#![no_std]` / `#![no_main]` sources, plus a broader committed frontend corpus and compile matrix over arithmetic, branch-heavy, state-machine, allocator-backed-memory, Hungarian-like, and Sudoku-like support families with typed refusal and toolchain-failure posture, but the final article-demo frontend parity claim still remains open",
         "closure_requirements": [
-          "expand the committed source corpus and compile matrix over that envelope",
           "close the Hungarian and Sudoku demo sources through that declared envelope"
         ],
         "article_line_refs": [
@@ -657,7 +656,7 @@
         "github_issue_number": 299,
         "title": "TAS-177: Frontend corpus and compile-matrix expansion",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-001"
         ]
@@ -836,7 +835,7 @@
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
     "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=6.",
-    "report_digest": "fa7e4b6c05e2773a84cd1dda0572b0e1605e00c204e527786a7d3d16332ad9f1"
+    "report_digest": "7d3c9f9c38e7d2f8aefa309f25a8af1b37ef7384bed73a034e34c095387f30f8"
   },
   "blocker_count": 7,
   "open_blocker_count": 6,
@@ -861,5 +860,5 @@
   ],
   "claim_boundary": "this summary mirrors the TAS-157 blocker matrix only. It keeps the blocker contract operator-readable, but it does not add evidence or widen the current public claim boundary beyond the underlying matrix",
   "summary": "Article-equivalence blocker matrix summary now records blocker_count=7, open_blocker_count=6, matrix_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "3e8d3f513c34f2449b49e2df08876733c1805c545c921322f8953991ae42546f"
+  "report_digest": "93ceaace2bd320b4556ede8e0ad9014905534c7f80ff81203e1c69f12c9d364d"
 }

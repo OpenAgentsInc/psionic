@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-177",
         "TAS-178",
         "TAS-179",
         "TAS-179A",
@@ -118,7 +117,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report closes only TAS-174. It proves the selected HullCache fast path is now exact and no-fallback on the declared canonical article workload families inside the current article profile, and that the served article-session plus hybrid route surfaces expose those workloads as direct HullCache executions on the trained Transformer-backed model. It does not yet claim throughput-floor closure or final article-equivalence green status.",
     "summary": "Article fast-route exactness report now records tied_requirement_satisfied=true, implementation_prerequisite_green=true, all_article_workloads_exact=true, article_session_direct_cases=3, hybrid_direct_cases=3, exactness_green=true, and article_equivalence_green=false.",
-    "report_digest": "2ab382882430545b98e97b8d58ee289ca0d38d7be72a34171193ec76dd58df65"
+    "report_digest": "9cfcb02037b6dd48b35c2aae0ede61a32d69afad485fefce967debb5b07ec478"
   },
   "tied_requirement_id": "TAS-174",
   "tied_requirement_satisfied": true,
@@ -131,5 +130,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-174 fast-route exactness tranche. It keeps the zero-fallback article-workload closure operator-readable without pretending that TAS-175 throughput closure or final article-equivalence green status are already closed.",
   "summary": "Article fast-route exactness summary now records tied_requirement_satisfied=true, implementation_prerequisite_green=true, all_article_workloads_exact=true, article_session_direct_case_count=3, hybrid_direct_case_count=3, exactness_green=true, and article_equivalence_green=false.",
-  "report_digest": "49cf9efd9d154423ab5b2b66cfe409502c328fee8b08dedcf5da29459c19f5e4"
+  "report_digest": "3bca59bfef9ad81130c4fc1d384dea7601b2c8b24110e286016ce01715522ee8"
 }

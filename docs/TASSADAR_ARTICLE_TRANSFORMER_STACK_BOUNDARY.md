@@ -393,6 +393,21 @@ bind to one explicit frontend/compiler envelope instead of borrowing the older
 Rust-only closeout path by implication, but corpus expansion and full
 Hungarian/Sudoku demo parity still remain later frontend tranches.
 
+`TAS-177` now closes the next frontend breadth tranche on top of that same
+owned route. `psionic-eval` now commits the broader article-envelope frontend
+corpus and compile matrix at
+`fixtures/tassadar/reports/tassadar_article_frontend_corpus_compile_matrix_report.json`,
+covering committed Rust sources across arithmetic, branch-heavy, state-machine,
+allocator-backed-memory, Hungarian-like, and Sudoku-like support families while
+keeping typed refusal and toolchain-failure rows explicit under the declared
+Rust-only envelope. `psionic-research` now mirrors the operator-readable
+summary at
+`fixtures/tassadar/reports/tassadar_article_frontend_corpus_compile_matrix_summary.json`.
+This is the point where the repo now machine-readably says the declared
+frontend/compiler envelope is exercised by a broader committed corpus instead
+of only the older narrow path, but full Hungarian/Sudoku demo-source parity and
+the final frontend claim surface still remain later tranches.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

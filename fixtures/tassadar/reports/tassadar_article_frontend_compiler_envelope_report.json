@@ -8,7 +8,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-177",
       "TAS-178",
       "TAS-179",
       "TAS-179A",
@@ -594,5 +593,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this report closes TAS-176 only. It freezes one declared public article frontend/compiler envelope, proves that the currently admitted Rust article fixtures stay inside it with stable toolchain identity and zero-import Wasm outputs, and proves that representative out-of-envelope rows still refuse explicitly. It does not yet widen the corpus, close Hungarian or Sudoku demo parity, or turn final article-equivalence green.",
   "summary": "Article frontend/compiler envelope report now records tied_requirement_satisfied=true, manifest_green=true, admitted_cases=8/8, refusal_probes=6/6, toolchain_identity_green=true, refusal_taxonomy_green=true, and article_equivalence_green=false.",
-  "report_digest": "ed4445a653821fc633bc719e51641cc628aae32ac6c6b6898b05a1bb5e972382"
+  "report_digest": "cd364848df912031a9db32a9f7cf3045c43b28a3cffb9ca6c049ad7d13163bfd"
 }

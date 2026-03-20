@@ -18,5 +18,6 @@ jq -e '
   and .blocker_count == 7
   and .open_blocker_count == 6
   and ((.issue_coverage_rows | map(select(.issue_id == "TAS-176" and .issue_state == "closed")) | length) == 1)
-  and ((.issue_coverage_rows | map(select(.issue_id == "TAS-177" and .issue_state == "open")) | length) == 1)
+  and ((.issue_coverage_rows | map(select(.issue_id == "TAS-177" and .issue_state == "closed")) | length) == 1)
+  and ((.issue_coverage_rows | map(select(.issue_id == "TAS-178" and .issue_state == "open")) | length) == 1)
 ' fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json >/dev/null
