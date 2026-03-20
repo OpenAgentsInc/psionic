@@ -144,6 +144,15 @@ Current honest posture:
   terminal statement: Turing-complete support is green for theory and operator
   use under declared `TCM.v1` semantics and explicit envelopes, while
   served/public universality remains suppressed
+- the repo now also has one machine-readable article-equivalence blocker
+  matrix, with a committed eval report at
+  `fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_summary.json`,
+  a checker script, and an audit note that freeze the separate post-`TAS-156`
+  article-gap closure bar without widening the current public capability
+  surface; the blocker contract is green while article equivalence itself
+  remains explicitly red
 - the repo now also has one research-only shared-memory and threads profile
   with a deterministic scheduler envelope, explicit sandbox boundary truth,
   and typed refusal on host-nondeterministic scheduling plus relaxed
@@ -259,6 +268,8 @@ Issue-state note:
 - `TAS-147` through `TAS-155` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-156` is now implemented and tracked in
+  `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
+- `TAS-157` is now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - there is currently no open GitHub TAS backlog in this repo
 

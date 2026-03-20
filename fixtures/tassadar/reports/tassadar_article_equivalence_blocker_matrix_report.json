@@ -1,0 +1,838 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.article_equivalence.blocker_matrix.v1",
+  "checker_script_ref": "scripts/check-tassadar-article-equivalence-blocker-matrix.sh",
+  "source_id": "percepta.can_llms_be_computers.2026_03_11.claim_surface",
+  "source_title": "Can LLMs Be Computers?",
+  "source_date": "2026-03-11",
+  "source_ref": "Percepta article `can-llms-be-computers.md` as reviewed on 2026-03-19",
+  "source_line_numbering_note": "line numbers refer to the 2026-03-19 working article text that includes the implementation-status note preface; they do not reuse the older gap-analysis line numbering",
+  "required_category_count": 7,
+  "category_coverage": [
+    {
+      "category": "frontend_scope",
+      "blocker_count": 1
+    },
+    {
+      "category": "interpreter_breadth",
+      "blocker_count": 1
+    },
+    {
+      "category": "transformer_stack_reality",
+      "blocker_count": 1
+    },
+    {
+      "category": "fast_route_scope",
+      "blocker_count": 1
+    },
+    {
+      "category": "benchmark_scope",
+      "blocker_count": 1
+    },
+    {
+      "category": "single_run_scope",
+      "blocker_count": 1
+    },
+    {
+      "category": "weights_ownership_scope",
+      "blocker_count": 1
+    }
+  ],
+  "blocker_count": 7,
+  "blocker_ids": [
+    "BEQ-001",
+    "BEQ-002",
+    "BEQ-003",
+    "BEQ-004",
+    "BEQ-005",
+    "BEQ-006",
+    "BEQ-007"
+  ],
+  "blockers": [
+    {
+      "blocker_id": "BEQ-001",
+      "category": "frontend_scope",
+      "title": "Declared article-equivalent frontend/compiler ingress remains open",
+      "repo_status": "partial",
+      "current_gap_summary": "the article claims arbitrary C-code ingress into an in-transformer execution path, while the public repo closes only a bounded Rust-only frontend route",
+      "current_public_truth": "the repo already has committed Rust source canon, Rust-to-Wasm profile completeness, bounded ABI closure, and a green Rust-only article closeout audit, but that is still narrower than the article's frontend rhetoric",
+      "closure_requirements": [
+        "declare one article frontend/compiler envelope instead of reusing the Rust-only closeout envelope by implication",
+        "expand the committed source corpus and compile matrix over that envelope",
+        "close the Hungarian and Sudoku demo sources through that declared envelope"
+      ],
+      "article_line_refs": [
+        {
+          "claim_ref_id": "article.frontend.arbitrary_c",
+          "line_start": 142,
+          "line_end": 142,
+          "claim_paraphrase": "the article claims arbitrary C code can be turned into tokens and executed by the model"
+        },
+        {
+          "claim_ref_id": "article.frontend.c_cpp_to_wasm",
+          "line_start": 238,
+          "line_end": 238,
+          "claim_paraphrase": "the article frames the interpreter as a WebAssembly target that languages such as C and C++ can compile to"
+        }
+      ],
+      "covered_by_issue_ids": [
+        "TAS-158",
+        "TAS-176",
+        "TAS-177",
+        "TAS-178",
+        "TAS-186"
+      ]
+    },
+    {
+      "blocker_id": "BEQ-002",
+      "category": "interpreter_breadth",
+      "title": "Declared article interpreter breadth remains open",
+      "repo_status": "partial",
+      "current_gap_summary": "the article frames arbitrary programs and a WebAssembly interpreter inside transformer weights, while the public repo still carries bounded named Wasm profiles and a suppressed frozen core-Wasm closure gate",
+      "current_public_truth": "the repo has a real bounded Wasm lane, a declared frozen core-Wasm window, and a bounded Turing-complete substrate statement under `TCM.v1`, but not a public generic interpreter-in-weights breadth claim",
+      "closure_requirements": [
+        "declare one article interpreter breadth envelope rather than relying on bounded Rust-only article fixtures",
+        "build a broad program-family suite over the declared article interpreter envelope",
+        "keep refusal and unsupported-program taxonomy machine-legible when breadth remains incomplete"
+      ],
+      "article_line_refs": [
+        {
+          "claim_ref_id": "article.interpreter.arbitrary_programs",
+          "line_start": 218,
+          "line_end": 218,
+          "claim_paraphrase": "the article claims arbitrary programs can execute inside a transformer"
+        },
+        {
+          "claim_ref_id": "article.interpreter.same_transformer_execution",
+          "line_start": 236,
+          "line_end": 247,
+          "claim_paraphrase": "the article claims the transformer executes the emitted program itself step by step within the same transformer"
+        },
+        {
+          "claim_ref_id": "article.interpreter.wasm_in_weights",
+          "line_start": 238,
+          "line_end": 238,
+          "claim_paraphrase": "the article claims a WebAssembly interpreter inside the transformer weights"
+        }
+      ],
+      "covered_by_issue_ids": [
+        "TAS-158",
+        "TAS-171B",
+        "TAS-179",
+        "TAS-179A",
+        "TAS-186"
+      ]
+    },
+    {
+      "blocker_id": "BEQ-003",
+      "category": "transformer_stack_reality",
+      "title": "Canonical owned Transformer-backed article route remains open",
+      "repo_status": "partial",
+      "current_gap_summary": "the article-equivalent path still lacks one canonical owned Transformer stack and one non-fixture article model artifact that carries the public route end to end",
+      "current_public_truth": "the repo now has real tensor, array, nn, runtime, and `psionic-transformer` substrate overlap, but the public article-closeout proof surface is still narrower than a canonical owned Transformer-backed route",
+      "closure_requirements": [
+        "freeze one canonical Transformer stack boundary above the existing Psionic substrate",
+        "implement the owned paper-faithful article Transformer path with training, replay, and receipts",
+        "replace the current fixture-shaped article model surface with a real artifact-backed Transformer model and weight lineage"
+      ],
+      "article_line_refs": [
+        {
+          "claim_ref_id": "article.execution.transformer_weights",
+          "line_start": 180,
+          "line_end": 180,
+          "claim_paraphrase": "the article says execution happens directly via transformer weights rather than an external tool"
+        },
+        {
+          "claim_ref_id": "article.execution.same_transformer_program",
+          "line_start": 236,
+          "line_end": 247,
+          "claim_paraphrase": "the article says the same transformer emits and executes the program"
+        },
+        {
+          "claim_ref_id": "article.weights.learned_interpreter",
+          "line_start": 821,
+          "line_end": 821,
+          "claim_paraphrase": "the article says the interpreter behavior is encoded in the model weights and could later compile programs directly into weights"
+        }
+      ],
+      "covered_by_issue_ids": [
+        "TAS-156A",
+        "TAS-158",
+        "TAS-159",
+        "TAS-160",
+        "TAS-161",
+        "TAS-162",
+        "TAS-163",
+        "TAS-164",
+        "TAS-165",
+        "TAS-166",
+        "TAS-167",
+        "TAS-168",
+        "TAS-169",
+        "TAS-169A",
+        "TAS-170",
+        "TAS-171",
+        "TAS-171A",
+        "TAS-186",
+        "TAS-R1"
+      ]
+    },
+    {
+      "blocker_id": "BEQ-004",
+      "category": "fast_route_scope",
+      "title": "Canonical fast decode route remains open",
+      "repo_status": "partial",
+      "current_gap_summary": "the article treats logarithmic-time fast decoding as the core technical unlock, but the current public closeout route is still the exact reference-linear CPU lane",
+      "current_public_truth": "the repo already has fast-path runtime and research comparison surfaces, yet none is currently the canonical audited article-equivalence proof route",
+      "closure_requirements": [
+        "choose one fast architecture that can become the canonical article route",
+        "integrate that fast path into the Transformer-backed article model itself",
+        "close exactness, no-fallback, and throughput floors on the selected fast path"
+      ],
+      "article_line_refs": [
+        {
+          "claim_ref_id": "article.fast_route.log_time_summary",
+          "line_start": 182,
+          "line_end": 182,
+          "claim_paraphrase": "the article says the decoding path turns attention lookups into logarithmic-time queries and enables millions of steps in a single run"
+        },
+        {
+          "claim_ref_id": "article.fast_route.technical_unlock",
+          "line_start": 216,
+          "line_end": 216,
+          "claim_paraphrase": "the article says the key technical unlock is a log-time decoding path enabled by 2D lookup heads"
+        },
+        {
+          "claim_ref_id": "article.fast_route.exponential_speedup",
+          "line_start": 440,
+          "line_end": 452,
+          "claim_paraphrase": "the article claims exponentially faster attention lookups with logarithmic-time work per step"
+        },
+        {
+          "claim_ref_id": "article.fast_route.long_horizon_payoff",
+          "line_start": 582,
+          "line_end": 582,
+          "claim_paraphrase": "the article says the hull-based decoder changes long-horizon feasibility by keeping per-step cost logarithmic"
+        }
+      ],
+      "covered_by_issue_ids": [
+        "TAS-158",
+        "TAS-172",
+        "TAS-173",
+        "TAS-174",
+        "TAS-175",
+        "TAS-180",
+        "TAS-181",
+        "TAS-185",
+        "TAS-186",
+        "TAS-R1"
+      ]
+    },
+    {
+      "blocker_id": "BEQ-005",
+      "category": "benchmark_scope",
+      "title": "Hungarian and hard-Sudoku benchmark parity remains open",
+      "repo_status": "partial",
+      "current_gap_summary": "the article makes visible Hungarian throughput claims and hard-Sudoku benchmark claims that the current public repo does not yet close on one canonical article-equivalent route",
+      "current_public_truth": "the repo already has bounded Hungarian and Sudoku article reproducers plus long-horizon runtime closure, but not one canonical article demo-and-benchmark parity gate at the article's stated breadth",
+      "closure_requirements": [
+        "close the Hungarian demo on the canonical article route with explicit throughput floors",
+        "close Arto Inkala and the declared hard-Sudoku benchmark suite on the canonical article route",
+        "combine those rows into one article demo-and-benchmark equivalence gate"
+      ],
+      "article_line_refs": [
+        {
+          "claim_ref_id": "article.hungarian.demo_throughput",
+          "line_start": 160,
+          "line_end": 163,
+          "claim_paraphrase": "the Hungarian demo publishes concrete token and line throughput plus total-token figures"
+        },
+        {
+          "claim_ref_id": "article.hungarian.cpu_throughput_claim",
+          "line_start": 180,
+          "line_end": 180,
+          "claim_paraphrase": "the article states the model streams results at more than 30k tokens per second on CPU"
+        },
+        {
+          "claim_ref_id": "article.sudoku.benchmark_accuracy",
+          "line_start": 292,
+          "line_end": 292,
+          "claim_paraphrase": "the article claims 100 percent accuracy on the hard-Sudoku benchmarks it highlights"
+        },
+        {
+          "claim_ref_id": "article.sudoku.arto_runtime",
+          "line_start": 296,
+          "line_end": 296,
+          "claim_paraphrase": "the article claims Arto Inkala's Sudoku is solved in under 3 minutes"
+        },
+        {
+          "claim_ref_id": "article.sudoku.demo_throughput",
+          "line_start": 311,
+          "line_end": 314,
+          "claim_paraphrase": "the Sudoku demo publishes concrete token, line, and total-token figures"
+        }
+      ],
+      "covered_by_issue_ids": [
+        "TAS-158",
+        "TAS-171A",
+        "TAS-171B",
+        "TAS-171C",
+        "TAS-175",
+        "TAS-178",
+        "TAS-180",
+        "TAS-181",
+        "TAS-182",
+        "TAS-185",
+        "TAS-186"
+      ]
+    },
+    {
+      "blocker_id": "BEQ-006",
+      "category": "single_run_scope",
+      "title": "Single-run no-spill article posture remains open",
+      "repo_status": "partial",
+      "current_gap_summary": "the article frames million-step execution inside a single transformer run, while the public terminal substrate claim still permits bounded slices, persisted continuation, and spill/tape extension",
+      "current_public_truth": "the repo already has named long-horizon direct execution and a bounded resumable universality substrate, but not the final no-resume single-run article gate",
+      "closure_requirements": [
+        "freeze one no-resume article operator envelope over the canonical route",
+        "prove exact long-horizon execution with no checkpoint restore, spill/tape extension, hidden re-entry, or teacher forcing",
+        "keep context-length sensitivity and no-cheat boundary perturbations explicit"
+      ],
+      "article_line_refs": [
+        {
+          "claim_ref_id": "article.single_run.million_steps",
+          "line_start": 142,
+          "line_end": 142,
+          "claim_paraphrase": "the article says arbitrary C-code programs can execute reliably for millions of steps in seconds"
+        },
+        {
+          "claim_ref_id": "article.single_run.log_time_enables_single_run",
+          "line_start": 182,
+          "line_end": 182,
+          "claim_paraphrase": "the article says the fast path enables millions of correct execution steps inside a single transformer run"
+        },
+        {
+          "claim_ref_id": "article.single_run.same_transformer",
+          "line_start": 236,
+          "line_end": 247,
+          "claim_paraphrase": "the article says execution stays within the same transformer instead of pausing for an external tool"
+        }
+      ],
+      "covered_by_issue_ids": [
+        "TAS-158",
+        "TAS-183",
+        "TAS-185",
+        "TAS-186"
+      ]
+    },
+    {
+      "blocker_id": "BEQ-007",
+      "category": "weights_ownership_scope",
+      "title": "Clean-room weight causality and route-minimality verdict remain open",
+      "repo_status": "partial",
+      "current_gap_summary": "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo still lacks the final clean-room causality, activation-dominance, and route-minimality verdicts for that stronger reading",
+      "current_public_truth": "the repo already has direct no-tool proof receipts on committed article workloads and explicit refusal discipline, but it does not yet have the final generic interpreter-ownership gate or the final route-minimality publication verdict",
+      "closure_requirements": [
+        "move direct no-tool proof and exactness onto the Transformer-backed route",
+        "close invariance, anti-memorization, and evaluation-independence evidence so correctness does not look like brittle recall",
+        "publish clean-room weight causality, KV-cache and activation-state discipline, route-minimality, and final publication verdicts"
+      ],
+      "article_line_refs": [
+        {
+          "claim_ref_id": "article.weights.no_external_tool",
+          "line_start": 180,
+          "line_end": 180,
+          "claim_paraphrase": "the article says the model does not call an external tool and executes directly via transformer weights"
+        },
+        {
+          "claim_ref_id": "article.weights.transparent_execution",
+          "line_start": 289,
+          "line_end": 289,
+          "claim_paraphrase": "the article contrasts in-model execution as transparent and fully inside the model loop"
+        },
+        {
+          "claim_ref_id": "article.weights.compiled_solver_inside_transformer",
+          "line_start": 294,
+          "line_end": 296,
+          "claim_paraphrase": "the article says the compiled Sudoku solver runs inside the transformer itself with no verifier gap"
+        },
+        {
+          "claim_ref_id": "article.weights.interpreter_in_weights",
+          "line_start": 821,
+          "line_end": 821,
+          "claim_paraphrase": "the article says the current prototype learns an interpreter whose behavior is encoded in its weights"
+        }
+      ],
+      "covered_by_issue_ids": [
+        "TAS-158",
+        "TAS-167",
+        "TAS-167A",
+        "TAS-169A",
+        "TAS-170",
+        "TAS-171",
+        "TAS-171A",
+        "TAS-171B",
+        "TAS-171C",
+        "TAS-184",
+        "TAS-184A",
+        "TAS-185",
+        "TAS-185A",
+        "TAS-186",
+        "TAS-R1"
+      ]
+    }
+  ],
+  "issue_coverage_rows": [
+    {
+      "issue_id": "TAS-156A",
+      "github_issue_number": 273,
+      "title": "TAS-156A: Create psionic-transformer crate boundary",
+      "issue_role": "prerequisite",
+      "issue_state": "closed",
+      "blocker_ids": [
+        "BEQ-003"
+      ]
+    },
+    {
+      "issue_id": "TAS-158",
+      "github_issue_number": 275,
+      "title": "TAS-158: Final article-equivalence acceptance gate skeleton",
+      "issue_role": "gate",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-001",
+        "BEQ-002",
+        "BEQ-003",
+        "BEQ-004",
+        "BEQ-005",
+        "BEQ-006",
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-159",
+      "github_issue_number": 276,
+      "title": "TAS-159: Existing substrate inventory and reuse boundary",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003"
+      ]
+    },
+    {
+      "issue_id": "TAS-160",
+      "github_issue_number": 277,
+      "title": "TAS-160: Canonical Transformer stack boundary",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003"
+      ]
+    },
+    {
+      "issue_id": "TAS-161",
+      "github_issue_number": 278,
+      "title": "TAS-161: Attention primitive and mask closure",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003"
+      ]
+    },
+    {
+      "issue_id": "TAS-162",
+      "github_issue_number": 279,
+      "title": "TAS-162: Multi-head, feed-forward, residual, and norm block closure",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003"
+      ]
+    },
+    {
+      "issue_id": "TAS-163",
+      "github_issue_number": 280,
+      "title": "TAS-163: Paper-faithful article-Transformer model closure",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003"
+      ]
+    },
+    {
+      "issue_id": "TAS-164",
+      "github_issue_number": 281,
+      "title": "TAS-164: Training recipe and tiny-task closure",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003"
+      ]
+    },
+    {
+      "issue_id": "TAS-165",
+      "github_issue_number": 282,
+      "title": "TAS-165: Transformer forward-pass replay and receipt closure",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003"
+      ]
+    },
+    {
+      "issue_id": "TAS-166",
+      "github_issue_number": 283,
+      "title": "TAS-166: Owned Transformer stack audit",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003"
+      ]
+    },
+    {
+      "issue_id": "TAS-167",
+      "github_issue_number": 284,
+      "title": "TAS-167: Article trace vocabulary and channel binding for the owned stack",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-167A",
+      "github_issue_number": 285,
+      "title": "TAS-167A: Prompt, tokenization, and representation invariance gate",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-168",
+      "github_issue_number": 286,
+      "title": "TAS-168: Transformer-backed article model descriptor and weight artifact",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003"
+      ]
+    },
+    {
+      "issue_id": "TAS-169",
+      "github_issue_number": 287,
+      "title": "TAS-169: Transformer-backed article model weight production run",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003"
+      ]
+    },
+    {
+      "issue_id": "TAS-169A",
+      "github_issue_number": 288,
+      "title": "TAS-169A: Transformer-backed article weight lineage and artifact contract",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-170",
+      "github_issue_number": 289,
+      "title": "TAS-170: Fixture-to-Transformer parity harness",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-171",
+      "github_issue_number": 290,
+      "title": "TAS-171: Reference-linear direct-proof closure on the Transformer-backed route",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-171A",
+      "github_issue_number": 291,
+      "title": "TAS-171A: Reference-linear Transformer-backed article exactness gate",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-005",
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-171B",
+      "github_issue_number": 292,
+      "title": "TAS-171B: Generalization and anti-memorization gate",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-002",
+        "BEQ-005",
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-171C",
+      "github_issue_number": 293,
+      "title": "TAS-171C: Dataset contamination and evaluation independence audit",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-005",
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-172",
+      "github_issue_number": 294,
+      "title": "TAS-172: Canonical fast-route architecture selection",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-004"
+      ]
+    },
+    {
+      "issue_id": "TAS-173",
+      "github_issue_number": 295,
+      "title": "TAS-173: Fast-path implementation inside the Transformer-backed model",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-004"
+      ]
+    },
+    {
+      "issue_id": "TAS-174",
+      "github_issue_number": 296,
+      "title": "TAS-174: Fast-route exactness and no-fallback closure",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-004"
+      ]
+    },
+    {
+      "issue_id": "TAS-175",
+      "github_issue_number": 297,
+      "title": "TAS-175: Fast-route throughput floor closeout",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-004",
+        "BEQ-005"
+      ]
+    },
+    {
+      "issue_id": "TAS-176",
+      "github_issue_number": 298,
+      "title": "TAS-176: Declared article frontend/compiler envelope",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-001"
+      ]
+    },
+    {
+      "issue_id": "TAS-177",
+      "github_issue_number": 299,
+      "title": "TAS-177: Frontend corpus and compile-matrix expansion",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-001"
+      ]
+    },
+    {
+      "issue_id": "TAS-178",
+      "github_issue_number": 300,
+      "title": "TAS-178: Article-demo frontend parity",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-001",
+        "BEQ-005"
+      ]
+    },
+    {
+      "issue_id": "TAS-179",
+      "github_issue_number": 301,
+      "title": "TAS-179: Declared article interpreter breadth envelope",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-002"
+      ]
+    },
+    {
+      "issue_id": "TAS-179A",
+      "github_issue_number": 302,
+      "title": "TAS-179A: Article interpreter breadth suite and gate",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-002"
+      ]
+    },
+    {
+      "issue_id": "TAS-180",
+      "github_issue_number": 303,
+      "title": "TAS-180: Hungarian article demo parity",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-004",
+        "BEQ-005"
+      ]
+    },
+    {
+      "issue_id": "TAS-181",
+      "github_issue_number": 304,
+      "title": "TAS-181: Arto Inkala and hard-Sudoku benchmark closure",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-004",
+        "BEQ-005"
+      ]
+    },
+    {
+      "issue_id": "TAS-182",
+      "github_issue_number": 305,
+      "title": "TAS-182: Article demo and benchmark equivalence gate",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-005"
+      ]
+    },
+    {
+      "issue_id": "TAS-183",
+      "github_issue_number": 306,
+      "title": "TAS-183: Single-run no-spill million-step closure",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-006"
+      ]
+    },
+    {
+      "issue_id": "TAS-184",
+      "github_issue_number": 307,
+      "title": "TAS-184: Clean-room weight causality and interpreter ownership gate",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-184A",
+      "github_issue_number": 308,
+      "title": "TAS-184A: KV-cache and activation-state discipline audit",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-185",
+      "github_issue_number": 309,
+      "title": "TAS-185: Cross-machine reproducibility matrix",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-004",
+        "BEQ-005",
+        "BEQ-006",
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-185A",
+      "github_issue_number": 310,
+      "title": "TAS-185A: Route minimality audit and publication verdict",
+      "issue_role": "implementation",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-186",
+      "github_issue_number": 311,
+      "title": "TAS-186: Final article-equivalence claim checker and audit",
+      "issue_role": "final_audit",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-001",
+        "BEQ-002",
+        "BEQ-003",
+        "BEQ-004",
+        "BEQ-005",
+        "BEQ-006",
+        "BEQ-007"
+      ]
+    },
+    {
+      "issue_id": "TAS-R1",
+      "github_issue_number": 312,
+      "title": "TAS-R1: Minimal Transformer size for article-equivalent behavior",
+      "issue_role": "optional_research",
+      "issue_state": "open",
+      "blocker_ids": [
+        "BEQ-003",
+        "BEQ-004",
+        "BEQ-007"
+      ]
+    }
+  ],
+  "required_later_issue_count": 38,
+  "prerequisite_transformer_boundary_green": true,
+  "all_required_categories_present": true,
+  "all_blocker_ids_unique": true,
+  "all_blockers_have_article_line_provenance": true,
+  "all_blockers_covered_by_issue_map": true,
+  "all_later_issues_covered": true,
+  "all_issue_refs_point_to_known_blockers": true,
+  "matrix_contract_green": true,
+  "article_equivalence_green": false,
+  "open_blocker_count": 7,
+  "open_blocker_ids": [
+    "BEQ-001",
+    "BEQ-002",
+    "BEQ-003",
+    "BEQ-004",
+    "BEQ-005",
+    "BEQ-006",
+    "BEQ-007"
+  ],
+  "current_truth_boundary": "the public repo has a bounded Rust-only article-closeout path, a bounded no-tool direct proof route on committed workloads, and a bounded Turing-complete substrate statement under declared `TCM.v1` semantics; it does not yet have full article-equivalent closure in the article's strongest frontend, fast-route, benchmark, single-run, or clean-room weight-ownership reading",
+  "non_implications": [
+    "not a positive article-equivalence closure claim",
+    "not arbitrary C or arbitrary Wasm ingress closure",
+    "not a generic public interpreter-in-weights claim",
+    "not proof that the fast decode path is already the canonical public route",
+    "not proof that hard-Sudoku benchmark closure, no-spill single-run closure, or route-minimality closure already exist"
+  ],
+  "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
+  "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
+  "report_digest": "67e298ba53cfc65d29c6a81c4d957a6ea497ccf759d511d80c652ebba31a07de"
+}
