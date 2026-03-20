@@ -795,7 +795,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             285,
             "TAS-167A: Prompt, tokenization, and representation invariance gate",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-007"],
         ),
         issue_row(

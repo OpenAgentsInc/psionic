@@ -510,7 +510,7 @@
         "github_issue_number": 285,
         "title": "TAS-167A: Prompt, tokenization, and representation invariance gate",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-007"
         ]
@@ -839,7 +839,7 @@
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
     "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
-    "report_digest": "744f83145801b27f60a752b470e968fe07fa50756cd76948073cad6cf0d7acb7"
+    "report_digest": "695e54fee91ed5c50efeedafb818192625add7677cc3678ed7526aeada2c8485"
   },
   "requirement_rows": [
     {
@@ -1036,14 +1036,14 @@
       "requirement_id": "TAS-167A",
       "requirement_kind": "implementation",
       "required_for_green": true,
-      "satisfied": false,
+      "satisfied": true,
       "blocker_ids": [
         "BEQ-007"
       ],
       "source_refs": [
         "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
       ],
-      "detail": "TAS-167A (`TAS-167A: Prompt, tokenization, and representation invariance gate`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-007 until that tranche closes."
+      "detail": "TAS-167A (`TAS-167A: Prompt, tokenization, and representation invariance gate`) is closed in the blocker matrix, so this acceptance-gate row is currently satisfied for blocker families BEQ-007."
     },
     {
       "requirement_id": "TAS-168",
@@ -1422,9 +1422,9 @@
   ],
   "total_requirement_count": 41,
   "required_requirement_count": 40,
-  "passed_required_requirement_count": 12,
+  "passed_required_requirement_count": 13,
   "required_issue_count": 37,
-  "closed_required_issue_count": 10,
+  "closed_required_issue_count": 11,
   "green_requirement_ids": [
     "blocker_matrix_contract_frozen",
     "owned_transformer_route_boundary_frozen",
@@ -1437,11 +1437,11 @@
     "TAS-164",
     "TAS-165",
     "TAS-166",
-    "TAS-167"
+    "TAS-167",
+    "TAS-167A"
   ],
   "failed_requirement_ids": [
     "article_equivalence_blockers_closed",
-    "TAS-167A",
     "TAS-168",
     "TAS-169",
     "TAS-169A",
@@ -1470,7 +1470,6 @@
     "TAS-186"
   ],
   "blocked_issue_ids": [
-    "TAS-167A",
     "TAS-168",
     "TAS-169",
     "TAS-169A",
@@ -1527,6 +1526,6 @@
   "article_equivalence_green": false,
   "public_claim_allowed": false,
   "claim_boundary": "this is the frozen final acceptance gate for article-equivalent closure. It stays blocked until the blocker-matrix contract remains intact, the owned `psionic-transformer` route boundary remains intact, the blocker matrix itself turns article-equivalence green, and every required TAS tranche from `TAS-158` through `TAS-186` is closed. A green result here is necessary but not sufficient to widen public capability claims, and it still does not imply arbitrary C ingress, arbitrary Wasm ingress, or generic interpreter-in-weights closure outside the declared article envelope.",
-  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=12/40, closed_required_issues=10/37, blocked_issues=27, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
-  "report_digest": "99282541014db1f0f23979dec0cf33e5d19b89eb970a4d1e1a17502b46914137"
+  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=13/40, closed_required_issues=11/37, blocked_issues=26, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
+  "report_digest": "12fdad8c17aef039d97228fb7fcd4fd393dfccf37fbaa1f6388424990a699f15"
 }

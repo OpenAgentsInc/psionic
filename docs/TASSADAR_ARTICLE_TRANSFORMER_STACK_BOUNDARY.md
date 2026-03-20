@@ -163,6 +163,22 @@ tokenization and source/target token batching in the model boundary instead of
 collapsing those responsibilities back into the legacy
 `tassadar_executor_transformer.rs` comparison lane.
 
+`TAS-167A` now adds the first explicit prompt, tokenization, and
+representation invariance gate on top of that trace-bound route.
+`psionic-runtime` now owns one explicit prompt-field surface plus local-slot
+remap and unreachable-suffix helpers in
+`crates/psionic-runtime/src/tassadar_article_representation_invariance.rs`,
+while `psionic-models` now owns symbolic retokenization and prompt/target
+symbolic recomposition helpers in
+`crates/psionic-models/src/tassadar_sequence.rs`.
+That split lets the repo prove exact-trace stability for whitespace, prompt
+field-order, and dead-code layout perturbations, while keeping local-renaming
+cases explicitly representation-sensitive but canonically equivalent instead of
+pretending every semantic-preserving perturbation must leave the raw trace
+identical. The machine-readable gate also keeps bounded suppressions explicit
+when an article case exceeds the current trace-domain reference-model position
+window rather than widening the support boundary silently.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

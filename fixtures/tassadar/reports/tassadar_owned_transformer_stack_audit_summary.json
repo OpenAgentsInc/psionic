@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-167A",
         "TAS-168",
         "TAS-169",
         "TAS-169A",
@@ -368,7 +367,6 @@
         "title": "Clean-room weight causality and route-minimality verdict remain open",
         "current_gap_summary": "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo still lacks the final clean-room causality, activation-dominance, and route-minimality verdicts for that stronger reading",
         "open_issue_ids": [
-          "TAS-167A",
           "TAS-169A",
           "TAS-170",
           "TAS-171",
@@ -421,7 +419,7 @@
     "current_truth_boundary": "the repo now has a real canonical owned Transformer stack boundary with reusable architecture in `psionic-transformer`, the canonical article wrapper in `psionic-models`, a bounded article-Transformer training lane in `psionic-train`, and a runtime receipt lane in `psionic-runtime`. That is stronger than generic substrate overlap alone, but it still stops short of final article-equivalent closure because fixture-backed legacy lanes, research/comparison lanes, and multiple blocker categories remain open.",
     "claim_boundary": "this audit freezes the boundary that the actual owned Transformer stack now exists in Psionic. It does not claim that the canonical article model artifact, weight lineage, reference-linear exactness gate, fast-route closure, frontend/compiler breadth, interpreter breadth, benchmark parity, single-run no-spill closure, clean-room weight causality, reproducibility, route-minimality, or final article-equivalence verdict are already complete.",
     "summary": "Owned Transformer stack audit now records surface_count=9, owned_stack_backed_surface_count=4, fixture_backed_surface_count=1, research_only_surface_count=1, substrate_only_surface_count=3, remaining_blocker_count=7, actual_owned_transformer_stack_exists=true, owned_transformer_stack_audit_green=true, and article_equivalence_green=false.",
-    "report_digest": "ba6dcb07d741a0dd0b288cb031f2fbe924e9d977446d3d41d9b8ac5d0c23518d"
+    "report_digest": "b30f1307235f2ed08d29d424b99937188c73468280d3a04cf73aa2710229f290"
   },
   "tied_requirement_id": "TAS-166",
   "tied_requirement_satisfied": true,
@@ -436,5 +434,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors the owned Transformer stack audit only. It keeps the extracted-stack boundary operator-readable without widening the underlying article-equivalence claim boundary.",
   "summary": "Owned Transformer stack audit summary now records owned_stack_backed_surface_count=4, fixture_backed_surface_count=1, research_only_surface_count=1, substrate_only_surface_count=3, remaining_blocker_count=7, actual_owned_transformer_stack_exists=true, owned_transformer_stack_audit_green=true, and article_equivalence_green=false.",
-  "report_digest": "20972f02bdba7903abafaa44f111aab56ef4af5be771d762ee0ac62b9847e444"
+  "report_digest": "bb893ce694e4a25ab78d6a15158f42c782307b42c5609e125fa8064c39761910"
 }

@@ -505,7 +505,7 @@
       "github_issue_number": 285,
       "title": "TAS-167A: Prompt, tokenization, and representation invariance gate",
       "issue_role": "implementation",
-      "issue_state": "open",
+      "issue_state": "closed",
       "blocker_ids": [
         "BEQ-007"
       ]
@@ -834,5 +834,5 @@
   ],
   "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
   "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
-  "report_digest": "744f83145801b27f60a752b470e968fe07fa50756cd76948073cad6cf0d7acb7"
+  "report_digest": "695e54fee91ed5c50efeedafb818192625add7677cc3678ed7526aeada2c8485"
 }

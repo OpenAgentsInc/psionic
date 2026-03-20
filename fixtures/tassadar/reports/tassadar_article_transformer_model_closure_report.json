@@ -8,7 +8,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-167A",
       "TAS-168",
       "TAS-169",
       "TAS-169A",
@@ -50,7 +49,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-167A",
         "TAS-168",
         "TAS-169",
         "TAS-169A",
@@ -91,7 +89,6 @@
         "acceptance_status": "blocked",
         "article_equivalence_green": false,
         "blocked_issue_ids": [
-          "TAS-167A",
           "TAS-168",
           "TAS-169",
           "TAS-169A",
@@ -292,7 +289,7 @@
       "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
       "claim_boundary": "this report inventories reusable substrate only. It freezes what can be reused, what needs extension, what stays research-only, and what is still not sufficient for article closure. It does not claim that the owned article-equivalence Transformer stack, the canonical article model artifact, or the final article-equivalence proof route already exist.",
       "summary": "Existing substrate inventory now records surface_count=11, blocker_surface_count=6, non_blocker_surface_count=5, inventory_contract_green=true, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-      "report_digest": "5576434a0227619dd2a692ea9ece047ce0b7ec0b102a324dcafc62ba9eaf12cc"
+      "report_digest": "a1ec55ad52e9cfb35ad78ae06dde9d28a4bfaadd1d3c9b1242257590a318d2f6"
     },
     "interface_rows": [
       {
@@ -424,7 +421,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report freezes one explicit canonical Transformer stack boundary for the article-equivalence closure wave. The route is not one monolithic crate; it is one required boundary spanning existing crates with `psionic-transformer` as the architecture anchor, `psionic-models` as the article-model and artifact owner, and `psionic-runtime` as the replay/receipt owner. This does not claim the final article-equivalence stack is complete or green.",
     "summary": "Canonical Transformer stack boundary now records interface_rows=5, dependency_checks=6, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
-    "report_digest": "d28b0ddec17cfb526112cdeec16b833894e60f78330d9cc68225a784f67bbe6f"
+    "report_digest": "ea40e497cc39a6a6fe2d9f9402ae39838982967acaf19cc3c696c0ff9e442c0c"
   },
   "case_rows": [
     {
@@ -484,5 +481,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this report freezes the canonical paper-faithful article-Transformer model path only. It proves that `psionic-transformer` now owns the reusable encoder-decoder stack and that `psionic-models` now owns one canonical article wrapper on top of that stack. It does not claim trace-vocabulary closure, artifact-backed lineage, training success, exactness, benchmark parity, or final article-equivalence green status.",
   "summary": "Article Transformer model closure now records case_rows=6, all_required_cases_present=true, all_cases_pass=true, boundary_review_passed=true, tied_requirement_satisfied=true, article_transformer_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "67aa4b83aa84a6208c9915df0ba1a44fab3c4e1a9cdb133980328337e9d60bb1"
+  "report_digest": "25280888ddbc20ef6638d3b263a185073fbb1a82d3eba4f14647028364620c9a"
 }

@@ -685,6 +685,33 @@ impl TassadarTraceTokenizer {
         TassadarTokenizedExecutionSequence::new(TokenSequence::new(sequence), prompt_tokens.len())
     }
 
+    /// Retokenizes one symbolic token-label text surface while preserving an
+    /// explicit prompt/target split.
+    #[must_use]
+    pub fn retokenize_symbolic_text(
+        &self,
+        symbolic_text: &str,
+        prompt_token_count: usize,
+    ) -> TassadarTokenizedExecutionSequence {
+        TassadarTokenizedExecutionSequence::new(
+            TokenizerBoundary::encode(self, symbolic_text),
+            prompt_token_count,
+        )
+    }
+
+    /// Re-encodes prompt and target symbolic token-label text independently
+    /// before composing the canonical prompt/target split.
+    #[must_use]
+    pub fn compose_prompt_and_target_symbolic_text(
+        &self,
+        prompt_text: &str,
+        target_text: &str,
+    ) -> TassadarTokenizedExecutionSequence {
+        let prompt_tokens = TokenizerBoundary::encode(self, prompt_text);
+        let target_tokens = TokenizerBoundary::encode(self, target_text);
+        self.compose_prompt_and_target_sequence(prompt_tokens.as_slice(), target_tokens.as_slice())
+    }
+
     /// Extracts output values from one symbolic executor trace.
     #[must_use]
     pub fn extract_output_values(&self, tokens: &[TokenId]) -> Vec<i32> {
@@ -2076,6 +2103,62 @@ mod tests {
             &tokenized.sequence.as_slice()[..tokenized.prompt_token_count],
             &tokenized.sequence.as_slice()[tokenized.prompt_token_count..],
         );
+
+        assert_eq!(recomposed, tokenized);
+        Ok(())
+    }
+
+    #[test]
+    fn tokenizer_retokenizes_symbolic_text_across_whitespace_variants(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let tokenizer = TassadarTraceTokenizer::new();
+        let case = tassadar_article_class_corpus()
+            .into_iter()
+            .next()
+            .expect("article corpus should not be empty");
+        let execution =
+            TassadarCpuReferenceRunner::for_program(&case.program)?.execute(&case.program)?;
+        let tokenized = tokenizer.tokenize_program_and_execution(&case.program, &execution);
+        let symbolic = tokenizer.decode_symbolic(&tokenized);
+        let whitespace_perturbed = format!(
+            "\n{}\n",
+            symbolic
+                .tokens
+                .iter()
+                .enumerate()
+                .map(|(index, token)| match index % 3 {
+                    0 => format!("{token}\n"),
+                    1 => format!("{token}\t"),
+                    _ => token.clone(),
+                })
+                .collect::<Vec<_>>()
+                .join("  ")
+        );
+
+        let perturbed =
+            tokenizer.retokenize_symbolic_text(&whitespace_perturbed, tokenized.prompt_token_count);
+
+        assert_eq!(perturbed, tokenized);
+        Ok(())
+    }
+
+    #[test]
+    fn tokenizer_can_compose_prompt_and_target_from_symbolic_text(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let tokenizer = TassadarTraceTokenizer::new();
+        let case = tassadar_article_class_corpus()
+            .into_iter()
+            .next()
+            .expect("article corpus should not be empty");
+        let execution =
+            TassadarCpuReferenceRunner::for_program(&case.program)?.execute(&case.program)?;
+        let tokenized = tokenizer.tokenize_program_and_execution(&case.program, &execution);
+        let symbolic = tokenizer.decode_symbolic(&tokenized);
+        let prompt_text = symbolic.tokens[..symbolic.prompt_token_count].join("\n");
+        let target_text = symbolic.tokens[symbolic.prompt_token_count..].join("\t");
+
+        let recomposed =
+            tokenizer.compose_prompt_and_target_symbolic_text(&prompt_text, &target_text);
 
         assert_eq!(recomposed, tokenized);
         Ok(())
