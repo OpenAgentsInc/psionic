@@ -439,7 +439,7 @@
         "github_issue_number": 278,
         "title": "TAS-161: Attention primitive and mask closure",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-003"
         ]
@@ -839,7 +839,7 @@
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
     "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
-    "report_digest": "ff67a95f689911315d4f2f1d1b7763f595623a88e5c28f15f793d9adf83adb01"
+    "report_digest": "7978e07275dc4309a23e0efe6957a62e1bbae100ea2ea0ea659631a60fc8ff74"
   },
   "requirement_rows": [
     {
@@ -944,14 +944,14 @@
       "requirement_id": "TAS-161",
       "requirement_kind": "implementation",
       "required_for_green": true,
-      "satisfied": false,
+      "satisfied": true,
       "blocker_ids": [
         "BEQ-003"
       ],
       "source_refs": [
         "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
       ],
-      "detail": "TAS-161 (`TAS-161: Attention primitive and mask closure`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003 until that tranche closes."
+      "detail": "TAS-161 (`TAS-161: Attention primitive and mask closure`) is closed in the blocker matrix, so this acceptance-gate row is currently satisfied for blocker families BEQ-003."
     },
     {
       "requirement_id": "TAS-162",
@@ -1422,19 +1422,19 @@
   ],
   "total_requirement_count": 41,
   "required_requirement_count": 40,
-  "passed_required_requirement_count": 5,
+  "passed_required_requirement_count": 6,
   "required_issue_count": 37,
-  "closed_required_issue_count": 3,
+  "closed_required_issue_count": 4,
   "green_requirement_ids": [
     "blocker_matrix_contract_frozen",
     "owned_transformer_route_boundary_frozen",
     "TAS-158",
     "TAS-159",
-    "TAS-160"
+    "TAS-160",
+    "TAS-161"
   ],
   "failed_requirement_ids": [
     "article_equivalence_blockers_closed",
-    "TAS-161",
     "TAS-162",
     "TAS-163",
     "TAS-164",
@@ -1470,7 +1470,6 @@
     "TAS-186"
   ],
   "blocked_issue_ids": [
-    "TAS-161",
     "TAS-162",
     "TAS-163",
     "TAS-164",
@@ -1534,6 +1533,6 @@
   "article_equivalence_green": false,
   "public_claim_allowed": false,
   "claim_boundary": "this is the frozen final acceptance gate for article-equivalent closure. It stays blocked until the blocker-matrix contract remains intact, the owned `psionic-transformer` route boundary remains intact, the blocker matrix itself turns article-equivalence green, and every required TAS tranche from `TAS-158` through `TAS-186` is closed. A green result here is necessary but not sufficient to widen public capability claims, and it still does not imply arbitrary C ingress, arbitrary Wasm ingress, or generic interpreter-in-weights closure outside the declared article envelope.",
-  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=5/40, closed_required_issues=3/37, blocked_issues=34, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
-  "report_digest": "60aa7ab9704a741beb467f454e2746329b9aef5206391758c8e2a42e94ded7b1"
+  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=6/40, closed_required_issues=4/37, blocked_issues=33, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
+  "report_digest": "507edb23ca99b63bb74e097d4087f50263a95fa4f8ea6a27c8831fb0f8041b28"
 }

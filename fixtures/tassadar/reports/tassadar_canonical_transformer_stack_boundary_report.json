@@ -10,7 +10,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-161",
       "TAS-162",
       "TAS-163",
       "TAS-164",
@@ -58,7 +57,6 @@
       "acceptance_status": "blocked",
       "article_equivalence_green": false,
       "blocked_issue_ids": [
-        "TAS-161",
         "TAS-162",
         "TAS-163",
         "TAS-164",
@@ -138,11 +136,12 @@
         "title": "Canonical reusable Transformer-boundary configs",
         "item_refs": [
           "crates/psionic-transformer/src/lib.rs",
+          "crates/psionic-transformer/src/attention.rs",
           "docs/ARCHITECTURE.md"
         ],
         "classification": "reusable_as_is",
         "blocks_article_closure": false,
-        "current_truth": "the dedicated `psionic-transformer` crate now owns reusable decoder and AttnRes architecture primitives at the intended layering boundary",
+        "current_truth": "the dedicated `psionic-transformer` crate now owns reusable decoder and AttnRes architecture primitives plus the owned scaled dot-product attention, mask, and probability-trace path at the intended layering boundary",
         "extension_or_gap": "the remaining gap is implementing the canonical article stack on top of this boundary, not redefining the boundary itself"
       },
       {
@@ -251,7 +250,7 @@
     "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
     "claim_boundary": "this report inventories reusable substrate only. It freezes what can be reused, what needs extension, what stays research-only, and what is still not sufficient for article closure. It does not claim that the owned article-equivalence Transformer stack, the canonical article model artifact, or the final article-equivalence proof route already exist.",
     "summary": "Existing substrate inventory now records surface_count=10, blocker_surface_count=5, non_blocker_surface_count=5, inventory_contract_green=true, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-    "report_digest": "28adc149ec68cbaec2010d02c365a43056b844303610a021ba419e625c81ec29"
+    "report_digest": "52e1d2403c3b1a21650ff826d9c50b52f2199a2f56797f8cb9b90b0892762753"
   },
   "interface_rows": [
     {
@@ -267,9 +266,10 @@
       "owner_modules": [
         "crates/psionic-nn/src/lib.rs",
         "crates/psionic-nn/src/layers.rs",
-        "crates/psionic-transformer/src/lib.rs"
+        "crates/psionic-transformer/src/lib.rs",
+        "crates/psionic-transformer/src/attention.rs"
       ],
-      "detail": "module state, primitive layers, and reusable transformer architecture configs stay split between `psionic-nn` and `psionic-transformer`, with `psionic-transformer` as the architecture anchor"
+      "detail": "module state, primitive layers, and reusable transformer attention plus architecture configs stay split between `psionic-nn` and `psionic-transformer`, with `psionic-transformer` as the architecture anchor"
     },
     {
       "interface_kind": "model_artifact_format",
@@ -314,8 +314,8 @@
     },
     {
       "crate_id": "psionic-transformer",
-      "module_ref": "crates/psionic-transformer/src/lib.rs",
-      "ownership_role": "canonical reusable transformer architecture boundary above primitive layers and below model artifacts"
+      "module_ref": "crates/psionic-transformer/src/attention.rs",
+      "ownership_role": "canonical reusable transformer architecture boundary plus owned scaled dot-product attention and masking primitive above primitive layers and below model artifacts"
     },
     {
       "crate_id": "psionic-models",
@@ -368,5 +368,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this report freezes one explicit canonical Transformer stack boundary for the article-equivalence closure wave. The route is not one monolithic crate; it is one required boundary spanning existing crates with `psionic-transformer` as the architecture anchor, `psionic-models` as the article-model and artifact owner, and `psionic-runtime` as the replay/receipt owner. This does not claim the final article-equivalence stack is complete or green.",
   "summary": "Canonical Transformer stack boundary now records interface_rows=5, dependency_checks=4, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "5b784463a8d928647e040521f51242affa4dadf94aa5cfe8593b2c58bd1ca3ba"
+  "report_digest": "a030893b9518fff4145009f0f271cf280114acdcea70a79b76662e7bbd2dae3f"
 }

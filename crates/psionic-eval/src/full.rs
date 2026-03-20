@@ -32,6 +32,8 @@ mod tassadar_approximate_attention_closure_matrix;
 mod tassadar_async_lifecycle_profile;
 #[path = "tassadar_architecture_bakeoff.rs"]
 mod tassadar_architecture_bakeoff;
+#[path = "tassadar_attention_primitive_mask_closure.rs"]
+mod tassadar_attention_primitive_mask_closure;
 #[path = "tassadar_article_abi.rs"]
 mod tassadar_article_abi;
 #[path = "tassadar_article_equivalence_acceptance_gate.rs"]
@@ -307,6 +309,7 @@ pub use tassadar::*;
 pub use tassadar_approximate_attention_closure_matrix::*;
 pub use tassadar_async_lifecycle_profile::*;
 pub use tassadar_architecture_bakeoff::*;
+pub use tassadar_attention_primitive_mask_closure::*;
 pub use tassadar_article_abi::*;
 pub use tassadar_article_equivalence_acceptance_gate::*;
 pub use tassadar_article_equivalence_blocker_matrix::*;

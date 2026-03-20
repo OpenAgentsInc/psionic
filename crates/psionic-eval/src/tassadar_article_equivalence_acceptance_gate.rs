@@ -491,8 +491,8 @@ mod tests {
         assert!(report.prerequisite_transformer_boundary_green);
         assert!(!report.blocker_matrix_article_equivalence_green);
         assert_eq!(report.required_issue_count, 37);
-        assert_eq!(report.closed_required_issue_count, 3);
-        assert_eq!(report.passed_required_requirement_count, 5);
+        assert_eq!(report.closed_required_issue_count, 4);
+        assert_eq!(report.passed_required_requirement_count, 6);
         assert!(report
             .green_requirement_ids
             .contains(&String::from(BLOCKER_MATRIX_CONTRACT_REQUIREMENT_ID)));
@@ -502,14 +502,15 @@ mod tests {
         assert!(report.green_requirement_ids.contains(&String::from("TAS-158")));
         assert!(report.green_requirement_ids.contains(&String::from("TAS-159")));
         assert!(report.green_requirement_ids.contains(&String::from("TAS-160")));
+        assert!(report.green_requirement_ids.contains(&String::from("TAS-161")));
         assert!(report
             .failed_requirement_ids
             .contains(&String::from(
                 ARTICLE_EQUIVALENCE_BLOCKERS_CLOSED_REQUIREMENT_ID
             )));
-        assert!(report.failed_requirement_ids.contains(&String::from("TAS-161")));
+        assert!(report.failed_requirement_ids.contains(&String::from("TAS-162")));
         assert_eq!(report.optional_open_issue_ids, vec![String::from(OPTIONAL_RESEARCH_ISSUE_ID)]);
-        assert_eq!(report.blocked_issue_ids.len(), 34);
+        assert_eq!(report.blocked_issue_ids.len(), 33);
         assert_eq!(report.blocked_blocker_ids.len(), 7);
     }
 

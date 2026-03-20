@@ -14,5 +14,7 @@ workspace = true
 path = "src/lib.rs"
 
 [dependencies]
+psionic-array = { path = "../psionic-array" }
+psionic-core = { path = "../psionic-core" }
 serde = { workspace = true }
 thiserror = { workspace = true }

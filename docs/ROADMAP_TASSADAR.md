@@ -184,6 +184,18 @@ Current honest posture:
   the canonical article-model and artifact owner, and `psionic-runtime` as the
   replay and receipt owner; the boundary is explicitly tied to the final
   acceptance gate while the overall article-equivalence verdict remains blocked
+- the repo now also has one canonical owned scaled dot-product attention and
+  mask path for the article-equivalence closure wave, with reusable
+  implementation in `crates/psionic-transformer/src/attention.rs`, a committed
+  eval report at
+  `fixtures/tassadar/reports/tassadar_attention_primitive_mask_closure_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_attention_primitive_mask_closure_summary.json`,
+  and an audit note that freeze stable softmax, causal and padding masks,
+  combined-mask support, deterministic forward behavior, and
+  probability-trace export as owned `psionic-transformer` truth; this tranche
+  is explicitly tied to the final acceptance gate while the overall
+  article-equivalence verdict remains blocked
 - the repo now also has one research-only shared-memory and threads profile
   with a deterministic scheduler envelope, explicit sandbox boundary truth,
   and typed refusal on host-nondeterministic scheduling plus relaxed

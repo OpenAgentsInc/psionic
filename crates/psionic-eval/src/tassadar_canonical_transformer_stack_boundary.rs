@@ -241,8 +241,9 @@ fn interface_rows() -> Vec<TassadarTransformerBoundaryInterfaceRow> {
                 "crates/psionic-nn/src/lib.rs",
                 "crates/psionic-nn/src/layers.rs",
                 "crates/psionic-transformer/src/lib.rs",
+                "crates/psionic-transformer/src/attention.rs",
             ],
-            "module state, primitive layers, and reusable transformer architecture configs stay split between `psionic-nn` and `psionic-transformer`, with `psionic-transformer` as the architecture anchor",
+            "module state, primitive layers, and reusable transformer attention plus architecture configs stay split between `psionic-nn` and `psionic-transformer`, with `psionic-transformer` as the architecture anchor",
         ),
         interface_row(
             TassadarTransformerBoundaryInterfaceKind::ModelArtifactFormat,
@@ -296,8 +297,8 @@ fn ownership_rows() -> Vec<TassadarTransformerBoundaryOwnershipRow> {
         ),
         ownership_row(
             "psionic-transformer",
-            "crates/psionic-transformer/src/lib.rs",
-            "canonical reusable transformer architecture boundary above primitive layers and below model artifacts",
+            "crates/psionic-transformer/src/attention.rs",
+            "canonical reusable transformer architecture boundary plus owned scaled dot-product attention and masking primitive above primitive layers and below model artifacts",
         ),
         ownership_row(
             "psionic-models",
@@ -492,6 +493,10 @@ mod tests {
         assert_eq!(report.interface_rows.len(), 5);
         assert_eq!(report.dependency_checks.len(), 4);
         assert!(report.all_dependency_checks_pass);
+        assert!(report.interface_rows.iter().any(|row| {
+            row.owner_modules
+                .contains(&String::from("crates/psionic-transformer/src/attention.rs"))
+        }));
     }
 
     #[test]

@@ -3562,6 +3562,7 @@ dependencies = [
  "psionic-router",
  "psionic-runtime",
  "psionic-sandbox",
+ "psionic-transformer",
  "serde",
  "serde_json",
  "sha2",
@@ -3956,6 +3957,8 @@ dependencies = [
 name = "psionic-transformer"
 version = "0.1.1"
 dependencies = [
+ "psionic-array",
+ "psionic-core",
  "serde",
  "thiserror 2.0.18",
 ]

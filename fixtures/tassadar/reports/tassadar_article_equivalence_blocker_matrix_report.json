@@ -434,7 +434,7 @@
       "github_issue_number": 278,
       "title": "TAS-161: Attention primitive and mask closure",
       "issue_role": "implementation",
-      "issue_state": "open",
+      "issue_state": "closed",
       "blocker_ids": [
         "BEQ-003"
       ]
@@ -834,5 +834,5 @@
   ],
   "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
   "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
-  "report_digest": "ff67a95f689911315d4f2f1d1b7763f595623a88e5c28f15f793d9adf83adb01"
+  "report_digest": "7978e07275dc4309a23e0efe6957a62e1bbae100ea2ea0ea659631a60fc8ff74"
 }

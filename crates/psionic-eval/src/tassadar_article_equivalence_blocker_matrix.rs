@@ -739,7 +739,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             278,
             "TAS-161: Attention primitive and mask closure",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-003"],
         ),
         issue_row(

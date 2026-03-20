@@ -260,10 +260,14 @@ fn substrate_surface_rows() -> Vec<TassadarExistingSubstrateSurfaceRow> {
             "psionic_transformer_architecture_boundary",
             "psionic-transformer",
             "Canonical reusable Transformer-boundary configs",
-            &["crates/psionic-transformer/src/lib.rs", "docs/ARCHITECTURE.md"],
+            &[
+                "crates/psionic-transformer/src/lib.rs",
+                "crates/psionic-transformer/src/attention.rs",
+                "docs/ARCHITECTURE.md",
+            ],
             TassadarExistingSubstrateClassification::ReusableAsIs,
             false,
-            "the dedicated `psionic-transformer` crate now owns reusable decoder and AttnRes architecture primitives at the intended layering boundary",
+            "the dedicated `psionic-transformer` crate now owns reusable decoder and AttnRes architecture primitives plus the owned scaled dot-product attention, mask, and probability-trace path at the intended layering boundary",
             "the remaining gap is implementing the canonical article stack on top of this boundary, not redefining the boundary itself",
         ),
         surface_row(

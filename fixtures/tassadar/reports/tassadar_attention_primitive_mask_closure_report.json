@@ -1,8 +1,50 @@
 {
   "schema_version": 1,
-  "report_id": "tassadar.canonical_transformer_stack_boundary.summary.v1",
-  "boundary_report_ref": "fixtures/tassadar/reports/tassadar_canonical_transformer_stack_boundary_report.json",
-  "boundary_report": {
+  "report_id": "tassadar.attention_primitive_mask_closure.report.v1",
+  "acceptance_gate_tie": {
+    "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+    "canonical_boundary_report_ref": "fixtures/tassadar/reports/tassadar_canonical_transformer_stack_boundary_report.json",
+    "tied_requirement_id": "TAS-161",
+    "tied_requirement_satisfied": true,
+    "acceptance_status": "blocked",
+    "blocked_issue_ids": [
+      "TAS-162",
+      "TAS-163",
+      "TAS-164",
+      "TAS-165",
+      "TAS-166",
+      "TAS-167",
+      "TAS-167A",
+      "TAS-168",
+      "TAS-169",
+      "TAS-169A",
+      "TAS-170",
+      "TAS-171",
+      "TAS-171A",
+      "TAS-171B",
+      "TAS-171C",
+      "TAS-172",
+      "TAS-173",
+      "TAS-174",
+      "TAS-175",
+      "TAS-176",
+      "TAS-177",
+      "TAS-178",
+      "TAS-179",
+      "TAS-179A",
+      "TAS-180",
+      "TAS-181",
+      "TAS-182",
+      "TAS-183",
+      "TAS-184",
+      "TAS-184A",
+      "TAS-185",
+      "TAS-185A",
+      "TAS-186"
+    ]
+  },
+  "canonical_boundary_report_ref": "fixtures/tassadar/reports/tassadar_canonical_transformer_stack_boundary_report.json",
+  "canonical_boundary_report": {
     "schema_version": 1,
     "report_id": "tassadar.canonical_transformer_stack_boundary.report.v1",
     "boundary_doc_ref": "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
@@ -374,15 +416,62 @@
     "summary": "Canonical Transformer stack boundary now records interface_rows=5, dependency_checks=4, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
     "report_digest": "a030893b9518fff4145009f0f271cf280114acdcea70a79b76662e7bbd2dae3f"
   },
-  "boundary_doc_ref": "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
-  "interface_count": 5,
-  "dependency_check_count": 4,
-  "tied_requirement_id": "TAS-160",
-  "tied_requirement_satisfied": true,
-  "acceptance_status": "blocked",
-  "boundary_contract_green": true,
+  "case_rows": [
+    {
+      "case_id": "stable_softmax",
+      "validation_kind": "stable_softmax",
+      "passed": true,
+      "detail": "stable softmax stayed finite under extreme logits and produced the expected [1, 0] probability split"
+    },
+    {
+      "case_id": "causal_mask",
+      "validation_kind": "causal_mask",
+      "passed": true,
+      "detail": "causal masking zeroed future attention while preserving the deterministic prefix row"
+    },
+    {
+      "case_id": "padding_mask",
+      "validation_kind": "padding_mask",
+      "passed": true,
+      "detail": "padding masking zeroed padded keys and kept the masked-out high-score column from dominating the output"
+    },
+    {
+      "case_id": "combined_mask",
+      "validation_kind": "combined_mask",
+      "passed": true,
+      "detail": "combined masking enforced both causal and padding boundaries in one reusable path"
+    },
+    {
+      "case_id": "deterministic_forward",
+      "validation_kind": "deterministic_forward",
+      "passed": true,
+      "detail": "the owned attention primitive produced byte-stable repeated outputs for the same inputs and mask"
+    },
+    {
+      "case_id": "probability_trace_export",
+      "validation_kind": "probability_trace_export",
+      "passed": true,
+      "detail": "attention probability traces now export through psionic-core tensor spec and dense f32 tensor data"
+    }
+  ],
+  "boundary_review": {
+    "transformer_cargo_ref": "crates/psionic-transformer/Cargo.toml",
+    "transformer_attention_module_ref": "crates/psionic-transformer/src/attention.rs",
+    "models_executor_module_ref": "crates/psionic-models/src/tassadar_executor_transformer.rs",
+    "direct_core_dependency": true,
+    "direct_array_dependency": true,
+    "direct_models_dependency": false,
+    "direct_runtime_dependency": false,
+    "transformer_defines_owned_primitive": true,
+    "models_mentions_owned_symbol": false,
+    "passed": true,
+    "detail": "the reusable owned attention primitive now lives in `psionic-transformer`, depends directly on `psionic-core` and `psionic-array`, and does not drift back into `psionic-models` or direct runtime ownership"
+  },
+  "all_required_cases_present": true,
+  "all_cases_pass": true,
+  "attention_primitive_contract_green": true,
   "article_equivalence_green": false,
-  "claim_boundary": "this summary mirrors the canonical Transformer stack boundary only. It keeps the crate/interface split operator-readable, but it does not widen the current public article-equivalence claim boundary beyond the underlying boundary report",
-  "summary": "Canonical Transformer stack boundary summary now records interface_count=5, dependency_check_count=4, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "e1587a9ba7009079f87720689d9d8fa48383528ff3a738d655fa5a014175311f"
+  "claim_boundary": "this report freezes the owned scaled dot-product attention and masking primitive only. It proves that reusable attention math, mask composition, deterministic trace export, and crate ownership now live in `psionic-transformer`, but it does not claim full article-equivalent Transformer closure.",
+  "summary": "Attention primitive closure now records case_rows=6, all_required_cases_present=true, all_cases_pass=true, boundary_review_passed=true, tied_requirement_satisfied=true, attention_primitive_contract_green=true, and article_equivalence_green=false.",
+  "report_digest": "0258ed9b3be174e5d2342a3e45e37149e21aa98da44af7c409d307480c13484c"
 }

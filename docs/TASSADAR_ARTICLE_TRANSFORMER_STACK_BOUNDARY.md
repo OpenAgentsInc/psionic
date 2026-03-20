@@ -54,8 +54,10 @@ psionic-runtime
   `crates/psionic-nn/src/lib.rs`
   `crates/psionic-nn/src/layers.rs`
   `crates/psionic-transformer/src/lib.rs`
+  `crates/psionic-transformer/src/attention.rs`
 - purpose:
-  primitive layer semantics and reusable Transformer-architecture configs stay
+  primitive layer semantics and reusable Transformer-architecture plus owned
+  scaled dot-product attention, masking, and probability-trace export stay
   here; `psionic-transformer` is the architecture anchor
 
 ### Model artifact format

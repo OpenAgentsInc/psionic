@@ -1,0 +1,493 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.attention_primitive_mask_closure.summary.v1",
+  "report_ref": "fixtures/tassadar/reports/tassadar_attention_primitive_mask_closure_report.json",
+  "report": {
+    "schema_version": 1,
+    "report_id": "tassadar.attention_primitive_mask_closure.report.v1",
+    "acceptance_gate_tie": {
+      "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+      "canonical_boundary_report_ref": "fixtures/tassadar/reports/tassadar_canonical_transformer_stack_boundary_report.json",
+      "tied_requirement_id": "TAS-161",
+      "tied_requirement_satisfied": true,
+      "acceptance_status": "blocked",
+      "blocked_issue_ids": [
+        "TAS-162",
+        "TAS-163",
+        "TAS-164",
+        "TAS-165",
+        "TAS-166",
+        "TAS-167",
+        "TAS-167A",
+        "TAS-168",
+        "TAS-169",
+        "TAS-169A",
+        "TAS-170",
+        "TAS-171",
+        "TAS-171A",
+        "TAS-171B",
+        "TAS-171C",
+        "TAS-172",
+        "TAS-173",
+        "TAS-174",
+        "TAS-175",
+        "TAS-176",
+        "TAS-177",
+        "TAS-178",
+        "TAS-179",
+        "TAS-179A",
+        "TAS-180",
+        "TAS-181",
+        "TAS-182",
+        "TAS-183",
+        "TAS-184",
+        "TAS-184A",
+        "TAS-185",
+        "TAS-185A",
+        "TAS-186"
+      ]
+    },
+    "canonical_boundary_report_ref": "fixtures/tassadar/reports/tassadar_canonical_transformer_stack_boundary_report.json",
+    "canonical_boundary_report": {
+      "schema_version": 1,
+      "report_id": "tassadar.canonical_transformer_stack_boundary.report.v1",
+      "boundary_doc_ref": "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
+      "boundary_decision": "explicit_boundary_spanning_existing_crates",
+      "acceptance_gate_tie": {
+        "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+        "existing_substrate_inventory_report_ref": "fixtures/tassadar/reports/tassadar_existing_substrate_inventory_report.json",
+        "tied_requirement_id": "TAS-160",
+        "tied_requirement_satisfied": true,
+        "acceptance_status": "blocked",
+        "blocked_issue_ids": [
+          "TAS-162",
+          "TAS-163",
+          "TAS-164",
+          "TAS-165",
+          "TAS-166",
+          "TAS-167",
+          "TAS-167A",
+          "TAS-168",
+          "TAS-169",
+          "TAS-169A",
+          "TAS-170",
+          "TAS-171",
+          "TAS-171A",
+          "TAS-171B",
+          "TAS-171C",
+          "TAS-172",
+          "TAS-173",
+          "TAS-174",
+          "TAS-175",
+          "TAS-176",
+          "TAS-177",
+          "TAS-178",
+          "TAS-179",
+          "TAS-179A",
+          "TAS-180",
+          "TAS-181",
+          "TAS-182",
+          "TAS-183",
+          "TAS-184",
+          "TAS-184A",
+          "TAS-185",
+          "TAS-185A",
+          "TAS-186"
+        ]
+      },
+      "existing_substrate_inventory_report_ref": "fixtures/tassadar/reports/tassadar_existing_substrate_inventory_report.json",
+      "existing_substrate_inventory_report": {
+        "schema_version": 1,
+        "report_id": "tassadar.existing_substrate_inventory.report.v1",
+        "acceptance_gate_tie": {
+          "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+          "blocker_matrix_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json",
+          "tied_requirement_id": "TAS-159",
+          "tied_requirement_satisfied": true,
+          "acceptance_status": "blocked",
+          "article_equivalence_green": false,
+          "blocked_issue_ids": [
+            "TAS-162",
+            "TAS-163",
+            "TAS-164",
+            "TAS-165",
+            "TAS-166",
+            "TAS-167",
+            "TAS-167A",
+            "TAS-168",
+            "TAS-169",
+            "TAS-169A",
+            "TAS-170",
+            "TAS-171",
+            "TAS-171A",
+            "TAS-171B",
+            "TAS-171C",
+            "TAS-172",
+            "TAS-173",
+            "TAS-174",
+            "TAS-175",
+            "TAS-176",
+            "TAS-177",
+            "TAS-178",
+            "TAS-179",
+            "TAS-179A",
+            "TAS-180",
+            "TAS-181",
+            "TAS-182",
+            "TAS-183",
+            "TAS-184",
+            "TAS-184A",
+            "TAS-185",
+            "TAS-185A",
+            "TAS-186"
+          ]
+        },
+        "surfaces": [
+          {
+            "surface_id": "psionic_core_tensor_contracts",
+            "crate_id": "psionic-core",
+            "title": "Tensor contracts and typed refusal vocabulary",
+            "item_refs": [
+              "crates/psionic-core/src/lib.rs"
+            ],
+            "classification": "reusable_as_is",
+            "blocks_article_closure": false,
+            "current_truth": "typed tensor ids, dtypes, shapes, devices, quantization layouts, and refusal codes already exist as shared engine contracts",
+            "extension_or_gap": "no article-specific closure gap lives here; higher layers consume these contracts"
+          },
+          {
+            "surface_id": "psionic_array_lazy_array_facade",
+            "crate_id": "psionic-array",
+            "title": "Lazy array facade and bounded public materialization surface",
+            "item_refs": [
+              "crates/psionic-array/src/lib.rs"
+            ],
+            "classification": "reusable_with_extension",
+            "blocks_article_closure": true,
+            "current_truth": "the repo already has a bounded graph-backed array surface with explicit evaluation, backend identities, cache posture, and debug capture hooks",
+            "extension_or_gap": "the owned article-equivalence stack still needs broader transformer-oriented tensor/view/math coverage than the current narrow public array surface provides"
+          },
+          {
+            "surface_id": "psionic_nn_module_state_and_basic_layers",
+            "crate_id": "psionic-nn",
+            "title": "Module state tree and basic reusable layers",
+            "item_refs": [
+              "crates/psionic-nn/src/lib.rs",
+              "crates/psionic-nn/src/layers.rs"
+            ],
+            "classification": "reusable_with_extension",
+            "blocks_article_closure": true,
+            "current_truth": "module trees, parameter traversal, quantized wrappers, and reusable Linear/Embedding/LayerNorm/RmsNorm/Dropout layers already exist",
+            "extension_or_gap": "the owned article route still needs attention primitives and article-block composition above these layers"
+          },
+          {
+            "surface_id": "psionic_transformer_architecture_boundary",
+            "crate_id": "psionic-transformer",
+            "title": "Canonical reusable Transformer-boundary configs",
+            "item_refs": [
+              "crates/psionic-transformer/src/lib.rs",
+              "crates/psionic-transformer/src/attention.rs",
+              "docs/ARCHITECTURE.md"
+            ],
+            "classification": "reusable_as_is",
+            "blocks_article_closure": false,
+            "current_truth": "the dedicated `psionic-transformer` crate now owns reusable decoder and AttnRes architecture primitives plus the owned scaled dot-product attention, mask, and probability-trace path at the intended layering boundary",
+            "extension_or_gap": "the remaining gap is implementing the canonical article stack on top of this boundary, not redefining the boundary itself"
+          },
+          {
+            "surface_id": "psionic_models_descriptor_and_weight_lineage",
+            "crate_id": "psionic-models",
+            "title": "Model descriptors and weight-lineage metadata",
+            "item_refs": [
+              "crates/psionic-models/src/lib.rs"
+            ],
+            "classification": "reusable_as_is",
+            "blocks_article_closure": false,
+            "current_truth": "shared model descriptors, weight bundle metadata, and artifact-governance wrappers already exist for reusable model families",
+            "extension_or_gap": "these surfaces can be reused directly once the canonical article model artifact exists"
+          },
+          {
+            "surface_id": "psionic_models_attnres_reference_family",
+            "crate_id": "psionic-models",
+            "title": "AttnRes reference model family",
+            "item_refs": [
+              "crates/psionic-models/src/attnres.rs"
+            ],
+            "classification": "research_only",
+            "blocks_article_closure": false,
+            "current_truth": "the repo already has a bounded CPU-reference AttnRes family that is useful as a model-architecture pilot and training/control experiment surface",
+            "extension_or_gap": "it is not the canonical article route and remains a research-only forcing function rather than a closure blocker"
+          },
+          {
+            "surface_id": "psionic_models_executor_transformer_scaffold",
+            "crate_id": "psionic-models",
+            "title": "Existing executor-transformer scaffold",
+            "item_refs": [
+              "crates/psionic-models/src/tassadar_executor_transformer.rs"
+            ],
+            "classification": "reusable_with_extension",
+            "blocks_article_closure": true,
+            "current_truth": "the repo already has executor-transformer configs, weight bundles, forward-pass scaffolding, decode state, KV points, and refusal posture",
+            "extension_or_gap": "the scaffold still needs paper-faithful architecture, owned vocabulary/channel binding, exactness closure, and lineage closure before it can become the canonical article route"
+          },
+          {
+            "surface_id": "psionic_models_fixture_backed_article_executor_lane",
+            "crate_id": "psionic-models",
+            "title": "Fixture-backed article executor lane",
+            "item_refs": [
+              "crates/psionic-models/src/tassadar.rs"
+            ],
+            "classification": "not_sufficient_for_article_closure",
+            "blocks_article_closure": true,
+            "current_truth": "the current fixture-backed article executor lane still carries the bounded Rust-only article closeout and compatibility truth",
+            "extension_or_gap": "canonical article-equivalence closure cannot stop at this reference-fixture lane; it must graduate to an owned Transformer-backed artifact"
+          },
+          {
+            "surface_id": "psionic_runtime_proof_identity_and_trace_receipts",
+            "crate_id": "psionic-runtime",
+            "title": "Runtime proof identity and trace receipts",
+            "item_refs": [
+              "crates/psionic-runtime/src/proof.rs",
+              "crates/psionic-runtime/src/tassadar.rs"
+            ],
+            "classification": "reusable_as_is",
+            "blocks_article_closure": false,
+            "current_truth": "execution proof bundles, runtime identity, trace ABI contracts, trace artifacts, and replay-safe evidence surfaces already exist",
+            "extension_or_gap": "these runtime truth surfaces can be reused directly once the owned article route emits the right artifacts"
+          },
+          {
+            "surface_id": "psionic_runtime_article_closeout_receipts",
+            "crate_id": "psionic-runtime",
+            "title": "Article-closeout runtime and direct-proof receipts",
+            "item_refs": [
+              "crates/psionic-runtime/src/tassadar_article_runtime_closeout.rs",
+              "crates/psionic-runtime/src/tassadar_direct_model_weight_execution_proof.rs"
+            ],
+            "classification": "reusable_with_extension",
+            "blocks_article_closure": true,
+            "current_truth": "the runtime already owns article ABI, article runtime closeout, and direct model-weight proof surfaces",
+            "extension_or_gap": "those receipts still need rebinding from the current bounded lanes into the canonical owned Transformer-backed article route"
+          }
+        ],
+        "required_classification_count": 4,
+        "classification_counts": [
+          {
+            "classification": "reusable_as_is",
+            "count": 4
+          },
+          {
+            "classification": "reusable_with_extension",
+            "count": 4
+          },
+          {
+            "classification": "research_only",
+            "count": 1
+          },
+          {
+            "classification": "not_sufficient_for_article_closure",
+            "count": 1
+          }
+        ],
+        "surface_count": 10,
+        "blocker_surface_count": 5,
+        "non_blocker_surface_count": 5,
+        "all_required_classifications_present": true,
+        "all_surface_ids_unique": true,
+        "all_surfaces_have_item_refs": true,
+        "all_surfaces_have_explicit_blocker_labels": true,
+        "inventory_contract_green": true,
+        "article_equivalence_green": false,
+        "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
+        "claim_boundary": "this report inventories reusable substrate only. It freezes what can be reused, what needs extension, what stays research-only, and what is still not sufficient for article closure. It does not claim that the owned article-equivalence Transformer stack, the canonical article model artifact, or the final article-equivalence proof route already exist.",
+        "summary": "Existing substrate inventory now records surface_count=10, blocker_surface_count=5, non_blocker_surface_count=5, inventory_contract_green=true, tied_requirement_satisfied=true, and article_equivalence_green=false.",
+        "report_digest": "52e1d2403c3b1a21650ff826d9c50b52f2199a2f56797f8cb9b90b0892762753"
+      },
+      "interface_rows": [
+        {
+          "interface_kind": "tensor_array_ops",
+          "owner_modules": [
+            "crates/psionic-core/src/lib.rs",
+            "crates/psionic-array/src/lib.rs"
+          ],
+          "detail": "tensor metadata, device/layout truth, and bounded array materialization stay below the canonical article route and are reused through `psionic-core` plus `psionic-array`"
+        },
+        {
+          "interface_kind": "layer_and_parameter_state",
+          "owner_modules": [
+            "crates/psionic-nn/src/lib.rs",
+            "crates/psionic-nn/src/layers.rs",
+            "crates/psionic-transformer/src/lib.rs",
+            "crates/psionic-transformer/src/attention.rs"
+          ],
+          "detail": "module state, primitive layers, and reusable transformer attention plus architecture configs stay split between `psionic-nn` and `psionic-transformer`, with `psionic-transformer` as the architecture anchor"
+        },
+        {
+          "interface_kind": "model_artifact_format",
+          "owner_modules": [
+            "crates/psionic-models/src/lib.rs",
+            "crates/psionic-models/src/tassadar_executor_transformer.rs"
+          ],
+          "detail": "canonical article-model descriptors, weight bundles, and artifact identity stay owned by `psionic-models` and must consume the `psionic-transformer` boundary rather than bypass it"
+        },
+        {
+          "interface_kind": "forward_pass_trace_hooks",
+          "owner_modules": [
+            "crates/psionic-models/src/tassadar_executor_transformer.rs",
+            "crates/psionic-runtime/src/tassadar.rs"
+          ],
+          "detail": "forward-pass trace hooks stay model-owned at the article-model boundary and serialize into runtime-owned trace ABI surfaces instead of inventing a second trace layer"
+        },
+        {
+          "interface_kind": "replay_and_receipt_hooks",
+          "owner_modules": [
+            "crates/psionic-runtime/src/proof.rs",
+            "crates/psionic-runtime/src/tassadar.rs"
+          ],
+          "detail": "replay, proof, trace receipt, and runtime identity hooks stay owned by `psionic-runtime` as the canonical receipt boundary for the article route"
+        }
+      ],
+      "ownership_rows": [
+        {
+          "crate_id": "psionic-core",
+          "module_ref": "crates/psionic-core/src/lib.rs",
+          "ownership_role": "tensor ids, dtypes, shapes, devices, layouts, and typed refusals"
+        },
+        {
+          "crate_id": "psionic-array",
+          "module_ref": "crates/psionic-array/src/lib.rs",
+          "ownership_role": "bounded array materialization, graph-backed arithmetic, and public array runtime surface"
+        },
+        {
+          "crate_id": "psionic-nn",
+          "module_ref": "crates/psionic-nn/src/layers.rs",
+          "ownership_role": "module state plus reusable primitive layer implementations"
+        },
+        {
+          "crate_id": "psionic-transformer",
+          "module_ref": "crates/psionic-transformer/src/attention.rs",
+          "ownership_role": "canonical reusable transformer architecture boundary plus owned scaled dot-product attention and masking primitive above primitive layers and below model artifacts"
+        },
+        {
+          "crate_id": "psionic-models",
+          "module_ref": "crates/psionic-models/src/tassadar_executor_transformer.rs",
+          "ownership_role": "canonical article-route model wrapper, config, forward-pass surface, and weight bundle owner"
+        },
+        {
+          "crate_id": "psionic-runtime",
+          "module_ref": "crates/psionic-runtime/src/proof.rs",
+          "ownership_role": "runtime proof identity, replay, trace receipt, and execution challenge boundary"
+        }
+      ],
+      "ownership_diagram_lines": [
+        "psionic-core + psionic-array -> tensor/array ops",
+        "psionic-nn + psionic-transformer -> layer/state + architecture boundary",
+        "psionic-models -> canonical article model artifact + forward-pass hooks",
+        "psionic-runtime -> replay, trace, and receipt hooks"
+      ],
+      "dependency_checks": [
+        {
+          "check_id": "psionic_models_depends_on_psionic_transformer",
+          "cargo_toml_ref": "crates/psionic-models/Cargo.toml",
+          "passed": true,
+          "detail": "`psionic-models` must depend on `psionic-transformer` so the canonical article model artifact cannot bypass the architecture boundary"
+        },
+        {
+          "check_id": "psionic_transformer_avoids_models_and_runtime",
+          "cargo_toml_ref": "crates/psionic-transformer/Cargo.toml",
+          "passed": true,
+          "detail": "`psionic-transformer` must stay below `psionic-models` and `psionic-runtime` so the architecture boundary remains reusable and not product-coupled"
+        },
+        {
+          "check_id": "psionic_runtime_avoids_models_dependency",
+          "cargo_toml_ref": "crates/psionic-runtime/Cargo.toml",
+          "passed": true,
+          "detail": "`psionic-runtime` must not depend on `psionic-models`; replay and receipt hooks stay runtime-owned and model-agnostic"
+        },
+        {
+          "check_id": "psionic_models_avoids_eval_and_research_dependency",
+          "cargo_toml_ref": "crates/psionic-models/Cargo.toml",
+          "passed": true,
+          "detail": "`psionic-models` must stay below eval and research crates so the canonical article route uses real runtime/model modules rather than review-only layers"
+        }
+      ],
+      "all_interfaces_covered": true,
+      "all_dependency_checks_pass": true,
+      "all_ownership_rows_have_real_module_refs": true,
+      "canonical_route_required_boundary": true,
+      "boundary_contract_green": true,
+      "article_equivalence_green": false,
+      "claim_boundary": "this report freezes one explicit canonical Transformer stack boundary for the article-equivalence closure wave. The route is not one monolithic crate; it is one required boundary spanning existing crates with `psionic-transformer` as the architecture anchor, `psionic-models` as the article-model and artifact owner, and `psionic-runtime` as the replay/receipt owner. This does not claim the final article-equivalence stack is complete or green.",
+      "summary": "Canonical Transformer stack boundary now records interface_rows=5, dependency_checks=4, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
+      "report_digest": "a030893b9518fff4145009f0f271cf280114acdcea70a79b76662e7bbd2dae3f"
+    },
+    "case_rows": [
+      {
+        "case_id": "stable_softmax",
+        "validation_kind": "stable_softmax",
+        "passed": true,
+        "detail": "stable softmax stayed finite under extreme logits and produced the expected [1, 0] probability split"
+      },
+      {
+        "case_id": "causal_mask",
+        "validation_kind": "causal_mask",
+        "passed": true,
+        "detail": "causal masking zeroed future attention while preserving the deterministic prefix row"
+      },
+      {
+        "case_id": "padding_mask",
+        "validation_kind": "padding_mask",
+        "passed": true,
+        "detail": "padding masking zeroed padded keys and kept the masked-out high-score column from dominating the output"
+      },
+      {
+        "case_id": "combined_mask",
+        "validation_kind": "combined_mask",
+        "passed": true,
+        "detail": "combined masking enforced both causal and padding boundaries in one reusable path"
+      },
+      {
+        "case_id": "deterministic_forward",
+        "validation_kind": "deterministic_forward",
+        "passed": true,
+        "detail": "the owned attention primitive produced byte-stable repeated outputs for the same inputs and mask"
+      },
+      {
+        "case_id": "probability_trace_export",
+        "validation_kind": "probability_trace_export",
+        "passed": true,
+        "detail": "attention probability traces now export through psionic-core tensor spec and dense f32 tensor data"
+      }
+    ],
+    "boundary_review": {
+      "transformer_cargo_ref": "crates/psionic-transformer/Cargo.toml",
+      "transformer_attention_module_ref": "crates/psionic-transformer/src/attention.rs",
+      "models_executor_module_ref": "crates/psionic-models/src/tassadar_executor_transformer.rs",
+      "direct_core_dependency": true,
+      "direct_array_dependency": true,
+      "direct_models_dependency": false,
+      "direct_runtime_dependency": false,
+      "transformer_defines_owned_primitive": true,
+      "models_mentions_owned_symbol": false,
+      "passed": true,
+      "detail": "the reusable owned attention primitive now lives in `psionic-transformer`, depends directly on `psionic-core` and `psionic-array`, and does not drift back into `psionic-models` or direct runtime ownership"
+    },
+    "all_required_cases_present": true,
+    "all_cases_pass": true,
+    "attention_primitive_contract_green": true,
+    "article_equivalence_green": false,
+    "claim_boundary": "this report freezes the owned scaled dot-product attention and masking primitive only. It proves that reusable attention math, mask composition, deterministic trace export, and crate ownership now live in `psionic-transformer`, but it does not claim full article-equivalent Transformer closure.",
+    "summary": "Attention primitive closure now records case_rows=6, all_required_cases_present=true, all_cases_pass=true, boundary_review_passed=true, tied_requirement_satisfied=true, attention_primitive_contract_green=true, and article_equivalence_green=false.",
+    "report_digest": "0258ed9b3be174e5d2342a3e45e37149e21aa98da44af7c409d307480c13484c"
+  },
+  "case_count": 6,
+  "passed_case_count": 6,
+  "boundary_review_passed": true,
+  "tied_requirement_id": "TAS-161",
+  "tied_requirement_satisfied": true,
+  "acceptance_status": "blocked",
+  "attention_primitive_contract_green": true,
+  "article_equivalence_green": false,
+  "claim_boundary": "this summary mirrors the owned attention primitive closure only. It keeps the reusable attention, mask, and trace facts operator-readable without widening the current article-equivalence claim boundary.",
+  "summary": "Attention primitive summary now records case_count=6, passed_case_count=6, boundary_review_passed=true, tied_requirement_satisfied=true, attention_primitive_contract_green=true, and article_equivalence_green=false.",
+  "report_digest": "edfd8b48bd2bd76de0d1763b07b4dce5ba771905186183b86ac0999885859028"
+}
