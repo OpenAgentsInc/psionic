@@ -6,7 +6,7 @@
   "historical_fixture_model_id": "tassadar-executor-article-i32-compute-v0",
   "benchmark_report_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
   "parity_report_ref": "fixtures/tassadar/reports/tassadar_article_fixture_transformer_parity_report.json",
-  "parity_report_digest": "37d9ea95f28f380b4e38dbdf454aa589420d4e92665c7805f0ee6ae796572723",
+  "parity_report_digest": "22b3b34dd3d340a61f7e3101547518086ee7e4231eeddfd9e871a146de5ae56b",
   "lineage_contract_ref": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_lineage_contract.json",
   "lineage_contract_digest": "6f641acf36b6831bfd81cab9da718cb615a69c4d2e02fa1fbdaa23b3576a008d",
   "route_descriptor_digest": "fd60b5bb9c1e95b1aabf1d1ca4754219fcec4992b1921a56f5eb1411712e5beb",
@@ -178,5 +178,5 @@
   "zero_external_call_case_count": 3,
   "claim_boundary": "this report moves the bounded direct no-tool proof family off the historical fixture model and onto the trained trace-bound Transformer-backed reference-linear route for the three canonical proof workloads named here. It does so only because the committed fixture-to-Transformer parity certificate proves exact trace and terminal-state parity on those cases, and it binds the trained weight-lineage contract into every receipt. It does not yet claim full declared-workload exactness, fast-route closure, benchmark parity, or final article-equivalence green status.",
   "summary": "Transformer-backed direct model-weight execution proof now freezes 3 canonical article workloads on route `fd60b5bb9c1e95b1aabf1d1ca4754219fcec4992b1921a56f5eb1411712e5beb` with direct_cases=3, fallback_free_cases=3, zero_external_call_cases=3, parity_report_ref=`fixtures/tassadar/reports/tassadar_article_fixture_transformer_parity_report.json`, and lineage_contract_ref=`fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_lineage_contract.json`.",
-  "report_digest": "05060d01ca0596dba056ffa73702db3ae6da16a49b5e6b527128a2d8385b5460"
+  "report_digest": "66a375c12b72ed201b26fc0920aa6483ffec1d27fcc69040d45abec9b44fc9ab"
 }

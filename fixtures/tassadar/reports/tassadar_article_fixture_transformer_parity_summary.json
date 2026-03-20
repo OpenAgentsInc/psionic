@@ -14,7 +14,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-171A",
         "TAS-171B",
         "TAS-171C",
         "TAS-172",
@@ -50,7 +49,6 @@
         "tied_requirement_satisfied": true,
         "acceptance_status": "blocked",
         "blocked_issue_ids": [
-          "TAS-171A",
           "TAS-171B",
           "TAS-171C",
           "TAS-172",
@@ -85,7 +83,6 @@
           "acceptance_status": "blocked",
           "article_equivalence_green": false,
           "blocked_issue_ids": [
-            "TAS-171A",
             "TAS-171B",
             "TAS-171C",
             "TAS-172",
@@ -280,7 +277,7 @@
         "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
         "claim_boundary": "this report inventories reusable substrate only. It freezes what can be reused, what needs extension, what stays research-only, and what is still not sufficient for article closure. It does not claim that the owned article-equivalence Transformer stack, the canonical article model artifact, or the final article-equivalence proof route already exist.",
         "summary": "Existing substrate inventory now records surface_count=11, blocker_surface_count=6, non_blocker_surface_count=5, inventory_contract_green=true, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-        "report_digest": "e429aa9d892a662f08f5164108b5dd24d1da813a1659360aa2ef70e9c3b67ce7"
+        "report_digest": "95a9ecc2610b69560131c93c038910d9fce4fcbf701fa240e41d9fb678700eb1"
       },
       "interface_rows": [
         {
@@ -412,7 +409,7 @@
       "article_equivalence_green": false,
       "claim_boundary": "this report freezes one explicit canonical Transformer stack boundary for the article-equivalence closure wave. The route is not one monolithic crate; it is one required boundary spanning existing crates with `psionic-transformer` as the architecture anchor, `psionic-models` as the article-model and artifact owner, and `psionic-runtime` as the replay/receipt owner. This does not claim the final article-equivalence stack is complete or green.",
       "summary": "Canonical Transformer stack boundary now records interface_rows=5, dependency_checks=6, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
-      "report_digest": "fcee3f2bd9b73fd95a0d6f1524b104bf0ac247ea22ff99279f48d9adf624a9aa"
+      "report_digest": "b8cf67f803cfedfa1f6c081b5794c4da3fa253af485713d7ebc537db6499ff4f"
     },
     "benchmark_report_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
     "article_suite_version": "2026.03.17",
@@ -970,7 +967,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report certifies only that the committed trained trace-bound Transformer-backed article wrapper can inherit the old fixture lane's declared bounded article workload set without trace or terminal-state drift when the canonical fixture execution is threaded through the shared Transformer trace-domain wrapper over the full article corpus. It keeps forward-pass evidence checks explicit only on the cases that fit the current model window, and it does not yet claim zero-tool direct-proof ownership, reference-linear exactness from model weights alone, fast-route promotion, benchmark parity, single-run closure, or final article-equivalence green status.",
     "summary": "Article fixture-to-Transformer parity now records supported_case_count=13, routeable_case_count=13, exact_trace_case_count=13, exact_output_case_count=13, context_window_fit_case_count=4, forward_binding_case_count=4, replacement_certified=true, and article_equivalence_green=false.",
-    "report_digest": "37d9ea95f28f380b4e38dbdf454aa589420d4e92665c7805f0ee6ae796572723"
+    "report_digest": "22b3b34dd3d340a61f7e3101547518086ee7e4231eeddfd9e871a146de5ae56b"
   },
   "case_count": 13,
   "routeable_case_count": 13,
@@ -987,5 +984,5 @@
   "mismatch_case_ids": [],
   "claim_boundary": "this summary mirrors only the bounded fixture-to-Transformer parity certificate. It keeps the replacement counts operator-readable without widening the claim beyond the underlying parity report.",
   "summary": "Article fixture-to-Transformer parity summary now records case_count=13, routeable_case_count=13, exact_trace_case_count=13, exact_output_case_count=13, context_window_fit_case_count=4, forward_binding_case_count=4, replacement_certified=true, and article_equivalence_green=false.",
-  "report_digest": "c5ddc907556538b59f15ec82d7b21b9858a711aba8b0503cbb53d60290be6799"
+  "report_digest": "034bd138b3dcb5d996e24707294a9fc6732fd8380edfd3bf730984a43f95bc05"
 }

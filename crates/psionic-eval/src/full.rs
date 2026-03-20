@@ -54,6 +54,8 @@ mod tassadar_article_transformer_forward_pass_closure;
 mod tassadar_article_transformer_forward_pass_evidence;
 #[path = "tassadar_article_transformer_model_closure.rs"]
 mod tassadar_article_transformer_model_closure;
+#[path = "tassadar_article_transformer_reference_linear_exactness_gate.rs"]
+mod tassadar_article_transformer_reference_linear_exactness_gate;
 #[path = "tassadar_article_transformer_training_closure.rs"]
 mod tassadar_article_transformer_training_closure;
 #[path = "tassadar_article_transformer_training_evidence.rs"]
@@ -346,6 +348,7 @@ pub use tassadar_article_transformer_artifact_descriptor::*;
 pub use tassadar_article_transformer_forward_pass_closure::*;
 pub use tassadar_article_transformer_forward_pass_evidence::*;
 pub use tassadar_article_transformer_model_closure::*;
+pub use tassadar_article_transformer_reference_linear_exactness_gate::*;
 pub use tassadar_article_transformer_training_closure::*;
 pub use tassadar_article_transformer_training_evidence::*;
 pub use tassadar_article_transformer_weight_lineage::*;

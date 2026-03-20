@@ -843,7 +843,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             291,
             "TAS-171A: Reference-linear Transformer-backed article exactness gate",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-003", "BEQ-005", "BEQ-007"],
         ),
         issue_row(

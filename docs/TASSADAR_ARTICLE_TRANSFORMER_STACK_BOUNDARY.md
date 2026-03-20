@@ -247,6 +247,21 @@ reference-linear exactness, anti-memorization, contamination independence, and
 the stronger clean-room ownership verdict still remain later tranches starting
 at `TAS-171A`.
 
+`TAS-171A` now closes that next exactness tranche on top of the same route.
+`psionic-eval` now commits one full-family exactness gate at
+`fixtures/tassadar/reports/tassadar_article_transformer_reference_linear_exactness_gate_report.json`
+that replays the full declared article corpus through the owned
+Transformer-backed reference-linear trace-domain route, records explicit
+exact/mismatch/refused rows, and separately verifies that the three bounded
+direct-proof cases remain bound to the committed direct model-weight proof
+report. `psionic-research` now mirrors the operator-readable summary at
+`fixtures/tassadar/reports/tassadar_article_transformer_reference_linear_exactness_summary.json`.
+This is the point where the owned reference-linear route is now machine-readably
+green on the full declared article family before fast-route promotion begins,
+but it still does not close anti-memorization, contamination independence,
+benchmark equivalence, single-run no-spill closure, or the final
+article-equivalence claim.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.
