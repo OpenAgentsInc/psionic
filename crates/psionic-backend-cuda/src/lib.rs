@@ -3967,8 +3967,8 @@ fn rotary_embedding_backward_host_values(
                     let right_index = base + half_dim + pair;
                     let grad_left = grad_output[left_index];
                     let grad_right = grad_output[right_index];
-                    grad_input[left_index] = grad_left * cosine + grad_right * sine;
-                    grad_input[right_index] = grad_right * cosine - grad_left * sine;
+                    grad_input[left_index] = grad_left * cosine - grad_right * sine;
+                    grad_input[right_index] = grad_left * sine + grad_right * cosine;
                 }
             }
         }

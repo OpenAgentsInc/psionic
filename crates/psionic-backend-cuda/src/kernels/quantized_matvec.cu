@@ -1401,8 +1401,8 @@ __global__ void rope_neox_in_place_kernel(
         );
         const float x0 = values[index0];
         const float x1 = values[index1];
-        values[index0] = x0 * cos_theta - x1 * sin_theta;
-        values[index1] = x0 * sin_theta + x1 * cos_theta;
+        values[index0] = x0 * cos_theta + x1 * sin_theta;
+        values[index1] = -x0 * sin_theta + x1 * cos_theta;
     }
 }
 
@@ -1447,7 +1447,8 @@ __device__ __forceinline__ float rope_neox_component(
     );
     const float x0 = values[index0];
     const float x1 = values[index1];
-    return dim < rotary_pairs ? x0 * cos_theta - x1 * sin_theta : x0 * sin_theta + x1 * cos_theta;
+    return dim < rotary_pairs ? x0 * cos_theta + x1 * sin_theta
+                              : -x0 * sin_theta + x1 * cos_theta;
 }
 
 __global__ void attention_decode_kernel(

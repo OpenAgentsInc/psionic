@@ -2343,6 +2343,9 @@ impl AutodiffGraph {
                         }
                     }
                     BackendExtensionOp::ScaledDotProductAttention { scale, causal } => {
+                        let current_gradient = backward_builder
+                            .reshape(&current_gradient, node.tensor().spec().shape().clone())
+                            .map_err(map_graph_error)?;
                         let query_id = node.inputs()[0];
                         let key_id = node.inputs()[1];
                         let value_id = node.inputs()[2];
@@ -4986,8 +4989,8 @@ fn rotary_embedding_values(
                     };
                     let left = input[left_index];
                     let right = input[right_index];
-                    output[left_index] = left * cosine - right * sine;
-                    output[right_index] = left * sine + right * cosine;
+                    output[left_index] = left * cosine + right * sine;
+                    output[right_index] = (-left * sine) + right * cosine;
                 }
             }
         }
@@ -5032,8 +5035,8 @@ fn rotary_embedding_backward_values(
                     };
                     let grad_left = grad_output[left_index];
                     let grad_right = grad_output[right_index];
-                    grad_input[left_index] = grad_left * cosine + grad_right * sine;
-                    grad_input[right_index] = grad_right * cosine - grad_left * sine;
+                    grad_input[left_index] = grad_left * cosine - grad_right * sine;
+                    grad_input[right_index] = grad_left * sine + grad_right * cosine;
                 }
             }
         }

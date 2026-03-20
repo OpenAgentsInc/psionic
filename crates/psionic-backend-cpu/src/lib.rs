@@ -816,8 +816,8 @@ impl CpuBackend {
                         };
                         let left = input[left_index];
                         let right = input[right_index];
-                        output[left_index] = left * cosine - right * sine;
-                        output[right_index] = left * sine + right * cosine;
+                        output[left_index] = left * cosine + right * sine;
+                        output[right_index] = (-left * sine) + right * cosine;
                     }
                 }
             }
