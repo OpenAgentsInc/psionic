@@ -1,0 +1,443 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.owned_transformer_stack_audit.summary.v1",
+  "audit_report_ref": "fixtures/tassadar/reports/tassadar_owned_transformer_stack_audit_report.json",
+  "audit_report": {
+    "schema_version": 1,
+    "report_id": "tassadar.owned_transformer_stack_audit.report.v1",
+    "acceptance_gate_tie": {
+      "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+      "blocker_matrix_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json",
+      "tied_requirement_id": "TAS-166",
+      "tied_requirement_satisfied": true,
+      "acceptance_status": "blocked",
+      "blocked_issue_ids": [
+        "TAS-167",
+        "TAS-167A",
+        "TAS-168",
+        "TAS-169",
+        "TAS-169A",
+        "TAS-170",
+        "TAS-171",
+        "TAS-171A",
+        "TAS-171B",
+        "TAS-171C",
+        "TAS-172",
+        "TAS-173",
+        "TAS-174",
+        "TAS-175",
+        "TAS-176",
+        "TAS-177",
+        "TAS-178",
+        "TAS-179",
+        "TAS-179A",
+        "TAS-180",
+        "TAS-181",
+        "TAS-182",
+        "TAS-183",
+        "TAS-184",
+        "TAS-184A",
+        "TAS-185",
+        "TAS-185A",
+        "TAS-186"
+      ],
+      "open_blocker_ids": [
+        "BEQ-001",
+        "BEQ-002",
+        "BEQ-003",
+        "BEQ-004",
+        "BEQ-005",
+        "BEQ-006",
+        "BEQ-007"
+      ]
+    },
+    "boundary_doc_ref": "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
+    "existing_substrate_inventory_report_ref": "fixtures/tassadar/reports/tassadar_existing_substrate_inventory_report.json",
+    "canonical_boundary_report_ref": "fixtures/tassadar/reports/tassadar_canonical_transformer_stack_boundary_report.json",
+    "attention_primitive_mask_closure_report_ref": "fixtures/tassadar/reports/tassadar_attention_primitive_mask_closure_report.json",
+    "transformer_block_closure_report_ref": "fixtures/tassadar/reports/tassadar_transformer_block_closure_report.json",
+    "article_transformer_model_closure_report_ref": "fixtures/tassadar/reports/tassadar_article_transformer_model_closure_report.json",
+    "article_transformer_training_closure_report_ref": "fixtures/tassadar/reports/tassadar_article_transformer_training_closure_report.json",
+    "article_transformer_forward_pass_closure_report_ref": "fixtures/tassadar/reports/tassadar_article_transformer_forward_pass_closure_report.json",
+    "surface_rows": [
+      {
+        "surface_id": "psionic_core_tensor_contracts",
+        "status": "substrate_only",
+        "crate_id": "psionic-core",
+        "item_refs": [
+          "crates/psionic-core/src/lib.rs"
+        ],
+        "article_route_role": "tensor metadata and refusal vocabulary below the canonical article route",
+        "current_truth": "the canonical stack still depends on `psionic-core` for lower-level tensor truth",
+        "non_proof_boundary": "this crate does not itself prove paper-faithful Transformer architecture or article-equivalent behavior"
+      },
+      {
+        "surface_id": "psionic_array_bounded_array_ops",
+        "status": "substrate_only",
+        "crate_id": "psionic-array",
+        "item_refs": [
+          "crates/psionic-array/src/lib.rs"
+        ],
+        "article_route_role": "bounded array and materialization substrate below the canonical article route",
+        "current_truth": "the canonical stack still depends on `psionic-array` for reusable matrix and array execution substrate",
+        "non_proof_boundary": "this crate does not itself prove article-route ownership or article-equivalent closure"
+      },
+      {
+        "surface_id": "psionic_nn_module_state",
+        "status": "substrate_only",
+        "crate_id": "psionic-nn",
+        "item_refs": [
+          "crates/psionic-nn/src/lib.rs"
+        ],
+        "article_route_role": "module state and primitive layer substrate below `psionic-transformer`",
+        "current_truth": "the canonical stack still depends on `psionic-nn` for reusable layer/state substrate",
+        "non_proof_boundary": "this crate does not itself own the extracted article-Transformer architecture"
+      },
+      {
+        "surface_id": "psionic_transformer_reusable_architecture",
+        "status": "owned_stack_backed",
+        "crate_id": "psionic-transformer",
+        "item_refs": [
+          "crates/psionic-transformer/src/lib.rs",
+          "crates/psionic-transformer/src/attention.rs",
+          "crates/psionic-transformer/src/blocks.rs",
+          "crates/psionic-transformer/src/encoder_decoder.rs"
+        ],
+        "article_route_role": "reusable attention, block, and encoder-decoder architecture anchor for the canonical article route",
+        "current_truth": "the extracted `psionic-transformer` crate now owns the reusable paper-faithful Transformer architecture path",
+        "non_proof_boundary": "this reusable architecture anchor alone does not prove the final article artifact, benchmark parity, or final article-equivalence verdict"
+      },
+      {
+        "surface_id": "psionic_models_canonical_article_wrapper",
+        "status": "owned_stack_backed",
+        "crate_id": "psionic-models",
+        "item_refs": [
+          "crates/psionic-models/src/tassadar_article_transformer.rs"
+        ],
+        "article_route_role": "canonical article-model descriptor, wrapper, and trace-hook surface",
+        "current_truth": "the canonical article wrapper now lives in `psionic-models` on top of the extracted `psionic-transformer` route",
+        "non_proof_boundary": "this wrapper alone does not prove clean-room weights, artifact lineage, or final exactness closure"
+      },
+      {
+        "surface_id": "psionic_train_bounded_article_transformer_lane",
+        "status": "owned_stack_backed",
+        "crate_id": "psionic-train",
+        "item_refs": [
+          "crates/psionic-train/src/tassadar_article_transformer_training.rs"
+        ],
+        "article_route_role": "bounded article-Transformer training lane rooted in the owned stack",
+        "current_truth": "the repo now has one bounded article-Transformer training lane above the canonical wrapper",
+        "non_proof_boundary": "this lane does not yet prove final article-model training, benchmark parity, or weight-production closure"
+      },
+      {
+        "surface_id": "psionic_runtime_article_transformer_receipt_lane",
+        "status": "owned_stack_backed",
+        "crate_id": "psionic-runtime",
+        "item_refs": [
+          "crates/psionic-runtime/src/tassadar_article_transformer_forward_pass.rs"
+        ],
+        "article_route_role": "runtime evidence and proof-bundle lane for the canonical article route",
+        "current_truth": "the repo now has one runtime-owned forward-pass receipt lane above the owned stack",
+        "non_proof_boundary": "this receipt lane does not yet prove article trace-vocabulary closure, fast-route closure, or final article equivalence"
+      },
+      {
+        "surface_id": "psionic_models_fixture_backed_article_executor_lane",
+        "status": "fixture_backed",
+        "crate_id": "psionic-models",
+        "item_refs": [
+          "crates/psionic-models/src/tassadar.rs"
+        ],
+        "article_route_role": "legacy bounded article executor truth carried by programmatic fixtures",
+        "current_truth": "the older fixture-backed article executor lane remains committed and citeable",
+        "non_proof_boundary": "this lane cannot be treated as proof that the canonical Transformer-backed article route or weight lineage is already closed"
+      },
+      {
+        "surface_id": "psionic_models_executor_transformer_comparison_lane",
+        "status": "research_only",
+        "crate_id": "psionic-models",
+        "item_refs": [
+          "crates/psionic-models/src/tassadar_executor_transformer.rs"
+        ],
+        "article_route_role": "legacy executor-transformer scaffold and comparison lane beside the canonical article wrapper",
+        "current_truth": "the older executor-transformer scaffold remains a separate research and comparison lane",
+        "non_proof_boundary": "this lane is not the canonical article route and must not be substituted for the owned paper-faithful stack"
+      }
+    ],
+    "extraction_rows": [
+      {
+        "aspect": "reusable_architecture_in_psionic_transformer",
+        "owner_crate_ids": [
+          "psionic-transformer"
+        ],
+        "item_refs": [
+          "crates/psionic-transformer/src/attention.rs",
+          "crates/psionic-transformer/src/blocks.rs",
+          "crates/psionic-transformer/src/encoder_decoder.rs"
+        ],
+        "current_truth": "reusable scaled dot-product attention, Transformer blocks, and the paper-faithful encoder-decoder stack now live in `psionic-transformer` as the extracted architecture anchor",
+        "non_implication": "this does not move article descriptors, fixture lanes, or runtime proof receipt ownership into `psionic-transformer`"
+      },
+      {
+        "aspect": "canonical_article_wrapper_in_psionic_models",
+        "owner_crate_ids": [
+          "psionic-models"
+        ],
+        "item_refs": [
+          "crates/psionic-models/src/tassadar_article_transformer.rs"
+        ],
+        "current_truth": "the canonical article wrapper, paper reference, embedding-sharing surface, model descriptor, and forward-pass trace hook surface remain in `psionic-models` above the extracted architecture crate",
+        "non_implication": "this does not justify rebuilding reusable attention or encoder-decoder architecture back inside `psionic-models`"
+      },
+      {
+        "aspect": "lower_substrate_in_core_array_nn",
+        "owner_crate_ids": [
+          "psionic-core",
+          "psionic-array",
+          "psionic-nn"
+        ],
+        "item_refs": [
+          "crates/psionic-core/src/lib.rs",
+          "crates/psionic-array/src/lib.rs",
+          "crates/psionic-nn/src/lib.rs"
+        ],
+        "current_truth": "tensor metadata, bounded array execution, and primitive layer/module-state substrate remain below the extracted Transformer architecture boundary in `psionic-core`, `psionic-array`, and `psionic-nn`",
+        "non_implication": "these lower crates are still substrate only for the article route and do not by themselves prove article-model ownership or article-equivalent closure"
+      }
+    ],
+    "provenance_rows": [
+      {
+        "provenance_id": "existing_substrate_inventory",
+        "source_refs": [
+          "crates/psionic-models/src/tassadar.rs",
+          "crates/psionic-models/src/tassadar_executor_transformer.rs"
+        ],
+        "artifact_ref": "fixtures/tassadar/reports/tassadar_existing_substrate_inventory_report.json",
+        "passed": true,
+        "detail": "existing substrate inventory remains green and keeps fixture-backed plus research/comparison rows explicit at surface_count=11"
+      },
+      {
+        "provenance_id": "canonical_transformer_boundary",
+        "source_refs": [
+          "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
+          "crates/psionic-transformer/src/lib.rs",
+          "crates/psionic-models/src/tassadar_article_transformer.rs"
+        ],
+        "artifact_ref": "fixtures/tassadar/reports/tassadar_canonical_transformer_stack_boundary_report.json",
+        "passed": true,
+        "detail": "canonical boundary report remains green with interface_rows=5 and dependency_checks=6"
+      },
+      {
+        "provenance_id": "owned_attention_primitive",
+        "source_refs": [
+          "crates/psionic-transformer/src/attention.rs"
+        ],
+        "artifact_ref": "fixtures/tassadar/reports/tassadar_attention_primitive_mask_closure_report.json",
+        "passed": true,
+        "detail": "attention closure remains green with case_rows=6"
+      },
+      {
+        "provenance_id": "owned_transformer_blocks",
+        "source_refs": [
+          "crates/psionic-transformer/src/blocks.rs"
+        ],
+        "artifact_ref": "fixtures/tassadar/reports/tassadar_transformer_block_closure_report.json",
+        "passed": true,
+        "detail": "Transformer block closure remains green with case_rows=6"
+      },
+      {
+        "provenance_id": "canonical_article_wrapper",
+        "source_refs": [
+          "crates/psionic-transformer/src/encoder_decoder.rs",
+          "crates/psionic-models/src/tassadar_article_transformer.rs"
+        ],
+        "artifact_ref": "fixtures/tassadar/reports/tassadar_article_transformer_model_closure_report.json",
+        "passed": true,
+        "detail": "article-Transformer model closure remains green with case_rows=6"
+      },
+      {
+        "provenance_id": "bounded_article_training_lane",
+        "source_refs": [
+          "crates/psionic-models/src/tassadar_article_transformer.rs",
+          "crates/psionic-train/src/tassadar_article_transformer_training.rs"
+        ],
+        "artifact_ref": "fixtures/tassadar/reports/tassadar_article_transformer_training_closure_report.json",
+        "passed": true,
+        "detail": "article-Transformer training closure remains green with case_rows=5"
+      },
+      {
+        "provenance_id": "runtime_receipt_lane",
+        "source_refs": [
+          "crates/psionic-models/src/tassadar_article_transformer.rs",
+          "crates/psionic-transformer/src/encoder_decoder.rs",
+          "crates/psionic-runtime/src/tassadar_article_transformer_forward_pass.rs"
+        ],
+        "artifact_ref": "fixtures/tassadar/reports/tassadar_article_transformer_forward_pass_closure_report.json",
+        "passed": true,
+        "detail": "article-Transformer forward-pass closure remains green with case_rows=6"
+      }
+    ],
+    "remaining_blocker_rows": [
+      {
+        "blocker_id": "BEQ-001",
+        "category": "frontend_scope",
+        "title": "Declared article-equivalent frontend/compiler ingress remains open",
+        "current_gap_summary": "the article claims arbitrary C-code ingress into an in-transformer execution path, while the public repo closes only a bounded Rust-only frontend route",
+        "open_issue_ids": [
+          "TAS-176",
+          "TAS-177",
+          "TAS-178",
+          "TAS-186"
+        ]
+      },
+      {
+        "blocker_id": "BEQ-002",
+        "category": "interpreter_breadth",
+        "title": "Declared article interpreter breadth remains open",
+        "current_gap_summary": "the article frames arbitrary programs and a WebAssembly interpreter inside transformer weights, while the public repo still carries bounded named Wasm profiles and a suppressed frozen core-Wasm closure gate",
+        "open_issue_ids": [
+          "TAS-171B",
+          "TAS-179",
+          "TAS-179A",
+          "TAS-186"
+        ]
+      },
+      {
+        "blocker_id": "BEQ-003",
+        "category": "transformer_stack_reality",
+        "title": "Canonical owned Transformer-backed article route remains open",
+        "current_gap_summary": "the article-equivalent path still lacks one canonical owned Transformer stack and one non-fixture article model artifact that carries the public route end to end",
+        "open_issue_ids": [
+          "TAS-167",
+          "TAS-168",
+          "TAS-169",
+          "TAS-169A",
+          "TAS-170",
+          "TAS-171",
+          "TAS-171A",
+          "TAS-186",
+          "TAS-R1"
+        ]
+      },
+      {
+        "blocker_id": "BEQ-004",
+        "category": "fast_route_scope",
+        "title": "Canonical fast decode route remains open",
+        "current_gap_summary": "the article treats logarithmic-time fast decoding as the core technical unlock, but the current public closeout route is still the exact reference-linear CPU lane",
+        "open_issue_ids": [
+          "TAS-172",
+          "TAS-173",
+          "TAS-174",
+          "TAS-175",
+          "TAS-180",
+          "TAS-181",
+          "TAS-185",
+          "TAS-186",
+          "TAS-R1"
+        ]
+      },
+      {
+        "blocker_id": "BEQ-005",
+        "category": "benchmark_scope",
+        "title": "Hungarian and hard-Sudoku benchmark parity remains open",
+        "current_gap_summary": "the article makes visible Hungarian throughput claims and hard-Sudoku benchmark claims that the current public repo does not yet close on one canonical article-equivalent route",
+        "open_issue_ids": [
+          "TAS-171A",
+          "TAS-171B",
+          "TAS-171C",
+          "TAS-175",
+          "TAS-178",
+          "TAS-180",
+          "TAS-181",
+          "TAS-182",
+          "TAS-185",
+          "TAS-186"
+        ]
+      },
+      {
+        "blocker_id": "BEQ-006",
+        "category": "single_run_scope",
+        "title": "Single-run no-spill article posture remains open",
+        "current_gap_summary": "the article frames million-step execution inside a single transformer run, while the public terminal substrate claim still permits bounded slices, persisted continuation, and spill/tape extension",
+        "open_issue_ids": [
+          "TAS-183",
+          "TAS-185",
+          "TAS-186"
+        ]
+      },
+      {
+        "blocker_id": "BEQ-007",
+        "category": "weights_ownership_scope",
+        "title": "Clean-room weight causality and route-minimality verdict remain open",
+        "current_gap_summary": "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo still lacks the final clean-room causality, activation-dominance, and route-minimality verdicts for that stronger reading",
+        "open_issue_ids": [
+          "TAS-167",
+          "TAS-167A",
+          "TAS-169A",
+          "TAS-170",
+          "TAS-171",
+          "TAS-171A",
+          "TAS-171B",
+          "TAS-171C",
+          "TAS-184",
+          "TAS-184A",
+          "TAS-185",
+          "TAS-185A",
+          "TAS-186",
+          "TAS-R1"
+        ]
+      }
+    ],
+    "boundary_review": {
+      "boundary_doc_ref": "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
+      "transformer_lib_ref": "crates/psionic-transformer/src/lib.rs",
+      "transformer_encoder_decoder_ref": "crates/psionic-transformer/src/encoder_decoder.rs",
+      "models_article_transformer_ref": "crates/psionic-models/src/tassadar_article_transformer.rs",
+      "models_executor_transformer_ref": "crates/psionic-models/src/tassadar_executor_transformer.rs",
+      "models_fixture_lane_ref": "crates/psionic-models/src/tassadar.rs",
+      "core_ref": "crates/psionic-core/src/lib.rs",
+      "array_ref": "crates/psionic-array/src/lib.rs",
+      "nn_ref": "crates/psionic-nn/src/lib.rs",
+      "boundary_doc_names_psionic_transformer_as_anchor": true,
+      "boundary_doc_marks_executor_transformer_noncanonical": true,
+      "transformer_exposes_attention_blocks_encoder_decoder": true,
+      "models_define_canonical_article_wrapper": true,
+      "executor_transformer_uses_programmatic_fixture_weights": true,
+      "fixture_lane_uses_programmatic_fixture_weights": true,
+      "substrate_rows_cover_core_array_nn_only": true,
+      "passed": true,
+      "detail": "the boundary doc, extracted transformer crate, canonical article wrapper, legacy executor-transformer scaffold, legacy fixture lane, and lower substrate rows all agree on the owned-stack split: reusable architecture in `psionic-transformer`, canonical wrapper in `psionic-models`, fixture-backed legacy lane still explicit, and `psionic-core` plus `psionic-array` plus `psionic-nn` still treated as lower substrate only"
+    },
+    "surface_count": 9,
+    "owned_stack_backed_surface_count": 4,
+    "fixture_backed_surface_count": 1,
+    "research_only_surface_count": 1,
+    "substrate_only_surface_count": 3,
+    "remaining_blocker_count": 7,
+    "all_required_surface_statuses_present": true,
+    "all_required_extraction_aspects_present": true,
+    "all_provenance_rows_pass": true,
+    "remaining_delta_explicit": true,
+    "actual_owned_transformer_stack_exists": true,
+    "psionic_transformer_extraction_explicit": true,
+    "owned_transformer_stack_audit_green": true,
+    "article_equivalence_green": false,
+    "current_truth_boundary": "the repo now has a real canonical owned Transformer stack boundary with reusable architecture in `psionic-transformer`, the canonical article wrapper in `psionic-models`, a bounded article-Transformer training lane in `psionic-train`, and a runtime receipt lane in `psionic-runtime`. That is stronger than generic substrate overlap alone, but it still stops short of final article-equivalent closure because fixture-backed legacy lanes, research/comparison lanes, and multiple blocker categories remain open.",
+    "claim_boundary": "this audit freezes the boundary that the actual owned Transformer stack now exists in Psionic. It does not claim that the canonical article model artifact, weight lineage, reference-linear exactness gate, fast-route closure, frontend/compiler breadth, interpreter breadth, benchmark parity, single-run no-spill closure, clean-room weight causality, reproducibility, route-minimality, or final article-equivalence verdict are already complete.",
+    "summary": "Owned Transformer stack audit now records surface_count=9, owned_stack_backed_surface_count=4, fixture_backed_surface_count=1, research_only_surface_count=1, substrate_only_surface_count=3, remaining_blocker_count=7, actual_owned_transformer_stack_exists=true, owned_transformer_stack_audit_green=true, and article_equivalence_green=false.",
+    "report_digest": "09dc7cdf9042b444313a00037b9ef30d958546e09ebb5250493d2e2da4a41274"
+  },
+  "tied_requirement_id": "TAS-166",
+  "tied_requirement_satisfied": true,
+  "acceptance_status": "blocked",
+  "owned_stack_backed_surface_count": 4,
+  "fixture_backed_surface_count": 1,
+  "research_only_surface_count": 1,
+  "substrate_only_surface_count": 3,
+  "remaining_blocker_count": 7,
+  "actual_owned_transformer_stack_exists": true,
+  "owned_transformer_stack_audit_green": true,
+  "article_equivalence_green": false,
+  "claim_boundary": "this summary mirrors the owned Transformer stack audit only. It keeps the extracted-stack boundary operator-readable without widening the underlying article-equivalence claim boundary.",
+  "summary": "Owned Transformer stack audit summary now records owned_stack_backed_surface_count=4, fixture_backed_surface_count=1, research_only_surface_count=1, substrate_only_surface_count=3, remaining_blocker_count=7, actual_owned_transformer_stack_exists=true, owned_transformer_stack_audit_green=true, and article_equivalence_green=false.",
+  "report_digest": "b1e2b252024e7a6e5c5716a7a3125cf7177e4621aac7386581d3258f1b7839b7"
+}

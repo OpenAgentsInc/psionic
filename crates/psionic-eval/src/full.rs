@@ -38,6 +38,8 @@ mod tassadar_article_cpu_reproducibility;
 mod tassadar_article_equivalence_acceptance_gate;
 #[path = "tassadar_article_equivalence_blocker_matrix.rs"]
 mod tassadar_article_equivalence_blocker_matrix;
+#[path = "tassadar_article_runtime_closeout.rs"]
+mod tassadar_article_runtime_closeout;
 #[path = "tassadar_article_transformer_forward_pass_closure.rs"]
 mod tassadar_article_transformer_forward_pass_closure;
 #[path = "tassadar_article_transformer_forward_pass_evidence.rs"]
@@ -48,8 +50,6 @@ mod tassadar_article_transformer_model_closure;
 mod tassadar_article_transformer_training_closure;
 #[path = "tassadar_article_transformer_training_evidence.rs"]
 mod tassadar_article_transformer_training_evidence;
-#[path = "tassadar_article_runtime_closeout.rs"]
-mod tassadar_article_runtime_closeout;
 #[path = "tassadar_async_lifecycle_profile.rs"]
 mod tassadar_async_lifecycle_profile;
 #[path = "tassadar_attention_primitive_mask_closure.rs"]
@@ -200,6 +200,8 @@ mod tassadar_numeric_encoding;
 mod tassadar_numeric_opcode_ladder;
 #[path = "tassadar_numeric_portability.rs"]
 mod tassadar_numeric_portability;
+#[path = "tassadar_owned_transformer_stack_audit.rs"]
+mod tassadar_owned_transformer_stack_audit;
 #[path = "tassadar_pointer_memory_scratchpad.rs"]
 mod tassadar_pointer_memory_scratchpad;
 #[path = "tassadar_pre_closeout_universality_audit.rs"]
@@ -324,12 +326,12 @@ pub use tassadar_article_abi::*;
 pub use tassadar_article_cpu_reproducibility::*;
 pub use tassadar_article_equivalence_acceptance_gate::*;
 pub use tassadar_article_equivalence_blocker_matrix::*;
+pub use tassadar_article_runtime_closeout::*;
 pub use tassadar_article_transformer_forward_pass_closure::*;
 pub use tassadar_article_transformer_forward_pass_evidence::*;
 pub use tassadar_article_transformer_model_closure::*;
 pub use tassadar_article_transformer_training_closure::*;
 pub use tassadar_article_transformer_training_evidence::*;
-pub use tassadar_article_runtime_closeout::*;
 pub use tassadar_async_lifecycle_profile::*;
 pub use tassadar_attention_primitive_mask_closure::*;
 pub use tassadar_benchmark_package_set::*;
@@ -405,6 +407,7 @@ pub use tassadar_negative_invocation::*;
 pub use tassadar_numeric_encoding::*;
 pub use tassadar_numeric_opcode_ladder::*;
 pub use tassadar_numeric_portability::*;
+pub use tassadar_owned_transformer_stack_audit::*;
 pub use tassadar_pointer_memory_scratchpad::*;
 pub use tassadar_pre_closeout_universality_audit::*;
 pub use tassadar_precision_attention_robustness_audit::*;

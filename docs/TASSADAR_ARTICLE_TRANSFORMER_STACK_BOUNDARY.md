@@ -138,6 +138,18 @@ encoder-decoder execution in `psionic-transformer`, and runtime-manifest plus
 proof-bundle ownership in `psionic-runtime` instead of collapsing those
 receipt hooks back into the model crate.
 
+`TAS-166` now freezes the stronger distinction between "the actual owned
+Transformer stack exists" and "final article equivalence is proven." The real
+owned stack now spans reusable attention/block/encoder-decoder architecture in
+`psionic-transformer`, the canonical article wrapper in `psionic-models`, the
+bounded training lane in `psionic-train`, and the runtime evidence lane in
+`psionic-runtime`. The older fixture-backed lane in
+`crates/psionic-models/src/tassadar.rs` and the older
+`crates/psionic-models/src/tassadar_executor_transformer.rs` comparison lane
+remain explicit non-canonical surfaces, while `psionic-core`,
+`psionic-array`, and `psionic-nn` remain lower substrate rather than
+article-route proof by themselves.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.
