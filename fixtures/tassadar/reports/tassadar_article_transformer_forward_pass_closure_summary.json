@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-179A",
         "TAS-180",
         "TAS-181",
         "TAS-182",
@@ -37,7 +36,6 @@
         "tied_requirement_satisfied": true,
         "acceptance_status": "blocked",
         "blocked_issue_ids": [
-          "TAS-179A",
           "TAS-180",
           "TAS-181",
           "TAS-182",
@@ -61,7 +59,6 @@
           "acceptance_status": "blocked",
           "article_equivalence_green": false,
           "blocked_issue_ids": [
-            "TAS-179A",
             "TAS-180",
             "TAS-181",
             "TAS-182",
@@ -245,7 +242,7 @@
         "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
         "claim_boundary": "this report inventories reusable substrate only. It freezes what can be reused, what needs extension, what stays research-only, and what is still not sufficient for article closure. It does not claim that the owned article-equivalence Transformer stack, the canonical article model artifact, or the final article-equivalence proof route already exist.",
         "summary": "Existing substrate inventory now records surface_count=11, blocker_surface_count=6, non_blocker_surface_count=5, inventory_contract_green=true, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-        "report_digest": "98f45a5cf58bf45734236f9e7feffb4eb85a6acb659577370bc16573ae0def4c"
+        "report_digest": "a5b3b432aee0554cfdffdfccd66ed7f86ec2368daf4c9bf89a1f6d9af4fbc62a"
       },
       "interface_rows": [
         {
@@ -377,7 +374,7 @@
       "article_equivalence_green": false,
       "claim_boundary": "this report freezes one explicit canonical Transformer stack boundary for the article-equivalence closure wave. The route is not one monolithic crate; it is one required boundary spanning existing crates with `psionic-transformer` as the architecture anchor, `psionic-models` as the article-model and artifact owner, and `psionic-runtime` as the replay/receipt owner. This does not claim the final article-equivalence stack is complete or green.",
       "summary": "Canonical Transformer stack boundary now records interface_rows=5, dependency_checks=6, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
-      "report_digest": "900b74c17ae02d915d8f63b7023fcb1d8fbb062df8695c85feed41eeddbb4449"
+      "report_digest": "facef3cf873661ea43527d8a7cfdcd1c981fff9604013ce03c4d63509ca18343"
     },
     "evidence_bundle_ref": "fixtures/tassadar/runs/tassadar_article_transformer_forward_pass_v1/article_transformer_forward_pass_evidence_bundle.json",
     "evidence_bundle": {
@@ -769,7 +766,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report freezes the runtime evidence closure for one canonical article-Transformer forward-pass lane only. It proves that model identity, run config, attention-trace summaries, deterministic replay, decode receipts, and checkpoint lineage now bind into the Psionic runtime-manifest and proof-bundle substrate on top of the owned `psionic-transformer` route. It does not claim final article trace-vocabulary closure, weight-production closure, reference-linear exactness proof, fast-route promotion, benchmark parity, or final article-equivalence green status.",
     "summary": "Article Transformer forward-pass closure now records case_rows=6, all_required_cases_present=true, all_cases_pass=true, boundary_review_passed=true, tied_requirement_satisfied=true, article_transformer_forward_pass_contract_green=true, and article_equivalence_green=false.",
-    "report_digest": "257e46db37002b80ae3190bbbb98667baec9ac50fb182078904aab70adcd4232"
+    "report_digest": "a2e9779b0dc26c62241aba5a99a241fcdf40b30de3228a5c344f4e237f9806b5"
   },
   "case_count": 6,
   "passed_case_count": 6,
@@ -783,5 +780,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors the article-Transformer forward-pass runtime closure only. It keeps the model-identity, trace, replay, decode, and checkpoint-lineage facts operator-readable without widening the repo's public article-equivalence claim boundary.",
   "summary": "Article Transformer forward-pass summary now records case_count=6, passed_case_count=6, trace_channel_count=6, decoded_token_count=1, forward_pass_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "3de56965daa3f4a3abb05d16b229adf67126376058b3353cb1c4d1d519388890"
+  "report_digest": "03c2ae8fec6fb515af9a2765df31bfc9f2187015f0f15b386fba6cefe0b94128"
 }

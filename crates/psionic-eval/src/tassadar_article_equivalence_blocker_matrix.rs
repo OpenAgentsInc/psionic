@@ -449,12 +449,12 @@ fn blocker_rows() -> Vec<TassadarArticleEquivalenceBlockerRow> {
             blocker_id: String::from("BEQ-002"),
             category: TassadarArticleEquivalenceBlockerCategory::InterpreterBreadth,
             title: String::from("Declared article interpreter breadth remains open"),
-            repo_status: TassadarRepoStatus::Partial,
+            repo_status: TassadarRepoStatus::Implemented,
             current_gap_summary: String::from(
-                "the public repo now declares one article interpreter breadth envelope, but the article still frames arbitrary programs and a WebAssembly interpreter inside transformer weights while the remaining breadth-suite and final gate tranches stay open",
+                "the public repo now closes the article-interpreter breadth blocker inside the declared TAS-179 envelope by proving one green generic family suite over arithmetic, call-heavy, allocator-backed, indirect-call, branch-heavy, loop-heavy, state-machine, and parser-style rows while keeping arbitrary-program language explicitly out of scope",
             ),
             current_public_truth: String::from(
-                "the repo now has a machine-readable article interpreter breadth envelope over the frozen core-Wasm floor, the current named article i32 profiles, and the later required search-process, long-horizon control, and module-scale Wasm-loop families, while linked-program bundles stay research-only and broader import-mediated, dynamic-memory, memory64, multi-memory, component-linking, exception, and float-semantics families remain outside the declared article envelope",
+                "the repo now has a machine-readable article interpreter breadth envelope plus one green TAS-179A suite gate over the declared generic article-program families, with linked-program bundles still research-only and broader import-mediated, dynamic-memory, memory64, multi-memory, component-linking, exception, and float-semantics families still explicit outside the article envelope",
             ),
             closure_requirements: vec![
                 String::from(
@@ -971,7 +971,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             302,
             "TAS-179A: Article interpreter breadth suite and gate",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-002"],
         ),
         issue_row(
@@ -1146,7 +1146,7 @@ mod tests {
         assert!(report.matrix_contract_green);
         assert!(!report.article_equivalence_green);
         assert_eq!(report.blocker_count, 7);
-        assert_eq!(report.open_blocker_count, 5);
+        assert_eq!(report.open_blocker_count, 4);
         assert!(report.all_later_issues_covered);
         assert!(report.all_blockers_have_article_line_provenance);
     }

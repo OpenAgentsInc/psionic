@@ -24,7 +24,7 @@ jq -e '
   and .unsupported_variant_refusal_green == true
   and .demo_frontend_parity_green == true
   and .article_equivalence_green == false
-  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-179A")
+  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-180")
 ' fixtures/tassadar/reports/tassadar_article_demo_frontend_parity_report.json >/dev/null
 
 jq -e '

@@ -8,7 +8,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-179A",
       "TAS-180",
       "TAS-181",
       "TAS-182",
@@ -399,5 +398,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this report closes TAS-179 only. It freezes one declared article interpreter breadth envelope over the frozen core-Wasm floor, the current named article i32 profiles, and the later required search-process, long-horizon control, and module-scale Wasm-loop families while keeping linked-program bundles research-only and import-mediated processes, dynamic-memory resume, memory64, multi-memory, component-linking, exception profiles, and broader float semantics explicitly outside the article envelope. It does not yet build the breadth suite or turn final article-equivalence green.",
   "summary": "Article interpreter breadth envelope report now records tied_requirement_satisfied=true, current_floor_green=2/2, declared_required_family_green=3/3, research_only_family_green=1/1, explicit_out_of_envelope_green=7/7, envelope_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "bc2ed818d3ace297739ae3f95a9abc3546f2eee4998779cd003e65f9054f9986"
+  "report_digest": "40d5d80497a095d6b9693cb74a87060d8bc85a3f72b63b0a91ce991709fbf49d"
 }

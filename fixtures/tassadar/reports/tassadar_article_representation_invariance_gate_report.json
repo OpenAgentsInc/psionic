@@ -8,7 +8,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-179A",
       "TAS-180",
       "TAS-181",
       "TAS-182",
@@ -393,5 +392,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this report closes the prompt, tokenization, and representation invariance gate for the declared owned article route only. It proves that trivial whitespace and prompt/target token-split perturbations do not change the route, that semantically irrelevant prompt-field ordering canonicalizes cleanly, that dead-code suffix IR layout changes preserve exact execution behavior, and that local-slot renaming is explicitly representation-sensitive but still canonicalizes back to the same semantic trace. It does not claim artifact-backed weight identity, reference-linear exactness on the Transformer-backed route, fast-route promotion, benchmark parity, or final article-equivalence green status.",
   "summary": "Article representation invariance now records case_count=18, exact_trace_case_count=16, canonicalized_trace_case_count=2, output_stable_case_count=18, tokenizer_roundtrip_exact_case_count=18, model_binding_roundtrip_exact_case_count=18, article_representation_invariance_green=true, and article_equivalence_green=false.",
-  "report_digest": "21146be8bb17bb145adc3cf25db7e65725d9edb3992d41f4d8160c1a97f95204"
+  "report_digest": "36c74b043413b3cae8501ff3b38118874d33488cb1ba1b52cab9e3ee69286994"
 }

@@ -24,7 +24,7 @@ jq -e '
   and .envelope_alignment_green == true
   and .compile_matrix_green == true
   and .article_equivalence_green == false
-  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-179A")
+  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-180")
 ' fixtures/tassadar/reports/tassadar_article_frontend_corpus_compile_matrix_report.json >/dev/null
 
 jq -e '

@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "manifest_id": "tassadar.article_interpreter_breadth_suite.v1",
+  "manifest_ref": "fixtures/tassadar/sources/tassadar_article_interpreter_breadth_suite_v1.json",
+  "envelope_manifest_ref": "fixtures/tassadar/sources/tassadar_article_interpreter_breadth_envelope_v1.json",
+  "gate_issue_id": "TAS-179A",
+  "gate_report_ref": "fixtures/tassadar/reports/tassadar_article_interpreter_breadth_suite_gate_report.json",
+  "gate_summary_ref": "fixtures/tassadar/reports/tassadar_article_interpreter_breadth_suite_gate_summary.json",
+  "required_family_ids": [
+    "arithmetic_programs",
+    "call_heavy_programs",
+    "allocator_backed_programs",
+    "indirect_call_programs",
+    "branch_heavy_programs",
+    "loop_heavy_programs",
+    "state_machine_programs",
+    "parser_style_programs"
+  ],
+  "family_rows": [
+    {
+      "family_id": "arithmetic_programs",
+      "envelope_anchor_family_ids": [
+        "frozen_core_wasm_window",
+        "article_named_i32_profiles"
+      ],
+      "authority_refs": [
+        "fixtures/tassadar/reports/tassadar_article_frontend_corpus_compile_matrix_report.json",
+        "fixtures/tassadar/reports/tassadar_trap_exception_report.json"
+      ],
+      "owner_surface_refs": [
+        "crates/psionic-compiler/src/tassadar_article_frontend_compiler_envelope.rs",
+        "crates/psionic-runtime/src/tassadar.rs"
+      ],
+      "required_evidence_ids": [
+        "arithmetic_accumulator_exact",
+        "arithmetic_reference_success"
+      ],
+      "detail": "arithmetic rows stay pinned to the frozen/core current article profile floor instead of being smuggled in later as a generic proxy for arbitrary programs"
+    },
+    {
+      "family_id": "call_heavy_programs",
+      "envelope_anchor_family_ids": [
+        "article_named_i32_profiles"
+      ],
+      "authority_refs": [
+        "fixtures/tassadar/reports/tassadar_call_frame_report.json"
+      ],
+      "owner_surface_refs": [
+        "crates/psionic-runtime/src/tassadar_call_frames.rs",
+        "crates/psionic-runtime/src/tassadar_call_frame_resume.rs"
+      ],
+      "required_evidence_ids": [
+        "multi_function_replay",
+        "bounded_recursive_exact",
+        "bounded_recursion_refusal"
+      ],
+      "detail": "call-heavy rows must keep exact multi-function replay and bounded recursion refusal explicit rather than claiming an unconstrained call-stack model"
+    },
+    {
+      "family_id": "allocator_backed_programs",
+      "envelope_anchor_family_ids": [
+        "article_named_i32_profiles",
+        "search_process_family"
+      ],
+      "authority_refs": [
+        "fixtures/tassadar/reports/tassadar_article_frontend_corpus_compile_matrix_report.json"
+      ],
+      "owner_surface_refs": [
+        "crates/psionic-compiler/src/tassadar_article_frontend_compiler_envelope.rs",
+        "crates/psionic-runtime/src/tassadar_article_abi.rs"
+      ],
+      "required_evidence_ids": [
+        "bump_allocator_checksum_exact",
+        "heap_sum_window_exact"
+      ],
+      "detail": "allocator-backed rows stay tied to the committed article corpus and bounded heap-input ABI rather than widening into generic dynamic-memory closure"
+    },
+    {
+      "family_id": "indirect_call_programs",
+      "envelope_anchor_family_ids": [
+        "article_named_i32_profiles",
+        "search_process_family"
+      ],
+      "authority_refs": [
+        "fixtures/tassadar/reports/tassadar_rust_article_profile_completeness_report.json",
+        "fixtures/tassadar/reports/tassadar_trap_exception_report.json"
+      ],
+      "owner_surface_refs": [
+        "crates/psionic-compiler/src/tassadar_wasm_module.rs",
+        "crates/psionic-runtime/src/tassadar_module_execution.rs"
+      ],
+      "required_evidence_ids": [
+        "tables_globals_indirect_calls.single_funcref_table_mutable_i32_globals",
+        "sudoku_indirect_call_failure"
+      ],
+      "detail": "indirect-call rows must keep the admitted table/global shape and the challengeable indirect-call failure path explicit rather than collapsing them into generic search success"
+    },
+    {
+      "family_id": "branch_heavy_programs",
+      "envelope_anchor_family_ids": [
+        "article_named_i32_profiles"
+      ],
+      "authority_refs": [
+        "fixtures/tassadar/reports/tassadar_article_frontend_corpus_compile_matrix_report.json"
+      ],
+      "owner_surface_refs": [
+        "crates/psionic-compiler/src/tassadar_article_frontend_compiler_envelope.rs",
+        "crates/psionic-runtime/src/tassadar.rs"
+      ],
+      "required_evidence_ids": [
+        "branch_dispatch_exact"
+      ],
+      "detail": "branch-heavy rows stay tied to one committed Rust article source family instead of being inferred from long-loop or search evidence"
+    },
+    {
+      "family_id": "loop_heavy_programs",
+      "envelope_anchor_family_ids": [
+        "long_horizon_control_family"
+      ],
+      "authority_refs": [
+        "fixtures/tassadar/reports/tassadar_article_frontend_corpus_compile_matrix_report.json",
+        "fixtures/tassadar/reports/tassadar_article_runtime_closeout_report.json"
+      ],
+      "owner_surface_refs": [
+        "crates/psionic-runtime/src/tassadar_article_runtime_closeout.rs",
+        "crates/psionic-runtime/src/tassadar.rs"
+      ],
+      "required_evidence_ids": [
+        "long_loop_frontier_exact",
+        "long_loop_kernel.million_step"
+      ],
+      "detail": "loop-heavy rows must keep the compiled long-loop source and the runtime stress horizon tied together instead of treating either one alone as a sufficient breadth proof"
+    },
+    {
+      "family_id": "state_machine_programs",
+      "envelope_anchor_family_ids": [
+        "long_horizon_control_family"
+      ],
+      "authority_refs": [
+        "fixtures/tassadar/reports/tassadar_article_frontend_corpus_compile_matrix_report.json",
+        "fixtures/tassadar/reports/tassadar_article_runtime_closeout_report.json"
+      ],
+      "owner_surface_refs": [
+        "crates/psionic-runtime/src/tassadar_article_runtime_closeout.rs",
+        "crates/psionic-runtime/src/tassadar.rs"
+      ],
+      "required_evidence_ids": [
+        "state_machine_router_exact",
+        "state_machine_loop_exact",
+        "state_machine_kernel.two_million_step"
+      ],
+      "detail": "state-machine rows must keep both the frontend corpus and the later runtime horizon explicit rather than letting one bounded state machine stand in for the entire long-horizon family"
+    },
+    {
+      "family_id": "parser_style_programs",
+      "envelope_anchor_family_ids": [
+        "module_scale_wasm_loop_family"
+      ],
+      "authority_refs": [
+        "fixtures/tassadar/reports/tassadar_module_scale_workload_suite_report.json"
+      ],
+      "owner_surface_refs": [
+        "crates/psionic-ir/src/tassadar_wasm_module.rs",
+        "crates/psionic-compiler/src/tassadar_wasm_module.rs",
+        "crates/psionic-runtime/src/tassadar_module_execution.rs"
+      ],
+      "required_evidence_ids": [
+        "parsing_token_triplet_exact"
+      ],
+      "detail": "parser-style rows stay tied to the bounded module-scale Wasm parsing fixture rather than borrowing linked-program-bundle or broader install-time parser claims"
+    }
+  ],
+  "current_truth_boundary": "the public repo now freezes one generic article-program family suite over arithmetic, call-heavy, allocator-backed, indirect-call, branch-heavy, loop-heavy, state-machine, and parser-style rows. Each row stays tied to the declared TAS-179 interpreter envelope, concrete authority refs, and explicit owner surfaces rather than borrowing arbitrary-program language by implication.",
+  "non_implications": [
+    "not arbitrary-program closure inside transformer weights",
+    "not arbitrary host-import or OS-mediated process closure",
+    "not memory64, multi-memory, component-linking, or exception-profile closure",
+    "not benchmark-wide Hungarian or Sudoku closeout",
+    "not final article-equivalence green status"
+  ],
+  "claim_boundary": "this manifest defines only the required generic article-program family suite for TAS-179A. A green suite gate proves the declared breadth rows are covered by committed evidence under the TAS-179 envelope; it does not widen the article claim to arbitrary programs or final article-equivalence closure.",
+  "manifest_digest": "3a701ce7f8163e53f1d110cc6eee3d01804bad8a83516b5990d6c2bc4b75f19f"
+}

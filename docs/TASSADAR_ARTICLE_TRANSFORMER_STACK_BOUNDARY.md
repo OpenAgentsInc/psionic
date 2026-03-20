@@ -443,6 +443,25 @@ instead of borrowing arbitrary-program language by implication, while the
 follow-on breadth-suite, benchmark, single-run, and final article-equivalence
 tranches remain open.
 
+`TAS-179A` now closes that follow-on breadth-suite tranche on top of the same
+owned route. `psionic-data` now commits one generic article-program family
+suite manifest at
+`fixtures/tassadar/sources/tassadar_article_interpreter_breadth_suite_v1.json`,
+freezing the exact arithmetic, call-heavy, allocator-backed, indirect-call,
+branch-heavy, loop-heavy, state-machine, and parser-style rows plus their
+envelope anchors, authority refs, owner surfaces, and required evidence ids.
+`psionic-eval` now commits one green suite gate at
+`fixtures/tassadar/reports/tassadar_article_interpreter_breadth_suite_gate_report.json`,
+proving those rows against the committed article frontend corpus, call-frame,
+profile-completeness, runtime-closeout, module-scale, and trap/exception
+surfaces without widening the claim outside the declared envelope.
+`psionic-research` now mirrors the operator-readable summary at
+`fixtures/tassadar/reports/tassadar_article_interpreter_breadth_suite_gate_summary.json`.
+This is the point where the repo now machine-readably says the declared
+article interpreter breadth blocker itself is closed inside the bounded public
+envelope, while benchmark-wide, single-run, and final article-equivalence
+tranches remain open.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

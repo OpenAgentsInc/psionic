@@ -90,9 +90,9 @@
         "blocker_id": "BEQ-002",
         "category": "interpreter_breadth",
         "title": "Declared article interpreter breadth remains open",
-        "repo_status": "partial",
-        "current_gap_summary": "the public repo now declares one article interpreter breadth envelope, but the article still frames arbitrary programs and a WebAssembly interpreter inside transformer weights while the remaining breadth-suite and final gate tranches stay open",
-        "current_public_truth": "the repo now has a machine-readable article interpreter breadth envelope over the frozen core-Wasm floor, the current named article i32 profiles, and the later required search-process, long-horizon control, and module-scale Wasm-loop families, while linked-program bundles stay research-only and broader import-mediated, dynamic-memory, memory64, multi-memory, component-linking, exception, and float-semantics families remain outside the declared article envelope",
+        "repo_status": "implemented",
+        "current_gap_summary": "the public repo now closes the article-interpreter breadth blocker inside the declared TAS-179 envelope by proving one green generic family suite over arithmetic, call-heavy, allocator-backed, indirect-call, branch-heavy, loop-heavy, state-machine, and parser-style rows while keeping arbitrary-program language explicitly out of scope",
+        "current_public_truth": "the repo now has a machine-readable article interpreter breadth envelope plus one green TAS-179A suite gate over the declared generic article-program families, with linked-program bundles still research-only and broader import-mediated, dynamic-memory, memory64, multi-memory, component-linking, exception, and float-semantics families still explicit outside the article envelope",
         "closure_requirements": [
           "declare one article interpreter breadth envelope rather than relying on bounded Rust-only article fixtures",
           "build a broad program-family suite over the declared article interpreter envelope",
@@ -688,7 +688,7 @@
         "github_issue_number": 302,
         "title": "TAS-179A: Article interpreter breadth suite and gate",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-002"
         ]
@@ -817,9 +817,8 @@
     "all_issue_refs_point_to_known_blockers": true,
     "matrix_contract_green": true,
     "article_equivalence_green": false,
-    "open_blocker_count": 5,
+    "open_blocker_count": 4,
     "open_blocker_ids": [
-      "BEQ-002",
       "BEQ-003",
       "BEQ-005",
       "BEQ-006",
@@ -834,8 +833,8 @@
       "not proof that hard-Sudoku benchmark closure, no-spill single-run closure, or route-minimality closure already exist"
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
-    "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=5.",
-    "report_digest": "37a77bcc2346e9e1b96b689eb2f40c43ba68379977d3bda18d60adedb18c0789"
+    "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=4.",
+    "report_digest": "60d2d726eddb16261c67999a26c377de55eb686ea2ee8140d64fcf9716d0436c"
   },
   "requirement_rows": [
     {
@@ -1263,14 +1262,14 @@
       "requirement_id": "TAS-179A",
       "requirement_kind": "implementation",
       "required_for_green": true,
-      "satisfied": false,
+      "satisfied": true,
       "blocker_ids": [
         "BEQ-002"
       ],
       "source_refs": [
         "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
       ],
-      "detail": "TAS-179A (`TAS-179A: Article interpreter breadth suite and gate`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-002 until that tranche closes."
+      "detail": "TAS-179A (`TAS-179A: Article interpreter breadth suite and gate`) is closed in the blocker matrix, so this acceptance-gate row is currently satisfied for blocker families BEQ-002."
     },
     {
       "requirement_id": "TAS-180",
@@ -1418,9 +1417,9 @@
   ],
   "total_requirement_count": 41,
   "required_requirement_count": 40,
-  "passed_required_requirement_count": 29,
+  "passed_required_requirement_count": 30,
   "required_issue_count": 37,
-  "closed_required_issue_count": 27,
+  "closed_required_issue_count": 28,
   "green_requirement_ids": [
     "blocker_matrix_contract_frozen",
     "owned_transformer_route_boundary_frozen",
@@ -1450,11 +1449,11 @@
     "TAS-176",
     "TAS-177",
     "TAS-178",
-    "TAS-179"
+    "TAS-179",
+    "TAS-179A"
   ],
   "failed_requirement_ids": [
     "article_equivalence_blockers_closed",
-    "TAS-179A",
     "TAS-180",
     "TAS-181",
     "TAS-182",
@@ -1466,7 +1465,6 @@
     "TAS-186"
   ],
   "blocked_issue_ids": [
-    "TAS-179A",
     "TAS-180",
     "TAS-181",
     "TAS-182",
@@ -1492,9 +1490,8 @@
   "blocker_matrix_contract_green": true,
   "prerequisite_transformer_boundary_green": true,
   "blocker_matrix_article_equivalence_green": false,
-  "open_blocker_count": 5,
+  "open_blocker_count": 4,
   "open_blocker_ids": [
-    "BEQ-002",
     "BEQ-003",
     "BEQ-005",
     "BEQ-006",
@@ -1504,6 +1501,6 @@
   "article_equivalence_green": false,
   "public_claim_allowed": false,
   "claim_boundary": "this is the frozen final acceptance gate for article-equivalent closure. It stays blocked until the blocker-matrix contract remains intact, the owned `psionic-transformer` route boundary remains intact, the blocker matrix itself turns article-equivalence green, and every required TAS tranche from `TAS-158` through `TAS-186` is closed. A green result here is necessary but not sufficient to widen public capability claims, and it still does not imply arbitrary C ingress, arbitrary Wasm ingress, or generic interpreter-in-weights closure outside the declared article envelope.",
-  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=29/40, closed_required_issues=27/37, blocked_issues=10, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
-  "report_digest": "e8282a54b3dcd9513151ce98e214b3af5ed69004fc23326a0db3892d9cdbb213"
+  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=30/40, closed_required_issues=28/37, blocked_issues=9, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
+  "report_digest": "5005dcb7072098b93a3353d2dce4d7aa30a527b7f861a6f77242cc5c844de913"
 }

@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-179A",
         "TAS-180",
         "TAS-181",
         "TAS-182",
@@ -37,7 +36,6 @@
         "tied_requirement_satisfied": true,
         "acceptance_status": "blocked",
         "blocked_issue_ids": [
-          "TAS-179A",
           "TAS-180",
           "TAS-181",
           "TAS-182",
@@ -61,7 +59,6 @@
           "acceptance_status": "blocked",
           "article_equivalence_green": false,
           "blocked_issue_ids": [
-            "TAS-179A",
             "TAS-180",
             "TAS-181",
             "TAS-182",
@@ -245,7 +242,7 @@
         "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
         "claim_boundary": "this report inventories reusable substrate only. It freezes what can be reused, what needs extension, what stays research-only, and what is still not sufficient for article closure. It does not claim that the owned article-equivalence Transformer stack, the canonical article model artifact, or the final article-equivalence proof route already exist.",
         "summary": "Existing substrate inventory now records surface_count=11, blocker_surface_count=6, non_blocker_surface_count=5, inventory_contract_green=true, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-        "report_digest": "98f45a5cf58bf45734236f9e7feffb4eb85a6acb659577370bc16573ae0def4c"
+        "report_digest": "a5b3b432aee0554cfdffdfccd66ed7f86ec2368daf4c9bf89a1f6d9af4fbc62a"
       },
       "interface_rows": [
         {
@@ -377,7 +374,7 @@
       "article_equivalence_green": false,
       "claim_boundary": "this report freezes one explicit canonical Transformer stack boundary for the article-equivalence closure wave. The route is not one monolithic crate; it is one required boundary spanning existing crates with `psionic-transformer` as the architecture anchor, `psionic-models` as the article-model and artifact owner, and `psionic-runtime` as the replay/receipt owner. This does not claim the final article-equivalence stack is complete or green.",
       "summary": "Canonical Transformer stack boundary now records interface_rows=5, dependency_checks=6, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
-      "report_digest": "900b74c17ae02d915d8f63b7023fcb1d8fbb062df8695c85feed41eeddbb4449"
+      "report_digest": "facef3cf873661ea43527d8a7cfdcd1c981fff9604013ce03c4d63509ca18343"
     },
     "trace_domain_binding": {
       "binding_id": "tassadar.article_transformer.trace_domain_binding.v1",
@@ -8165,7 +8162,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report closes the owned-route trace vocabulary and channel binding only. It proves that the canonical article wrapper can consume one runtime-owned prompt/trace schema, split prompt tokens from the append-only trace suffix, bind stack/local/memory channels directly to that schema, and roundtrip one article-class case through the shared tokenizer without drift. It does not claim representation invariance, artifact-backed weight identity, reference-linear exactness, fast-route promotion, benchmark parity, or final article-equivalence green status.",
     "summary": "Article trace vocabulary binding now records channel_binding_rows=14, case_rows=4, source_vocab_compatible=true, target_vocab_compatible=true, prompt_trace_boundary_supported=true, halt_boundary_supported=true, all_required_channels_bound=true, roundtrip_exact=true, article_trace_vocabulary_binding_green=true, and article_equivalence_green=false.",
-    "report_digest": "7ad52460845595d738b37bc90fb82dd68153e31008d936e832a15b5d94bcc511"
+    "report_digest": "227a6aaec94ff91dc8abb734a4a142f169a061b9c2f84a8f2657b6a0608b8378"
   },
   "tied_requirement_id": "TAS-167",
   "tied_requirement_satisfied": true,
@@ -8181,5 +8178,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors the owned-route article trace vocabulary binding only. It keeps the tokenizer/schema/channel closure operator-readable without widening the underlying article-equivalence claim boundary.",
   "summary": "Article trace vocabulary binding summary now records channel_binding_row_count=14, source_vocab_compatible=true, target_vocab_compatible=true, prompt_trace_boundary_supported=true, halt_boundary_supported=true, all_required_channels_bound=true, roundtrip_exact=true, article_trace_vocabulary_binding_green=true, and article_equivalence_green=false.",
-  "report_digest": "a6f2175ba25ff632663dd51c672447904292544eeb8c1da94a1b84c372efbb66"
+  "report_digest": "189805234ec8e6df76f92ebb906cd7564f2274ec9de6be9643c7e0b7a76805c1"
 }

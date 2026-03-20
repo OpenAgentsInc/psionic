@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-179A",
         "TAS-180",
         "TAS-181",
         "TAS-182",
@@ -397,7 +396,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report closes the prompt, tokenization, and representation invariance gate for the declared owned article route only. It proves that trivial whitespace and prompt/target token-split perturbations do not change the route, that semantically irrelevant prompt-field ordering canonicalizes cleanly, that dead-code suffix IR layout changes preserve exact execution behavior, and that local-slot renaming is explicitly representation-sensitive but still canonicalizes back to the same semantic trace. It does not claim artifact-backed weight identity, reference-linear exactness on the Transformer-backed route, fast-route promotion, benchmark parity, or final article-equivalence green status.",
     "summary": "Article representation invariance now records case_count=18, exact_trace_case_count=16, canonicalized_trace_case_count=2, output_stable_case_count=18, tokenizer_roundtrip_exact_case_count=18, model_binding_roundtrip_exact_case_count=18, article_representation_invariance_green=true, and article_equivalence_green=false.",
-    "report_digest": "21146be8bb17bb145adc3cf25db7e65725d9edb3992d41f4d8160c1a97f95204"
+    "report_digest": "36c74b043413b3cae8501ff3b38118874d33488cb1ba1b52cab9e3ee69286994"
   },
   "tied_requirement_id": "TAS-167A",
   "tied_requirement_satisfied": true,
@@ -413,5 +412,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors the owned-route prompt, tokenization, and representation invariance gate only. It keeps the exact-trace versus canonicalized-equivalence split operator-readable without widening the underlying article-equivalence claim boundary.",
   "summary": "Article representation invariance summary now records case_count=18, suppressed_case_count=9, exact_trace_case_count=16, canonicalized_trace_case_count=2, output_stable_case_count=18, tokenizer_roundtrip_exact_case_count=18, model_binding_roundtrip_exact_case_count=18, article_representation_invariance_green=true, and article_equivalence_green=false.",
-  "report_digest": "d505ba91ae69fdc47bc90a6b64eb71b0233fba726eb430c923e70f8f8f31a369"
+  "report_digest": "4a86a364e435d10b4274d0c2148304057b4d869a35c6af1762d0282f21d5747b"
 }
