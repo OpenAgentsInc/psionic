@@ -540,7 +540,7 @@
         "github_issue_number": 288,
         "title": "TAS-169A: Transformer-backed article weight lineage and artifact contract",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-003",
           "BEQ-007"
@@ -839,7 +839,7 @@
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
     "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=7.",
-    "report_digest": "5837e5ea2bcf9f7b05b725c2171b4335dc66776e1f420ca018fa10ec15d19c0b"
+    "report_digest": "0961199d0cffe374850d0199deaf90fd2dc8a50230a6cdaa09f5bd68ab9f062d"
   },
   "requirement_rows": [
     {
@@ -1075,7 +1075,7 @@
       "requirement_id": "TAS-169A",
       "requirement_kind": "implementation",
       "required_for_green": true,
-      "satisfied": false,
+      "satisfied": true,
       "blocker_ids": [
         "BEQ-003",
         "BEQ-007"
@@ -1083,7 +1083,7 @@
       "source_refs": [
         "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
       ],
-      "detail": "TAS-169A (`TAS-169A: Transformer-backed article weight lineage and artifact contract`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-003, BEQ-007 until that tranche closes."
+      "detail": "TAS-169A (`TAS-169A: Transformer-backed article weight lineage and artifact contract`) is closed in the blocker matrix, so this acceptance-gate row is currently satisfied for blocker families BEQ-003, BEQ-007."
     },
     {
       "requirement_id": "TAS-170",
@@ -1422,9 +1422,9 @@
   ],
   "total_requirement_count": 41,
   "required_requirement_count": 40,
-  "passed_required_requirement_count": 15,
+  "passed_required_requirement_count": 16,
   "required_issue_count": 37,
-  "closed_required_issue_count": 13,
+  "closed_required_issue_count": 14,
   "green_requirement_ids": [
     "blocker_matrix_contract_frozen",
     "owned_transformer_route_boundary_frozen",
@@ -1440,11 +1440,11 @@
     "TAS-167",
     "TAS-167A",
     "TAS-168",
-    "TAS-169"
+    "TAS-169",
+    "TAS-169A"
   ],
   "failed_requirement_ids": [
     "article_equivalence_blockers_closed",
-    "TAS-169A",
     "TAS-170",
     "TAS-171",
     "TAS-171A",
@@ -1470,7 +1470,6 @@
     "TAS-186"
   ],
   "blocked_issue_ids": [
-    "TAS-169A",
     "TAS-170",
     "TAS-171",
     "TAS-171A",
@@ -1524,6 +1523,6 @@
   "article_equivalence_green": false,
   "public_claim_allowed": false,
   "claim_boundary": "this is the frozen final acceptance gate for article-equivalent closure. It stays blocked until the blocker-matrix contract remains intact, the owned `psionic-transformer` route boundary remains intact, the blocker matrix itself turns article-equivalence green, and every required TAS tranche from `TAS-158` through `TAS-186` is closed. A green result here is necessary but not sufficient to widen public capability claims, and it still does not imply arbitrary C ingress, arbitrary Wasm ingress, or generic interpreter-in-weights closure outside the declared article envelope.",
-  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=15/40, closed_required_issues=13/37, blocked_issues=24, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
-  "report_digest": "5caaae41ce940a33bd2cf1ac2aba42ab8bc3eacc5a7ca6bb230a60a3e52359fa"
+  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=16/40, closed_required_issues=14/37, blocked_issues=23, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
+  "report_digest": "cc125b48b23aa831b7684ad0c5e8d88e5328a1112d149b9e7d3b9e27004262cc"
 }

@@ -206,6 +206,9 @@ It already has real substrate for:
   article-class trace-prefix slice, with one explicit trained trace-bound
   safetensors artifact plus checkpoint and artifact-reload parity rooted in
   `psionic-transformer`
+- frozen lineage contracts for trained article-Transformer artifacts, binding
+  exact workload set, training-config snapshot, source inventory, checkpoint
+  lineage, and committed artifact digests into one challengeable manifest
 - adapter lineage
 
 It does not yet implement the full distributed trainer-orchestrator-RL runtime.
@@ -404,6 +407,19 @@ closure:
   with no fallbacks or refusals and about `1.93x` hull speedup (`42,172` vs
   `21,860` target tok/s over a `4,096`-token per-case window), while exactness
   remains `0/8`, which is the right claim boundary for the lane today
+- `TAS-169A` now hardens the same run into a challengeable provenance
+  contract:
+  `fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_lineage_contract.json`
+  now freezes the exact workload set, training-config snapshot, source
+  inventory, checkpoint lineage, descriptor digests, and committed artifact
+  digests around the first trained trace-bound article weights, while
+  `psionic-eval` and `psionic-research` mirror that state in
+  `fixtures/tassadar/reports/tassadar_article_transformer_weight_lineage_report.json`
+  and
+  `fixtures/tassadar/reports/tassadar_article_transformer_weight_lineage_summary.json`
+  without pretending that provenance closure itself is already reference-linear
+  exactness, fast-route promotion, benchmark parity, or final
+  article-equivalence green status
 - the Phase 11 scale-out substrate now also exists above that run:
   `psionic-runtime` owns a real `tassadar.wasm.sudoku_9x9_search.v1` profile
   plus a real split-aware 9x9 Sudoku-class corpus, `psionic-eval` and

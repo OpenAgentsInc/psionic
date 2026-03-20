@@ -819,7 +819,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             288,
             "TAS-169A: Transformer-backed article weight lineage and artifact contract",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-003", "BEQ-007"],
         ),
         issue_row(

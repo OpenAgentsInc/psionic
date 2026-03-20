@@ -58,6 +58,8 @@ mod tassadar_article_transformer_training_closure;
 mod tassadar_article_transformer_training_evidence;
 #[path = "tassadar_article_transformer_weight_production.rs"]
 mod tassadar_article_transformer_weight_production;
+#[path = "tassadar_article_transformer_weight_lineage.rs"]
+mod tassadar_article_transformer_weight_lineage;
 #[path = "tassadar_async_lifecycle_profile.rs"]
 mod tassadar_async_lifecycle_profile;
 #[path = "tassadar_attention_primitive_mask_closure.rs"]
@@ -344,6 +346,7 @@ pub use tassadar_article_transformer_model_closure::*;
 pub use tassadar_article_transformer_training_closure::*;
 pub use tassadar_article_transformer_training_evidence::*;
 pub use tassadar_article_transformer_weight_production::*;
+pub use tassadar_article_transformer_weight_lineage::*;
 pub use tassadar_async_lifecycle_profile::*;
 pub use tassadar_attention_primitive_mask_closure::*;
 pub use tassadar_benchmark_package_set::*;

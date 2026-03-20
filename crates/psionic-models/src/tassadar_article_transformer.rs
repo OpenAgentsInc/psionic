@@ -319,6 +319,8 @@ impl TassadarArticleTransformer {
         "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_descriptor.json";
     pub const TRAINED_TRACE_BOUND_ARTIFACT_REF: &str =
         "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0.safetensors";
+    pub const TRAINED_TRACE_BOUND_LINEAGE_CONTRACT_REF: &str =
+        "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_lineage_contract.json";
 
     /// Returns a small canonical reference config used for closure tests.
     #[must_use]
@@ -483,6 +485,11 @@ impl TassadarArticleTransformer {
     #[must_use]
     pub fn trained_trace_bound_artifact_path() -> PathBuf {
         repo_root().join(Self::TRAINED_TRACE_BOUND_ARTIFACT_REF)
+    }
+
+    #[must_use]
+    pub fn trained_trace_bound_lineage_contract_path() -> PathBuf {
+        repo_root().join(Self::TRAINED_TRACE_BOUND_LINEAGE_CONTRACT_REF)
     }
 
     /// Returns the public descriptor.

@@ -206,6 +206,18 @@ without pretending that this first trained artifact is already the final
 reference-linear proof route, full article-class exactness, or final
 article-equivalence green status.
 
+`TAS-169A` now closes the provenance hardening tranche on top of that same
+split. `psionic-models` now points the trained trace-bound route at one
+committed lineage contract under
+`fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_lineage_contract.json`,
+while `psionic-eval` now audits that manifest against the exact workload set,
+training-config snapshot, source inventory, checkpoint lineage, descriptor
+digests, and committed artifact digests in
+`fixtures/tassadar/reports/tassadar_article_transformer_weight_lineage_report.json`.
+That keeps "weights exist" separate from "weight provenance is frozen and
+challengeable" and still does not widen the public claim beyond this bounded
+trained artifact.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.
