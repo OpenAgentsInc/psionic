@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "scope_window": "parameter_golf_after_action_v1",
+  "decision_date": "2026-03-19",
+  "lane_status": "stopped_not_planned",
+  "decision_basis": "user_directed_pause_and_wontfix_closure",
+  "retained_claim_posture": "non_record_submission",
+  "final_acceptance_categories": {
+    "challenge_oracle_parity": "implemented",
+    "single_device_trainer_parity": "implemented_early",
+    "distributed_throughput_closure": "partial",
+    "packaging_readiness": "implemented",
+    "record_track_readiness": "partial_outside_psionic"
+  },
+  "retained_artifacts": [
+    "docs/PARAMETER_GOLF_ACCOUNTING.md",
+    "docs/PARAMETER_GOLF_ACCEPTANCE_MATRIX.md",
+    "docs/PARAMETER_GOLF_SINGLE_H100_BRINGUP.md",
+    "docs/PARAMETER_GOLF_RECORD_FOLDER_COMPATIBILITY.md",
+    "docs/PARAMETER_GOLF_EXPORTED_SUBMISSION_EVIDENCE.md",
+    "docs/PARAMETER_GOLF_ARCHITECTURE_EXPERIMENT_QUEUE.md",
+    "docs/PARAMETER_GOLF_RESTRICTED_ATTENTION_REPORT.md",
+    "fixtures/parameter_golf/reports/parameter_golf_acceptance_report.json",
+    "fixtures/parameter_golf/reports/parameter_golf_record_folder_compatibility.json",
+    "fixtures/parameter_golf/reports/parameter_golf_record_folder_replay_verification.json",
+    "fixtures/parameter_golf/reports/parameter_golf_research_harness_report.json",
+    "fixtures/parameter_golf/reports/parameter_golf_restricted_attention_report.json",
+    "fixtures/parameter_golf/reports/parameter_golf_single_h100_bringup.json"
+  ],
+  "unfinished_work": [
+    "rust_only_single_h100_baseline_trainer",
+    "real_exported_folder_8xH100_run_evidence",
+    "acceptance_matrix_promotion_beyond_non_record_submission",
+    "record_candidate_campaign"
+  ],
+  "last_single_h100_findings": {
+    "hardware": "NVIDIA H100 PCIe",
+    "machine_admission_succeeded": true,
+    "trainer_reached_cuda_microbatch": true,
+    "observed_forward_costs": {
+      "scaled_dot_product_attention_ms": 7713,
+      "rotary_embedding_ms_range": [
+        2044,
+        3856
+      ],
+      "permute_ms_range": [
+        1104,
+        2253
+      ],
+      "expand_ms": 2091,
+      "reshape_ms_range": [
+        220,
+        758
+      ]
+    },
+    "next_unlanded_engineering_step": "reduce_host_materialized_view_op_cost_and_continue_forward_path_profiling"
+  },
+  "closed_not_planned_issues": [
+    {
+      "issue": 183,
+      "id": "PGOLF-500",
+      "reason": "parent_sprint_stopped"
+    },
+    {
+      "issue": 189,
+      "id": "PGOLF-602",
+      "reason": "no_real_8xH100_exported_folder_evidence_before_stop"
+    },
+    {
+      "issue": 194,
+      "id": "PGOLF-604",
+      "reason": "single_H100_trainer_path_not_finished_before_stop"
+    },
+    {
+      "issue": 250,
+      "id": "PGOLF-606",
+      "reason": "promotion_depended_on_unfinished_runtime_and_hardware_evidence"
+    },
+    {
+      "issue": 253,
+      "id": "PGOLF-609",
+      "reason": "no_record_candidate_campaign_before_stop"
+    }
+  ],
+  "summary": "Parameter Golf work stopped on 2026-03-19 by user direction. The repo retains oracle parity, non-record packaging, research evidence, and the single-H100 bring-up seam, but it never closed the Rust-only single-H100 trainer, real exported-folder 8xH100 evidence, or record-candidate campaign."
+}

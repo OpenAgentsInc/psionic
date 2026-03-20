@@ -14,6 +14,12 @@
 > and
 > `~/code/parameter-golf/records/track_non_record_16mb/2026-03-18_Quasi10Bfrom50B_SP1024_9x512_KV4_4h_pgut3/README.md`.
 >
+> Active development on this lane stopped on 2026-03-19 by explicit user
+> direction. See `docs/PARAMETER_GOLF_AFTER_ACTION.md` and
+> `fixtures/parameter_golf/reports/parameter_golf_after_action_report.json`
+> for the final stop record and the closed-not-planned resolution of the
+> remaining open PGOLF issues.
+>
 > This is the lane-specific roadmap for building a Psionic-owned Parameter Golf
 > stack inside `crates/psionic-*`. It is intentionally narrower than
 > `docs/ROADMAP.md`: it is about FineWeb challenge data, compact causal-decoder
@@ -263,11 +269,14 @@ We should not assume A automatically solves B.
 
 ## Current Sprint Assumption
 
-The current continuation sprint is no longer aimed at another review package.
+This section is historical only.
 
-It is aimed at a real record-track candidate path.
+Before the 2026-03-19 stop decision, the continuation sprint was no longer
+aimed at another review package.
 
-That means the next queue should optimize for:
+It was aimed at a real record-track candidate path.
+
+That meant the next queue should optimize for:
 
 - a generated folder that can actually be staged into `~/code/parameter-golf`
   as a submission candidate
@@ -300,6 +309,11 @@ That queue covers `PGOLF-501` / [#184](https://github.com/OpenAgentsInc/psionic/
 through `PGOLF-703` / [#193](https://github.com/OpenAgentsInc/psionic/issues/193)
 and turns the remaining work from "reviewable package" to "record-track PR
 candidate" into an explicit dependency-ordered program.
+
+That historical sprint queue is no longer active.
+
+On 2026-03-19, the remaining open issues in that queue were closed not planned
+under the stop decision recorded in `docs/PARAMETER_GOLF_AFTER_ACTION.md`.
 
 ## Epic 0: Governance And Acceptance
 
@@ -486,9 +500,9 @@ Turn the PR-ready submission surface into a genuine record-candidate runtime.
 | `PGOLF-627` / [#271](https://github.com/OpenAgentsInc/psionic/issues/271) | done (2026-03-19) | `Psionic Parameter Golf: add Parameter Golf train-time ReLU^2 graph and runtime support` | `psionic-core`, `psionic-ir`, `psionic-backend-cpu`, and `psionic-backend-cuda` now expose exact bounded `relu_squared` plus `relu_squared_backward` backend-extension ops, register them in the built-in operator surface, evaluate them on the dense reference path, materialize reverse-mode ReLU^2 gradients, and execute the forward plus seeded backward graph on CUDA through a bounded host-orchestrated `f32` runtime. This retires the real baseline MLP activation gap on the honest Rust-native train graph without claiming logits, loss, or end-to-end trainer closure. |
 | `PGOLF-628` / [#272](https://github.com/OpenAgentsInc/psionic/issues/272) | done (2026-03-19) | `Psionic Parameter Golf: add Parameter Golf tanh-softcap projection-loss graph and CUDA runtime support` | `psionic-core`, `psionic-ir`, `psionic-backend-cpu`, and `psionic-backend-cuda` now expose a bounded `parameter_golf_projection_loss` plus `parameter_golf_projection_loss_backward` backend-extension family, register it in the built-in operator surface, evaluate it on the dense reference path, materialize reverse-mode logits gradients without differentiating target ids, execute the forward and seeded backward graph on CUDA, and refuse the same op explicitly on the CPU runtime. This retires the remaining host-logits roundtrip dependency for the honest Rust-native Parameter Golf trainer path without claiming the trainer loop itself is done. |
 | `PGOLF-626` / [#269](https://github.com/OpenAgentsInc/psionic/issues/269) | done (2026-03-19) | `Psionic Parameter Golf: lower the full baseline forward-logits and seeded backward path` | `psionic-train` now ships a trainer-owned `parameter_golf_baseline_graph` module that lowers the full bounded baseline path from dense embedded inputs through pre-softcap logits, binds the stable Parameter Golf parameter surface explicitly, applies the host-owned tanh softcap plus cross-entropy seed honestly, and materializes seeded backward gradients including the tied token-embedding scatter-add path. The bounded tests prove forward-logit parity against the committed baseline fixture and finite-difference gradient agreement across representative parameter families, while the same change also retires the rotary-sign mismatch and attention-backward seed-layout bug that were blocking that parity. |
-| `PGOLF-602` / [#189](https://github.com/OpenAgentsInc/psionic/issues/189) | open (2026-03-18) | `Psionic Parameter Golf: capture real 8xH100 run bundles from the exported submission entrypoint` | The repo should preserve run bundles, train logs, wallclock receipts, memory receipts, and artifact-size receipts emitted by the real exported submission folder on actual `8xH100` hardware instead of only by the internal benchmark or receipt path. |
+| `PGOLF-602` / [#189](https://github.com/OpenAgentsInc/psionic/issues/189) | closed_not_planned (2026-03-19) | `Psionic Parameter Golf: capture real 8xH100 run bundles from the exported submission entrypoint` | This remained real unfinished work, but the lane stopped before real exported-folder `8xH100` evidence was captured. The repo now preserves the gap in `docs/PARAMETER_GOLF_AFTER_ACTION.md` instead of tracking it as active work. |
 | `PGOLF-603` / [#190](https://github.com/OpenAgentsInc/psionic/issues/190) | done (2026-03-18) | `Psionic Parameter Golf: add record-folder-local replay verification for metric, wallclock, and artifact bytes` | `psionic-train` now ships exported-folder run-evidence and replay-verification reports plus `scripts/check-parameter-golf-record-folder-replay.sh`, validating `submission.json`, `train.log`, runtime receipts, benchmark receipts, and counted bytes directly from the generated folder while keeping the current measured-or-refused `8xH100` posture explicit. |
-| `PGOLF-604` / [#194](https://github.com/OpenAgentsInc/psionic/issues/194) | open (2026-03-18) | `Psionic Parameter Golf: add a Rust-native 1xH100 baseline trainer entrypoint` | The repo now has a real Rust-native `parameter_golf_single_h100_bringup` command that binds cached FineWeb `sp1024` data, tokenizer identity, explicit local CUDA machine-admission truth, baseline model or optimizer truth, and the current CUDA blocker list into one typed report. It also now has the bounded baseline forward-logits, on-device tanh-softcap projection-loss, and seeded backward graph lanes needed to train against the real Parameter Golf parameter surface without a full-logits host roundtrip every microstep. The remaining work is to turn those pieces into the actual Psionic-owned single-H100 training loop instead of a refusal-bound readiness report. |
+| `PGOLF-604` / [#194](https://github.com/OpenAgentsInc/psionic/issues/194) | closed_not_planned (2026-03-19) | `Psionic Parameter Golf: add a Rust-native 1xH100 baseline trainer entrypoint` | The repo landed the real Rust-native single-H100 bring-up seam and bounded baseline graph lane, but not the full Psionic-owned trainer closure before the lane stopped. The final honest status now lives in `docs/PARAMETER_GOLF_AFTER_ACTION.md`. |
 | `PGOLF-605` / [#195](https://github.com/OpenAgentsInc/psionic/issues/195) | done (2026-03-18) | `Psionic Parameter Golf: add Rust-only 1xH100 parity and bring-up evidence for the public baseline` | The repo now ships a committed `parameter_golf_single_h100_bringup.json` report plus `scripts/check-parameter-golf-single-h100-bringup.sh`, both generated from the real downloaded FineWeb `sp1024` cache and tokenizer. The current evidence is an honest refusal with exact dataset, tokenizer, geometry, wallclock, and blocker facts, while preserving explicit absence of final training metrics and artifact bytes because the command still stops at contract validation. |
 
 ## Epic 7: Promotion Gate And PR Submission
@@ -550,10 +564,10 @@ work instead of leaving those steps implicit after the local dry-run lane.
 
 | ID | Status | Proposed GitHub issue title | Description |
 | --- | --- | --- | --- |
-| `PGOLF-606` / [#250](https://github.com/OpenAgentsInc/psionic/issues/250) | open (2026-03-19) | `Psionic Parameter Golf: promote the acceptance matrix and claim posture after the public runtime path closes` | This stays open until `PGOLF-601`, `PGOLF-602`, and `PGOLF-604` close; only then can the acceptance matrix, accounting doc, and machine-readable report be promoted honestly. |
+| `PGOLF-606` / [#250](https://github.com/OpenAgentsInc/psionic/issues/250) | closed_not_planned (2026-03-19) | `Psionic Parameter Golf: promote the acceptance matrix and claim posture after the public runtime path closes` | This never became honest because the real runtime and hardware-evidence issues stopped first. The retained claim posture remains `non_record_submission`, and the stop record now freezes that boundary explicitly. |
 | `PGOLF-607` / [#251](https://github.com/OpenAgentsInc/psionic/issues/251) | done (2026-03-19) | `Psionic Parameter Golf: submit and track the first real external non-record PR against openai/parameter-golf` | Psionic now preserves the first real external non-record PR as historical evidence only: `https://github.com/openai/parameter-golf/pull/119` was opened and then closed on 2026-03-19, and the exact fork commit, record-folder tree hash, and verifier digests remain frozen in `fixtures/parameter_golf/reports/parameter_golf_external_non_record_pr.json`. |
 | `PGOLF-608` / [#252](https://github.com/OpenAgentsInc/psionic/issues/252) | done (2026-03-19) | `Psionic Parameter Golf: capture maintainer-facing resolution on counted Rust runtime and build-dependency posture` | This issue is intentionally retired under the outbound-contribution ban. Psionic no longer tracks a live maintainer-facing counted-runtime question inside this repo; the canonical docs now preserve the unresolved accounting ambiguity as explicit local blocked posture instead. |
-| `PGOLF-609` / [#253](https://github.com/OpenAgentsInc/psionic/issues/253) | open (2026-03-19) | `Psionic Parameter Golf: freeze one real record-candidate config and run campaign` | This stays blocked on the real public runtime path and real `8xH100` evidence rather than on the earlier non-record packaging and PR mechanics. |
+| `PGOLF-609` / [#253](https://github.com/OpenAgentsInc/psionic/issues/253) | closed_not_planned (2026-03-19) | `Psionic Parameter Golf: freeze one real record-candidate config and run campaign` | This remained blocked on the unfinished public runtime path and missing real `8xH100` evidence when the lane stopped. No real record-candidate campaign was run before closure. |
 | `PGOLF-614` / [#258](https://github.com/OpenAgentsInc/psionic/issues/258) | done (2026-03-19) | `Psionic Parameter Golf: replace stale external-PR claims with repo-local blocked posture` | Psionic now updates the canonical docs and machine-readable receipt to reflect that the first external non-record PR is closed historical evidence, not a live workflow, and that counted-runtime ambiguity remains explicitly blocked locally unless the user directs new outbound action. |
 
 ## Current Execution Order
@@ -613,9 +627,9 @@ work instead of leaving those steps implicit after the local dry-run lane.
 - `PGOLF-628` -> landed bounded Parameter Golf tanh-softcap projection-loss forward and backward graph/runtime support across the core IR, CPU reference backend refusal path, and CUDA runtime
 - `PGOLF-626` -> landed the bounded full-baseline forward-logits and seeded backward path, including explicit host-owned softcap or seed handling and tied-embedding gradient reconstruction for the real Parameter Golf parameter surface
 - `PGOLF-603` -> landed folder-local replay verification plus exported-folder run-evidence reports for metrics, wallclock, and artifact bytes
-- `PGOLF-604` -> landed the first Rust-native single-H100 bring-up command and report seam plus the bounded baseline graph lane; turn those pieces into the actual Psionic-native baseline trainer path
+- `PGOLF-604` -> landed the first Rust-native single-H100 bring-up command and report seam plus the bounded baseline graph lane; the remaining trainer closure was never completed before the lane stopped
 - `PGOLF-605` -> landed the committed single-H100 parity or refusal report plus local-cache verifier for the Rust-native bring-up path
-- `PGOLF-602` -> capture real `8xH100` run bundles from the exported folder itself
+- `PGOLF-602` -> real exported-folder `8xH100` run bundles were never captured before the lane stopped
 
 ### Phase 8: promote and submit
 
@@ -635,8 +649,8 @@ work instead of leaving those steps implicit after the local dry-run lane.
 - `PGOLF-607` -> landed the first external non-record PR receipt; that PR is now closed and preserved as historical evidence only
 - `PGOLF-608` -> retired the live-upstream accounting-question lane under the outbound-contribution ban; the ambiguity now stays blocked locally instead
 - `PGOLF-614` -> landed the stale external-PR cleanup and repo-local blocked posture in the canonical docs and receipt
-- `PGOLF-606` -> acceptance-matrix promotion stays blocked on the real public runtime and evidence issues
-- `PGOLF-609` -> record-candidate campaign stays blocked on the real public runtime and `8xH100` evidence issues
+- `PGOLF-606` -> acceptance-matrix promotion never became honest before the lane stopped
+- `PGOLF-609` -> no real record-candidate campaign was frozen and run before the lane stopped
 
 ## Bottom Line
 
@@ -645,7 +659,7 @@ tokenizer-byte accounting, artifact compression, and honest benchmark
 packaging.
 
 Psionic is now strong enough to justify a real lane, but the repo should stay
-precise about what is true on 2026-03-18:
+precise about what was true before the 2026-03-19 stop decision:
 
 - Psionic already has strong reusable train, eval, model, tokenizer, and
   distributed substrate

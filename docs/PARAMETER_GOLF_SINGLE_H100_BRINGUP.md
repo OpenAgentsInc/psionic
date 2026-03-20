@@ -4,6 +4,8 @@
 > added 2026-03-18 after landing
 > `crates/psionic-train/src/parameter_golf_single_h100_bringup.rs` and
 > `crates/psionic-train/src/bin/parameter_golf_single_h100_bringup.rs`.
+> Parameter Golf development stopped on 2026-03-19 before this seam became a
+> full Rust-only trainer path; see `docs/PARAMETER_GOLF_AFTER_ACTION.md`.
 
 This document records the current honest single-H100 bring-up posture for the
 Psionic Parameter Golf lane.
@@ -154,13 +156,16 @@ Instead, it does one narrower but important job:
 - it preserves the exact dataset or tokenizer or model or blocker truth that
   later work must reuse instead of rebuilding from memory
 
-That is the intended bridge to `PGOLF-604`, `PGOLF-605`, and the existing
-`PGOLF-601` and `PGOLF-602` work:
+This remains the historical bridge that had been intended for `PGOLF-604`,
+`PGOLF-605`, and the existing `PGOLF-601` and `PGOLF-602` work before the lane
+stopped:
 
 - `PGOLF-601` / `#188` retired the explicit family-level public CUDA blocker
   list in the canonical coverage report
-- `PGOLF-604` / `#194` turns the bring-up seam into a real Psionic-native
-  single-H100 trainer path
+- `PGOLF-604` / `#194` would have turned the bring-up seam into a real
+  Psionic-native single-H100 trainer path, but that issue closed not planned
+  when the lane stopped
 - `PGOLF-605` / `#195` preserves the machine-readable single-H100 parity or
   refusal evidence
-- `PGOLF-602` / `#189` remains the later real `8xH100` evidence capture step
+- `PGOLF-602` / `#189` would have been the later real `8xH100` evidence
+  capture step, but that issue also closed not planned when the lane stopped

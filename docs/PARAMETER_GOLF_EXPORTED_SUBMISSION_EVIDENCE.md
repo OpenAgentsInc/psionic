@@ -81,7 +81,7 @@ These reports close exported-folder evidence and replay verification only.
 
 They do not claim:
 
-- that `PGOLF-602` / `#189` is closed
+- that real exported-folder `8xH100` evidence exists
 - that the current committed evidence is a true `8xH100` success
 - that the remaining CUDA baseline blockers are retired
 - that the current non-record folder is record-ready
@@ -89,4 +89,5 @@ They do not claim:
 The current committed challenge receipt is still a refusal on the local
 single-`RTX 4080` review host. That is intentional: the point of this layer is
 to make the folder-facing evidence and refusal posture explicit rather than
-implied. True exported-folder `8xH100` evidence remains open work.
+implied. The repo never reached true exported-folder `8xH100` evidence before
+the lane stopped.

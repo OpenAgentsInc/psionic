@@ -1591,6 +1591,7 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
 - **[docs/PARAMETER_GOLF_ARCHITECTURE_EXPERIMENT_QUEUE.md](docs/PARAMETER_GOLF_ARCHITECTURE_EXPERIMENT_QUEUE.md)** — canonical concrete post-parity architecture queue for shared-depth, stronger parameter-tying, and restricted-attention evidence.
 - **[docs/PARAMETER_GOLF_RESTRICTED_ATTENTION_REPORT.md](docs/PARAMETER_GOLF_RESTRICTED_ATTENTION_REPORT.md)** — canonical restricted-attention evidence record on one committed `seq_len=1024` challenge-format validation slice, including the current negative-evidence result for a fixed `256`-token window.
 - **[docs/PARAMETER_GOLF_EXTERNAL_NON_RECORD_PR.md](docs/PARAMETER_GOLF_EXTERNAL_NON_RECORD_PR.md)** — canonical historical record of the first external non-record PR, including the exact folder identity, verifier digests, closed-PR state, and the current local blocked posture for counted-runtime ambiguity.
+- **[docs/PARAMETER_GOLF_AFTER_ACTION.md](docs/PARAMETER_GOLF_AFTER_ACTION.md)** — canonical stop record for the paused Parameter Golf lane, including the final honest posture, last H100 findings, and the closed-not-planned resolution of the remaining open PGOLF issues.
 - **[docs/ROADMAP_FM.md](docs/ROADMAP_FM.md)** — Apple FM lane roadmap and API coverage.
 - **[docs/ROADMAP_PARAMETERGOLF.md](docs/ROADMAP_PARAMETERGOLF.md)** — Parameter Golf lane roadmap for challenge-oracle parity, compact decoder training, artifact accounting, and submission packaging inside Psionic.
 - `scripts/check-parameter-golf-acceptance.sh` and
@@ -1605,6 +1606,9 @@ For canonical current-state detail, use `docs/ARCHITECTURE.md` and
   `fixtures/parameter_golf/reports/parameter_golf_record_folder_compatibility.json`
   are the canonical verifier and machine-readable artifact for current
   Parameter Golf challenge-repo folder compatibility.
+- `fixtures/parameter_golf/reports/parameter_golf_after_action_report.json`
+  is the canonical machine-readable stop record for the paused Parameter Golf
+  lane.
 - **[docs/ROADMAP_TASSADAR.md](docs/ROADMAP_TASSADAR.md)** — Tassadar lane roadmap from the current bounded executor substrate to article-grade WebAssembly in-model compute.
 - **[docs/ROADMAP_TASSADAR_INDEX.md](docs/ROADMAP_TASSADAR_INDEX.md)** — compact Tassadar phase-to-artifact index for canonical bundle roots, audits, validators, and current claim boundaries.
 - `scripts/check-tassadar-acceptance.sh` and

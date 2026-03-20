@@ -43,6 +43,11 @@ The initial machine-readable matrix posture is `tracking_only`.
 
 The current lane claim posture is `non_record_submission`.
 
+Active development on the lane stopped on 2026-03-19 by explicit user
+direction. This matrix therefore remains historical claim truth for the landed
+repo state rather than an active promotion target. See
+`docs/PARAMETER_GOLF_AFTER_ACTION.md` for the stop record.
+
 That means:
 
 - the acceptance contract is now canonical and runnable
