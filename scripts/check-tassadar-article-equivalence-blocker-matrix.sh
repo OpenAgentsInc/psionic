@@ -16,8 +16,8 @@ jq -e '
   and .all_later_issues_covered == true
   and .all_issue_refs_point_to_known_blockers == true
   and .blocker_count == 7
-  and .open_blocker_count == 6
+  and .open_blocker_count == 5
   and ((.issue_coverage_rows | map(select(.issue_id == "TAS-176" and .issue_state == "closed")) | length) == 1)
   and ((.issue_coverage_rows | map(select(.issue_id == "TAS-177" and .issue_state == "closed")) | length) == 1)
-  and ((.issue_coverage_rows | map(select(.issue_id == "TAS-178" and .issue_state == "open")) | length) == 1)
+  and ((.issue_coverage_rows | map(select(.issue_id == "TAS-178" and .issue_state == "closed")) | length) == 1)
 ' fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json >/dev/null

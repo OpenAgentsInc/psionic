@@ -408,6 +408,21 @@ frontend/compiler envelope is exercised by a broader committed corpus instead
 of only the older narrow path, but full Hungarian/Sudoku demo-source parity and
 the final frontend claim surface still remain later tranches.
 
+`TAS-178` now closes that article-demo frontend parity tranche on top of the
+same owned route. `psionic-eval` now commits the dedicated article-demo
+frontend parity artifact at
+`fixtures/tassadar/reports/tassadar_article_demo_frontend_parity_report.json`,
+which recompiles the canonical Hungarian and Sudoku article demo sources
+through the declared envelope into dedicated `_tas178` Wasm artifacts beside
+the existing bounded route and verifies stable source, case-id, and
+compiled-executor workload-id binding against the existing bounded reproducers.
+`psionic-research` now mirrors the operator-readable summary at
+`fixtures/tassadar/reports/tassadar_article_demo_frontend_parity_summary.json`.
+This is the point where the repo now machine-readably says the demo sources
+themselves close through the declared frontend/compiler envelope, while later
+interpreter-breadth, benchmark-wide, and final article-equivalence tranches
+remain open.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

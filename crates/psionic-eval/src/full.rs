@@ -34,6 +34,8 @@ mod tassadar_architecture_bakeoff;
 mod tassadar_article_abi;
 #[path = "tassadar_article_cpu_reproducibility.rs"]
 mod tassadar_article_cpu_reproducibility;
+#[path = "tassadar_article_demo_frontend_parity.rs"]
+mod tassadar_article_demo_frontend_parity;
 #[path = "tassadar_article_equivalence_acceptance_gate.rs"]
 mod tassadar_article_equivalence_acceptance_gate;
 #[path = "tassadar_article_equivalence_blocker_matrix.rs"]
@@ -354,6 +356,7 @@ pub use tassadar_approximate_attention_closure_matrix::*;
 pub use tassadar_architecture_bakeoff::*;
 pub use tassadar_article_abi::*;
 pub use tassadar_article_cpu_reproducibility::*;
+pub use tassadar_article_demo_frontend_parity::*;
 pub use tassadar_article_equivalence_acceptance_gate::*;
 pub use tassadar_article_equivalence_blocker_matrix::*;
 pub use tassadar_article_evaluation_independence_audit::*;

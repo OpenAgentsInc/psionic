@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-178",
         "TAS-179",
         "TAS-179A",
         "TAS-180",
@@ -82,7 +81,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report closes only TAS-173. It proves the canonical trained Transformer-backed article model now owns the selected HullCache fast path at the descriptor, article-session, hybrid-route, and direct-proof surfaces. It does not yet claim fast-route no-fallback closure, throughput-floor closure, or final article-equivalence green status.",
     "summary": "Article fast-route implementation report now records selected_candidate_kind=`hull_cache_runtime`, tied_requirement_satisfied=true, fast_route_implementation_green=true, article_session_model_id=`tassadar-article-transformer-trace-bound-trained-v0`, hybrid_model_id=`tassadar-article-transformer-trace-bound-trained-v0`, and direct_proof_descriptor_binding_green=true.",
-    "report_digest": "af27e22d7d4be46a94763e381059231aa35e45f0a797277c944316e099a4ec67"
+    "report_digest": "80d0773c6ddcb9129bfad6d3ca70695f3bf45f5e6242f73206801a2f5f8efd84"
   },
   "tied_requirement_id": "TAS-173",
   "tied_requirement_satisfied": true,
@@ -95,5 +94,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-173 fast-route implementation tranche. It keeps the canonical HullCache ownership, live session routing, and direct-proof descriptor binding operator-readable without pretending that TAS-174 or TAS-175 are already closed.",
   "summary": "Article fast-route implementation summary now records selected_candidate_kind=`hull_cache_runtime`, tied_requirement_satisfied=true, article_session_fast_path_integrated=true, hybrid_fast_path_integrated=true, direct_proof_descriptor_binding_green=true, fast_route_implementation_green=true, and article_equivalence_green=false.",
-  "report_digest": "623c78de9b3979a3fa4023853ba74c9d599b4be6b7802948bd1dffc30106b558"
+  "report_digest": "828609a9b79dbbf59340abc239c38cffa1b399476527cc78f2cbdbdcbfe50961"
 }

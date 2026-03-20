@@ -58,9 +58,9 @@
         "blocker_id": "BEQ-001",
         "category": "frontend_scope",
         "title": "Declared article-equivalent frontend/compiler ingress remains open",
-        "repo_status": "partial",
-        "current_gap_summary": "the article claims arbitrary C-code ingress into an in-transformer execution path, while the public repo now declares only one narrower Rust-source-only article frontend/compiler envelope",
-        "current_public_truth": "the repo now has one explicit article frontend/compiler envelope manifest and report over Rust-source-only `rustc` -> `wasm32-unknown-unknown` `#![no_std]` / `#![no_main]` sources, plus a broader committed frontend corpus and compile matrix over arithmetic, branch-heavy, state-machine, allocator-backed-memory, Hungarian-like, and Sudoku-like support families with typed refusal and toolchain-failure posture, but the final article-demo frontend parity claim still remains open",
+        "repo_status": "implemented",
+        "current_gap_summary": "the public repo now closes the Hungarian and Sudoku article demo sources through one explicit Rust-source-only frontend/compiler envelope and binds them to the same canonical compiled-executor workload identities used by the bounded reproducers, while keeping broader arbitrary-C public claims explicitly out of scope",
+        "current_public_truth": "the repo now has one explicit article frontend/compiler envelope manifest and report over Rust-source-only `rustc` -> `wasm32-unknown-unknown` `#![no_std]` / `#![no_main]` sources, a broader committed frontend corpus and compile matrix over arithmetic, branch-heavy, state-machine, allocator-backed-memory, Hungarian-like, and Sudoku-like support families, and one dedicated article-demo frontend parity report that recompiles the canonical Hungarian and Sudoku demo sources through that envelope with stable source/receipt/Wasm parity and the same canonical compiled-executor case and workload identities as the existing bounded reproducers",
         "closure_requirements": [
           "close the Hungarian and Sudoku demo sources through that declared envelope"
         ],
@@ -667,7 +667,7 @@
         "github_issue_number": 300,
         "title": "TAS-178: Article-demo frontend parity",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-001",
           "BEQ-005"
@@ -817,9 +817,8 @@
     "all_issue_refs_point_to_known_blockers": true,
     "matrix_contract_green": true,
     "article_equivalence_green": false,
-    "open_blocker_count": 6,
+    "open_blocker_count": 5,
     "open_blocker_ids": [
-      "BEQ-001",
       "BEQ-002",
       "BEQ-003",
       "BEQ-005",
@@ -835,8 +834,8 @@
       "not proof that hard-Sudoku benchmark closure, no-spill single-run closure, or route-minimality closure already exist"
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
-    "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=6.",
-    "report_digest": "7d3c9f9c38e7d2f8aefa309f25a8af1b37ef7384bed73a034e34c095387f30f8"
+    "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=5.",
+    "report_digest": "a48ff9f8b33372c47921f5f83a627e327c0b748a92fbc50b88d42406e4d074d6"
   },
   "requirement_rows": [
     {
@@ -1237,7 +1236,7 @@
       "requirement_id": "TAS-178",
       "requirement_kind": "implementation",
       "required_for_green": true,
-      "satisfied": false,
+      "satisfied": true,
       "blocker_ids": [
         "BEQ-001",
         "BEQ-005"
@@ -1245,7 +1244,7 @@
       "source_refs": [
         "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
       ],
-      "detail": "TAS-178 (`TAS-178: Article-demo frontend parity`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-001, BEQ-005 until that tranche closes."
+      "detail": "TAS-178 (`TAS-178: Article-demo frontend parity`) is closed in the blocker matrix, so this acceptance-gate row is currently satisfied for blocker families BEQ-001, BEQ-005."
     },
     {
       "requirement_id": "TAS-179",
@@ -1419,9 +1418,9 @@
   ],
   "total_requirement_count": 41,
   "required_requirement_count": 40,
-  "passed_required_requirement_count": 27,
+  "passed_required_requirement_count": 28,
   "required_issue_count": 37,
-  "closed_required_issue_count": 25,
+  "closed_required_issue_count": 26,
   "green_requirement_ids": [
     "blocker_matrix_contract_frozen",
     "owned_transformer_route_boundary_frozen",
@@ -1449,11 +1448,11 @@
     "TAS-174",
     "TAS-175",
     "TAS-176",
-    "TAS-177"
+    "TAS-177",
+    "TAS-178"
   ],
   "failed_requirement_ids": [
     "article_equivalence_blockers_closed",
-    "TAS-178",
     "TAS-179",
     "TAS-179A",
     "TAS-180",
@@ -1467,7 +1466,6 @@
     "TAS-186"
   ],
   "blocked_issue_ids": [
-    "TAS-178",
     "TAS-179",
     "TAS-179A",
     "TAS-180",
@@ -1495,9 +1493,8 @@
   "blocker_matrix_contract_green": true,
   "prerequisite_transformer_boundary_green": true,
   "blocker_matrix_article_equivalence_green": false,
-  "open_blocker_count": 6,
+  "open_blocker_count": 5,
   "open_blocker_ids": [
-    "BEQ-001",
     "BEQ-002",
     "BEQ-003",
     "BEQ-005",
@@ -1508,6 +1505,6 @@
   "article_equivalence_green": false,
   "public_claim_allowed": false,
   "claim_boundary": "this is the frozen final acceptance gate for article-equivalent closure. It stays blocked until the blocker-matrix contract remains intact, the owned `psionic-transformer` route boundary remains intact, the blocker matrix itself turns article-equivalence green, and every required TAS tranche from `TAS-158` through `TAS-186` is closed. A green result here is necessary but not sufficient to widen public capability claims, and it still does not imply arbitrary C ingress, arbitrary Wasm ingress, or generic interpreter-in-weights closure outside the declared article envelope.",
-  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=27/40, closed_required_issues=25/37, blocked_issues=12, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
-  "report_digest": "9ca63ee9e13304e9753e1db5729233fe46659bc722469af19a2353a5a7866131"
+  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=28/40, closed_required_issues=26/37, blocked_issues=11, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
+  "report_digest": "d2c83749e41916f3705764d6a97f0d509a440dc1b41451c0368c190d188eaf3a"
 }

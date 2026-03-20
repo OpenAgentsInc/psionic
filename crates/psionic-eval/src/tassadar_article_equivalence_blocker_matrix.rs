@@ -417,12 +417,12 @@ fn blocker_rows() -> Vec<TassadarArticleEquivalenceBlockerRow> {
             title: String::from(
                 "Declared article-equivalent frontend/compiler ingress remains open",
             ),
-            repo_status: TassadarRepoStatus::Partial,
+            repo_status: TassadarRepoStatus::Implemented,
             current_gap_summary: String::from(
-                "the article claims arbitrary C-code ingress into an in-transformer execution path, while the public repo now declares only one narrower Rust-source-only article frontend/compiler envelope",
+                "the public repo now closes the Hungarian and Sudoku article demo sources through one explicit Rust-source-only frontend/compiler envelope and binds them to the same canonical compiled-executor workload identities used by the bounded reproducers, while keeping broader arbitrary-C public claims explicitly out of scope",
             ),
             current_public_truth: String::from(
-                "the repo now has one explicit article frontend/compiler envelope manifest and report over Rust-source-only `rustc` -> `wasm32-unknown-unknown` `#![no_std]` / `#![no_main]` sources, plus a broader committed frontend corpus and compile matrix over arithmetic, branch-heavy, state-machine, allocator-backed-memory, Hungarian-like, and Sudoku-like support families with typed refusal and toolchain-failure posture, but the final article-demo frontend parity claim still remains open",
+                "the repo now has one explicit article frontend/compiler envelope manifest and report over Rust-source-only `rustc` -> `wasm32-unknown-unknown` `#![no_std]` / `#![no_main]` sources, a broader committed frontend corpus and compile matrix over arithmetic, branch-heavy, state-machine, allocator-backed-memory, Hungarian-like, and Sudoku-like support families, and one dedicated article-demo frontend parity report that recompiles the canonical Hungarian and Sudoku demo sources through that envelope with stable source/receipt/Wasm parity and the same canonical compiled-executor case and workload identities as the existing bounded reproducers",
             ),
             closure_requirements: vec![
                 String::from(
@@ -955,7 +955,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             300,
             "TAS-178: Article-demo frontend parity",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-001", "BEQ-005"],
         ),
         issue_row(
@@ -1146,7 +1146,7 @@ mod tests {
         assert!(report.matrix_contract_green);
         assert!(!report.article_equivalence_green);
         assert_eq!(report.blocker_count, 7);
-        assert_eq!(report.open_blocker_count, 6);
+        assert_eq!(report.open_blocker_count, 5);
         assert!(report.all_later_issues_covered);
         assert!(report.all_blockers_have_article_line_provenance);
     }

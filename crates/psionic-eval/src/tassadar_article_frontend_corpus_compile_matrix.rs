@@ -938,7 +938,7 @@ mod tests {
         assert!(!report.article_equivalence_green);
         assert_eq!(
             report.acceptance_gate_tie.blocked_issue_ids.first().map(String::as_str),
-            Some("TAS-178")
+            Some("TAS-179")
         );
         assert_eq!(
             report

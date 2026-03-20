@@ -615,7 +615,7 @@ mod tests {
                 .blocked_issue_ids
                 .first()
                 .map(String::as_str),
-            Some("TAS-178")
+            Some("TAS-179")
         );
         assert!(report.envelope_manifest_green);
         assert!(report.toolchain_identity_green);

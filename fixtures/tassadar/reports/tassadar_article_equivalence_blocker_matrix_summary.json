@@ -57,9 +57,9 @@
         "blocker_id": "BEQ-001",
         "category": "frontend_scope",
         "title": "Declared article-equivalent frontend/compiler ingress remains open",
-        "repo_status": "partial",
-        "current_gap_summary": "the article claims arbitrary C-code ingress into an in-transformer execution path, while the public repo now declares only one narrower Rust-source-only article frontend/compiler envelope",
-        "current_public_truth": "the repo now has one explicit article frontend/compiler envelope manifest and report over Rust-source-only `rustc` -> `wasm32-unknown-unknown` `#![no_std]` / `#![no_main]` sources, plus a broader committed frontend corpus and compile matrix over arithmetic, branch-heavy, state-machine, allocator-backed-memory, Hungarian-like, and Sudoku-like support families with typed refusal and toolchain-failure posture, but the final article-demo frontend parity claim still remains open",
+        "repo_status": "implemented",
+        "current_gap_summary": "the public repo now closes the Hungarian and Sudoku article demo sources through one explicit Rust-source-only frontend/compiler envelope and binds them to the same canonical compiled-executor workload identities used by the bounded reproducers, while keeping broader arbitrary-C public claims explicitly out of scope",
+        "current_public_truth": "the repo now has one explicit article frontend/compiler envelope manifest and report over Rust-source-only `rustc` -> `wasm32-unknown-unknown` `#![no_std]` / `#![no_main]` sources, a broader committed frontend corpus and compile matrix over arithmetic, branch-heavy, state-machine, allocator-backed-memory, Hungarian-like, and Sudoku-like support families, and one dedicated article-demo frontend parity report that recompiles the canonical Hungarian and Sudoku demo sources through that envelope with stable source/receipt/Wasm parity and the same canonical compiled-executor case and workload identities as the existing bounded reproducers",
         "closure_requirements": [
           "close the Hungarian and Sudoku demo sources through that declared envelope"
         ],
@@ -666,7 +666,7 @@
         "github_issue_number": 300,
         "title": "TAS-178: Article-demo frontend parity",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-001",
           "BEQ-005"
@@ -816,9 +816,8 @@
     "all_issue_refs_point_to_known_blockers": true,
     "matrix_contract_green": true,
     "article_equivalence_green": false,
-    "open_blocker_count": 6,
+    "open_blocker_count": 5,
     "open_blocker_ids": [
-      "BEQ-001",
       "BEQ-002",
       "BEQ-003",
       "BEQ-005",
@@ -834,13 +833,12 @@
       "not proof that hard-Sudoku benchmark closure, no-spill single-run closure, or route-minimality closure already exist"
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
-    "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=6.",
-    "report_digest": "7d3c9f9c38e7d2f8aefa309f25a8af1b37ef7384bed73a034e34c095387f30f8"
+    "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=5.",
+    "report_digest": "a48ff9f8b33372c47921f5f83a627e327c0b748a92fbc50b88d42406e4d074d6"
   },
   "blocker_count": 7,
-  "open_blocker_count": 6,
+  "open_blocker_count": 5,
   "open_blocker_ids": [
-    "BEQ-001",
     "BEQ-002",
     "BEQ-003",
     "BEQ-005",
@@ -859,6 +857,6 @@
     "not proof that hard-Sudoku benchmark closure, no-spill single-run closure, or route-minimality closure already exist"
   ],
   "claim_boundary": "this summary mirrors the TAS-157 blocker matrix only. It keeps the blocker contract operator-readable, but it does not add evidence or widen the current public claim boundary beyond the underlying matrix",
-  "summary": "Article-equivalence blocker matrix summary now records blocker_count=7, open_blocker_count=6, matrix_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "93ceaace2bd320b4556ede8e0ad9014905534c7f80ff81203e1c69f12c9d364d"
+  "summary": "Article-equivalence blocker matrix summary now records blocker_count=7, open_blocker_count=5, matrix_contract_green=true, and article_equivalence_green=false.",
+  "report_digest": "0cce7c6680cd93c45a6c0d97fb58e0d7be06b67993040f2d89d739ff98a5aad4"
 }
