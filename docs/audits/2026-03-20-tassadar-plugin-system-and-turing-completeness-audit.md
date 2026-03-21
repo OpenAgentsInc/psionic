@@ -76,7 +76,7 @@ Relevant public issue waves reviewed:
 Current audit verdict:
 
 - software-module, mount, effect, replay, and publication substrate below the
-  plugin system: `implemented`
+  plugin system for bounded operator/internal posture: `implemented`
 - plugin-specific Wasm manifest, packet ABI, runtime API, receipt family, and
   hot-swap contract: `partial`
 - weighted controller that selects and sequences plugins while preserving
@@ -101,6 +101,28 @@ The right move is:
 
 That sequencing keeps the Turing-completeness claim honest while still steering
 the system toward the plugin model.
+
+## Computability, Programmability, And Productization
+
+The cleanest way to keep the plugin story honest is to distinguish three
+different things the repo may eventually prove:
+
+- computability:
+  the post-`TAS-186` Turing-completeness rebase would prove that the canonical
+  owned route carries bounded universal computation under declared continuation
+  semantics
+- programmability:
+  the plugin tranche would prove that the same route can sit above a bounded
+  software-capability layer with stable artifacts, manifests, envelopes,
+  receipts, and model-visible control surfaces
+- productization:
+  later promotion, authority, publication, and governance gates would decide
+  whether that programmable layer is usable beyond bounded operator/internal
+  posture
+
+Those are different claim classes. The Turing-completeness rebase buys the
+first. The plugin tranche buys the second. The governance and publication
+machinery decides the third.
 
 ## What The Plugin-System Spec Actually Requires
 
@@ -135,7 +157,8 @@ post-`TAS-186` ownership and route-minimality work.
 
 ## What Already Exists In Psionic
 
-Large parts of the plugin-system substrate are already present in bounded form.
+Large parts of the plugin-system substrate are already present in bounded
+operator/internal form.
 
 ### 1. Module And Package Substrate: `implemented`
 
@@ -384,9 +407,43 @@ The plugin spec requires:
 - replay posture checks
 - receipt integrity checks
 - mount-envelope compatibility checks
+- multi-plugin workflow integrity checks
+- refusal propagation across chained plugins
+- envelope intersection checks across multi-step workflows
+- replay under partial cancellation
 - cold/warm/pool/cancel overhead benchmarks
 
 That conformance surface does not yet exist as one plugin-system bar.
+
+### 9. Plugin Result-Binding And Schema-Stability Contract: `planned`
+
+The plugin system also needs one explicit contract for getting plugin outputs
+back into the model loop without semantic drift.
+
+That contract must freeze:
+
+- output schema evolution rules
+- backward-compatibility posture
+- refusal normalization rules
+- digest binding from packet output to the next model-visible state
+- typed failure when result reinjection would change declared task meaning
+
+The repo does not yet have that result-binding contract.
+
+### 10. Plugin Authority And Governance Contract: `planned`
+
+The plugin system also needs governance identity, not only technical identity.
+
+That contract must freeze:
+
+- who may declare a plugin canonical
+- who may widen a plugin capability envelope
+- which receipts are required before a plugin moves from private or
+  operator-only posture toward broader use
+- who may change trust, promotion, quarantine, or publication state
+
+The repo already has adjacent trust and publication substrate, but not one
+plugin-specific authority model that answers those questions.
 
 ## The Most Important Boundary Question
 
@@ -410,9 +467,9 @@ It intersects directly with:
 Until those are closed, any weighted plugin-controller claim would be weak,
 because the host runtime could still be doing too much orchestration work.
 
-## Two Non-Negotiable Ownership Laws
+## Non-Negotiable Platform Laws
 
-The plugin tranche should freeze two blunt laws early, because they are the
+The plugin tranche should freeze these laws early, because they are the
 easiest place for the repo to drift into host-orchestrated tool behavior while
 still using weighted-plugin language.
 
@@ -461,6 +518,37 @@ But the host may not:
 
 Without this law, the repo would drift into a tool runtime that only sounds
 weighted.
+
+### 3. Semantic Preservation Law
+
+Packet marshalling, schema evolution, mount adaptation, and result reinjection
+must preserve declared task meaning or fail closed with typed refusal.
+
+That means:
+
+- schema conversion may not silently rewrite the meaning of the task
+- capability mounting may not widen or alter meaning under the guise of
+  compatibility
+- result reinjection may not silently coerce plugin outputs into a different
+  model-visible contract
+- adapter layers must fail closed when semantic preservation cannot be shown
+
+Without this law, the plugin system can become adapter-led while still sounding
+weighted.
+
+### 4. Authority And Governance Law
+
+The plugin system also needs one explicit authority model.
+
+It must answer:
+
+- who may declare a plugin canonical
+- who may widen a plugin capability envelope
+- what receipts are required before promotion or publication state may change
+- who may move a plugin between private, operator-only, and broader posture
+
+Without governance identity, the platform can have technical identity while
+still lacking a trustworthy authority boundary.
 
 ## Does The Plugin System Change The Shape Of The Turing-Completeness Push?
 
@@ -531,6 +619,9 @@ The right pattern is:
 - add a separate named plugin execution contract above it
 - bind the two through policy and receipts, not through hand-waving
 
+That boundary should also carry a semantic-preservation rule for packet
+marshalling, schema adaptation, and result reinjection.
+
 #### 3. Continuation Ownership Must Become State-Class-Aware
 
 The plugin spec makes a strong distinction between:
@@ -587,6 +678,8 @@ Those are:
 - make the bridge contract reserve plugin-boundary identity fields
 - make the continuation-ownership audit explicit about packet-local,
   ephemeral-instance, and durable-host state
+- freeze a semantic-preservation rule for packet-mediated adapters and result
+  reinjection before any weighted plugin-controller claim is made
 - freeze the workflow-ownership rule before any plugin-controller claim is made
 - keep the rebased verdict split from over-reading future plugin capability
 
@@ -610,17 +703,17 @@ Suggested numbering below assumes the post-`TAS-186` Turing-completeness
 bridge consumes `TAS-187` through `TAS-196`. If the tracker advances first,
 preserve the dependency order and titles, not the exact numerals.
 
-### Suggested `TAS-197`: Freeze Plugin Charter, Claim Boundary, And Ownership Laws
+### Suggested `TAS-197`: Freeze Plugin Charter, Authority Boundary, And Platform Laws
 
 Suggested GitHub title:
 
-`Tassadar: freeze weighted plugin charter and ownership boundary`
+`Tassadar: freeze weighted plugin charter, authority boundary, and platform laws`
 
 Summary:
 
 Freeze the plugin system as a bounded software-capability layer above the
-rebased compute substrate, with explicit state ownership and control ownership
-rules.
+rebased compute substrate, with explicit state ownership, control ownership,
+semantic-preservation, and governance rules.
 
 Description:
 
@@ -630,6 +723,10 @@ Description:
 - freeze the state-class split across packet-local, instance-local ephemeral,
   host-backed durable, and weights-owned control state
 - freeze the rule that host may execute capability but may not decide workflow
+- freeze the semantic-preservation rule for marshalling, schema adaptation, and
+  result reinjection
+- define who may declare a plugin canonical, who may widen capability
+  envelopes, and which receipts are required before posture changes
 
 Supporting material:
 
@@ -638,6 +735,8 @@ Supporting material:
 - `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
 - `fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json`
 - `fixtures/tassadar/reports/tassadar_broad_internal_compute_profile_publication_report.json`
+- `fixtures/tassadar/reports/tassadar_module_promotion_state_report.json`
+- `fixtures/tassadar/reports/tassadar_module_trust_isolation_report.json`
 
 ### Suggested `TAS-198`: Canonical Plugin Manifest, Identity, And Hot-Swap Contract
 
@@ -791,6 +890,9 @@ Description:
 - cover roundtrip success, malformed packet refusal, capability denial,
   timeout, memory-limit, packet-size, digest-mismatch, replay, and hot-swap
   compatibility rows
+- cover multi-plugin workflow integrity, refusal propagation, envelope
+  intersection, hot-swap inside composed workflows, and replay under partial
+  cancellation
 - benchmark cold, warm, pooled, queued, and cancelled execution paths
 - keep receipt integrity and envelope compatibility explicit
 
@@ -801,6 +903,34 @@ Supporting material:
 - `fixtures/tassadar/reports/tassadar_effectful_replay_audit_report.json`
 - `fixtures/tassadar/reports/tassadar_module_trust_isolation_report.json`
 - `fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json`
+
+### Suggested `TAS-203A`: Plugin Result-Binding And Schema-Stability Contract
+
+Suggested GitHub title:
+
+`Tassadar: add plugin result-binding and schema-stability contract`
+
+Summary:
+
+Prove that plugin outputs can be bound back into the model loop in a stable,
+typed, replayable way before the repo claims model-owned plugin sequencing.
+
+Description:
+
+- define output schema evolution and backward-compatibility rules
+- define refusal normalization and typed failure preservation
+- bind output digests to the next model-visible state explicitly
+- refuse reinjection when schema repair or coercion would alter declared task
+  meaning
+- make the return path stable enough that weighted planning is not built on an
+  adapter-defined contract
+
+Supporting material:
+
+- `~/code/alpha/tassadar/plugin-system.md`
+- `fixtures/tassadar/reports/tassadar_effectful_replay_audit_report.json`
+- `fixtures/tassadar/reports/tassadar_internal_component_abi_report.json`
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
 
 ### Suggested `TAS-204`: Weighted Plugin Controller Trace And Refusal-Aware Model Loop
 
@@ -820,6 +950,8 @@ Description:
 - return result packets and typed refusals back into the model loop
 - prove that the host validates and executes but does not become the planner
 - add negative rows for hidden host-side sequencing or retry logic
+- add negative rows for host auto-retry, fallback export selection, heuristic
+  plugin ranking, schema auto-repair, and cached result substitution
 
 Supporting material:
 
@@ -828,11 +960,11 @@ Supporting material:
 - `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
 - `fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json`
 
-### Suggested `TAS-205`: Plugin Promotion, Publication, And Trust-Tier Gate
+### Suggested `TAS-205`: Plugin Authority, Promotion, Publication, And Trust-Tier Gate
 
 Suggested GitHub title:
 
-`Tassadar: add plugin promotion and publication gate`
+`Tassadar: add plugin authority, promotion, and publication gate`
 
 Summary:
 
@@ -841,10 +973,13 @@ accidentally widening them into a public arbitrary-software claim.
 
 Description:
 
+- implement the earlier authority model on canonical declaration, capability
+  envelope widening, and posture changes
 - define plugin benchmark bars and trust-tier gates
 - define operator-only versus served/public posture
 - bind validator and accepted-outcome hooks where required
-- keep promotion, quarantine, revocation, and publication refusal explicit
+- keep promotion, quarantine, revocation, publication refusal, and required
+  posture-change receipts explicit
 
 Supporting material:
 
@@ -890,9 +1025,10 @@ The dependency order should be:
 4. land the world-mount envelope compiler and plugin admissibility contract
 5. land the plugin conformance sandbox with static harnesses and scripted
    traces, not model-owned sequencing
-6. only then land weighted plugin-controller integration
-7. land plugin promotion/publication policy
-8. only then consider any stronger "weighted software platform" closeout
+6. land the plugin result-binding and schema-stability contract
+7. only then land weighted plugin-controller integration
+8. land plugin authority/promotion/publication policy
+9. only then consider any stronger "weighted software platform" closeout
 
 That order matters because it keeps the repo from using a not-yet-audited
 weighted controller as evidence for a plugin system whose core control-ownership
@@ -902,8 +1038,8 @@ question is still unresolved.
 
 The strongest honest statement today is:
 
-Psionic/Tassadar already has most of the bounded software-platform substrate a
-plugin system would need:
+Psionic/Tassadar already has most of the bounded operator/internal
+software-platform substrate a plugin system would need:
 
 - module and package identity
 - module evidence and promotion lifecycle
@@ -920,12 +1056,15 @@ But the repo does **not** yet have:
 - a packet ABI and Rust plugin PDK
 - a host-owned plugin runtime API
 - plugin-specific invocation receipts
+- a stable result-binding and schema-stability contract
+- a plugin-specific authority and governance model
 - or a weighted controller that owns plugin selection and sequencing on the
   canonical owned Transformer route
 
 So the plugin system is not blocked on basic substrate. It is blocked on
-unifying that substrate under one plugin contract and then proving weighted
-control ownership.
+unifying that substrate under one plugin contract, proving semantic
+preservation through adapters and result reinjection, freezing governance
+identity, and then proving weighted control ownership.
 
 ## Final Judgment
 

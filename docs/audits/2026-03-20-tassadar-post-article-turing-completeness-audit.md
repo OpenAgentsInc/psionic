@@ -84,6 +84,26 @@ What the repo does **not** yet have is a proof that the newer canonical
 that Turing-completeness story. The old closeout and the new article wave are
 not the same lane, and they were not updated together.
 
+## Computability, Programmability, And Productization
+
+The cleanest way to keep these audits honest is to distinguish three different
+things the repo may eventually prove:
+
+- computability:
+  the post-`TAS-186` Turing-completeness rebase would prove that the canonical
+  owned route can carry bounded universal computation under declared
+  continuation semantics
+- programmability:
+  a later plugin tranche would prove that the same route can sit above a
+  bounded software-capability layer with stable artifacts, envelopes, and model
+  visible control surfaces
+- productization:
+  later authority, promotion, publication, and governance gates would decide
+  whether any of that is usable beyond bounded operator/internal posture
+
+The first item is the point of the bridge tranche. The second is the point of
+the plugin tranche. The third is a policy and release question above both.
+
 ## What Is Already Real And Still Valid
 
 The older universality scaffold was not invalidated by the later article work.
@@ -355,7 +375,7 @@ capability is already part of the Turing-completeness closeout.
 
 ## Non-Negotiable Bridge Laws
 
-The bridge tranche should freeze two blunt laws early, because both the
+The bridge tranche should freeze these blunt laws early, because both the
 rebased Turing-completeness story and the later plugin-system story can drift
 if these are left implicit.
 
@@ -405,6 +425,41 @@ But the host may not:
 This is how the repo keeps operator universality under bounded continuation
 from decaying into host-orchestrated behavior that only sounds weighted.
 
+### 3. Semantic Preservation Law
+
+Resume, spill, and process-object mechanics must preserve the semantics of the
+canonical owned route, not merely preserve output parity on a few happy-path
+cases.
+
+That means:
+
+- continuation mechanics may not silently rewrite the machine model that the
+  route implements
+- adapters may not change control meaning while still looking route-compatible
+- process-object restore, checkpoint reload, and spill/tape mechanics must fail
+  closed when semantic preservation cannot be shown
+
+The important distinction is:
+
+output equivalence alone is not enough if the proof-bearing structure or the
+route's mechanistic assumptions have changed underneath it.
+
+### 4. Carrier Split Law
+
+The bridge must publish one explicit split between:
+
+- direct article-equivalent carrier truths
+- bounded resumable universality carrier truths
+
+No later audit may collapse those carriers into one undifferentiated route
+claim.
+
+That split is the cleanest way to stop people from mentally merging:
+
+- single-run article closure
+- resumable operator universality
+- later plugin-aware capability execution
+
 ## Necessary Work After `TAS-186`
 
 The following follow-on work is `planned` if the goal is to make the new
@@ -428,6 +483,8 @@ Land one dedicated bridge artifact that answers:
   universality carrier?
 - which canonical weight artifact digest is in scope?
 - which route digest is in scope?
+- which truths are carried by direct article-equivalent execution, and which
+  are carried only by the bounded resumable universality carrier?
 - is universality carried by `ReferenceLinear`, `HullCache`, a resumable route
   family above them, or an explicit split across those lanes?
 - which old `TCM.v1` rows now bind to new owned-route evidence, and which still
@@ -438,7 +495,7 @@ Land one dedicated bridge artifact that answers:
 
 Without this contract, later universality rebasing will drift.
 
-### B. Prove Continuation Ownership On The New Route
+### B. Prove Continuation, Control, And State Ownership On The New Route
 
 The canonical route needs one explicit audit for resumed execution ownership.
 
@@ -450,11 +507,26 @@ It must prove that checkpoint, spill/tape, and process-object semantics:
 - fail closed when resumed execution would leave the declared route or profile
 - keep packet-local, instance-local ephemeral, and host-backed durable state
   classes explicit so later plugin execution does not blur continuation truth
+- preserve route semantics rather than merely preserving surface outputs
+- freeze the rule that host may execute continuation mechanics but may not
+  decide workflow
 
 This is the most important missing bridge between `TAS-183`/`TAS-184` and the
 older operator-universality lane.
 
-### C. Rebind Universal-Machine Proofs To The Canonical Route
+### C. Publish The Carrier Split Contract
+
+The rebase should publish one dedicated carrier split statement that freezes:
+
+- direct article-equivalent compute as one carrier class
+- bounded resumable universality as a second carrier class
+- the exact truths each carrier class is allowed to support
+- the explicit refusal to merge them into one vague route claim
+
+Without that split, later docs will keep over-reading article closure as if it
+already closed operator universality.
+
+### D. Rebind Universal-Machine Proofs To The Canonical Route
 
 The older witness construction must be replayed against the new canonical
 owned-route identities.
@@ -466,11 +538,15 @@ That means:
 - exact proof receipts must cite the canonical post-`TAS-186` route digest
 - checkpoint/resume equivalence must remain explicit where resumable execution
   is still part of the operator claim
+- rebinding must not be treated as a metadata swap
+- one explicit proof-transport check must show that the new route preserves the
+  mechanistic assumptions the proof actually relies on
+- rebinding must fail closed if route changes alter the proof-bearing structure
 
 Until this happens, the old universal-machine proof remains real but not
 canonically attached to the new route.
 
-### D. Rebuild The Witness Suite Around The Canonical Route
+### E. Rebuild The Witness Suite Around The Canonical Route
 
 The universality witness suite should be reissued so the canonical owned route
 is the route being exercised, not only the older operator lane.
@@ -490,7 +566,7 @@ But it now also needs:
 - negative rows for helper substitution, hidden cache-owned control flow, and
   resume-only cheating
 
-### E. Add A Canonical-Route Universal-Substrate Gate
+### F. Add A Canonical-Route Universal-Substrate Gate
 
 The old minimal gate should not be silently reused.
 
@@ -498,7 +574,8 @@ One new gate should require:
 
 - `TAS-186` green
 - canonical-route bridge contract green
-- continuation-ownership audit green
+- continuation/control/state ownership audit green
+- carrier split contract green
 - canonical-route universal-machine proof green
 - canonical-route witness suite green
 - portability and refusal rows green on the declared machine matrix
@@ -506,7 +583,7 @@ One new gate should require:
 That gate is the first place where the repo can honestly ask whether the new
 canonical route, not merely the older operator lane, is Turing-complete.
 
-### F. Extend Portability And Minimality To The Universality Lane
+### G. Extend Portability And Minimality To The Universality Lane
 
 `TAS-185` and `TAS-185A` are necessary, but not sufficient.
 
@@ -520,7 +597,7 @@ They need one follow-on extension over the universality carrier itself:
 The older `TAS-156` closeout already carried portability and refusal language,
 but it was not bound to the newer canonical route.
 
-### G. Reissue The Final Verdict Split
+### H. Reissue The Final Verdict Split
 
 Once the rebased gate is green, the repo should publish one new verdict split
 for the canonical route:
@@ -535,7 +612,7 @@ The expected served verdict remains `partial_outside_psionic` unless
 `kernel-policy` and `nexus` ownership moves or the user explicitly asks for
 that cross-repo work.
 
-### H. Publish A New Final Closeout Audit
+### I. Publish A New Final Closeout Audit
 
 Only after the new bridge, proof, suite, gate, portability, and verdict-split
 artifacts exist should the repo publish a second final closeout.
@@ -547,7 +624,7 @@ That new closeout should say:
   for the bounded Turing-completeness statement
 - served/public universality remains either suppressed or explicitly bounded
 
-### I. Reserve A Separate Plugin-Capability Boundary
+### J. Reserve A Separate Plugin-Capability Boundary
 
 The rebased universality tranche should also publish one explicit boundary
 statement that says:
@@ -585,6 +662,8 @@ Description:
 
 - declare the canonical model id, weight artifact digest, and route digest that
   now carry the rebased universality story
+- publish the explicit split between direct article-equivalent carrier truths
+  and bounded resumable universality carrier truths
 - state whether the carrier is `ReferenceLinear`, `HullCache`, a resumable
   route family above them, or an explicit split across those lanes
 - bind old `TCM.v1` rows to new owned-route evidence where appropriate
@@ -600,25 +679,27 @@ Supporting material:
 - `fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json`
 - `fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json`
 
-### Suggested `TAS-188`: Freeze Canonical-Route State Ownership Law
+### Suggested `TAS-188`: Audit Canonical-Route Ownership And Semantic Preservation
 
 Suggested GitHub title:
 
-`Tassadar: freeze canonical-route state ownership law`
+`Tassadar: audit canonical-route ownership and semantic preservation`
 
 Summary:
 
-Make state classes first-class so later continuation and plugin work cannot
-quietly move durable workflow truth into caches or hidden host state.
+Prove that continuation mechanics preserve canonical-route control, state
+ownership, and semantics rather than merely preserving a subset of outputs.
 
 Description:
 
-- define what state is weights-owned compute state
-- define what cache or activation state may exist and keep it explicitly
-  ephemeral
-- define what resumed process objects and spill/checkpoint state may preserve
-- define what may live only in host-backed durable stores under receipts
-- refuse undeclared durable workflow state outside those classes
+- preserve canonical model identity and route identity across resumes
+- inspect actual continuation behavior before finalizing state classes
+- freeze the rule that host may execute continuation mechanics but may not
+  decide workflow
+- prove resume, spill, and process-object mechanics preserve route semantics
+  rather than merely surface outputs
+- classify weights-owned, ephemeral, resumed, and durable state from that
+  evidence and refuse undeclared workflow state outside those classes
 
 Supporting material:
 
@@ -630,35 +711,32 @@ Supporting material:
 - `fixtures/tassadar/reports/tassadar_session_process_profile_report.json`
 - `fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json`
 
-### Suggested `TAS-189`: Audit Canonical-Route Continuation And Control Ownership
+### Suggested `TAS-189`: Publish Carrier Split Between Direct And Resumable Carriers
 
 Suggested GitHub title:
 
-`Tassadar: audit continuation and control ownership on the canonical route`
+`Tassadar: publish carrier split between direct and resumable route truths`
 
 Summary:
 
-Prove that bounded resume, spill/tape, and process identity mechanics wrap the
-canonical owned route without the host becoming the workflow planner.
+Freeze one machine-readable split between direct article-equivalent carrier
+truths and bounded resumable universality carrier truths.
 
 Description:
 
-- preserve model identity and route identity across resumes
-- prove resume logic does not substitute a different interpreter or helper path
-- freeze the rule that host may execute continuation mechanics but may not
-  decide workflow
-- include negative rows for host-side branch choice, hidden helper loops, and
-  resume-only cheating
-- fail closed when resumed execution would leave the declared route or profile
+- define which truths are carried only by direct single-run execution
+- define which truths are carried only by resumable continuation semantics
+- bind each claim class to its carrier explicitly
+- refuse any later audit or checker that collapses those carriers into one
+  undifferentiated route claim
 
 Supporting material:
 
 - `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
 - `docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md`
-- `fixtures/tassadar/reports/tassadar_spill_tape_store_report.json`
-- `fixtures/tassadar/reports/tassadar_session_process_profile_runtime_report.json`
-- `fixtures/tassadar/reports/tassadar_async_lifecycle_profile_report.json`
-- `fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json`
+- `fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json`
+- `fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json`
+- `fixtures/tassadar/reports/tassadar_turing_completeness_closeout_audit_report.json`
 
 ### Suggested `TAS-190`: Rebind The Universal-Machine Proof To The Canonical Route
 
@@ -676,6 +754,9 @@ Description:
 - reissue proof receipts against the canonical owned route
 - make resumed-execution equivalence explicit where the operator claim still
   depends on continuation
+- require one proof-transport audit instead of treating rebinding as metadata
+  relabeling
+- prove the new route preserves the mechanistic assumptions the proof relies on
 - keep helper substitution and route drift as explicit failure rows
 
 Supporting material:
@@ -725,8 +806,8 @@ now carries the bounded universality story.
 Description:
 
 - require `TAS-186` closure
-- require the bridge contract, state/control ownership law, continuation audit,
-  proof rebinding, and witness suite
+- require the bridge contract, ownership and semantic-preservation audit,
+  carrier split contract, proof rebinding, and witness suite
 - keep portability and refusal rows explicit
 - refuse over-reading article equivalence as universality
 
