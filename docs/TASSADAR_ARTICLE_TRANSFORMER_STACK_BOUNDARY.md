@@ -462,6 +462,27 @@ article interpreter breadth blocker itself is closed inside the bounded public
 envelope, while benchmark-wide, single-run, and final article-equivalence
 tranches remain open.
 
+`TAS-180` now closes the Hungarian article-demo parity tranche on top of that
+same owned route. `psionic-serve` now commits one direct article-session
+artifact at
+`fixtures/tassadar/reports/tassadar_article_hungarian_demo_fast_route_session_artifact.json`
+and one planner-owned hybrid-workflow artifact at
+`fixtures/tassadar/reports/tassadar_article_hungarian_demo_fast_route_hybrid_workflow_artifact.json`,
+each keeping `hungarian_10x10_test_a` direct on `HullCache` with the trained
+trace-bound article model and the committed article outputs. `psionic-eval`
+now commits the joined parity artifact at
+`fixtures/tassadar/reports/tassadar_article_hungarian_demo_parity_report.json`,
+binding the canonical Hungarian source, the committed frontend parity row, the
+existing no-tool reproducer proof, the new served fast-route artifacts, and the
+declared throughput-floor receipt into one machine-readable TAS-180 closure
+surface without claiming broader benchmark closure. `psionic-research` now
+mirrors the operator-readable summary at
+`fixtures/tassadar/reports/tassadar_article_hungarian_demo_parity_summary.json`.
+This is the point where the repo now machine-readably says the canonical 10x10
+Hungarian article demo is closed on the fast route inside the bounded public
+envelope, while named hard-Sudoku closure, unified demo-and-benchmark parity,
+single-run closure, and final article-equivalence tranches remain open.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

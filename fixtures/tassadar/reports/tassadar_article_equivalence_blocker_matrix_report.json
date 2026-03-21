@@ -229,12 +229,11 @@
     {
       "blocker_id": "BEQ-005",
       "category": "benchmark_scope",
-      "title": "Hungarian and hard-Sudoku benchmark parity remains open",
+      "title": "Hard-Sudoku benchmark parity and unified benchmark gate remain open",
       "repo_status": "partial",
-      "current_gap_summary": "the article makes visible Hungarian throughput claims and hard-Sudoku benchmark claims that the current public repo does not yet close on one canonical article-equivalent route",
-      "current_public_truth": "the repo already has bounded Hungarian and Sudoku article reproducers plus long-horizon runtime closure, but not one canonical article demo-and-benchmark parity gate at the article's stated breadth",
+      "current_gap_summary": "the article still makes visible hard-Sudoku benchmark claims and a joined demo-plus-benchmark claim surface that the current public repo does not yet close on one canonical article-equivalent route",
+      "current_public_truth": "the repo already has bounded Hungarian fast-route parity, Sudoku article reproducers, and long-horizon runtime closure, but not the named Arto Inkala hard-Sudoku closeout or one canonical article demo-and-benchmark parity gate at the article's stated breadth",
       "closure_requirements": [
-        "close the Hungarian demo on the canonical article route with explicit throughput floors",
         "close Arto Inkala and the declared hard-Sudoku benchmark suite on the canonical article route",
         "combine those rows into one article demo-and-benchmark equivalence gate"
       ],
@@ -693,7 +692,7 @@
       "github_issue_number": 303,
       "title": "TAS-180: Hungarian article demo parity",
       "issue_role": "implementation",
-      "issue_state": "open",
+      "issue_state": "closed",
       "blocker_ids": [
         "BEQ-004",
         "BEQ-005"
@@ -829,5 +828,5 @@
   ],
   "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
   "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=4.",
-  "report_digest": "60d2d726eddb16261c67999a26c377de55eb686ea2ee8140d64fcf9716d0436c"
+  "report_digest": "20cd845423c7e82185d72b62950d525c366505bc7278b722f97d46fd550caa5f"
 }

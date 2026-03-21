@@ -32,12 +32,13 @@ use psionic_router::{
 use psionic_runtime::{
     build_tassadar_execution_evidence_bundle, diagnose_tassadar_executor_request,
     execute_tassadar_executor_request, tassadar_article_class_corpus,
-    tassadar_trace_abi_for_profile_id, tassadar_wasm_profile_for_id,
-    TassadarDirectModelWeightExecutionProofReceipt, TassadarExecution,
-    TassadarExecutionEvidenceBundle, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
-    TassadarExecutorExecutionReport, TassadarExecutorSelectionDiagnostic,
-    TassadarFrozenCoreWasmClosureGateStatus, TassadarInstruction, TassadarProgramArtifact,
-    TassadarRuntimeCapabilityReport, TassadarTraceEvent, TassadarTraceStep, TassadarValidationCase,
+    tassadar_hungarian_10x10_corpus, tassadar_trace_abi_for_profile_id,
+    tassadar_wasm_profile_for_id, TassadarDirectModelWeightExecutionProofReceipt,
+    TassadarExecution, TassadarExecutionEvidenceBundle, TassadarExecutionRefusal,
+    TassadarExecutorDecodeMode, TassadarExecutorExecutionReport,
+    TassadarExecutorSelectionDiagnostic, TassadarFrozenCoreWasmClosureGateStatus,
+    TassadarInstruction, TassadarProgramArtifact, TassadarRuntimeCapabilityReport,
+    TassadarTraceEvent, TassadarTraceStep, TassadarValidationCase,
     TASSADAR_ARTICLE_CLASS_BENCHMARK_ENVIRONMENT_REF, TASSADAR_ARTICLE_CLASS_BENCHMARK_REF,
     TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
 };
@@ -619,6 +620,16 @@ fn transformer_backed_article_fixture() -> TassadarExecutorFixture {
     TassadarExecutorFixture::article_i32_compute_v1()
 }
 
+fn transformer_backed_article_fixture_for_profile_id(
+    profile_id: &str,
+) -> Result<TassadarExecutorFixture, String> {
+    TassadarExecutorFixture::for_profile_id(profile_id).ok_or_else(|| {
+        format!(
+            "trained Transformer-backed article route does not declare fixture compatibility for Wasm profile `{profile_id}`"
+        )
+    })
+}
+
 fn ensure_transformer_backed_article_replacement_ready() -> Result<(), String> {
     let parity_report = psionic_eval::build_tassadar_article_fixture_transformer_parity_report()
         .map_err(|error| {
@@ -647,6 +658,17 @@ fn transformer_backed_article_model_descriptor() -> Result<TassadarExecutorModel
     build_tassadar_article_transformer_trained_executor_descriptor().map_err(|error| {
         format!("failed to build trained Transformer-backed article descriptor: {error}")
     })
+}
+
+fn transformer_backed_article_model_descriptor_for_profile_id(
+    profile_id: &str,
+) -> Result<TassadarExecutorModelDescriptor, String> {
+    let mut descriptor = transformer_backed_article_model_descriptor()?;
+    let fixture = transformer_backed_article_fixture_for_profile_id(profile_id)?;
+    descriptor.compatibility = fixture.descriptor().compatibility.clone();
+    descriptor.profile = fixture.descriptor().profile.clone();
+    descriptor.trace_abi = fixture.descriptor().trace_abi.clone();
+    Ok(descriptor)
 }
 
 fn transformer_backed_article_workload_capability_matrix(
@@ -1225,7 +1247,10 @@ impl LocalTassadarExecutorService {
             .as_deref()
             .unwrap_or(self.default_model_id.as_str());
         if is_transformer_backed_article_model_id(requested_model_id) {
-            let descriptor = transformer_backed_article_model_descriptor().map_err(|detail| {
+            let descriptor = transformer_backed_article_model_descriptor_for_profile_id(
+                request.program_artifact.wasm_profile_id.as_str(),
+            )
+            .map_err(|detail| {
                 TassadarExecutorServiceError::InvalidArticleTransformerReplacement { detail }
             })?;
             return Ok(self.preflight_with_model_descriptor(
@@ -1283,7 +1308,10 @@ impl LocalTassadarExecutorService {
         &self,
         request: &TassadarExecutorRequest,
     ) -> Result<TassadarExecutorOutcome, TassadarExecutorServiceError> {
-        let descriptor = transformer_backed_article_model_descriptor().map_err(|detail| {
+        let descriptor = transformer_backed_article_model_descriptor_for_profile_id(
+            request.program_artifact.wasm_profile_id.as_str(),
+        )
+        .map_err(|detail| {
             TassadarExecutorServiceError::InvalidArticleTransformerReplacement { detail }
         })?;
         Ok(self.execute_with_model_descriptor(
@@ -3365,7 +3393,7 @@ impl TassadarArticleHybridWorkflowRequest {
             requested_model_id: None,
             requested_decode_mode,
             routing_policy: TassadarPlannerRoutingPolicy::default(),
-            routing_budget: TassadarPlannerRoutingBudget::new(4_096, 131_072, 8),
+            routing_budget: TassadarPlannerRoutingBudget::new(8_192, 262_144, 8),
             environment_refs: Vec::new(),
         }
     }
@@ -3665,6 +3693,12 @@ fn article_case_by_id(case_id: &str) -> Option<TassadarValidationCase> {
     tassadar_article_class_corpus()
         .into_iter()
         .find(|case| case.case_id == case_id)
+        .or_else(|| {
+            tassadar_hungarian_10x10_corpus()
+                .into_iter()
+                .find(|case| case.case_id == case_id)
+                .map(|case| case.validation_case)
+        })
 }
 
 fn article_workload_family(case_id: &str) -> &'static str {
@@ -6142,9 +6176,9 @@ mod tests {
         TassadarPlannerExecutorRoutePosture, TassadarPlannerExecutorWasmImportPosture,
     };
     use psionic_runtime::{
-        tassadar_article_class_corpus, tassadar_validation_corpus, TassadarExecutorDecodeMode,
-        TassadarExecutorSelectionState, TassadarInstruction, TassadarProgram,
-        TassadarProgramArtifact, TassadarTraceAbi, TassadarWasmProfile,
+        tassadar_article_class_corpus, tassadar_hungarian_10x10_corpus, tassadar_validation_corpus,
+        TassadarExecutorDecodeMode, TassadarExecutorSelectionState, TassadarInstruction,
+        TassadarProgram, TassadarProgramArtifact, TassadarTraceAbi, TassadarWasmProfile,
     };
 
     fn request_for_case(case_id: &str) -> TassadarExecutorRequest {
@@ -6723,6 +6757,46 @@ mod tests {
     }
 
     #[test]
+    fn article_session_keeps_hungarian_10x10_demo_direct_on_hull_cache() {
+        let service = LocalTassadarArticleExecutorSessionService::new();
+        let request = article_request_for_case(
+            "hungarian_10x10_test_a",
+            TassadarExecutorDecodeMode::HullCache,
+        );
+        let expected_outputs = tassadar_hungarian_10x10_corpus()
+            .into_iter()
+            .find(|case| case.case_id == "hungarian_10x10_test_a")
+            .expect("article case should exist")
+            .validation_case
+            .expected_outputs;
+
+        let outcome = service.execute(&request).expect("request should be typed");
+        match outcome {
+            TassadarArticleExecutorSessionOutcome::Completed { response } => {
+                let selection = &response.executor_response.execution_report.selection;
+                assert_eq!(
+                    response.benchmark_identity.case_id,
+                    "hungarian_10x10_test_a"
+                );
+                assert_eq!(
+                    response.executor_response.model_descriptor.model.model_id,
+                    TassadarArticleTransformer::TRAINED_TRACE_BOUND_MODEL_ID
+                );
+                assert_eq!(response.final_outputs(), expected_outputs.as_slice());
+                assert_eq!(
+                    selection.effective_decode_mode,
+                    Some(TassadarExecutorDecodeMode::HullCache)
+                );
+                assert_eq!(
+                    selection.selection_state,
+                    TassadarExecutorSelectionState::Direct
+                );
+            }
+            other => panic!("expected completed direct article session, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn article_session_stream_surfaces_benchmark_proof_log_trace_and_terminal() {
         let service = LocalTassadarArticleExecutorSessionService::new();
         let request =
@@ -6941,6 +7015,54 @@ mod tests {
                 }
                 other => panic!("expected completed direct hybrid workflow, got {other:?}"),
             }
+        }
+    }
+
+    #[test]
+    fn article_hybrid_workflow_keeps_hungarian_10x10_demo_direct_on_hull_cache() {
+        let service = LocalTassadarArticleHybridWorkflowService::new();
+        let request = article_workflow_request_for_case(
+            "hungarian_10x10_test_a",
+            TassadarExecutorDecodeMode::HullCache,
+        );
+        let expected_outputs = tassadar_hungarian_10x10_corpus()
+            .into_iter()
+            .find(|case| case.case_id == "hungarian_10x10_test_a")
+            .expect("article case should exist")
+            .validation_case
+            .expected_outputs;
+
+        let outcome = service.execute(&request).expect("request should be typed");
+        match outcome {
+            TassadarArticleHybridWorkflowOutcome::Completed { response } => {
+                let routing = &response.planner_response.routing_decision;
+                let selection = &response
+                    .planner_response
+                    .executor_response
+                    .execution_report
+                    .selection;
+                assert_eq!(
+                    response.benchmark_identity.case_id,
+                    "hungarian_10x10_test_a"
+                );
+                assert_eq!(
+                    response.planner_response.executor_response.final_outputs(),
+                    expected_outputs.as_slice()
+                );
+                assert_eq!(
+                    routing.effective_decode_mode,
+                    Some(TassadarExecutorDecodeMode::HullCache)
+                );
+                assert_eq!(
+                    selection.effective_decode_mode,
+                    Some(TassadarExecutorDecodeMode::HullCache)
+                );
+                assert_eq!(
+                    selection.selection_state,
+                    TassadarExecutorSelectionState::Direct
+                );
+            }
+            other => panic!("expected completed direct hybrid workflow, got {other:?}"),
         }
     }
 

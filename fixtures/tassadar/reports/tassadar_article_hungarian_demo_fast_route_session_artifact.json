@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "benchmark_report_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+  "cases": [
+    {
+      "name": "direct_hungarian_10x10_hull",
+      "request": {
+        "article_case_id": "hungarian_10x10_test_a",
+        "requested_decode_mode": "hull_cache"
+      },
+      "outcome": {
+        "status": "completed",
+        "response": {
+          "benchmark_identity": {
+            "case_id": "hungarian_10x10_test_a"
+          },
+          "executor_response": {
+            "model_descriptor": {
+              "model": {
+                "model_id": "tassadar-article-transformer-trace-bound-trained-v0"
+              }
+            },
+            "execution_report": {
+              "selection": {
+                "effective_decode_mode": "hull_cache",
+                "selection_state": "direct"
+              },
+              "execution": {
+                "outputs": [
+                  7,
+                  1,
+                  5,
+                  8,
+                  3,
+                  6,
+                  9,
+                  4,
+                  0,
+                  2,
+                  341
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "artifact_digest": "2638e908126722277b6542a3e7ea1670ff51189914a878247218684c6ae16e94"
+}

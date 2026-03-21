@@ -586,18 +586,15 @@ fn blocker_rows() -> Vec<TassadarArticleEquivalenceBlockerRow> {
         TassadarArticleEquivalenceBlockerRow {
             blocker_id: String::from("BEQ-005"),
             category: TassadarArticleEquivalenceBlockerCategory::BenchmarkScope,
-            title: String::from("Hungarian and hard-Sudoku benchmark parity remains open"),
+            title: String::from("Hard-Sudoku benchmark parity and unified benchmark gate remain open"),
             repo_status: TassadarRepoStatus::Partial,
             current_gap_summary: String::from(
-                "the article makes visible Hungarian throughput claims and hard-Sudoku benchmark claims that the current public repo does not yet close on one canonical article-equivalent route",
+                "the article still makes visible hard-Sudoku benchmark claims and a joined demo-plus-benchmark claim surface that the current public repo does not yet close on one canonical article-equivalent route",
             ),
             current_public_truth: String::from(
-                "the repo already has bounded Hungarian and Sudoku article reproducers plus long-horizon runtime closure, but not one canonical article demo-and-benchmark parity gate at the article's stated breadth",
+                "the repo already has bounded Hungarian fast-route parity, Sudoku article reproducers, and long-horizon runtime closure, but not the named Arto Inkala hard-Sudoku closeout or one canonical article demo-and-benchmark parity gate at the article's stated breadth",
             ),
             closure_requirements: vec![
-                String::from(
-                    "close the Hungarian demo on the canonical article route with explicit throughput floors",
-                ),
                 String::from(
                     "close Arto Inkala and the declared hard-Sudoku benchmark suite on the canonical article route",
                 ),
@@ -979,7 +976,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             303,
             "TAS-180: Hungarian article demo parity",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-004", "BEQ-005"],
         ),
         issue_row(
