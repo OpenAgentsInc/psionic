@@ -28,6 +28,7 @@ burn-ndarray = { version = "0.20.1", default-features = false, features = ["std"
 burn-nn = { version = "0.20.1", default-features = false, features = ["std"], optional = true }
 burn-store = { version = "0.20.1", default-features = false, features = ["std"], optional = true }
 hex = { workspace = true }
+psionic-catalog = { path = "../psionic-catalog" }
 psionic-compiler = { path = "../psionic-compiler" }
 psionic-data = { path = "../psionic-data" }
 psionic-eval = { path = "../psionic-eval" }

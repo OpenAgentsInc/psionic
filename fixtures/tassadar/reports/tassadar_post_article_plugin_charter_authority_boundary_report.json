@@ -536,10 +536,8 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "deferred_issue_ids": [
-    "TAS-198"
-  ],
+  "deferred_issue_ids": [],
   "claim_boundary": "this report freezes the bounded post-article plugin charter above the canonical rebased Transformer carrier without mutating `TCM.v1` or widening the current public claim surface. It binds the plugin lane to one canonical machine identity and computational-model statement, inherits the pre-plugin control-plane proof as a hard dependency, freezes operator/internal-only publication posture, explicit state ownership, semantic-preservation and scheduling laws, adversarial-host and anti-interpreter-smuggling posture, and governance receipts, and still leaves weighted plugin capability, plugin publication, served/public universality, and arbitrary software capability blocked until later manifest/runtime/controller/platform issues land.",
-  "summary": "post-article plugin charter report binds machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, charter_status=Green, dependency_rows=11, law_rows=17, governance_rows=4, rebase_claim_allowed=true, plugin_capability_claim_allowed=false, and deferred_issue_ids=1.",
-  "report_digest": "b98fe56f744f9bed2e936e9f4750eaf8df7d61f0280e09f3374d9bea556adae5"
+  "summary": "post-article plugin charter report binds machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, charter_status=Green, dependency_rows=11, law_rows=17, governance_rows=4, rebase_claim_allowed=true, plugin_capability_claim_allowed=false, and deferred_issue_ids=0.",
+  "report_digest": "e95e6163bb3521805674473814449fcf0a2e9e32ab4ddf01f83a28399cc483c0"
 }

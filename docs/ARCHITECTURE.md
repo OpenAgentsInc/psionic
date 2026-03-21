@@ -1302,6 +1302,24 @@ The current scope is:
   current posture bounded to operator/internal plugin work while weighted
   plugin control, plugin publication, served/public universality, and
   arbitrary software capability stay blocked
+- the current post-article plugin-manifest identity-contract artifacts are
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json`,
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_summary.json`,
+  the provider receipt in
+  `crates/psionic-provider/src/tassadar_post_article_plugin_manifest_identity_contract.rs`,
+  the checker script
+  `scripts/check-tassadar-post-article-plugin-manifest-identity-contract.sh`,
+  and the audit note
+  `docs/audits/2026-03-21-tassadar-post-article-plugin-manifest-identity-contract.md`,
+  which freeze one canonical plugin artifact contract above the rebased
+  carrier by binding `plugin_id`, `plugin_version`, `artifact_digest`,
+  declared exports, packet ABI version, schema ids, limits, trust tier,
+  replay class, evidence settings, canonical invocation identity, linked-bundle
+  membership, and hot-swap compatibility rules to the same machine identity
+  and computational-model statement as the plugin charter while keeping the
+  current lane operator/internal-only, default-served empty, and weighted
+  plugin control, plugin publication, served/public universality, and
+  arbitrary software capability blocked
 - the current post-article Turing-completeness closeout artifacts are
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_summary.json`,

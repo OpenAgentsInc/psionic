@@ -1,19 +1,19 @@
 use serde::{Deserialize, Serialize};
 
-use psionic_research::TassadarPostArticlePluginCharterAuthorityBoundarySummary;
+use psionic_research::TassadarPostArticlePluginManifestIdentityContractSummary;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassadarPostArticlePluginCharterAuthorityBoundaryReceipt {
+pub struct TassadarPostArticlePluginManifestIdentityContractReceipt {
     pub report_id: String,
     pub machine_identity_id: String,
     pub canonical_route_id: String,
     pub computational_model_statement_id: String,
-    pub charter_status: String,
-    pub current_publication_posture: String,
-    pub first_plugin_tranche_posture: String,
-    pub governance_row_count: u32,
-    pub validation_row_count: u32,
+    pub contract_status: String,
+    pub manifest_field_row_count: u32,
+    pub hot_swap_rule_row_count: u32,
+    pub packaging_row_count: u32,
     pub deferred_issue_ids: Vec<String>,
+    pub operator_internal_only_posture: bool,
     pub rebase_claim_allowed: bool,
     pub plugin_capability_claim_allowed: bool,
     pub weighted_plugin_control_allowed: bool,
@@ -23,22 +23,20 @@ pub struct TassadarPostArticlePluginCharterAuthorityBoundaryReceipt {
     pub detail: String,
 }
 
-impl TassadarPostArticlePluginCharterAuthorityBoundaryReceipt {
+impl TassadarPostArticlePluginManifestIdentityContractReceipt {
     #[must_use]
-    pub fn from_summary(
-        summary: &TassadarPostArticlePluginCharterAuthorityBoundarySummary,
-    ) -> Self {
+    pub fn from_summary(summary: &TassadarPostArticlePluginManifestIdentityContractSummary) -> Self {
         Self {
             report_id: summary.report_id.clone(),
             machine_identity_id: summary.machine_identity_id.clone(),
             canonical_route_id: summary.canonical_route_id.clone(),
             computational_model_statement_id: summary.computational_model_statement_id.clone(),
-            charter_status: format!("{:?}", summary.charter_status).to_lowercase(),
-            current_publication_posture: summary.current_publication_posture.clone(),
-            first_plugin_tranche_posture: summary.first_plugin_tranche_posture.clone(),
-            governance_row_count: summary.governance_row_count,
-            validation_row_count: summary.validation_row_count,
+            contract_status: format!("{:?}", summary.contract_status).to_lowercase(),
+            manifest_field_row_count: summary.manifest_field_row_count,
+            hot_swap_rule_row_count: summary.hot_swap_rule_row_count,
+            packaging_row_count: summary.packaging_row_count,
             deferred_issue_ids: summary.deferred_issue_ids.clone(),
+            operator_internal_only_posture: summary.operator_internal_only_posture,
             rebase_claim_allowed: summary.rebase_claim_allowed,
             plugin_capability_claim_allowed: summary.plugin_capability_claim_allowed,
             weighted_plugin_control_allowed: summary.weighted_plugin_control_allowed,
@@ -46,11 +44,11 @@ impl TassadarPostArticlePluginCharterAuthorityBoundaryReceipt {
             served_public_universality_allowed: summary.served_public_universality_allowed,
             arbitrary_software_capability_allowed: summary.arbitrary_software_capability_allowed,
             detail: format!(
-                "post-article plugin-charter summary `{}` keeps charter_status={:?}, current_publication_posture=`{}`, first_plugin_tranche_posture=`{}`, deferred_issue_ids={}, and plugin/publication claims blocked={}.",
+                "post-article plugin-manifest summary `{}` keeps contract_status={:?}, manifest_field_rows={}, packaging_rows={}, deferred_issue_ids={}, and plugin/publication claims blocked={}.",
                 summary.report_id,
-                summary.charter_status,
-                summary.current_publication_posture,
-                summary.first_plugin_tranche_posture,
+                summary.contract_status,
+                summary.manifest_field_row_count,
+                summary.packaging_row_count,
                 summary.deferred_issue_ids.len(),
                 !summary.plugin_capability_claim_allowed
                     && !summary.weighted_plugin_control_allowed
@@ -62,26 +60,20 @@ impl TassadarPostArticlePluginCharterAuthorityBoundaryReceipt {
 
 #[cfg(test)]
 mod tests {
-    use super::TassadarPostArticlePluginCharterAuthorityBoundaryReceipt;
-    use psionic_research::build_tassadar_post_article_plugin_charter_authority_boundary_summary;
+    use super::TassadarPostArticlePluginManifestIdentityContractReceipt;
+    use psionic_research::build_tassadar_post_article_plugin_manifest_identity_contract_summary;
 
     #[test]
-    fn post_article_plugin_charter_receipt_projects_summary() {
-        let summary = build_tassadar_post_article_plugin_charter_authority_boundary_summary()
-            .expect("summary");
+    fn post_article_plugin_manifest_receipt_projects_summary() {
+        let summary =
+            build_tassadar_post_article_plugin_manifest_identity_contract_summary()
+                .expect("summary");
         let receipt =
-            TassadarPostArticlePluginCharterAuthorityBoundaryReceipt::from_summary(&summary);
+            TassadarPostArticlePluginManifestIdentityContractReceipt::from_summary(&summary);
 
-        assert_eq!(receipt.charter_status, "green");
-        assert_eq!(
-            receipt.current_publication_posture,
-            "internal_only_until_later_plugin_platform_gates"
-        );
-        assert_eq!(
-            receipt.first_plugin_tranche_posture,
-            "closed_world_operator_curated_only_until_audited"
-        );
-        assert!(receipt.deferred_issue_ids.is_empty());
+        assert_eq!(receipt.contract_status, "green");
+        assert_eq!(receipt.deferred_issue_ids, vec![String::from("TAS-199")]);
+        assert!(receipt.operator_internal_only_posture);
         assert!(receipt.rebase_claim_allowed);
         assert!(!receipt.plugin_capability_claim_allowed);
         assert!(!receipt.weighted_plugin_control_allowed);

@@ -296,6 +296,20 @@ Current honest posture:
   the current claim surface; this tranche still does not imply weighted
   plugin control, plugin publication, served/public universality, or
   arbitrary software capability
+- the repo now also has one post-article plugin manifest, identity, and
+  hot-swap contract, with a committed catalog-owned report at
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_summary.json`,
+  a provider-facing receipt, a checker script, and an audit note that bind
+  canonical plugin identity to `plugin_id`, `plugin_version`,
+  `artifact_digest`, declared exports, packet ABI version, schema ids,
+  limits, trust tier, replay class, and evidence settings, define canonical
+  invocation identity and typed hot-swap compatibility rules, and keep
+  linked multi-module packaging explicit without widening the current claim
+  surface beyond operator/internal plugin artifacts; this tranche still keeps
+  weighted plugin control, plugin publication, served/public universality,
+  and arbitrary software capability blocked
 - the repo now also has one post-article Turing-completeness closeout audit,
   with a committed eval report at
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
@@ -508,9 +522,9 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-156` is now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-157` through `TAS-197` are now implemented and tracked in
+- `TAS-157` through `TAS-198` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-198` through `TAS-215` remain open in GitHub and are tracked via the
+- `TAS-199` through `TAS-215` remain open in GitHub and are tracked via the
   issue bodies plus `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 
 ## Repo-Local Companion Docs

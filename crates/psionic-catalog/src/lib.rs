@@ -2,6 +2,7 @@
 
 mod ollama;
 mod registry;
+mod tassadar_post_article_plugin_manifest_identity_contract;
 
 use std::{
     fs,
@@ -16,6 +17,7 @@ use thiserror::Error;
 
 pub use ollama::*;
 pub use registry::*;
+pub use tassadar_post_article_plugin_manifest_identity_contract::*;
 
 /// Human-readable crate ownership summary.
 pub const CRATE_ROLE: &str = "local blob access and catalog substrate";

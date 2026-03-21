@@ -1,0 +1,427 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_plugin_manifest_identity_contract.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-post-article-plugin-manifest-identity-contract.sh",
+  "plugin_charter_report_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
+  "module_trust_isolation_report_ref": "fixtures/tassadar/reports/tassadar_module_trust_isolation_report.json",
+  "module_promotion_state_report_ref": "fixtures/tassadar/reports/tassadar_module_promotion_state_report.json",
+  "internal_compute_package_manager_report_ref": "fixtures/tassadar/reports/tassadar_internal_compute_package_manager_report.json",
+  "internal_compute_package_route_policy_report_ref": "fixtures/tassadar/reports/tassadar_internal_compute_package_route_policy_report.json",
+  "local_plugin_system_spec_ref": "~/code/alpha/tassadar/plugin-system.md",
+  "supporting_material_refs": [
+    "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
+    "fixtures/tassadar/reports/tassadar_module_trust_isolation_report.json",
+    "fixtures/tassadar/reports/tassadar_module_promotion_state_report.json",
+    "fixtures/tassadar/reports/tassadar_internal_compute_package_manager_report.json",
+    "fixtures/tassadar/reports/tassadar_internal_compute_package_route_policy_report.json",
+    "~/code/alpha/tassadar/plugin-system.md",
+    "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md"
+  ],
+  "machine_identity_binding": {
+    "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+    "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+    "canonical_route_descriptor_digest": "00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032",
+    "canonical_weight_bundle_digest": "99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+    "canonical_weight_primary_artifact_sha256": "e24923e6fe39f0656b3f331fb935e0827a3de43b706014610e513ca5a54e9f84",
+    "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+    "continuation_contract_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
+    "computational_model_statement_id": "tassadar.post_article_universality_bridge.computational_model_statement.v1",
+    "plugin_charter_report_id": "tassadar.post_article_plugin_charter_authority_boundary.report.v1",
+    "plugin_charter_report_digest": "e95e6163bb3521805674473814449fcf0a2e9e32ab4ddf01f83a28399cc483c0",
+    "canonical_architecture_anchor_crate": "psionic-transformer",
+    "canonical_architecture_boundary_ref": "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
+    "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_model_id=`tassadar-article-transformer-trace-bound-trained-v0` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` computational_model_statement_id=`tassadar.post_article_universality_bridge.computational_model_statement.v1` and plugin_charter_report_id=`tassadar.post_article_plugin_charter_authority_boundary.report.v1` remain the manifest contract anchor in `psionic-transformer`."
+  },
+  "dependency_rows": [
+    {
+      "dependency_id": "plugin_charter_authority_boundary",
+      "dependency_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
+      "bound_report_id": "tassadar.post_article_plugin_charter_authority_boundary.report.v1",
+      "bound_report_digest": "e95e6163bb3521805674473814449fcf0a2e9e32ab4ddf01f83a28399cc483c0",
+      "detail": "the manifest contract inherits the green plugin charter instead of inventing a parallel plugin authority story."
+    },
+    {
+      "dependency_id": "module_trust_isolation",
+      "dependency_class": "governance_dependency",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_module_trust_isolation_report.json",
+      "bound_report_id": "tassadar.module_trust_isolation.report.v1",
+      "bound_report_digest": "d669cb8959dfad7df9295c24646bf2ca00f8842792004096648e8b6d0b5ccb1a",
+      "detail": "trust tiers remain typed and refusal-backed so manifest compatibility cannot silently widen privilege."
+    },
+    {
+      "dependency_id": "module_promotion_state",
+      "dependency_class": "governance_dependency",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_module_promotion_state_report.json",
+      "bound_report_id": "tassadar.module_promotion_state.report.v1",
+      "bound_report_digest": "966367515d664914f84ed60b9a1f069da44128218e6fae3357acbc01c383b1ac",
+      "detail": "promotion evidence, quarantine, revocation, and supersession remain explicit prerequisites for later manifest widening."
+    },
+    {
+      "dependency_id": "internal_compute_package_manager",
+      "dependency_class": "catalog_dependency",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_internal_compute_package_manager_report.json",
+      "bound_report_id": "tassadar.internal_compute_package_manager.report.v1",
+      "bound_report_digest": "988da14eecf765fc16907bc4aa0409cb85319e79f22036d86ea41d934c6e6620",
+      "detail": "named internal packages already make software artifacts explicit, bounded, and refusal-backed instead of arbitrary package discovery."
+    },
+    {
+      "dependency_id": "internal_compute_package_route_policy",
+      "dependency_class": "route_policy_dependency",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_internal_compute_package_route_policy_report.json",
+      "bound_report_id": "tassadar.internal_compute_package_route_policy.report.v1",
+      "bound_report_digest": "ad014dbfca4138c11ed39c4021554a7aaadf77d39985515be98423a62ff62ee4",
+      "detail": "route policy keeps named packages explicit, default-served empty, and refusals typed so manifests do not imply arbitrary plugin discovery or serving."
+    },
+    {
+      "dependency_id": "local_plugin_system_spec",
+      "dependency_class": "design_input",
+      "satisfied": true,
+      "source_ref": "~/code/alpha/tassadar/plugin-system.md",
+      "detail": "the draft plugin-system note remains the design input for canonical manifest fields, invocation identity, and hot-swap rules."
+    }
+  ],
+  "manifest_field_rows": [
+    {
+      "field_id": "plugin_id",
+      "current_posture": "required_named_artifact_key",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "every plugin must carry one stable `plugin_id`; named internal packages already prove the repo does not need loose anonymous modules as the artifact vocabulary."
+    },
+    {
+      "field_id": "plugin_version",
+      "current_posture": "required_hot_swap_key",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "every plugin must carry one stable `plugin_version` so artifact replacement is explicit rather than inferred from mutable host state."
+    },
+    {
+      "field_id": "artifact_digest",
+      "current_posture": "required_integrity_key",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "every plugin must carry one `artifact_digest` so identity and integrity stay machine-checkable."
+    },
+    {
+      "field_id": "declared_exports",
+      "current_posture": "required_callable_surface",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "every plugin must declare callable exports explicitly; undeclared exports are outside the contract."
+    },
+    {
+      "field_id": "packet_abi_version",
+      "current_posture": "required_abi_selector",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "every plugin manifest must declare one packet ABI version instead of hiding ABI drift in host adapters."
+    },
+    {
+      "field_id": "input_schema_id",
+      "current_posture": "required_schema_key",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "every plugin manifest must carry one explicit input schema id for fail-closed invocation."
+    },
+    {
+      "field_id": "output_schema_id",
+      "current_posture": "required_schema_key",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "every plugin manifest must carry one explicit output schema id for fail-closed reinjection."
+    },
+    {
+      "field_id": "limits",
+      "current_posture": "required_timeout_memory_fuel_envelope",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "every plugin manifest must declare time, memory, and fuel ceilings inside one bounded envelope."
+    },
+    {
+      "field_id": "trust_tier",
+      "current_posture": "required_trust_posture_key",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_module_trust_isolation_report.json"
+      ],
+      "detail": "every plugin manifest must declare one trust tier so widening privilege is explicit and challengeable."
+    },
+    {
+      "field_id": "replay_class",
+      "current_posture": "required_replay_posture_key",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "every plugin manifest must declare one replay class so hot-swap and retry posture stay typed."
+    },
+    {
+      "field_id": "evidence_settings",
+      "current_posture": "required_receipt_emission_key",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "every plugin manifest must declare evidence settings for input digest, output digest, and receipt emission."
+    },
+    {
+      "field_id": "publication_posture",
+      "current_posture": "required_release_scope_key",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
+        "fixtures/tassadar/reports/tassadar_internal_compute_package_route_policy_report.json"
+      ],
+      "detail": "every plugin manifest must declare publication posture explicitly; the current posture remains operator/internal-only with no default served lane."
+    }
+  ],
+  "invocation_identity_rows": [
+    {
+      "identity_id": "canonical_plugin_identity_fields",
+      "required_fields": [
+        "plugin_id",
+        "plugin_version",
+        "artifact_digest"
+      ],
+      "current_posture": "required_for_all_plugin_artifacts",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md"
+      ],
+      "detail": "a plugin artifact is not canonically attributable without `plugin_id`, `plugin_version`, and `artifact_digest`."
+    },
+    {
+      "identity_id": "canonical_invocation_identity_fields",
+      "required_fields": [
+        "plugin_id",
+        "plugin_version",
+        "artifact_digest",
+        "export_name",
+        "packet_abi_version",
+        "mount_envelope_identity"
+      ],
+      "current_posture": "required_for_every_invocation",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
+        "fixtures/tassadar/reports/tassadar_internal_compute_package_route_policy_report.json"
+      ],
+      "detail": "a plugin invocation is not validly attributable without plugin id/version/digest plus export name, packet ABI version, and mount-envelope identity."
+    },
+    {
+      "identity_id": "linked_bundle_member_identity_fields",
+      "required_fields": [
+        "plugin_id",
+        "plugin_version",
+        "artifact_digest",
+        "linked_bundle_member_refs"
+      ],
+      "current_posture": "required_when_packaging_kind_is_linked_bundle",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_internal_compute_package_manager_report.json"
+      ],
+      "detail": "linked multi-module plugins must keep member refs explicit rather than collapsing bundle composition behind one opaque module label."
+    }
+  ],
+  "hot_swap_rule_rows": [
+    {
+      "rule_id": "same_plugin_id_versioned_replacement_only",
+      "current_posture": "version_key_required_for_hot_swap",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "hot-swap is explicit only when one stable `plugin_id` carries an explicit `plugin_version` transition; silent in-place replacement is out of contract."
+    },
+    {
+      "rule_id": "abi_and_schema_shape_compatibility_required",
+      "current_posture": "typed_compatibility_or_blocked",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_internal_compute_package_route_policy_report.json"
+      ],
+      "detail": "ABI-version and schema-shape drift must resolve through typed compatibility checks, downgrade, or blocked posture rather than silent host translation."
+    },
+    {
+      "rule_id": "trust_posture_widening_requires_receipts",
+      "current_posture": "challenge_and_trust_receipts_required",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_module_trust_isolation_report.json",
+        "fixtures/tassadar/reports/tassadar_module_promotion_state_report.json"
+      ],
+      "detail": "trust posture may not widen through hot-swap without explicit trust and promotion receipts."
+    },
+    {
+      "rule_id": "replay_and_evidence_posture_compatibility_required",
+      "current_posture": "receipt_family_must_stay_compatible",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "replay class and evidence settings are part of hot-swap compatibility; a host may not change them without explicit manifest transition and typed receipts."
+    }
+  ],
+  "packaging_rows": [
+    {
+      "packaging_id": "single_wasm_module_packaging_explicit",
+      "current_posture": "single_module_plugins_allowed_when_manifest_complete",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_internal_compute_package_manager_report.json"
+      ],
+      "detail": "single-module packaging remains explicit and named rather than anonymous loose binaries."
+    },
+    {
+      "packaging_id": "linked_multi_module_packaging_explicit",
+      "current_posture": "linked_bundle_members_must_be_named",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_internal_compute_package_manager_report.json"
+      ],
+      "detail": "when one plugin is a linked bundle, member modules remain explicit instead of being hidden inside one opaque artifact label."
+    },
+    {
+      "packaging_id": "future_component_model_bundle_requires_explicit_profile",
+      "current_posture": "blocked_until_later_profile_issue",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_internal_compute_package_route_policy_report.json"
+      ],
+      "detail": "future component-model bundles require an explicit admitted profile; they are not silently admitted by this manifest contract."
+    }
+  ],
+  "validation_rows": [
+    {
+      "validation_id": "hidden_host_orchestration_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "the host may project manifest selection and hot-swap mechanics, but it may not secretly decide workflow."
+    },
+    {
+      "validation_id": "schema_drift_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_internal_compute_package_route_policy_report.json"
+      ],
+      "detail": "schema or ABI drift remains typed and fail-closed rather than silently mediated by the host runtime."
+    },
+    {
+      "validation_id": "envelope_leakage_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_module_trust_isolation_report.json"
+      ],
+      "detail": "manifest identity does not leak envelope authority into the host; task-scoped module authority remains explicit and external where required."
+    },
+    {
+      "validation_id": "side_channel_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "cost, latency, and scheduling signals remain explicit or fixed by contract rather than hidden hot-swap steering channels."
+    },
+    {
+      "validation_id": "overclaim_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "the manifest contract does not itself imply weighted plugin capability, public plugin publication, served/public universality, or arbitrary software capability."
+    },
+    {
+      "validation_id": "typed_fail_closed_posture_explicit",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_internal_compute_package_route_policy_report.json",
+        "fixtures/tassadar/reports/tassadar_module_promotion_state_report.json",
+        "fixtures/tassadar/reports/tassadar_module_trust_isolation_report.json"
+      ],
+      "detail": "suppression, quarantine, downgrade, and blocked posture remain explicit whenever manifest, trust, or promotion prerequisites are missing."
+    },
+    {
+      "validation_id": "linked_bundle_members_explicit",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_internal_compute_package_manager_report.json"
+      ],
+      "detail": "linked bundle members remain named and machine-readable instead of being hidden inside one opaque plugin package."
+    },
+    {
+      "validation_id": "default_served_lane_remains_empty",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_internal_compute_package_route_policy_report.json"
+      ],
+      "detail": "the current manifest contract keeps the default served plugin lane empty rather than widening operator/internal artifacts into a public platform."
+    }
+  ],
+  "contract_status": "green",
+  "contract_green": true,
+  "operator_internal_only_posture": true,
+  "manifest_fields_frozen": true,
+  "canonical_invocation_identity_frozen": true,
+  "hot_swap_rules_frozen": true,
+  "multi_module_packaging_explicit": true,
+  "linked_bundle_identity_explicit": true,
+  "rebase_claim_allowed": true,
+  "plugin_capability_claim_allowed": false,
+  "weighted_plugin_control_allowed": false,
+  "plugin_publication_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "deferred_issue_ids": [
+    "TAS-199"
+  ],
+  "claim_boundary": "this report freezes the canonical plugin manifest, identity, and hot-swap contract above the rebased post-article machine without widening the current claim surface. It defines the required manifest fields, canonical invocation identity, compatibility and hot-swap rules, and explicit linked-bundle packaging posture for named plugin artifacts while preserving operator/internal-only release posture and leaving weighted plugin capability, plugin publication, served/public universality, and arbitrary software capability blocked until later ABI/runtime/controller/platform issues land.",
+  "summary": "post-article plugin manifest contract binds machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, contract_status=Green, dependency_rows=6, manifest_field_rows=12, hot_swap_rule_rows=4, and deferred_issue_ids=1.",
+  "report_digest": "84e3faf954c793d72074b87758bec3fd538e23200eb77976e4f1d3b3a8361c93"
+}

@@ -541,7 +541,7 @@ pub fn build_tassadar_post_article_plugin_charter_authority_boundary_report() ->
         plugin_publication_allowed,
         served_public_universality_allowed,
         arbitrary_software_capability_allowed,
-        deferred_issue_ids: vec![String::from("TAS-198")],
+        deferred_issue_ids: Vec::new(),
         claim_boundary: String::from(
             "this report freezes the bounded post-article plugin charter above the canonical rebased Transformer carrier without mutating `TCM.v1` or widening the current public claim surface. It binds the plugin lane to one canonical machine identity and computational-model statement, inherits the pre-plugin control-plane proof as a hard dependency, freezes operator/internal-only publication posture, explicit state ownership, semantic-preservation and scheduling laws, adversarial-host and anti-interpreter-smuggling posture, and governance receipts, and still leaves weighted plugin capability, plugin publication, served/public universality, and arbitrary software capability blocked until later manifest/runtime/controller/platform issues land.",
         ),
@@ -1584,7 +1584,7 @@ mod tests {
         assert_eq!(report.state_class_rows.len(), 4);
         assert_eq!(report.governance_rows.len(), 4);
         assert_eq!(report.validation_rows.len(), 10);
-        assert_eq!(report.deferred_issue_ids, vec![String::from("TAS-198")]);
+        assert!(report.deferred_issue_ids.is_empty());
     }
 
     #[test]

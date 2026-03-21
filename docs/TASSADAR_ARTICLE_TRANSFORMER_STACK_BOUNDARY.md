@@ -851,6 +851,27 @@ governance receipts for any later envelope or publication widening, and still
 does not admit weighted plugin control, plugin publication, served/public
 universality, or arbitrary software capability.
 
+`TAS-198` now closes the canonical plugin manifest, identity, and hot-swap
+contract tranche at
+`fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json`.
+That report freezes one named plugin-artifact contract above the rebased
+carrier by inheriting the green plugin charter, module trust isolation,
+promotion-state, package-manager, and route-policy artifacts as explicit
+dependencies, binding `plugin_id`, `plugin_version`, `artifact_digest`,
+declared exports, packet ABI version, schema ids, limits, trust tier, replay
+class, and evidence settings to the same canonical machine identity and
+computational-model statement as the charter, and making canonical invocation
+identity plus linked-bundle member identity machine-readable instead of
+leaving them implied. The operator-readable summary now lives at
+`fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_summary.json`,
+the provider receipt now lives at
+`crates/psionic-provider/src/tassadar_post_article_plugin_manifest_identity_contract.rs`,
+and the dedicated checker now lives at
+`scripts/check-tassadar-post-article-plugin-manifest-identity-contract.sh`.
+This tranche keeps hot-swap compatibility typed, keeps default-served plugin
+lanes empty, and still does not admit weighted plugin control, plugin
+publication, served/public universality, or arbitrary software capability.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

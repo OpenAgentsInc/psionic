@@ -46,7 +46,7 @@ jq -e '
   and .plugin_publication_allowed == false
   and .served_public_universality_allowed == false
   and .arbitrary_software_capability_allowed == false
-  and (.deferred_issue_ids == ["TAS-198"])
+  and (.deferred_issue_ids == [])
 ' fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json >/dev/null
 
 jq -e '
@@ -63,7 +63,7 @@ jq -e '
   and .validation_row_count == 10
   and .current_publication_posture == "internal_only_until_later_plugin_platform_gates"
   and .first_plugin_tranche_posture == "closed_world_operator_curated_only_until_audited"
-  and (.deferred_issue_ids == ["TAS-198"])
+  and (.deferred_issue_ids == [])
   and .rebase_claim_allowed == true
   and .plugin_capability_claim_allowed == false
   and .weighted_plugin_control_allowed == false

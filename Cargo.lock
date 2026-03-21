@@ -3836,6 +3836,7 @@ dependencies = [
  "burn-nn",
  "burn-store",
  "hex",
+ "psionic-catalog",
  "psionic-compiler",
  "psionic-data",
  "psionic-environments",
