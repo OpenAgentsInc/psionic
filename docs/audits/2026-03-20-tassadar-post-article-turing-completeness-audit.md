@@ -117,6 +117,10 @@ invariants.
   resumed, or host-backed state classes
 - Control Ownership:
   host may execute declared mechanics, but host may not decide workflow
+- Control-Plane Provenance:
+  every decision-bearing trace must bind branch, retry, stop, and later
+  capability-choice outcomes back to model outputs, canonical route identity,
+  and replayable control evidence
 - Semantic Preservation:
   adapters, continuation mechanics, marshalling, and reinjection must preserve
   declared meaning or fail closed
@@ -219,6 +223,9 @@ class of risk:
 - Choice-Set Neutrality Drift:
   surfacing "all choices" is not enough if ordering, latency, or soft-failure
   effects still bias effectively equivalent options
+- Control-Plane Proof Gap:
+  the repo can forbid host control in prose while still lacking one
+  machine-readable proof that decisions remain weight-owned across the stack
 - Operator Versus Served Drift:
   rebasing can reopen the earlier operator/served divergence if served routes
   are not held inside an explicit conformance envelope
@@ -228,6 +235,37 @@ class of risk:
 
 Those risks are why the bridge needs explicit anti-drift artifacts, not only
 green witness rows.
+
+## The Missing Proof Surface: Control-Plane Ownership And Decision Provenance
+
+The rebased stack now has three proof-bearing surfaces in view:
+
+- compute proof:
+  `TCM.v1`, the universal-machine construction, and the witness suite
+- route and execution proof:
+  the canonical owned-route article lane plus semantics and continuation audits
+- anti-drift proof:
+  machine identity, execution semantics, continuation discipline, and
+  fast-route legitimacy
+
+What it still needs as its own object is:
+
+- control-plane ownership and decision provenance proof:
+  one machine-readable proof that branch, retry, stop, and later
+  capability-facing decisions remain weight-owned on the canonical route
+
+That proof surface must positively show:
+
+- decision provenance from model output to canonical route identity
+- choice-set completeness and neutrality inside the declared equivalent-choice
+  class
+- absence or explicit surfacing of hidden control channels
+- replayability of branch, retry, and stop decisions under declared
+  determinism posture
+
+Without that proof surface, the bridge can forbid host orchestration without
+yet proving that the canonical route is actually the thing deciding what
+happens next.
 
 ## What Is Already Real And Still Valid
 
@@ -717,6 +755,25 @@ answers:
 Without this law, different artifacts can all sound correct while referring to
 different machines.
 
+### 15. Control-Plane Provenance Law
+
+The bridge also needs one positive proof surface for control ownership, not
+only negative refusals against host steering.
+
+That proof must show:
+
+- every branch, retry, and stop decision traces back to model outputs, the
+  canonical route digest, and the machine identity tuple
+- admissible choice sets are complete and neutral inside the declared
+  equivalent-choice class
+- latency, cost, queueing, scheduling, cache hits, helper substitution, and
+  fast-route fallback do not become hidden control channels
+- the control trace for branch, retry, and stop logic is replayable under a
+  declared determinism posture even before later plugin control exists
+
+Without this law, the repo can say host control is forbidden without yet
+proving that the canonical route owns workflow decisions.
+
 ## Necessary Work After `TAS-186`
 
 The following follow-on work is `planned` if the goal is to make the new
@@ -730,7 +787,8 @@ The bar is:
 
 - whether the canonical owned route remains the truth carrier under bounded
   resume, continuation, spill/tape, and process-identity semantics without
-  losing state-ownership or control-ownership cleanliness
+  losing state-ownership, control-ownership, or control-plane-provenance
+  cleanliness
 
 ### A. Freeze The Bridge Contract
 
@@ -780,7 +838,27 @@ It must prove that checkpoint, spill/tape, and process-object semantics:
 This is the most important missing bridge between `TAS-183`/`TAS-184` and the
 older operator-universality lane.
 
-### C. Publish The Carrier Split Contract
+### C. Publish Control-Plane Ownership And Decision-Provenance Proof
+
+The bridge also needs one dedicated proof surface for workflow decisions.
+
+It must prove that:
+
+- branch, retry, and stop decisions are attributable to model outputs on the
+  canonical route
+- the admissible choice set is complete and neutral inside the declared
+  equivalent-choice class
+- latency, cost, queueing, scheduling, cache hits, helper substitution, and
+  fast-route fallback do not become hidden control channels
+- the branch, retry, and stop trace is replayable under a declared
+  determinism posture
+- host control substitution causes typed failure rather than silent takeover
+
+Without this proof surface, the rebase can still sound weight-owned while
+lacking positive evidence that the canonical route is the thing deciding what
+happens next.
+
+### D. Publish The Carrier Split Contract
 
 The rebase should publish one dedicated carrier split statement that freezes:
 
@@ -792,7 +870,7 @@ The rebase should publish one dedicated carrier split statement that freezes:
 Without that split, later docs will keep over-reading article closure as if it
 already closed operator universality.
 
-### D. Rebind Universal-Machine Proofs To The Canonical Route
+### E. Rebind Universal-Machine Proofs To The Canonical Route
 
 The older witness construction must be replayed against the new canonical
 owned-route identities.
@@ -812,7 +890,7 @@ That means:
 Until this happens, the old universal-machine proof remains real but not
 canonically attached to the new route.
 
-### E. Rebuild The Witness Suite Around The Canonical Route
+### F. Rebuild The Witness Suite Around The Canonical Route
 
 The universality witness suite should be reissued so the canonical owned route
 is the route being exercised, not only the older operator lane.
@@ -832,7 +910,7 @@ But it now also needs:
 - negative rows for helper substitution, hidden cache-owned control flow, and
   resume-only cheating
 
-### F. Add A Canonical-Route Universal-Substrate Gate
+### G. Add A Canonical-Route Universal-Substrate Gate
 
 The old minimal gate should not be silently reused.
 
@@ -841,6 +919,7 @@ One new gate should require:
 - `TAS-186` green
 - canonical-route bridge contract green
 - continuation/control/state ownership audit green
+- control-plane ownership and decision-provenance proof green
 - carrier split contract green
 - canonical-route universal-machine proof green
 - canonical-route witness suite green
@@ -849,7 +928,7 @@ One new gate should require:
 That gate is the first place where the repo can honestly ask whether the new
 canonical route, not merely the older operator lane, is Turing-complete.
 
-### G. Extend Portability And Minimality To The Universality Lane
+### H. Extend Portability And Minimality To The Universality Lane
 
 `TAS-185` and `TAS-185A` are necessary, but not sufficient.
 
@@ -863,7 +942,7 @@ They need one follow-on extension over the universality carrier itself:
 The older `TAS-156` closeout already carried portability and refusal language,
 but it was not bound to the newer canonical route.
 
-### H. Reissue The Final Verdict Split
+### I. Reissue The Final Verdict Split
 
 Once the rebased gate is green, the repo should publish one new verdict split
 for the canonical route:
@@ -878,7 +957,7 @@ The expected served verdict remains `partial_outside_psionic` unless
 `kernel-policy` and `nexus` ownership moves or the user explicitly asks for
 that cross-repo work.
 
-### I. Publish A New Final Closeout Audit
+### J. Publish A New Final Closeout Audit
 
 Only after the new bridge, proof, suite, gate, portability, and verdict-split
 artifacts exist should the repo publish a second final closeout.
@@ -890,7 +969,7 @@ That new closeout should say:
   for the bounded Turing-completeness statement
 - served/public universality remains either suppressed or explicitly bounded
 
-### J. Reserve A Separate Plugin-Capability Boundary
+### K. Reserve A Separate Plugin-Capability Boundary
 
 The rebased universality tranche should also publish one explicit boundary
 statement that says:
@@ -909,8 +988,9 @@ accidentally preclude the cleaner plugin architecture.
 ## Proposed GitHub Issue Roadmap
 
 Suggested numbering below assumes the next dedicated post-`TAS-186` tranche
-continues the current TAS sequence. If the tracker advances first, preserve the
-dependency order and titles, not the exact numerals.
+continues the current TAS sequence, with `TAS-188A` reserved for the
+control-plane proof. If the tracker advances first, preserve the dependency
+order and titles, not the exact numerals.
 
 ### Suggested `TAS-187`: Freeze Post-Article Universality Bridge Contract
 
@@ -986,6 +1066,37 @@ Supporting material:
 - `fixtures/tassadar/reports/tassadar_spill_tape_store_report.json`
 - `fixtures/tassadar/reports/tassadar_session_process_profile_report.json`
 - `fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json`
+
+### Suggested `TAS-188A`: Prove Control-Plane Ownership And Decision Provenance
+
+Suggested GitHub title:
+
+`Tassadar: prove control-plane ownership and decision provenance`
+
+Summary:
+
+Publish one machine-readable proof that workflow decisions on the rebased route
+remain weight-owned, choice-complete, choice-neutral, and replayable.
+
+Description:
+
+- bind branch, retry, and stop decisions to model outputs, canonical route
+  identity, and the machine identity tuple
+- prove the admissible choice set is complete and neutral inside the declared
+  equivalent-choice class
+- prove latency, cost, queueing, scheduling, cache hits, helper substitution,
+  and fast-route fallback do not become hidden control channels
+- define replay posture for the branch, retry, and stop trace under the
+  declared determinism class
+- fail closed when host control substitution is detected
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+- `fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json`
+- `fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json`
+- `fixtures/tassadar/reports/tassadar_universality_witness_suite_report.json`
 
 ### Suggested `TAS-189`: Publish Carrier Split Between Direct And Resumable Carriers
 
@@ -1085,7 +1196,8 @@ Description:
 
 - require `TAS-186` closure
 - require the bridge contract, ownership and semantic-preservation audit,
-  carrier split contract, proof rebinding, and witness suite
+  control-plane proof, carrier split contract, proof rebinding, and witness
+  suite
 - keep portability and refusal rows explicit
 - refuse over-reading article equivalence as universality
 
@@ -1194,13 +1306,15 @@ Suggested GitHub title:
 Summary:
 
 Publish the final rebased closeout once the bridge, ownership, witness, gate,
-portability, and verdict artifacts are all green.
+control-plane, portability, and verdict artifacts are all green.
 
 Description:
 
 - state that the historical `TAS-156` closeout still stands
 - state that the canonical post-`TAS-186` route is now the truth carrier for
   the bounded Turing-completeness claim
+- state that the control-plane ownership and decision-provenance proof is part
+  of that truth carrier
 - keep plugin capability and served/public plugin posture out of scope
 - preserve explicit refusal and publication boundaries
 
@@ -1411,6 +1525,7 @@ constraints are actually locked.
 Description:
 
 - summarize the final machine identity lock and computational model statement
+- summarize the control-plane provenance verdict and decision-replay posture
 - summarize execution-semantics, continuation, and fast-route legitimacy
   verdicts
 - summarize equivalent-choice, downward non-influence, and served-envelope
@@ -1446,6 +1561,8 @@ It also still cannot say:
   plugin-capability layer cleanly
 - that one canonical machine identity lock already binds proofs, witnesses,
   benchmarks, and continuation semantics to the same route family
+- that one control-plane ownership and decision-provenance proof already binds
+  workflow decisions to the canonical route
 - that proof rebinding already carries an execution-semantics equivalence
   contract rather than output parity alone
 - that continuation has already been proven non-computational beyond the base

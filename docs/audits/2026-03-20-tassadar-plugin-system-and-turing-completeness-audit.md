@@ -137,6 +137,10 @@ under the same invariants.
   resumed, or host-backed state classes
 - Control Ownership:
   host may execute declared mechanics, but host may not decide workflow
+- Control-Plane Provenance:
+  every decision-bearing trace must bind branch, retry, stop, and later
+  capability-choice outcomes back to model outputs, canonical route identity,
+  and replayable control evidence
 - Semantic Preservation:
   adapters, continuation mechanics, marshalling, and reinjection must preserve
   declared meaning or fail closed
@@ -238,6 +242,9 @@ class of risk:
 - Choice-Set Neutrality Drift:
   surfacing "all choices" is not enough if ordering, latency, cost, or
   soft-failure effects still bias effectively equivalent options
+- Control-Plane Proof Gap:
+  the repo can forbid host control in prose while still lacking one
+  machine-readable proof that decisions remain weight-owned across the stack
 - Operator Versus Served Drift:
   served/plugin posture can drift away from operator truth unless a conformance
   envelope freezes what is allowed to differ
@@ -264,6 +271,35 @@ All other plugin work is subordinate to that dependency:
 Without weighted control ownership, those surfaces may still describe useful
 bounded software components, but they do not yet add up to the claimed weighted
 plugin system.
+
+## The Missing Proof Surface: Control-Plane Ownership And Decision Provenance
+
+Across the full stack, the repo now has:
+
+- compute proof:
+  `TCM.v1`, the universal-machine construction, and the witness suite
+- route and execution proof:
+  the canonical owned-route article lane plus semantics and continuation audits
+- capability substrate:
+  manifests, packets, receipts, runtime contracts, and plugin envelopes
+
+What it still needs as its own object before a plugin controller claim is:
+
+- control-plane ownership and decision provenance proof:
+  one machine-readable proof that workflow decisions remain weight-owned on the
+  canonical route
+
+That proof surface must positively show:
+
+- decision provenance from model output to canonical route identity
+- choice-set completeness and neutrality inside the declared equivalent-choice
+  class
+- absence or explicit surfacing of hidden control channels
+- replayability of branch, retry, and stop decisions before later plugin
+  sequencing is added
+
+The later weighted plugin-controller trace should extend that proof surface,
+not substitute for it.
 
 ## What The Plugin-System Spec Actually Requires
 
@@ -970,6 +1006,25 @@ that says:
 Without this law, the served plugin system can drift away from the operator
 truth carrier while still sounding like the same platform.
 
+### 16. Control-Plane Provenance Proof Dependency
+
+Before the repo can claim weighted plugin control, it needs one inherited,
+machine-readable control-plane proof from the rebased carrier.
+
+That proof must show:
+
+- branch, retry, and stop decisions already trace back to model outputs, the
+  canonical route digest, and the machine identity tuple
+- admissible choice sets are complete and neutral inside the declared
+  equivalent-choice class
+- latency, cost, queueing, scheduling, cache hits, helper substitution, and
+  fast-route fallback do not become hidden control channels
+- the pre-plugin control trace is replayable under the declared determinism
+  posture
+
+The plugin-specific controller trace should extend this proof to plugin
+selection and sequencing, not invent control ownership from scratch.
+
 ## Does The Plugin System Change The Shape Of The Turing-Completeness Push?
 
 Yes, but only in a constrained way.
@@ -981,6 +1036,7 @@ Turing-completeness objective from the companion audit:
 
 - rebase the old `TCM.v1` closeout onto the canonical owned route
 - prove continuation ownership on that route
+- publish a control-plane ownership and decision-provenance proof on that route
 - rebind universal-machine proofs and witness suites to that route
 - issue a new canonical-route universal-substrate gate
 - refresh portability and verdict split on that route
@@ -999,7 +1055,7 @@ That would weaken the claim discipline.
 ### What Should Change
 
 If the long-term target includes the plugin system, the post-`TAS-186`
-Turing-completeness push should become plugin-aware in five concrete ways.
+Turing-completeness push should become plugin-aware in six concrete ways.
 
 #### 1. Do Not Freeze A Pure-Compute-Only Terminal Shape
 
@@ -1082,7 +1138,22 @@ That rule belongs in the bridge before the plugin tranche starts, because later
 plugin work will otherwise be forced to infer it from indirect article or
 continuation artifacts.
 
-#### 5. The Verdict Split Should Keep Plugin Capability Separate
+#### 5. Publish A Pre-Plugin Control-Plane Proof Surface
+
+The post-`TAS-186` bridge should also publish one machine-readable proof that:
+
+- branch, retry, and stop decisions are attributable to model outputs on the
+  canonical route
+- admissible choice sets are complete and neutral inside the declared
+  equivalent-choice class
+- hidden control channels are surfaced or refused
+- workflow decisions are replayable before later plugin sequencing is added
+
+Without that artifact, the later plugin controller claim would inherit laws but
+not yet inherit a positive proof that the model is the thing deciding what
+happens next.
+
+#### 6. The Verdict Split Should Keep Plugin Capability Separate
 
 The final rebased theory/operator/served split should not silently imply:
 
@@ -1113,6 +1184,8 @@ Those are:
 - make the bridge contract reserve plugin-boundary identity fields
 - make the continuation-ownership audit explicit about packet-local,
   ephemeral-instance, and durable-host state
+- publish the control-plane ownership and decision-provenance proof before any
+  weighted plugin-controller claim is made
 - freeze a semantic-preservation rule for packet-mediated adapters and result
   reinjection before any weighted plugin-controller claim is made
 - reserve choice-set integrity, resource transparency, and scheduling
@@ -1141,8 +1214,9 @@ Those belong in the next tranche.
 ## Proposed GitHub Issue Roadmap
 
 Suggested numbering below assumes the post-`TAS-186` Turing-completeness
-bridge consumes `TAS-187` through `TAS-196`. If the tracker advances first,
-preserve the dependency order and titles, not the exact numerals.
+bridge consumes `TAS-187` through `TAS-196`, including `TAS-188A` for the
+control-plane proof. If the tracker advances first, preserve the dependency
+order and titles, not the exact numerals.
 
 ### Suggested `TAS-197`: Freeze Plugin Charter, Authority Boundary, And Platform Laws
 
@@ -1163,6 +1237,8 @@ Description:
   without mutating `TCM.v1`
 - inherit one canonical machine identity lock and computational model
   statement from the rebased carrier
+- inherit the pre-plugin control-plane ownership and decision-provenance proof
+  as a hard dependency rather than treating plugin control as a fresh claim
 - freeze the three-plane contract across data plane, control plane, and
   capability plane
 - freeze the adversarial host model the later conformance harness must defend
@@ -1424,6 +1500,8 @@ plugin selection, sequencing, retries, and stop conditions.
 
 Description:
 
+- extend the earlier pre-plugin control-plane proof through plugin selection
+  and sequencing rather than inventing control ownership from scratch
 - define the structured weighted plugin control trace
 - define the control-trace determinism class, sampling policy, and randomness
   controls
@@ -1489,6 +1567,8 @@ Description:
 
 - state clearly what the plugin system does and does not claim
 - preserve the separation from the bounded Turing-completeness closeout
+- state that weighted plugin control depends on the inherited control-plane
+  proof plus the plugin-specific controller extension
 - keep operator and served/plugin publication posture explicit
 - refuse any implication that broader served posture already shares operator
   conformance when the envelope is not published
@@ -1700,6 +1780,8 @@ served-envelope constraints are actually locked.
 Description:
 
 - summarize the final machine identity lock and computational model statement
+- summarize the inherited control-plane provenance proof and the plugin-layer
+  control extension verdict
 - summarize execution-semantics, continuation, and fast-route legitimacy
   verdicts
 - summarize equivalent-choice, downward non-influence, and served-envelope
@@ -1719,7 +1801,7 @@ The dependency order should be:
 
 1. finish `TAS-182` through `TAS-186`
 2. land the post-article Turing-completeness bridge tranche from the companion
-   audit
+   audit, including the pre-plugin control-plane proof
 3. land plugin charter, manifest, packet ABI, runtime API, receipts, and
    replay classes
 4. land the world-mount envelope compiler and plugin admissibility contract
@@ -1765,6 +1847,7 @@ But the repo does **not** yet have:
 - a unified adversarial host model
 - one canonical machine identity lock inherited across plugin-facing artifacts
 - one canonical computational model statement for the underlying carrier
+- one inherited control-plane ownership and decision-provenance proof
 - a frozen plugin language boundary plus closed-world discovery contract
 - planner-indistinguishability guardrails over choice sets, resources, and
   scheduling
@@ -1784,7 +1867,8 @@ unifying that substrate under one plugin contract, proving semantic
 preservation through adapters and result reinjection, freezing governance
 identity, closing host-steering attack surfaces, and then proving weighted
 control ownership while keeping machine identity, computational-model truth,
-choice neutrality, and served conformance from drifting.
+choice neutrality, served conformance, and control-plane provenance from
+drifting.
 
 ## Final Judgment
 
@@ -1802,6 +1886,8 @@ without letting plugin ergonomics rewrite lower-plane machine truth.
 So the right answer is:
 
 - finish the core post-`TAS-186` Turing-completeness rebase first
+- make that rebase publish the standalone control-plane ownership and
+  decision-provenance proof
 - make that rebase plugin-aware at the boundary level
 - then build the plugin system as the next explicit tranche on top of it
 
