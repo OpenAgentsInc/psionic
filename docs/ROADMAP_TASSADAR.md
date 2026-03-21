@@ -170,6 +170,20 @@ Current honest posture:
   bounded Turing-completeness claim on the canonical route, or imply
   served/public universality, weighted plugin control, or arbitrary software
   capability
+- the repo now also has one post-article control-plane decision-provenance
+  proof, with a committed eval report at
+  `fixtures/tassadar/reports/tassadar_post_article_control_plane_decision_provenance_proof_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_post_article_control_plane_decision_provenance_proof_summary.json`,
+  a provider-facing receipt, a checker script, and an audit note that bind
+  branch, retry, and stop decisions to model outputs, canonical route
+  identity, and the bridge machine identity while freezing determinism,
+  equivalent-choice, failure semantics, time semantics, information
+  boundaries, hidden-state closure, observer acceptance, and hidden-control
+  channel exclusions; this tranche still does not publish the final carrier
+  split, reissue the bounded Turing-completeness claim on the canonical route,
+  or imply served/public universality, weighted plugin control, or arbitrary
+  software capability
 - the repo now also has one machine-readable article-equivalence blocker
   matrix, with a committed eval report at
   `fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json`,

@@ -672,6 +672,25 @@ the final direct-versus-resumable carrier split publication, a rebased
 Turing-completeness approval, a served/public universality approval, a
 weighted plugin-control claim, or an arbitrary software-capability claim.
 
+`TAS-188A` now closes the control-plane ownership and decision-provenance
+tranche at
+`fixtures/tassadar/reports/tassadar_post_article_control_plane_decision_provenance_proof_report.json`.
+That proof binds branch, retry, and stop decisions to model outputs, canonical
+route identity, and the bridge machine identity tuple while freezing one
+machine-readable determinism contract, equivalent-choice relation,
+failure-semantics lattice, time semantics contract, information boundary,
+training-versus-inference boundary, hidden-state closure rule, observer model,
+and hidden-control-channel review. The operator-readable summary now lives at
+`fixtures/tassadar/reports/tassadar_post_article_control_plane_decision_provenance_proof_summary.json`,
+the provider receipt now lives at
+`crates/psionic-provider/src/tassadar_post_article_control_plane_decision_provenance_proof.rs`,
+and the dedicated checker now lives at
+`scripts/check-tassadar-post-article-control-plane-decision-provenance-proof.sh`.
+This tranche still is not the final direct-versus-resumable carrier split
+publication, a rebased Turing-completeness approval, a served/public
+universality approval, a weighted plugin-control claim, or an arbitrary
+software-capability claim.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

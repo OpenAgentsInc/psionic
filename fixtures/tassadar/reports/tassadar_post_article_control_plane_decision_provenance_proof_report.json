@@ -1,0 +1,349 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_control_plane_decision_provenance_proof.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-post-article-control-plane-decision-provenance-proof.sh",
+  "bridge_contract_report_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+  "semantic_preservation_audit_report_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json",
+  "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+  "witness_suite_report_ref": "fixtures/tassadar/reports/tassadar_universality_witness_suite_report.json",
+  "supporting_material_rows": [
+    {
+      "material_id": "bridge_contract",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+      "source_report_id": "tassadar.post_article_universality_bridge.contract.report.v1",
+      "source_report_digest": "2908d3a3b0a47f76c60fcf61726f8f37fc366b9ffe9ba3d3ddad75f08a012e10",
+      "detail": "the bridge contract must stay green before branch, retry, and stop decisions can be bound to one canonical machine identity tuple"
+    },
+    {
+      "material_id": "semantic_preservation_audit",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json",
+      "source_report_id": "tassadar.post_article_canonical_route_semantic_preservation_audit.report.v1",
+      "source_report_digest": "43e448b14eefefbc80745a93960d4cc591d930c16e3a7abb083421e499a97467",
+      "detail": "the semantic-preservation audit must stay green before control-plane proof can rely on the declared state taxonomy and continuation semantics"
+    },
+    {
+      "material_id": "tcm_v1_runtime_contract",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+      "source_report_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+      "source_report_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
+      "detail": "the declared `TCM.v1` runtime contract must stay green before replay-stable decision semantics can be carried on the bridge machine identity"
+    },
+    {
+      "material_id": "article_equivalence_acceptance_gate",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+      "source_report_id": "tassadar.article_equivalence.acceptance_gate.report.v1",
+      "source_report_digest": "e61112cca9b9525c33c875cb21cc0b8927047a968c92bf371fe98f3d0a859395",
+      "detail": "the article acceptance gate must stay green so control-plane proof remains tied to the canonical owned route rather than an alternate route family"
+    },
+    {
+      "material_id": "universality_witness_suite",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_universality_witness_suite_report.json",
+      "source_report_id": "tassadar.universality_witness_suite.report.v1",
+      "source_report_digest": "434f80150c05c44ef7bdf6d126f8e6141e2506e6a4c4da6a5178f5d415ebae3c",
+      "detail": "the witness suite must stay green so the branch-and-stop bearing session and spill witnesses remain explicit inside the declared control proof surface"
+    },
+    {
+      "material_id": "post_article_turing_completeness_audit_context",
+      "material_class": "observational_context",
+      "satisfied": true,
+      "source_ref": "docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md",
+      "detail": "the March 20 rebase audit remains observational context only here and does not substitute for proof-carrying control-plane evidence"
+    },
+    {
+      "material_id": "plugin_system_turing_completeness_audit_context",
+      "material_class": "observational_context",
+      "satisfied": true,
+      "source_ref": "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md",
+      "detail": "the March 20 plugin audit remains observational context only here and keeps the later capability boundary visible without substituting for proof-carrying control-plane evidence"
+    }
+  ],
+  "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+  "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "decision_binding_rows": [
+    {
+      "decision_id": "branch_decision_provenance",
+      "decision_kind": "branch",
+      "bound_to_model_outputs": true,
+      "bound_to_canonical_route_identity": true,
+      "bound_to_machine_identity_tuple": true,
+      "replay_stable": true,
+      "current_posture": "implemented",
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json",
+        "fixtures/tassadar/reports/tassadar_universality_witness_suite_report.json"
+      ],
+      "decision_binding_green": true,
+      "detail": "branch decisions stay weight-owned and replay-stable on the current rebased route because deterministic session-process continuation remains exact and bound to one fixed machine identity tuple."
+    },
+    {
+      "decision_id": "retry_decision_provenance",
+      "decision_kind": "retry",
+      "bound_to_model_outputs": true,
+      "bound_to_canonical_route_identity": true,
+      "bound_to_machine_identity_tuple": true,
+      "replay_stable": true,
+      "current_posture": "ambient_retry_disallowed",
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "decision_binding_green": true,
+      "detail": "ambient host retry is disallowed. Any retry-bearing control transition must therefore remain explicit and replay-stable under the same machine identity instead of being smuggled in as hidden host policy."
+    },
+    {
+      "decision_id": "stop_decision_provenance",
+      "decision_kind": "stop",
+      "bound_to_model_outputs": true,
+      "bound_to_canonical_route_identity": true,
+      "bound_to_machine_identity_tuple": true,
+      "replay_stable": true,
+      "current_posture": "implemented",
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json",
+        "fixtures/tassadar/reports/tassadar_universality_witness_suite_report.json"
+      ],
+      "decision_binding_green": true,
+      "detail": "stop decisions remain replay-stable because the current spill/tape and lifecycle continuation witnesses preserve terminal semantics under typed refusal boundaries instead of deferring stop authority to host scheduling."
+    }
+  ],
+  "determinism_class_contract": {
+    "supported_classes": [
+      "strict_deterministic",
+      "seeded_stochastic",
+      "bounded_nondeterministic_with_equivalence_class"
+    ],
+    "selected_class": "strict_deterministic",
+    "equivalent_choice_relation_id": "singleton_exact_control_trace.v1",
+    "replay_posture": "exact_replay_required",
+    "determinism_contract_green": true,
+    "detail": "the current rebased route selects `strict_deterministic` control tracing. `seeded_stochastic` and `bounded_nondeterministic_with_equivalence_class` remain declared classes, but they are not the selected class for this proof artifact."
+  },
+  "equivalent_choice_relation": {
+    "relation_id": "singleton_exact_control_trace.v1",
+    "equivalent_choice_rule": "exact same branch/retry/stop trace under the same machine identity tuple",
+    "admissible_divergence_bound": "zero_control_trace_divergence",
+    "choice_completeness_green": true,
+    "choice_neutrality_green": true,
+    "green": true,
+    "detail": "the current proof uses the singleton exact-trace relation: every admissible choice must be explicit on-trace, and no hidden host ranking or filtering may create a second equivalent path."
+  },
+  "failure_semantics_lattice": {
+    "failure_classes": [
+      "refusal",
+      "policy_failure",
+      "semantic_failure",
+      "capability_failure",
+      "resource_exhaustion",
+      "determinism_violation"
+    ],
+    "replay_stable_propagation_rule": "failure classes must propagate as typed receipts and may not be rewritten into hidden retry or hidden branch transitions",
+    "green": true,
+    "detail": "the failure lattice keeps typed refusal, policy, semantic, capability, resource, and determinism classes distinct so hidden retry or hidden stop coercion cannot be disguised as generic failure handling."
+  },
+  "time_semantics_contract": {
+    "logical_time_source": "declared_step_index_and_receipt_order",
+    "wall_time_model_observable": false,
+    "time_driven_branching_allowed": false,
+    "green": true,
+    "detail": "logical time is the declared step index plus receipt order. Wall time is not model-observable here, and time-driven branching is disallowed so host timing cannot become a hidden decision channel."
+  },
+  "information_boundary": {
+    "model_visible_signal_ids": [
+      "token_outputs",
+      "typed_refusal_ids",
+      "declared_continuation_receipt_ids",
+      "declared_step_index"
+    ],
+    "model_hidden_signal_ids": [
+      "latency",
+      "cost",
+      "queue_pressure",
+      "scheduler_order",
+      "cache_hit_rate",
+      "helper_selection"
+    ],
+    "green": true,
+    "detail": "cost, queue, scheduling, cache-hit, and helper-selection signals are not model-visible in this proof contract and therefore may not shape branch, retry, or stop behavior."
+  },
+  "training_inference_boundary": {
+    "runtime_adaptation_allowed": false,
+    "telemetry_decision_authority": false,
+    "logging_decision_authority": false,
+    "cache_behavior_decision_authority": false,
+    "green": true,
+    "detail": "runtime adaptation, telemetry, logging, and cache behavior stay outside decision authority for this proof surface; they may observe or accelerate execution but may not rewrite branch, retry, or stop outcomes."
+  },
+  "hidden_state_channel_closure": {
+    "allowed_state_class_ids": [
+      "weights_owned_control_state",
+      "ephemeral_execution_state",
+      "resumed_continuation_state",
+      "durable_receipt_backed_state",
+      "undeclared_workflow_state_refused"
+    ],
+    "hidden_state_channel_closed": true,
+    "green": true,
+    "detail": "all control-affecting state must stay inside the state classes already frozen by `TAS-188`; no additional hidden state channel is allowed to steer branch, retry, or stop behavior."
+  },
+  "observer_model": {
+    "verifier_roles": [
+      "artifact_replayer",
+      "receipt_verifier",
+      "gate_verdict_checker"
+    ],
+    "acceptance_requirements": [
+      "machine_identity_match",
+      "decision_trace_replay_match",
+      "determinism_class_match",
+      "typed_failure_class_match"
+    ],
+    "replay_receipt_required": true,
+    "gate_verdict_bound_to_machine_identity": true,
+    "green": true,
+    "detail": "control-plane acceptance now requires replay receipts and machine-identity match rather than sampled observation alone. The observer model is machine-readable and tied to artifact replay, receipt verification, and gate checks."
+  },
+  "hidden_control_channel_rows": [
+    {
+      "validation_id": "latency_steering_blocked",
+      "channel_kind": "latency_steering",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json"
+      ],
+      "detail": "latency is outside the model-visible boundary and cannot steer control decisions."
+    },
+    {
+      "validation_id": "cost_steering_blocked",
+      "channel_kind": "cost_steering",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json"
+      ],
+      "detail": "cost is outside the model-visible boundary and cannot steer control decisions."
+    },
+    {
+      "validation_id": "scheduling_steering_blocked",
+      "channel_kind": "scheduling_steering",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json"
+      ],
+      "detail": "scheduler order is outside the model-visible boundary and cannot steer control decisions."
+    },
+    {
+      "validation_id": "cache_hit_steering_blocked",
+      "channel_kind": "cache_hit_steering",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json"
+      ],
+      "detail": "cache-hit behavior is acceleration-only here and may not become hidden decision authority."
+    },
+    {
+      "validation_id": "helper_substitution_blocked",
+      "channel_kind": "helper_substitution",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "helper substitution stays explicitly quarantined and cannot become a hidden control channel."
+    },
+    {
+      "validation_id": "fast_route_fallback_blocked",
+      "channel_kind": "fast_route_fallback",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json"
+      ],
+      "detail": "fast-route fallback stays blocked because the proof remains tied to one fixed canonical route id and one fixed semantic-preservation audit surface."
+    }
+  ],
+  "validation_rows": [
+    {
+      "validation_id": "helper_substitution_quarantined",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "helper substitution remains quarantined and cannot own control decisions."
+    },
+    {
+      "validation_id": "route_drift_rejected",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "route drift remains rejected because every decision proof row binds to one fixed canonical route id."
+    },
+    {
+      "validation_id": "continuation_abuse_quarantined",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json"
+      ],
+      "detail": "continuation abuse remains quarantined because host mechanics stay non-authoritative and ambient retry stays disallowed."
+    },
+    {
+      "validation_id": "semantic_drift_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json"
+      ],
+      "detail": "semantic drift remains blocked because this proof builds on the green semantic-preservation audit rather than sampled parity alone."
+    },
+    {
+      "validation_id": "proof_class_distinction_preserved",
+      "green": true,
+      "source_refs": [
+        "docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md",
+        "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
+      ],
+      "detail": "proof-carrying artifacts remain distinct from observational audits in the control-plane proof surface."
+    },
+    {
+      "validation_id": "decision_provenance_contract_green",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json",
+        "fixtures/tassadar/reports/tassadar_universality_witness_suite_report.json"
+      ],
+      "detail": "decision provenance is now frozen as one machine-readable contract over branch, retry, and stop binding, determinism, equivalent-choice, failure semantics, time semantics, information boundaries, state closure, and observer acceptance."
+    },
+    {
+      "validation_id": "overclaim_posture_explicit",
+      "green": true,
+      "source_refs": [
+        "docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md",
+        "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
+      ],
+      "detail": "the control-plane proof remains bounded: carrier split publication, rebased universality admission, plugin control, served/public universality, and arbitrary software capability all stay explicitly blocked."
+    }
+  ],
+  "replay_posture_green": true,
+  "control_plane_ownership_green": true,
+  "control_plane_ownership_status": "green",
+  "decision_provenance_proof_complete": true,
+  "carrier_split_publication_complete": false,
+  "deferred_issue_ids": [
+    "TAS-189"
+  ],
+  "rebase_claim_allowed": false,
+  "plugin_capability_claim_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "claim_boundary": "this proof artifact closes only the post-`TAS-186` control-plane ownership and decision-provenance tranche on the bridge machine identity. It binds branch, retry, and stop decisions to model outputs, canonical route identity, and one replay-stable control contract while freezing determinism, equivalent-choice, failure semantics, time semantics, information boundaries, training-versus-inference boundaries, hidden-state closure, and observer acceptance requirements. It does not by itself publish the final direct-versus-resumable carrier split, admit the rebased Turing-completeness claim, admit weighted plugin control, admit served/public universality, or admit arbitrary software capability.",
+  "summary": "Post-article control-plane decision-provenance proof keeps supporting_materials=7/7, decision_bindings=3/3, hidden_control_channels=6/6, validation_rows=7/7, control_plane_ownership_status=Green, decision_provenance_proof_complete=true, and carrier_split_publication_complete=false.",
+  "report_digest": "6e2ee7d74812a896d76f878dbad372fe2f3acaf44436adbe4d8c7091f5960ba1"
+}

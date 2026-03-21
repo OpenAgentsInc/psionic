@@ -1150,6 +1150,22 @@ The current scope is:
   identity without widening the claim to control-plane decision provenance,
   final carrier publication, rebased universality admission, served/public
   universality, weighted plugin control, or arbitrary software capability
+- the current post-article control-plane proof artifacts are
+  `fixtures/tassadar/reports/tassadar_post_article_control_plane_decision_provenance_proof_report.json`,
+  `fixtures/tassadar/reports/tassadar_post_article_control_plane_decision_provenance_proof_summary.json`,
+  the provider receipt in
+  `crates/psionic-provider/src/tassadar_post_article_control_plane_decision_provenance_proof.rs`,
+  the checker script
+  `scripts/check-tassadar-post-article-control-plane-decision-provenance-proof.sh`,
+  and the audit note
+  `docs/audits/2026-03-21-tassadar-post-article-control-plane-decision-provenance-proof.md`,
+  which freeze one proof-carrying control contract over branch, retry, and
+  stop decision binding, determinism, equivalent-choice, failure semantics,
+  time semantics, information boundaries, hidden-state closure, observer
+  acceptance, and hidden-control-channel exclusion on the bridge machine
+  identity; this still does not publish the final carrier split, admit the
+  rebased universality claim, admit served/public universality, admit weighted
+  plugin control, or admit arbitrary software capability
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

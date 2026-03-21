@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_control_plane_decision_provenance_proof.report.v1",
+  "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+  "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "control_plane_ownership_status": "green",
+  "control_plane_ownership_green": true,
+  "replay_posture_green": true,
+  "decision_provenance_proof_complete": true,
+  "carrier_split_publication_complete": false,
+  "deferred_issue_ids": [
+    "TAS-189"
+  ],
+  "decision_binding_ids": [
+    "branch_decision_provenance",
+    "retry_decision_provenance",
+    "stop_decision_provenance"
+  ],
+  "hidden_control_channel_ids": [
+    "latency_steering_blocked",
+    "cost_steering_blocked",
+    "scheduling_steering_blocked",
+    "cache_hit_steering_blocked",
+    "helper_substitution_blocked",
+    "fast_route_fallback_blocked"
+  ],
+  "rebase_claim_allowed": false,
+  "plugin_capability_claim_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "detail": "post-article control-plane summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, decision_bindings=3, hidden_control_channels=6, control_plane_ownership_status=Green, decision_provenance_proof_complete=true, and carrier_split_publication_complete=false.",
+  "summary_digest": "deef7fc0d7a2aea39649aa10fe6df5668673f0491082776906a7153b6e1fb298"
+}
