@@ -132,6 +132,22 @@ invariants.
 - Scheduling Ownership:
   ordering, concurrency, and result-visibility timing must be model-decided or
   fixed as a declared runtime contract
+- Canonical Machine Identity:
+  one named machine identity tuple must bind model id, weight digest, route
+  digest, continuation contract, and carrier class for every proof, witness,
+  benchmark, and audit
+- Execution-Semantics Equivalence:
+  proof-bearing route changes must preserve declared transition semantics or an
+  explicit proof abstraction boundary, not merely output parity
+- Downward Non-Influence:
+  later capability or served layers may not silently rewrite lower-plane
+  compute, continuation, or proof assumptions
+- Computational Model Statement:
+  every claim-bearing artifact must name the computational model,
+  continuation semantics, and effect boundaries it relies on
+- Served Conformance:
+  served posture may deviate from operator truth only inside an explicit
+  conformance envelope and otherwise must fail closed
 
 ## Three-Plane Contract
 
@@ -156,6 +172,8 @@ In particular:
   logic
 - the future capability plane may not silently rewrite compute or control
   claims
+- higher planes may not push downward requirements that silently redefine the
+  lower-plane machine model, continuation semantics, or proof assumptions
 
 ## Adversarial Host Model
 
@@ -176,6 +194,40 @@ The bridge must therefore either:
 - surface these behaviors in route-visible truth and receipts
 - freeze them as non-adaptive runtime contract
 - or refuse them outright
+
+## Stability Risks That Need Explicit Artifacts
+
+Reading the Turing-completeness and plugin audits together exposes a second
+class of risk:
+
+- Dual Truth Carrier Drift:
+  once `TCM.v1` and the canonical Transformer route are both historically real,
+  proofs, witnesses, and benchmarks can drift apart again unless one canonical
+  machine identity lock binds them
+- Proof Versus Execution Semantics Split:
+  output parity can stay green while caching, batching, continuation, or fast
+  routes silently change the semantics the proof relied on
+- Continuation Inflation:
+  resumable execution can quietly become a second machine unless continuation
+  is constrained to extend execution without adding expressivity
+- Fast-Route Legitimacy Drift:
+  production can migrate to a fast route that is benchmark-green but no longer
+  the same proof-bearing machine
+- Downward Plugin Backpressure:
+  later plugin ergonomics can pressure the bridge into changing continuation,
+  carrier, or proof assumptions from above
+- Choice-Set Neutrality Drift:
+  surfacing "all choices" is not enough if ordering, latency, or soft-failure
+  effects still bias effectively equivalent options
+- Operator Versus Served Drift:
+  rebasing can reopen the earlier operator/served divergence if served routes
+  are not held inside an explicit conformance envelope
+- Computational Model Ambiguity:
+  proofs, routes, continuation artifacts, and plugin layers can otherwise end
+  up speaking about different machines without naming the difference
+
+Those risks are why the bridge needs explicit anti-drift artifacts, not only
+green witness rows.
 
 ## What Is Already Real And Still Valid
 
@@ -576,6 +628,95 @@ Ordering, concurrency, and result-visibility timing must be either:
 
 Otherwise scheduling becomes hidden planning.
 
+### 8. Canonical Machine Identity Lock
+
+The rebased universality lane needs one globally named machine identity tuple:
+
+- canonical model id
+- canonical weight digest
+- canonical route digest
+- canonical continuation contract
+- carrier class
+
+Every proof, witness, benchmark, and closeout must bind to that tuple or fail
+closed.
+
+Without this lock, the repo can re-open dual truth-carrier drift while still
+sounding canonical.
+
+### 9. Execution-Semantics Equivalence Law
+
+Proof transport requires more than output equivalence.
+
+The bridge must freeze either:
+
+- transition-level equivalence for the rebased route family
+- or one explicit abstraction boundary that the proof relies on
+
+Caching, batching, continuation restore, fast routes, and helper mechanics may
+not change the proof-bearing execution semantics off-trace.
+
+### 10. Continuation Non-Computationality Law
+
+Continuation may extend execution time, persistence, or resume posture, but it
+may not add computational expressivity beyond the base route.
+
+That means:
+
+- checkpoint structure may not encode hidden workflow logic
+- process-object restore may not introduce new control semantics
+- spill or tape mechanics may not become an undeclared second machine
+
+Without this law, the canonical route stops being the real compute carrier.
+
+### 11. Fast-Route Legitimacy Law
+
+Any fast route must be classified explicitly as either:
+
+- inside the universality carrier because semantics equivalence is proven
+- or outside the universality carrier as an operator or served acceleration
+
+Benchmark parity alone is not enough.
+
+Without this law, the repo can split the proof-bearing machine from the
+production machine again.
+
+### 12. Downward Non-Influence Law
+
+Later capability or served layers may not redefine:
+
+- continuation semantics
+- core compute-substrate rules
+- proof assumptions
+- or carrier identity
+
+The bridge may reserve hooks for later layers, but those hooks may not let a
+higher plane rewrite lower-plane truth.
+
+### 13. Served Conformance Envelope Law
+
+Served posture must publish one explicit conformance envelope that says:
+
+- which deviations from operator truth are allowed
+- which properties must remain identical
+- and which cases must fail closed
+
+Without this law, served optimizations can drift away from operator truth while
+still sounding aligned.
+
+### 14. Computational Model Statement Law
+
+The rebased lane must publish one explicit computational model statement that
+answers:
+
+- what machine the repo is claiming equivalence to
+- under what continuation semantics
+- with which declared effect boundaries
+- and without what plugin or public-serving implications
+
+Without this law, different artifacts can all sound correct while referring to
+different machines.
+
 ## Necessary Work After `TAS-186`
 
 The following follow-on work is `planned` if the goal is to make the new
@@ -599,17 +740,22 @@ Land one dedicated bridge artifact that answers:
   universality carrier?
 - which canonical weight artifact digest is in scope?
 - which route digest is in scope?
+- which globally named machine identity tuple is in scope?
 - which truths are carried by direct article-equivalent execution, and which
   are carried only by the bounded resumable universality carrier?
+- what the canonical computational model statement is for that carrier
 - is universality carried by `ReferenceLinear`, `HullCache`, a resumable route
   family above them, or an explicit split across those lanes?
 - which old `TCM.v1` rows now bind to new owned-route evidence, and which still
   bind only to older operator surfaces?
+- what execution-semantics equivalence class or proof abstraction boundary the
+  bridge relies on
 - where future packet-mediated software capability calls sit relative to the
   pure compute substrate, so the bridge does not later have to be redefined to
   accommodate plugins
 - how choice-set integrity, resource transparency, and scheduling ownership are
   reserved for later capability layers above the bridge
+- how downward non-influence from later capability layers is reserved
 - which forward-compatible hooks remain reserved for packet boundaries,
   capability invocation slots, receipt extensibility, and schema negotiation
 
@@ -782,8 +928,10 @@ Description:
 
 - declare the canonical model id, weight artifact digest, and route digest that
   now carry the rebased universality story
+- freeze one globally named machine identity tuple for the rebased carrier
 - publish the explicit split between direct article-equivalent carrier truths
   and bounded resumable universality carrier truths
+- publish one canonical computational model statement for the rebased carrier
 - freeze the three-plane contract across data plane, control plane, and later
   capability plane
 - state whether the carrier is `ReferenceLinear`, `HullCache`, a resumable
@@ -822,6 +970,8 @@ Description:
 - inspect actual continuation behavior before finalizing state classes
 - freeze the rule that host may execute continuation mechanics but may not
   decide workflow
+- prove continuation extends execution without adding expressivity beyond the
+  base route
 - prove resume, spill, and process-object mechanics preserve route semantics
   rather than merely surface outputs
 - classify weights-owned, ephemeral, resumed, and durable state from that
@@ -882,6 +1032,8 @@ Description:
   depends on continuation
 - require one proof-transport audit instead of treating rebinding as metadata
   relabeling
+- define the transition-level equivalence class or explicit proof abstraction
+  boundary the rebinding relies on
 - prove the new route preserves the mechanistic assumptions the proof relies on
 - keep helper substitution and route drift as explicit failure rows
 
@@ -958,8 +1110,11 @@ Description:
 
 - replay witness workloads across the declared machine matrix
 - require resumed-execution parity across the same matrix
+- classify whether each fast route is inside the universality carrier or
+  outside it as an acceleration-only surface
 - make route-drift suppression and minimality failures explicit
-- preserve the older served/public suppression boundary
+- preserve the older served/public suppression boundary and define the served
+  conformance envelope for any later widening
 
 Supporting material:
 
@@ -985,6 +1140,7 @@ Description:
 - publish the operator verdict for bounded-slice universality under explicit
   continuation semantics
 - keep served/public universality suppressed unless external dependencies move
+  and freeze the served conformance envelope for any narrower served posture
 - refuse any implication that plugin capability or publication has become green
 
 Supporting material:
@@ -1011,6 +1167,8 @@ Description:
   bridge rather than an implicit extension of compute truth
 - declare that plugin execution is a separate software-capability layer above
   that substrate
+- refuse downward pressure from plugin ergonomics into continuation semantics,
+  carrier identity, or proof assumptions
 - keep plugin state classes and receipt identity separate from the core compute
   substrate
 - reserve choice-set integrity, resource transparency, and scheduling ownership
@@ -1053,6 +1211,218 @@ Supporting material:
 - `fixtures/tassadar/reports/tassadar_turing_completeness_closeout_audit_report.json`
 - `fixtures/tassadar/reports/tassadar_turing_completeness_closeout_summary.json`
 
+## Suggested `TAS-207` Through `TAS-214`: Anti-Drift Stability Tranche
+
+If the tracker wants the second-order stability constraints called out as
+first-class artifacts rather than only absorbed into `TAS-187` through
+`TAS-206`, the cleanest follow-on tranche is:
+
+### Suggested `TAS-207`: Freeze Canonical Machine Identity Lock
+
+Suggested GitHub title:
+
+`Tassadar: freeze canonical machine identity lock`
+
+Summary:
+
+Bind every proof, witness, benchmark, route, and closeout to one globally
+named machine identity tuple so the bridge cannot drift back into dual truth
+carriers.
+
+Description:
+
+- define the canonical tuple over model id, weight digest, route digest,
+  continuation contract, and carrier class
+- require all proof-bearing and benchmark-bearing artifacts to reference that
+  tuple explicitly
+- refuse mixed-carrier evidence bundles that silently bind different tuples
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+- `fixtures/tassadar/reports/tassadar_tcm_v1_model.json`
+- `fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json`
+
+### Suggested `TAS-208`: Publish Canonical Computational Model Statement
+
+Suggested GitHub title:
+
+`Tassadar: publish canonical computational model statement`
+
+Summary:
+
+State exactly what machine the rebased carrier claims equivalence to, under
+which continuation semantics and effect boundaries.
+
+Description:
+
+- name the computational model the repo is claiming
+- state the continuation, effect, and refusal boundaries that belong to that
+  model
+- keep plugin capability and public-serving implications explicitly out of
+  scope unless separately green
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
+- `fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json`
+- `docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md`
+
+### Suggested `TAS-209`: Audit Execution-Semantics Equivalence And Proof Transport
+
+Suggested GitHub title:
+
+`Tassadar: audit execution-semantics equivalence and proof transport`
+
+Summary:
+
+Prove that proof rebinding preserves execution semantics rather than merely
+preserving outputs.
+
+Description:
+
+- define the transition-level equivalence class or explicit proof abstraction
+  boundary the rebinding relies on
+- audit cache, batching, helper, continuation, and route-family effects
+- refuse proof transport when execution semantics drift outside the declared
+  proof boundary
+
+Supporting material:
+
+- `fixtures/tassadar/reports/tassadar_universal_machine_proof_report.json`
+- `fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json`
+- `fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json`
+
+### Suggested `TAS-210`: Freeze Continuation Non-Computationality Contract
+
+Suggested GitHub title:
+
+`Tassadar: freeze continuation non-computationality contract`
+
+Summary:
+
+Prove that continuation extends execution without becoming a second machine.
+
+Description:
+
+- audit checkpoint, spill, tape, and process-object structures for hidden
+  workflow logic
+- prove continuation does not add computational expressivity beyond the base
+  route
+- refuse resume semantics that relocate real computation into host-managed
+  continuation
+
+Supporting material:
+
+- `fixtures/tassadar/reports/tassadar_spill_tape_store_report.json`
+- `fixtures/tassadar/reports/tassadar_session_process_profile_report.json`
+- `fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json`
+
+### Suggested `TAS-211`: Freeze Fast-Route Legitimacy And Carrier Binding
+
+Suggested GitHub title:
+
+`Tassadar: freeze fast-route legitimacy and carrier binding`
+
+Summary:
+
+Make every fast route either provably part of the universality carrier or
+explicitly outside it.
+
+Description:
+
+- classify `ReferenceLinear`, `HullCache`, and any resumable family relative to
+  the universality carrier
+- require semantics-equivalence evidence before a fast route may inherit proof
+  or universality status
+- refuse production or served wording that treats an unproven fast route as the
+  proof-bearing machine
+
+Supporting material:
+
+- `fixtures/tassadar/reports/tassadar_article_fast_route_architecture_selection_report.json`
+- `fixtures/tassadar/reports/tassadar_article_fast_route_implementation_report.json`
+- `fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json`
+
+### Suggested `TAS-212`: Freeze Equivalent-Choice Neutrality And Admissibility Contract
+
+Suggested GitHub title:
+
+`Tassadar: freeze equivalent-choice neutrality and admissibility contract`
+
+Summary:
+
+Define when two admissible choices are equivalent and when ordering, cost, or
+soft-failure effects are allowed to distinguish them.
+
+Description:
+
+- define an auditable equivalent-choice class or constrained admissibility
+  model
+- keep ordering, latency, cost, and soft-failure effects from becoming hidden
+  control channels inside that class
+- require receipt-visible justification when equivalent choices are narrowed or
+  ordered differently
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+- `fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json`
+- `fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json`
+
+### Suggested `TAS-213`: Freeze Downward Non-Influence And Served Conformance Envelope
+
+Suggested GitHub title:
+
+`Tassadar: freeze downward non-influence and served conformance envelope`
+
+Summary:
+
+Prove that later capability and served layers cannot rewrite lower-plane truth
+and that served posture stays inside a declared conformance envelope.
+
+Description:
+
+- forbid plugin or served ergonomics from redefining continuation semantics,
+  compute-substrate rules, proof assumptions, or carrier identity
+- define which served deviations from operator truth are allowed
+- require fail-closed behavior when served posture would escape the declared
+  conformance envelope
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+- `fixtures/tassadar/reports/tassadar_universality_verdict_split_report.json`
+- `fixtures/tassadar/reports/tassadar_broad_internal_compute_profile_publication_report.json`
+
+### Suggested `TAS-214`: Publish Anti-Drift Stability Closeout
+
+Suggested GitHub title:
+
+`Tassadar: publish anti-drift stability closeout`
+
+Summary:
+
+Publish one explicit closeout that says the rebased machine identity,
+semantics, continuation, fast-route, capability-boundary, and served-envelope
+constraints are actually locked.
+
+Description:
+
+- summarize the final machine identity lock and computational model statement
+- summarize execution-semantics, continuation, and fast-route legitimacy
+  verdicts
+- summarize equivalent-choice, downward non-influence, and served-envelope
+  verdicts
+- refuse any stronger claim when one of those locks is still open
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+- `fixtures/tassadar/reports/tassadar_turing_completeness_closeout_audit_report.json`
+
 ## Current Honest Statement
 
 The strongest current statement this repo can make is:
@@ -1074,6 +1444,15 @@ It also still cannot say:
 
 - that the rebased universality bridge is already written to host a weighted
   plugin-capability layer cleanly
+- that one canonical machine identity lock already binds proofs, witnesses,
+  benchmarks, and continuation semantics to the same route family
+- that proof rebinding already carries an execution-semantics equivalence
+  contract rather than output parity alone
+- that continuation has already been proven non-computational beyond the base
+  route
+- that fast routes have already been classified as legitimate universality
+  carriers or as acceleration-only surfaces
+- that served posture already sits inside a frozen conformance envelope
 - that theory/operator universality already implies weighted plugin control
 - or that a future plugin platform would inherit publication rights from the
   Turing-completeness closeout
@@ -1099,4 +1478,6 @@ discipline.
 That bridge should also be written so a later weighted plugin system can sit on
 top of it cleanly, rather than forcing the repo to reopen the universality
 contract just to explain packet-mediated capability execution or software-like
-artifact identity.
+artifact identity, and it should lock machine identity, execution semantics,
+continuation discipline, fast-route legitimacy, and served conformance before
+the repo treats the rebase as stable.

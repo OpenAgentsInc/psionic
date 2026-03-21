@@ -152,6 +152,22 @@ under the same invariants.
 - Scheduling Ownership:
   ordering, concurrency, and result-visibility timing must be model-decided or
   fixed as a declared runtime contract
+- Canonical Machine Identity:
+  one named machine identity tuple must bind model id, weight digest, route
+  digest, continuation contract, and carrier class for every proof, witness,
+  benchmark, and audit
+- Execution-Semantics Equivalence:
+  proof-bearing route changes must preserve declared transition semantics or an
+  explicit proof abstraction boundary, not merely output parity
+- Downward Non-Influence:
+  capability or served layers may not silently rewrite lower-plane compute,
+  continuation, or proof assumptions
+- Computational Model Statement:
+  every claim-bearing artifact must name the computational model,
+  continuation semantics, and effect boundaries it relies on
+- Served Conformance:
+  served posture may deviate from operator truth only inside an explicit
+  conformance envelope and otherwise must fail closed
 
 ## Three-Plane Contract
 
@@ -175,6 +191,8 @@ That means:
   admissibility logic
 - the data plane may not be widened into arbitrary capability execution by
   implication
+- higher planes may not push downward requirements that silently redefine the
+  lower-plane machine model, continuation semantics, or proof assumptions
 
 ## Adversarial Host Model
 
@@ -195,6 +213,40 @@ The system must therefore either:
 - surface these behaviors explicitly in the model-visible trace and receipts
 - freeze them as non-adaptive runtime contract
 - or refuse them outright
+
+## Stability Risks That Need Explicit Artifacts
+
+Reading the plugin and Turing-completeness audits together exposes a second
+class of risk:
+
+- Dual Truth Carrier Drift:
+  proofs, witnesses, route claims, and plugin execution claims can drift back
+  onto different underlying machines unless one canonical machine identity lock
+  binds them
+- Proof Versus Execution Semantics Split:
+  output parity can stay green while batching, caching, continuation, or fast
+  routes silently change the semantics the proof relied on
+- Continuation Inflation:
+  resumable execution can quietly become a second machine unless continuation
+  is constrained to extend execution without adding expressivity
+- Fast-Route Legitimacy Drift:
+  production can migrate to a fast route that is benchmark-green but no longer
+  the same proof-bearing machine
+- Plugin Backpressure Into Core Semantics:
+  plugin ergonomics can pressure the bridge into changing continuation,
+  carrier, or proof assumptions from above
+- Choice-Set Neutrality Drift:
+  surfacing "all choices" is not enough if ordering, latency, cost, or
+  soft-failure effects still bias effectively equivalent options
+- Operator Versus Served Drift:
+  served/plugin posture can drift away from operator truth unless a conformance
+  envelope freezes what is allowed to differ
+- Computational Model Ambiguity:
+  compute, continuation, and capability artifacts can all sound correct while
+  referring to different machines
+
+Those risks are why the plugin lane needs explicit anti-drift artifacts, not
+only a manifest and runtime API.
 
 ## Primary Claim Dependency
 
@@ -771,6 +823,8 @@ That means:
 - hidden heuristics may not narrow the effective choice set
 - precomputed candidate outputs may not be surfaced as if they were neutral
   options
+- the repo must define an equivalent-choice class or constrained admissibility
+  model rather than treating mere enumeration as neutrality
 
 Without this law, host filtering can decide workflow while preserving surface
 compliance.
@@ -797,6 +851,9 @@ Either:
 
 - cost and latency are fixed constants for the contract
 - or they are fully surfaced and stable across equivalent choices
+
+Soft failures, queueing asymmetries, and ordering effects may not become
+hidden tie-breakers inside the equivalent-choice class.
 
 Without this law, economics become hidden orchestration.
 
@@ -874,6 +931,44 @@ That means:
 
 Without this law, the plugin system can pass surface conformance while moving
 real control out of the model.
+
+### 13. Downward Non-Influence Law
+
+Plugin requirements may not redefine:
+
+- continuation semantics
+- core compute-substrate rules
+- proof assumptions
+- or carrier identity
+
+The plugin layer may sit above the rebased carrier and use reserved hooks, but
+it may not push downward changes that alter the underlying machine truth.
+
+### 14. Canonical Machine Inheritance Law
+
+The plugin layer must inherit one canonical machine identity lock and one
+computational model statement from the rebased carrier.
+
+That means:
+
+- plugin manifests, receipts, and controller traces must bind back to the same
+  underlying machine identity tuple
+- plugin capability may extend bounded execution surfaces without forking the
+  underlying compute claim
+- plugin wording may not imply a different machine than the one the bridge
+  already names
+
+### 15. Served Conformance Envelope Law
+
+Served or broader plugin posture must publish one explicit conformance envelope
+that says:
+
+- which deviations from operator truth are allowed
+- which properties must remain identical
+- and which cases must fail closed
+
+Without this law, the served plugin system can drift away from the operator
+truth carrier while still sounding like the same platform.
 
 ## Does The Plugin System Change The Shape Of The Turing-Completeness Push?
 
@@ -954,6 +1049,7 @@ It should also reserve:
 - resource transparency
 - scheduling ownership
 - closed-world enumeration guarantees for the first plugin tranche
+- downward non-influence from later plugin ergonomics into bridge semantics
 - forward-compatible packet and receipt hooks rather than ad hoc later
   extensions
 
@@ -1012,6 +1108,8 @@ Those are:
   execution layer
 - preserve a clean separation between data plane, control plane, and capability
   plane
+- preserve one canonical machine identity lock and computational model
+  statement across the future plugin-facing surfaces
 - make the bridge contract reserve plugin-boundary identity fields
 - make the continuation-ownership audit explicit about packet-local,
   ephemeral-instance, and durable-host state
@@ -1019,6 +1117,8 @@ Those are:
   reinjection before any weighted plugin-controller claim is made
 - reserve choice-set integrity, resource transparency, and scheduling
   ownership before any adaptive plugin layer exists
+- reserve downward non-influence so plugin ergonomics cannot rewrite lower
+  compute or continuation truth
 - reserve forward-compatible packet boundary hooks, capability invocation
   slots, receipt extensibility fields, and schema-version negotiation hooks
 - freeze the workflow-ownership rule before any plugin-controller claim is made
@@ -1061,6 +1161,8 @@ Description:
 - define plugin non-goals and internal-only/publication posture
 - bind the plugin system explicitly to the post-`TAS-186` owned-route truth
   without mutating `TCM.v1`
+- inherit one canonical machine identity lock and computational model
+  statement from the rebased carrier
 - freeze the three-plane contract across data plane, control plane, and
   capability plane
 - freeze the adversarial host model the later conformance harness must defend
@@ -1077,6 +1179,8 @@ Description:
   than an undeclared second compute substrate
 - freeze the first plugin tranche as closed-world and operator-curated
 - freeze the anti-interpreter-smuggling rule
+- freeze the downward non-influence rule so plugin ergonomics cannot redefine
+  continuation semantics, proof assumptions, or carrier identity
 - define who may declare a plugin canonical, who may widen capability
   envelopes, and which receipts are required before posture changes
 
@@ -1220,6 +1324,8 @@ Description:
 - define plugin admissibility checks
 - make candidate sets fully enumerated or explicitly bounded
 - make any filtering, ranking, or transformation receipt-visible
+- define the equivalent-choice class or constrained admissibility model that
+  makes neutral choice claims auditable
 - freeze the closed-world discovery assumption and explicit enumeration
   guarantees for the admissible set
 - compile capability namespace grants, network rules, and mount posture into
@@ -1355,6 +1461,7 @@ Description:
   envelope widening, and posture changes
 - define plugin benchmark bars and trust-tier gates
 - define operator-only versus served/public posture
+- define the served conformance envelope for any broader plugin posture
 - bind validator and accepted-outcome hooks where required
 - keep promotion, quarantine, revocation, publication refusal, and required
   posture-change receipts explicit
@@ -1383,7 +1490,222 @@ Description:
 - state clearly what the plugin system does and does not claim
 - preserve the separation from the bounded Turing-completeness closeout
 - keep operator and served/plugin publication posture explicit
+- refuse any implication that broader served posture already shares operator
+  conformance when the envelope is not published
 - refuse any implication of arbitrary public Wasm or arbitrary public tool use
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+- `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
+- `~/code/alpha/tassadar/plugin-system.md`
+
+## Suggested `TAS-207` Through `TAS-214`: Anti-Drift Stability Tranche
+
+If the tracker wants the second-order stability constraints called out as
+first-class artifacts rather than only absorbed into `TAS-187` through
+`TAS-206`, the cleanest follow-on tranche is:
+
+### Suggested `TAS-207`: Freeze Canonical Machine Identity Lock
+
+Suggested GitHub title:
+
+`Tassadar: freeze canonical machine identity lock`
+
+Summary:
+
+Bind every proof, witness, benchmark, route, plugin receipt, and closeout to
+one globally named machine identity tuple so the stack cannot drift back into
+multiple underlying machines.
+
+Description:
+
+- define the canonical tuple over model id, weight digest, route digest,
+  continuation contract, and carrier class
+- require plugin-facing receipts and controller traces to inherit that tuple
+  explicitly
+- refuse mixed-carrier evidence bundles that silently bind different tuples
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+- `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
+- `fixtures/tassadar/reports/tassadar_tcm_v1_model.json`
+- `fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json`
+
+### Suggested `TAS-208`: Publish Canonical Computational Model Statement
+
+Suggested GitHub title:
+
+`Tassadar: publish canonical computational model statement`
+
+Summary:
+
+State exactly what machine the plugin layer sits on top of, under which
+continuation semantics and effect boundaries.
+
+Description:
+
+- name the computational model the repo is claiming
+- state the continuation, effect, and refusal boundaries that belong to that
+  model
+- keep plugin capability and public-serving implications explicitly out of
+  scope unless separately green
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+- `fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json`
+
+### Suggested `TAS-209`: Audit Execution-Semantics Equivalence And Proof Transport
+
+Suggested GitHub title:
+
+`Tassadar: audit execution-semantics equivalence and proof transport`
+
+Summary:
+
+Prove that route rebinding and later plugin-facing execution still sit on the
+same proof-bearing semantics rather than merely preserving outputs.
+
+Description:
+
+- define the transition-level equivalence class or explicit proof abstraction
+  boundary the rebinding relies on
+- audit cache, batching, helper, continuation, and route-family effects
+- refuse plugin-facing wording that assumes a stronger machine than the proof
+  actually binds
+
+Supporting material:
+
+- `fixtures/tassadar/reports/tassadar_universal_machine_proof_report.json`
+- `fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json`
+- `fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json`
+
+### Suggested `TAS-210`: Freeze Continuation Non-Computationality Contract
+
+Suggested GitHub title:
+
+`Tassadar: freeze continuation non-computationality contract`
+
+Summary:
+
+Prove that continuation extends execution without becoming a second machine.
+
+Description:
+
+- audit checkpoint, spill, tape, and process-object structures for hidden
+  workflow logic
+- prove continuation does not add computational expressivity beyond the base
+  route
+- refuse plugin or controller designs that lean on resume semantics as hidden
+  compute
+
+Supporting material:
+
+- `fixtures/tassadar/reports/tassadar_spill_tape_store_report.json`
+- `fixtures/tassadar/reports/tassadar_session_process_profile_report.json`
+- `fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json`
+
+### Suggested `TAS-211`: Freeze Fast-Route Legitimacy And Carrier Binding
+
+Suggested GitHub title:
+
+`Tassadar: freeze fast-route legitimacy and carrier binding`
+
+Summary:
+
+Make every fast route either provably part of the underlying carrier or
+explicitly outside it before plugin or served wording leans on it.
+
+Description:
+
+- classify `ReferenceLinear`, `HullCache`, and any resumable family relative to
+  the proof-bearing carrier
+- require semantics-equivalence evidence before a fast route may inherit proof
+  or universality status
+- refuse served or plugin wording that treats an unproven fast route as the
+  machine underneath the platform
+
+Supporting material:
+
+- `fixtures/tassadar/reports/tassadar_article_fast_route_architecture_selection_report.json`
+- `fixtures/tassadar/reports/tassadar_article_fast_route_implementation_report.json`
+- `fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json`
+
+### Suggested `TAS-212`: Freeze Equivalent-Choice Neutrality And Admissibility Contract
+
+Suggested GitHub title:
+
+`Tassadar: freeze equivalent-choice neutrality and admissibility contract`
+
+Summary:
+
+Define when two admissible plugin choices are equivalent and when ordering,
+cost, latency, or soft-failure effects are allowed to distinguish them.
+
+Description:
+
+- define an auditable equivalent-choice class or constrained admissibility
+  model
+- keep ordering, latency, cost, and soft-failure effects from becoming hidden
+  control channels inside that class
+- require receipt-visible justification when equivalent choices are narrowed or
+  ordered differently
+
+Supporting material:
+
+- `~/code/alpha/tassadar/plugin-system.md`
+- `fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json`
+- `fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json`
+
+### Suggested `TAS-213`: Freeze Downward Non-Influence And Served Conformance Envelope
+
+Suggested GitHub title:
+
+`Tassadar: freeze downward non-influence and served conformance envelope`
+
+Summary:
+
+Prove that plugin or served layers cannot rewrite lower-plane truth and that
+broader posture stays inside a declared conformance envelope.
+
+Description:
+
+- forbid plugin ergonomics from redefining continuation semantics,
+  compute-substrate rules, proof assumptions, or carrier identity
+- define which served deviations from operator truth are allowed
+- require fail-closed behavior when served posture would escape the declared
+  conformance envelope
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+- `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
+- `fixtures/tassadar/reports/tassadar_broad_internal_compute_profile_publication_report.json`
+
+### Suggested `TAS-214`: Publish Anti-Drift Stability Closeout
+
+Suggested GitHub title:
+
+`Tassadar: publish anti-drift stability closeout`
+
+Summary:
+
+Publish one explicit closeout that says machine identity, semantics,
+continuation, fast-route, choice-neutrality, capability-boundary, and
+served-envelope constraints are actually locked.
+
+Description:
+
+- summarize the final machine identity lock and computational model statement
+- summarize execution-semantics, continuation, and fast-route legitimacy
+  verdicts
+- summarize equivalent-choice, downward non-influence, and served-envelope
+  verdicts
+- refuse any stronger plugin-platform claim when one of those locks is still
+  open
 
 Supporting material:
 
@@ -1406,7 +1728,9 @@ The dependency order should be:
 6. land the plugin result-binding and schema-stability contract
 7. only then land weighted plugin-controller integration
 8. land plugin authority/promotion/publication policy
-9. only then consider any stronger "weighted software platform" closeout
+9. if those anti-drift constraints are not already absorbed into the earlier
+   issues, land the `TAS-207` through `TAS-214` stability tranche
+10. only then consider any stronger "weighted software platform" closeout
 
 That order matters because it keeps the repo from using a not-yet-audited
 weighted controller as evidence for a plugin system whose core control-ownership
@@ -1439,13 +1763,19 @@ But the repo does **not** yet have:
 - a plugin-specific authority and governance model
 - a formal three-plane contract across data, control, and capability planes
 - a unified adversarial host model
+- one canonical machine identity lock inherited across plugin-facing artifacts
+- one canonical computational model statement for the underlying carrier
 - a frozen plugin language boundary plus closed-world discovery contract
 - planner-indistinguishability guardrails over choice sets, resources, and
   scheduling
+- a formal equivalent-choice neutrality contract for admissible choices
 - explicit failure-domain and covert-channel constraints
 - a replayable control-trace determinism contract
 - a model-plugin compatibility contract
 - an explicit no-externalized-learning guardrail
+- an explicit downward non-influence rule from plugin ergonomics into core
+  compute truth
+- a served conformance envelope for broader plugin posture
 - or a weighted controller that owns plugin selection and sequencing on the
   canonical owned Transformer route
 
@@ -1453,7 +1783,8 @@ So the plugin system is not blocked on basic substrate. It is blocked on
 unifying that substrate under one plugin contract, proving semantic
 preservation through adapters and result reinjection, freezing governance
 identity, closing host-steering attack surfaces, and then proving weighted
-control ownership.
+control ownership while keeping machine identity, computational-model truth,
+choice neutrality, and served conformance from drifting.
 
 ## Final Judgment
 
@@ -1465,7 +1796,8 @@ It changes the shape by forcing one architectural discipline:
 the post-`TAS-186` universality rebase must be written so the canonical owned
 Transformer route can later become the weighted controller for a bounded
 software-like Wasm capability platform, without turning `TCM.v1` into a vague
-everything-machine and without letting the host quietly steal orchestration.
+everything-machine, without letting the host quietly steal orchestration, and
+without letting plugin ergonomics rewrite lower-plane machine truth.
 
 So the right answer is:
 
