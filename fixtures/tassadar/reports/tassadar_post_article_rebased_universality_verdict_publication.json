@@ -1,0 +1,28 @@
+{
+  "publication_id": "tassadar.post_article_rebased_universality_verdict.publication.v1",
+  "report_ref": "fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json",
+  "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+  "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "current_served_internal_compute_profile_id": "tassadar.internal_compute.article_closeout.v1",
+  "theory_green": true,
+  "operator_green": true,
+  "served_green": false,
+  "operator_allowed_profile_ids": [
+    "tassadar.internal_compute.session_process.v1",
+    "tassadar.internal_compute.spill_tape_store.v1",
+    "tassadar.internal_compute.process_objects.v1"
+  ],
+  "served_blocked_by": [
+    "named_served_universal_profile_missing",
+    "kernel_policy_served_universality_authority_outside_psionic",
+    "nexus_accepted_outcome_closure_outside_psionic"
+  ],
+  "served_conformance_envelope_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_served_conformance_envelope.json",
+  "rebase_claim_allowed": true,
+  "plugin_capability_claim_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "claim_boundary": "this served publication projects the rebased theory/operator/served verdict split on the canonical machine identity. Theory and operator truth are green on the canonical route, but served/public universality remains suppressed inside the declared served conformance envelope and no plugin-capability claim is implied.",
+  "publication_digest": "0dc3778c16ac301be113a11451e812edcabecea0bf7b8a39f29e48f759ea8d57"
+}

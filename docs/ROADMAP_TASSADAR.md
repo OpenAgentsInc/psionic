@@ -253,6 +253,20 @@ Current honest posture:
   the narrower served article-closeout boundary; this tranche still does not
   publish the rebased theory/operator/served verdict split, imply served/public
   universality, weighted plugin control, or arbitrary software capability
+- the repo now also has one post-article rebased theory/operator/served verdict
+  split, with a committed eval report at
+  `fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_summary.json`,
+  a served publication at
+  `fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_publication.json`,
+  a provider-facing receipt, a checker script, and an audit note that rebind
+  the older universality verdict split onto the canonical bridge machine,
+  canonical route, and canonical portability/minimality envelope while keeping
+  served/public universality suppressed and plugin capability explicitly out of
+  scope; this tranche now allows the rebased theory/operator claim, but it
+  still does not imply weighted plugin control, served/public universality, or
+  arbitrary software capability
 - the repo now also has one machine-readable article-equivalence blocker
   matrix, with a committed eval report at
   `fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json`,

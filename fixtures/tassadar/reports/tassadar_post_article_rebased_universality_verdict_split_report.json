@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_rebased_universality_verdict_split.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-post-article-rebased-universality-verdict-split.sh",
+  "historical_verdict_split_report_ref": "fixtures/tassadar/reports/tassadar_universality_verdict_split_report.json",
+  "turing_completeness_closeout_summary_ref": "fixtures/tassadar/reports/tassadar_turing_completeness_closeout_summary.json",
+  "universal_substrate_gate_report_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_route_universal_substrate_gate_report.json",
+  "portability_minimality_matrix_report_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_portability_minimality_matrix_report.json",
+  "bridge_contract_report_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+  "served_conformance_envelope_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_served_conformance_envelope.json",
+  "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+  "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "canonical_weight_artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-trace-bound-trained-v0/99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+  "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "canonical_route_descriptor_digest": "00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032",
+  "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+  "current_served_internal_compute_profile_id": "tassadar.internal_compute.article_closeout.v1",
+  "supporting_material_rows": [
+    {
+      "material_id": "historical_verdict_split",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_universality_verdict_split_report.json",
+      "source_artifact_id": "tassadar.universality_verdict_split.report.v1",
+      "source_artifact_digest": "c74c77968fda637f0fa73d12c0c131cac0d00ff10092cc712efb0787d9746082",
+      "detail": "the historical theory/operator/served split must stay green/suppressed in the old posture before it can be rebound to the canonical route."
+    },
+    {
+      "material_id": "historical_closeout_summary",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_turing_completeness_closeout_summary.json",
+      "source_artifact_id": "tassadar.turing_completeness_closeout.summary.v1",
+      "source_artifact_digest": "b6e1f91689b41d3451f992e2dd035f23de0ad8d4e1321e7e54a270b1c9d610ef",
+      "detail": "the historical closeout summary must keep served blockers and non-implications explicit so the rebased split preserves the old public boundary."
+    },
+    {
+      "material_id": "post_article_bridge_contract",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+      "source_artifact_id": "tassadar.post_article_universality_bridge.contract.report.v1",
+      "source_artifact_digest": "2908d3a3b0a47f76c60fcf61726f8f37fc366b9ffe9ba3d3ddad75f08a012e10",
+      "detail": "the bridge contract must stay green so the rebased split binds to one canonical machine identity instead of a mixed historical reconstruction."
+    },
+    {
+      "material_id": "canonical_route_universal_substrate_gate",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_route_universal_substrate_gate_report.json",
+      "source_artifact_id": "tassadar.post_article_canonical_route_universal_substrate_gate.report.v1",
+      "source_artifact_digest": "4a81f409aa1be57cba2df1c9a4d04e518902c53ddd772de5c4f9919275452b98",
+      "detail": "the canonical-route universal-substrate gate must stay green before the rebased verdict split can publish theory/operator truth on the canonical route."
+    },
+    {
+      "material_id": "portability_minimality_matrix",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_portability_minimality_matrix_report.json",
+      "source_artifact_id": "tassadar.post_article_universality_portability_minimality_matrix.report.v1",
+      "source_artifact_digest": "c2fdf6afbcc46642c1a8f494264e595b1def5145a2200946b2aff963a8d6469b",
+      "detail": "the portability/minimality matrix must stay green so theory/operator truth remains bound to the declared CPU machine matrix and explicit route-carrier classification."
+    },
+    {
+      "material_id": "served_conformance_envelope",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_served_conformance_envelope.json",
+      "source_artifact_id": "tassadar.post_article_universality_served_conformance_envelope.v1",
+      "source_artifact_digest": "18acdafa84adfc0295205334fc64eec765c70537d15c3a063ab72bc0532ef73a",
+      "detail": "the served conformance envelope must stay fail-closed so the rebased split can keep theory/operator truth separate from served/public universality."
+    },
+    {
+      "material_id": "plugin_audit_context",
+      "material_class": "observational_context",
+      "satisfied": true,
+      "source_ref": "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md",
+      "detail": "the plugin/turing audit remains observational context here and explains why the rebased verdict split must not over-read future plugin capability."
+    }
+  ],
+  "verdict_rows": [
+    {
+      "verdict_level": "theory",
+      "verdict_status": "green",
+      "bound_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+      "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+      "allowed_statement": "Psionic/Tassadar can honestly say that the post-`TAS-186` canonical route on machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` carries the declared `TCM.v1` universal substrate plus explicit universal-machine witness constructions under the declared checkpoint-and-resume semantics.",
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_universality_verdict_split_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_universal_substrate_gate_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_portability_minimality_matrix_report.json"
+      ],
+      "route_constraint_ids": [
+        "theory_has_no_served_route_claim",
+        "canonical_machine_identity_bound",
+        "canonical_route_universal_substrate_gate_green",
+        "canonical_portability_matrix_bound"
+      ],
+      "allowed_profile_ids": [
+        "tcm.v1"
+      ],
+      "blocked_by": [],
+      "detail": "theory-green means there is now one declared universal substrate plus explicit witness encodings and a green minimal universal-substrate gate; it does not by itself imply operator or served widening Rebased theory truth is now bound to canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` and canonical_route_descriptor_digest=`00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032`."
+    },
+    {
+      "verdict_level": "operator",
+      "verdict_status": "green",
+      "bound_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+      "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+      "allowed_statement": "Psionic/Tassadar can honestly say that operators have one bounded universality-capable lane on the post-`TAS-186` canonical route under named session-process, spill/tape, and process-object envelopes with exact checkpoint-and-replay evidence.",
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_universality_verdict_split_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_universal_substrate_gate_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_portability_minimality_matrix_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "route_constraint_ids": [
+        "operator_named_profile_routes_only",
+        "operator_checkpoint_resume_required",
+        "operator_spill_tape_extension_required",
+        "canonical_machine_identity_bound",
+        "operator_canonical_portability_matrix_bound",
+        "operator_served_boundary_not_widened"
+      ],
+      "allowed_profile_ids": [
+        "tassadar.internal_compute.session_process.v1",
+        "tassadar.internal_compute.spill_tape_store.v1",
+        "tassadar.internal_compute.process_objects.v1"
+      ],
+      "blocked_by": [],
+      "detail": "operator-green means the universal construction survives only inside explicit resumable process envelopes with persisted state objects, spill/tape extension, and typed refusal on broader external loops or ambient effects Rebased operator truth is now frozen on machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` with canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`."
+    },
+    {
+      "verdict_level": "served",
+      "verdict_status": "suppressed",
+      "bound_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+      "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+      "allowed_statement": "Psionic/Tassadar does not yet expose a served/public universality lane on the post-`TAS-186` canonical route; served posture remains the narrower `tassadar.internal_compute.article_closeout.v1` lane inside the declared conformance envelope.",
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_universality_verdict_split_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_served_conformance_envelope.json"
+      ],
+      "route_constraint_ids": [
+        "served_universality_route_publication_suppressed",
+        "served_universality_profile_not_selected",
+        "served_conformance_envelope_fail_closed"
+      ],
+      "allowed_profile_ids": [],
+      "blocked_by": [
+        "named_served_universal_profile_missing",
+        "kernel_policy_served_universality_authority_outside_psionic",
+        "nexus_accepted_outcome_closure_outside_psionic"
+      ],
+      "detail": "served-green remains suppressed because the current served internal-compute lane is still article-closeout, not a published universality profile, and the authority-bearing served closure still lives outside standalone psionic The rebased served row remains suppressed because the served conformance envelope is fail-closed and served/public universality is still out of scope."
+    }
+  ],
+  "theory_green": true,
+  "operator_green": true,
+  "served_green": false,
+  "verdict_split_status": "theory_green_operator_green_served_suppressed",
+  "verdict_split_green": true,
+  "deferred_issue_ids": [
+    "TAS-195"
+  ],
+  "rebase_claim_allowed": true,
+  "plugin_capability_claim_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "validation_rows": [
+    {
+      "validation_id": "helper_substitution_quarantined",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_universal_substrate_gate_report.json"
+      ],
+      "detail": "helper substitution remains quarantined, so the rebased verdict split cannot inherit canonical-route truth through hidden host execution."
+    },
+    {
+      "validation_id": "route_drift_rejected",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_universal_substrate_gate_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_portability_minimality_matrix_report.json"
+      ],
+      "detail": "route drift remains rejected, so the rebased verdict split stays attached to one canonical route id and one descriptor digest."
+    },
+    {
+      "validation_id": "continuation_abuse_quarantined",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_universal_substrate_gate_report.json"
+      ],
+      "detail": "continuation abuse remains quarantined, so operator truth still depends on explicit checkpoint-and-resume semantics rather than hidden control transfer."
+    },
+    {
+      "validation_id": "semantic_drift_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_universal_substrate_gate_report.json"
+      ],
+      "detail": "semantic drift remains blocked, so the rebased verdict split does not treat portability or publication as permission to change the compute semantics."
+    },
+    {
+      "validation_id": "historical_artifacts_preserved_without_rewrite",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "historical universality artifacts remain preserved without rewrite, so the rebased split is explicit rebinding rather than narrative replacement."
+    },
+    {
+      "validation_id": "canonical_machine_matrix_bound",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_portability_minimality_matrix_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "the rebased verdict split stays bound to the declared canonical machine identity and machine matrix rather than inheriting truth from an unspecified host/runtime mix."
+    },
+    {
+      "validation_id": "served_conformance_envelope_bound",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_served_conformance_envelope.json"
+      ],
+      "detail": "the served conformance envelope stays bound and fail-closed, so served posture remains the narrower article-closeout lane instead of silently widening into served universality."
+    },
+    {
+      "validation_id": "overclaim_posture_explicit",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_universal_substrate_gate_report.json"
+      ],
+      "detail": "the rebased theory/operator split is now allowed, but plugin capability, served/public universality, and arbitrary software capability remain explicitly out of scope."
+    }
+  ],
+  "claim_boundary": "this report reissues the theory/operator/served universality verdict split on the post-`TAS-186` canonical machine identity. It binds the historical verdict split to the canonical owned route, the canonical weight artifact, the continuation contract, the portability/minimality matrix, and the served conformance envelope. It allows the rebased theory/operator claim only for the canonical route and still does not imply weighted plugin control, served/public universality, or arbitrary software capability.",
+  "summary": "Post-article rebased universality verdict split keeps supporting_materials=7/7, validation_rows=8/8, verdict_split_status=TheoryGreenOperatorGreenServedSuppressed, rebase_claim_allowed=true, and served_green=false.",
+  "report_digest": "93d823f653046de935a26bdbbd3999feafd8e4759eccda9936d7eb4304b7199c"
+}

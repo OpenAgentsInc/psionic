@@ -1252,6 +1252,22 @@ The current scope is:
   explicitly suppressed; this still does not publish the rebased verdict
   split, admit served/public universality, admit weighted plugin control, or
   admit arbitrary software capability
+- the current post-article rebased universality verdict artifacts are
+  `fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json`,
+  `fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_summary.json`,
+  the served publication at
+  `fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_publication.json`,
+  the provider receipt in
+  `crates/psionic-provider/src/tassadar_post_article_rebased_universality_verdict_split.rs`,
+  the checker script
+  `scripts/check-tassadar-post-article-rebased-universality-verdict-split.sh`,
+  and the audit note
+  `docs/audits/2026-03-21-tassadar-post-article-rebased-universality-verdict-split.md`,
+  which reissue the theory/operator/served split on the canonical bridge
+  machine identity, keep theory/operator green, keep served/public
+  universality suppressed on the narrower article-closeout lane, and allow the
+  rebased theory/operator claim without implying weighted plugin control,
+  served/public universality, or arbitrary software capability
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

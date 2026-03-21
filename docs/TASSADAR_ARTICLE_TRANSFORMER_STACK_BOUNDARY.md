@@ -778,6 +778,24 @@ This tranche still does not publish the rebased theory/operator/served verdict
 split, admit served/public universality, admit weighted plugin control, or
 admit arbitrary software capability.
 
+`TAS-194` now closes the rebased theory/operator/served verdict-split tranche
+at
+`fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json`.
+That report reissues the older universality verdict split on the canonical
+bridge machine identity, canonical route, canonical weight artifact, and
+canonical portability/minimality envelope instead of inheriting the older split
+by implication. The operator-readable summary now lives at
+`fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_summary.json`,
+the served publication now lives at
+`fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_publication.json`,
+the provider receipt now lives at
+`crates/psionic-provider/src/tassadar_post_article_rebased_universality_verdict_split.rs`,
+and the dedicated checker now lives at
+`scripts/check-tassadar-post-article-rebased-universality-verdict-split.sh`.
+This tranche turns the rebased theory/operator claim on, but it still does not
+admit weighted plugin control, served/public universality, or arbitrary
+software capability.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_rebased_universality_verdict_split.report.v1",
+  "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+  "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "current_served_internal_compute_profile_id": "tassadar.internal_compute.article_closeout.v1",
+  "verdict_split_status": "theory_green_operator_green_served_suppressed",
+  "theory_green": true,
+  "operator_green": true,
+  "served_green": false,
+  "supporting_material_row_count": 7,
+  "validation_row_count": 8,
+  "deferred_issue_ids": [
+    "TAS-195"
+  ],
+  "rebase_claim_allowed": true,
+  "plugin_capability_claim_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "detail": "post-article rebased universality verdict split summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, theory_green=true, operator_green=true, served_green=false, verdict_split_status=TheoryGreenOperatorGreenServedSuppressed, and rebase_claim_allowed=true.",
+  "summary_digest": "01345b34f315f2c3b239f4b6210a7b94aa039fbc7d35c12046630956c2f77104"
+}
