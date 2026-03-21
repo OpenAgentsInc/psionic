@@ -16,6 +16,10 @@ It answers two separate questions:
    owned Transformer route is the route that carries the repo's
    Turing-completeness story?
 
+Companion audit:
+
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+
 ## Source Set
 
 This audit is based on the current repo state plus the current public TAS issue
@@ -32,6 +36,7 @@ Canonical repo surfaces reviewed:
 - `docs/audits/2026-03-19-tassadar-universality-verdict-split-audit.md`
 - `docs/audits/2026-03-20-tassadar-article-equivalence-blocker-matrix.md`
 - `docs/audits/2026-03-20-tassadar-article-equivalence-acceptance-gate.md`
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
 
 Canonical machine-readable surfaces reviewed:
 
@@ -64,6 +69,8 @@ Current audit verdict:
   `TAS-181`, `partial` through `TAS-186`
 - Turing-completeness claim rebased onto the canonical owned Transformer route:
   `planned`
+- post-`TAS-186` universality bridge written with an explicit future
+  plugin-capability boundary: `planned`
 - served/public universality on the new route: `partial_outside_psionic`
 
 The important distinction is this:
@@ -294,6 +301,9 @@ The recommended strategy is:
 - add one new post-`TAS-186` bridge tranche that explicitly ties the canonical
   owned Transformer route back into the existing `TCM.v1` theory/operator
   story
+- write that bridge so it does **not** hard-code a pure-compute-only terminal
+  shape that would have to be reopened for the later weighted plugin-system
+  tranche
 
 This is the least error-prone option because it preserves the old claim
 discipline while letting the new route become the truth carrier for that older
@@ -332,6 +342,17 @@ to make a truthful Turing-completeness statement. The older `TCM.v1` closeout
 was already honest that universality lived under bounded slices and persisted
 continuation.
 
+### 5. It keeps the later plugin-system lane composable
+
+The companion plugin audit shows that the repo already has much of the module,
+mount, replay, and policy substrate needed for a weighted Wasm plugin system,
+but not yet the plugin-specific manifest, packet ABI, receipt family, or
+weighted controller.
+
+That means the universality bridge should leave room for a later bounded
+software-capability layer above `TCM.v1`, without implying that plugin
+capability is already part of the Turing-completeness closeout.
+
 ## Necessary Work After `TAS-186`
 
 The following follow-on work is `planned` if the goal is to make the new
@@ -349,6 +370,9 @@ Land one dedicated bridge artifact that answers:
   family above them, or an explicit split across those lanes?
 - which old `TCM.v1` rows now bind to new owned-route evidence, and which still
   bind only to older operator surfaces?
+- where future packet-mediated software capability calls sit relative to the
+  pure compute substrate, so the bridge does not later have to be redefined to
+  accommodate plugins
 
 Without this contract, later universality rebasing will drift.
 
@@ -362,6 +386,8 @@ It must prove that checkpoint, spill/tape, and process-object semantics:
 - preserve canonical model identity and route identity across resumes
 - do not add helper-side control flow that would defeat `TAS-184`
 - fail closed when resumed execution would leave the declared route or profile
+- keep packet-local, instance-local ephemeral, and host-backed durable state
+  classes explicit so later plugin execution does not blur continuation truth
 
 This is the most important missing bridge between `TAS-183`/`TAS-184` and the
 older operator-universality lane.
@@ -459,6 +485,22 @@ That new closeout should say:
   for the bounded Turing-completeness statement
 - served/public universality remains either suppressed or explicitly bounded
 
+### I. Reserve A Separate Plugin-Capability Boundary
+
+The rebased universality tranche should also publish one explicit boundary
+statement that says:
+
+- `TCM.v1` remains the bounded compute substrate
+- later plugin execution is a separate software-capability layer above that
+  substrate, not a silent expansion of it
+- weighted plugin control is not implied by theory/operator universality
+- plugin capability and served plugin publication will require their own gates
+  and verdicts
+
+This is not a request to build the plugin system inside the rebased
+Turing-completeness tranche. It is a request to make sure that tranche does not
+accidentally preclude the cleaner plugin architecture.
+
 ## Recommended Follow-On Issue Shape
 
 The cleanest path after `TAS-186` is one new post-article tranche with issue
@@ -472,6 +514,8 @@ shape roughly like this:
 - `planned`: canonical-route minimal universal-substrate gate
 - `planned`: canonical-route universality portability and minimality matrix
 - `planned`: rebased theory/operator/served universality verdict split
+- `planned`: plugin-aware capability-boundary and state-class contract for the
+  post-`TAS-186` bridge
 - `planned`: post-article Turing-completeness closeout audit
 
 The numbering can be chosen later. The important thing is the dependency order.
@@ -493,7 +537,15 @@ What the repo still cannot say is:
 The new post-`TAS-156A` canonical owned Transformer route is already the route
 that carries the repo's bounded Turing-completeness closeout.
 
-That remains `planned`.
+It also still cannot say:
+
+- that the rebased universality bridge is already written to host a weighted
+  plugin-capability layer cleanly
+- that theory/operator universality already implies weighted plugin control
+- or that a future plugin platform would inherit publication rights from the
+  Turing-completeness closeout
+
+Those remain `planned`.
 
 ## Final Judgment
 
@@ -510,3 +562,8 @@ explicit bridge tranche that binds `TCM.v1`, witness proofs, resumable
 continuation, portability, and verdict splitting onto the canonical owned
 Transformer route without weakening the existing refusal and publication
 discipline.
+
+That bridge should also be written so a later weighted plugin system can sit on
+top of it cleanly, rather than forcing the repo to reopen the universality
+contract just to explain packet-mediated capability execution or software-like
+artifact identity.
