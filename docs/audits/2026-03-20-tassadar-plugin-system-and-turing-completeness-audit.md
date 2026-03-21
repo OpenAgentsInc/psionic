@@ -156,6 +156,21 @@ under the same invariants.
 - Scheduling Ownership:
   ordering, concurrency, and result-visibility timing must be model-decided or
   fixed as a declared runtime contract
+- Determinism Classes:
+  decision traces must declare whether they are `strict_deterministic`,
+  `seeded_stochastic`, or
+  `bounded_nondeterministic_with_equivalence_class`
+- Failure Semantics:
+  refusal, policy failure, semantic failure, capability failure, resource
+  exhaustion, and determinism violation must remain distinct typed classes
+- Time Semantics:
+  logical time, wall time, time observability, and time-driven branching must
+  be declared explicitly
+- Information Boundary:
+  every model-visible signal that can shape control flow must be declared
+- Training-Inference Boundary:
+  model updates, runtime adaptation, telemetry, caches, and logs must stay in
+  explicit classes
 - Canonical Machine Identity:
   one named machine identity tuple must bind model id, weight digest, route
   digest, continuation contract, and carrier class for every proof, witness,
@@ -169,6 +184,18 @@ under the same invariants.
 - Computational Model Statement:
   every claim-bearing artifact must name the computational model,
   continuation semantics, and effect boundaries it relies on
+- Proof Class Distinction:
+  mechanistic proof artifacts and observational audits must remain separate
+  artifact classes
+- Hidden State Channels:
+  all state that can influence control flow must live in weights, declared
+  continuation state, or explicit receipt-backed host state
+- Machine Minimality:
+  minimality must be defined over machine components, semantics, and preserved
+  transforms rather than implied loosely from route shape
+- Observer Model:
+  verifier roles, trust assumptions, and acceptance conditions must be
+  machine-readable
 - Served Conformance:
   served posture may deviate from operator truth only inside an explicit
   conformance envelope and otherwise must fail closed
@@ -300,6 +327,20 @@ That proof surface must positively show:
 
 The later weighted plugin-controller trace should extend that proof surface,
 not substitute for it.
+
+To become a real proof surface rather than a bundle of policy prose, that
+artifact must also freeze a concrete formal-object set:
+
+- a determinism class contract
+- an equivalent-choice relation with admissible divergence bounds
+- a failure-semantics lattice
+- a time-semantics contract for logical versus wall time
+- a model-information boundary
+- a training-versus-inference boundary
+- a proof-versus-audit distinction
+- a machine-minimality definition
+- a hidden-state-channel closure rule
+- and one observer or acceptance model
 
 ## What The Plugin-System Spec Actually Requires
 
@@ -1022,6 +1063,24 @@ That proof must show:
 - the pre-plugin control trace is replayable under the declared determinism
   posture
 
+That inherited proof also needs explicit formal objects for:
+
+- determinism classes:
+  `strict_deterministic`, `seeded_stochastic`, and
+  `bounded_nondeterministic_with_equivalence_class`
+- equivalent-choice relation and admissible divergence bounds
+- failure-semantics lattice across semantic failure, capability failure,
+  policy refusal, resource exhaustion, and determinism violation
+- logical-time versus wall-time semantics and whether time is model-observable
+- model information boundary for cost, queue, retry, and other
+  control-shaping signals
+- training-versus-inference boundary for runtime adaptation, telemetry, and
+  cache behavior
+- hidden-state-channel closure for every stateful input to control flow
+- proof-carrying versus observational artifact distinction
+- observer and acceptance model for who verifies replay, receipts, and gates
+- machine-level minimality relation and preserved transforms
+
 The plugin-specific controller trace should extend this proof to plugin
 selection and sequencing, not invent control ownership from scratch.
 
@@ -1149,6 +1208,19 @@ The post-`TAS-186` bridge should also publish one machine-readable proof that:
 - hidden control channels are surfaced or refused
 - workflow decisions are replayable before later plugin sequencing is added
 
+That proof should also freeze the formal-object bundle for:
+
+- determinism classes
+- equivalent-choice relation
+- failure-semantics lattice
+- time semantics
+- model-information boundary
+- training-versus-inference boundary
+- hidden-state-channel closure
+- proof-versus-audit distinction
+- machine minimality
+- and the observer or acceptance model
+
 Without that artifact, the later plugin controller claim would inherit laws but
 not yet inherit a positive proof that the model is the thing deciding what
 happens next.
@@ -1186,6 +1258,9 @@ Those are:
   ephemeral-instance, and durable-host state
 - publish the control-plane ownership and decision-provenance proof before any
   weighted plugin-controller claim is made
+- freeze the determinism, equivalence, failure, time, information, training,
+  hidden-state, proof-vs-audit, minimality, and observer contracts through
+  that pre-plugin control-plane proof
 - freeze a semantic-preservation rule for packet-mediated adapters and result
   reinjection before any weighted plugin-controller claim is made
 - reserve choice-set integrity, resource transparency, and scheduling
@@ -1239,6 +1314,8 @@ Description:
   statement from the rebased carrier
 - inherit the pre-plugin control-plane ownership and decision-provenance proof
   as a hard dependency rather than treating plugin control as a fresh claim
+- freeze the proof-versus-audit distinction and observer model for the plugin
+  tranche instead of letting publication language stand in for proof
 - freeze the three-plane contract across data plane, control plane, and
   capability plane
 - freeze the adversarial host model the later conformance harness must defend
@@ -1344,6 +1421,10 @@ Description:
 - define pool, queue, timeout, memory, concurrency, and optional fuel bounds
 - freeze which resource signals are model-visible and which are fixed runtime
   contract
+- define logical-time versus wall-time semantics and whether time is
+  model-observable or control-neutral
+- define the model-information boundary for queue depth, retries, cost, and
+  similar runtime signals
 - freeze cost-model invariance requirements across equivalent choices
 - freeze concurrency and scheduling semantics so the host cannot adapt them
   opportunistically
@@ -1374,6 +1455,8 @@ Description:
 - define invocation id, plugin id, version, artifact digest, export name,
   packet ABI version, digests, envelope ids, backend id, refusal/failure
   class, and resource summary
+- define the failure-semantics lattice and keep replay, retry, and propagation
+  behavior typed across those classes
 - define deterministic and snapshot-based replay classes
 - connect plugin receipts to route-integrated evidence and challenge receipts
 
@@ -1402,6 +1485,7 @@ Description:
 - make any filtering, ranking, or transformation receipt-visible
 - define the equivalent-choice class or constrained admissibility model that
   makes neutral choice claims auditable
+- define failure conditions when equivalent-choice neutrality is violated
 - freeze the closed-world discovery assumption and explicit enumeration
   guarantees for the admissible set
 - compile capability namespace grants, network rules, and mount posture into
@@ -1472,6 +1556,8 @@ Description:
 - bind output digests to the next model-visible state explicitly
 - define model-version versus plugin-schema compatibility and fail-closed
   behavior on version skew
+- keep proof-carrying result guarantees distinct from observational result
+  audits
 - require semantic closure under multi-step chaining
 - require non-lossy schema transitions across chained plugin outputs
 - refuse reinjection when schema repair or coercion would alter declared task
@@ -1505,6 +1591,9 @@ Description:
 - define the structured weighted plugin control trace
 - define the control-trace determinism class, sampling policy, and randomness
   controls
+- inherit and extend the equivalent-choice relation, failure lattice, time
+  semantics, and information boundary instead of redefining them inside the
+  controller
 - encode packet arguments from model outputs under the canonical packet ABI
 - return result packets and typed refusals back into the model loop
 - prove that the host validates and executes but does not become the planner
@@ -1540,6 +1629,8 @@ Description:
 - define plugin benchmark bars and trust-tier gates
 - define operator-only versus served/public posture
 - define the served conformance envelope for any broader plugin posture
+- define which observers are allowed to accept, challenge, or publish plugin
+  conformance results
 - bind validator and accepted-outcome hooks where required
 - keep promotion, quarantine, revocation, publication refusal, and required
   posture-change receipts explicit
@@ -1782,10 +1873,14 @@ Description:
 - summarize the final machine identity lock and computational model statement
 - summarize the inherited control-plane provenance proof and the plugin-layer
   control extension verdict
+- summarize determinism classes, equivalent-choice relation, failure lattice,
+  time semantics, information boundary, and training-versus-inference
+  boundary status
 - summarize execution-semantics, continuation, and fast-route legitimacy
   verdicts
-- summarize equivalent-choice, downward non-influence, and served-envelope
-  verdicts
+- summarize proof-versus-audit classification, machine minimality,
+  hidden-state closure, observer model, downward non-influence, and
+  served-envelope verdicts
 - refuse any stronger plugin-platform claim when one of those locks is still
   open
 
@@ -1801,7 +1896,8 @@ The dependency order should be:
 
 1. finish `TAS-182` through `TAS-186`
 2. land the post-article Turing-completeness bridge tranche from the companion
-   audit, including the pre-plugin control-plane proof
+   audit, including the pre-plugin control-plane proof and its formal-object
+   bundle
 3. land plugin charter, manifest, packet ABI, runtime API, receipts, and
    replay classes
 4. land the world-mount envelope compiler and plugin admissibility contract
@@ -1848,14 +1944,23 @@ But the repo does **not** yet have:
 - one canonical machine identity lock inherited across plugin-facing artifacts
 - one canonical computational model statement for the underlying carrier
 - one inherited control-plane ownership and decision-provenance proof
+- a formal determinism class contract for workflow and controller traces
 - a frozen plugin language boundary plus closed-world discovery contract
 - planner-indistinguishability guardrails over choice sets, resources, and
   scheduling
 - a formal equivalent-choice neutrality contract for admissible choices
+- a formal failure-semantics lattice with replay and propagation rules
+- a time-semantics contract and explicit model-information boundary
+- a formal training-versus-inference boundary for adaptation, telemetry, and
+  caches
 - explicit failure-domain and covert-channel constraints
 - a replayable control-trace determinism contract
 - a model-plugin compatibility contract
 - an explicit no-externalized-learning guardrail
+- a proof-versus-audit distinction for plugin evidence
+- a machine-level minimality definition for the inherited carrier
+- a hidden-state-channel closure rule
+- an observer and acceptance model for replay, challenge, and publication
 - an explicit downward non-influence rule from plugin ergonomics into core
   compute truth
 - a served conformance envelope for broader plugin posture
@@ -1867,7 +1972,8 @@ unifying that substrate under one plugin contract, proving semantic
 preservation through adapters and result reinjection, freezing governance
 identity, closing host-steering attack surfaces, and then proving weighted
 control ownership while keeping machine identity, computational-model truth,
-choice neutrality, served conformance, and control-plane provenance from
+choice neutrality, served conformance, control-plane provenance, and the
+determinism/equivalence/failure/time/information/proof-class contracts from
 drifting.
 
 ## Final Judgment
@@ -1888,6 +1994,9 @@ So the right answer is:
 - finish the core post-`TAS-186` Turing-completeness rebase first
 - make that rebase publish the standalone control-plane ownership and
   decision-provenance proof
+- make that rebase freeze the formal determinism, equivalence, failure, time,
+  information, training, proof-class, minimality, hidden-state, and observer
+  contracts
 - make that rebase plugin-aware at the boundary level
 - then build the plugin system as the next explicit tranche on top of it
 

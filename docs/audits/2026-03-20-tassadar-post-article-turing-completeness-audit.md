@@ -136,6 +136,21 @@ invariants.
 - Scheduling Ownership:
   ordering, concurrency, and result-visibility timing must be model-decided or
   fixed as a declared runtime contract
+- Determinism Classes:
+  decision traces must declare whether they are `strict_deterministic`,
+  `seeded_stochastic`, or
+  `bounded_nondeterministic_with_equivalence_class`
+- Failure Semantics:
+  refusal, policy failure, semantic failure, capability failure, resource
+  exhaustion, and determinism violation must remain distinct typed classes
+- Time Semantics:
+  logical time, wall time, time observability, and time-driven branching must
+  be declared explicitly
+- Information Boundary:
+  every model-visible signal that can shape control flow must be declared
+- Training-Inference Boundary:
+  model updates, runtime adaptation, telemetry, caches, and logs must stay in
+  explicit classes
 - Canonical Machine Identity:
   one named machine identity tuple must bind model id, weight digest, route
   digest, continuation contract, and carrier class for every proof, witness,
@@ -149,6 +164,18 @@ invariants.
 - Computational Model Statement:
   every claim-bearing artifact must name the computational model,
   continuation semantics, and effect boundaries it relies on
+- Proof Class Distinction:
+  mechanistic proof artifacts and observational audits must remain separate
+  artifact classes
+- Hidden State Channels:
+  all state that can influence control flow must live in weights, declared
+  continuation state, or explicit receipt-backed host state
+- Machine Minimality:
+  minimality must be defined over machine components, semantics, and preserved
+  transforms rather than implied loosely from route shape
+- Observer Model:
+  verifier roles, trust assumptions, and acceptance conditions must be
+  machine-readable
 - Served Conformance:
   served posture may deviate from operator truth only inside an explicit
   conformance envelope and otherwise must fail closed
@@ -266,6 +293,20 @@ That proof surface must positively show:
 Without that proof surface, the bridge can forbid host orchestration without
 yet proving that the canonical route is actually the thing deciding what
 happens next.
+
+To become a real proof surface rather than a bundle of policy prose, that
+artifact must also freeze a concrete formal-object set:
+
+- a determinism class contract
+- an equivalent-choice relation with admissible divergence bounds
+- a failure-semantics lattice
+- a time-semantics contract for logical versus wall time
+- a model-information boundary
+- a training-versus-inference boundary
+- a proof-versus-audit distinction
+- a machine-minimality definition
+- a hidden-state-channel closure rule
+- and one observer or acceptance model
 
 ## What Is Already Real And Still Valid
 
@@ -771,6 +812,24 @@ That proof must show:
 - the control trace for branch, retry, and stop logic is replayable under a
   declared determinism posture even before later plugin control exists
 
+That proof also needs explicit formal objects for:
+
+- determinism classes:
+  `strict_deterministic`, `seeded_stochastic`, and
+  `bounded_nondeterministic_with_equivalence_class`
+- equivalent-choice relation and admissible divergence bounds
+- failure-semantics lattice across semantic failure, capability failure,
+  policy refusal, resource exhaustion, and determinism violation
+- logical-time versus wall-time semantics and whether time is model-observable
+- model information boundary for cost, queue, retry, and other control-shaping
+  signals
+- training-versus-inference boundary for runtime adaptation, telemetry, and
+  cache behavior
+- hidden-state-channel closure for every stateful input to control flow
+- proof-carrying versus observational artifact distinction
+- observer and acceptance model for who verifies replay, receipts, and gates
+- machine-level minimality relation and preserved transforms
+
 Without this law, the repo can say host control is forbidden without yet
 proving that the canonical route owns workflow decisions.
 
@@ -852,6 +911,18 @@ It must prove that:
   fast-route fallback do not become hidden control channels
 - the branch, retry, and stop trace is replayable under a declared
   determinism posture
+- determinism classes are explicit and machine-readable
+- failure classes are explicit and closed under replay and propagation
+- logical time, wall time, and time observability are explicit
+- the model-information boundary is explicit for cost, queue, retry, and other
+  control-shaping signals
+- training, inference, telemetry, and runtime adaptation stay in explicit
+  classes
+- all control-affecting state is confined to weights, declared continuation,
+  or receipt-backed host state
+- proof-carrying artifacts are kept distinct from observational audits
+- one observer and acceptance model exists for replay, receipts, and gate
+  acceptance
 - host control substitution causes typed failure rather than silent takeover
 
 Without this proof surface, the rebase can still sound weight-owned while
@@ -1082,8 +1153,23 @@ Description:
 
 - bind branch, retry, and stop decisions to model outputs, canonical route
   identity, and the machine identity tuple
+- define the determinism class contract for the control trace, including
+  `strict_deterministic`, `seeded_stochastic`, and
+  `bounded_nondeterministic_with_equivalence_class`
 - prove the admissible choice set is complete and neutral inside the declared
   equivalent-choice class
+- define the equivalent-choice relation and admissible divergence bounds
+- define the failure-semantics lattice and replay-stable propagation rules
+- define logical-time versus wall-time semantics and whether time is
+  model-observable
+- define the model-information boundary for cost, queue, retry, and other
+  control-shaping signals
+- define the training-versus-inference boundary for runtime adaptation,
+  telemetry, logging, and cache behavior
+- define the hidden-state-channel closure rule for all control-affecting state
+- distinguish proof-carrying artifacts from observational audits
+- define the observer and acceptance model for replay, receipts, and gate
+  verdicts
 - prove latency, cost, queueing, scheduling, cache hits, helper substitution,
   and fast-route fallback do not become hidden control channels
 - define replay posture for the branch, retry, and stop trace under the
@@ -1145,6 +1231,8 @@ Description:
   relabeling
 - define the transition-level equivalence class or explicit proof abstraction
   boundary the rebinding relies on
+- distinguish proof-carrying artifacts from observational audits so rebinding
+  cannot silently downgrade proof into sampled evidence
 - prove the new route preserves the mechanistic assumptions the proof relies on
 - keep helper substitution and route drift as explicit failure rows
 
@@ -1224,6 +1312,8 @@ Description:
 - require resumed-execution parity across the same matrix
 - classify whether each fast route is inside the universality carrier or
   outside it as an acceleration-only surface
+- define machine-level minimality over components, semantics, and preserved
+  transforms rather than only route shape
 - make route-drift suppression and minimality failures explicit
 - preserve the older served/public suppression boundary and define the served
   conformance envelope for any later widening
@@ -1528,6 +1618,8 @@ Description:
 - summarize the control-plane provenance verdict and decision-replay posture
 - summarize execution-semantics, continuation, and fast-route legitimacy
   verdicts
+- summarize proof-versus-audit classification, machine minimality, and the
+  observer or acceptance model
 - summarize equivalent-choice, downward non-influence, and served-envelope
   verdicts
 - refuse any stronger claim when one of those locks is still open
@@ -1563,12 +1655,21 @@ It also still cannot say:
   benchmarks, and continuation semantics to the same route family
 - that one control-plane ownership and decision-provenance proof already binds
   workflow decisions to the canonical route
+- that determinism classes, equivalent-choice bounds, and the failure
+  semantics lattice are already frozen as machine-checkable objects
+- that time semantics and the model-information boundary are already frozen
+- that training-versus-inference behavior and hidden-state channels are already
+  frozen as explicit contracts
 - that proof rebinding already carries an execution-semantics equivalence
   contract rather than output parity alone
 - that continuation has already been proven non-computational beyond the base
   route
 - that fast routes have already been classified as legitimate universality
   carriers or as acceleration-only surfaces
+- that proof-carrying artifacts are already cleanly separated from
+  observational audits
+- that machine-level minimality and the observer or acceptance model are
+  already frozen
 - that served posture already sits inside a frozen conformance envelope
 - that theory/operator universality already implies weighted plugin control
 - or that a future plugin platform would inherit publication rights from the
@@ -1597,4 +1698,7 @@ top of it cleanly, rather than forcing the repo to reopen the universality
 contract just to explain packet-mediated capability execution or software-like
 artifact identity, and it should lock machine identity, execution semantics,
 continuation discipline, fast-route legitimacy, and served conformance before
-the repo treats the rebase as stable.
+the repo treats the rebase as stable. It also needs to freeze determinism,
+equivalence, failure, time, information, proof-class, minimality, hidden-state
+closure, and observer contracts as machine-readable objects rather than
+leaving them as prose-only laws.
