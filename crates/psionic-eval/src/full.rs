@@ -56,6 +56,8 @@ mod tassadar_article_fixture_transformer_parity;
 mod tassadar_article_frontend_compiler_envelope;
 #[path = "tassadar_article_frontend_corpus_compile_matrix.rs"]
 mod tassadar_article_frontend_corpus_compile_matrix;
+#[path = "tassadar_article_hard_sudoku_benchmark_closure.rs"]
+mod tassadar_article_hard_sudoku_benchmark_closure;
 #[path = "tassadar_article_hungarian_demo_parity.rs"]
 mod tassadar_article_hungarian_demo_parity;
 #[path = "tassadar_article_interpreter_breadth_envelope.rs"]
@@ -373,6 +375,7 @@ pub use tassadar_article_fast_route_throughput_floor::*;
 pub use tassadar_article_fixture_transformer_parity::*;
 pub use tassadar_article_frontend_compiler_envelope::*;
 pub use tassadar_article_frontend_corpus_compile_matrix::*;
+pub use tassadar_article_hard_sudoku_benchmark_closure::*;
 pub use tassadar_article_hungarian_demo_parity::*;
 pub use tassadar_article_interpreter_breadth_envelope::*;
 pub use tassadar_article_interpreter_breadth_suite_gate::*;

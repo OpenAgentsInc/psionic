@@ -8,7 +8,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-181",
       "TAS-182",
       "TAS-183",
       "TAS-184",
@@ -145,6 +144,6 @@
   "hungarian_demo_parity_green": true,
   "article_equivalence_green": false,
   "claim_boundary": "this report closes TAS-180 only. It binds the canonical 10x10 Hungarian article demo source to one direct HullCache fast-route session, one planner-owned HullCache hybrid workflow, the declared throughput-floor artifact, and the existing no-tool reproducer proof surface. It does not yet claim Arto closure, benchmark-wide hard-Sudoku closure, unified demo-and-benchmark equivalence, single-run closure, or final article-equivalence green status.",
-  "summary": "Hungarian article demo parity now records tied_requirement_satisfied=true, frontend_green=true, no_tool_proof_green=true, session_fast_route_green=true, hybrid_fast_route_green=true, throughput_floor_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-181\"), and article_equivalence_green=false.",
-  "report_digest": "1c4e76d7653e516bbed4d7861b162860c2f6ebc254c21abbee214f98450e5eea"
+  "summary": "Hungarian article demo parity now records tied_requirement_satisfied=true, frontend_green=true, no_tool_proof_green=true, session_fast_route_green=true, hybrid_fast_route_green=true, throughput_floor_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-182\"), and article_equivalence_green=false.",
+  "report_digest": "25b3273a7101f1327fe9f21aa6983cdb805ea00698b34eec62a61409c9aa5aac"
 }

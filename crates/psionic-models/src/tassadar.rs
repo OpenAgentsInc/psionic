@@ -784,6 +784,9 @@ impl TassadarExecutorFixture {
         "tassadar-executor-hungarian-10x10-matching-v0";
     /// Stable model identifier for the honest 9x9 Sudoku-class search fixture.
     pub const SUDOKU_9X9_SEARCH_MODEL_ID: &str = "tassadar-executor-sudoku-9x9-search-v0";
+    /// Stable model identifier for the named hard 9x9 Sudoku-class search fixture.
+    pub const SUDOKU_9X9_HARD_SEARCH_MODEL_ID: &str =
+        "tassadar-executor-sudoku-9x9-hard-search-v0";
     /// Stable model family for the Phase 1 fixture.
     pub const MODEL_FAMILY: &str = "tassadar_executor";
 
@@ -886,6 +889,20 @@ impl TassadarExecutorFixture {
         )
     }
 
+    /// Creates the named hard 9x9 Sudoku-class search executor fixture.
+    #[must_use]
+    pub fn sudoku_9x9_hard_search_v1() -> Self {
+        let profile = TassadarWasmProfile::sudoku_9x9_hard_search_v1();
+        let trace_abi = TassadarTraceAbi::sudoku_9x9_hard_search_v1();
+        let runtime_weights = RuntimeTassadarFixtureWeights::sudoku_9x9_hard_search_v1();
+        Self::from_parts(
+            Self::SUDOKU_9X9_HARD_SEARCH_MODEL_ID,
+            profile,
+            trace_abi,
+            runtime_weights,
+        )
+    }
+
     /// Returns the canonical fixture for one supported Wasm profile id.
     #[must_use]
     pub fn for_profile_id(profile_id: &str) -> Option<Self> {
@@ -910,6 +927,9 @@ impl TassadarExecutorFixture {
             }
             value if value == TassadarWasmProfile::sudoku_9x9_search_v1().profile_id => {
                 Some(Self::sudoku_9x9_search_v1())
+            }
+            value if value == TassadarWasmProfile::sudoku_9x9_hard_search_v1().profile_id => {
+                Some(Self::sudoku_9x9_hard_search_v1())
             }
             _ => None,
         }
@@ -1652,7 +1672,8 @@ fn workload_capability_matrix_for_fixture(
         }
         value
             if value == TassadarExecutorFixture::SUDOKU_V0_SEARCH_MODEL_ID
-                || value == TassadarExecutorFixture::SUDOKU_9X9_SEARCH_MODEL_ID =>
+                || value == TassadarExecutorFixture::SUDOKU_9X9_SEARCH_MODEL_ID
+                || value == TassadarExecutorFixture::SUDOKU_9X9_HARD_SEARCH_MODEL_ID =>
         {
             exact_single_workload_matrix_rows(
                 TassadarWorkloadClass::SudokuClass,
@@ -1695,7 +1716,8 @@ fn workload_capability_matrix_for_fixture(
         }
         value
             if value == TassadarExecutorFixture::SUDOKU_V0_SEARCH_MODEL_ID
-                || value == TassadarExecutorFixture::SUDOKU_9X9_SEARCH_MODEL_ID =>
+                || value == TassadarExecutorFixture::SUDOKU_9X9_SEARCH_MODEL_ID
+                || value == TassadarExecutorFixture::SUDOKU_9X9_HARD_SEARCH_MODEL_ID =>
         {
             "Sudoku fixture publication is exact only for Sudoku-class search workloads"
         }
@@ -2861,5 +2883,28 @@ mod tests {
         assert_eq!(suite.deployments.len(), artifacts.len());
         assert!(suite.total_compiled_weight_artifact_bytes > 0);
         assert!(!suite.artifact_digest.is_empty());
+    }
+
+    #[test]
+    fn tassadar_fixture_supports_named_hard_sudoku_profile() {
+        let fixture = TassadarExecutorFixture::for_profile_id(
+            TassadarWasmProfile::sudoku_9x9_hard_search_v1()
+                .profile_id
+                .as_str(),
+        )
+        .expect("named hard Sudoku profile should resolve to a fixture");
+
+        assert_eq!(
+            fixture.descriptor().model.model_id,
+            TassadarExecutorFixture::SUDOKU_9X9_HARD_SEARCH_MODEL_ID
+        );
+        assert_eq!(
+            fixture.descriptor().profile.profile_id,
+            TassadarWasmProfile::sudoku_9x9_hard_search_v1().profile_id
+        );
+        assert_eq!(
+            fixture.descriptor().trace_abi.profile_id,
+            TassadarTraceAbi::sudoku_9x9_hard_search_v1().profile_id
+        );
     }
 }

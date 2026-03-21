@@ -32,13 +32,13 @@ use psionic_router::{
 use psionic_runtime::{
     build_tassadar_execution_evidence_bundle, diagnose_tassadar_executor_request,
     execute_tassadar_executor_request, tassadar_article_class_corpus,
-    tassadar_hungarian_10x10_corpus, tassadar_trace_abi_for_profile_id,
-    tassadar_wasm_profile_for_id, TassadarDirectModelWeightExecutionProofReceipt,
-    TassadarExecution, TassadarExecutionEvidenceBundle, TassadarExecutionRefusal,
-    TassadarExecutorDecodeMode, TassadarExecutorExecutionReport,
-    TassadarExecutorSelectionDiagnostic, TassadarFrozenCoreWasmClosureGateStatus,
-    TassadarInstruction, TassadarProgramArtifact, TassadarRuntimeCapabilityReport,
-    TassadarTraceEvent, TassadarTraceStep, TassadarValidationCase,
+    tassadar_article_hard_sudoku_suite, tassadar_hungarian_10x10_corpus,
+    tassadar_trace_abi_for_profile_id, tassadar_wasm_profile_for_id,
+    TassadarDirectModelWeightExecutionProofReceipt, TassadarExecution,
+    TassadarExecutionEvidenceBundle, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
+    TassadarExecutorExecutionReport, TassadarExecutorSelectionDiagnostic,
+    TassadarFrozenCoreWasmClosureGateStatus, TassadarInstruction, TassadarProgramArtifact,
+    TassadarRuntimeCapabilityReport, TassadarTraceEvent, TassadarTraceStep, TassadarValidationCase,
     TASSADAR_ARTICLE_CLASS_BENCHMARK_ENVIRONMENT_REF, TASSADAR_ARTICLE_CLASS_BENCHMARK_REF,
     TASSADAR_ARTICLE_CLASS_BENCHMARK_REPORT_REF,
 };
@@ -3393,7 +3393,7 @@ impl TassadarArticleHybridWorkflowRequest {
             requested_model_id: None,
             requested_decode_mode,
             routing_policy: TassadarPlannerRoutingPolicy::default(),
-            routing_budget: TassadarPlannerRoutingBudget::new(8_192, 262_144, 8),
+            routing_budget: TassadarPlannerRoutingBudget::new(16_384, 1_048_576, 8),
             environment_refs: Vec::new(),
         }
     }
@@ -3695,6 +3695,12 @@ fn article_case_by_id(case_id: &str) -> Option<TassadarValidationCase> {
         .find(|case| case.case_id == case_id)
         .or_else(|| {
             tassadar_hungarian_10x10_corpus()
+                .into_iter()
+                .find(|case| case.case_id == case_id)
+                .map(|case| case.validation_case)
+        })
+        .or_else(|| {
+            tassadar_article_hard_sudoku_suite()
                 .into_iter()
                 .find(|case| case.case_id == case_id)
                 .map(|case| case.validation_case)
@@ -6176,7 +6182,8 @@ mod tests {
         TassadarPlannerExecutorRoutePosture, TassadarPlannerExecutorWasmImportPosture,
     };
     use psionic_runtime::{
-        tassadar_article_class_corpus, tassadar_hungarian_10x10_corpus, tassadar_validation_corpus,
+        tassadar_article_class_corpus, tassadar_article_hard_sudoku_suite,
+        tassadar_hungarian_10x10_corpus, tassadar_validation_corpus,
         TassadarExecutorDecodeMode, TassadarExecutorSelectionState, TassadarInstruction,
         TassadarProgram, TassadarProgramArtifact, TassadarTraceAbi, TassadarWasmProfile,
     };
@@ -6797,6 +6804,41 @@ mod tests {
     }
 
     #[test]
+    fn article_session_keeps_hard_sudoku_suite_direct_on_hull_cache() {
+        let service = LocalTassadarArticleExecutorSessionService::new();
+        for case in tassadar_article_hard_sudoku_suite() {
+            let request = article_request_for_case(
+                case.case_id.as_str(),
+                TassadarExecutorDecodeMode::HullCache,
+            );
+            let outcome = service.execute(&request).expect("request should be typed");
+            match outcome {
+                TassadarArticleExecutorSessionOutcome::Completed { response } => {
+                    let selection = &response.executor_response.execution_report.selection;
+                    assert_eq!(response.benchmark_identity.case_id, case.case_id);
+                    assert_eq!(
+                        response.executor_response.model_descriptor.model.model_id,
+                        TassadarArticleTransformer::TRAINED_TRACE_BOUND_MODEL_ID
+                    );
+                    assert_eq!(
+                        response.executor_response.final_outputs(),
+                        case.validation_case.expected_outputs.as_slice()
+                    );
+                    assert_eq!(
+                        selection.effective_decode_mode,
+                        Some(TassadarExecutorDecodeMode::HullCache)
+                    );
+                    assert_eq!(
+                        selection.selection_state,
+                        TassadarExecutorSelectionState::Direct
+                    );
+                }
+                other => panic!("expected completed direct article session, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
     fn article_session_stream_surfaces_benchmark_proof_log_trace_and_terminal() {
         let service = LocalTassadarArticleExecutorSessionService::new();
         let request =
@@ -7063,6 +7105,55 @@ mod tests {
                 );
             }
             other => panic!("expected completed direct hybrid workflow, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn article_hybrid_workflow_keeps_hard_sudoku_suite_direct_on_hull_cache() {
+        let service = LocalTassadarArticleHybridWorkflowService::new();
+        for case in tassadar_article_hard_sudoku_suite() {
+            let request = article_workflow_request_for_case(
+                case.case_id.as_str(),
+                TassadarExecutorDecodeMode::HullCache,
+            );
+            let outcome = service.execute(&request).expect("request should be typed");
+            match outcome {
+                TassadarArticleHybridWorkflowOutcome::Completed { response } => {
+                    let routing = &response.planner_response.routing_decision;
+                    let selection = &response
+                        .planner_response
+                        .executor_response
+                        .execution_report
+                        .selection;
+                    assert_eq!(response.benchmark_identity.case_id, case.case_id);
+                    assert_eq!(
+                        response
+                            .planner_response
+                            .executor_response
+                            .model_descriptor
+                            .model
+                            .model_id,
+                        TassadarArticleTransformer::TRAINED_TRACE_BOUND_MODEL_ID
+                    );
+                    assert_eq!(
+                        response.planner_response.executor_response.final_outputs(),
+                        case.validation_case.expected_outputs.as_slice()
+                    );
+                    assert_eq!(
+                        routing.effective_decode_mode,
+                        Some(TassadarExecutorDecodeMode::HullCache)
+                    );
+                    assert_eq!(
+                        selection.effective_decode_mode,
+                        Some(TassadarExecutorDecodeMode::HullCache)
+                    );
+                    assert_eq!(
+                        selection.selection_state,
+                        TassadarExecutorSelectionState::Direct
+                    );
+                }
+                other => panic!("expected completed direct hybrid workflow, got {other:?}"),
+            }
         }
     }
 

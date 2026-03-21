@@ -12,8 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-180",
-        "TAS-181",
         "TAS-182",
         "TAS-183",
         "TAS-184",
@@ -322,8 +320,8 @@
           ]
         },
         "toolchain_digest": "2fb122e4a8f359220507d1a66af2a083cd8ea0f3d6479759f7ec17aee2a4611d",
-        "compile_receipt_digest": "570d757c2bf983f7a96e390866c7ce0281d7b608490690266f7c87dc3033edcc",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_article_arithmetic_accumulator.wasm",
+        "compile_receipt_digest": "52f33c4ae4c653fd475bd9e6d7e379ad4f039e1b03d0abfc56ec2348d2df9ef8",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_article_arithmetic_accumulator.wasm",
         "wasm_binary_digest": "f3ca4b37bcec8804ec5014ed846f4c121186668ad625c0f4664f4a4735dd9619",
         "wasm_binary_summary": {
           "byte_len": 629,
@@ -382,8 +380,8 @@
           ]
         },
         "toolchain_digest": "c4f0d63e0853a8c9747d30ebb1abbd29f0504d8359df09edb0188037a18886b6",
-        "compile_receipt_digest": "a3b671eceb4e0f0ca740ba47dbf179e1e516d06e1f0f9e1d62873be3b3d2fc89",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_article_branch_dispatch.wasm",
+        "compile_receipt_digest": "aa1340253ee5288be7e3515c34789f4463d79468d2936cb8819219bfb513bbc4",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_article_branch_dispatch.wasm",
         "wasm_binary_digest": "c34bff27064b18b75f43d537f428ec35dc9bfc0762aadb507ee1d8e5c961576d",
         "wasm_binary_summary": {
           "byte_len": 610,
@@ -441,8 +439,8 @@
           ]
         },
         "toolchain_digest": "4e7a28eed02d5354108d3e5490a635810503cbdeb527252e0c07d4e7d61f312d",
-        "compile_receipt_digest": "dfbc50f71dc899b33829fc81f8b2ae7fcb11ff7cc4b9fe2d525069a8c77afc09",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_article_state_machine_router.wasm",
+        "compile_receipt_digest": "e701681b4801ff69405c20b7b0334110dea5d60c4ac4ae9edf51ecdf3026286b",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_article_state_machine_router.wasm",
         "wasm_binary_digest": "9a556cbe12692786132337e2e4f555435ce9e07b3876c36fea261a44b574c2b6",
         "wasm_binary_summary": {
           "byte_len": 598,
@@ -500,8 +498,8 @@
           ]
         },
         "toolchain_digest": "e2b19dcccd668c4ce921d92b28bf1e147405019248c1656fbaac02c5a4a8d16d",
-        "compile_receipt_digest": "25baf017c46861d2af870bff45f1162b03acbe843fd3769d685d064174e3e6fa",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_state_machine_kernel_tas177.wasm",
+        "compile_receipt_digest": "a256baf56bc23dd03471260a656cacbd7bf01024b1c57b293c8bd56b2ba3c36f",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_state_machine_kernel_tas177.wasm",
         "wasm_binary_digest": "979bc8ec86a567b19db65ea6e0530e77ecdde69a8247ca57126c8fbb251e4970",
         "wasm_binary_summary": {
           "byte_len": 441,
@@ -559,8 +557,8 @@
           ]
         },
         "toolchain_digest": "fb36d2bbd6176ce117f80cee42fd171a295efc36b2659335691a58e9e512f872",
-        "compile_receipt_digest": "cae3d6ae0ca3537e116583d44df97cf7f68b07d7081028fc497706c6b98c5b9a",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_long_loop_kernel_tas177.wasm",
+        "compile_receipt_digest": "5c0efa4fc80e1bedfba719e9d897f4916dbb97992b6c58ad10c3d089403bcdfa",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_long_loop_kernel_tas177.wasm",
         "wasm_binary_digest": "ba97113df18551ae454144ebcfec24a933685a1927236ad0588a5431e458c0d4",
         "wasm_binary_summary": {
           "byte_len": 407,
@@ -618,8 +616,8 @@
           ]
         },
         "toolchain_digest": "66c4e7ae41d2e161f44e7bca4998687d5c651ff6472171805a34473288664607",
-        "compile_receipt_digest": "1bd853c497eca0c34a3d3b4671ac25abfdb09f7651762490b8851fe08fd2e4d0",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_article_bump_allocator.wasm",
+        "compile_receipt_digest": "c526eefbc513cce5d6e3f5e43c18dc2b18fe6edfeb46968bc0fdd000f75ac2ff",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_article_bump_allocator.wasm",
         "wasm_binary_digest": "f48662b15897821a3a9ee3a3a84ed250c0978c0fdd39964982fc2e8b63e9744b",
         "wasm_binary_summary": {
           "byte_len": 4294,
@@ -681,8 +679,8 @@
           ]
         },
         "toolchain_digest": "909fef25abcb497796a0f4c36e976d01c3744d4a3f0769ea73f8e00fb480e8d9",
-        "compile_receipt_digest": "8c433520e904cacdf15b803973a0621e9ab5344cf762aaf07d01a8ecc3d6b229",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_heap_sum_kernel_tas177.wasm",
+        "compile_receipt_digest": "361b6328692813a42fa58fb89115acb6d7edf1b69e3d4d906f8af52a96bf73e0",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_heap_sum_kernel_tas177.wasm",
         "wasm_binary_digest": "629b30b0e8c998c83ce2ef7d6670224eabfa422de075dae245ab9a9162f6f1c6",
         "wasm_binary_summary": {
           "byte_len": 1222,
@@ -742,8 +740,8 @@
           ]
         },
         "toolchain_digest": "ad131988832d33ffe698759ad7fd0dde52a3e77626c28228e693384162ba433c",
-        "compile_receipt_digest": "dc99c410a4c5396fcfb69c171593546d04f671cfcb9b7c3894dafe8f7df5d0bd",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_article_hungarian_support.wasm",
+        "compile_receipt_digest": "32e2ec7f860b02e231b975357019ac60b68940cdd01d0ccda549931a7154582c",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_article_hungarian_support.wasm",
         "wasm_binary_digest": "2f3a6c15fb35b1c37da94f501d34965ef814fb7d476dca6f283ae3c22487c7f1",
         "wasm_binary_summary": {
           "byte_len": 426,
@@ -801,8 +799,8 @@
           ]
         },
         "toolchain_digest": "215b6b1314cdd1fb11bf3316c1caef1908e20391e4c5dace72e215f654167823",
-        "compile_receipt_digest": "f795ee8999b9fca94c7a1ec1b9212f3b0b225e634145d65a4d388aff204a5f6b",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_hungarian_10x10_article_tas177.wasm",
+        "compile_receipt_digest": "dc358daf48a745fb559a9df446a01f32bbd7169dae5d8050bf3dbc60660e9a43",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_hungarian_10x10_article_tas177.wasm",
         "wasm_binary_digest": "c2f617448b97058f2ea10244ef84419c5812e966f54eb8b57e8c1d89af182f3f",
         "wasm_binary_summary": {
           "byte_len": 1696,
@@ -860,8 +858,8 @@
           ]
         },
         "toolchain_digest": "06b3b49354e481b81ef5a3b706df07e84e60290e34dd41f4c030d521f3f8d5e0",
-        "compile_receipt_digest": "7602a20169126725a71cd296e6ff1028ff143acc8c82b522b3a5e6735929fb5c",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_article_sudoku_support.wasm",
+        "compile_receipt_digest": "e4560d2f4adc9242507c61accc1b534055b3438e8715c817dfeeca18bd44bcfe",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_article_sudoku_support.wasm",
         "wasm_binary_digest": "00493eb45c29e53ed8ee66acfe89a80594a377b9c8404985b8c50d1850983560",
         "wasm_binary_summary": {
           "byte_len": 4851,
@@ -919,8 +917,8 @@
           ]
         },
         "toolchain_digest": "a1ac0472925a0e009ec71e6a2fcfbc83dde4cfb1592facb22176c2d5a55d5e46",
-        "compile_receipt_digest": "50863b76dc285d17968ab88ea80435787cedd063f02ffe6ed0a6b20ca9f913b0",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_sudoku_9x9_article_tas177.wasm",
+        "compile_receipt_digest": "fb9df3fc078f1b2f1e514d175d349cce22a4572a67c7700cdbd7d4203205eeae",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_sudoku_9x9_article_tas177.wasm",
         "wasm_binary_digest": "e9b18fb4483749d023ef99fcfb2e31498a6c2891fea0efe0800866930c2f7058",
         "wasm_binary_summary": {
           "byte_len": 5911,
@@ -977,9 +975,9 @@
           ]
         },
         "toolchain_digest": "d7f3dd9a5bbfb0bb7c1ae9c8cef47c34630c7afdb1f21c5a6c55d853ed60ab79",
-        "compile_receipt_digest": "1c4093c1d34bc09718615aafe7c89dae951174ac4270687a2fef48439239fae2",
+        "compile_receipt_digest": "f8ab340b92d86e38dbc25ed2da3bba0f8b634dbf2c4d32e89d5f2a98d3f820a4",
         "envelope_refusal_kind": "outside_declared_library_surface",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_article_std_surface_refusal_tas177.wasm",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_article_std_surface_refusal_tas177.wasm",
         "wasm_binary_digest": "5a1e83df4ccb8a0ccddd37ac679ff1e1b1cc289d426a2ec77fa5d3bc216863d0",
         "wasm_binary_summary": {
           "byte_len": 436,
@@ -1036,9 +1034,9 @@
           ]
         },
         "toolchain_digest": "34149cd045406b125dd1e504698825e0985dc65b83a0179544c0c9b3113fb4f9",
-        "compile_receipt_digest": "3f7a486c03663882fdc11e00ab765cde04f400622e4f3d7ac4cff186e733e1e2",
+        "compile_receipt_digest": "6e631e264432ca6848dca13ac38a1e66812c4684d021eb2ff9b4734adbfb87d8",
         "envelope_refusal_kind": "host_or_syscall_surface_disallowed",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_article_host_import_refusal_tas177.wasm",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_article_host_import_refusal_tas177.wasm",
         "wasm_binary_digest": "7ef40680918917956bd4ffa9b87c61d253c766696b4434e17aad977dbe0e7261",
         "wasm_binary_summary": {
           "byte_len": 464,
@@ -1095,9 +1093,9 @@
           ]
         },
         "toolchain_digest": "eb627a9a8ad9e754db973292a636a371cd5620a1755be227a19a2a36a1bc13c7",
-        "compile_receipt_digest": "2be9c5a8ee390278dd175eccedd4d977c5107c2478ba529fca6e3fdb450eabd7",
+        "compile_receipt_digest": "5353ebd19df8254b628278b312bc3545b4bf134eb59654f92fb3ea50f92d9863",
         "envelope_refusal_kind": "ub_dependent_source_disallowed",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_article_ub_refusal_tas177.wasm",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_article_ub_refusal_tas177.wasm",
         "wasm_binary_digest": "11e7bbd16da42d79de010453467f20bbc6fc4a365e9b1f81afeb7cdabce9dce8",
         "wasm_binary_summary": {
           "byte_len": 390,
@@ -1158,9 +1156,9 @@
           ]
         },
         "toolchain_digest": "38d2bdd6ba9350992a820e7561bce0d93c009ca69b183d8b02492697004fd1ee",
-        "compile_receipt_digest": "51157da6747693392cfe053d47de25abcf23781171bb59857f8d28b26271c3c3",
+        "compile_receipt_digest": "eb999ff90d85b93e339cd203b1ec5937d3d783898113b3f37c478d8bf81e251b",
         "envelope_refusal_kind": "outside_declared_abi_surface",
-        "wasm_binary_ref": "/home/christopherdavid/code/psionic/fixtures/tassadar/wasm/tassadar_wider_numeric_kernel_tas177.wasm",
+        "wasm_binary_ref": "/home/christopherdavid/code/psionic-tas-seq/fixtures/tassadar/wasm/tassadar_wider_numeric_kernel_tas177.wasm",
         "wasm_binary_digest": "e9f371e756e8763515328bec77a8e1e0f7585a8ef0024ab97ccc2aec8bd2f67f",
         "wasm_binary_summary": {
           "byte_len": 866,
@@ -1274,7 +1272,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report closes TAS-177 only. It expands the article-envelope frontend corpus beyond the old narrow canonical lane by compiling a broader committed Rust source set across arithmetic, branch-heavy, state-machine, allocator-backed memory, Hungarian-like, and Sudoku-like support families, while keeping typed refusal and toolchain-failure posture machine-readable. It does not yet claim article-demo frontend parity, arbitrary-program closure, or final article-equivalence green status.",
     "summary": "Article frontend corpus compile matrix now records tied_requirement_satisfied=true, compiled_cases=11/11, typed_refusals=4/4, toolchain_failures=1/1, category_coverage_green=true, envelope_alignment_green=true, compile_matrix_green=true, and article_equivalence_green=false.",
-    "report_digest": "88aa60c451e199ddcf1885805f6fa13a05c93230eb13ff667b2ca8f754ab7a47"
+    "report_digest": "a7d187eb23468adfa2abf0188ff55238dd0376967b038efe411a7ab3d79e5013"
   },
   "tied_requirement_id": "TAS-177",
   "tied_requirement_satisfied": true,
@@ -1290,5 +1288,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-177 frontend corpus and compile-matrix tranche. It keeps the widened category coverage, typed refusal coverage, and toolchain-failure posture operator-readable without pretending that later article-demo parity or final article-equivalence closure are already green.",
   "summary": "Article frontend corpus compile matrix summary now records tied_requirement_satisfied=true, compiled_cases=11, typed_refusals=4, toolchain_failures=1, category_coverage_green=true, envelope_alignment_green=true, compile_matrix_green=true, and article_equivalence_green=false.",
-  "report_digest": "9c059503e6de62efe8b5b7c233364135e73abd464893a67bd5a3ce933af3abfc"
+  "report_digest": "f66859dafde0e001fb994ee51a293c4d3819db4935b970c40fed3589cc919f92"
 }

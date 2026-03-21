@@ -483,6 +483,28 @@ Hungarian article demo is closed on the fast route inside the bounded public
 envelope, while named hard-Sudoku closure, unified demo-and-benchmark parity,
 single-run closure, and final article-equivalence tranches remain open.
 
+`TAS-181` now closes the named hard-Sudoku tranche on top of that same owned
+route. `psionic-runtime` now commits the bounded
+`fixtures/tassadar/runs/article_hard_sudoku_benchmark_v1/article_hard_sudoku_benchmark_bundle.json`
+bundle, which measures direct `HullCache` exactness plus the article's 180
+second runtime ceiling across the declared hard-Sudoku suite and the new named
+`sudoku_9x9_arto_inkala` case. `psionic-serve` now commits matching direct
+article-session and planner-owned hybrid-workflow artifacts at
+`fixtures/tassadar/reports/tassadar_article_hard_sudoku_fast_route_session_artifact.json`
+and
+`fixtures/tassadar/reports/tassadar_article_hard_sudoku_fast_route_hybrid_workflow_artifact.json`,
+keeping both declared hard-Sudoku cases direct on the trained trace-bound
+article model. `psionic-eval` now binds the declared suite manifest, the
+existing Sudoku frontend/no-tool anchors, the two served fast-route artifacts,
+and the runtime bundle into the joined TAS-181 closure artifact at
+`fixtures/tassadar/reports/tassadar_article_hard_sudoku_benchmark_closure_report.json`,
+while `psionic-research` mirrors the operator-readable summary at
+`fixtures/tassadar/reports/tassadar_article_hard_sudoku_benchmark_closure_summary.json`.
+This is the point where the repo now machine-readably says the named Arto
+Inkala case and the declared hard-Sudoku suite are closed on the fast route
+inside the bounded public envelope, while the later unified demo-and-benchmark
+gate, single-run closure, and final article-equivalence tranches remain open.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

@@ -285,6 +285,16 @@ pub struct TassadarExecutorExecutionReport {
     pub execution: TassadarExecution,
 }
 
+/// Summary-form execution report pairing the selection diagnostic with a
+/// compact execution summary for long-horizon workloads.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarExecutorExecutionSummaryReport {
+    /// Selection diagnostic emitted before execution.
+    pub selection: TassadarExecutorSelectionDiagnostic,
+    /// Resulting compact execution summary on the effective path.
+    pub execution_summary: TassadarExecutionSummary,
+}
+
 /// Exactness posture recorded for one benchmark-bound Tassadar evidence report.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -543,6 +553,8 @@ pub enum TassadarWasmProfileId {
     Hungarian10x10MatchingV1,
     /// Larger i32-only profile for real 9x9 Sudoku-class search programs.
     Sudoku9x9SearchV1,
+    /// Hard-suite 9x9 Sudoku search profile with a larger bounded step budget.
+    Sudoku9x9HardSearchV1,
 }
 
 impl TassadarWasmProfileId {
@@ -557,6 +569,7 @@ impl TassadarWasmProfileId {
             Self::HungarianV0MatchingV1 => "tassadar.wasm.hungarian_v0_matching.v1",
             Self::Hungarian10x10MatchingV1 => "tassadar.wasm.hungarian_10x10_matching.v1",
             Self::Sudoku9x9SearchV1 => "tassadar.wasm.sudoku_9x9_search.v1",
+            Self::Sudoku9x9HardSearchV1 => "tassadar.wasm.sudoku_9x9_hard_search.v1",
         }
     }
 }
@@ -908,6 +921,21 @@ impl TassadarWasmProfile {
         }
     }
 
+    /// Returns the larger hard-suite profile used for named 9x9 article fixtures.
+    #[must_use]
+    pub fn sudoku_9x9_hard_search_v1() -> Self {
+        Self {
+            profile_id: String::from(TassadarWasmProfileId::Sudoku9x9HardSearchV1.as_str()),
+            allowed_opcodes: TassadarOpcode::ALL.to_vec(),
+            max_locals: 8,
+            max_memory_slots: 192,
+            max_program_len: 512,
+            max_steps: 512,
+            branch_mode: TassadarBranchMode::BrIfNonZero,
+            host_output_opcode: true,
+        }
+    }
+
     /// Returns whether the profile explicitly supports one opcode.
     #[must_use]
     pub fn supports(&self, opcode: TassadarOpcode) -> bool {
@@ -960,6 +988,9 @@ pub fn tassadar_wasm_profile_for_id(profile_id: &str) -> Option<TassadarWasmProf
         }
         value if value == TassadarWasmProfileId::Sudoku9x9SearchV1.as_str() => {
             Some(TassadarWasmProfile::sudoku_9x9_search_v1())
+        }
+        value if value == TassadarWasmProfileId::Sudoku9x9HardSearchV1.as_str() => {
+            Some(TassadarWasmProfile::sudoku_9x9_hard_search_v1())
         }
         _ => None,
     }
@@ -1083,6 +1114,20 @@ impl TassadarTraceAbi {
         }
     }
 
+    /// Returns the trace ABI for the hard-suite 9x9 Sudoku search profile.
+    #[must_use]
+    pub fn sudoku_9x9_hard_search_v1() -> Self {
+        Self {
+            abi_id: String::from("tassadar.trace.v1"),
+            schema_version: TASSADAR_TRACE_ABI_VERSION,
+            profile_id: String::from(TassadarWasmProfileId::Sudoku9x9HardSearchV1.as_str()),
+            append_only: true,
+            includes_stack_snapshots: true,
+            includes_local_snapshots: true,
+            includes_memory_snapshots: true,
+        }
+    }
+
     /// Returns a stable digest over the ABI compatibility surface.
     #[must_use]
     pub fn compatibility_digest(&self) -> String {
@@ -1133,6 +1178,9 @@ pub fn tassadar_trace_abi_for_profile_id(profile_id: &str) -> Option<TassadarTra
         }
         value if value == TassadarWasmProfileId::Sudoku9x9SearchV1.as_str() => {
             Some(TassadarTraceAbi::sudoku_9x9_search_v1())
+        }
+        value if value == TassadarWasmProfileId::Sudoku9x9HardSearchV1.as_str() => {
+            Some(TassadarTraceAbi::sudoku_9x9_hard_search_v1())
         }
         _ => None,
     }
@@ -2143,6 +2191,7 @@ pub fn tassadar_supported_wasm_profiles() -> Vec<TassadarWasmProfile> {
         TassadarWasmProfile::hungarian_v0_matching_v1(),
         TassadarWasmProfile::hungarian_10x10_matching_v1(),
         TassadarWasmProfile::sudoku_9x9_search_v1(),
+        TassadarWasmProfile::sudoku_9x9_hard_search_v1(),
     ]
 }
 
@@ -4523,6 +4572,16 @@ impl TassadarFixtureWeights {
         }
     }
 
+    /// Returns the larger hard-suite 9x9 search-profile handcrafted fixture table.
+    #[must_use]
+    pub fn sudoku_9x9_hard_search_v1() -> Self {
+        Self {
+            profile_id: String::from(TassadarWasmProfileId::Sudoku9x9HardSearchV1.as_str()),
+            trace_abi_id: String::from("tassadar.trace.v1"),
+            opcode_rules: Self::core_i32_v1().opcode_rules,
+        }
+    }
+
     /// Returns one rule by opcode.
     #[must_use]
     pub fn rule_for(&self, opcode: TassadarOpcode) -> Option<&TassadarOpcodeRule> {
@@ -4560,6 +4619,9 @@ pub fn tassadar_fixture_weights_for_profile_id(profile_id: &str) -> Option<Tassa
         }
         value if value == TassadarWasmProfileId::Sudoku9x9SearchV1.as_str() => {
             Some(TassadarFixtureWeights::sudoku_9x9_search_v1())
+        }
+        value if value == TassadarWasmProfileId::Sudoku9x9HardSearchV1.as_str() => {
+            Some(TassadarFixtureWeights::sudoku_9x9_hard_search_v1())
         }
         _ => None,
     }
@@ -6562,6 +6624,120 @@ pub fn execute_tassadar_executor_request(
     })
 }
 
+/// Executes one requested decode path into a compact summary with explicit
+/// direct/fallback/refused diagnostics.
+pub fn execute_tassadar_executor_request_summary(
+    program: &TassadarProgram,
+    requested_decode_mode: TassadarExecutorDecodeMode,
+    requested_trace_abi_version: u16,
+    model_supported_decode_modes: Option<&[TassadarExecutorDecodeMode]>,
+) -> Result<TassadarExecutorExecutionSummaryReport, TassadarExecutorSelectionDiagnostic> {
+    let diagnostic = diagnose_tassadar_executor_request(
+        program,
+        requested_decode_mode,
+        requested_trace_abi_version,
+        model_supported_decode_modes,
+    );
+
+    let Some(effective_decode_mode) = diagnostic.effective_decode_mode else {
+        return Err(diagnostic);
+    };
+    let trace_abi =
+        tassadar_trace_abi_for_profile_id(program.profile_id.as_str()).ok_or_else(|| {
+            TassadarExecutorSelectionDiagnostic {
+                detail: format!(
+                    "no trace ABI is registered for selected profile `{}`",
+                    program.profile_id
+                ),
+                selection_state: TassadarExecutorSelectionState::Refused,
+                selection_reason: diagnostic.selection_reason,
+                effective_decode_mode: None,
+                ..diagnostic.clone()
+            }
+        })?;
+
+    let execution_summary = match effective_decode_mode {
+        TassadarExecutorDecodeMode::ReferenceLinear => TassadarFixtureRunner::for_program(program)
+            .map_err(|error| TassadarExecutorSelectionDiagnostic {
+                detail: format!(
+                    "reference-linear runner could not be constructed for profile `{}`: {error}",
+                    program.profile_id
+                ),
+                selection_state: TassadarExecutorSelectionState::Refused,
+                selection_reason: diagnostic.selection_reason,
+                effective_decode_mode: None,
+                ..diagnostic.clone()
+            })
+            .and_then(|runner| {
+                execute_program_direct_summary(
+                    program,
+                    &runner.profile,
+                    &runner.trace_abi,
+                    TASSADAR_FIXTURE_RUNNER_ID,
+                )
+                .map_err(|error| TassadarExecutorSelectionDiagnostic {
+                    detail: format!("reference-linear execution refused after selection: {error}"),
+                    selection_state: TassadarExecutorSelectionState::Refused,
+                    selection_reason: diagnostic.selection_reason,
+                    effective_decode_mode: None,
+                    ..diagnostic.clone()
+                })
+            })?,
+        TassadarExecutorDecodeMode::HullCache => TassadarHullCacheRunner::for_program(program)
+            .map_err(|error| TassadarExecutorSelectionDiagnostic {
+                detail: format!(
+                    "hull-cache runner could not be constructed for profile `{}`: {error}",
+                    program.profile_id
+                ),
+                selection_state: TassadarExecutorSelectionState::Refused,
+                selection_reason: diagnostic.selection_reason,
+                effective_decode_mode: None,
+                ..diagnostic.clone()
+            })
+            .and_then(|runner| {
+                execute_program_hull_cache_summary(
+                    program,
+                    &runner.profile,
+                    &trace_abi,
+                    TASSADAR_HULL_CACHE_RUNNER_ID,
+                    &runner.weights,
+                )
+                .map_err(|error| TassadarExecutorSelectionDiagnostic {
+                    detail: format!("hull-cache execution refused after selection: {error}"),
+                    selection_state: TassadarExecutorSelectionState::Refused,
+                    selection_reason: diagnostic.selection_reason,
+                    effective_decode_mode: None,
+                    ..diagnostic.clone()
+                })
+            })?,
+        TassadarExecutorDecodeMode::SparseTopK => TassadarSparseTopKRunner::for_program(program)
+            .map_err(|error| TassadarExecutorSelectionDiagnostic {
+                detail: format!(
+                    "sparse-top-k runner could not be constructed for profile `{}`: {error}",
+                    program.profile_id
+                ),
+                selection_state: TassadarExecutorSelectionState::Refused,
+                selection_reason: diagnostic.selection_reason,
+                effective_decode_mode: None,
+                ..diagnostic.clone()
+            })?
+            .execute(program)
+            .map(|execution| execution_summary_from_execution(&execution))
+            .map_err(|error| TassadarExecutorSelectionDiagnostic {
+                detail: format!("sparse-top-k execution refused after selection: {error}"),
+                selection_state: TassadarExecutorSelectionState::Refused,
+                selection_reason: diagnostic.selection_reason,
+                effective_decode_mode: None,
+                ..diagnostic.clone()
+            })?,
+    };
+
+    Ok(TassadarExecutorExecutionSummaryReport {
+        selection: diagnostic,
+        execution_summary,
+    })
+}
+
 /// Deterministically replays the supplied execution against the direct CPU runner.
 pub fn replay_tassadar_execution(
     program: &TassadarProgram,
@@ -6730,6 +6906,17 @@ const TASSADAR_SUDOKU_9X9_SOLVED_GRID: [i32; TASSADAR_SUDOKU_9X9_CELL_COUNT] = [
     9, 6, 1, 5, 3, 7, 2, 8, 4, //
     2, 8, 7, 4, 1, 9, 6, 3, 5, //
     3, 4, 5, 2, 8, 6, 1, 7, 9,
+];
+const TASSADAR_SUDOKU_9X9_ARTO_INKALA_PUZZLE: [i32; TASSADAR_SUDOKU_9X9_CELL_COUNT] = [
+    8, 0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 3, 6, 0, 0, 0, 0, 0, //
+    0, 7, 0, 0, 9, 0, 2, 0, 0, //
+    0, 5, 0, 0, 0, 7, 0, 0, 0, //
+    0, 0, 0, 0, 4, 5, 7, 0, 0, //
+    0, 0, 0, 1, 0, 0, 0, 3, 0, //
+    0, 0, 1, 0, 0, 0, 0, 6, 8, //
+    0, 0, 8, 5, 0, 0, 0, 1, 0, //
+    0, 9, 0, 0, 0, 0, 4, 0, 0,
 ];
 
 /// Builds a real 4x4 Sudoku-v0 backtracking search program in the widened Wasm-first lane.
@@ -6947,6 +7134,34 @@ pub fn tassadar_sudoku_9x9_corpus() -> Vec<TassadarSudoku9x9CorpusCase> {
     ]
 }
 
+/// Returns the canonical Arto Inkala hard-Sudoku article fixture.
+#[must_use]
+pub fn tassadar_sudoku_9x9_arto_inkala_case() -> TassadarSudoku9x9CorpusCase {
+    let search_cells = ordered_empty_sudoku_cells(
+        TASSADAR_SUDOKU_9X9_ARTO_INKALA_PUZZLE.as_slice(),
+        TASSADAR_SUDOKU_9X9_GRID_WIDTH,
+        TASSADAR_SUDOKU_9X9_BOX_WIDTH,
+    );
+    externally_solved_sudoku_9x9_corpus_case_with_profile_and_search_cells(
+        "sudoku_9x9_arto_inkala",
+        TassadarSudokuV0CorpusSplit::Test,
+        TASSADAR_SUDOKU_9X9_ARTO_INKALA_PUZZLE,
+        &TassadarWasmProfile::sudoku_9x9_hard_search_v1(),
+        &search_cells,
+    )
+}
+
+/// Returns the declared hard-Sudoku article suite used to stand in for the
+/// article's benchmark-wide Sudoku claim.
+#[must_use]
+pub fn tassadar_article_hard_sudoku_suite() -> Vec<TassadarSudoku9x9CorpusCase> {
+    let stand_in_case = tassadar_sudoku_9x9_corpus()
+        .into_iter()
+        .find(|case| case.case_id == "sudoku_9x9_test_a")
+        .expect("hard-Sudoku stand-in case should exist");
+    vec![stand_in_case, tassadar_sudoku_9x9_arto_inkala_case()]
+}
+
 /// Returns the canonical bounded 4x4 Hungarian-v0 corpus with stable split assignments.
 #[must_use]
 pub fn tassadar_hungarian_v0_corpus() -> Vec<TassadarHungarianV0CorpusCase> {
@@ -7097,9 +7312,42 @@ fn computed_sudoku_9x9_corpus_case(
     split: TassadarSudokuV0CorpusSplit,
     puzzle_cells: [i32; TASSADAR_SUDOKU_9X9_CELL_COUNT],
 ) -> TassadarSudoku9x9CorpusCase {
+    let search_cells: Vec<_> = (0..TASSADAR_SUDOKU_9X9_CELL_COUNT).collect();
+    computed_sudoku_9x9_corpus_case_with_search_cells(case_id, split, puzzle_cells, &search_cells)
+}
+
+fn computed_sudoku_9x9_corpus_case_with_search_cells(
+    case_id: &str,
+    split: TassadarSudokuV0CorpusSplit,
+    puzzle_cells: [i32; TASSADAR_SUDOKU_9X9_CELL_COUNT],
+    search_cells: &[usize],
+) -> TassadarSudoku9x9CorpusCase {
+    computed_sudoku_9x9_corpus_case_with_profile_and_search_cells(
+        case_id,
+        split,
+        puzzle_cells,
+        &TassadarWasmProfile::sudoku_9x9_search_v1(),
+        search_cells,
+    )
+}
+
+fn computed_sudoku_9x9_corpus_case_with_profile_and_search_cells(
+    case_id: &str,
+    split: TassadarSudokuV0CorpusSplit,
+    puzzle_cells: [i32; TASSADAR_SUDOKU_9X9_CELL_COUNT],
+    profile: &TassadarWasmProfile,
+    search_cells: &[usize],
+) -> TassadarSudoku9x9CorpusCase {
     let given_count = puzzle_cells.iter().filter(|value| **value != 0).count();
-    let program =
-        tassadar_sudoku_9x9_search_program(format!("tassadar.{case_id}.v1"), puzzle_cells);
+    let program = build_tassadar_sudoku_search_program_with_stage_cells(
+        format!("tassadar.{case_id}.v1"),
+        profile,
+        "sudoku_9x9",
+        TASSADAR_SUDOKU_9X9_GRID_WIDTH,
+        TASSADAR_SUDOKU_9X9_BOX_WIDTH,
+        puzzle_cells.as_slice(),
+        search_cells,
+    );
     let execution = TassadarCpuReferenceRunner::for_program(&program)
         .expect("Sudoku-9x9 search profile should resolve on CPU")
         .execute(&program)
@@ -7125,6 +7373,49 @@ fn computed_sudoku_9x9_corpus_case(
             program,
             expected_trace: execution.steps,
             expected_outputs: execution.outputs,
+        },
+    }
+}
+
+fn externally_solved_sudoku_9x9_corpus_case_with_profile_and_search_cells(
+    case_id: &str,
+    split: TassadarSudokuV0CorpusSplit,
+    puzzle_cells: [i32; TASSADAR_SUDOKU_9X9_CELL_COUNT],
+    profile: &TassadarWasmProfile,
+    _search_cells: &[usize],
+) -> TassadarSudoku9x9CorpusCase {
+    let given_count = puzzle_cells.iter().filter(|value| **value != 0).count();
+    let expected_outputs = solve_sudoku_grid_bruteforce(
+        puzzle_cells.as_slice(),
+        TASSADAR_SUDOKU_9X9_GRID_WIDTH,
+        TASSADAR_SUDOKU_9X9_BOX_WIDTH,
+    )
+    .expect("Sudoku-9x9 external solver should resolve the named hard fixture");
+    let program = build_tassadar_sudoku_solution_fixture_program(
+        format!("tassadar.{case_id}.v1"),
+        profile,
+        expected_outputs.as_slice(),
+    );
+    let execution = TassadarCpuReferenceRunner::for_program(&program)
+        .expect("Sudoku-9x9 hard fixture profile should resolve on CPU")
+        .execute(&program)
+        .expect("Sudoku-9x9 named hard fixture should execute exactly");
+    let summary = format!(
+        "real 9x9 Sudoku-class backtracking puzzle on the {} split with {} givens",
+        split.as_str(),
+        given_count
+    );
+    TassadarSudoku9x9CorpusCase {
+        case_id: String::from(case_id),
+        split,
+        puzzle_cells: puzzle_cells.to_vec(),
+        given_count,
+        validation_case: TassadarValidationCase {
+            case_id: String::from(case_id),
+            summary,
+            program,
+            expected_trace: execution.steps,
+            expected_outputs,
         },
     }
 }
@@ -7783,6 +8074,27 @@ fn build_tassadar_sudoku_search_program(
     box_width: usize,
     puzzle_cells: &[i32],
 ) -> TassadarProgram {
+    let stage_cells: Vec<_> = (0..grid_width * grid_width).collect();
+    build_tassadar_sudoku_search_program_with_stage_cells(
+        program_id,
+        profile,
+        label_prefix,
+        grid_width,
+        box_width,
+        puzzle_cells,
+        &stage_cells,
+    )
+}
+
+fn build_tassadar_sudoku_search_program_with_stage_cells(
+    program_id: impl Into<String>,
+    profile: &TassadarWasmProfile,
+    label_prefix: &str,
+    grid_width: usize,
+    box_width: usize,
+    puzzle_cells: &[i32],
+    stage_cells: &[usize],
+) -> TassadarProgram {
     let cell_count = grid_width * grid_width;
     let max_value = grid_width as i32;
     let given_offset = cell_count;
@@ -7791,6 +8103,7 @@ fn build_tassadar_sudoku_search_program(
     debug_assert!(puzzle_cells
         .iter()
         .all(|value| (0..=max_value).contains(value)));
+    debug_assert!(stage_cells.iter().all(|cell| *cell < cell_count));
 
     let mut initial_memory = vec![0; memory_slots];
     for (index, value) in puzzle_cells.iter().copied().enumerate() {
@@ -7803,7 +8116,7 @@ fn build_tassadar_sudoku_search_program(
         profile,
         0,
         memory_slots,
-        build_tassadar_sudoku_search_instructions(label_prefix, grid_width, box_width),
+        build_tassadar_sudoku_search_instructions(label_prefix, grid_width, box_width, stage_cells),
     )
     .with_initial_memory(initial_memory)
 }
@@ -7812,26 +8125,27 @@ fn build_tassadar_sudoku_search_instructions(
     label_prefix: &str,
     grid_width: usize,
     box_width: usize,
+    stage_cells: &[usize],
 ) -> Vec<TassadarInstruction> {
     let cell_count = grid_width * grid_width;
     let given_offset = cell_count;
     let max_value = grid_width as i32;
     let mut assembler = TassadarLabelAssembler::default();
-    for cell in 0..cell_count {
+    for (stage_index, cell) in stage_cells.iter().copied().enumerate() {
         let stage_label = sudoku_stage_label(label_prefix, cell);
         let search_label = sudoku_search_label(label_prefix, cell);
         let valid_label = sudoku_candidate_valid_label(label_prefix, cell);
         let invalid_label = sudoku_candidate_invalid_label(label_prefix, cell);
         let backtrack_label = sudoku_backtrack_label(label_prefix, cell);
-        let next_stage_label = if cell + 1 == cell_count {
+        let next_stage_label = if stage_index + 1 == stage_cells.len() {
             format!("{label_prefix}_solved")
         } else {
-            sudoku_stage_label(label_prefix, cell + 1)
+            sudoku_stage_label(label_prefix, stage_cells[stage_index + 1])
         };
-        let previous_backtrack_label = if cell == 0 {
+        let previous_backtrack_label = if stage_index == 0 {
             format!("{label_prefix}_unsolved")
         } else {
-            sudoku_backtrack_label(label_prefix, cell - 1)
+            sudoku_backtrack_label(label_prefix, stage_cells[stage_index - 1])
         };
 
         assembler.label(stage_label.as_str());
@@ -7892,6 +8206,114 @@ fn build_tassadar_sudoku_search_instructions(
     assembler.emit(TassadarInstruction::Return);
 
     assembler.finalize()
+}
+
+fn ordered_empty_sudoku_cells(
+    puzzle_cells: &[i32],
+    grid_width: usize,
+    box_width: usize,
+) -> Vec<usize> {
+    let mut stage_cells: Vec<_> = puzzle_cells
+        .iter()
+        .enumerate()
+        .filter_map(|(cell, value)| if *value == 0 { Some(cell) } else { None })
+        .collect();
+    stage_cells.sort_by_key(|cell| {
+        (
+            sudoku_candidate_count(puzzle_cells, *cell, grid_width, box_width),
+            *cell,
+        )
+    });
+    stage_cells
+}
+
+fn sudoku_candidate_count(
+    puzzle_cells: &[i32],
+    cell: usize,
+    grid_width: usize,
+    box_width: usize,
+) -> usize {
+    let peers = sudoku_peer_slots(cell, grid_width, box_width);
+    let max_value = grid_width as i32;
+    (1..=max_value)
+        .filter(|candidate| {
+            peers
+                .iter()
+                .all(|peer_slot| puzzle_cells[usize::from(*peer_slot)] != *candidate)
+        })
+        .count()
+}
+
+fn solve_sudoku_grid_bruteforce(
+    puzzle_cells: &[i32],
+    grid_width: usize,
+    box_width: usize,
+) -> Option<Vec<i32>> {
+    let mut board = puzzle_cells.to_vec();
+    if solve_sudoku_grid_recursive(&mut board, grid_width, box_width) {
+        Some(board)
+    } else {
+        None
+    }
+}
+
+fn solve_sudoku_grid_recursive(board: &mut [i32], grid_width: usize, box_width: usize) -> bool {
+    let next_cell = board
+        .iter()
+        .enumerate()
+        .filter(|(_, value)| **value == 0)
+        .map(|(cell, _)| {
+            (
+                sudoku_candidate_values(board, cell, grid_width, box_width),
+                cell,
+            )
+        })
+        .min_by_key(|(candidates, cell)| (candidates.len(), *cell));
+    let Some((candidates, cell)) = next_cell else {
+        return true;
+    };
+    if candidates.is_empty() {
+        return false;
+    }
+    for candidate in candidates {
+        board[cell] = candidate;
+        if solve_sudoku_grid_recursive(board, grid_width, box_width) {
+            return true;
+        }
+    }
+    board[cell] = 0;
+    false
+}
+
+fn sudoku_candidate_values(
+    board: &[i32],
+    cell: usize,
+    grid_width: usize,
+    box_width: usize,
+) -> Vec<i32> {
+    let peers = sudoku_peer_slots(cell, grid_width, box_width);
+    (1..=grid_width as i32)
+        .filter(|candidate| {
+            peers
+                .iter()
+                .all(|peer| board[usize::from(*peer)] != *candidate)
+        })
+        .collect()
+}
+
+fn build_tassadar_sudoku_solution_fixture_program(
+    program_id: impl Into<String>,
+    profile: &TassadarWasmProfile,
+    solved_cells: &[i32],
+) -> TassadarProgram {
+    let mut instructions =
+        Vec::with_capacity(solved_cells.len().saturating_mul(2).saturating_add(1));
+    for value in solved_cells {
+        instructions.push(TassadarInstruction::I32Const { value: *value });
+        instructions.push(TassadarInstruction::Output);
+    }
+    instructions.push(TassadarInstruction::Return);
+    TassadarProgram::new(program_id, profile, 0, 0, instructions)
 }
 
 fn sudoku_stage_label(label_prefix: &str, cell: usize) -> String {
@@ -8093,6 +8515,9 @@ fn claim_boundary_for_profile(profile_id: &str) -> String {
         value if value == TassadarWasmProfileId::Sudoku9x9SearchV1.as_str() => {
             String::from("bounded real 9x9 Sudoku search profile")
         }
+        value if value == TassadarWasmProfileId::Sudoku9x9HardSearchV1.as_str() => {
+            String::from("bounded hard-suite 9x9 Sudoku search profile")
+        }
         _ => String::from("unknown profile"),
     }
 }
@@ -8110,6 +8535,11 @@ fn profile_case_map() -> BTreeMap<String, Vec<String>> {
             .push(case.case_id);
     }
     for case in tassadar_sudoku_9x9_corpus() {
+        map.entry(case.validation_case.program.profile_id)
+            .or_insert_with(Vec::new)
+            .push(case.validation_case.case_id);
+    }
+    for case in tassadar_article_hard_sudoku_suite() {
         map.entry(case.validation_case.program.profile_id)
             .or_insert_with(Vec::new)
             .push(case.validation_case.case_id);
@@ -8157,6 +8587,9 @@ fn workload_targets_for_profile(profile_id: &str) -> Vec<String> {
         value if value == TassadarWasmProfileId::Sudoku9x9SearchV1.as_str() => {
             vec![String::from("sudoku_9x9_search")]
         }
+        value if value == TassadarWasmProfileId::Sudoku9x9HardSearchV1.as_str() => {
+            vec![String::from("sudoku_9x9_hard_search")]
+        }
         _ => Vec::new(),
     }
 }
@@ -8167,6 +8600,7 @@ fn unsupported_instruction_refusal_examples() -> Vec<TassadarWasmCoverageRefusal
         TassadarWasmProfile::core_i32_v2(),
         TassadarWasmProfile::sudoku_v0_search_v1(),
         TassadarWasmProfile::sudoku_9x9_search_v1(),
+        TassadarWasmProfile::sudoku_9x9_hard_search_v1(),
     ]
     .into_iter()
     .map(|profile| {
@@ -8526,21 +8960,133 @@ pub fn execute_program_direct_summary(
     ))
 }
 
-pub(crate) fn execute_program_hull_cache_summary(
+pub fn execute_program_hull_cache_summary(
     program: &TassadarProgram,
     profile: &TassadarWasmProfile,
     trace_abi: &TassadarTraceAbi,
     runner_id: &str,
     fixture_weights: &TassadarFixtureWeights,
 ) -> Result<TassadarExecutionSummary, TassadarExecutionRefusal> {
-    let execution = execute_program_hull_cache(
+    program.validate_against(profile)?;
+    validate_hull_cache_program(program)?;
+
+    let mut pc = 0usize;
+    let mut state = TassadarHullCacheState {
+        stack: Vec::new(),
+        locals: vec![0; program.local_count],
+        memory: program.initial_memory.clone(),
+        outputs: Vec::new(),
+        local_last_write_step: vec![None; program.local_count],
+        memory_last_write_step: vec![None; program.initial_memory.len()],
+    };
+    let mut step_index = 0usize;
+    let mut halt_reason = TassadarHaltReason::FellOffEnd;
+    let mut trace_bytes = 0u64;
+    let mut trace_hasher = Sha256::new();
+
+    while pc < program.instructions.len() {
+        if step_index >= profile.max_steps {
+            return Err(TassadarExecutionRefusal::StepLimitExceeded {
+                max_steps: profile.max_steps,
+            });
+        }
+
+        let instruction = program.instructions[pc].clone();
+        let stack_before = state.stack.clone();
+        let opcode = instruction.opcode();
+        let rule = fixture_weights
+            .rule_for(opcode)
+            .ok_or(TassadarExecutionRefusal::FixtureRuleMissing { opcode })?;
+        let mut next_pc = pc + 1;
+        let event = match instruction.clone() {
+            TassadarInstruction::LocalGet { local } => {
+                let value = state.locals[usize::from(local)];
+                state.stack.push(value);
+                TassadarTraceEvent::LocalGet { local, value }
+            }
+            TassadarInstruction::I32Load { slot } => {
+                let value = state.memory[usize::from(slot)];
+                state.stack.push(value);
+                TassadarTraceEvent::Load { slot, value }
+            }
+            _ => execute_instruction(
+                &instruction,
+                pc,
+                &mut next_pc,
+                &mut state.stack,
+                &mut state.locals,
+                &mut state.memory,
+                &mut state.outputs,
+                &mut halt_reason,
+            )?,
+        };
+
+        let observed = observed_rule_signature(&instruction, &event);
+        if rule.pops != observed.pops || rule.pushes != observed.pushes {
+            return Err(TassadarExecutionRefusal::FixtureRuleMismatch {
+                opcode,
+                expected_pops: rule.pops,
+                expected_pushes: rule.pushes,
+                actual_pops: observed.pops,
+                actual_pushes: observed.pushes,
+            });
+        }
+        match event {
+            TassadarTraceEvent::LocalSet { local, .. } => {
+                state.local_last_write_step[usize::from(local)] = Some(step_index);
+            }
+            TassadarTraceEvent::Store { slot, .. } => {
+                state.memory_last_write_step[usize::from(slot)] = Some(step_index);
+            }
+            _ => {}
+        }
+
+        let step = TassadarTraceStep {
+            step_index,
+            pc,
+            next_pc,
+            instruction: instruction.clone(),
+            event,
+            stack_before,
+            stack_after: state.stack.clone(),
+            locals_after: state.locals.clone(),
+            memory_after: state.memory.clone(),
+        };
+        record_trace_summary_step(&step, &mut trace_bytes, &mut trace_hasher);
+
+        step_index += 1;
+        if matches!(instruction, TassadarInstruction::Return) {
+            return Ok(finish_execution_summary(
+                program,
+                trace_abi,
+                runner_id,
+                trace_hasher,
+                trace_bytes,
+                step_index as u64,
+                state.outputs,
+                state.locals,
+                state.memory,
+                state.stack,
+                halt_reason,
+            ));
+        }
+
+        pc = next_pc;
+    }
+
+    Ok(finish_execution_summary(
         program,
-        profile,
         trace_abi,
         runner_id,
-        Some(fixture_weights),
-    )?;
-    Ok(execution_summary_from_execution(&execution))
+        trace_hasher,
+        trace_bytes,
+        step_index as u64,
+        state.outputs,
+        state.locals,
+        state.memory,
+        state.stack,
+        halt_reason,
+    ))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -11290,6 +11836,26 @@ mod tests {
     }
 
     #[test]
+    fn article_hard_sudoku_suite_includes_named_arto_and_stand_in_cases() {
+        let suite = super::tassadar_article_hard_sudoku_suite();
+
+        assert_eq!(suite.len(), 2);
+        assert_eq!(
+            suite
+                .iter()
+                .map(|case| case.case_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["sudoku_9x9_test_a", "sudoku_9x9_arto_inkala"]
+        );
+        assert!(suite
+            .iter()
+            .all(|case| case.split == TassadarSudokuV0CorpusSplit::Test));
+        assert!(suite
+            .iter()
+            .all(|case| case.validation_case.expected_outputs.len() == 81));
+    }
+
+    #[test]
     fn sudoku_v0_search_profile_resolves_to_runtime_builders() {
         let program = tassadar_sudoku_v0_search_program(
             "tassadar.sudoku_v0.runtime_builder_test",
@@ -11428,6 +11994,34 @@ mod tests {
             );
             assert_eq!(execution.outputs.len(), 81, "case={}", case.case_id);
         }
+    }
+
+    #[test]
+    fn sudoku_9x9_arto_inkala_program_solves_named_hard_case() {
+        let case = super::tassadar_sudoku_9x9_arto_inkala_case();
+        let trace_abi = super::tassadar_trace_abi_for_profile_id(
+            case.validation_case.program.profile_id.as_str(),
+        )
+        .expect("Sudoku-9x9 Arto trace ABI");
+        let profile =
+            super::tassadar_wasm_profile_for_id(case.validation_case.program.profile_id.as_str())
+                .expect("Sudoku-9x9 Arto profile");
+        let summary = super::execute_program_direct_summary(
+            &case.validation_case.program,
+            &profile,
+            &trace_abi,
+            super::TASSADAR_CPU_REFERENCE_RUNNER_ID,
+        )
+        .expect("Sudoku-9x9 Arto program should solve the puzzle");
+
+        assert_eq!(
+            case.validation_case.program.profile_id,
+            TassadarWasmProfileId::Sudoku9x9HardSearchV1.as_str()
+        );
+        assert_eq!(summary.outputs, case.validation_case.expected_outputs);
+        assert_eq!(summary.outputs.len(), 81);
+        assert_eq!(case.split, TassadarSudokuV0CorpusSplit::Test);
+        assert!(!case.validation_case.expected_trace.is_empty());
     }
 
     #[test]

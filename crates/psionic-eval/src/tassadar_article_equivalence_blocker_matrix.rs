@@ -586,18 +586,15 @@ fn blocker_rows() -> Vec<TassadarArticleEquivalenceBlockerRow> {
         TassadarArticleEquivalenceBlockerRow {
             blocker_id: String::from("BEQ-005"),
             category: TassadarArticleEquivalenceBlockerCategory::BenchmarkScope,
-            title: String::from("Hard-Sudoku benchmark parity and unified benchmark gate remain open"),
+            title: String::from("Unified article demo-and-benchmark gate remains open"),
             repo_status: TassadarRepoStatus::Partial,
             current_gap_summary: String::from(
-                "the article still makes visible hard-Sudoku benchmark claims and a joined demo-plus-benchmark claim surface that the current public repo does not yet close on one canonical article-equivalent route",
+                "the repo now closes the named Arto Inkala case plus the declared hard-Sudoku suite, but the article's combined demo-plus-benchmark claim surface still is not frozen behind one canonical joined parity gate",
             ),
             current_public_truth: String::from(
-                "the repo already has bounded Hungarian fast-route parity, Sudoku article reproducers, and long-horizon runtime closure, but not the named Arto Inkala hard-Sudoku closeout or one canonical article demo-and-benchmark parity gate at the article's stated breadth",
+                "the repo already has bounded Hungarian fast-route parity, Sudoku article reproducers, named Arto Inkala closure, the declared hard-Sudoku suite closure, and long-horizon runtime closure, but not one canonical article demo-and-benchmark parity gate at the article's stated breadth",
             ),
             closure_requirements: vec![
-                String::from(
-                    "close Arto Inkala and the declared hard-Sudoku benchmark suite on the canonical article route",
-                ),
                 String::from(
                     "combine those rows into one article demo-and-benchmark equivalence gate",
                 ),
@@ -984,7 +981,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             304,
             "TAS-181: Arto Inkala and hard-Sudoku benchmark closure",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-004", "BEQ-005"],
         ),
         issue_row(

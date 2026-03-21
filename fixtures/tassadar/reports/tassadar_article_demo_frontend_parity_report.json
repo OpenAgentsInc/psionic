@@ -8,8 +8,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-180",
-      "TAS-181",
       "TAS-182",
       "TAS-183",
       "TAS-184",
@@ -289,7 +287,7 @@
       "source_ref": "fixtures/tassadar/sources/tassadar_hungarian_10x10_article.rs",
       "source_digest": "f3a89c7c1baf3c9706188edffae9042e14bf5c526b4f4184632e1edaf8221b3e",
       "source_receipt_digest": "d8e42a3dc5c78d4ada31815077a84873d7babec39c462069d7178686b124bfeb",
-      "compile_receipt_digest": "e5cb38b28ee223ead847c0af81efedb25c3c9fcc9e2a54752218d8b3d2370202",
+      "compile_receipt_digest": "fadff82f10c6e7f07e632dba0cc69d18f55267c7426619d85cc80055ef140e14",
       "compile_config_digest": "d1629c79f07cf91c73860c767fe8e42dd4f8678710e674a5d394750dea3a46bf",
       "compile_pipeline_features": [
         "compiler_binary:rustc",
@@ -358,7 +356,7 @@
       "source_ref": "fixtures/tassadar/sources/tassadar_sudoku_9x9_article.rs",
       "source_digest": "8a8d943d3c073db5157cd841db7b2e582a96d5299116ca004db292d8c1508c8e",
       "source_receipt_digest": "ebfe4a69b5384864a8bc27bb0911e44ef2f0425b999d5d2c58012bab1cd04ac5",
-      "compile_receipt_digest": "ae35abefd7d81e3d640ac6a5a9819e060329e63014f9af3ba93d085b5ef530fd",
+      "compile_receipt_digest": "0639a93a9412e19d9563e194fb8c685727780809403fe53b4a2f0d9b23a7d46d",
       "compile_config_digest": "dd71bf6270a38ebe9c5d3e57f67b9f81b816f1eb8c065bd078e9d3c0392e477a",
       "compile_pipeline_features": [
         "compiler_binary:rustc",
@@ -511,5 +509,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this report closes TAS-178 only. It proves that the canonical Hungarian and Sudoku article demo sources compile through the declared public frontend/compiler envelope and stay bound to the same canonical compiled-executor case and workload identities already used by the bounded reproducers. It does not yet claim final Hungarian fast-route parity, Arto or benchmark-wide hard-Sudoku closure, arbitrary-program closure, or final article-equivalence green status.",
   "summary": "Article demo frontend parity now records tied_requirement_satisfied=true, compiled_demos=2/2, refusal_probes=2/2, source_compile_receipt_parity_green=true, workload_identity_parity_green=true, unsupported_variant_refusal_green=true, demo_frontend_parity_green=true, and article_equivalence_green=false.",
-  "report_digest": "a4f9390dd80fd830458d02715ed05785790835789216124174891293a776cc86"
+  "report_digest": "ea27b1bd263bfc9da8643582cc3f6d0f17eac70937516787ef5b8f16879dbb2a"
 }

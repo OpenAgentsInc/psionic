@@ -490,8 +490,8 @@ mod tests {
         assert!(report.prerequisite_transformer_boundary_green);
         assert!(!report.blocker_matrix_article_equivalence_green);
         assert_eq!(report.required_issue_count, 37);
-        assert_eq!(report.closed_required_issue_count, 29);
-        assert_eq!(report.passed_required_requirement_count, 31);
+        assert_eq!(report.closed_required_issue_count, 30);
+        assert_eq!(report.passed_required_requirement_count, 32);
         assert!(report
             .green_requirement_ids
             .contains(&String::from(BLOCKER_MATRIX_CONTRACT_REQUIREMENT_ID)));
@@ -592,12 +592,15 @@ mod tests {
         assert!(report
             .green_requirement_ids
             .contains(&String::from("TAS-180")));
-        assert_eq!(report.closed_required_issue_count, 29);
-        assert_eq!(report.passed_required_requirement_count, 31);
-        assert_eq!(report.blocked_issue_ids.len(), 8);
+        assert!(report
+            .green_requirement_ids
+            .contains(&String::from("TAS-181")));
+        assert_eq!(report.closed_required_issue_count, 30);
+        assert_eq!(report.passed_required_requirement_count, 32);
+        assert_eq!(report.blocked_issue_ids.len(), 7);
         assert_eq!(
             report.blocked_issue_ids.first().map(String::as_str),
-            Some("TAS-181")
+            Some("TAS-182")
         );
         assert_eq!(report.blocked_blocker_ids.len(), 7);
     }

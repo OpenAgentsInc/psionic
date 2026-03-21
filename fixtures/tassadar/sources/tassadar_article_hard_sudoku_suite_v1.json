@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "manifest_id": "tassadar.article_hard_sudoku_suite.v1",
+  "manifest_ref": "fixtures/tassadar/sources/tassadar_article_hard_sudoku_suite_v1.json",
+  "gate_issue_id": "TAS-181",
+  "canonical_source_case_id": "sudoku_9x9_article",
+  "source_ref": "fixtures/tassadar/sources/tassadar_sudoku_9x9_article.rs",
+  "frontend_parity_report_ref": "fixtures/tassadar/reports/tassadar_article_demo_frontend_parity_report.json",
+  "runtime_ceiling_seconds": 180.0,
+  "named_case_id": "sudoku_9x9_arto_inkala",
+  "case_rows": [
+    {
+      "case_id": "sudoku_9x9_test_a",
+      "case_role": "hard_sudoku_stand_in",
+      "split": "test",
+      "detail": "the committed article-shaped Sudoku-9x9 test case remains the explicit hard-Sudoku suite stand-in already referenced by TAS-175 and the Sudoku article reproducer"
+    },
+    {
+      "case_id": "sudoku_9x9_arto_inkala",
+      "case_role": "named_arto_inkala",
+      "split": "test",
+      "detail": "the named Arto Inkala puzzle is added as the canonical public hard-Sudoku benchmark case and must stay exact on HullCache under the article's under-three-minute ceiling"
+    }
+  ],
+  "claim_boundary": "this manifest defines only the TAS-181 hard-Sudoku suite: one committed stand-in plus the named Arto Inkala case, both bound to the canonical Sudoku article source and a 180 second runtime ceiling. It does not itself claim the later unified demo-and-benchmark equivalence gate or final article-equivalence green status."
+}
