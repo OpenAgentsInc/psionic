@@ -340,6 +340,20 @@ Current honest posture:
   isolation; this tranche still keeps weighted plugin control, plugin
   publication, served/public universality, and arbitrary software
   capability blocked
+- the repo now also has one post-article plugin invocation-receipt and replay
+  class contract, with a committed eval-owned report at
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_summary.json`,
+  a committed runtime bundle, a provider-facing receipt, a checker script, and
+  an audit note that freeze canonical invocation receipt identity above the
+  host-owned runtime API, including explicit receipt/install/plugin/artifact/
+  export/packet/envelope/backend identity, required resource summaries, four
+  replay classes, twelve typed refusal and failure classes, route-integrated
+  evidence, and explicit challenge bindings for success and snapshot-replayable
+  failure lanes; this tranche still keeps weighted plugin control, plugin
+  publication, served/public universality, and arbitrary software capability
+  blocked
 - the repo now also has one post-article Turing-completeness closeout audit,
   with a committed eval report at
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
@@ -552,9 +566,9 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-156` is now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-157` through `TAS-200` are now implemented and tracked in
+- `TAS-157` through `TAS-201` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-201` through `TAS-216` remain open in GitHub and are tracked via the
+- `TAS-202` through `TAS-216` remain open in GitHub and are tracked via the
   issue bodies plus `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 
 ## Repo-Local Companion Docs

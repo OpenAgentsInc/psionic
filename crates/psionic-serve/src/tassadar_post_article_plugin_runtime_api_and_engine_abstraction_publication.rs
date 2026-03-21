@@ -97,7 +97,7 @@ fn build_publication_from_summary(
         served_public_universality_allowed: summary.served_public_universality_allowed,
         arbitrary_software_capability_allowed: summary.arbitrary_software_capability_allowed,
         claim_boundary: String::from(
-            "this served publication projects the host-owned plugin runtime API onto the current article-closeout served boundary without widening any served plugin surface. The runtime API is frozen and machine-bound, but served plugin publication stays blocked until later receipt, controller, authority, and closeout issues land.",
+            "this served publication projects the host-owned plugin runtime API onto the current article-closeout served boundary without widening any served plugin surface. The runtime API is frozen and machine-bound, but served plugin publication stays blocked until later admissibility, controller, authority, and closeout issues land.",
         ),
         publication_digest: String::new(),
     };
@@ -186,7 +186,7 @@ mod tests {
             "tassadar.plugin_runtime.engine_abstraction.v1"
         );
         assert!(publication.served_plugin_surface_ids.is_empty());
-        assert_eq!(publication.blocked_by, vec![String::from("TAS-201")]);
+        assert!(publication.blocked_by.is_empty());
         assert!(publication.operator_internal_only_posture);
         assert!(publication.rebase_claim_allowed);
         assert!(!publication.plugin_capability_claim_allowed);

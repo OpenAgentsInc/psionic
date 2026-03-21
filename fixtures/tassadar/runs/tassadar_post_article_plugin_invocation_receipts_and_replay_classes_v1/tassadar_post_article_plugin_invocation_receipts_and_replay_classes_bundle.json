@@ -1,0 +1,480 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.post_article_plugin_invocation_receipts_and_replay_classes.runtime_bundle.v1",
+  "profile_id": "tassadar.plugin_runtime.invocation_receipts.v1",
+  "host_owned_runtime_api_id": "tassadar.plugin_runtime.host_owned_api.v1",
+  "engine_abstraction_id": "tassadar.plugin_runtime.engine_abstraction.v1",
+  "packet_abi_version": "packet.v1",
+  "receipt_field_rows": [
+    {
+      "field_id": "receipt_id",
+      "required": true,
+      "detail": "receipt identity remains explicit and stable."
+    },
+    {
+      "field_id": "invocation_id",
+      "required": true,
+      "detail": "invocation identity remains explicit."
+    },
+    {
+      "field_id": "plugin_id",
+      "required": true,
+      "detail": "plugin family identity remains explicit."
+    },
+    {
+      "field_id": "plugin_version",
+      "required": true,
+      "detail": "plugin version remains explicit."
+    },
+    {
+      "field_id": "install_id",
+      "required": true,
+      "detail": "admitted install identity remains explicit."
+    },
+    {
+      "field_id": "artifact_digest",
+      "required": true,
+      "detail": "artifact digest remains explicit so invocation truth stays tied to one declared artifact."
+    },
+    {
+      "field_id": "export_name",
+      "required": true,
+      "detail": "guest export identity remains explicit at receipt time."
+    },
+    {
+      "field_id": "packet_abi_version",
+      "required": true,
+      "detail": "packet ABI version remains explicit at receipt time."
+    },
+    {
+      "field_id": "input_packet_digest",
+      "required": true,
+      "detail": "input packet digest remains explicit for challengeable replay."
+    },
+    {
+      "field_id": "output_packet_digest",
+      "required": false,
+      "detail": "output packet digest is explicit when an invocation returns an output packet."
+    },
+    {
+      "field_id": "mount_envelope_id",
+      "required": true,
+      "detail": "world-mount envelope identity remains explicit."
+    },
+    {
+      "field_id": "capability_envelope_id",
+      "required": true,
+      "detail": "capability envelope identity remains explicit."
+    },
+    {
+      "field_id": "backend_id",
+      "required": true,
+      "detail": "runner/backend identity remains explicit in the receipt."
+    },
+    {
+      "field_id": "replay_class_id",
+      "required": true,
+      "detail": "replay posture remains explicit in the receipt."
+    },
+    {
+      "field_id": "failure_class_id",
+      "required": false,
+      "detail": "typed refusal or failure class remains explicit when an invocation does not succeed."
+    },
+    {
+      "field_id": "resource_summary",
+      "required": true,
+      "detail": "resource summary carries logical start, duration, timeout, memory ceiling, and bounded usage signals."
+    },
+    {
+      "field_id": "route_evidence_refs",
+      "required": true,
+      "detail": "route-integrated evidence references remain explicit in every receipt."
+    },
+    {
+      "field_id": "challenge_receipt_ref",
+      "required": false,
+      "detail": "challenge receipt references remain explicit when the replay posture requires or emits them."
+    }
+  ],
+  "replay_class_rows": [
+    {
+      "replay_class_id": "deterministic_replayable",
+      "retry_posture_id": "no_retry_without_input_or_policy_change",
+      "propagation_posture_id": "stop_step_may_reprompt",
+      "route_evidence_required": true,
+      "challenge_receipt_required": false,
+      "promotion_allowed": true,
+      "served_claim_allowed": false,
+      "detail": "deterministic replayable receipts are exact under fixed inputs and policy, and promoted routes must carry route evidence plus challenge receipts."
+    },
+    {
+      "replay_class_id": "replayable_with_snapshots",
+      "retry_posture_id": "retry_after_snapshot_resume",
+      "propagation_posture_id": "propagate_typed_failure_until_snapshot_or_budget_change",
+      "route_evidence_required": true,
+      "challenge_receipt_required": true,
+      "promotion_allowed": true,
+      "served_claim_allowed": false,
+      "detail": "snapshot-backed replay classes remain admissible only when receipts carry the replay posture and the route binds snapshot-aware evidence."
+    },
+    {
+      "replay_class_id": "operator_replay_only",
+      "retry_posture_id": "operator_manual_retry_only",
+      "propagation_posture_id": "quarantine_plugin_and_block_public_claims",
+      "route_evidence_required": true,
+      "challenge_receipt_required": false,
+      "promotion_allowed": false,
+      "served_claim_allowed": false,
+      "detail": "operator-only replay classes remain challengeable but cannot back promotion or public claims."
+    },
+    {
+      "replay_class_id": "non_replayable_refused_for_publication",
+      "retry_posture_id": "no_retry_fail_closed",
+      "propagation_posture_id": "block_publication_and_served_claims",
+      "route_evidence_required": true,
+      "challenge_receipt_required": false,
+      "promotion_allowed": false,
+      "served_claim_allowed": false,
+      "detail": "non-replayable receipts remain explicit refusal truth and cannot support promoted or public plugin claims."
+    }
+  ],
+  "failure_class_rows": [
+    {
+      "failure_class_id": "policy_refusal",
+      "class_kind": "refusal",
+      "default_replay_class_id": "deterministic_replayable",
+      "retry_posture_id": "no_retry_fail_closed",
+      "propagation_posture_id": "stop_workflow_until_policy_changes",
+      "detail": "`policy_refusal` remains typed with replay=`deterministic_replayable`, retry=`no_retry_fail_closed`, and propagation=`stop_workflow_until_policy_changes`."
+    },
+    {
+      "failure_class_id": "schema_refusal",
+      "class_kind": "refusal",
+      "default_replay_class_id": "deterministic_replayable",
+      "retry_posture_id": "retry_after_input_fix",
+      "propagation_posture_id": "stop_step_may_reprompt",
+      "detail": "`schema_refusal` remains typed with replay=`deterministic_replayable`, retry=`retry_after_input_fix`, and propagation=`stop_step_may_reprompt`."
+    },
+    {
+      "failure_class_id": "capability_refusal",
+      "class_kind": "refusal",
+      "default_replay_class_id": "deterministic_replayable",
+      "retry_posture_id": "retry_after_mount_change",
+      "propagation_posture_id": "stop_step_may_reprompt",
+      "detail": "`capability_refusal` remains typed with replay=`deterministic_replayable`, retry=`retry_after_mount_change`, and propagation=`stop_step_may_reprompt`."
+    },
+    {
+      "failure_class_id": "runtime_timeout",
+      "class_kind": "failure",
+      "default_replay_class_id": "replayable_with_snapshots",
+      "retry_posture_id": "retry_after_snapshot_resume",
+      "propagation_posture_id": "propagate_typed_failure",
+      "detail": "`runtime_timeout` remains typed with replay=`replayable_with_snapshots`, retry=`retry_after_snapshot_resume`, and propagation=`propagate_typed_failure`."
+    },
+    {
+      "failure_class_id": "runtime_memory_limit",
+      "class_kind": "failure",
+      "default_replay_class_id": "replayable_with_snapshots",
+      "retry_posture_id": "retry_after_limit_change",
+      "propagation_posture_id": "propagate_typed_failure",
+      "detail": "`runtime_memory_limit` remains typed with replay=`replayable_with_snapshots`, retry=`retry_after_limit_change`, and propagation=`propagate_typed_failure`."
+    },
+    {
+      "failure_class_id": "runtime_crash",
+      "class_kind": "failure",
+      "default_replay_class_id": "replayable_with_snapshots",
+      "retry_posture_id": "retry_after_engine_restart",
+      "propagation_posture_id": "propagate_typed_failure",
+      "detail": "`runtime_crash` remains typed with replay=`replayable_with_snapshots`, retry=`retry_after_engine_restart`, and propagation=`propagate_typed_failure`."
+    },
+    {
+      "failure_class_id": "artifact_mismatch",
+      "class_kind": "failure",
+      "default_replay_class_id": "deterministic_replayable",
+      "retry_posture_id": "no_retry_fail_closed",
+      "propagation_posture_id": "block_plugin_until_artifact_fixed",
+      "detail": "`artifact_mismatch` remains typed with replay=`deterministic_replayable`, retry=`no_retry_fail_closed`, and propagation=`block_plugin_until_artifact_fixed`."
+    },
+    {
+      "failure_class_id": "plugin_internal_refusal",
+      "class_kind": "refusal",
+      "default_replay_class_id": "deterministic_replayable",
+      "retry_posture_id": "retry_after_input_change",
+      "propagation_posture_id": "stop_step_may_reprompt",
+      "detail": "`plugin_internal_refusal` remains typed with replay=`deterministic_replayable`, retry=`retry_after_input_change`, and propagation=`stop_step_may_reprompt`."
+    },
+    {
+      "failure_class_id": "plugin_internal_failure",
+      "class_kind": "failure",
+      "default_replay_class_id": "replayable_with_snapshots",
+      "retry_posture_id": "retry_after_snapshot_resume",
+      "propagation_posture_id": "propagate_typed_failure",
+      "detail": "`plugin_internal_failure` remains typed with replay=`replayable_with_snapshots`, retry=`retry_after_snapshot_resume`, and propagation=`propagate_typed_failure`."
+    },
+    {
+      "failure_class_id": "replay_posture_violation",
+      "class_kind": "refusal",
+      "default_replay_class_id": "operator_replay_only",
+      "retry_posture_id": "no_retry_fail_closed",
+      "propagation_posture_id": "suppress_promotion_until_replay_posture_fixed",
+      "detail": "`replay_posture_violation` remains typed with replay=`operator_replay_only`, retry=`no_retry_fail_closed`, and propagation=`suppress_promotion_until_replay_posture_fixed`."
+    },
+    {
+      "failure_class_id": "trust_posture_violation",
+      "class_kind": "refusal",
+      "default_replay_class_id": "operator_replay_only",
+      "retry_posture_id": "no_retry_fail_closed",
+      "propagation_posture_id": "quarantine_plugin_and_block_route",
+      "detail": "`trust_posture_violation` remains typed with replay=`operator_replay_only`, retry=`no_retry_fail_closed`, and propagation=`quarantine_plugin_and_block_route`."
+    },
+    {
+      "failure_class_id": "publication_posture_violation",
+      "class_kind": "refusal",
+      "default_replay_class_id": "non_replayable_refused_for_publication",
+      "retry_posture_id": "no_retry_fail_closed",
+      "propagation_posture_id": "block_publication_and_served_claims",
+      "detail": "`publication_posture_violation` remains typed with replay=`non_replayable_refused_for_publication`, retry=`no_retry_fail_closed`, and propagation=`block_publication_and_served_claims`."
+    }
+  ],
+  "case_receipts": [
+    {
+      "case_id": "frontier_relax_core_deterministic_success",
+      "status": "exact_success_receipt",
+      "receipt_id": "receipt.frontier_relax_core.success.0001",
+      "invocation_id": "inv.frontier_relax_core.success.0001",
+      "plugin_id": "plugin.frontier_relax_core",
+      "plugin_version": "1.0.0",
+      "install_id": "reinstall.frontier_relax_core.session.v2",
+      "artifact_digest": "sha256:6c7ee2d494f041e5b8cc14b30d7471d0fb759b7151dc12a3f5da6e3dded7f0cd",
+      "export_name": "handle_packet",
+      "packet_abi_version": "packet.v1",
+      "input_packet_digest": "sha256:05a4d1a173d9a7ff857d7d6c7b7db786cb5a2892c17f1be2f7c54f18f982ed74",
+      "output_packet_digest": "sha256:f6e3ad5da47404b915b6f5e5702d0f48e179f5ea7f8d44e6762f72bca4f0a7ef",
+      "mount_envelope_id": "world_mount.frontier_relax_core.read_only.v1",
+      "capability_envelope_id": "capability_envelope.frontier_relax_core.read_only.v1",
+      "backend_id": "tassadar.plugin_runtime.engine_profile.wasm_bounded.v1",
+      "replay_class_id": "deterministic_replayable",
+      "route_evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_runtime_api_and_engine_abstraction_report.json",
+        "fixtures/tassadar/reports/tassadar_installed_module_evidence_report.json",
+        "fixtures/tassadar/reports/tassadar_module_promotion_state_report.json"
+      ],
+      "challenge_receipt_ref": "fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/challenge_receipts/virtual_fs_proof_replay.challenge_receipt.json",
+      "resource_summary": {
+        "logical_start_tick": 4200,
+        "logical_duration_ticks": 9,
+        "timeout_ceiling_millis": 150,
+        "memory_ceiling_bytes": 8388608,
+        "queue_wait_millis": 0,
+        "logical_cpu_millis": 3,
+        "fuel_consumed": 18432
+      },
+      "note": "deterministic frontier_relax_core invocation remains replayable because receipt identity, output digest, route evidence, and challenge receipt all stay explicit.",
+      "receipt_digest": "57fa3711f92090dc64344cb6d7aebcc4e931621523cd51cfe950378138db404a"
+    },
+    {
+      "case_id": "candidate_select_core_schema_refusal",
+      "status": "exact_refusal_receipt",
+      "receipt_id": "receipt.candidate_select_core.schema_refusal.0002",
+      "invocation_id": "inv.candidate_select_core.schema_refusal.0002",
+      "plugin_id": "plugin.candidate_select_core",
+      "plugin_version": "1.1.0",
+      "install_id": "install.candidate_select_core.rollback.v1",
+      "artifact_digest": "sha256:79a34165f460f1bd49ef4335a8a3574f4bd1dc8f2411da53af87aa7355094908",
+      "export_name": "handle_packet",
+      "packet_abi_version": "packet.v1",
+      "input_packet_digest": "sha256:827c7f6bcfcd88d2ef9eb47b777d4df362e97aa9879129f541c415d9efc75d09",
+      "mount_envelope_id": "world_mount.candidate_select_core.rollback.v1",
+      "capability_envelope_id": "capability_envelope.candidate_select_core.rollback.v1",
+      "backend_id": "tassadar.plugin_runtime.engine_profile.wasm_bounded.v1",
+      "replay_class_id": "deterministic_replayable",
+      "failure_class_id": "schema_refusal",
+      "route_evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_runtime_api_and_engine_abstraction_report.json",
+        "fixtures/tassadar/reports/tassadar_module_promotion_state_report.json"
+      ],
+      "resource_summary": {
+        "logical_start_tick": 4240,
+        "logical_duration_ticks": 2,
+        "timeout_ceiling_millis": 150,
+        "memory_ceiling_bytes": 8388608,
+        "queue_wait_millis": 0,
+        "logical_cpu_millis": 1
+      },
+      "note": "schema refusal remains exact and challengeable by route evidence even when no output packet is produced.",
+      "receipt_digest": "a8dbb078dd55cb80cb43ab93dee33724b642de49d78ac7beb9a4f79cee55f275"
+    },
+    {
+      "case_id": "candidate_select_core_capability_refusal",
+      "status": "exact_refusal_receipt",
+      "receipt_id": "receipt.candidate_select_core.capability_refusal.0003",
+      "invocation_id": "inv.candidate_select_core.capability_refusal.0003",
+      "plugin_id": "plugin.candidate_select_core",
+      "plugin_version": "1.1.0",
+      "install_id": "install.candidate_select_core.rollback.v1",
+      "artifact_digest": "sha256:79a34165f460f1bd49ef4335a8a3574f4bd1dc8f2411da53af87aa7355094908",
+      "export_name": "handle_packet",
+      "packet_abi_version": "packet.v1",
+      "input_packet_digest": "sha256:dc6d29fce84b0a56c5f699bdb1236fa4f04334b8a2f7fd2ee7a8bc46ce9be92b",
+      "mount_envelope_id": "world_mount.candidate_select_core.rollback.v1",
+      "capability_envelope_id": "capability_envelope.candidate_select_core.rollback.v1",
+      "backend_id": "tassadar.plugin_runtime.engine_profile.wasm_bounded.v1",
+      "replay_class_id": "deterministic_replayable",
+      "failure_class_id": "capability_refusal",
+      "route_evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_runtime_api_and_engine_abstraction_report.json",
+        "fixtures/tassadar/reports/tassadar_module_promotion_state_report.json"
+      ],
+      "resource_summary": {
+        "logical_start_tick": 4250,
+        "logical_duration_ticks": 2,
+        "timeout_ceiling_millis": 150,
+        "memory_ceiling_bytes": 8388608,
+        "queue_wait_millis": 0,
+        "logical_cpu_millis": 1
+      },
+      "note": "capability denial remains a typed refusal and preserves the exact install and envelope identities used during admission.",
+      "receipt_digest": "d58ab0a682ec0739d1d883f3a264887af3942d329d956e09bb34deb8df1a8b30"
+    },
+    {
+      "case_id": "search_frontier_timeout_failure",
+      "status": "exact_failure_receipt",
+      "receipt_id": "receipt.search_frontier.timeout_failure.0004",
+      "invocation_id": "inv.search_frontier.timeout_failure.0004",
+      "plugin_id": "plugin.search_frontier",
+      "plugin_version": "1.0.0",
+      "install_id": "reinstall.frontier_relax_core.session.v2",
+      "artifact_digest": "sha256:11f9b9be8f68aa2ff1e3d25723337ed90433dc98336c661cff79897fbd26075e",
+      "export_name": "handle_packet",
+      "packet_abi_version": "packet.v1",
+      "input_packet_digest": "sha256:95d12917d27bb7793448254e817f3ee9e45afd2fbb27b4d9b8e0cbe6d4a31ee8",
+      "mount_envelope_id": "world_mount.search_frontier.snapshot.v1",
+      "capability_envelope_id": "capability_envelope.search_frontier.snapshot.v1",
+      "backend_id": "tassadar.plugin_runtime.engine_profile.wasm_bounded.v1",
+      "replay_class_id": "replayable_with_snapshots",
+      "failure_class_id": "runtime_timeout",
+      "route_evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_runtime_api_and_engine_abstraction_report.json",
+        "fixtures/tassadar/reports/tassadar_effectful_replay_audit_report.json"
+      ],
+      "challenge_receipt_ref": "fixtures/tassadar/runs/tassadar_effectful_replay_audit_v1/challenge_receipts/async_safe_cancel_replay.challenge_receipt.json",
+      "resource_summary": {
+        "logical_start_tick": 4320,
+        "logical_duration_ticks": 24,
+        "timeout_ceiling_millis": 25,
+        "memory_ceiling_bytes": 8388608,
+        "queue_wait_millis": 0,
+        "logical_cpu_millis": 25,
+        "fuel_consumed": 131072
+      },
+      "note": "timeout failures remain snapshot-replayable because the runtime carries replay posture and challenge binding explicitly.",
+      "receipt_digest": "1d5fa02a88c0fe84b807cc4597c4cbe237484d940c985c31231977a62066467b"
+    },
+    {
+      "case_id": "memory_probe_failure",
+      "status": "exact_failure_receipt",
+      "receipt_id": "receipt.memory_probe.failure.0005",
+      "invocation_id": "inv.memory_probe.failure.0005",
+      "plugin_id": "plugin.memory_probe",
+      "plugin_version": "1.0.0",
+      "install_id": "reinstall.frontier_relax_core.session.v2",
+      "artifact_digest": "sha256:ae6713a1b2208d9363565108ba8d5b005402f176c0ff76e709e26d932855db02",
+      "export_name": "handle_packet",
+      "packet_abi_version": "packet.v1",
+      "input_packet_digest": "sha256:e8b89e6f1b06220f3f71c2e7e3a69d4bf0d12f75c245270b2f234d3722e3f359",
+      "mount_envelope_id": "world_mount.memory_probe.snapshot.v1",
+      "capability_envelope_id": "capability_envelope.memory_probe.snapshot.v1",
+      "backend_id": "tassadar.plugin_runtime.engine_profile.wasm_bounded.v1",
+      "replay_class_id": "replayable_with_snapshots",
+      "failure_class_id": "runtime_memory_limit",
+      "route_evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_runtime_api_and_engine_abstraction_report.json",
+        "fixtures/tassadar/reports/tassadar_effectful_replay_audit_report.json"
+      ],
+      "challenge_receipt_ref": "receipt://memory_probe/challenge/runtime_memory_limit.snapshot",
+      "resource_summary": {
+        "logical_start_tick": 4360,
+        "logical_duration_ticks": 8,
+        "timeout_ceiling_millis": 50,
+        "memory_ceiling_bytes": 8388608,
+        "queue_wait_millis": 0,
+        "logical_cpu_millis": 9,
+        "fuel_consumed": 49152
+      },
+      "note": "memory-limit failures remain snapshot-replayable and keep typed resource summaries explicit.",
+      "receipt_digest": "a27184dd23754cb8423fab1dee4105bd528f908c67c938a2cb8f33cb8d286616"
+    },
+    {
+      "case_id": "branch_prune_publication_posture_violation",
+      "status": "exact_refusal_receipt",
+      "receipt_id": "receipt.branch_prune.publication_posture_violation.0006",
+      "invocation_id": "inv.branch_prune.publication_posture_violation.0006",
+      "plugin_id": "plugin.branch_prune_core",
+      "plugin_version": "0.1.0",
+      "install_id": "install.branch_prune_core.refused_missing_evidence.v1",
+      "artifact_digest": "sha256:fdcbfef2d2ff3ab3ba5c6711bb989d8bb690729e82396595f7a9192928ed3c1d",
+      "export_name": "handle_packet",
+      "packet_abi_version": "packet.v1",
+      "input_packet_digest": "sha256:713462e48a2a77a74f9a318327b4e0a9ac52f31b0d24dd47cebb6a42199d9db7",
+      "mount_envelope_id": "world_mount.branch_prune_core.operator_only.v1",
+      "capability_envelope_id": "capability_envelope.branch_prune_core.operator_only.v1",
+      "backend_id": "tassadar.plugin_runtime.engine_profile.wasm_bounded.v1",
+      "replay_class_id": "non_replayable_refused_for_publication",
+      "failure_class_id": "publication_posture_violation",
+      "route_evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_installed_module_evidence_report.json",
+        "fixtures/tassadar/reports/tassadar_module_promotion_state_report.json"
+      ],
+      "resource_summary": {
+        "logical_start_tick": 4400,
+        "logical_duration_ticks": 1,
+        "timeout_ceiling_millis": 100,
+        "memory_ceiling_bytes": 4194304,
+        "queue_wait_millis": 0,
+        "logical_cpu_millis": 1
+      },
+      "note": "publication posture violations remain explicit refusal truth and cannot be widened into replayable public claims.",
+      "receipt_digest": "849c9238d64c54b9dc5c1b910b1636d07a169cb36f2c7c04a2500b77e8a73aab"
+    },
+    {
+      "case_id": "candidate_select_trust_posture_violation",
+      "status": "exact_refusal_receipt",
+      "receipt_id": "receipt.candidate_select.trust_posture_violation.0007",
+      "invocation_id": "inv.candidate_select.trust_posture_violation.0007",
+      "plugin_id": "plugin.candidate_select_core",
+      "plugin_version": "1.1.0",
+      "install_id": "install.candidate_select_core.refused_stale_evidence.v2",
+      "artifact_digest": "sha256:6a14d0d4341e13d093f95ce109da3db50f9fa3a5c87cceac401a9b9cb18f1d95",
+      "export_name": "handle_packet",
+      "packet_abi_version": "packet.v1",
+      "input_packet_digest": "sha256:8507d324d43afb7af6e9cfd0ca8cfd576552be4277ea26f15f57314be4628ebf",
+      "mount_envelope_id": "world_mount.candidate_select_core.quarantined.v2",
+      "capability_envelope_id": "capability_envelope.candidate_select_core.quarantined.v2",
+      "backend_id": "tassadar.plugin_runtime.engine_profile.wasm_bounded.v1",
+      "replay_class_id": "operator_replay_only",
+      "failure_class_id": "trust_posture_violation",
+      "route_evidence_refs": [
+        "fixtures/tassadar/reports/tassadar_installed_module_evidence_report.json",
+        "fixtures/tassadar/reports/tassadar_module_promotion_state_report.json"
+      ],
+      "resource_summary": {
+        "logical_start_tick": 4420,
+        "logical_duration_ticks": 1,
+        "timeout_ceiling_millis": 100,
+        "memory_ceiling_bytes": 4194304,
+        "queue_wait_millis": 0,
+        "logical_cpu_millis": 1
+      },
+      "note": "trust posture violations remain operator-only receipt truth until stale evidence is repaired and re-promoted.",
+      "receipt_digest": "82a0aba1364e9990ce22514fac0c2c24601d15c38ab071b0dfa0af5b9f9f4fbd"
+    }
+  ],
+  "exact_success_case_count": 1,
+  "exact_refusal_case_count": 4,
+  "exact_failure_case_count": 2,
+  "challenge_bound_case_count": 3,
+  "claim_boundary": "this runtime bundle freezes the canonical invocation-receipt identity and replay-class lattice above the host-owned plugin runtime API. It keeps invocation identity, packet digests, envelope ids, backend id, resource summaries, failure classes, replay posture, route evidence, and challenge bindings explicit while keeping weighted plugin control, plugin publication, served/public universality, and arbitrary software capability blocked.",
+  "summary": "Post-article plugin invocation receipt bundle covers receipt_fields=18, replay_classes=4, failure_classes=12, success_cases=1, refusal_cases=4, failure_cases=2, challenge_bound_cases=3.",
+  "bundle_digest": "ecb374492e4642919f57ce37fed77d31e6e0fd57333e6ecb34a9feb24ba658f2"
+}

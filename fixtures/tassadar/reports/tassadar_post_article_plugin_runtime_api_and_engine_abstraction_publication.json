@@ -9,9 +9,7 @@
   "host_owned_runtime_api_id": "tassadar.plugin_runtime.host_owned_api.v1",
   "engine_abstraction_id": "tassadar.plugin_runtime.engine_abstraction.v1",
   "served_plugin_surface_ids": [],
-  "blocked_by": [
-    "TAS-201"
-  ],
+  "blocked_by": [],
   "operator_internal_only_posture": true,
   "rebase_claim_allowed": true,
   "plugin_capability_claim_allowed": false,
@@ -19,6 +17,6 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "claim_boundary": "this served publication projects the host-owned plugin runtime API onto the current article-closeout served boundary without widening any served plugin surface. The runtime API is frozen and machine-bound, but served plugin publication stays blocked until later receipt, controller, authority, and closeout issues land.",
-  "publication_digest": "57dee52e3ddece34e7056de84d4d28de0013897839f6d83108851d9472c4da30"
+  "claim_boundary": "this served publication projects the host-owned plugin runtime API onto the current article-closeout served boundary without widening any served plugin surface. The runtime API is frozen and machine-bound, but served plugin publication stays blocked until later admissibility, controller, authority, and closeout issues land.",
+  "publication_digest": "ddb9e0bdf10b05683ca4ce8167ec76388e59171caca664fb7dc41ed06a0db7fe"
 }

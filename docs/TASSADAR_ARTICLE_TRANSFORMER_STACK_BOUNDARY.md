@@ -936,6 +936,30 @@ packet-ABI defer pointer to empty, and still does not admit weighted plugin
 control, plugin publication, served/public universality, or arbitrary
 software capability.
 
+`TAS-201` now closes the canonical invocation-receipt and replay-class tranche
+at
+`fixtures/tassadar/reports/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_report.json`.
+That report freezes canonical receipt identity above the already-closed
+runtime API by inheriting the now-closed runtime contract plus the earlier
+effectful replay, installed-module evidence, and module-promotion precedents,
+binding explicit receipt/install/plugin/artifact/export/packet/envelope/
+backend identity, required resource summaries, four replay classes, twelve
+typed refusal and failure classes, route-integrated evidence, and challenge
+bindings for success and snapshot-replayable failure lanes to the same
+canonical machine identity and computational-model statement as the earlier
+plugin tranche. The operator-readable summary now lives at
+`fixtures/tassadar/reports/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_summary.json`,
+the runtime bundle now lives at
+`fixtures/tassadar/runs/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_v1/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_bundle.json`,
+the provider receipt now lives at
+`crates/psionic-provider/src/tassadar_post_article_plugin_invocation_receipts_and_replay_classes.rs`,
+and the dedicated checker now lives at
+`scripts/check-tassadar-post-article-plugin-invocation-receipts-and-replay-classes.sh`.
+This tranche keeps receipt and replay posture bounded and machine-legible,
+clears the runtime-API defer pointer to empty, moves the deferred frontier to
+`TAS-202`, and still does not admit weighted plugin control, plugin
+publication, served/public universality, or arbitrary software capability.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

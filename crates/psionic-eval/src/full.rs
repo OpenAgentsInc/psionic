@@ -260,26 +260,28 @@ mod tassadar_numeric_portability;
 mod tassadar_owned_transformer_stack_audit;
 #[path = "tassadar_pointer_memory_scratchpad.rs"]
 mod tassadar_pointer_memory_scratchpad;
+#[path = "tassadar_post_article_canonical_route_semantic_preservation_audit.rs"]
+mod tassadar_post_article_canonical_route_semantic_preservation_audit;
+#[path = "tassadar_post_article_canonical_route_universal_substrate_gate.rs"]
+mod tassadar_post_article_canonical_route_universal_substrate_gate;
 #[path = "tassadar_post_article_carrier_split_contract.rs"]
 mod tassadar_post_article_carrier_split_contract;
 #[path = "tassadar_post_article_control_plane_decision_provenance_proof.rs"]
 mod tassadar_post_article_control_plane_decision_provenance_proof;
-#[path = "tassadar_post_article_universal_machine_proof_rebinding.rs"]
-mod tassadar_post_article_universal_machine_proof_rebinding;
-#[path = "tassadar_post_article_universality_witness_suite_reissue.rs"]
-mod tassadar_post_article_universality_witness_suite_reissue;
-#[path = "tassadar_post_article_canonical_route_universal_substrate_gate.rs"]
-mod tassadar_post_article_canonical_route_universal_substrate_gate;
-#[path = "tassadar_post_article_universality_portability_minimality_matrix.rs"]
-mod tassadar_post_article_universality_portability_minimality_matrix;
+#[path = "tassadar_post_article_plugin_invocation_receipts_and_replay_classes.rs"]
+mod tassadar_post_article_plugin_invocation_receipts_and_replay_classes;
 #[path = "tassadar_post_article_rebased_universality_verdict_split.rs"]
 mod tassadar_post_article_rebased_universality_verdict_split;
 #[path = "tassadar_post_article_turing_completeness_closeout_audit.rs"]
 mod tassadar_post_article_turing_completeness_closeout_audit;
-#[path = "tassadar_post_article_canonical_route_semantic_preservation_audit.rs"]
-mod tassadar_post_article_canonical_route_semantic_preservation_audit;
+#[path = "tassadar_post_article_universal_machine_proof_rebinding.rs"]
+mod tassadar_post_article_universal_machine_proof_rebinding;
 #[path = "tassadar_post_article_universality_bridge_contract.rs"]
 mod tassadar_post_article_universality_bridge_contract;
+#[path = "tassadar_post_article_universality_portability_minimality_matrix.rs"]
+mod tassadar_post_article_universality_portability_minimality_matrix;
+#[path = "tassadar_post_article_universality_witness_suite_reissue.rs"]
+mod tassadar_post_article_universality_witness_suite_reissue;
 #[path = "tassadar_pre_closeout_universality_audit.rs"]
 mod tassadar_pre_closeout_universality_audit;
 #[path = "tassadar_precision_attention_robustness_audit.rs"]
@@ -513,16 +515,17 @@ pub use tassadar_numeric_opcode_ladder::*;
 pub use tassadar_numeric_portability::*;
 pub use tassadar_owned_transformer_stack_audit::*;
 pub use tassadar_pointer_memory_scratchpad::*;
+pub use tassadar_post_article_canonical_route_semantic_preservation_audit::*;
+pub use tassadar_post_article_canonical_route_universal_substrate_gate::*;
 pub use tassadar_post_article_carrier_split_contract::*;
 pub use tassadar_post_article_control_plane_decision_provenance_proof::*;
-pub use tassadar_post_article_universal_machine_proof_rebinding::*;
-pub use tassadar_post_article_universality_witness_suite_reissue::*;
-pub use tassadar_post_article_canonical_route_universal_substrate_gate::*;
-pub use tassadar_post_article_universality_portability_minimality_matrix::*;
+pub use tassadar_post_article_plugin_invocation_receipts_and_replay_classes::*;
 pub use tassadar_post_article_rebased_universality_verdict_split::*;
 pub use tassadar_post_article_turing_completeness_closeout_audit::*;
-pub use tassadar_post_article_canonical_route_semantic_preservation_audit::*;
+pub use tassadar_post_article_universal_machine_proof_rebinding::*;
 pub use tassadar_post_article_universality_bridge_contract::*;
+pub use tassadar_post_article_universality_portability_minimality_matrix::*;
+pub use tassadar_post_article_universality_witness_suite_reissue::*;
 pub use tassadar_pre_closeout_universality_audit::*;
 pub use tassadar_precision_attention_robustness_audit::*;
 pub use tassadar_preemptive_job_profile::*;

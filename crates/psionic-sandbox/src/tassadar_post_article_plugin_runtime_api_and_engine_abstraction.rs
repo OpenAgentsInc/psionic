@@ -679,7 +679,7 @@ pub fn build_tassadar_post_article_plugin_runtime_api_and_engine_abstraction_rep
         plugin_publication_allowed: false,
         served_public_universality_allowed: false,
         arbitrary_software_capability_allowed: false,
-        deferred_issue_ids: vec![String::from("TAS-201")],
+        deferred_issue_ids: Vec::new(),
         claim_boundary: String::from(
             "this report freezes one host-owned plugin runtime API and engine abstraction above the packet ABI, import-policy, async-lifecycle, and simulator-effect precedents. It keeps digest-verified loading, bounded instantiate/invoke/mount/cancel semantics, bounded queue/pool/timeout/memory/concurrency ceilings, hidden runtime cost and queue signals, fixed scheduling semantics, and explicit failure isolation machine-readable while keeping weighted plugin control, plugin publication, served/public universality, and arbitrary software capability blocked.",
         ),
@@ -937,7 +937,7 @@ mod tests {
         assert_eq!(report.signal_boundary_rows.len(), 8);
         assert_eq!(report.failure_isolation_rows.len(), 3);
         assert_eq!(report.validation_rows.len(), 8);
-        assert_eq!(report.deferred_issue_ids, vec![String::from("TAS-201")]);
+        assert!(report.deferred_issue_ids.is_empty());
         assert!(report.contract_green);
         assert!(report.operator_internal_only_posture);
         assert!(report.runtime_api_frozen);

@@ -1363,6 +1363,27 @@ The current scope is:
   isolation while keeping the current lane operator/internal-only and leaving
   weighted plugin control, plugin publication, served/public universality,
   and arbitrary software capability blocked
+- the current post-article plugin invocation-receipt and replay-class
+  artifacts are
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_report.json`,
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_summary.json`,
+  the runtime bundle in
+  `fixtures/tassadar/runs/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_v1/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_bundle.json`,
+  the provider receipt in
+  `crates/psionic-provider/src/tassadar_post_article_plugin_invocation_receipts_and_replay_classes.rs`,
+  the checker script
+  `scripts/check-tassadar-post-article-plugin-invocation-receipts-and-replay-classes.sh`,
+  and the audit note
+  `docs/audits/2026-03-21-tassadar-post-article-plugin-invocation-receipts-and-replay-classes.md`,
+  which freeze canonical invocation receipt identity above the host-owned
+  runtime API by requiring explicit receipt/install/plugin/artifact/export/
+  packet/envelope/backend identity, typed optional output and failure fields,
+  required resource summaries, four replay classes, twelve typed refusal and
+  failure classes, route-integrated evidence binding, and explicit challenge
+  bindings for success and snapshot-replayable failure lanes while keeping the
+  current lane operator/internal-only and leaving weighted plugin control,
+  plugin publication, served/public universality, and arbitrary software
+  capability blocked
 - the current post-article Turing-completeness closeout artifacts are
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_summary.json`,

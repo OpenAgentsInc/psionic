@@ -1,19 +1,20 @@
 use serde::{Deserialize, Serialize};
 
-use psionic_research::TassadarPostArticlePluginRuntimeApiAndEngineAbstractionSummary;
+use psionic_research::TassadarPostArticlePluginInvocationReceiptsAndReplayClassesSummary;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassadarPostArticlePluginRuntimeApiAndEngineAbstractionReceipt {
+pub struct TassadarPostArticlePluginInvocationReceiptsAndReplayClassesReceipt {
     pub report_id: String,
     pub machine_identity_id: String,
     pub canonical_route_id: String,
     pub packet_abi_version: String,
     pub host_owned_runtime_api_id: String,
     pub engine_abstraction_id: String,
+    pub invocation_receipt_profile_id: String,
     pub contract_status: String,
-    pub runtime_api_row_count: u32,
-    pub engine_row_count: u32,
-    pub bound_row_count: u32,
+    pub receipt_identity_row_count: u32,
+    pub replay_class_row_count: u32,
+    pub failure_class_row_count: u32,
     pub validation_row_count: u32,
     pub deferred_issue_ids: Vec<String>,
     pub operator_internal_only_posture: bool,
@@ -26,10 +27,10 @@ pub struct TassadarPostArticlePluginRuntimeApiAndEngineAbstractionReceipt {
     pub detail: String,
 }
 
-impl TassadarPostArticlePluginRuntimeApiAndEngineAbstractionReceipt {
+impl TassadarPostArticlePluginInvocationReceiptsAndReplayClassesReceipt {
     #[must_use]
     pub fn from_summary(
-        summary: &TassadarPostArticlePluginRuntimeApiAndEngineAbstractionSummary,
+        summary: &TassadarPostArticlePluginInvocationReceiptsAndReplayClassesSummary,
     ) -> Self {
         Self {
             report_id: summary.report_id.clone(),
@@ -38,10 +39,11 @@ impl TassadarPostArticlePluginRuntimeApiAndEngineAbstractionReceipt {
             packet_abi_version: summary.packet_abi_version.clone(),
             host_owned_runtime_api_id: summary.host_owned_runtime_api_id.clone(),
             engine_abstraction_id: summary.engine_abstraction_id.clone(),
+            invocation_receipt_profile_id: summary.invocation_receipt_profile_id.clone(),
             contract_status: format!("{:?}", summary.contract_status).to_lowercase(),
-            runtime_api_row_count: summary.runtime_api_row_count,
-            engine_row_count: summary.engine_row_count,
-            bound_row_count: summary.bound_row_count,
+            receipt_identity_row_count: summary.receipt_identity_row_count,
+            replay_class_row_count: summary.replay_class_row_count,
+            failure_class_row_count: summary.failure_class_row_count,
             validation_row_count: summary.validation_row_count,
             deferred_issue_ids: summary.deferred_issue_ids.clone(),
             operator_internal_only_posture: summary.operator_internal_only_posture,
@@ -52,11 +54,11 @@ impl TassadarPostArticlePluginRuntimeApiAndEngineAbstractionReceipt {
             served_public_universality_allowed: summary.served_public_universality_allowed,
             arbitrary_software_capability_allowed: summary.arbitrary_software_capability_allowed,
             detail: format!(
-                "post-article plugin runtime API summary `{}` keeps contract_status={:?}, host_owned_runtime_api_id=`{}`, engine_abstraction_id=`{}`, validation_rows={}, and deferred_issue_ids={}.",
+                "post-article plugin invocation-receipt summary `{}` keeps contract_status={:?}, invocation_receipt_profile_id=`{}`, replay_class_rows={}, validation_rows={}, and deferred_issue_ids={}.",
                 summary.report_id,
                 summary.contract_status,
-                summary.host_owned_runtime_api_id,
-                summary.engine_abstraction_id,
+                summary.invocation_receipt_profile_id,
+                summary.replay_class_row_count,
                 summary.validation_row_count,
                 summary.deferred_issue_ids.len(),
             ),
@@ -66,18 +68,21 @@ impl TassadarPostArticlePluginRuntimeApiAndEngineAbstractionReceipt {
 
 #[cfg(test)]
 mod tests {
-    use super::TassadarPostArticlePluginRuntimeApiAndEngineAbstractionReceipt;
-    use psionic_research::build_tassadar_post_article_plugin_runtime_api_and_engine_abstraction_summary;
+    use super::TassadarPostArticlePluginInvocationReceiptsAndReplayClassesReceipt;
+    use psionic_research::build_tassadar_post_article_plugin_invocation_receipts_and_replay_classes_summary;
 
     #[test]
-    fn post_article_plugin_runtime_api_receipt_projects_summary() {
+    fn post_article_plugin_invocation_receipts_receipt_projects_summary() {
         let summary =
-            build_tassadar_post_article_plugin_runtime_api_and_engine_abstraction_summary()
+            build_tassadar_post_article_plugin_invocation_receipts_and_replay_classes_summary()
                 .expect("summary");
         let receipt =
-            TassadarPostArticlePluginRuntimeApiAndEngineAbstractionReceipt::from_summary(&summary);
+            TassadarPostArticlePluginInvocationReceiptsAndReplayClassesReceipt::from_summary(
+                &summary,
+            );
 
         assert_eq!(receipt.contract_status, "green");
+        assert_eq!(receipt.packet_abi_version, "packet.v1");
         assert_eq!(
             receipt.host_owned_runtime_api_id,
             "tassadar.plugin_runtime.host_owned_api.v1"
@@ -86,7 +91,11 @@ mod tests {
             receipt.engine_abstraction_id,
             "tassadar.plugin_runtime.engine_abstraction.v1"
         );
-        assert!(receipt.deferred_issue_ids.is_empty());
+        assert_eq!(
+            receipt.invocation_receipt_profile_id,
+            "tassadar.plugin_runtime.invocation_receipts.v1"
+        );
+        assert_eq!(receipt.deferred_issue_ids, vec![String::from("TAS-202")]);
         assert!(receipt.operator_internal_only_posture);
         assert!(receipt.rebase_claim_allowed);
         assert!(!receipt.plugin_capability_claim_allowed);

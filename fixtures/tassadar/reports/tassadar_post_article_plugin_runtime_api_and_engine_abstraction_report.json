@@ -951,10 +951,8 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "deferred_issue_ids": [
-    "TAS-201"
-  ],
+  "deferred_issue_ids": [],
   "claim_boundary": "this report freezes one host-owned plugin runtime API and engine abstraction above the packet ABI, import-policy, async-lifecycle, and simulator-effect precedents. It keeps digest-verified loading, bounded instantiate/invoke/mount/cancel semantics, bounded queue/pool/timeout/memory/concurrency ceilings, hidden runtime cost and queue signals, fixed scheduling semantics, and explicit failure isolation machine-readable while keeping weighted plugin control, plugin publication, served/public universality, and arbitrary software capability blocked.",
-  "summary": "Post-article plugin runtime API report keeps contract_status=Green, dependency_rows=5, runtime_api_rows=8, engine_rows=6, bound_rows=6, signal_rows=8, validation_rows=8, and deferred_issue_ids=1.",
-  "report_digest": "588324a79ac1267bf26b51ad9e598697e8022facc7b81f66432071ba34f3808d"
+  "summary": "Post-article plugin runtime API report keeps contract_status=Green, dependency_rows=5, runtime_api_rows=8, engine_rows=6, bound_rows=6, signal_rows=8, validation_rows=8, and deferred_issue_ids=0.",
+  "report_digest": "d904b76e18bf24b52d72cf7dd7e02133b34017a7e2b54e2fe6a3592d34818fec"
 }
