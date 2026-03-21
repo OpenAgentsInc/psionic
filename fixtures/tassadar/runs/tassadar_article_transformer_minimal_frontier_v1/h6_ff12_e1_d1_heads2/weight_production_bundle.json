@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.article_transformer.weight_production_bundle.v1",
+  "tied_requirement_id": "TAS-169",
+  "model_module_ref": "crates/psionic-models/src/tassadar_article_transformer.rs",
+  "transformer_module_ref": "crates/psionic-transformer/src/encoder_decoder.rs",
+  "train_module_ref": "crates/psionic-train/src/tassadar_article_transformer_weight_production.rs",
+  "runtime_module_ref": "crates/psionic-runtime/src/tassadar.rs",
+  "run_id": "tassadar-article-transformer-minimal-frontier-h6_ff12_e1_d1_heads2-weight-production-v1",
+  "checkpoint_family": "train.tassadar.article_transformer.minimal_frontier.h6_ff12_e1_d1_heads2",
+  "suite_id": "tassadar.article_transformer.weight_production_suite.v1",
+  "suite_description": "bounded article-class trace-production slice over one trained Hungarian article demo plus held-out kernel-family cases on a 32-token trace-prefix window",
+  "source_corpus_id": "tassadar.article_class_corpus.v1",
+  "architecture_variant": "attention_is_all_you_need_encoder_decoder",
+  "config": {
+    "source_vocab_size": 303,
+    "target_vocab_size": 303,
+    "hidden_size": 6,
+    "feed_forward_size": 12,
+    "head_count": 2,
+    "encoder_layer_count": 1,
+    "decoder_layer_count": 1,
+    "max_source_positions": 16384,
+    "max_target_positions": 16384,
+    "dropout_probability_bps": 0
+  },
+  "embedding_strategy": "shared_source_target_and_output",
+  "trainable_parameter_ids": [
+    "logits_projection_bias"
+  ],
+  "trainable_parameter_scalar_count": 303,
+  "loss_kind": "label_smoothed_cross_entropy",
+  "optimizer_kind": "adam",
+  "scheduler_kind": "inverse_square_root_warmup",
+  "warmup_steps": 1,
+  "label_smoothing": 0.01,
+  "finite_difference_epsilon": 0.01,
+  "base_descriptor_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h6_ff12_e1_d1_heads2/base_descriptor.json",
+  "base_artifact_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h6_ff12_e1_d1_heads2/base_weights.safetensors",
+  "produced_descriptor_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h6_ff12_e1_d1_heads2/trained_descriptor.json",
+  "produced_artifact_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h6_ff12_e1_d1_heads2/trained_weights.safetensors",
+  "training_cases": [
+    {
+      "case_id": "hungarian_matching",
+      "split": "train",
+      "summary": "tiny fixed 2x2 matching instance with comparison-selected winning assignment and exact cost",
+      "profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "trace_step_count": 17,
+      "expected_output_count": 2,
+      "prompt_token_count": 108,
+      "target_token_count": 32,
+      "full_target_token_count": 1410,
+      "source_token_digest": "ef9760bd58df73b1ee90108c3f77fe8a711b549fef8a64aace035b93c517674a",
+      "target_token_digest": "f92a7cd911b7b3426dc56981b972ed8d0bae6ee4f4788d17eb33c9184afe759c",
+      "sequence_digest": "6984530e5aea6d029a8a038031aa9c972a16d51f98303eefa399b880bbfbdaac",
+      "halt_reason": "returned"
+    }
+  ],
+  "held_out_cases": [
+    {
+      "case_id": "micro_wasm_kernel",
+      "split": "held_out",
+      "summary": "unrolled weighted-sum and checksum micro-kernel over memory-backed inputs",
+      "profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "trace_step_count": 49,
+      "expected_output_count": 2,
+      "prompt_token_count": 235,
+      "target_token_count": 32,
+      "full_target_token_count": 4941,
+      "source_token_digest": "6a21fcf81d0d0e9d3538008b1791e82581f87858ac84cf163712f0939d52163e",
+      "target_token_digest": "d4c8ef632458f402ce99a9572d60b748eee7e7c57d5c5f7755052a82eb969469",
+      "sequence_digest": "d8cdeedff73790165a0b4f2f7d4edc75376b7de80f56d2264490f29a19ca6a7c",
+      "halt_reason": "returned"
+    },
+    {
+      "case_id": "branch_heavy_kernel",
+      "split": "held_out",
+      "summary": "acyclic branch ladder over memory-backed flags that exercises repeated forward control-flow pivots",
+      "profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "trace_step_count": 45,
+      "expected_output_count": 1,
+      "prompt_token_count": 371,
+      "target_token_count": 32,
+      "full_target_token_count": 3917,
+      "source_token_digest": "c19a2908e40e145229d2d7d7352d245e65e96e248c18f8f1d4d0028b59bfd4f3",
+      "target_token_digest": "d4c8ef632458f402ce99a9572d60b748eee7e7c57d5c5f7755052a82eb969469",
+      "sequence_digest": "ed9591e9ccd3ab11da987a8dea147633561c6f3443a2219b355d1889f7172acf",
+      "halt_reason": "returned"
+    },
+    {
+      "case_id": "memory_heavy_kernel",
+      "split": "held_out",
+      "summary": "dense memory-read and memory-write kernel that folds adjacent slots into staged accumulator buffers",
+      "profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "trace_step_count": 31,
+      "expected_output_count": 1,
+      "prompt_token_count": 185,
+      "target_token_count": 32,
+      "full_target_token_count": 3501,
+      "source_token_digest": "1caaff46fc4e923f45c921cbb12e8b59be77b5de52b65c5e09e63fd71acd908d",
+      "target_token_digest": "78ea5ebbcb4f7a01bf99b4875a8bba503c93fcfc612f97d9b1f559f2cd8dbd9e",
+      "sequence_digest": "29bb75e2d226b8f2b7f5fe5abb2f2631f345ef5486008bc8ad4f55cc931f6126",
+      "halt_reason": "returned"
+    }
+  ],
+  "gradient_checks": [
+    {
+      "parameter_id": "logits_projection_bias",
+      "gradient_len": 303,
+      "max_abs_gradient": 0.67745966,
+      "all_finite": true,
+      "detail": "selected trace-bound article-Transformer gradients were computed directly on the bounded trainable surface, using exact bias gradients where available and finite differences otherwise"
+    }
+  ],
+  "step_evidence": [
+    {
+      "global_step": 1,
+      "batch_id": "tassadar.article_transformer.weight_production_suite.v1-gradient-batch",
+      "training_mean_loss": 5.0822196,
+      "training_token_exactness_bps": 312,
+      "training_exact_match_count": 0,
+      "held_out_mean_loss": 5.138869,
+      "held_out_token_exactness_bps": 104,
+      "held_out_exact_match_count": 0,
+      "effective_learning_rates": {
+        "logits_projection_bias": 0.35
+      },
+      "scheduler_kinds": {
+        "logits_projection_bias": "inverse_square_root_warmup"
+      }
+    }
+  ],
+  "case_metrics": [
+    {
+      "case_id": "hungarian_matching",
+      "split": "train",
+      "initial_mean_loss": 5.6866364,
+      "final_mean_loss": 5.0822196,
+      "initial_token_exactness_bps": 0,
+      "final_token_exactness_bps": 312,
+      "initial_exact_target_match": false,
+      "final_exact_target_match": false,
+      "improved": true,
+      "initial_prediction_digest": "0716889c5f9b1b33a04c3e771b56ea1b89c23d633e232cb0c1d57c1ae0f49d47",
+      "final_prediction_digest": "9e9ce1bd8e8fbb73d406317958f2dbfaf09642016c61f8d2989094d7f7b1d137"
+    },
+    {
+      "case_id": "micro_wasm_kernel",
+      "split": "held_out",
+      "initial_mean_loss": 5.725096,
+      "final_mean_loss": 5.154649,
+      "initial_token_exactness_bps": 0,
+      "final_token_exactness_bps": 0,
+      "initial_exact_target_match": false,
+      "final_exact_target_match": false,
+      "improved": true,
+      "initial_prediction_digest": "04addd1f2267b6f1f36307d5287a656d4defff121546421a8b86a1890f9d0362",
+      "final_prediction_digest": "ef3fdbe04942521745483a958a68391a021f89f24126671937bd414ae8e76686"
+    },
+    {
+      "case_id": "branch_heavy_kernel",
+      "split": "held_out",
+      "initial_mean_loss": 5.724814,
+      "final_mean_loss": 5.154586,
+      "initial_token_exactness_bps": 0,
+      "final_token_exactness_bps": 0,
+      "initial_exact_target_match": false,
+      "final_exact_target_match": false,
+      "improved": true,
+      "initial_prediction_digest": "04addd1f2267b6f1f36307d5287a656d4defff121546421a8b86a1890f9d0362",
+      "final_prediction_digest": "ef3fdbe04942521745483a958a68391a021f89f24126671937bd414ae8e76686"
+    },
+    {
+      "case_id": "memory_heavy_kernel",
+      "split": "held_out",
+      "initial_mean_loss": 5.701329,
+      "final_mean_loss": 5.1073723,
+      "initial_token_exactness_bps": 0,
+      "final_token_exactness_bps": 312,
+      "initial_exact_target_match": false,
+      "final_exact_target_match": false,
+      "improved": true,
+      "initial_prediction_digest": "0716889c5f9b1b33a04c3e771b56ea1b89c23d633e232cb0c1d57c1ae0f49d47",
+      "final_prediction_digest": "ef3fdbe04942521745483a958a68391a021f89f24126671937bd414ae8e76686"
+    }
+  ],
+  "base_model_artifact_binding": {
+    "model_id": "tassadar-article-transformer-minimal-frontier-h6_ff12_e1_d1_heads2-base-v0",
+    "model_family": "tassadar_article_transformer",
+    "descriptor_digest": "5c93ab800a647637846b7ba9a2f5946a3a2a7635f9664029c8c6f0623cd91956",
+    "trainable_parameter_digest": "e012adc45123720ce54f808fd410f168d469b01459fe18210d2ab1e6b5f76df6",
+    "artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-minimal-frontier-h6_ff12_e1_d1_heads2-base-v0/3bb56b923192298a958f1ff2d64a88faaec6347b941111812bf993be2ebf5114",
+    "weight_bundle_digest": "3bb56b923192298a958f1ff2d64a88faaec6347b941111812bf993be2ebf5114",
+    "primary_artifact_sha256": "887808b617c79b80a6bfd92956e2bdf65dc4e441f1bbf8454fe39602966a05de",
+    "artifact_digest": "19f4996d837fe41f705d50607ce32fd5c0ab01c2fc272e5032b68a380236ff5f"
+  },
+  "produced_model_artifact_binding": {
+    "model_id": "tassadar-article-transformer-minimal-frontier-h6_ff12_e1_d1_heads2-trained-v0",
+    "model_family": "tassadar_article_transformer",
+    "descriptor_digest": "55bdd50b4b2f03e67ec0ab08a90d49ce97e582422a3d58cf56bc103c458f6437",
+    "trainable_parameter_digest": "8c9eae0d30c7284aa3bdf6975dadd5cd1794a439bca7b24ae97a302bc375b33d",
+    "artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-minimal-frontier-h6_ff12_e1_d1_heads2-trained-v0/0463466600659db61295bb38165ffa5220d5accbe57abbcbaa376703550a3a68",
+    "weight_bundle_digest": "0463466600659db61295bb38165ffa5220d5accbe57abbcbaa376703550a3a68",
+    "primary_artifact_sha256": "809e99dc9c80cbcc94f8cfdc3912d96d3bca2e8076953863d68b165703a2c510",
+    "artifact_digest": "648da8a4ebe0909818a828632077e9c78cd3e49b65a5b05e3b88d8f03b0068c3"
+  },
+  "initial_training_mean_loss": 5.7391806,
+  "final_training_mean_loss": 5.0822196,
+  "initial_training_token_exactness_bps": 0,
+  "final_training_token_exactness_bps": 312,
+  "initial_training_exact_match_count": 0,
+  "final_training_exact_match_count": 0,
+  "final_held_out_mean_loss": 5.138869,
+  "final_held_out_token_exactness_bps": 104,
+  "final_held_out_exact_match_count": 0,
+  "produced_artifact_differs_from_base": true,
+  "checkpoint": {
+    "checkpoint_ref": "tassadar-article-transformer-minimal-frontier-h6_ff12_e1_d1_heads2-weight-production-v1:step:1",
+    "checkpoint_family": "train.tassadar.article_transformer.minimal_frontier.h6_ff12_e1_d1_heads2",
+    "stream_id": "tassadar.article_transformer.weight_production.tassadar-article-transformer-minimal-frontier-h6_ff12_e1_d1_heads2-weight-production-v1.1",
+    "manifest_digest": "f23c5d0cb70a13477deb09aa133dd32be9432dadd53eea579f347870f86c9758",
+    "object_digest": "7457f230825c9bdd81eb8637bb5a52b118c9b248102afc35b8a8ce2926c90e27",
+    "writer_node_id": "psionic.local.cpu_reference",
+    "membership_epoch": 0,
+    "cluster_state_digest": "cluster.local.cpu_reference",
+    "topology_digest": "topology.cpu_reference",
+    "started_at_ms": 1774406400250,
+    "step": 1,
+    "durable_at_ms": 1774406400250,
+    "parent_checkpoint_ref": "tassadar-article-transformer-minimal-frontier-h6_ff12_e1_d1_heads2-weight-production-v1:step:0",
+    "parent_manifest_digest": "47a037e5cdb528c5fb61d3701c2bcfc0510892a2d77bc434c49d777091c6190b",
+    "trained_trainable_parameter_digest": "8c9eae0d30c7284aa3bdf6975dadd5cd1794a439bca7b24ae97a302bc375b33d",
+    "restored_trainable_parameter_digest": "8c9eae0d30c7284aa3bdf6975dadd5cd1794a439bca7b24ae97a302bc375b33d",
+    "restore_matches_trained_state": true
+  },
+  "artifact_reload_matches_trained_state": true,
+  "artifact_reload_descriptor_digest": "55bdd50b4b2f03e67ec0ab08a90d49ce97e582422a3d58cf56bc103c458f6437",
+  "claim_boundary": "this evidence bundle covers the first real Transformer-backed article-model weight production run on a bounded article-class slice. It proves that the owned trace-bound article wrapper can train on canonical trace-domain targets, emit a committed trained safetensors artifact, reload that artifact exactly, and preserve checkpoint restore parity. It does not claim full article-class exactness, benchmark parity, fast-route closure, or final article-equivalence green status.",
+  "bundle_digest": "a4edd7d4fdf18b0cb180521bfbab266cce17c619d30987db4ab92f75458b1754"
+}

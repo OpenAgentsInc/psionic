@@ -609,6 +609,7 @@ impl LocalTassadarExecutorStream {
 #[derive(Clone, Debug)]
 pub struct LocalTassadarExecutorService {
     fixtures: BTreeMap<String, TassadarExecutorFixture>,
+    custom_model_descriptors: BTreeMap<String, TassadarExecutorModelDescriptor>,
     default_model_id: String,
 }
 
@@ -674,15 +675,23 @@ fn transformer_backed_article_model_descriptor_for_profile_id(
 fn transformer_backed_article_workload_capability_matrix(
 ) -> Result<TassadarWorkloadCapabilityMatrix, String> {
     let descriptor = transformer_backed_article_model_descriptor()?;
+    Ok(transformer_backed_article_workload_capability_matrix_for_descriptor(
+        &descriptor,
+    ))
+}
+
+fn transformer_backed_article_workload_capability_matrix_for_descriptor(
+    descriptor: &TassadarExecutorModelDescriptor,
+) -> TassadarWorkloadCapabilityMatrix {
     let baseline = transformer_backed_article_fixture().workload_capability_matrix();
-    Ok(TassadarWorkloadCapabilityMatrix::new(
+    TassadarWorkloadCapabilityMatrix::new(
         descriptor.model.model_id.clone(),
         descriptor.model.family.clone(),
         baseline.rows,
         String::from(
             "this workload matrix projects the certified article fixture workload boundary onto the trained trace-bound Transformer-backed article route. It now carries explicit direct HullCache exactness on the declared article workload families while still leaving TAS-175 throughput closure open.",
         ),
-    ))
+    )
 }
 
 impl Default for LocalTassadarExecutorService {
@@ -701,6 +710,7 @@ impl LocalTassadarExecutorService {
         fixtures.insert(model_id.clone(), fixture);
         Self {
             fixtures,
+            custom_model_descriptors: BTreeMap::new(),
             default_model_id: model_id,
         }
     }
@@ -716,6 +726,18 @@ impl LocalTassadarExecutorService {
         self
     }
 
+    /// Registers one additional Transformer-backed article model descriptor.
+    #[must_use]
+    pub fn with_model_descriptor(
+        mut self,
+        model_descriptor: TassadarExecutorModelDescriptor,
+    ) -> Self {
+        let model_id = model_descriptor.model.model_id.clone();
+        self.custom_model_descriptors
+            .insert(model_id.clone(), model_descriptor);
+        self
+    }
+
     /// Returns the benchmark-gated served capability publication for one fixture.
     pub fn capability_publication(
         &self,
@@ -728,7 +750,19 @@ impl LocalTassadarExecutorService {
             workload_capability_matrix,
             runtime_capability,
             module_execution_capability,
-        ) = if is_transformer_backed_article_model_id(requested_model_id) {
+        ) = if let Ok(model_descriptor) = self
+            .resolve_custom_model_descriptor_by_model_id(Some(requested_model_id))
+            .cloned()
+        {
+            (
+                model_descriptor.clone(),
+                transformer_backed_article_workload_capability_matrix_for_descriptor(
+                    &model_descriptor,
+                ),
+                TassadarRuntimeCapabilityReport::current(),
+                transformer_backed_article_fixture().module_execution_capability_publication(),
+            )
+        } else if is_transformer_backed_article_model_id(requested_model_id) {
             let model_descriptor =
                     transformer_backed_article_model_descriptor().map_err(|detail| {
                         TassadarExecutorCapabilityPublicationError::InvalidArticleTransformerReplacement {
@@ -1204,6 +1238,15 @@ impl LocalTassadarExecutorService {
             .requested_model_id
             .as_deref()
             .unwrap_or(self.default_model_id.as_str());
+        if self
+            .resolve_custom_model_descriptor_by_model_id(Some(requested_model_id))
+            .is_ok()
+        {
+            return self.execute_with_custom_transformer_backed_article_model(
+                request,
+                requested_model_id,
+            );
+        }
         if is_transformer_backed_article_model_id(requested_model_id) {
             return self.execute_with_transformer_backed_article_model(request);
         }
@@ -1223,7 +1266,11 @@ impl LocalTassadarExecutorService {
             .requested_model_id
             .as_deref()
             .unwrap_or(self.default_model_id.as_str());
-        let runtime_capability = if is_transformer_backed_article_model_id(requested_model_id) {
+        let runtime_capability = if self
+            .resolve_custom_model_descriptor_by_model_id(Some(requested_model_id))
+            .is_ok()
+            || is_transformer_backed_article_model_id(requested_model_id)
+        {
             TassadarRuntimeCapabilityReport::current()
         } else {
             self.resolve_fixture_by_model_id(Some(requested_model_id))
@@ -1246,6 +1293,24 @@ impl LocalTassadarExecutorService {
             .requested_model_id
             .as_deref()
             .unwrap_or(self.default_model_id.as_str());
+        if self
+            .resolve_custom_model_descriptor_by_model_id(Some(requested_model_id))
+            .is_ok()
+        {
+            let descriptor = self
+                .custom_model_descriptor_for_profile_id(
+                    requested_model_id,
+                    request.program_artifact.wasm_profile_id.as_str(),
+                )
+                .map_err(|detail| {
+                    TassadarExecutorServiceError::InvalidArticleTransformerReplacement { detail }
+                })?;
+            return Ok(self.preflight_with_model_descriptor(
+                request,
+                descriptor,
+                TassadarRuntimeCapabilityReport::current(),
+            ));
+        }
         if is_transformer_backed_article_model_id(requested_model_id) {
             let descriptor = transformer_backed_article_model_descriptor_for_profile_id(
                 request.program_artifact.wasm_profile_id.as_str(),
@@ -1292,6 +1357,16 @@ impl LocalTassadarExecutorService {
             .ok_or_else(|| requested_model_id.to_string())
     }
 
+    fn resolve_custom_model_descriptor_by_model_id(
+        &self,
+        requested_model_id: Option<&str>,
+    ) -> Result<&TassadarExecutorModelDescriptor, String> {
+        let requested_model_id = requested_model_id.unwrap_or(self.default_model_id.as_str());
+        self.custom_model_descriptors
+            .get(requested_model_id)
+            .ok_or_else(|| requested_model_id.to_string())
+    }
+
     fn execute_with_fixture(
         &self,
         fixture: &TassadarExecutorFixture,
@@ -1314,6 +1389,41 @@ impl LocalTassadarExecutorService {
         .map_err(|detail| {
             TassadarExecutorServiceError::InvalidArticleTransformerReplacement { detail }
         })?;
+        Ok(self.execute_with_model_descriptor(
+            request,
+            descriptor,
+            TassadarRuntimeCapabilityReport::current(),
+        ))
+    }
+
+    fn custom_model_descriptor_for_profile_id(
+        &self,
+        model_id: &str,
+        profile_id: &str,
+    ) -> Result<TassadarExecutorModelDescriptor, String> {
+        let mut descriptor = self
+            .resolve_custom_model_descriptor_by_model_id(Some(model_id))?
+            .clone();
+        let fixture = transformer_backed_article_fixture_for_profile_id(profile_id)?;
+        descriptor.compatibility = fixture.descriptor().compatibility.clone();
+        descriptor.profile = fixture.descriptor().profile.clone();
+        descriptor.trace_abi = fixture.descriptor().trace_abi.clone();
+        Ok(descriptor)
+    }
+
+    fn execute_with_custom_transformer_backed_article_model(
+        &self,
+        request: &TassadarExecutorRequest,
+        requested_model_id: &str,
+    ) -> Result<TassadarExecutorOutcome, TassadarExecutorServiceError> {
+        let descriptor = self
+            .custom_model_descriptor_for_profile_id(
+                requested_model_id,
+                request.program_artifact.wasm_profile_id.as_str(),
+            )
+            .map_err(|detail| {
+                TassadarExecutorServiceError::InvalidArticleTransformerReplacement { detail }
+            })?;
         Ok(self.execute_with_model_descriptor(
             request,
             descriptor,
@@ -2665,6 +2775,12 @@ impl LocalTassadarPlannerRouter {
         &self,
         requested_model_id: Option<&str>,
     ) -> Result<TassadarPlannerExecutorRouteDescriptor, TassadarPlannerRouteDescriptorError> {
+        if let Ok(model_descriptor) = self
+            .executor_service
+            .resolve_custom_model_descriptor_by_model_id(requested_model_id)
+        {
+            return custom_transformer_backed_route_capability_descriptor(model_descriptor);
+        }
         let publication = self
             .executor_service
             .capability_publication(requested_model_id)
@@ -3116,9 +3232,20 @@ impl LocalTassadarPlannerRouter {
 fn routeable_wasm_capability_matrix(
     publication: &TassadarExecutorCapabilityPublication,
 ) -> TassadarPlannerExecutorWasmCapabilityMatrix {
-    let model_id = publication.model_descriptor.model.model_id.clone();
-    let rows = publication
-        .workload_capability_matrix
+    routeable_wasm_capability_matrix_from_parts(
+        &publication.model_descriptor,
+        &publication.workload_capability_matrix,
+        &publication.module_execution_capability,
+    )
+}
+
+fn routeable_wasm_capability_matrix_from_parts(
+    model_descriptor: &TassadarExecutorModelDescriptor,
+    workload_capability_matrix: &TassadarWorkloadCapabilityMatrix,
+    module_execution_capability: &TassadarModuleExecutionCapabilityPublication,
+) -> TassadarPlannerExecutorWasmCapabilityMatrix {
+    let model_id = model_descriptor.model.model_id.clone();
+    let rows = workload_capability_matrix
         .rows
         .iter()
         .map(routeable_wasm_capability_row)
@@ -3129,9 +3256,9 @@ fn routeable_wasm_capability_matrix(
         rows,
         format!(
             "{} Route negotiation currently publishes only `{}` module classes above the served benchmark rows; {}",
-            publication.workload_capability_matrix.claim_boundary,
+            workload_capability_matrix.claim_boundary,
             TassadarPlannerExecutorWasmImportPosture::NoImportsOnly.as_str(),
-            publication.module_execution_capability.claim_boundary
+            module_execution_capability.claim_boundary
         ),
     )
 }
@@ -3240,13 +3367,22 @@ fn route_benchmark_report_ref(
     publication: &TassadarExecutorCapabilityPublication,
     wasm_capability_matrix: &TassadarPlannerExecutorWasmCapabilityMatrix,
 ) -> String {
+    route_benchmark_report_ref_from_workload_capability_matrix(
+        &publication.workload_capability_matrix,
+        wasm_capability_matrix,
+    )
+}
+
+fn route_benchmark_report_ref_from_workload_capability_matrix(
+    workload_capability_matrix: &TassadarWorkloadCapabilityMatrix,
+    wasm_capability_matrix: &TassadarPlannerExecutorWasmCapabilityMatrix,
+) -> String {
     wasm_capability_matrix
         .rows
         .iter()
         .find_map(|row| row.benchmark_report_ref.clone())
         .unwrap_or_else(|| {
-            publication
-                .workload_capability_matrix
+            workload_capability_matrix
                 .rows
                 .iter()
                 .find_map(|row| {
@@ -3263,8 +3399,19 @@ fn aggregate_route_decode_capabilities(
     wasm_capability_matrix: &TassadarPlannerExecutorWasmCapabilityMatrix,
     benchmark_report_ref: &str,
 ) -> Vec<TassadarPlannerExecutorDecodeCapability> {
-    publication
-        .model_descriptor
+    aggregate_route_decode_capabilities_from_model_descriptor(
+        &publication.model_descriptor,
+        wasm_capability_matrix,
+        benchmark_report_ref,
+    )
+}
+
+fn aggregate_route_decode_capabilities_from_model_descriptor(
+    model_descriptor: &TassadarExecutorModelDescriptor,
+    wasm_capability_matrix: &TassadarPlannerExecutorWasmCapabilityMatrix,
+    benchmark_report_ref: &str,
+) -> Vec<TassadarPlannerExecutorDecodeCapability> {
+    model_descriptor
         .compatibility
         .supported_decode_modes
         .iter()
@@ -3293,6 +3440,71 @@ fn aggregate_route_decode_capabilities(
             })
         })
         .collect()
+}
+
+fn custom_transformer_backed_route_capability_descriptor(
+    model_descriptor: &TassadarExecutorModelDescriptor,
+) -> Result<TassadarPlannerExecutorRouteDescriptor, TassadarPlannerRouteDescriptorError> {
+    let workload_capability_matrix =
+        transformer_backed_article_workload_capability_matrix_for_descriptor(model_descriptor);
+    workload_capability_matrix
+        .validate_publication()
+        .map_err(|error| TassadarPlannerRouteDescriptorError::CapabilityPublication {
+            detail: format!("invalid custom workload capability publication: {error}"),
+        })?;
+    let internal_compute_profile_ladder =
+        tassadar_internal_compute_profile_ladder_publication();
+    let internal_compute_profile_claim_check = check_tassadar_internal_compute_profile_claim(
+        &internal_compute_profile_ladder,
+        tassadar_current_served_internal_compute_profile_claim(),
+    );
+    if !internal_compute_profile_claim_check.green {
+        return Err(TassadarPlannerRouteDescriptorError::CapabilityPublication {
+            detail: internal_compute_profile_claim_check.detail.clone(),
+        });
+    }
+    let module_execution_capability =
+        transformer_backed_article_fixture().module_execution_capability_publication();
+    let wasm_capability_matrix = routeable_wasm_capability_matrix_from_parts(
+        model_descriptor,
+        &workload_capability_matrix,
+        &module_execution_capability,
+    );
+    let benchmark_report_ref = route_benchmark_report_ref_from_workload_capability_matrix(
+        &workload_capability_matrix,
+        &wasm_capability_matrix,
+    );
+    let decode_capabilities = aggregate_route_decode_capabilities_from_model_descriptor(
+        model_descriptor,
+        &wasm_capability_matrix,
+        &benchmark_report_ref,
+    );
+    Ok(TassadarPlannerExecutorRouteDescriptor::new(
+        format!(
+            "tassadar.planner_executor_route.{}.v0",
+            model_descriptor.model.model_id
+        ),
+        model_descriptor.model.model_id.clone(),
+        benchmark_report_ref,
+        internal_compute_profile_claim_check.claim.profile_id.clone(),
+        internal_compute_profile_claim_check.claim_digest.clone(),
+        workload_capability_matrix.matrix_digest.clone(),
+        wasm_capability_matrix,
+        decode_capabilities,
+        vec![
+            TassadarPlannerExecutorRouteRefusalReason::UnsupportedProduct,
+            TassadarPlannerExecutorRouteRefusalReason::UnknownModel,
+            TassadarPlannerExecutorRouteRefusalReason::ProviderNotReady,
+            TassadarPlannerExecutorRouteRefusalReason::BenchmarkGateMissing,
+            TassadarPlannerExecutorRouteRefusalReason::DecodeModeUnsupported,
+            TassadarPlannerExecutorRouteRefusalReason::RuntimeFallbackDisallowed,
+            TassadarPlannerExecutorRouteRefusalReason::DirectDecodeRequired,
+            TassadarPlannerExecutorRouteRefusalReason::WasmModuleClassUnsupported,
+            TassadarPlannerExecutorRouteRefusalReason::WasmOpcodeFamilyUnsupported,
+            TassadarPlannerExecutorRouteRefusalReason::WasmImportPostureUnsupported,
+        ],
+        "benchmark-gated research route descriptor for one candidate Transformer-backed article model, with canonical internal-compute claim binding preserved while full served capability publication remains out of scope",
+    ))
 }
 
 fn aggregate_route_decode_note(

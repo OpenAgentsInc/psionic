@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "contract_id": "tassadar.article_transformer_minimal_frontier.h8_ff16_e2_d2_heads2.lineage_contract.v1",
+  "tied_requirement_id": "TAS-R1",
+  "evidence_bundle_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h8_ff16_e2_d2_heads2/weight_production_bundle.json",
+  "evidence_bundle_digest": "0cd7e4162e0c111fa4dad279951ff3cf5f75b149d786f450bd4076395522b7aa",
+  "model_module_ref": "crates/psionic-models/src/tassadar_article_transformer.rs",
+  "transformer_module_ref": "crates/psionic-transformer/src/encoder_decoder.rs",
+  "train_module_ref": "crates/psionic-train/src/tassadar_article_transformer_weight_production.rs",
+  "runtime_module_ref": "crates/psionic-runtime/src/tassadar.rs",
+  "base_descriptor_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h8_ff16_e2_d2_heads2/base_descriptor.json",
+  "base_artifact_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h8_ff16_e2_d2_heads2/base_weights.safetensors",
+  "produced_descriptor_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h8_ff16_e2_d2_heads2/trained_descriptor.json",
+  "produced_artifact_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h8_ff16_e2_d2_heads2/trained_weights.safetensors",
+  "training_config": {
+    "run_id": "tassadar-article-transformer-minimal-frontier-h8_ff16_e2_d2_heads2-weight-production-v1",
+    "checkpoint_family": "train.tassadar.article_transformer.minimal_frontier.h8_ff16_e2_d2_heads2",
+    "source_corpus_id": "tassadar.article_class_corpus.v1",
+    "suite_id": "tassadar.article_transformer.weight_production_suite.v1",
+    "suite_description": "bounded article-class trace-production slice over one trained Hungarian article demo plus held-out kernel-family cases on a 32-token trace-prefix window",
+    "architecture_variant": "attention_is_all_you_need_encoder_decoder",
+    "transformer_config": {
+      "source_vocab_size": 303,
+      "target_vocab_size": 303,
+      "hidden_size": 8,
+      "feed_forward_size": 16,
+      "head_count": 2,
+      "encoder_layer_count": 2,
+      "decoder_layer_count": 2,
+      "max_source_positions": 16384,
+      "max_target_positions": 16384,
+      "dropout_probability_bps": 0
+    },
+    "embedding_strategy": "shared_source_target_and_output",
+    "trainable_parameter_ids": [
+      "logits_projection_bias"
+    ],
+    "trainable_parameter_scalar_count": 303,
+    "loss_kind": "label_smoothed_cross_entropy",
+    "optimizer_kind": "adam",
+    "scheduler_kind": "inverse_square_root_warmup",
+    "warmup_steps": 1,
+    "label_smoothing": 0.01,
+    "finite_difference_epsilon": 0.01
+  },
+  "training_config_digest": "10446c7d7bead6ce0f3e3dfa9a710a8ea7f0a31e0ca85cbd02e9bd25e72b7a1b",
+  "training_cases": [
+    {
+      "case_id": "hungarian_matching",
+      "split": "train",
+      "summary": "tiny fixed 2x2 matching instance with comparison-selected winning assignment and exact cost",
+      "profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "trace_step_count": 17,
+      "expected_output_count": 2,
+      "prompt_token_count": 108,
+      "target_token_count": 32,
+      "full_target_token_count": 1410,
+      "source_token_digest": "ef9760bd58df73b1ee90108c3f77fe8a711b549fef8a64aace035b93c517674a",
+      "target_token_digest": "f92a7cd911b7b3426dc56981b972ed8d0bae6ee4f4788d17eb33c9184afe759c",
+      "sequence_digest": "6984530e5aea6d029a8a038031aa9c972a16d51f98303eefa399b880bbfbdaac",
+      "halt_reason": "returned"
+    }
+  ],
+  "held_out_cases": [
+    {
+      "case_id": "micro_wasm_kernel",
+      "split": "held_out",
+      "summary": "unrolled weighted-sum and checksum micro-kernel over memory-backed inputs",
+      "profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "trace_step_count": 49,
+      "expected_output_count": 2,
+      "prompt_token_count": 235,
+      "target_token_count": 32,
+      "full_target_token_count": 4941,
+      "source_token_digest": "6a21fcf81d0d0e9d3538008b1791e82581f87858ac84cf163712f0939d52163e",
+      "target_token_digest": "d4c8ef632458f402ce99a9572d60b748eee7e7c57d5c5f7755052a82eb969469",
+      "sequence_digest": "d8cdeedff73790165a0b4f2f7d4edc75376b7de80f56d2264490f29a19ca6a7c",
+      "halt_reason": "returned"
+    },
+    {
+      "case_id": "branch_heavy_kernel",
+      "split": "held_out",
+      "summary": "acyclic branch ladder over memory-backed flags that exercises repeated forward control-flow pivots",
+      "profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "trace_step_count": 45,
+      "expected_output_count": 1,
+      "prompt_token_count": 371,
+      "target_token_count": 32,
+      "full_target_token_count": 3917,
+      "source_token_digest": "c19a2908e40e145229d2d7d7352d245e65e96e248c18f8f1d4d0028b59bfd4f3",
+      "target_token_digest": "d4c8ef632458f402ce99a9572d60b748eee7e7c57d5c5f7755052a82eb969469",
+      "sequence_digest": "ed9591e9ccd3ab11da987a8dea147633561c6f3443a2219b355d1889f7172acf",
+      "halt_reason": "returned"
+    },
+    {
+      "case_id": "memory_heavy_kernel",
+      "split": "held_out",
+      "summary": "dense memory-read and memory-write kernel that folds adjacent slots into staged accumulator buffers",
+      "profile_id": "tassadar.wasm.article_i32_compute.v1",
+      "trace_step_count": 31,
+      "expected_output_count": 1,
+      "prompt_token_count": 185,
+      "target_token_count": 32,
+      "full_target_token_count": 3501,
+      "source_token_digest": "1caaff46fc4e923f45c921cbb12e8b59be77b5de52b65c5e09e63fd71acd908d",
+      "target_token_digest": "78ea5ebbcb4f7a01bf99b4875a8bba503c93fcfc612f97d9b1f559f2cd8dbd9e",
+      "sequence_digest": "29bb75e2d226b8f2b7f5fe5abb2f2631f345ef5486008bc8ad4f55cc931f6126",
+      "halt_reason": "returned"
+    }
+  ],
+  "workload_set_digest": "493296d01891d845644924d47e81624d90310523f58e0b875815a9de94cfaa3b",
+  "source_inventory": [
+    {
+      "source_role": "model_module",
+      "source_ref": "crates/psionic-models/src/tassadar_article_transformer.rs",
+      "byte_length": 113686,
+      "sha256": "420cf6c0df0682344efdb9113dbdea30115ebde29b3988cc07fa320f8daa8097"
+    },
+    {
+      "source_role": "transformer_module",
+      "source_ref": "crates/psionic-transformer/src/encoder_decoder.rs",
+      "byte_length": 37533,
+      "sha256": "8b6da6fa41afc0d486f1634633b3c2f0f93695706e13a74c64e1b653de96fb79"
+    },
+    {
+      "source_role": "train_module",
+      "source_ref": "crates/psionic-train/src/tassadar_article_transformer_weight_production.rs",
+      "byte_length": 62317,
+      "sha256": "2d0f95ffa674b9bcf9737a8db0f46a7a4ec87de1c1ba10a20daf0b5a42af1d75"
+    },
+    {
+      "source_role": "runtime_module",
+      "source_ref": "crates/psionic-runtime/src/tassadar.rs",
+      "byte_length": 489657,
+      "sha256": "369bfcca3862e5dfb8fcb2631958dedbcb855f45951d4c25449e67e3eb5a2874"
+    }
+  ],
+  "source_inventory_digest": "d2305cb6473fabf602ece45c5568a601e2c74f1a810b9ea9644128777a4d8c39",
+  "artifact_inventory": [
+    {
+      "artifact_role": "evidence_bundle",
+      "artifact_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h8_ff16_e2_d2_heads2/weight_production_bundle.json",
+      "byte_length": 12740,
+      "sha256": "4cf89421f36578f785122f9b85da86258614c5d9bac8ec4bba0d11c665b371ec"
+    },
+    {
+      "artifact_role": "base_descriptor",
+      "artifact_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h8_ff16_e2_d2_heads2/base_descriptor.json",
+      "byte_length": 21579,
+      "sha256": "86317671661228c78ddcf5066f0d40fedc2747d1d62183c178c9d8af65b7440c"
+    },
+    {
+      "artifact_role": "base_weights",
+      "artifact_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h8_ff16_e2_d2_heads2/base_weights.safetensors",
+      "byte_length": 51948,
+      "sha256": "788e90536c3cf35dda30d842cede3b2f2a046cc3af89451199db6deb3179644a"
+    },
+    {
+      "artifact_role": "produced_descriptor",
+      "artifact_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h8_ff16_e2_d2_heads2/trained_descriptor.json",
+      "byte_length": 21591,
+      "sha256": "7c61a81aa45f606105d4d28af49cf5b41cb5f587576355cd39ad66cc8b055836"
+    },
+    {
+      "artifact_role": "produced_weights",
+      "artifact_ref": "fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/h8_ff16_e2_d2_heads2/trained_weights.safetensors",
+      "byte_length": 51948,
+      "sha256": "64eff9ac7a8ed41cefdc0ab1c158d13885ebd0c4dba6167e8007392de2f317cb"
+    }
+  ],
+  "artifact_inventory_digest": "7d1e13a6f440d8f32895ba64b1cc968336f88250bf36692b61c718efccffd905",
+  "base_model_artifact_binding": {
+    "model_id": "tassadar-article-transformer-minimal-frontier-h8_ff16_e2_d2_heads2-base-v0",
+    "model_family": "tassadar_article_transformer",
+    "descriptor_digest": "c965154666c321176fee584eca91a8dec10b59c7281f58bb404502ef67ba9a00",
+    "trainable_parameter_digest": "65f85416eb59fc05dc2d136694a65d78d443e9508a638ab0d6ef60ab2718dd42",
+    "artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-minimal-frontier-h8_ff16_e2_d2_heads2-base-v0/efb7507315ab98d34b69c8078be22689b775830f9ba6449db88ad5983b499a6c",
+    "weight_bundle_digest": "efb7507315ab98d34b69c8078be22689b775830f9ba6449db88ad5983b499a6c",
+    "primary_artifact_sha256": "788e90536c3cf35dda30d842cede3b2f2a046cc3af89451199db6deb3179644a",
+    "artifact_digest": "586e446534884d0cb7755fa2931c43c057edc9013ccb8b52547044bc804b3337"
+  },
+  "produced_model_artifact_binding": {
+    "model_id": "tassadar-article-transformer-minimal-frontier-h8_ff16_e2_d2_heads2-trained-v0",
+    "model_family": "tassadar_article_transformer",
+    "descriptor_digest": "c026c83b1c1d0af08188f3981dcefc432412207e450f9af0ca16d35ee52cf663",
+    "trainable_parameter_digest": "638321825b08bac1ec86d35d043a5dd187ee1f1da6ed4f8d0b0333c00fd839bd",
+    "artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-minimal-frontier-h8_ff16_e2_d2_heads2-trained-v0/78171bfc0563bd2a0f3dcb58e5457050a2f3306d5b36fa97071949d9b6592d98",
+    "weight_bundle_digest": "78171bfc0563bd2a0f3dcb58e5457050a2f3306d5b36fa97071949d9b6592d98",
+    "primary_artifact_sha256": "64eff9ac7a8ed41cefdc0ab1c158d13885ebd0c4dba6167e8007392de2f317cb",
+    "artifact_digest": "c5544ebc5b23026e0acb7e0c13ceac0305248e87110a281ced784e1d40b58d99"
+  },
+  "base_descriptor_stable_digest": "c965154666c321176fee584eca91a8dec10b59c7281f58bb404502ef67ba9a00",
+  "produced_descriptor_stable_digest": "c026c83b1c1d0af08188f3981dcefc432412207e450f9af0ca16d35ee52cf663",
+  "checkpoint": {
+    "checkpoint_ref": "tassadar-article-transformer-minimal-frontier-h8_ff16_e2_d2_heads2-weight-production-v1:step:1",
+    "checkpoint_family": "train.tassadar.article_transformer.minimal_frontier.h8_ff16_e2_d2_heads2",
+    "stream_id": "tassadar.article_transformer.weight_production.tassadar-article-transformer-minimal-frontier-h8_ff16_e2_d2_heads2-weight-production-v1.1",
+    "manifest_digest": "dbcf19b92f563c8a6e76ebe967b9aae30fd7ae7e84fe4d58c086d5aaafe208bb",
+    "object_digest": "89a4acf845a8cb40b8cfaf25579d537c3c7613aaf19acf6bf00b220e8fc8cf5e",
+    "writer_node_id": "psionic.local.cpu_reference",
+    "membership_epoch": 0,
+    "cluster_state_digest": "cluster.local.cpu_reference",
+    "topology_digest": "topology.cpu_reference",
+    "started_at_ms": 1774406400250,
+    "step": 1,
+    "durable_at_ms": 1774406400250,
+    "parent_checkpoint_ref": "tassadar-article-transformer-minimal-frontier-h8_ff16_e2_d2_heads2-weight-production-v1:step:0",
+    "parent_manifest_digest": "482663cdc72a745979cdb55b991999dcc2e5bfc46ee30b7d2afa2b0aab307b14",
+    "trained_trainable_parameter_digest": "638321825b08bac1ec86d35d043a5dd187ee1f1da6ed4f8d0b0333c00fd839bd",
+    "restored_trainable_parameter_digest": "638321825b08bac1ec86d35d043a5dd187ee1f1da6ed4f8d0b0333c00fd839bd",
+    "restore_matches_trained_state": true
+  },
+  "claim_boundary": "this research-only lineage contract freezes one TAS-R1 candidate artifact pair without rebinding the canonical TAS-169A lineage contract. It binds the candidate-specific workload set, training-config snapshot, source inventory, descriptor digests, checkpoint lineage, and committed candidate artifact digests into one challengeable manifest while keeping the canonical public article-equivalence claim unchanged.",
+  "contract_digest": "56a1ebd7e2e1345ad0bce67e9a91474a6e37e336a80ddbfa7130669f38fe5183"
+}

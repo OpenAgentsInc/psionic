@@ -201,6 +201,29 @@ pub fn build_tassadar_direct_model_weight_execution_proof_receipt_for_article_se
     TassadarDirectModelWeightExecutionProofReceipt,
     TassadarDirectModelWeightExecutionProofReportError,
 > {
+    let (model_lineage_contract_ref, model_lineage_contract_digest) =
+        model_lineage_contract_binding(&response.executor_response.model_descriptor)?;
+    build_tassadar_direct_model_weight_execution_proof_receipt_for_article_session_with_lineage(
+        executor_service,
+        request,
+        response,
+        model_lineage_contract_ref,
+        model_lineage_contract_digest,
+    )
+}
+
+pub fn build_tassadar_direct_model_weight_execution_proof_receipt_for_article_session_with_lineage(
+    executor_service: &LocalTassadarExecutorService,
+    request: &TassadarArticleExecutorSessionRequest,
+    response: &TassadarArticleExecutorSessionResponse,
+    model_lineage_contract_ref: impl Into<String>,
+    model_lineage_contract_digest: impl Into<String>,
+) -> Result<
+    TassadarDirectModelWeightExecutionProofReceipt,
+    TassadarDirectModelWeightExecutionProofReportError,
+> {
+    let model_lineage_contract_ref = model_lineage_contract_ref.into();
+    let model_lineage_contract_digest = model_lineage_contract_digest.into();
     let route_descriptor = LocalTassadarPlannerRouter::new()
         .with_executor_service(executor_service.clone())
         .route_capability_descriptor(Some(
@@ -233,8 +256,6 @@ pub fn build_tassadar_direct_model_weight_execution_proof_receipt_for_article_se
     let fallback_observed = selection.selection_state
         != psionic_runtime::TassadarExecutorSelectionState::Direct
         || selection.effective_decode_mode != Some(request.requested_decode_mode);
-    let (model_lineage_contract_ref, model_lineage_contract_digest) =
-        model_lineage_contract_binding(&response.executor_response.model_descriptor)?;
     Ok(TassadarDirectModelWeightExecutionProofReceipt::new(
         TassadarDirectModelWeightExecutionProofInput {
             receipt_id: format!(
