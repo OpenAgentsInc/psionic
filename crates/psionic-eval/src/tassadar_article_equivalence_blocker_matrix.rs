@@ -586,13 +586,13 @@ fn blocker_rows() -> Vec<TassadarArticleEquivalenceBlockerRow> {
         TassadarArticleEquivalenceBlockerRow {
             blocker_id: String::from("BEQ-005"),
             category: TassadarArticleEquivalenceBlockerCategory::BenchmarkScope,
-            title: String::from("Unified article demo-and-benchmark gate remains open"),
-            repo_status: TassadarRepoStatus::Partial,
+            title: String::from("Unified article demo-and-benchmark gate is now closed"),
+            repo_status: TassadarRepoStatus::Implemented,
             current_gap_summary: String::from(
-                "the repo now closes the named Arto Inkala case plus the declared hard-Sudoku suite, but the article's combined demo-plus-benchmark claim surface still is not frozen behind one canonical joined parity gate",
+                "the repo now closes the article's combined demo-plus-benchmark claim surface inside one canonical joined parity gate over the Hungarian demo, the named Arto row, and the declared hard-Sudoku suite",
             ),
             current_public_truth: String::from(
-                "the repo already has bounded Hungarian fast-route parity, Sudoku article reproducers, named Arto Inkala closure, the declared hard-Sudoku suite closure, and long-horizon runtime closure, but not one canonical article demo-and-benchmark parity gate at the article's stated breadth",
+                "the repo now has one canonical article demo-and-benchmark equivalence gate that binds bounded Hungarian fast-route parity, the named Arto Inkala row, the declared hard-Sudoku suite closure, and the owned-route boundary into one machine-readable benchmark-scope closure surface at the article's stated breadth",
             ),
             closure_requirements: vec![
                 String::from(
@@ -989,7 +989,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             305,
             "TAS-182: Article demo and benchmark equivalence gate",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-005"],
         ),
         issue_row(
@@ -1140,7 +1140,7 @@ mod tests {
         assert!(report.matrix_contract_green);
         assert!(!report.article_equivalence_green);
         assert_eq!(report.blocker_count, 7);
-        assert_eq!(report.open_blocker_count, 4);
+        assert_eq!(report.open_blocker_count, 3);
         assert!(report.all_later_issues_covered);
         assert!(report.all_blockers_have_article_line_provenance);
     }

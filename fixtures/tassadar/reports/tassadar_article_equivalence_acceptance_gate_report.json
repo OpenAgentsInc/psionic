@@ -234,10 +234,10 @@
       {
         "blocker_id": "BEQ-005",
         "category": "benchmark_scope",
-        "title": "Unified article demo-and-benchmark gate remains open",
-        "repo_status": "partial",
-        "current_gap_summary": "the repo now closes the named Arto Inkala case plus the declared hard-Sudoku suite, but the article's combined demo-plus-benchmark claim surface still is not frozen behind one canonical joined parity gate",
-        "current_public_truth": "the repo already has bounded Hungarian fast-route parity, Sudoku article reproducers, named Arto Inkala closure, the declared hard-Sudoku suite closure, and long-horizon runtime closure, but not one canonical article demo-and-benchmark parity gate at the article's stated breadth",
+        "title": "Unified article demo-and-benchmark gate is now closed",
+        "repo_status": "implemented",
+        "current_gap_summary": "the repo now closes the article's combined demo-plus-benchmark claim surface inside one canonical joined parity gate over the Hungarian demo, the named Arto row, and the declared hard-Sudoku suite",
+        "current_public_truth": "the repo now has one canonical article demo-and-benchmark equivalence gate that binds bounded Hungarian fast-route parity, the named Arto Inkala row, the declared hard-Sudoku suite closure, and the owned-route boundary into one machine-readable benchmark-scope closure surface at the article's stated breadth",
         "closure_requirements": [
           "combine those rows into one article demo-and-benchmark equivalence gate"
         ],
@@ -718,7 +718,7 @@
         "github_issue_number": 305,
         "title": "TAS-182: Article demo and benchmark equivalence gate",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-005"
         ]
@@ -815,10 +815,9 @@
     "all_issue_refs_point_to_known_blockers": true,
     "matrix_contract_green": true,
     "article_equivalence_green": false,
-    "open_blocker_count": 4,
+    "open_blocker_count": 3,
     "open_blocker_ids": [
       "BEQ-003",
-      "BEQ-005",
       "BEQ-006",
       "BEQ-007"
     ],
@@ -831,8 +830,8 @@
       "not proof that hard-Sudoku benchmark closure, no-spill single-run closure, or route-minimality closure already exist"
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
-    "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=4.",
-    "report_digest": "eee7b9ac3da077d59d45ae375d7b88618eb28ed7f3d0b460d830334d69f72808"
+    "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=3.",
+    "report_digest": "ee4f8f1190c297989b85a8164500aa2efa96e18c895a4b53bac42def0e57bed3"
   },
   "requirement_rows": [
     {
@@ -1301,14 +1300,14 @@
       "requirement_id": "TAS-182",
       "requirement_kind": "implementation",
       "required_for_green": true,
-      "satisfied": false,
+      "satisfied": true,
       "blocker_ids": [
         "BEQ-005"
       ],
       "source_refs": [
         "fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json"
       ],
-      "detail": "TAS-182 (`TAS-182: Article demo and benchmark equivalence gate`) remains open in the blocker matrix, so the final article-equivalence gate stays blocked on blocker families BEQ-005 until that tranche closes."
+      "detail": "TAS-182 (`TAS-182: Article demo and benchmark equivalence gate`) is closed in the blocker matrix, so this acceptance-gate row is currently satisfied for blocker families BEQ-005."
     },
     {
       "requirement_id": "TAS-183",
@@ -1415,9 +1414,9 @@
   ],
   "total_requirement_count": 41,
   "required_requirement_count": 40,
-  "passed_required_requirement_count": 32,
+  "passed_required_requirement_count": 33,
   "required_issue_count": 37,
-  "closed_required_issue_count": 30,
+  "closed_required_issue_count": 31,
   "green_requirement_ids": [
     "blocker_matrix_contract_frozen",
     "owned_transformer_route_boundary_frozen",
@@ -1450,11 +1449,11 @@
     "TAS-179",
     "TAS-179A",
     "TAS-180",
-    "TAS-181"
+    "TAS-181",
+    "TAS-182"
   ],
   "failed_requirement_ids": [
     "article_equivalence_blockers_closed",
-    "TAS-182",
     "TAS-183",
     "TAS-184",
     "TAS-184A",
@@ -1463,7 +1462,6 @@
     "TAS-186"
   ],
   "blocked_issue_ids": [
-    "TAS-182",
     "TAS-183",
     "TAS-184",
     "TAS-184A",
@@ -1486,10 +1484,9 @@
   "blocker_matrix_contract_green": true,
   "prerequisite_transformer_boundary_green": true,
   "blocker_matrix_article_equivalence_green": false,
-  "open_blocker_count": 4,
+  "open_blocker_count": 3,
   "open_blocker_ids": [
     "BEQ-003",
-    "BEQ-005",
     "BEQ-006",
     "BEQ-007"
   ],
@@ -1497,6 +1494,6 @@
   "article_equivalence_green": false,
   "public_claim_allowed": false,
   "claim_boundary": "this is the frozen final acceptance gate for article-equivalent closure. It stays blocked until the blocker-matrix contract remains intact, the owned `psionic-transformer` route boundary remains intact, the blocker matrix itself turns article-equivalence green, and every required TAS tranche from `TAS-158` through `TAS-186` is closed. A green result here is necessary but not sufficient to widen public capability claims, and it still does not imply arbitrary C ingress, arbitrary Wasm ingress, or generic interpreter-in-weights closure outside the declared article envelope.",
-  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=32/40, closed_required_issues=30/37, blocked_issues=7, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
-  "report_digest": "ee8ad6391976995558b0c59710d32bf2d5dcf401d423e02bc3959b54dd05990e"
+  "summary": "Article-equivalence acceptance gate now records passed_required_requirements=33/40, closed_required_issues=31/37, blocked_issues=6, blocker_matrix_article_equivalence_green=false, and article_equivalence_green=false.",
+  "report_digest": "2e9cd8500c2baf6e8fb567bbb259fe328a1804ae0d51074bd7e7318d7fdafea8"
 }

@@ -10,9 +10,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-180",
-      "TAS-181",
-      "TAS-182",
       "TAS-183",
       "TAS-184",
       "TAS-184A",
@@ -34,9 +31,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-180",
-        "TAS-181",
-        "TAS-182",
         "TAS-183",
         "TAS-184",
         "TAS-184A",
@@ -57,9 +51,6 @@
         "acceptance_status": "blocked",
         "article_equivalence_green": false,
         "blocked_issue_ids": [
-          "TAS-180",
-          "TAS-181",
-          "TAS-182",
           "TAS-183",
           "TAS-184",
           "TAS-184A",
@@ -240,7 +231,7 @@
       "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
       "claim_boundary": "this report inventories reusable substrate only. It freezes what can be reused, what needs extension, what stays research-only, and what is still not sufficient for article closure. It does not claim that the owned article-equivalence Transformer stack, the canonical article model artifact, or the final article-equivalence proof route already exist.",
       "summary": "Existing substrate inventory now records surface_count=11, blocker_surface_count=6, non_blocker_surface_count=5, inventory_contract_green=true, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-      "report_digest": "a5b3b432aee0554cfdffdfccd66ed7f86ec2368daf4c9bf89a1f6d9af4fbc62a"
+      "report_digest": "dad3c431973cb3112427b9793b40a87b01e7753514bcac9a592a7145f799f9a0"
     },
     "interface_rows": [
       {
@@ -372,7 +363,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report freezes one explicit canonical Transformer stack boundary for the article-equivalence closure wave. The route is not one monolithic crate; it is one required boundary spanning existing crates with `psionic-transformer` as the architecture anchor, `psionic-models` as the article-model and artifact owner, and `psionic-runtime` as the replay/receipt owner. This does not claim the final article-equivalence stack is complete or green.",
     "summary": "Canonical Transformer stack boundary now records interface_rows=5, dependency_checks=6, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
-    "report_digest": "facef3cf873661ea43527d8a7cfdcd1c981fff9604013ce03c4d63509ca18343"
+    "report_digest": "87fc34695f849d8b066b6dea8503d9bb85bc24b637ef111b778304fa7c9068cf"
   },
   "benchmark_report_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
   "article_suite_version": "2026.03.17",
@@ -930,5 +921,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this report certifies only that the committed trained trace-bound Transformer-backed article wrapper can inherit the old fixture lane's declared bounded article workload set without trace or terminal-state drift when the canonical fixture execution is threaded through the shared Transformer trace-domain wrapper over the full article corpus. It keeps forward-pass evidence checks explicit only on the cases that fit the current model window, and it does not yet claim zero-tool direct-proof ownership, reference-linear exactness from model weights alone, fast-route promotion, benchmark parity, single-run closure, or final article-equivalence green status.",
   "summary": "Article fixture-to-Transformer parity now records supported_case_count=13, routeable_case_count=13, exact_trace_case_count=13, exact_output_case_count=13, context_window_fit_case_count=4, forward_binding_case_count=4, replacement_certified=true, and article_equivalence_green=false.",
-  "report_digest": "f22c02cfe2c32d20dc8affa4b7659157cc2e7a7b59999e679e1ef5978948438e"
+  "report_digest": "536d3267b3a6123c323fc3a7709d3aad3f0a476ca29b4a30b506d4dd176f6993"
 }

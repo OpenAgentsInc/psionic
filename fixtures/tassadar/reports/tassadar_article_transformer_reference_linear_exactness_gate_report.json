@@ -10,10 +10,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-179A",
-      "TAS-180",
-      "TAS-181",
-      "TAS-182",
       "TAS-183",
       "TAS-184",
       "TAS-184A",
@@ -445,5 +441,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this gate certifies only that the owned Transformer-backed reference-linear route now stays exact on the declared article workload family under the current trace-domain route, with explicit exact/mismatch/refused rows and explicit direct-proof binding for the bounded proof family. It does not yet claim anti-memorization closure, contamination independence, fast-route promotion, benchmark parity, single-run closure, or final article-equivalence green status.",
   "summary": "Transformer-backed reference-linear exactness gate now records declared_case_count=13, exact_case_count=13, mismatch_case_count=0, refused_case_count=0, direct_model_weight_proof_case_count=3, reference_linear_exactness_green=true, and article_equivalence_green=false.",
-  "report_digest": "8b59056c174fa6dc6b6b224026e221dd17208ba7d1ab279cbbd3f51b0827bd44"
+  "report_digest": "23be60e81c0e900f115b02734d6c4d3bf620d5204ce1539468c17c4205447685"
 }

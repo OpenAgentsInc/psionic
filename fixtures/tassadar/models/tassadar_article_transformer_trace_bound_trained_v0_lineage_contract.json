@@ -131,11 +131,11 @@
     {
       "source_role": "runtime_module",
       "source_ref": "crates/psionic-runtime/src/tassadar.rs",
-      "byte_length": 467595,
-      "sha256": "891b4b38fd727d8ff151ecec7f79af7e873ef8f8f6b393c987fd619678250660"
+      "byte_length": 489657,
+      "sha256": "369bfcca3862e5dfb8fcb2631958dedbcb855f45951d4c25449e67e3eb5a2874"
     }
   ],
-  "source_inventory_digest": "1ecb925a0fac206e277925cfb2473b61e84bd9ed9dfc8944182c477185661a60",
+  "source_inventory_digest": "55f5199988cfa25860fc87dfa797397e91fe9791e0df660377667d3f09a89c73",
   "artifact_inventory": [
     {
       "artifact_role": "evidence_bundle",
@@ -211,5 +211,5 @@
     "restore_matches_trained_state": true
   },
   "claim_boundary": "this lineage contract freezes only the first real trained trace-bound article-model weight artifact. It binds the exact workload set, training-config snapshot, source inventory, descriptor digests, checkpoint lineage, and committed artifact digests into one challengeable manifest without implying reference-linear exactness, fast-route closure, benchmark parity, or final article-equivalence green status.",
-  "contract_digest": "c449f1b60fbb88b1c9e467b856426e28823c5c94d0d28015c331bc4c4c77ed01"
+  "contract_digest": "93956cc32e9cb600d7f6709e6ddb8d67831e32024af82ebbae0ea0fc5d8dbaf8"
 }

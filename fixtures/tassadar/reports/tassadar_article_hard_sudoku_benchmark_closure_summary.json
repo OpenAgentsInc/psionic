@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-182",
         "TAS-183",
         "TAS-184",
         "TAS-184A",
@@ -471,7 +470,7 @@
           "requested_decode_mode": "hull_cache",
           "effective_decode_mode": "hull_cache",
           "selection_state": "direct",
-          "measured_run_time_seconds": 0.054667745,
+          "measured_run_time_seconds": 0.053784114,
           "runtime_ceiling_seconds": 180.0,
           "exact_output_match": true,
           "exact_behavior_match": true,
@@ -487,7 +486,7 @@
           "requested_decode_mode": "hull_cache",
           "effective_decode_mode": "hull_cache",
           "selection_state": "direct",
-          "measured_run_time_seconds": 0.000117143,
+          "measured_run_time_seconds": 0.000116682,
           "runtime_ceiling_seconds": 180.0,
           "exact_output_match": true,
           "exact_behavior_match": true,
@@ -518,12 +517,12 @@
     "hard_sudoku_benchmark_closure_green": true,
     "article_equivalence_green": false,
     "claim_boundary": "this report closes TAS-181 only. It binds the canonical Sudoku article source, the existing no-tool Sudoku reproducer, the declared hard-Sudoku suite manifest, two served HullCache artifacts, and the runtime hard-Sudoku benchmark bundle into one machine-readable closure surface for the named Arto Inkala instance plus the declared benchmark suite. It does not yet claim the later unified demo-and-benchmark equivalence gate, no-spill single-run closure, or final article-equivalence green status.",
-    "summary": "Hard-Sudoku benchmark closure now records tied_requirement_satisfied=true, manifest_green=true, frontend_green=true, no_tool_proof_green=true, session_suite_green=true, hybrid_suite_green=true, runtime_suite_green=true, named_arto_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-182\"), and article_equivalence_green=false.",
-    "report_digest": "4c4d65da98f74a31a42aac2b56220c5dd28739a18a0a1e714b52177c3244512b"
+    "summary": "Hard-Sudoku benchmark closure now records tied_requirement_satisfied=true, manifest_green=true, frontend_green=true, no_tool_proof_green=true, session_suite_green=true, hybrid_suite_green=true, runtime_suite_green=true, named_arto_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-183\"), and article_equivalence_green=false.",
+    "report_digest": "c371a38dc25f4994aa479188f86214bd8dd82db88e38ffd58c6165def5b915e5"
   },
   "tied_requirement_id": "TAS-181",
   "tied_requirement_satisfied": true,
-  "blocked_issue_frontier": "TAS-182",
+  "blocked_issue_frontier": "TAS-183",
   "named_arto_green": true,
   "hard_sudoku_suite_green": true,
   "session_fast_route_green": true,
@@ -533,6 +532,6 @@
   "hard_sudoku_benchmark_closure_green": true,
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-181 hard-Sudoku tranche. It keeps the named Arto case, the declared hard-Sudoku suite, the served HullCache artifacts, and the runtime ceiling bundle operator-readable without pretending that the later unified demo-and-benchmark gate or final article-equivalence tranches are already green.",
-  "summary": "Hard-Sudoku benchmark closure summary now records tied_requirement_satisfied=true, named_arto_green=true, hard_sudoku_suite_green=true, session_fast_route_green=true, hybrid_fast_route_green=true, runtime_suite_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-182\"), and article_equivalence_green=false.",
-  "report_digest": "b64d082a316b152c533e755fb2c6646b8ad0c7f01344c148d9856d545d71da91"
+  "summary": "Hard-Sudoku benchmark closure summary now records tied_requirement_satisfied=true, named_arto_green=true, hard_sudoku_suite_green=true, session_fast_route_green=true, hybrid_fast_route_green=true, runtime_suite_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-183\"), and article_equivalence_green=false.",
+  "report_digest": "db8fa1e456acdcf9d7e6ab4af1e1642e7b24285f4daefa1ecb1241a3a315aea9"
 }

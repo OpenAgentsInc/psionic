@@ -26,7 +26,7 @@ jq -e '
 jq -e '
   .acceptance_gate_tie.tied_requirement_id == "TAS-176"
   and .acceptance_gate_tie.tied_requirement_satisfied == true
-  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-182")
+  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-183")
   and .manifest_check.manifest_green == true
   and .compile_matrix_tie.green == true
   and .admitted_case_green_count == 8
@@ -49,9 +49,9 @@ jq -e '
 ' "$summary_path" >/dev/null
 
 jq -e '
-  .closed_required_issue_count == 30
-  and .passed_required_requirement_count == 32
-  and (.blocked_issue_ids[0] == "TAS-182")
+  .closed_required_issue_count == 31
+  and .passed_required_requirement_count == 33
+  and (.blocked_issue_ids[0] == "TAS-183")
   and (.green_requirement_ids | index("TAS-176")) != null
   and (.green_requirement_ids | index("TAS-177")) != null
   and (.green_requirement_ids | index("TAS-178")) != null
@@ -59,4 +59,5 @@ jq -e '
   and (.green_requirement_ids | index("TAS-179A")) != null
   and (.green_requirement_ids | index("TAS-180")) != null
   and (.green_requirement_ids | index("TAS-181")) != null
+  and (.green_requirement_ids | index("TAS-182")) != null
 ' "$acceptance_gate_path" >/dev/null

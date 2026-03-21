@@ -505,6 +505,22 @@ Inkala case and the declared hard-Sudoku suite are closed on the fast route
 inside the bounded public envelope, while the later unified demo-and-benchmark
 gate, single-run closure, and final article-equivalence tranches remain open.
 
+`TAS-182` now closes that later unified demo-and-benchmark gate on top of the
+same owned route. `psionic-eval` now commits the joined gate artifact at
+`fixtures/tassadar/reports/tassadar_article_demo_benchmark_equivalence_gate_report.json`,
+which binds the committed `TAS-180` Hungarian demo parity report and the
+committed `TAS-181` hard-Sudoku benchmark closure report into one canonical
+joined surface while explicitly anchoring the route boundary on
+`crates/psionic-transformer/Cargo.toml` and this boundary document.
+`psionic-research` now mirrors the operator-readable summary at
+`fixtures/tassadar/reports/tassadar_article_demo_benchmark_equivalence_gate_summary.json`,
+and `psionic-provider` now projects the same gate into a provider-facing
+receipt. This is the point where the repo now machine-readably says the
+article's combined demo-and-benchmark surface is closed inside the bounded
+public envelope, while no-spill single-run closure, clean-room weight
+causality, route minimality, and final article-equivalence tranches remain
+open.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

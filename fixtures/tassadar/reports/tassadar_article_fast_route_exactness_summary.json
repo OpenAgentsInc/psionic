@@ -12,9 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-180",
-        "TAS-181",
-        "TAS-182",
         "TAS-183",
         "TAS-184",
         "TAS-184A",
@@ -114,7 +111,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report closes only TAS-174. It proves the selected HullCache fast path is now exact and no-fallback on the declared canonical article workload families inside the current article profile, and that the served article-session plus hybrid route surfaces expose those workloads as direct HullCache executions on the trained Transformer-backed model. It does not yet claim throughput-floor closure or final article-equivalence green status.",
     "summary": "Article fast-route exactness report now records tied_requirement_satisfied=true, implementation_prerequisite_green=true, all_article_workloads_exact=true, article_session_direct_cases=3, hybrid_direct_cases=3, exactness_green=true, and article_equivalence_green=false.",
-    "report_digest": "a375528a03b5dcc2101d54f32d74fefc8d65be3a6ba7bfd9aae3e84d4d88c4cc"
+    "report_digest": "cb1ccb9d23e66d745dc9a0d3530775c8dd65fc480327018a643df68acdce9b57"
   },
   "tied_requirement_id": "TAS-174",
   "tied_requirement_satisfied": true,
@@ -127,5 +124,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-174 fast-route exactness tranche. It keeps the zero-fallback article-workload closure operator-readable without pretending that TAS-175 throughput closure or final article-equivalence green status are already closed.",
   "summary": "Article fast-route exactness summary now records tied_requirement_satisfied=true, implementation_prerequisite_green=true, all_article_workloads_exact=true, article_session_direct_case_count=3, hybrid_direct_case_count=3, exactness_green=true, and article_equivalence_green=false.",
-  "report_digest": "b6b21bfebcbe61c002c180427fe79d00eb5bed3ae47b493cf695bb6d5652ae56"
+  "report_digest": "a987e6426d1605f2f8cb3f1b5c94add16a602c594676f5fa79d81d177798306b"
 }

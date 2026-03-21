@@ -8,9 +8,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-180",
-      "TAS-181",
-      "TAS-182",
       "TAS-183",
       "TAS-184",
       "TAS-184A",
@@ -564,5 +561,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this report selects exactly one fast architecture for the canonical article route without pretending that the fast path is already integrated into the owned Transformer-backed model. It keeps same-harness exactness, direct-versus-fallback posture, route-contract fit, promoted runtime truth, and research-only candidates separate so TAS-173 through TAS-175 can close the integration, no-fallback, and throughput tranches explicitly rather than collapsing them into one weak headline.",
   "summary": "Article fast-route architecture selection now chooses `hull_cache_runtime` as the canonical fast article route with routeable_candidate_count=1, exact_article_matrix_candidate_count=3, selected_direct_module_class_count=6, selected_fallback_module_class_count=0, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-  "report_digest": "63c92d62004c2339b884fa988e12ab656de64ae8a18f45ac0248cbc0c89aa859"
+  "report_digest": "2478e2e010f81cedc3bf85fe0986f91a44bbb026556028a08c5c2f672c57042e"
 }

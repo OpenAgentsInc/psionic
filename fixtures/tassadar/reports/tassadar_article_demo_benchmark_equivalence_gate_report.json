@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.article_demo_benchmark_equivalence_gate.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-article-demo-benchmark-equivalence-gate.sh",
+  "acceptance_gate_tie": {
+    "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+    "tied_requirement_id": "TAS-182",
+    "tied_requirement_satisfied": true,
+    "acceptance_status": "blocked",
+    "blocked_issue_ids": [
+      "TAS-183",
+      "TAS-184",
+      "TAS-184A",
+      "TAS-185",
+      "TAS-185A",
+      "TAS-186"
+    ]
+  },
+  "hungarian_review": {
+    "report_ref": "fixtures/tassadar/reports/tassadar_article_hungarian_demo_parity_report.json",
+    "report_id": "tassadar.article_hungarian_demo_parity.report.v1",
+    "tied_requirement_id": "TAS-180",
+    "tied_requirement_satisfied": true,
+    "canonical_case_id": "hungarian_10x10_test_a",
+    "session_fast_route_green": true,
+    "hybrid_fast_route_green": true,
+    "throughput_floor_green": true,
+    "no_tool_proof_green": true,
+    "binding_green": true,
+    "hungarian_demo_parity_green": true,
+    "detail": "Hungarian demo report `tassadar.article_hungarian_demo_parity.report.v1` keeps tied_requirement_id=TAS-180, canonical_case_id=hungarian_10x10_test_a, session_fast_route_green=true, hybrid_fast_route_green=true, throughput_floor_green=true, no_tool_proof_green=true, binding_green=true, and hungarian_demo_parity_green=true."
+  },
+  "benchmark_review": {
+    "report_ref": "fixtures/tassadar/reports/tassadar_article_hard_sudoku_benchmark_closure_report.json",
+    "report_id": "tassadar.article_hard_sudoku_benchmark_closure.report.v1",
+    "tied_requirement_id": "TAS-181",
+    "tied_requirement_satisfied": true,
+    "named_case_id": "sudoku_9x9_arto_inkala",
+    "declared_case_ids": [
+      "sudoku_9x9_test_a",
+      "sudoku_9x9_arto_inkala"
+    ],
+    "named_arto_parity_green": true,
+    "benchmark_wide_sudoku_parity_green": true,
+    "session_fast_route_green": true,
+    "hybrid_fast_route_green": true,
+    "runtime_suite_green": true,
+    "binding_green": true,
+    "hard_sudoku_benchmark_closure_green": true,
+    "detail": "Hard-Sudoku benchmark report `tassadar.article_hard_sudoku_benchmark_closure.report.v1` keeps tied_requirement_id=TAS-181, named_case_id=sudoku_9x9_arto_inkala, declared_case_count=2, named_arto_parity_green=true, benchmark_wide_sudoku_parity_green=true, session_fast_route_green=true, hybrid_fast_route_green=true, runtime_suite_green=true, binding_green=true, and hard_sudoku_benchmark_closure_green=true."
+  },
+  "binding_review": {
+    "owned_route_boundary_refs": [
+      "crates/psionic-transformer/Cargo.toml",
+      "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md"
+    ],
+    "owned_route_boundary_refs_exist": true,
+    "hungarian_requirement_alignment_green": true,
+    "hard_sudoku_requirement_alignment_green": true,
+    "hungarian_case_alignment_green": true,
+    "named_arto_case_alignment_green": true,
+    "benchmark_suite_alignment_green": true,
+    "upstream_binding_green": true,
+    "binding_green": true,
+    "detail": "Binding review keeps owned_route_boundary_refs_exist=true, hungarian_requirement_alignment_green=true, hard_sudoku_requirement_alignment_green=true, hungarian_case_alignment_green=true, named_arto_case_alignment_green=true, benchmark_suite_alignment_green=true, and upstream_binding_green=true."
+  },
+  "hungarian_demo_parity_green": true,
+  "named_arto_parity_green": true,
+  "benchmark_wide_sudoku_parity_green": true,
+  "article_demo_benchmark_equivalence_gate_green": true,
+  "article_equivalence_green": false,
+  "claim_boundary": "this report closes TAS-182 only. It freezes one unified article demo-and-benchmark gate on top of the canonical owned `psionic-transformer` route boundary by requiring the Hungarian demo parity row, the named Arto parity row, and the declared hard-Sudoku benchmark-suite row to stay green together. It does not imply single-run no-spill closure, clean-room weight causality, route minimality, or final article-equivalence green status.",
+  "summary": "Article demo-and-benchmark equivalence gate now records tied_requirement_satisfied=true, hungarian_demo_parity_green=true, named_arto_parity_green=true, benchmark_wide_sudoku_parity_green=true, binding_green=true, gate_green=true, blocked_issue_frontier=Some(\"TAS-183\"), and article_equivalence_green=false.",
+  "report_digest": "5abae31f1052daa186e31f853d3f33d89da83131ae39b42975741337a4cee530"
+}
