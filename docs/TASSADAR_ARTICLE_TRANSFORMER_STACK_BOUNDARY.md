@@ -565,9 +565,28 @@ and `psionic-provider` now projects the same verdict into
 This is the point where the repo now machine-readably says the decisive
 interpreter behavior for the declared article envelope belongs to the owned
 Transformer forward-pass route itself rather than a hidden host-side control
-plane, while the later KV-cache and activation-state dominance verdict,
-cross-machine reproducibility, route minimality, and final
-article-equivalence tranches remain open.
+plane.
+
+`TAS-184A` now closes the next KV-cache and activation-state discipline tranche
+on top of the same route. `psionic-eval` now commits the joined audit artifact
+at
+`fixtures/tassadar/reports/tassadar_article_kv_activation_discipline_audit_report.json`,
+which makes the route's same-run state carriers explicit with analytic
+KV-growth accounting, constrained-history sensitivity rows, acceptable versus
+non-acceptable carrier boundaries, and one declared `mixed` verdict. That
+verdict is stronger than hand-waving "weights do everything" and stronger than
+"the cache is secretly the interpreter": the bounded article route is now
+machine-readably declared as weight-sensitive and route-owned, while still
+depending on request-local KV and activation state to carry same-run execution
+history inside the admitted forward pass. `psionic-research` now mirrors the
+operator-readable summary at
+`fixtures/tassadar/reports/tassadar_article_kv_activation_discipline_audit_summary.json`,
+and `psionic-provider` now projects the same verdict into
+`crates/psionic-provider/src/tassadar_article_kv_activation_discipline_audit.rs`.
+Persisted or resumed cache state, hidden activation replay, and undeclared
+history channels remain outside the admitted route. Cross-machine
+reproducibility, route minimality, and final article-equivalence tranches
+still remain open.
 
 ## Route Requirement
 

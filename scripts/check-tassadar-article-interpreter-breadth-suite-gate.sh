@@ -15,7 +15,7 @@ cargo run -p psionic-research --example tassadar_article_interpreter_breadth_sui
 jq -e '
   .acceptance_gate_tie.tied_requirement_id == "TAS-179A"
   and .acceptance_gate_tie.tied_requirement_satisfied == true
-  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-184A")
+  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-185")
   and .green_family_count == 8
   and .contract_check.contract_green == true
   and ((.family_checks | map(select(.green == true)) | length) == 8)
@@ -26,7 +26,7 @@ jq -e '
 jq -e '
   .tied_requirement_id == "TAS-179A"
   and .tied_requirement_satisfied == true
-  and .blocked_issue_frontier == "TAS-184A"
+  and .blocked_issue_frontier == "TAS-185"
   and .green_family_count == 8
   and .required_family_count == 8
   and .breadth_gate_green == true

@@ -1,0 +1,382 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.article_kv_activation_discipline_audit.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-article-kv-activation-discipline-audit.sh",
+  "acceptance_gate_tie": {
+    "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+    "ownership_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_interpreter_ownership_gate_report.json",
+    "tied_requirement_id": "TAS-184A",
+    "tied_requirement_satisfied": true,
+    "acceptance_status": "blocked",
+    "blocked_issue_ids": [
+      "TAS-185",
+      "TAS-185A",
+      "TAS-186"
+    ]
+  },
+  "ownership_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_interpreter_ownership_gate_report.json",
+  "ownership_gate_green": true,
+  "growth_report": {
+    "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "model_descriptor_digest": "5fac189c12ccc979a0e457a970222dcb6b4c055e84d56cfc76d1396017f90804",
+    "weight_artifact_bytes": 51948,
+    "decoder_kv_bytes_per_generated_token": 128,
+    "cross_attention_kv_bytes_per_prompt_token": 128,
+    "feasible_constraint_case_ids": [
+      "micro_wasm_kernel",
+      "branch_heavy_kernel",
+      "memory_heavy_kernel",
+      "hungarian_matching"
+    ],
+    "case_rows": [
+      {
+        "case_id": "micro_wasm_kernel",
+        "workload_family_id": "MicroWasmKernel",
+        "prompt_token_count": 235,
+        "target_token_count": 4941,
+        "constraint_audit_supported": true,
+        "decoder_kv_bytes": 632448,
+        "cross_attention_kv_bytes": 30080,
+        "encoder_activation_bytes": 22560,
+        "decoder_activation_bytes": 474336,
+        "total_activation_bytes": 496896,
+        "dynamic_state_bytes": 1106784,
+        "total_state_bytes": 1159424,
+        "detail": "analytic state accounting uses the declared encoder/decoder layer counts plus hidden size to make the article-route KV and activation carrier explicit per token instead of hiding it behind runtime heuristics"
+      },
+      {
+        "case_id": "branch_heavy_kernel",
+        "workload_family_id": "BranchHeavyKernel",
+        "prompt_token_count": 371,
+        "target_token_count": 3917,
+        "constraint_audit_supported": true,
+        "decoder_kv_bytes": 501376,
+        "cross_attention_kv_bytes": 47488,
+        "encoder_activation_bytes": 35616,
+        "decoder_activation_bytes": 376032,
+        "total_activation_bytes": 411648,
+        "dynamic_state_bytes": 877408,
+        "total_state_bytes": 960512,
+        "detail": "analytic state accounting uses the declared encoder/decoder layer counts plus hidden size to make the article-route KV and activation carrier explicit per token instead of hiding it behind runtime heuristics"
+      },
+      {
+        "case_id": "memory_heavy_kernel",
+        "workload_family_id": "MemoryHeavyKernel",
+        "prompt_token_count": 185,
+        "target_token_count": 3501,
+        "constraint_audit_supported": true,
+        "decoder_kv_bytes": 448128,
+        "cross_attention_kv_bytes": 23680,
+        "encoder_activation_bytes": 17760,
+        "decoder_activation_bytes": 336096,
+        "total_activation_bytes": 353856,
+        "dynamic_state_bytes": 784224,
+        "total_state_bytes": 825664,
+        "detail": "analytic state accounting uses the declared encoder/decoder layer counts plus hidden size to make the article-route KV and activation carrier explicit per token instead of hiding it behind runtime heuristics"
+      },
+      {
+        "case_id": "long_loop_kernel",
+        "workload_family_id": "LongLoopKernel",
+        "prompt_token_count": 71,
+        "target_token_count": 1036188,
+        "constraint_audit_supported": false,
+        "decoder_kv_bytes": 132632064,
+        "cross_attention_kv_bytes": 9088,
+        "encoder_activation_bytes": 6816,
+        "decoder_activation_bytes": 99474048,
+        "total_activation_bytes": 99480864,
+        "dynamic_state_bytes": 232106112,
+        "total_state_bytes": 232122016,
+        "detail": "analytic state accounting uses the declared encoder/decoder layer counts plus hidden size to make the article-route KV and activation carrier explicit per token instead of hiding it behind runtime heuristics"
+      },
+      {
+        "case_id": "sudoku_v0_test_a",
+        "workload_family_id": "SudokuClass",
+        "prompt_token_count": 4788,
+        "target_token_count": 137638,
+        "constraint_audit_supported": false,
+        "decoder_kv_bytes": 17617664,
+        "cross_attention_kv_bytes": 612864,
+        "encoder_activation_bytes": 459648,
+        "decoder_activation_bytes": 13213248,
+        "total_activation_bytes": 13672896,
+        "dynamic_state_bytes": 30830912,
+        "total_state_bytes": 31903424,
+        "detail": "analytic state accounting uses the declared encoder/decoder layer counts plus hidden size to make the article-route KV and activation carrier explicit per token instead of hiding it behind runtime heuristics"
+      },
+      {
+        "case_id": "hungarian_matching",
+        "workload_family_id": "HungarianMatching",
+        "prompt_token_count": 108,
+        "target_token_count": 1410,
+        "constraint_audit_supported": true,
+        "decoder_kv_bytes": 180480,
+        "cross_attention_kv_bytes": 13824,
+        "encoder_activation_bytes": 10368,
+        "decoder_activation_bytes": 135360,
+        "total_activation_bytes": 145728,
+        "dynamic_state_bytes": 315840,
+        "total_state_bytes": 340032,
+        "detail": "analytic state accounting uses the declared encoder/decoder layer counts plus hidden size to make the article-route KV and activation carrier explicit per token instead of hiding it behind runtime heuristics"
+      }
+    ],
+    "cache_growth_scales_with_problem_size": true,
+    "dynamic_state_exceeds_weight_artifact_bytes": true,
+    "detail": "decoder_kv_bytes_per_generated_token=128 cross_attention_kv_bytes_per_prompt_token=128 weight_artifact_bytes=51948 feasible_constraint_case_count=4"
+  },
+  "sensitivity_review": {
+    "audited_case_ids": [
+      "micro_wasm_kernel",
+      "branch_heavy_kernel",
+      "memory_heavy_kernel",
+      "hungarian_matching"
+    ],
+    "moderate_window_tokens": 8,
+    "strict_window_tokens": 1,
+    "constraint_rows": [
+      {
+        "constraint_kind": "sliding_window_moderate",
+        "audited_case_ids": [
+          "micro_wasm_kernel",
+          "branch_heavy_kernel",
+          "memory_heavy_kernel",
+          "hungarian_matching"
+        ],
+        "case_rows": [
+          {
+            "case_id": "micro_wasm_kernel",
+            "workload_family_id": "MicroWasmKernel",
+            "prompt_token_count": 235,
+            "target_token_count": 4941,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "312cb6f75305a837444555258e7d46091d6f415d348af189cd77a7c6377c6122",
+            "constrained_behavior_digest": "78810d28cc72807ef3eef22699779924d4773d8ee739963d5deb49b98d018908",
+            "detail": "only the last 8 target tokens remain visible to each decode step"
+          },
+          {
+            "case_id": "branch_heavy_kernel",
+            "workload_family_id": "BranchHeavyKernel",
+            "prompt_token_count": 371,
+            "target_token_count": 3917,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "4c4da15fcd9986dd3b2ec28b46bcce77da0f9d0a121169787dfef3c3252c9674",
+            "constrained_behavior_digest": "882c66308d77d8648a1d92c4bede6f8d185112d3680825931e868b76458329c9",
+            "detail": "only the last 8 target tokens remain visible to each decode step"
+          },
+          {
+            "case_id": "memory_heavy_kernel",
+            "workload_family_id": "MemoryHeavyKernel",
+            "prompt_token_count": 185,
+            "target_token_count": 3501,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "ee86f1efe330008540983d7a6863f56e7ff304750f5b20a5a630f3f1b71ea826",
+            "constrained_behavior_digest": "69cbed6d74bde536ca78a87d97676e29c4a88ea0a27684e139440db74730fafd",
+            "detail": "only the last 8 target tokens remain visible to each decode step"
+          },
+          {
+            "case_id": "hungarian_matching",
+            "workload_family_id": "HungarianMatching",
+            "prompt_token_count": 108,
+            "target_token_count": 1410,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "eb5ac88bab3dbbe7d3ed306017a2fda5242ea57cc7956b5d61231c25ca4e398b",
+            "constrained_behavior_digest": "bd42f73986dd7230c784aa43ef7d6db28833a50768e32640f6ea64fe49489ad5",
+            "detail": "only the last 8 target tokens remain visible to each decode step"
+          }
+        ],
+        "exact_case_count": 0,
+        "mismatch_case_count": 4,
+        "behavior_changed_case_count": 4,
+        "all_audited_cases_sensitive": true,
+        "detail": "exact_case_count=0 mismatch_case_count=4 behavior_changed_case_count=4"
+      },
+      {
+        "constraint_kind": "sliding_window_strict",
+        "audited_case_ids": [
+          "micro_wasm_kernel",
+          "branch_heavy_kernel",
+          "memory_heavy_kernel",
+          "hungarian_matching"
+        ],
+        "case_rows": [
+          {
+            "case_id": "micro_wasm_kernel",
+            "workload_family_id": "MicroWasmKernel",
+            "prompt_token_count": 235,
+            "target_token_count": 4941,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "312cb6f75305a837444555258e7d46091d6f415d348af189cd77a7c6377c6122",
+            "constrained_behavior_digest": "ee85115c97f6e9c829f0f60080ff019ddfc51d8e4a7fbcb2ff9b27342465dde1",
+            "detail": "only the current target token remains visible to each decode step"
+          },
+          {
+            "case_id": "branch_heavy_kernel",
+            "workload_family_id": "BranchHeavyKernel",
+            "prompt_token_count": 371,
+            "target_token_count": 3917,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "4c4da15fcd9986dd3b2ec28b46bcce77da0f9d0a121169787dfef3c3252c9674",
+            "constrained_behavior_digest": "08e0645ec76bd9eb55ff7c6e792c183b44e7398d3089f0cf855a808009cba4a5",
+            "detail": "only the current target token remains visible to each decode step"
+          },
+          {
+            "case_id": "memory_heavy_kernel",
+            "workload_family_id": "MemoryHeavyKernel",
+            "prompt_token_count": 185,
+            "target_token_count": 3501,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "ee86f1efe330008540983d7a6863f56e7ff304750f5b20a5a630f3f1b71ea826",
+            "constrained_behavior_digest": "9a54bf6f22dee4e2a207afa762d76eb2ca0a3d3284e5969a6172aa6ba125f2ec",
+            "detail": "only the current target token remains visible to each decode step"
+          },
+          {
+            "case_id": "hungarian_matching",
+            "workload_family_id": "HungarianMatching",
+            "prompt_token_count": 108,
+            "target_token_count": 1410,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "eb5ac88bab3dbbe7d3ed306017a2fda5242ea57cc7956b5d61231c25ca4e398b",
+            "constrained_behavior_digest": "c9d4d7b66e22046494e499f8da4bc52e739c038d13865d4fd5866bfefecb0f12",
+            "detail": "only the current target token remains visible to each decode step"
+          }
+        ],
+        "exact_case_count": 0,
+        "mismatch_case_count": 4,
+        "behavior_changed_case_count": 4,
+        "all_audited_cases_sensitive": true,
+        "detail": "exact_case_count=0 mismatch_case_count=4 behavior_changed_case_count=4"
+      },
+      {
+        "constraint_kind": "mid_decode_reset",
+        "audited_case_ids": [
+          "micro_wasm_kernel",
+          "branch_heavy_kernel",
+          "memory_heavy_kernel",
+          "hungarian_matching"
+        ],
+        "case_rows": [
+          {
+            "case_id": "micro_wasm_kernel",
+            "workload_family_id": "MicroWasmKernel",
+            "prompt_token_count": 235,
+            "target_token_count": 4941,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "312cb6f75305a837444555258e7d46091d6f415d348af189cd77a7c6377c6122",
+            "constrained_behavior_digest": "1defef57b2065ad08558d9ae6912241894a9134b57d3a200946ca0d8dc35d8a2",
+            "detail": "mid-sequence history reset blocks every post-reset decode step from attending to the pre-reset target history"
+          },
+          {
+            "case_id": "branch_heavy_kernel",
+            "workload_family_id": "BranchHeavyKernel",
+            "prompt_token_count": 371,
+            "target_token_count": 3917,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "4c4da15fcd9986dd3b2ec28b46bcce77da0f9d0a121169787dfef3c3252c9674",
+            "constrained_behavior_digest": "922b7d028302d1cfa8320fedf2340e06bf4325852cb77f7f5db502c92ec19343",
+            "detail": "mid-sequence history reset blocks every post-reset decode step from attending to the pre-reset target history"
+          },
+          {
+            "case_id": "memory_heavy_kernel",
+            "workload_family_id": "MemoryHeavyKernel",
+            "prompt_token_count": 185,
+            "target_token_count": 3501,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "ee86f1efe330008540983d7a6863f56e7ff304750f5b20a5a630f3f1b71ea826",
+            "constrained_behavior_digest": "dfe05da59cd78a0a18cfad861cbe9a708d805d1aea4e298dd3548f6acde91f86",
+            "detail": "mid-sequence history reset blocks every post-reset decode step from attending to the pre-reset target history"
+          },
+          {
+            "case_id": "hungarian_matching",
+            "workload_family_id": "HungarianMatching",
+            "prompt_token_count": 108,
+            "target_token_count": 1410,
+            "baseline_exact": false,
+            "constrained_exact": false,
+            "behavior_changed": true,
+            "baseline_behavior_digest": "eb5ac88bab3dbbe7d3ed306017a2fda5242ea57cc7956b5d61231c25ca4e398b",
+            "constrained_behavior_digest": "85308173064e16b9b71ebedc55451a1a3df311b81959965ff81c1550eff711f3",
+            "detail": "mid-sequence history reset blocks every post-reset decode step from attending to the pre-reset target history"
+          }
+        ],
+        "exact_case_count": 0,
+        "mismatch_case_count": 4,
+        "behavior_changed_case_count": 4,
+        "all_audited_cases_sensitive": true,
+        "detail": "exact_case_count=0 mismatch_case_count=4 behavior_changed_case_count=4"
+      }
+    ],
+    "cache_truncation_breaks_correctness": true,
+    "cache_reset_breaks_correctness": true,
+    "equivalent_behavior_survives_under_constrained_cache": false,
+    "constraint_suite_complete": true,
+    "detail": "audited_case_count=4 moderate_window_tokens=8 strict_window_tokens=1 cache_truncation_breaks_correctness=true cache_reset_breaks_correctness=true constrained_cache_equivalence=false"
+  },
+  "carrier_boundary_rows": [
+    {
+      "carrier_kind": "kv_cache",
+      "acceptable_use": "request-local decoder and cross-attention cache state inside one admitted continuous forward-pass route",
+      "non_acceptable_use": "persisted, resumed, or cross-run cache state that silently reintroduces the blocked continuation or spill surfaces from TAS-183",
+      "declared_boundary": "KV state is acceptable only as ephemeral same-run attention carrier state that is reset at the request boundary and stays subordinate to the declared Transformer route"
+    },
+    {
+      "carrier_kind": "residual_stream",
+      "acceptable_use": "ephemeral layer-local activation flow inside the declared encoder-decoder forward pass",
+      "non_acceptable_use": "externalized residual activations or hidden helper-mediated activation replay that would act as an undeclared control plane",
+      "declared_boundary": "residual activations are admitted only as transient within-pass state, not as a durable interpreter substrate outside the forward pass"
+    },
+    {
+      "carrier_kind": "attention_history",
+      "acceptable_use": "the explicit source-token and prior-target-token history already declared by the article trace domain",
+      "non_acceptable_use": "extra hidden history, undeclared prompt extensions, or cache reuse across unrelated requests that smuggle in additional interpreter state",
+      "declared_boundary": "attention history is acceptable only when it is exactly the current request-local article trace, with no undeclared history channel beyond the admitted source and target tokens"
+    }
+  ],
+  "dominance_verdict": {
+    "verdict": "mixed",
+    "weight_perturbation_sensitivity_green": true,
+    "cache_truncation_sensitivity_green": true,
+    "cache_reset_sensitivity_green": true,
+    "cache_growth_scales_with_problem_size": true,
+    "dynamic_state_exceeds_weight_artifact_bytes": true,
+    "carrier_boundary_declared": true,
+    "detail": "weight_perturbation_sensitivity_green=true cache_truncation_sensitivity_green=true cache_reset_sensitivity_green=true cache_growth_scales_with_problem_size=true dynamic_state_exceeds_weight_artifact_bytes=true verdict=Mixed"
+  },
+  "binding_review": {
+    "ownership_gate_green": true,
+    "weight_perturbation_sensitivity_green": true,
+    "cache_growth_scales_with_problem_size": true,
+    "cache_truncation_breaks_correctness": true,
+    "cache_reset_breaks_correctness": true,
+    "carrier_boundary_declared": true,
+    "dominance_verdict_declared": true,
+    "discipline_audit_green": true,
+    "detail": "ownership_gate_green=true weight_perturbation_sensitivity_green=true cache_growth_scales_with_problem_size=true cache_truncation_breaks_correctness=true cache_reset_breaks_correctness=true carrier_boundary_declared=true"
+  },
+  "kv_activation_discipline_green": true,
+  "article_equivalence_green": false,
+  "claim_boundary": "this report closes TAS-184A only. It declares the article-route KV-cache and activation-state discipline verdict for the bounded public envelope, including explicit acceptable versus non-acceptable state carriers and an explicit weight-dominant versus activation-dominant versus mixed verdict. It still does not close cross-machine reproducibility from TAS-185, route minimality from TAS-185A, or the final article-equivalence audit from TAS-186.",
+  "summary": "Article KV-cache and activation-state discipline audit now records tied_requirement_satisfied=true, verdict=Mixed, cache_growth_scales_with_problem_size=true, truncation_breaks_correctness=true, reset_breaks_correctness=true, constrained_cache_equivalence=false, blocked_issue_frontier=Some(\"TAS-185\"), and article_equivalence_green=false.",
+  "report_digest": "2a80c1a7f0a9cc23f6efa68223a696aa41044c1ffdb55f92aa024f738d1fd86a"
+}

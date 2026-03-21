@@ -326,8 +326,8 @@
       "category": "weights_ownership_scope",
       "title": "Clean-room weight causality and route-minimality verdict remain open",
       "repo_status": "partial",
-      "current_gap_summary": "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo now closes the first joined interpreter-ownership verdict, but it still lacks the later KV-cache and activation-dominance discipline, cross-machine reproducibility, route-minimality, and final publication verdicts for that stronger reading",
-      "current_public_truth": "the repo now has one canonical TAS-184 interpreter-ownership gate tying the owned Transformer boundary, the declared breadth suite, a widened generic direct no-tool proof suite, route-purity review, computation mapping, and weight-perturbation sensitivity into one machine-readable ownership verdict; it still does not yet have the later KV-cache and activation-state discipline audit, cross-machine reproducibility matrix, route-minimality publication verdict, or final article-equivalence claim checker",
+      "current_gap_summary": "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo now closes the joined interpreter-ownership verdict and the explicit KV-cache plus activation-state discipline verdict, but it still lacks cross-machine reproducibility, route-minimality, and the final publication verdicts for that stronger reading",
+      "current_public_truth": "the repo now has one canonical TAS-184 interpreter-ownership gate plus one TAS-184A KV-cache and activation-state discipline audit, together making the bounded route's weight sensitivity and mixed same-run state carrier posture machine-readable; it still does not yet have the later cross-machine reproducibility matrix, route-minimality publication verdict, or final article-equivalence claim checker",
       "closure_requirements": [
         "move direct no-tool proof and exactness onto the Transformer-backed route",
         "close invariance, anti-memorization, and evaluation-independence evidence so correctness does not look like brittle recall",
@@ -743,7 +743,7 @@
       "github_issue_number": 308,
       "title": "TAS-184A: KV-cache and activation-state discipline audit",
       "issue_role": "implementation",
-      "issue_state": "open",
+      "issue_state": "closed",
       "blocker_ids": [
         "BEQ-007"
       ]
@@ -825,5 +825,5 @@
   ],
   "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
   "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=2.",
-  "report_digest": "fc310ef11864950aae90ea633e34e6129349d60f66f6ae3281596013768d9766"
+  "report_digest": "e0c720c4c92c1bdc2fb49193ed7b4fc4da87724ea6e22d0f5082e688b2b5fd22"
 }

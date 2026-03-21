@@ -11,9 +11,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-183",
-        "TAS-184",
-        "TAS-184A",
         "TAS-185",
         "TAS-185A",
         "TAS-186"
@@ -66,7 +63,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report freezes the article-Transformer descriptor and weight-artifact closure only. It proves that the canonical and trace-bound article descriptors are now safetensors-backed, non-fixture, and bound to explicit tensor inventory plus runtime-visible artifact identity. It does not claim reference-linear exactness, fast-route closure, benchmark parity, single-run closure, or final article-equivalence green status.",
     "summary": "Article Transformer artifact descriptor closure now records case_rows=5, all_required_cases_present=true, all_cases_pass=true, committed_refs_exist=true, tied_requirement_satisfied=true, artifact_descriptor_contract_green=true, and article_equivalence_green=false.",
-    "report_digest": "5b23485af0c514924ccb11d4f0e6196bf59224e94d5dc8a5ab0ec73007b49492"
+    "report_digest": "0395ddf0efbc91cec6a3af4722edecfc2c9fd204c6fad580be58a713d09d0e72"
   },
   "case_count": 5,
   "passed_case_count": 5,
@@ -78,5 +75,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors the article-Transformer descriptor and weight-artifact closure only. It keeps the safetensors-backed canonical/trace-bound model facts operator-readable without widening the current article-equivalence claim boundary.",
   "summary": "Article Transformer artifact descriptor summary now records case_count=5, passed_case_count=5, committed_refs_exist=true, tied_requirement_satisfied=true, artifact_descriptor_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "08a808142018dd4263d42ccc043cdd0f1ffd27bb140bed1134a2c79f27b735f0"
+  "report_digest": "aad111c7f1161064f3c5204097a02de7da7abbb2e1935a6ae2c0860ffae70631"
 }

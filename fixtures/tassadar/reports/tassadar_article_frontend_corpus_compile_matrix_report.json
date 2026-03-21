@@ -8,7 +8,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-184A",
       "TAS-185",
       "TAS-185A",
       "TAS-186"
@@ -1265,5 +1264,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this report closes TAS-177 only. It expands the article-envelope frontend corpus beyond the old narrow canonical lane by compiling a broader committed Rust source set across arithmetic, branch-heavy, state-machine, allocator-backed memory, Hungarian-like, and Sudoku-like support families, while keeping typed refusal and toolchain-failure posture machine-readable. It does not yet claim article-demo frontend parity, arbitrary-program closure, or final article-equivalence green status.",
   "summary": "Article frontend corpus compile matrix now records tied_requirement_satisfied=true, compiled_cases=11/11, typed_refusals=4/4, toolchain_failures=1/1, category_coverage_green=true, envelope_alignment_green=true, compile_matrix_green=true, and article_equivalence_green=false.",
-  "report_digest": "5289262a12fcd386fd454cb885f7b005247dbb93fd92c830f500aa6de6962a41"
+  "report_digest": "620276cbefcae5f6cda41a1c43da664751d92a3dfc38f2e3ecc7d29abae672b1"
 }

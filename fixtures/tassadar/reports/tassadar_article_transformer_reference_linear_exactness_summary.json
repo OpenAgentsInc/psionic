@@ -14,9 +14,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-183",
-        "TAS-184",
-        "TAS-184A",
         "TAS-185",
         "TAS-185A",
         "TAS-186"
@@ -445,7 +442,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this gate certifies only that the owned Transformer-backed reference-linear route now stays exact on the declared article workload family under the current trace-domain route, with explicit exact/mismatch/refused rows and explicit direct-proof binding for the bounded proof family. It does not yet claim anti-memorization closure, contamination independence, fast-route promotion, benchmark parity, single-run closure, or final article-equivalence green status.",
     "summary": "Transformer-backed reference-linear exactness gate now records declared_case_count=13, exact_case_count=13, mismatch_case_count=0, refused_case_count=0, direct_model_weight_proof_case_count=3, reference_linear_exactness_green=true, and article_equivalence_green=false.",
-    "report_digest": "23be60e81c0e900f115b02734d6c4d3bf620d5204ce1539468c17c4205447685"
+    "report_digest": "74f5e338e972bb84364bda28b8082c3c02b99f8496bff0a71fc3299286b185a6"
   },
   "case_count": 13,
   "exact_case_count": 13,
@@ -462,5 +459,5 @@
   "refused_case_ids": [],
   "claim_boundary": "this summary mirrors only the bounded Transformer-backed reference-linear exactness gate. It keeps the full-family exactness counts operator-readable without widening the claim beyond the underlying gate report.",
   "summary": "Transformer-backed reference-linear exactness summary now records case_count=13, exact_case_count=13, mismatch_case_count=0, refused_case_count=0, direct_model_weight_proof_case_count=3, reference_linear_exactness_green=true, and article_equivalence_green=false.",
-  "report_digest": "59758b1f9002937b17ff3a624b9af3ce1870d737d4bb26815006fe62ad4e640c"
+  "report_digest": "88e0960f03f812cf28adb16d2aeb8338eebb4afbd2d8ad80f1e970fcd9f9b79b"
 }

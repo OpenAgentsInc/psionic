@@ -685,10 +685,10 @@ fn blocker_rows() -> Vec<TassadarArticleEquivalenceBlockerRow> {
             ),
             repo_status: TassadarRepoStatus::Partial,
             current_gap_summary: String::from(
-                "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo now closes the first joined interpreter-ownership verdict, but it still lacks the later KV-cache and activation-dominance discipline, cross-machine reproducibility, route-minimality, and final publication verdicts for that stronger reading",
+                "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo now closes the joined interpreter-ownership verdict and the explicit KV-cache plus activation-state discipline verdict, but it still lacks cross-machine reproducibility, route-minimality, and the final publication verdicts for that stronger reading",
             ),
             current_public_truth: String::from(
-                "the repo now has one canonical TAS-184 interpreter-ownership gate tying the owned Transformer boundary, the declared breadth suite, a widened generic direct no-tool proof suite, route-purity review, computation mapping, and weight-perturbation sensitivity into one machine-readable ownership verdict; it still does not yet have the later KV-cache and activation-state discipline audit, cross-machine reproducibility matrix, route-minimality publication verdict, or final article-equivalence claim checker",
+                "the repo now has one canonical TAS-184 interpreter-ownership gate plus one TAS-184A KV-cache and activation-state discipline audit, together making the bounded route's weight sensitivity and mixed same-run state carrier posture machine-readable; it still does not yet have the later cross-machine reproducibility matrix, route-minimality publication verdict, or final article-equivalence claim checker",
             ),
             closure_requirements: vec![
                 String::from(
@@ -1013,7 +1013,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             308,
             "TAS-184A: KV-cache and activation-state discipline audit",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-007"],
         ),
         issue_row(

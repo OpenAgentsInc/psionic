@@ -9,7 +9,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-184A",
       "TAS-185",
       "TAS-185A",
       "TAS-186"
@@ -342,5 +341,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this gate certifies only that the owned Transformer-backed reference-linear route stays exact on a deterministic held-out and adversarial article-envelope generalization suite, including mixed-order runs and size/structure scaling across bounded and article-scale Sudoku and Hungarian programs. It does not yet certify dataset contamination independence, fast-route promotion, article-demo benchmark parity, single-run no-spill closure, clean-room weight causality, route minimality, or final article-equivalence green status.",
   "summary": "Transformer-backed generalization gate now records case_count=6, exact_case_count=6, mismatch_case_count=0, refused_case_count=0, out_of_distribution_case_count=6, randomized_case_count=2, adversarial_case_count=2, curriculum_run_count=2, generalization_green=true, and article_equivalence_green=false.",
-  "report_digest": "f8712e6a880a67757bbe7c9f28ffe125babd3389e21f7d9576e6f988a9067fde"
+  "report_digest": "48e9e10c9254487a12a40fd93e2e7907b4921081ad511ba2b485328356d3bdc1"
 }

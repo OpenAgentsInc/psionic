@@ -604,7 +604,7 @@ mod tests {
                 .blocked_issue_ids
                 .first()
                 .map(String::as_str),
-            Some("TAS-184A")
+            Some("TAS-185")
         );
         assert_eq!(report.green_family_count, 8);
         assert!(report.contract_check.contract_green);

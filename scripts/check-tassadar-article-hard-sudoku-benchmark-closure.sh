@@ -16,7 +16,7 @@ cargo run -p psionic-research --example tassadar_article_hard_sudoku_benchmark_c
 jq -e '
   .acceptance_gate_tie.tied_requirement_id == "TAS-181"
   and .acceptance_gate_tie.tied_requirement_satisfied == true
-  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-184A")
+  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-185")
   and .manifest_review.manifest_green == true
   and .frontend_review.row_green == true
   and .no_tool_proof_review.no_tool_proof_green == true
@@ -33,7 +33,7 @@ jq -e '
 jq -e '
   .tied_requirement_id == "TAS-181"
   and .tied_requirement_satisfied == true
-  and .blocked_issue_frontier == "TAS-184A"
+  and .blocked_issue_frontier == "TAS-185"
   and .named_arto_green == true
   and .hard_sudoku_suite_green == true
   and .session_fast_route_green == true

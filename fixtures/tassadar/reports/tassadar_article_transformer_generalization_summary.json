@@ -13,9 +13,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-183",
-        "TAS-184",
-        "TAS-184A",
         "TAS-185",
         "TAS-185A",
         "TAS-186"
@@ -348,7 +345,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this gate certifies only that the owned Transformer-backed reference-linear route stays exact on a deterministic held-out and adversarial article-envelope generalization suite, including mixed-order runs and size/structure scaling across bounded and article-scale Sudoku and Hungarian programs. It does not yet certify dataset contamination independence, fast-route promotion, article-demo benchmark parity, single-run no-spill closure, clean-room weight causality, route minimality, or final article-equivalence green status.",
     "summary": "Transformer-backed generalization gate now records case_count=6, exact_case_count=6, mismatch_case_count=0, refused_case_count=0, out_of_distribution_case_count=6, randomized_case_count=2, adversarial_case_count=2, curriculum_run_count=2, generalization_green=true, and article_equivalence_green=false.",
-    "report_digest": "b8e52930b58d674fcc6d0bd2b968a546f4af877ebbc608bc7eea774ab6f9195c"
+    "report_digest": "48e9e10c9254487a12a40fd93e2e7907b4921081ad511ba2b485328356d3bdc1"
   },
   "tied_requirement_id": "TAS-171B",
   "tied_requirement_satisfied": true,
@@ -367,5 +364,5 @@
   "refused_case_ids": [],
   "claim_boundary": "this summary mirrors the owned-route generalization and anti-memorization gate only. It keeps the held-out, adversarial, scaling, and mixed-order counts operator-readable without widening the underlying article-equivalence claim boundary.",
   "summary": "Article Transformer generalization summary now records case_count=6, exact_case_count=6, mismatch_case_count=0, refused_case_count=0, out_of_distribution_case_count=6, randomized_case_count=2, adversarial_case_count=2, curriculum_run_count=2, generalization_green=true, and article_equivalence_green=false.",
-  "report_digest": "02b209d66f962577d063bb50f072f38f5927d6c10cecd881a61b505849124631"
+  "report_digest": "122fa2fdfa4c4dcded73c43cdb55ae9d59a3a39498c5b45e7a3c6dec1006bab3"
 }

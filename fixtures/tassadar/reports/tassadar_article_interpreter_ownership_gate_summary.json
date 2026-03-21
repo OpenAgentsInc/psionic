@@ -21,7 +21,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-184A",
         "TAS-185",
         "TAS-185A",
         "TAS-186"
@@ -40,7 +39,6 @@
         "tied_requirement_satisfied": true,
         "acceptance_status": "blocked",
         "blocked_issue_ids": [
-          "TAS-184A",
           "TAS-185",
           "TAS-185A",
           "TAS-186"
@@ -58,7 +56,6 @@
           "acceptance_status": "blocked",
           "article_equivalence_green": false,
           "blocked_issue_ids": [
-            "TAS-184A",
             "TAS-185",
             "TAS-185A",
             "TAS-186"
@@ -236,7 +233,7 @@
         "current_truth_boundary": "psionic already owns real reusable substrate for tensor contracts, bounded array execution, module state, basic layers, transformer-boundary configs, model descriptors, weight lineage metadata, runtime proof identity, and trace receipts. The current gap is not substrate absence; it is the missing owned article-equivalence stack and the current presence of bounded research or fixture-backed lanes that are not yet sufficient for canonical article closure.",
         "claim_boundary": "this report inventories reusable substrate only. It freezes what can be reused, what needs extension, what stays research-only, and what is still not sufficient for article closure. It does not claim that the owned article-equivalence Transformer stack, the canonical article model artifact, or the final article-equivalence proof route already exist.",
         "summary": "Existing substrate inventory now records surface_count=11, blocker_surface_count=6, non_blocker_surface_count=5, inventory_contract_green=true, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-        "report_digest": "be63dee54295c4da45ae21b8ee7cb4c052fb4c9260487bd8b6bb127678a7d9b8"
+        "report_digest": "b39dc2952ab53179534b7688035f120c6f3d7aa3ad079864c38d6ce03aa7628c"
       },
       "interface_rows": [
         {
@@ -368,7 +365,7 @@
       "article_equivalence_green": false,
       "claim_boundary": "this report freezes one explicit canonical Transformer stack boundary for the article-equivalence closure wave. The route is not one monolithic crate; it is one required boundary spanning existing crates with `psionic-transformer` as the architecture anchor, `psionic-models` as the article-model and artifact owner, and `psionic-runtime` as the replay/receipt owner. This does not claim the final article-equivalence stack is complete or green.",
       "summary": "Canonical Transformer stack boundary now records interface_rows=5, dependency_checks=6, tied_requirement_satisfied=true, boundary_contract_green=true, and article_equivalence_green=false.",
-      "report_digest": "07c3e642fa08dbf784bfa858a5ad9574f92e28455a6b18b102638a285576d4cf"
+      "report_digest": "a7855860c1dd9f5d71d6b61f57ab3084e9537cd2c8f8e0cd254531d745a2c65f"
     },
     "breadth_suite_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_interpreter_breadth_suite_gate_report.json",
     "breadth_suite_gate_report": {
@@ -381,7 +378,6 @@
         "tied_requirement_satisfied": true,
         "acceptance_status": "blocked",
         "blocked_issue_ids": [
-          "TAS-184A",
           "TAS-185",
           "TAS-185A",
           "TAS-186"
@@ -398,7 +394,6 @@
           "tied_requirement_satisfied": true,
           "acceptance_status": "blocked",
           "blocked_issue_ids": [
-            "TAS-184A",
             "TAS-185",
             "TAS-185A",
             "TAS-186"
@@ -783,7 +778,7 @@
         "article_equivalence_green": false,
         "claim_boundary": "this report closes TAS-179 only. It freezes one declared article interpreter breadth envelope over the frozen core-Wasm floor, the current named article i32 profiles, and the later required search-process, long-horizon control, and module-scale Wasm-loop families while keeping linked-program bundles research-only and import-mediated processes, dynamic-memory resume, memory64, multi-memory, component-linking, exception profiles, and broader float semantics explicitly outside the article envelope. It does not yet build the breadth suite or turn final article-equivalence green.",
         "summary": "Article interpreter breadth envelope report now records tied_requirement_satisfied=true, current_floor_green=2/2, declared_required_family_green=3/3, research_only_family_green=1/1, explicit_out_of_envelope_green=7/7, envelope_contract_green=true, and article_equivalence_green=false.",
-        "report_digest": "d9ab6281962c20888d6e6a7b68385002a92a6a790ecee96c3623d3fbab56f5fe"
+        "report_digest": "7761e70d2da08c3ebc3b0311be3b65aaeacc6950091b142ee6f7a4a88cb23b42"
       },
       "suite_manifest_ref": "fixtures/tassadar/sources/tassadar_article_interpreter_breadth_suite_v1.json",
       "suite_manifest": {
@@ -1108,8 +1103,8 @@
       "breadth_gate_green": true,
       "article_equivalence_green": false,
       "claim_boundary": "this report closes TAS-179A only. It proves the declared TAS-179 interpreter-breadth envelope over one generic article-program family suite spanning arithmetic, call-heavy, allocator-backed, indirect-call, branch-heavy, loop-heavy, state-machine, and parser-style rows. It still does not imply arbitrary-program closure, benchmark-wide article closure, or final article-equivalence green status.",
-      "summary": "Article interpreter breadth suite gate now records tied_requirement_satisfied=true, green_families=8/8, breadth_gate_green=true, blocked_issue_frontier=Some(\"TAS-184A\"), and article_equivalence_green=false.",
-      "report_digest": "5a5fc21ec6c3f2406d5a1991d8030cd3c53bc4904f1ffdf712fd019075ff406c"
+      "summary": "Article interpreter breadth suite gate now records tied_requirement_satisfied=true, green_families=8/8, breadth_gate_green=true, blocked_issue_frontier=Some(\"TAS-185\"), and article_equivalence_green=false.",
+      "report_digest": "e59d5816ee1db3f09ee0f018c1b17e44a115b4162a27bbaff3d88087384ed410"
     },
     "generic_direct_proof_review": {
       "generic_suite_id": "tassadar.article_workload_family_generic_direct_proof_suite.v1",
@@ -1845,7 +1840,7 @@
           "exact_case_count": 0,
           "mismatch_case_count": 3,
           "behavior_changed": true,
-          "detail": "witness_case_count=3 exact_case_count=0 mismatch_case_count=3"
+          "detail": "witness_case_count=3 exact_case_count=0 baseline_divergence_case_count=3"
         },
         {
           "intervention_kind": "randomized_trainable_subset",
@@ -1857,7 +1852,7 @@
           "exact_case_count": 0,
           "mismatch_case_count": 3,
           "behavior_changed": true,
-          "detail": "witness_case_count=3 exact_case_count=0 mismatch_case_count=3"
+          "detail": "witness_case_count=3 exact_case_count=0 baseline_divergence_case_count=3"
         },
         {
           "intervention_kind": "clamped_attention_head",
@@ -1871,7 +1866,7 @@
           "exact_case_count": 0,
           "mismatch_case_count": 3,
           "behavior_changed": true,
-          "detail": "witness_case_count=3 exact_case_count=0 mismatch_case_count=3"
+          "detail": "witness_case_count=3 exact_case_count=0 baseline_divergence_case_count=3"
         },
         {
           "intervention_kind": "removed_decoder_layer",
@@ -1883,7 +1878,7 @@
           "exact_case_count": 0,
           "mismatch_case_count": 3,
           "behavior_changed": true,
-          "detail": "witness_case_count=3 exact_case_count=0 mismatch_case_count=3"
+          "detail": "witness_case_count=3 exact_case_count=0 baseline_divergence_case_count=3"
         }
       ],
       "all_interventions_show_sensitivity": true,
@@ -1903,12 +1898,12 @@
     "interpreter_ownership_green": true,
     "article_equivalence_green": false,
     "claim_boundary": "this report closes TAS-184 only. It binds the owned Transformer route, the generic article workload-family direct no-tool proof suite, the already-green breadth/generalization/independence/no-spill prerequisites, and concrete weight-perturbation sensitivity into one clean-room interpreter-ownership verdict. It still does not freeze the later KV-cache and activation-state dominance verdict from TAS-184A, cross-machine reproducibility from TAS-185, route minimality from TAS-185A, or the final article-equivalence audit from TAS-186.",
-    "summary": "Article interpreter-ownership gate now records tied_requirement_satisfied=true, generic_direct_proof_cases=6, breadth_families_green=8/8, route_purity_green=true, perturbation_sensitivity_green=true, ownership_gate_green=true, blocked_issue_frontier=Some(\"TAS-184A\"), and article_equivalence_green=false.",
-    "report_digest": "d397b798c30f8009a8375c1c478a349230208afa90e5c62a9f4a8c301ac8a222"
+    "summary": "Article interpreter-ownership gate now records tied_requirement_satisfied=true, generic_direct_proof_cases=6, breadth_families_green=8/8, route_purity_green=true, perturbation_sensitivity_green=true, ownership_gate_green=true, blocked_issue_frontier=Some(\"TAS-185\"), and article_equivalence_green=false.",
+    "report_digest": "0f6419695706c85800e2348e144640412dd994d118dccb2974b1e40d55e22271"
   },
   "tied_requirement_id": "TAS-184",
   "tied_requirement_satisfied": true,
-  "blocked_issue_frontier": "TAS-184A",
+  "blocked_issue_frontier": "TAS-185",
   "generic_direct_proof_suite_green": true,
   "generic_direct_proof_case_count": 6,
   "breadth_conformance_matrix_green": true,
@@ -1920,6 +1915,6 @@
   "interpreter_ownership_green": true,
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-184 interpreter-ownership gate. It keeps the widened generic direct-proof suite, breadth conformance, route-purity audit, computation mapping, and weight-perturbation sensitivity operator-readable without pretending that the later KV-cache and activation-state discipline verdict, cross-machine reproducibility, route minimality, or final article-equivalence green status are already true.",
-  "summary": "Article interpreter-ownership gate summary now records tied_requirement_satisfied=true, generic_direct_proof_suite_green=true, generic_direct_proof_case_count=6, breadth_conformance_matrix_green=true, green_family_count=8, route_purity_green=true, mapping_stable_across_runs=true, perturbation_sensitivity_green=true, locality_characterization=Diffuse, blocked_issue_frontier=Some(\"TAS-184A\"), ownership_gate_green=true, and article_equivalence_green=false.",
-  "report_digest": "c8f919fe86697ed901156f042a5e4e0345b7f112c76c93f0a0120bd53946a6c4"
+  "summary": "Article interpreter-ownership gate summary now records tied_requirement_satisfied=true, generic_direct_proof_suite_green=true, generic_direct_proof_case_count=6, breadth_conformance_matrix_green=true, green_family_count=8, route_purity_green=true, mapping_stable_across_runs=true, perturbation_sensitivity_green=true, locality_characterization=Diffuse, blocked_issue_frontier=Some(\"TAS-185\"), ownership_gate_green=true, and article_equivalence_green=false.",
+  "report_digest": "0add1c6dd3fbb8c06fb89247e60dd1ef26cb2487afea4495f4192580de9369b6"
 }

@@ -17,7 +17,7 @@ use psionic_runtime::{
     TassadarExecution, TassadarProgram,
 };
 use psionic_transformer::{
-    ActivationKind, AttentionProbabilityTrace, EncoderDecoderTransformer,
+    ActivationKind, AttentionMask, AttentionProbabilityTrace, EncoderDecoderTransformer,
     EncoderDecoderTransformerConfig, EncoderDecoderTransformerError, LayerError, LayerNorm, Linear,
     MultiHeadAttention, PositionwiseFeedForward, TransformerDecoderLayer, TransformerEmbeddings,
     TransformerEncoderLayer, TransformerExecutionMode,
@@ -1130,6 +1130,33 @@ impl TassadarArticleTransformer {
             source_token_ids,
             target_index_shape,
             target_token_ids,
+            mode,
+        )?)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn forward_with_masks(
+        &self,
+        source_index_shape: Shape,
+        source_token_ids: &[usize],
+        target_index_shape: Shape,
+        target_token_ids: &[usize],
+        encoder_self_attention_mask: Option<&AttentionMask>,
+        decoder_self_attention_mask: Option<&AttentionMask>,
+        cross_attention_mask: Option<&AttentionMask>,
+        mode: TransformerExecutionMode,
+    ) -> Result<
+        psionic_transformer::EncoderDecoderTransformerForwardOutput,
+        TassadarArticleTransformerError,
+    > {
+        Ok(self.model.forward_with_masks(
+            source_index_shape,
+            source_token_ids,
+            target_index_shape,
+            target_token_ids,
+            encoder_self_attention_mask,
+            decoder_self_attention_mask,
+            cross_attention_mask,
             mode,
         )?)
     }

@@ -68,6 +68,8 @@ mod tassadar_article_interpreter_breadth_envelope;
 mod tassadar_article_interpreter_breadth_suite_gate;
 #[path = "tassadar_article_interpreter_ownership_gate.rs"]
 mod tassadar_article_interpreter_ownership_gate;
+#[path = "tassadar_article_kv_activation_discipline_audit.rs"]
+mod tassadar_article_kv_activation_discipline_audit;
 #[path = "tassadar_article_representation_invariance_gate.rs"]
 mod tassadar_article_representation_invariance_gate;
 #[path = "tassadar_article_runtime_closeout.rs"]
@@ -387,6 +389,7 @@ pub use tassadar_article_hungarian_demo_parity::*;
 pub use tassadar_article_interpreter_breadth_envelope::*;
 pub use tassadar_article_interpreter_breadth_suite_gate::*;
 pub use tassadar_article_interpreter_ownership_gate::*;
+pub use tassadar_article_kv_activation_discipline_audit::*;
 pub use tassadar_article_representation_invariance_gate::*;
 pub use tassadar_article_runtime_closeout::*;
 pub use tassadar_article_single_run_no_spill_closure::*;
