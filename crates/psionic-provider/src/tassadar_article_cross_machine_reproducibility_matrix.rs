@@ -98,7 +98,7 @@ mod tests {
         assert_eq!(receipt.tied_requirement_id, "TAS-185");
         assert_eq!(
             receipt.blocked_issue_ids.first().map(String::as_str),
-            Some("TAS-185A")
+            Some("TAS-186")
         );
         assert_eq!(receipt.supported_machine_class_ids.len(), 2);
         assert!(receipt.deterministic_mode_green);

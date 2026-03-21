@@ -199,7 +199,7 @@ mod tests {
         assert!(summary.runtime_suite_green);
         assert!(summary.binding_green);
         assert!(summary.hard_sudoku_benchmark_closure_green);
-        assert_eq!(summary.blocked_issue_frontier.as_deref(), Some("TAS-185A"));
+        assert_eq!(summary.blocked_issue_frontier.as_deref(), Some("TAS-186"));
         assert!(!summary.article_equivalence_green);
     }
 

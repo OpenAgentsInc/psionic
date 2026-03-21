@@ -8,7 +8,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-185A",
       "TAS-186"
     ]
   },
@@ -153,5 +152,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this report closes TAS-185 only. It freezes one cross-machine reproducibility matrix for the canonical fast article route over the declared `host_cpu_x86_64` and `host_cpu_aarch64` machine classes, binding deterministic demo exactness, deterministic long-horizon exactness, and throughput-floor stability to the selected HullCache route while keeping stochastic execution explicit and out of scope for the current canonical route. It does not by itself close route minimality, final publication verdicts, or article-equivalence green status.",
   "summary": "Cross-machine reproducibility now records tied_requirement_satisfied=true, current_host_machine_class_id=`host_cpu_x86_64`, supported_machine_classes=2, deterministic_mode_green=true, throughput_floor_stability_green=true, stochastic_out_of_scope=true, and reproducibility_matrix_green=true.",
-  "report_digest": "115a1ce6689570d3f38ee18a7c5f45ae19f2e168500111db26509824312b319f"
+  "report_digest": "3b7725a14f7b2a3bd1a8fd2a6670b88f7fdec8393ac1ea8b50d844b2e013f180"
 }

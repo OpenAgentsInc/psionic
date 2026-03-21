@@ -607,6 +607,23 @@ CPU machine envelope, while stochastic execution remains explicitly out of
 scope for this article route and route-minimality plus the final claim checker
 still remain open.
 
+`TAS-185A` now closes that next route-minimality tranche on top of the same
+route. `psionic-eval` now commits the joined audit artifact at
+`fixtures/tassadar/reports/tassadar_article_route_minimality_audit_report.json`,
+which fixes the canonical public claim route to the direct `HullCache` runtime
+path on the canonical article model and excludes checkpoint restore, spill or
+tape continuation, hidden helper mediation, planner-owned indirection, and
+hybrid orchestration from that claim route. `psionic-research` now mirrors the
+operator-readable summary at
+`fixtures/tassadar/reports/tassadar_article_route_minimality_audit_summary.json`,
+`psionic-provider` now projects the same verdict into
+`crates/psionic-provider/src/tassadar_article_route_minimality_audit.rs`, and
+`psionic-serve` now freezes the explicit publication verdict split at
+`fixtures/tassadar/reports/tassadar_article_route_minimality_publication_verdict.json`.
+The bounded article route is now machine-readably minimal and operator-green,
+while the public verdict remains explicitly suppressed until the final
+`TAS-186` article-equivalence claim checker closes.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

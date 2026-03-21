@@ -329,13 +329,13 @@
         "blocker_id": "BEQ-007",
         "category": "weights_ownership_scope",
         "title": "Clean-room weight causality and route-minimality verdict remain open",
-        "repo_status": "partial",
-        "current_gap_summary": "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo now closes the joined interpreter-ownership verdict, the explicit KV-cache plus activation-state discipline verdict, and the cross-machine reproducibility matrix, but it still lacks route-minimality and the final publication verdicts for that stronger reading",
-        "current_public_truth": "the repo now has one canonical TAS-184 interpreter-ownership gate, one TAS-184A KV-cache and activation-state discipline audit, and one TAS-185 cross-machine reproducibility matrix, together making the bounded route's weight sensitivity, mixed same-run state carrier posture, and declared machine-class stability machine-readable; it still does not yet have the later route-minimality publication verdict or final article-equivalence claim checker",
+        "repo_status": "implemented",
+        "current_gap_summary": "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo now closes the joined interpreter-ownership verdict, the explicit KV-cache plus activation-state discipline verdict, the cross-machine reproducibility matrix, and the direct-route minimality plus publication verdict split for that stronger reading",
+        "current_public_truth": "the repo now has one canonical TAS-184 interpreter-ownership gate, one TAS-184A KV-cache and activation-state discipline audit, one TAS-185 cross-machine reproducibility matrix, and one TAS-185A route-minimality audit plus publication verdict, together making the bounded route's weight sensitivity, mixed same-run state carrier posture, declared machine-class stability, and direct-route ownership boundary machine-readable; only the final TAS-186 article-equivalence claim checker remains separate",
         "closure_requirements": [
           "move direct no-tool proof and exactness onto the Transformer-backed route",
           "close invariance, anti-memorization, and evaluation-independence evidence so correctness does not look like brittle recall",
-          "publish clean-room weight causality, KV-cache and activation-state discipline, route-minimality, and final publication verdicts"
+          "publish clean-room weight causality, KV-cache and activation-state discipline, route-minimality, and explicit operator versus public publication verdicts"
         ],
         "article_line_refs": [
           {
@@ -770,7 +770,7 @@
         "github_issue_number": 310,
         "title": "TAS-185A: Route minimality audit and publication verdict",
         "issue_role": "implementation",
-        "issue_state": "open",
+        "issue_state": "closed",
         "blocker_ids": [
           "BEQ-007"
         ]
@@ -814,10 +814,9 @@
     "all_issue_refs_point_to_known_blockers": true,
     "matrix_contract_green": true,
     "article_equivalence_green": false,
-    "open_blocker_count": 2,
+    "open_blocker_count": 1,
     "open_blocker_ids": [
-      "BEQ-003",
-      "BEQ-007"
+      "BEQ-003"
     ],
     "current_truth_boundary": "the public repo has a bounded Rust-only article-closeout path, a bounded no-tool direct proof route on committed workloads, and a bounded Turing-complete substrate statement under declared `TCM.v1` semantics; it does not yet have full article-equivalent closure in the article's strongest frontend, fast-route, benchmark, single-run, or clean-room weight-ownership reading",
     "non_implications": [
@@ -828,14 +827,13 @@
       "not proof that hard-Sudoku benchmark closure, no-spill single-run closure, or route-minimality closure already exist"
     ],
     "claim_boundary": "this report freezes the exact blocker set for article-equivalent closure. It is a machine-readable contract for what still has to become true. It keeps article-equivalence red by design until every blocker closes, and it must not be read as widening the current public capability surface",
-    "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=2.",
-    "report_digest": "4f019c67d923fb18331b04e292a0fbc38bd2e11927a400ff88275b4f9bc69aac"
+    "summary": "Article-equivalence blocker matrix now freezes blocker_count=7, later_issue_count=38, matrix_contract_green=true, article_equivalence_green=false, and open_blocker_count=1.",
+    "report_digest": "1c32012a25bd94aa78fb80170d545194d3f93da0e05e495b058b4a5a1196568c"
   },
   "blocker_count": 7,
-  "open_blocker_count": 2,
+  "open_blocker_count": 1,
   "open_blocker_ids": [
-    "BEQ-003",
-    "BEQ-007"
+    "BEQ-003"
   ],
   "required_later_issue_count": 38,
   "matrix_contract_green": true,
@@ -849,6 +847,6 @@
     "not proof that hard-Sudoku benchmark closure, no-spill single-run closure, or route-minimality closure already exist"
   ],
   "claim_boundary": "this summary mirrors the TAS-157 blocker matrix only. It keeps the blocker contract operator-readable, but it does not add evidence or widen the current public claim boundary beyond the underlying matrix",
-  "summary": "Article-equivalence blocker matrix summary now records blocker_count=7, open_blocker_count=2, matrix_contract_green=true, and article_equivalence_green=false.",
-  "report_digest": "ea7d4839c6f09fa2f2dc031fc51f2142740b85958d3fe4aef29c67e21e3c9027"
+  "summary": "Article-equivalence blocker matrix summary now records blocker_count=7, open_blocker_count=1, matrix_contract_green=true, and article_equivalence_green=false.",
+  "report_digest": "d63ad2a2c7dccec73a49af6d1b83d87ea9a07136bee5d7ceede8ee39872c08cd"
 }

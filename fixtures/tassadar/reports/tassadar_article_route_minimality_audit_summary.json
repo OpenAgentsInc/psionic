@@ -1,0 +1,16 @@
+{
+  "report_id": "tassadar.article_route_minimality.audit.v1",
+  "tied_requirement_id": "TAS-185A",
+  "tied_requirement_satisfied": true,
+  "blocked_issue_frontier": "TAS-186",
+  "canonical_claim_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "route_descriptor_digest": "00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032",
+  "selected_decode_mode": "tassadar.decode.hull_cache.v1",
+  "operator_verdict_green": true,
+  "public_posture": "suppressed_pending_final_audit",
+  "public_verdict_green": false,
+  "route_minimality_audit_green": true,
+  "article_equivalence_green": false,
+  "detail": "TAS-185A now records canonical_claim_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, selected_decode_mode=`tassadar.decode.hull_cache.v1`, operator_verdict_green=true, public_posture=SuppressedPendingFinalAudit, public_verdict_green=false, route_minimality_audit_green=true, and article_equivalence_green=false.",
+  "summary_digest": "73f0322f289d8484c9d1c3f241af8edb524a5f24b5d2415cb3f4412240df18df"
+}

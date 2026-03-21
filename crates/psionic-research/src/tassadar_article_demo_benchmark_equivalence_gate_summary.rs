@@ -195,7 +195,7 @@ mod tests {
         assert!(summary.benchmark_wide_sudoku_parity_green);
         assert!(summary.binding_green);
         assert!(summary.article_demo_benchmark_equivalence_gate_green);
-        assert_eq!(summary.blocked_issue_frontier.as_deref(), Some("TAS-185A"));
+        assert_eq!(summary.blocked_issue_frontier.as_deref(), Some("TAS-186"));
         assert!(!summary.article_equivalence_green);
     }
 

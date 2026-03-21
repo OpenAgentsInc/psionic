@@ -148,7 +148,7 @@ mod tests {
         let summary = build_tassadar_article_cross_machine_reproducibility_matrix_summary()?;
 
         assert_eq!(summary.tied_requirement_id, "TAS-185");
-        assert_eq!(summary.blocked_issue_frontier, "TAS-185A");
+        assert_eq!(summary.blocked_issue_frontier, "TAS-186");
         assert_eq!(summary.supported_machine_class_ids.len(), 2);
         assert!(summary.deterministic_mode_green);
         assert!(summary.throughput_floor_stability_green);

@@ -21,7 +21,7 @@ cargo run -p psionic-research --example tassadar_article_interpreter_ownership_g
 jq -e '
   .acceptance_gate_tie.tied_requirement_id == "TAS-184"
   and .acceptance_gate_tie.tied_requirement_satisfied == true
-  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-185A")
+  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-186")
   and .canonical_boundary_report.boundary_contract_green == true
   and .generic_direct_proof_review.generic_direct_proof_suite_green == true
   and .generic_direct_proof_review.direct_case_count == 6
@@ -40,7 +40,7 @@ jq -e '
 jq -e '
   .tied_requirement_id == "TAS-184"
   and .tied_requirement_satisfied == true
-  and .blocked_issue_frontier == "TAS-185A"
+  and .blocked_issue_frontier == "TAS-186"
   and .generic_direct_proof_suite_green == true
   and .generic_direct_proof_case_count == 6
   and .breadth_conformance_matrix_green == true

@@ -211,7 +211,7 @@ mod tests {
         assert!(summary.route_purity_green);
         assert!(summary.mapping_stable_across_runs);
         assert!(summary.perturbation_sensitivity_green);
-        assert_eq!(summary.blocked_issue_frontier.as_deref(), Some("TAS-185A"));
+        assert_eq!(summary.blocked_issue_frontier.as_deref(), Some("TAS-186"));
         assert!(summary.interpreter_ownership_green);
         assert!(!summary.article_equivalence_green);
     }

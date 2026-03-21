@@ -1,0 +1,19 @@
+{
+  "product_id": "psionic.executor_trace",
+  "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "report_ref": "fixtures/tassadar/reports/tassadar_article_route_minimality_audit_report.json",
+  "summary_ref": "fixtures/tassadar/reports/tassadar_article_route_minimality_audit_summary.json",
+  "canonical_claim_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "route_descriptor_digest": "00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032",
+  "selected_decode_mode": "tassadar.decode.hull_cache.v1",
+  "operator_verdict_green": true,
+  "public_posture": "suppressed_pending_final_audit",
+  "public_verdict_green": false,
+  "public_blocked_issue_ids": [
+    "TAS-186"
+  ],
+  "route_minimality_audit_green": true,
+  "article_equivalence_green": false,
+  "claim_boundary": "this served publication verdict cites the canonical TAS-185A route-minimality audit for the direct HullCache article route only. It freezes the operator-green route-minimality result together with the explicit public suppression posture while TAS-186 remains open, and it does not widen the served claim to final article-equivalence green status or to planner-mediated and hybrid orchestration lanes.",
+  "publication_digest": "6a774d0c3671cd7cbecc33a74d484172c875325748d357b2cf1b9f828074edcf"
+}

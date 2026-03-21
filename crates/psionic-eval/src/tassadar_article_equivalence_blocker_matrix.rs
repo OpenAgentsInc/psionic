@@ -683,12 +683,12 @@ fn blocker_rows() -> Vec<TassadarArticleEquivalenceBlockerRow> {
             title: String::from(
                 "Clean-room weight causality and route-minimality verdict remain open",
             ),
-            repo_status: TassadarRepoStatus::Partial,
+            repo_status: TassadarRepoStatus::Implemented,
             current_gap_summary: String::from(
-                "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo now closes the joined interpreter-ownership verdict, the explicit KV-cache plus activation-state discipline verdict, and the cross-machine reproducibility matrix, but it still lacks route-minimality and the final publication verdicts for that stronger reading",
+                "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo now closes the joined interpreter-ownership verdict, the explicit KV-cache plus activation-state discipline verdict, the cross-machine reproducibility matrix, and the direct-route minimality plus publication verdict split for that stronger reading",
             ),
             current_public_truth: String::from(
-                "the repo now has one canonical TAS-184 interpreter-ownership gate, one TAS-184A KV-cache and activation-state discipline audit, and one TAS-185 cross-machine reproducibility matrix, together making the bounded route's weight sensitivity, mixed same-run state carrier posture, and declared machine-class stability machine-readable; it still does not yet have the later route-minimality publication verdict or final article-equivalence claim checker",
+                "the repo now has one canonical TAS-184 interpreter-ownership gate, one TAS-184A KV-cache and activation-state discipline audit, one TAS-185 cross-machine reproducibility matrix, and one TAS-185A route-minimality audit plus publication verdict, together making the bounded route's weight sensitivity, mixed same-run state carrier posture, declared machine-class stability, and direct-route ownership boundary machine-readable; only the final TAS-186 article-equivalence claim checker remains separate",
             ),
             closure_requirements: vec![
                 String::from(
@@ -698,7 +698,7 @@ fn blocker_rows() -> Vec<TassadarArticleEquivalenceBlockerRow> {
                     "close invariance, anti-memorization, and evaluation-independence evidence so correctness does not look like brittle recall",
                 ),
                 String::from(
-                    "publish clean-room weight causality, KV-cache and activation-state discipline, route-minimality, and final publication verdicts",
+                    "publish clean-room weight causality, KV-cache and activation-state discipline, route-minimality, and explicit operator versus public publication verdicts",
                 ),
             ],
             article_line_refs: vec![
@@ -1029,7 +1029,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             310,
             "TAS-185A: Route minimality audit and publication verdict",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-007"],
         ),
         issue_row(
@@ -1140,7 +1140,7 @@ mod tests {
         assert!(report.matrix_contract_green);
         assert!(!report.article_equivalence_green);
         assert_eq!(report.blocker_count, 7);
-        assert_eq!(report.open_blocker_count, 2);
+        assert_eq!(report.open_blocker_count, 1);
         assert!(report.all_later_issues_covered);
         assert!(report.all_blockers_have_article_line_provenance);
     }

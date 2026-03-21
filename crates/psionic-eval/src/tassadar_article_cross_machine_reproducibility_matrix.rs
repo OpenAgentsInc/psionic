@@ -969,7 +969,7 @@ mod tests {
                 .blocked_issue_ids
                 .first()
                 .map(String::as_str),
-            Some("TAS-185A")
+            Some("TAS-186")
         );
         assert!(report.machine_matrix_review.current_host_measured_green);
         assert!(report.machine_matrix_review.machine_class_alignment_green);

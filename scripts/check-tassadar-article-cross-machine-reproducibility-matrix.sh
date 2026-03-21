@@ -18,7 +18,7 @@ cargo run -p psionic-serve --example tassadar_article_cross_machine_reproducibil
 jq -e '
   .acceptance_gate_tie.tied_requirement_id == "TAS-185"
   and .acceptance_gate_tie.tied_requirement_satisfied == true
-  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-185A")
+  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-186")
   and .machine_matrix_review.current_host_measured_green == true
   and (.machine_matrix_review.supported_machine_class_ids | length) == 2
   and .machine_matrix_review.machine_class_alignment_green == true
@@ -38,7 +38,7 @@ jq -e '
 jq -e '
   .tied_requirement_id == "TAS-185"
   and .tied_requirement_satisfied == true
-  and .blocked_issue_frontier == "TAS-185A"
+  and .blocked_issue_frontier == "TAS-186"
   and (.supported_machine_class_ids | length) == 2
   and .deterministic_mode_green == true
   and .throughput_floor_stability_green == true

@@ -189,7 +189,7 @@ mod tests {
         assert!(summary.no_tool_proof_green);
         assert!(summary.binding_green);
         assert!(summary.hungarian_demo_parity_green);
-        assert_eq!(summary.blocked_issue_frontier.as_deref(), Some("TAS-185A"));
+        assert_eq!(summary.blocked_issue_frontier.as_deref(), Some("TAS-186"));
         assert!(!summary.article_equivalence_green);
     }
 

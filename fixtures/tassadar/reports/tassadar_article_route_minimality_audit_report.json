@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.article_route_minimality.audit.v1",
+  "checker_script_ref": "scripts/check-tassadar-article-route-minimality-audit.sh",
+  "acceptance_gate_tie": {
+    "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+    "architecture_selection_report_ref": "fixtures/tassadar/reports/tassadar_article_fast_route_architecture_selection_report.json",
+    "single_run_no_spill_report_ref": "fixtures/tassadar/reports/tassadar_article_single_run_no_spill_closure_report.json",
+    "interpreter_ownership_report_ref": "fixtures/tassadar/reports/tassadar_article_interpreter_ownership_gate_report.json",
+    "kv_activation_discipline_report_ref": "fixtures/tassadar/reports/tassadar_article_kv_activation_discipline_audit_report.json",
+    "cross_machine_reproducibility_report_ref": "fixtures/tassadar/reports/tassadar_article_cross_machine_reproducibility_matrix_report.json",
+    "tied_requirement_id": "TAS-185A",
+    "tied_requirement_satisfied": true,
+    "acceptance_status": "blocked",
+    "blocked_issue_ids": [
+      "TAS-186"
+    ]
+  },
+  "canonical_claim_route_review": {
+    "canonical_claim_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+    "selected_candidate_kind": "hull_cache_runtime",
+    "selected_decode_mode": "hull_cache",
+    "transformer_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "projected_route_descriptor_digest": "00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032",
+    "projected_planner_route_posture": "fallback_capable",
+    "routeable_module_class_count": 6,
+    "direct_module_class_count": 6,
+    "fallback_module_class_count": 0,
+    "all_module_classes_direct": true,
+    "deterministic_direct_case_count": 3,
+    "deterministic_hybrid_case_count": 3,
+    "deterministic_long_horizon_count": 4,
+    "canonical_claim_route_green": true,
+    "detail": "canonical_claim_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` selected_candidate_kind=`hull_cache_runtime` selected_decode_mode=`HullCache` route_descriptor_digest=`00af062cccc3d1b2` routeable_module_class_count=6 direct_module_class_count=6 fallback_module_class_count=0 deterministic_direct_case_count=3 deterministic_hybrid_case_count=3 deterministic_long_horizon_count=4 canonical_claim_route_green=true"
+  },
+  "continuation_boundary_review": {
+    "checkpoint_restore_allowed": false,
+    "spill_tape_extension_allowed": false,
+    "external_persisted_continuation_allowed": false,
+    "hidden_reentry_allowed": false,
+    "implicit_segmentation_allowed": false,
+    "runtime_loop_unrolling_allowed": false,
+    "teacher_forcing_allowed": false,
+    "oracle_leakage_allowed": false,
+    "oversized_context_memory_allowed": false,
+    "deterministic_mode_required": true,
+    "perturbation_negative_control_green": true,
+    "continuation_boundary_green": true,
+    "detail": "checkpoint_restore_allowed=false spill_tape_extension_allowed=false external_persisted_continuation_allowed=false hidden_reentry_allowed=false implicit_segmentation_allowed=false runtime_loop_unrolling_allowed=false teacher_forcing_allowed=false oracle_leakage_allowed=false oversized_context_memory_allowed=false perturbation_negative_control_green=true continuation_boundary_green=true"
+  },
+  "execution_ownership_review": {
+    "hidden_host_substitution_excluded": true,
+    "external_oracle_excluded": true,
+    "preprocessing_shortcut_excluded": true,
+    "route_drift_excluded": true,
+    "runtime_owned_control_flow_excluded": true,
+    "helper_module_mediation_excluded": true,
+    "artifact_lineage_to_behavior_closed": true,
+    "stable_across_runs": true,
+    "control_flow_realization": "control flow is realized by deterministic reference-linear decode over forward-pass logits with runtime receipts acting only as audit surfaces, not as an alternate control plane",
+    "route_purity_green": true,
+    "detail": "hidden_host_substitution_excluded=true external_oracle_excluded=true preprocessing_shortcut_excluded=true route_drift_excluded=true runtime_owned_control_flow_excluded=true helper_module_mediation_excluded=true artifact_lineage_to_behavior_closed=true stable_across_runs=true route_purity_green=true"
+  },
+  "state_carrier_review": {
+    "carrier_boundary_rows": [
+      {
+        "carrier_kind": "kv_cache",
+        "acceptable_use": "request-local decoder and cross-attention cache state inside one admitted continuous forward-pass route",
+        "non_acceptable_use": "persisted, resumed, or cross-run cache state that silently reintroduces the blocked continuation or spill surfaces from TAS-183",
+        "declared_boundary": "KV state is acceptable only as ephemeral same-run attention carrier state that is reset at the request boundary and stays subordinate to the declared Transformer route"
+      },
+      {
+        "carrier_kind": "residual_stream",
+        "acceptable_use": "ephemeral layer-local activation flow inside the declared encoder-decoder forward pass",
+        "non_acceptable_use": "externalized residual activations or hidden helper-mediated activation replay that would act as an undeclared control plane",
+        "declared_boundary": "residual activations are admitted only as transient within-pass state, not as a durable interpreter substrate outside the forward pass"
+      },
+      {
+        "carrier_kind": "attention_history",
+        "acceptable_use": "the explicit source-token and prior-target-token history already declared by the article trace domain",
+        "non_acceptable_use": "extra hidden history, undeclared prompt extensions, or cache reuse across unrelated requests that smuggle in additional interpreter state",
+        "declared_boundary": "attention history is acceptable only when it is exactly the current request-local article trace, with no undeclared history channel beyond the admitted source and target tokens"
+      }
+    ],
+    "dominance_verdict": {
+      "verdict": "mixed",
+      "weight_perturbation_sensitivity_green": true,
+      "cache_truncation_sensitivity_green": true,
+      "cache_reset_sensitivity_green": true,
+      "cache_growth_scales_with_problem_size": true,
+      "dynamic_state_exceeds_weight_artifact_bytes": true,
+      "carrier_boundary_declared": true,
+      "detail": "weight_perturbation_sensitivity_green=true cache_truncation_sensitivity_green=true cache_reset_sensitivity_green=true cache_growth_scales_with_problem_size=true dynamic_state_exceeds_weight_artifact_bytes=true verdict=Mixed"
+    },
+    "carrier_boundary_declared": true,
+    "request_local_same_run_only_green": true,
+    "persisted_or_cross_run_state_excluded": true,
+    "kv_activation_discipline_green": true,
+    "state_carrier_minimality_green": true,
+    "detail": "carrier_boundary_declared=true persisted_or_cross_run_state_excluded=true dominance_verdict=Mixed kv_activation_discipline_green=true state_carrier_minimality_green=true"
+  },
+  "orchestration_review": {
+    "projected_planner_route_posture": "fallback_capable",
+    "deterministic_direct_case_count": 3,
+    "deterministic_hybrid_case_count": 3,
+    "hybrid_surface_present": true,
+    "hybrid_same_decode_mode_green": true,
+    "hybrid_surface_operator_only": true,
+    "public_claim_route_excludes_planner_indirection": true,
+    "public_claim_route_excludes_hybrid_surface": true,
+    "extra_orchestration_layers_excluded": true,
+    "detail": "hybrid_surface_present=true hybrid_same_decode_mode_green=true public_claim_route_excludes_planner_indirection=true public_claim_route_excludes_hybrid_surface=true extra_orchestration_layers_excluded=true"
+  },
+  "operator_verdict_review": {
+    "route_like_article_in_kind": true,
+    "operator_verdict_green": true,
+    "detail": "route_like_article_in_kind=true operator_verdict_green=true canonical_claim_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`"
+  },
+  "public_verdict_review": {
+    "posture": "suppressed_pending_final_audit",
+    "public_verdict_declared": true,
+    "public_verdict_green": false,
+    "blocked_issue_ids": [
+      "TAS-186"
+    ],
+    "detail": "public_verdict_declared=true posture=SuppressedPendingFinalAudit public_verdict_green=false blocked_issue_count=1"
+  },
+  "route_minimality_audit_green": true,
+  "article_equivalence_green": false,
+  "claim_boundary": "this report closes TAS-185A only. It freezes the minimal final article claim route as the direct HullCache runtime path on the canonical article model, excludes checkpoint, spill, persisted continuation, hidden helper mediation, and planner-owned hybrid orchestration from that claim route, and publishes an explicit operator-green versus public-suppressed verdict split. It does not by itself close the final TAS-186 article-equivalence claim checker or turn article_equivalence_green true.",
+  "summary": "Article route-minimality audit now records tied_requirement_satisfied=true, operator_verdict_green=true, public_verdict_green=false, public_blocked_issue_count=1, route_minimality_audit_green=true, and article_equivalence_green=false.",
+  "report_digest": "cfde677578f41c6b1ad91ae14a9ef16fd837e33c269c549c487a5d971031212c"
+}

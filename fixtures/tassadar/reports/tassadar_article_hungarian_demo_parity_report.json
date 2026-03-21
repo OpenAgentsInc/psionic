@@ -8,7 +8,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-185A",
       "TAS-186"
     ]
   },
@@ -117,14 +116,14 @@
     "public_anchor_token_throughput_per_second": 33409,
     "public_anchor_line_throughput_per_second": 7263,
     "public_anchor_total_token_count": 158396,
-    "measured_tokens_per_second": 3104357153.912932,
-    "measured_lines_per_second": 13117896.054429092,
+    "measured_tokens_per_second": 3216136382.0168943,
+    "measured_lines_per_second": 13590234.842336878,
     "measured_total_token_count": 11532454,
     "public_token_anchor_status": "passed",
     "public_line_anchor_status": "passed",
     "internal_token_floor_status": "passed",
     "declared_floor_green": true,
-    "detail": "throughput report kept `hungarian_10x10_test_a` direct on HullCache with exactness_bps=10000 and public token/line anchors 33409/7263 at measured tok/s 3104357153.91."
+    "detail": "throughput report kept `hungarian_10x10_test_a` direct on HullCache with exactness_bps=10000 and public token/line anchors 33409/7263 at measured tok/s 3216136382.02."
   },
   "binding_review": {
     "frontend_source_matches_reproducer": true,
@@ -139,6 +138,6 @@
   "hungarian_demo_parity_green": true,
   "article_equivalence_green": false,
   "claim_boundary": "this report closes TAS-180 only. It binds the canonical 10x10 Hungarian article demo source to one direct HullCache fast-route session, one planner-owned HullCache hybrid workflow, the declared throughput-floor artifact, and the existing no-tool reproducer proof surface. It does not yet claim Arto closure, benchmark-wide hard-Sudoku closure, unified demo-and-benchmark equivalence, single-run closure, or final article-equivalence green status.",
-  "summary": "Hungarian article demo parity now records tied_requirement_satisfied=true, frontend_green=true, no_tool_proof_green=true, session_fast_route_green=true, hybrid_fast_route_green=true, throughput_floor_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-185A\"), and article_equivalence_green=false.",
-  "report_digest": "d57d6d342b897eac44edc6031c57eb2fbde43e32983b7d3d9c4ec90129b1fd3c"
+  "summary": "Hungarian article demo parity now records tied_requirement_satisfied=true, frontend_green=true, no_tool_proof_green=true, session_fast_route_green=true, hybrid_fast_route_green=true, throughput_floor_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-186\"), and article_equivalence_green=false.",
+  "report_digest": "ca8dfe616b745af865b1754133956cc3046ce9b8dcbbd085f9cda6b2db7bec0f"
 }

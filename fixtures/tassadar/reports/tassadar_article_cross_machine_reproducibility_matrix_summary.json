@@ -2,7 +2,7 @@
   "report_id": "tassadar.article_cross_machine_reproducibility_matrix.report.v1",
   "tied_requirement_id": "TAS-185",
   "tied_requirement_satisfied": true,
-  "blocked_issue_frontier": "TAS-185A",
+  "blocked_issue_frontier": "TAS-186",
   "current_host_machine_class_id": "host_cpu_x86_64",
   "supported_machine_class_ids": [
     "host_cpu_aarch64",
@@ -15,5 +15,5 @@
   "reproducibility_matrix_green": true,
   "article_equivalence_green": false,
   "detail": "TAS-185 now records current_host_machine_class_id=`host_cpu_x86_64`, supported_machine_classes=2, deterministic_mode_green=true, throughput_floor_stability_green=true, stochastic_mode_supported=false, stochastic_mode_out_of_scope=true, reproducibility_matrix_green=true, and article_equivalence_green=false.",
-  "summary_digest": "0ee785997567faa1cc840e43f30784377f55bbd3919cf941e5ba5ba5c87df114"
+  "summary_digest": "ce8d9f6af6b39bf52ad2b781ee590c96b1c750db348ad60a3c14bc090e370ec1"
 }

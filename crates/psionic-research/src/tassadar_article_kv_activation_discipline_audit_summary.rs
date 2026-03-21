@@ -158,7 +158,7 @@ mod tests {
         let summary = build_tassadar_article_kv_activation_discipline_audit_summary()?;
 
         assert_eq!(summary.tied_requirement_id, "TAS-184A");
-        assert_eq!(summary.blocked_issue_frontier, "TAS-185A");
+        assert_eq!(summary.blocked_issue_frontier, "TAS-186");
         assert_eq!(summary.feasible_constraint_case_count, 4);
         assert_eq!(
             summary.dominance_verdict,

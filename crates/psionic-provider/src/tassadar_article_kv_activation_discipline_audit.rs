@@ -98,7 +98,7 @@ mod tests {
         assert_eq!(receipt.tied_requirement_id, "TAS-184A");
         assert_eq!(
             receipt.blocked_issue_ids.first().map(String::as_str),
-            Some("TAS-185A")
+            Some("TAS-186")
         );
         assert!(receipt.ownership_gate_green);
         assert_eq!(receipt.feasible_constraint_case_count, 4);

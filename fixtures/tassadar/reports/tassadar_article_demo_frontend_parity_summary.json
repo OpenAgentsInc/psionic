@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-185A",
         "TAS-186"
       ]
     },
@@ -508,7 +507,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report closes TAS-178 only. It proves that the canonical Hungarian and Sudoku article demo sources compile through the declared public frontend/compiler envelope and stay bound to the same canonical compiled-executor case and workload identities already used by the bounded reproducers. It does not yet claim final Hungarian fast-route parity, Arto or benchmark-wide hard-Sudoku closure, arbitrary-program closure, or final article-equivalence green status.",
     "summary": "Article demo frontend parity now records tied_requirement_satisfied=true, compiled_demos=2/2, refusal_probes=2/2, source_compile_receipt_parity_green=true, workload_identity_parity_green=true, unsupported_variant_refusal_green=true, demo_frontend_parity_green=true, and article_equivalence_green=false.",
-    "report_digest": "8b9533ff7ffd5ef3bd84435931ba1037e8fdd2c401c5e931fba2907e209bd821"
+    "report_digest": "935ffb99e0e472fb3b6594b01d29e55585fab568777e5c6b91cd61e460a4c79e"
   },
   "tied_requirement_id": "TAS-178",
   "tied_requirement_satisfied": true,
@@ -522,5 +521,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-178 article-demo frontend parity tranche. It keeps the Hungarian and Sudoku demo-source closure plus explicit unsupported-variant refusals operator-readable without pretending that later interpreter-breadth, benchmark-wide, or final article-equivalence tranches are already green.",
   "summary": "Article demo frontend parity summary now records tied_requirement_satisfied=true, green_demos=2/2, refusal_probes_green=2, source_compile_receipt_parity_green=true, workload_identity_parity_green=true, unsupported_variant_refusal_green=true, demo_frontend_parity_green=true, and article_equivalence_green=false.",
-  "report_digest": "d1294a09d2544a83c2e9e827979738acd785ff7cbe193572f74c2f783dac7960"
+  "report_digest": "030302958738e7256a1d31f1d859f4b40c82a4b94a837925e6a33894cc36d051"
 }
