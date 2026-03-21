@@ -24,6 +24,9 @@ pub use tassadar_import_boundary::*;
 mod tassadar_import_policy_matrix;
 pub use tassadar_import_policy_matrix::*;
 
+mod tassadar_post_article_plugin_capability_boundary;
+pub use tassadar_post_article_plugin_capability_boundary::*;
+
 mod tassadar_simulator_effect_boundary;
 pub use tassadar_simulator_effect_boundary::*;
 

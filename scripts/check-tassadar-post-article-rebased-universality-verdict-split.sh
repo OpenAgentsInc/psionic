@@ -24,7 +24,7 @@ jq -e '
   and .theory_green == true
   and .operator_green == true
   and .served_green == false
-  and (.deferred_issue_ids == ["TAS-195"])
+  and (.deferred_issue_ids == ["TAS-196"])
   and .rebase_claim_allowed == true
   and .plugin_capability_claim_allowed == false
   and .served_public_universality_allowed == false
@@ -42,7 +42,7 @@ jq -e '
   and .theory_green == true
   and .operator_green == true
   and .served_green == false
-  and (.deferred_issue_ids == ["TAS-195"])
+  and (.deferred_issue_ids == ["TAS-196"])
   and .rebase_claim_allowed == true
   and .plugin_capability_claim_allowed == false
   and .served_public_universality_allowed == false

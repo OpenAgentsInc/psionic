@@ -280,7 +280,7 @@ fn build_report_from_inputs(
     } else {
         TassadarPostArticleRebasedUniversalityVerdictSplitStatus::Incomplete
     };
-    let deferred_issue_ids = vec![String::from("TAS-195")];
+    let deferred_issue_ids = vec![String::from("TAS-196")];
 
     let mut report = TassadarPostArticleRebasedUniversalityVerdictSplitReport {
         schema_version: 1,
@@ -856,7 +856,7 @@ mod tests {
         );
         assert_eq!(report.supporting_material_rows.len(), 7);
         assert_eq!(report.validation_rows.len(), 8);
-        assert_eq!(report.deferred_issue_ids, vec![String::from("TAS-195")]);
+        assert_eq!(report.deferred_issue_ids, vec![String::from("TAS-196")]);
         assert!(report.rebase_claim_allowed);
         assert!(!report.plugin_capability_claim_allowed);
         assert!(!report.served_public_universality_allowed);

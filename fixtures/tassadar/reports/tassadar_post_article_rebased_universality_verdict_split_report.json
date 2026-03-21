@@ -161,7 +161,7 @@
   "verdict_split_status": "theory_green_operator_green_served_suppressed",
   "verdict_split_green": true,
   "deferred_issue_ids": [
-    "TAS-195"
+    "TAS-196"
   ],
   "rebase_claim_allowed": true,
   "plugin_capability_claim_allowed": false,
@@ -237,5 +237,5 @@
   ],
   "claim_boundary": "this report reissues the theory/operator/served universality verdict split on the post-`TAS-186` canonical machine identity. It binds the historical verdict split to the canonical owned route, the canonical weight artifact, the continuation contract, the portability/minimality matrix, and the served conformance envelope. It allows the rebased theory/operator claim only for the canonical route and still does not imply weighted plugin control, served/public universality, or arbitrary software capability.",
   "summary": "Post-article rebased universality verdict split keeps supporting_materials=7/7, validation_rows=8/8, verdict_split_status=TheoryGreenOperatorGreenServedSuppressed, rebase_claim_allowed=true, and served_green=false.",
-  "report_digest": "93d823f653046de935a26bdbbd3999feafd8e4759eccda9936d7eb4304b7199c"
+  "report_digest": "2f8b9a63db23339a06a378940ffb71d80a15a1af779d99a2e68cc893ea9cf57d"
 }

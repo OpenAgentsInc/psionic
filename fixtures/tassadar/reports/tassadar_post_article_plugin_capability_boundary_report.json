@@ -1,0 +1,391 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_plugin_capability_boundary.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-post-article-plugin-capability-boundary.sh",
+  "tcm_v1_runtime_contract_report_ref": "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+  "bridge_contract_report_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+  "rebased_verdict_split_report_ref": "fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json",
+  "world_mount_compatibility_report_ref": "fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json",
+  "import_policy_matrix_report_ref": "fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json",
+  "plugin_system_audit_ref": "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md",
+  "local_plugin_system_spec_ref": "~/code/alpha/tassadar/plugin-system.md",
+  "supporting_material_refs": [
+    "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+    "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+    "fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json",
+    "fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json",
+    "fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json",
+    "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md",
+    "~/code/alpha/tassadar/plugin-system.md",
+    "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md"
+  ],
+  "machine_identity_binding": {
+    "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+    "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+    "canonical_route_descriptor_digest": "00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032",
+    "canonical_weight_bundle_digest": "99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+    "canonical_weight_primary_artifact_sha256": "e24923e6fe39f0656b3f331fb935e0827a3de43b706014610e513ca5a54e9f84",
+    "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+    "continuation_contract_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
+    "reserved_capability_plane_id": "tassadar.post_article_universality_bridge.reserved_capability_plane.v1",
+    "bridge_contract_report_id": "tassadar.post_article_universality_bridge.contract.report.v1",
+    "bridge_contract_report_digest": "2908d3a3b0a47f76c60fcf61726f8f37fc366b9ffe9ba3d3ddad75f08a012e10",
+    "rebased_verdict_report_id": "tassadar.post_article_rebased_universality_verdict_split.report.v1",
+    "rebased_verdict_report_digest": "2f8b9a63db23339a06a378940ffb71d80a15a1af779d99a2e68cc893ea9cf57d",
+    "canonical_architecture_anchor_crate": "psionic-transformer",
+    "canonical_architecture_boundary_ref": "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
+    "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_model_id=`tassadar-article-transformer-trace-bound-trained-v0` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` continuation_contract_id=`tassadar.tcm_v1.runtime_contract.report.v1` reserved_capability_plane_id=`tassadar.post_article_universality_bridge.reserved_capability_plane.v1` and canonical architecture ownership stays anchored in `psionic-transformer`."
+  },
+  "dependency_rows": [
+    {
+      "dependency_id": "tcm_v1_runtime_contract",
+      "dependency_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+      "bound_report_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+      "bound_report_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
+      "detail": "`TCM.v1` remains the bounded compute substrate and continuation contract below any later plugin layer."
+    },
+    {
+      "dependency_id": "post_article_bridge_machine_identity",
+      "dependency_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+      "bound_report_id": "tassadar.post_article_universality_bridge.contract.report.v1",
+      "bound_report_digest": "2908d3a3b0a47f76c60fcf61726f8f37fc366b9ffe9ba3d3ddad75f08a012e10",
+      "detail": "the plugin-aware boundary binds to the canonical post-article bridge machine identity instead of reconstructing a mixed host/runtime machine ad hoc."
+    },
+    {
+      "dependency_id": "rebased_universality_verdict_split",
+      "dependency_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json",
+      "bound_report_id": "tassadar.post_article_rebased_universality_verdict_split.report.v1",
+      "bound_report_digest": "2f8b9a63db23339a06a378940ffb71d80a15a1af779d99a2e68cc893ea9cf57d",
+      "detail": "the rebased theory/operator verdict stays green while plugin capability remains explicitly out of scope."
+    },
+    {
+      "dependency_id": "plugin_system_and_turing_audit",
+      "dependency_class": "observational_context",
+      "satisfied": true,
+      "source_ref": "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md",
+      "detail": "the March 20 plugin audit provides the observational context for keeping plugin capability above the rebased compute substrate rather than folded into it."
+    },
+    {
+      "dependency_id": "local_plugin_system_spec",
+      "dependency_class": "design_input",
+      "satisfied": true,
+      "source_ref": "~/code/alpha/tassadar/plugin-system.md",
+      "detail": "the local plugin-system note is cited explicitly as a design input without treating it as already-landed runtime truth."
+    },
+    {
+      "dependency_id": "world_mount_compatibility",
+      "dependency_class": "compatibility_dependency",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json",
+      "bound_report_id": "tassadar.world_mount_compatibility.report.v1",
+      "bound_report_digest": "ab62499732e3692564b323a9e0dd8c0446a5bc2bfc9c4eca28db44d4024a2fb4",
+      "detail": "world-mount compatibility keeps mount admission task-scoped and external to standalone psionic with allowed=2, denied=1, unresolved=1 cases."
+    },
+    {
+      "dependency_id": "import_policy_matrix",
+      "dependency_class": "compatibility_dependency",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json",
+      "bound_report_id": "tassadar.import_policy_matrix.report.v1",
+      "bound_report_digest": "62d7e2eb8bc8bdcef179f6150a1694ff1dd150cdea39d92cb8dbac2c845f50e3",
+      "detail": "the import-policy matrix keeps internal deterministic stubs, explicit sandbox delegation, and refused unsafe side effects separate with internal=1, delegated=1, refused=2 cases."
+    }
+  ],
+  "boundary_rows": [
+    {
+      "boundary_id": "tcm_v1_remains_bounded_compute_substrate",
+      "current_posture": "bounded_compute_substrate_locked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "`TCM.v1` remains the bounded compute substrate and is not widened by later plugin ambitions."
+    },
+    {
+      "boundary_id": "plugin_capability_plane_reserved_above_bridge",
+      "current_posture": "reserved_above_rebased_compute_substrate",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json"
+      ],
+      "detail": "plugin capability stays on reserved plane `tassadar.post_article_universality_bridge.reserved_capability_plane.v1` above bridge machine `tassadar.post_article_universality_bridge.machine_identity.v1` instead of collapsing into the direct compute carrier."
+    },
+    {
+      "boundary_id": "plugin_execution_separate_software_capability_layer",
+      "current_posture": "separate_software_capability_layer_reserved",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json",
+        "fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json"
+      ],
+      "detail": "plugin execution is reserved as a separate software-capability layer with explicit mount and import boundaries rather than treated as direct compute truth."
+    },
+    {
+      "boundary_id": "downward_non_influence_against_plugin_ergonomics",
+      "current_posture": "reserved_non_negotiable",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
+      ],
+      "detail": "plugin ergonomics may not rewrite continuation semantics, carrier identity, or proof assumptions below the capability plane."
+    },
+    {
+      "boundary_id": "plugin_state_and_receipt_identity_stay_separate",
+      "current_posture": "reserved_separate_identity_families",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json"
+      ],
+      "detail": "plugin packet state, instance-local state, and receipt families stay separate from the core compute substrate and continuation contract."
+    },
+    {
+      "boundary_id": "closed_world_operator_curated_first_plugin_tranche",
+      "current_posture": "required_until_later_discovery_audit",
+      "green": true,
+      "source_refs": [
+        "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md",
+        "~/code/alpha/tassadar/plugin-system.md"
+      ],
+      "detail": "the first audited plugin tranche stays closed-world and operator-curated unless later discovery work is audited separately."
+    },
+    {
+      "boundary_id": "rebased_universality_does_not_grant_plugin_control",
+      "current_posture": "claims_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json"
+      ],
+      "detail": "theory/operator universality on the canonical route does not imply weighted plugin control, plugin publication, served/public universality, or arbitrary software capability."
+    }
+  ],
+  "state_receipt_rows": [
+    {
+      "row_id": "continuation_substrate_state",
+      "state_or_receipt_class": "tcm_v1_continuation_state",
+      "owner_plane": "data",
+      "current_posture": "bounded_compute_substrate",
+      "separate_from_compute_substrate": false,
+      "receipt_identity_family": "tassadar.tcm_v1.runtime_contract.report.v1",
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json"
+      ],
+      "green": true,
+      "detail": "checkpoint, spill, process, and declared effect state stay inside the `TCM.v1` continuation substrate instead of being repackaged as plugin state."
+    },
+    {
+      "row_id": "weights_owned_control_state",
+      "state_or_receipt_class": "weights_owned_control_state",
+      "owner_plane": "control",
+      "current_posture": "already_bound_to_rebased_route",
+      "separate_from_compute_substrate": true,
+      "receipt_identity_family": "tassadar.post_article_rebased_universality_verdict_split.report.v1",
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json"
+      ],
+      "green": true,
+      "detail": "workflow choice remains weights-owned control state on the rebased canonical route rather than plugin-owned orchestration state."
+    },
+    {
+      "row_id": "plugin_packet_local_state",
+      "state_or_receipt_class": "plugin_packet_local_state",
+      "owner_plane": "capability",
+      "current_posture": "reserved_not_implemented",
+      "separate_from_compute_substrate": true,
+      "receipt_identity_family": "tassadar.plugin_invocation.packet.v1.reserved",
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
+      ],
+      "green": true,
+      "detail": "packet-local plugin state is explicitly future-facing and must not be confused with the compute substrate state classes."
+    },
+    {
+      "row_id": "plugin_instance_local_ephemeral_state",
+      "state_or_receipt_class": "plugin_instance_local_ephemeral_state",
+      "owner_plane": "capability",
+      "current_posture": "reserved_not_implemented",
+      "separate_from_compute_substrate": true,
+      "receipt_identity_family": "tassadar.plugin_instance.state.v1.reserved",
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
+      ],
+      "green": true,
+      "detail": "instance-local ephemeral plugin state is reserved as its own class instead of leaking into continuations or proof-bearing compute state."
+    },
+    {
+      "row_id": "plugin_receipt_identity_family",
+      "state_or_receipt_class": "plugin_receipt_identity_family",
+      "owner_plane": "capability",
+      "current_posture": "reserved_not_implemented",
+      "separate_from_compute_substrate": true,
+      "receipt_identity_family": "tassadar.plugin_invocation.receipt.v1.reserved",
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json",
+        "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
+      ],
+      "green": true,
+      "detail": "plugin invocation receipts are reserved as a later capability-plane receipt family instead of being backfilled into current compute receipts."
+    }
+  ],
+  "reserved_invariant_rows": [
+    {
+      "invariant_id": "choice_set_integrity",
+      "current_posture": "reserved_for_later_plugin_layer",
+      "reserved_for_later_plugin_layer": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
+      ],
+      "green": true,
+      "detail": "admissible plugin choices may not be hidden, filtered, or pre-ranked off-trace."
+    },
+    {
+      "invariant_id": "resource_transparency",
+      "current_posture": "reserved_for_later_plugin_layer",
+      "reserved_for_later_plugin_layer": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
+      ],
+      "green": true,
+      "detail": "latency, quota, cost, and availability that could steer plugin choice remain reserved as explicit model-visible or fixed-by-contract facts."
+    },
+    {
+      "invariant_id": "scheduling_ownership",
+      "current_posture": "reserved_for_later_plugin_layer",
+      "reserved_for_later_plugin_layer": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
+      ],
+      "green": true,
+      "detail": "ordering, concurrency, and visibility timing remain reserved as model-owned or fixed-by-contract instead of host-steered behavior."
+    }
+  ],
+  "validation_rows": [
+    {
+      "validation_id": "canonical_identity_matches_bridge_machine",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json"
+      ],
+      "detail": "the plugin-aware boundary stays attached to the canonical bridge machine identity rather than drifting onto a parallel route."
+    },
+    {
+      "validation_id": "runtime_contract_remains_tcm_v1_substrate",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "the same `TCM.v1` continuation contract remains the lower substrate instead of being silently rewritten for plugin ergonomics."
+    },
+    {
+      "validation_id": "world_mount_dependency_stays_task_scoped_external",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json"
+      ],
+      "detail": "world-mount truth remains task-scoped and external, so plugin admission cannot be mistaken for compute-substrate ownership."
+    },
+    {
+      "validation_id": "import_policy_internal_vs_delegated_split_explicit",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json"
+      ],
+      "detail": "deterministic stubs, explicit sandbox delegation, and refused side effects remain typed, counted, and separate."
+    },
+    {
+      "validation_id": "helper_substitution_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json"
+      ],
+      "detail": "undeclared helpers and unsafe side effects cannot be laundered into the rebased compute claim as if they were part of `TCM.v1`."
+    },
+    {
+      "validation_id": "route_drift_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json"
+      ],
+      "detail": "plugin awareness stays bound to the canonical direct article route and does not authorize route-family drift."
+    },
+    {
+      "validation_id": "continuation_abuse_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "continuation semantics remain anchored to the same digest-bound runtime contract and are not widened by plugin ergonomics."
+    },
+    {
+      "validation_id": "semantic_drift_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_world_mount_compatibility_report.json",
+        "fixtures/tassadar/reports/tassadar_import_policy_matrix_report.json"
+      ],
+      "detail": "mount/import boundaries keep plugin-capability mediation explicit rather than rebranding wider semantics as exact compute truth."
+    },
+    {
+      "validation_id": "overclaim_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_rebased_universality_verdict_split_report.json"
+      ],
+      "detail": "the rebased theory/operator verdict remains green while plugin control, plugin publication, served/public universality, and arbitrary software capability stay blocked."
+    },
+    {
+      "validation_id": "later_plugin_invariants_remain_reserved",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
+      ],
+      "detail": "choice-set integrity, resource transparency, and scheduling ownership are frozen as non-negotiable plugin-plane invariants instead of being left optional."
+    }
+  ],
+  "boundary_status": "green",
+  "boundary_green": true,
+  "tcm_v1_substrate_retained": true,
+  "plugin_capability_plane_reserved": true,
+  "plugin_execution_layer_separate": true,
+  "downward_non_influence_reserved": true,
+  "plugin_state_identity_separated": true,
+  "closed_world_operator_curated_first_tranche_required": true,
+  "first_plugin_tranche_posture": "closed_world_operator_curated_only_until_audited",
+  "choice_set_integrity_reserved": true,
+  "resource_transparency_reserved": true,
+  "scheduling_ownership_reserved": true,
+  "rebase_claim_allowed": true,
+  "plugin_capability_claim_allowed": false,
+  "weighted_plugin_control_allowed": false,
+  "plugin_publication_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "deferred_issue_ids": [
+    "TAS-196",
+    "TAS-197"
+  ],
+  "claim_boundary": "this report makes the post-`TAS-186` rebased universality lane explicitly plugin-aware without widening `TCM.v1`, the continuation contract, or the rebased verdict into weighted plugin control. It binds one reserved capability plane above the canonical bridge machine identity, keeps plugin execution as a separate software-capability layer, keeps plugin state and receipt identity outside the bounded compute substrate, reserves choice-set integrity/resource transparency/scheduling ownership and a closed-world operator-curated first tranche, and leaves plugin/publication/served/arbitrary software capability claims blocked.",
+  "summary": "post-article plugin-capability boundary report binds machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, boundary_status=Green, dependency_rows=7, reserved_invariants=3, rebase_claim_allowed=true, plugin_capability_claim_allowed=false, weighted_plugin_control_allowed=false, and plugin_publication_allowed=false.",
+  "report_digest": "d4425bd013c4c0be651fd67da93d5f9e836ca38081f5714051b3de5707d1cc49"
+}

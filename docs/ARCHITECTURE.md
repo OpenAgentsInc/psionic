@@ -1268,6 +1268,22 @@ The current scope is:
   universality suppressed on the narrower article-closeout lane, and allow the
   rebased theory/operator claim without implying weighted plugin control,
   served/public universality, or arbitrary software capability
+- the current post-article plugin-capability boundary artifacts are
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_capability_boundary_report.json`,
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_capability_boundary_summary.json`,
+  the provider receipt in
+  `crates/psionic-provider/src/tassadar_post_article_plugin_capability_boundary.rs`,
+  the checker script
+  `scripts/check-tassadar-post-article-plugin-capability-boundary.sh`, and the
+  audit note
+  `docs/audits/2026-03-21-tassadar-post-article-plugin-capability-boundary.md`,
+  which make the rebased closeout explicitly plugin-aware while keeping
+  `TCM.v1` as the bounded compute substrate, freezing the plugin capability
+  plane above the bridge, reserving choice-set integrity/resource
+  transparency/scheduling ownership plus the first closed-world
+  operator-curated plugin tranche, and keeping weighted plugin control,
+  plugin publication, served/public universality, and arbitrary software
+  capability blocked
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

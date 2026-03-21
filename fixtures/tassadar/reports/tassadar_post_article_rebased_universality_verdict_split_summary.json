@@ -12,12 +12,12 @@
   "supporting_material_row_count": 7,
   "validation_row_count": 8,
   "deferred_issue_ids": [
-    "TAS-195"
+    "TAS-196"
   ],
   "rebase_claim_allowed": true,
   "plugin_capability_claim_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
   "detail": "post-article rebased universality verdict split summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, theory_green=true, operator_green=true, served_green=false, verdict_split_status=TheoryGreenOperatorGreenServedSuppressed, and rebase_claim_allowed=true.",
-  "summary_digest": "01345b34f315f2c3b239f4b6210a7b94aa039fbc7d35c12046630956c2f77104"
+  "summary_digest": "64556dbb3ea372747d0a654e3289afad257ff28a3cd9b30d9237d4a25753b8ca"
 }

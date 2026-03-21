@@ -3843,6 +3843,7 @@ dependencies = [
  "psionic-ir",
  "psionic-models",
  "psionic-runtime",
+ "psionic-sandbox",
  "psionic-train",
  "safetensors",
  "serde",

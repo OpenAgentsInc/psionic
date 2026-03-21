@@ -35,6 +35,7 @@ psionic-environments = { path = "../psionic-environments" }
 psionic-ir = { path = "../psionic-ir" }
 psionic-models = { path = "../psionic-models" }
 psionic-runtime = { path = "../psionic-runtime" }
+psionic-sandbox = { path = "../psionic-sandbox" }
 psionic-train = { path = "../psionic-train" }
 safetensors = { workspace = true }
 serde = { workspace = true }

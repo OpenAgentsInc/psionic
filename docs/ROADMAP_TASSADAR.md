@@ -267,6 +267,20 @@ Current honest posture:
   scope; this tranche now allows the rebased theory/operator claim, but it
   still does not imply weighted plugin control, served/public universality, or
   arbitrary software capability
+- the repo now also has one post-article plugin-capability boundary contract,
+  with a committed sandbox-owned report at
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_capability_boundary_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_capability_boundary_summary.json`,
+  a provider-facing receipt, a checker script, and an audit note that make the
+  rebased closeout explicitly plugin-aware without widening `TCM.v1`, the
+  continuation contract, or the rebased verdict into weighted plugin control;
+  this tranche keeps plugin execution on a separate software-capability layer,
+  freezes plugin packet/state/receipt identity as separate from core compute,
+  reserves choice-set integrity/resource transparency/scheduling ownership and
+  the first closed-world operator-curated plugin tranche, and still does not
+  imply plugin publication, served/public universality, or arbitrary software
+  capability
 - the repo now also has one machine-readable article-equivalence blocker
   matrix, with a committed eval report at
   `fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json`,

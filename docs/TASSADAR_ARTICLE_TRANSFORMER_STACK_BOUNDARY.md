@@ -796,6 +796,24 @@ This tranche turns the rebased theory/operator claim on, but it still does not
 admit weighted plugin control, served/public universality, or arbitrary
 software capability.
 
+`TAS-195` now closes the plugin-aware boundary tranche at
+`fixtures/tassadar/reports/tassadar_post_article_plugin_capability_boundary_report.json`.
+That report keeps `TCM.v1` as the bounded compute substrate below the canonical
+owned route, binds the reserved plugin capability plane to the same bridge
+machine identity, and states machine-readably that plugin execution is a
+separate software-capability layer rather than an implicit extension of
+compute truth. The operator-readable summary now lives at
+`fixtures/tassadar/reports/tassadar_post_article_plugin_capability_boundary_summary.json`,
+the provider receipt now lives at
+`crates/psionic-provider/src/tassadar_post_article_plugin_capability_boundary.rs`,
+and the dedicated checker now lives at
+`scripts/check-tassadar-post-article-plugin-capability-boundary.sh`.
+This tranche keeps plugin packet/state/receipt identity separate from the core
+compute substrate, reserves choice-set integrity/resource transparency/
+scheduling ownership plus the first closed-world operator-curated plugin
+tranche, and still does not admit weighted plugin control, plugin publication,
+served/public universality, or arbitrary software capability.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

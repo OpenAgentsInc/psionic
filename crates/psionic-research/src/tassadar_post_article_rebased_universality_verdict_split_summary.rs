@@ -202,7 +202,7 @@ mod tests {
         assert!(!summary.served_green);
         assert_eq!(summary.supporting_material_row_count, 7);
         assert_eq!(summary.validation_row_count, 8);
-        assert_eq!(summary.deferred_issue_ids, vec![String::from("TAS-195")]);
+        assert_eq!(summary.deferred_issue_ids, vec![String::from("TAS-196")]);
         assert!(summary.rebase_claim_allowed);
         assert!(!summary.plugin_capability_claim_allowed);
         assert!(!summary.served_public_universality_allowed);

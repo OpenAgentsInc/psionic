@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_plugin_capability_boundary.report.v1",
+  "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+  "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "reserved_capability_plane_id": "tassadar.post_article_universality_bridge.reserved_capability_plane.v1",
+  "boundary_status": "green",
+  "dependency_row_count": 7,
+  "boundary_row_count": 7,
+  "state_receipt_row_count": 5,
+  "reserved_invariant_count": 3,
+  "validation_row_count": 10,
+  "first_plugin_tranche_posture": "closed_world_operator_curated_only_until_audited",
+  "rebase_claim_allowed": true,
+  "plugin_capability_claim_allowed": false,
+  "weighted_plugin_control_allowed": false,
+  "plugin_publication_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "deferred_issue_ids": [
+    "TAS-196",
+    "TAS-197"
+  ],
+  "detail": "post-article plugin-capability boundary summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, boundary_status=Green, reserved_capability_plane_id=`tassadar.post_article_universality_bridge.reserved_capability_plane.v1`, first_plugin_tranche_posture=`closed_world_operator_curated_only_until_audited`, and plugin/publication claims blocked=true.",
+  "summary_digest": "502aa88d988a4ba7569bf4c13e5b601b514bf04393754694768e72d00be0c730"
+}
