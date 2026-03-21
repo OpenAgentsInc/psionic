@@ -1,0 +1,266 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_universal_machine_proof_rebinding.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-post-article-universal-machine-proof-rebinding.sh",
+  "historical_proof_report_ref": "fixtures/tassadar/reports/tassadar_universal_machine_proof_report.json",
+  "historical_proof_report_id": "tassadar.universal_machine_proof.report.v1",
+  "historical_proof_report_digest": "8c1f7ecbadfc51d75dd4b00590c4e0bb2752ddf06d83ca9b3b139d36fde81559",
+  "substrate_model_ref": "fixtures/tassadar/reports/tassadar_tcm_v1_model.json",
+  "substrate_model_id": "tcm.v1",
+  "substrate_model_digest": "259cab92c74b71b0135d4d2efee3212d4c8efe8ae6a62165f9560cbd509fe3c6",
+  "runtime_contract_ref": "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+  "runtime_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+  "runtime_contract_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
+  "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+  "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "canonical_weight_artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-trace-bound-trained-v0/99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+  "canonical_weight_bundle_digest": "99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+  "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "canonical_route_descriptor_digest": "00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032",
+  "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+  "supporting_material_rows": [
+    {
+      "material_id": "historical_universal_machine_proof",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_universal_machine_proof_report.json",
+      "source_artifact_id": "tassadar.universal_machine_proof.report.v1",
+      "source_artifact_digest": "8c1f7ecbadfc51d75dd4b00590c4e0bb2752ddf06d83ca9b3b139d36fde81559",
+      "detail": "the historical universal-machine proof must stay green so the rebinding report transports a proof-carrying artifact rather than sampled observation."
+    },
+    {
+      "material_id": "tcm_v1_substrate_model",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_tcm_v1_model.json",
+      "source_artifact_id": "tcm.v1",
+      "source_artifact_digest": "259cab92c74b71b0135d4d2efee3212d4c8efe8ae6a62165f9560cbd509fe3c6",
+      "detail": "the declared `TCM.v1` substrate rows remain the computational substrate below the rebinding boundary and must stay explicit by id and digest."
+    },
+    {
+      "material_id": "tcm_v1_runtime_contract",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+      "source_artifact_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+      "source_artifact_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
+      "detail": "the declared `TCM.v1` runtime contract must stay green so resumed-execution equivalence remains explicit where the universality claim still depends on continuation."
+    },
+    {
+      "material_id": "article_equivalence_acceptance_gate",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+      "source_artifact_id": "tassadar.article_equivalence.acceptance_gate.report.v1",
+      "source_artifact_digest": "e61112cca9b9525c33c875cb21cc0b8927047a968c92bf371fe98f3d0a859395",
+      "detail": "the article acceptance gate must stay green so proof rebinding attaches to the declared canonical owned route rather than to a weaker non-canonical lane."
+    },
+    {
+      "material_id": "post_article_bridge_contract",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+      "source_artifact_id": "tassadar.post_article_universality_bridge.contract.report.v1",
+      "source_artifact_digest": "2908d3a3b0a47f76c60fcf61726f8f37fc366b9ffe9ba3d3ddad75f08a012e10",
+      "detail": "the post-article bridge contract must stay green so the canonical machine, model, weight, route, and continuation identities remain frozen while the historical proof is rebound."
+    },
+    {
+      "material_id": "post_article_semantic_preservation_audit",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json",
+      "source_artifact_id": "tassadar.post_article_canonical_route_semantic_preservation_audit.report.v1",
+      "source_artifact_digest": "43e448b14eefefbc80745a93960d4cc591d930c16e3a7abb083421e499a97467",
+      "detail": "the semantic-preservation audit must stay green so proof transport preserves execution semantics instead of merely preserving outputs."
+    },
+    {
+      "material_id": "post_article_control_plane_proof",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_control_plane_decision_provenance_proof_report.json",
+      "source_artifact_id": "tassadar.post_article_control_plane_decision_provenance_proof.report.v1",
+      "source_artifact_digest": "6e2ee7d74812a896d76f878dbad372fe2f3acaf44436adbe4d8c7091f5960ba1",
+      "detail": "the control-plane proof must stay green so the rebound proof receipts remain bound to model-owned workflow decisions instead of host-owned route collapse."
+    },
+    {
+      "material_id": "post_article_carrier_split_contract",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_carrier_split_contract_report.json",
+      "source_artifact_id": "tassadar.post_article_carrier_split.contract.report.v1",
+      "source_artifact_digest": "fe9d679ae954ffe4d844844568fcdba0f5afee2acc8056081690f2a364309cd4",
+      "detail": "the carrier-split contract must stay green so the rebound universal-machine proof remains bound only to the resumable universality carrier rather than collapsing into the direct article-equivalent carrier."
+    },
+    {
+      "material_id": "turing_closeout_audit_context",
+      "material_class": "observational_context",
+      "satisfied": true,
+      "source_ref": "docs/audits/2026-03-19-tassadar-turing-completeness-closeout-audit.md",
+      "detail": "the March 19 closeout audit remains observational context only here and motivates proof rebinding without substituting for the proof-carrying receipts and audits."
+    }
+  ],
+  "proof_transport_boundary": {
+    "boundary_id": "tassadar.post_article_universal_machine_proof.proof_transport_boundary.v1",
+    "preserved_transition_class_ids": [
+      "bounded_small_step_control_updates",
+      "declared_memory_state_updates",
+      "declared_continuation_resume_equivalence",
+      "declared_effect_boundary_only"
+    ],
+    "admitted_variance_ids": [
+      "canonical_machine_identity_binding",
+      "canonical_model_and_weight_identity_binding",
+      "canonical_route_identity_binding",
+      "carrier_split_publication_without_claim_collapse"
+    ],
+    "blocked_drift_ids": [
+      "helper_substitution",
+      "route_family_drift",
+      "undeclared_cache_owned_control",
+      "undeclared_batching_semantics",
+      "semantic_drift_outside_declared_proof_boundary"
+    ],
+    "boundary_green": true,
+    "detail": "proof transport is explicit instead of implicit: the historical proof may be rebound only across preserved small-step control, memory, continuation, and effect-boundary semantics while machine/model/weight/route identity binding is admitted and helper, route-family, cache-owned, batching-owned, or semantic drift remains blocked."
+  },
+  "proof_transport_receipt_rows": [
+    {
+      "receipt_id": "tassadar.post_article_universal_machine_proof_rebinding.tcm.encoding.two_register_counter_loop.v1.receipt.v1",
+      "encoding_id": "tcm.encoding.two_register_counter_loop.v1",
+      "historical_proof_satisfied": true,
+      "resumed_execution_equivalence_explicit": true,
+      "mechanistic_assumptions_preserved": true,
+      "canonical_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+      "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+      "canonical_weight_artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-trace-bound-trained-v0/99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+      "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+      "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+      "proof_transport_boundary_id": "tassadar.post_article_universal_machine_proof.proof_transport_boundary.v1",
+      "bound_claim_ids": [
+        "construction_backed_universal_machine_witness",
+        "checkpoint_resume_equivalent_under_declared_continuation_contract"
+      ],
+      "rebound_receipt_green": true,
+      "detail": "historical proof row `tcm.encoding.two_register_counter_loop.v1` is rebound onto machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_model_id=`tassadar-article-transformer-trace-bound-trained-v0` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` through proof_transport_boundary_id=`tassadar.post_article_universal_machine_proof.proof_transport_boundary.v1` while keeping continuation semantics explicit under `tassadar.tcm_v1.runtime_contract.report.v1`."
+    },
+    {
+      "receipt_id": "tassadar.post_article_universal_machine_proof_rebinding.tcm.encoding.single_tape_bit_flip.v1.receipt.v1",
+      "encoding_id": "tcm.encoding.single_tape_bit_flip.v1",
+      "historical_proof_satisfied": true,
+      "resumed_execution_equivalence_explicit": true,
+      "mechanistic_assumptions_preserved": true,
+      "canonical_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+      "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+      "canonical_weight_artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-trace-bound-trained-v0/99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+      "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+      "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+      "proof_transport_boundary_id": "tassadar.post_article_universal_machine_proof.proof_transport_boundary.v1",
+      "bound_claim_ids": [
+        "construction_backed_universal_machine_witness",
+        "checkpoint_resume_equivalent_under_declared_continuation_contract"
+      ],
+      "rebound_receipt_green": true,
+      "detail": "historical proof row `tcm.encoding.single_tape_bit_flip.v1` is rebound onto machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_model_id=`tassadar-article-transformer-trace-bound-trained-v0` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` through proof_transport_boundary_id=`tassadar.post_article_universal_machine_proof.proof_transport_boundary.v1` while keeping continuation semantics explicit under `tassadar.tcm_v1.runtime_contract.report.v1`."
+    }
+  ],
+  "rebound_encoding_ids": [
+    "tcm.encoding.two_register_counter_loop.v1",
+    "tcm.encoding.single_tape_bit_flip.v1"
+  ],
+  "proof_transport_audit_complete": true,
+  "proof_rebinding_complete": true,
+  "proof_rebinding_status": "green",
+  "carrier_split_publication_complete": true,
+  "universality_witness_suite_reissued": false,
+  "universal_substrate_gate_allowed": false,
+  "deferred_issue_ids": [
+    "TAS-191"
+  ],
+  "rebase_claim_allowed": false,
+  "plugin_capability_claim_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "validation_rows": [
+    {
+      "validation_id": "helper_substitution_quarantined",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "helper substitution remains quarantined, so proof rebinding cannot be satisfied by hidden host helpers or synthetic metadata swaps."
+    },
+    {
+      "validation_id": "route_drift_rejected",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "route drift remains rejected, so the rebound proof stays attached to one declared canonical route id and one declared route descriptor digest."
+    },
+    {
+      "validation_id": "continuation_abuse_quarantined",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_carrier_split_contract_report.json"
+      ],
+      "detail": "continuation abuse remains quarantined, so resumed execution stays a declared continuation carrier instead of becoming a second hidden machine that manufactures the rebound proof."
+    },
+    {
+      "validation_id": "semantic_drift_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_route_semantic_preservation_audit_report.json"
+      ],
+      "detail": "semantic drift remains blocked, so proof transport preserves execution semantics rather than merely preserving selected outputs."
+    },
+    {
+      "validation_id": "cache_and_batching_drift_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_control_plane_decision_provenance_proof_report.json"
+      ],
+      "detail": "cache-owned and batching-owned control drift stay explicit and blocked, so proof rebinding cannot silently hide a new route family inside cache state or scheduler behavior."
+    },
+    {
+      "validation_id": "proof_transport_boundary_explicit",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_universal_machine_proof_report.json",
+        "fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "one explicit proof-transport boundary now names the preserved transition classes, admitted identity rebinding, and blocked drift classes instead of pretending the rebind is a metadata-only relabel."
+    },
+    {
+      "validation_id": "proof_receipts_reissued_on_canonical_identity",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_universal_machine_proof_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_carrier_split_contract_report.json"
+      ],
+      "detail": "proof transport receipts are reissued against the canonical machine, model, weight, and route identities instead of relying on implied inheritance from the historical operator lane."
+    },
+    {
+      "validation_id": "proof_carrying_distinction_preserved",
+      "green": true,
+      "source_refs": [
+        "docs/audits/2026-03-19-tassadar-turing-completeness-closeout-audit.md"
+      ],
+      "detail": "proof-carrying artifacts remain distinct from observational audit context while the rebind closes as its own machine-readable proof surface."
+    },
+    {
+      "validation_id": "overclaim_posture_explicit",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_carrier_split_contract_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json"
+      ],
+      "detail": "the proof rebind remains bounded: the witness suite, universal-substrate gate, rebased verdict split, served/public universality, weighted plugin control, and arbitrary software capability all remain blocked here."
+    }
+  ],
+  "claim_boundary": "this report rebounds the historical universal-machine proof onto the post-`TAS-186` canonical machine, model, weight, and route identities through an explicit proof-transport boundary and rebinding receipts. It does not by itself reissue the broader universality witness suite, enable the canonical-route universal-substrate gate, publish the rebased theory/operator/served verdict split, admit served/public universality, admit weighted plugin control, or admit arbitrary software capability.",
+  "summary": "Post-article universal-machine proof rebinding keeps supporting_materials=9/9, rebound_receipts=2/2, validation_rows=9/9, proof_transport_audit_complete=true, and proof_rebinding_status=Green.",
+  "report_digest": "624319869c9f792273fe1bd09aa397e9c4b7116483d1c748f1e1fd89d0bb2c5a"
+}

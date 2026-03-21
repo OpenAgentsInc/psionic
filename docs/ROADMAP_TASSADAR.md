@@ -196,7 +196,22 @@ Current honest posture:
   explicit; this tranche still does not rebind the historical
   universal-machine proof, reissue the witness suite, publish the rebased
   verdict split, imply served/public universality, weighted plugin control,
-  software capability
+  or arbitrary software capability
+- the repo now also has one post-article universal-machine proof-rebinding
+  report, with a committed eval report at
+  `fixtures/tassadar/reports/tassadar_post_article_universal_machine_proof_rebinding_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_post_article_universal_machine_proof_rebinding_summary.json`,
+  a provider-facing receipt, a checker script, and an audit note that bind
+  the historical universal-machine proof to the bridge machine identity,
+  canonical model artifact, canonical weight artifact, and canonical route id
+  through one explicit proof-transport boundary instead of metadata-only
+  relabeling while keeping helper substitution, route-family drift,
+  undeclared cache-owned control, undeclared batching semantics, and semantic
+  drift blocked; this tranche still does not reissue the broader witness
+  suite, enable the canonical-route universal-substrate gate, publish the
+  rebased verdict split, imply served/public universality, weighted plugin
+  control, or arbitrary software capability
 - the repo now also has one machine-readable article-equivalence blocker
   matrix, with a committed eval report at
   `fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json`,

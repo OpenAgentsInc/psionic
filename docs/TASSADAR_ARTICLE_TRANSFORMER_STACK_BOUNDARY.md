@@ -708,6 +708,23 @@ universality witness suite, publish the rebased verdict split, admit
 served/public universality, admit weighted plugin control, or admit arbitrary
 software capability.
 
+`TAS-190` now closes the universal-machine proof-rebinding tranche at
+`fixtures/tassadar/reports/tassadar_post_article_universal_machine_proof_rebinding_report.json`.
+That report rebinds the historical universal-machine proof onto the bridge
+machine identity, canonical model artifact, canonical weight artifact, and
+canonical route id through one explicit proof-transport boundary instead of
+treating rebinding as metadata relabeling. The operator-readable summary now
+lives at
+`fixtures/tassadar/reports/tassadar_post_article_universal_machine_proof_rebinding_summary.json`,
+the provider receipt now lives at
+`crates/psionic-provider/src/tassadar_post_article_universal_machine_proof_rebinding.rs`,
+and the dedicated checker now lives at
+`scripts/check-tassadar-post-article-universal-machine-proof-rebinding.sh`.
+This tranche still does not reissue the broader universality witness suite,
+enable the canonical-route universal-substrate gate, publish the rebased
+theory/operator/served verdict split, admit served/public universality, admit
+weighted plugin control, or admit arbitrary software capability.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

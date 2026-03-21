@@ -1182,6 +1182,24 @@ The current scope is:
   historical universal-machine proof, reissue the witness suite, publish the
   rebased verdict split, admit served/public universality, admit weighted
   plugin control, or admit arbitrary software capability
+- the current post-article universal-machine proof-rebinding artifacts are
+  `fixtures/tassadar/reports/tassadar_post_article_universal_machine_proof_rebinding_report.json`,
+  `fixtures/tassadar/reports/tassadar_post_article_universal_machine_proof_rebinding_summary.json`,
+  the provider receipt in
+  `crates/psionic-provider/src/tassadar_post_article_universal_machine_proof_rebinding.rs`,
+  the checker script
+  `scripts/check-tassadar-post-article-universal-machine-proof-rebinding.sh`,
+  and the audit note
+  `docs/audits/2026-03-21-tassadar-post-article-universal-machine-proof-rebinding.md`,
+  which freeze one explicit proof-transport boundary and rebinding receipt set
+  that bind the historical universal-machine proof to the bridge machine,
+  canonical model, canonical weight artifact, and canonical route identity
+  without allowing helper substitution, route-family drift, undeclared
+  cache-owned control, undeclared batching semantics, or semantic drift; this
+  still does not reissue the broader witness suite, enable the canonical-route
+  universal-substrate gate, publish the rebased verdict split, admit
+  served/public universality, admit weighted plugin control, or admit
+  arbitrary software capability
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

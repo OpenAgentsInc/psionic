@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_universal_machine_proof_rebinding.report.v1",
+  "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+  "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "canonical_weight_artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-trace-bound-trained-v0/99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+  "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "proof_transport_boundary_id": "tassadar.post_article_universal_machine_proof.proof_transport_boundary.v1",
+  "proof_rebinding_status": "green",
+  "proof_transport_audit_complete": true,
+  "proof_rebinding_complete": true,
+  "rebound_encoding_ids": [
+    "tcm.encoding.two_register_counter_loop.v1",
+    "tcm.encoding.single_tape_bit_flip.v1"
+  ],
+  "carrier_split_publication_complete": true,
+  "universality_witness_suite_reissued": false,
+  "universal_substrate_gate_allowed": false,
+  "deferred_issue_ids": [
+    "TAS-191"
+  ],
+  "rebase_claim_allowed": false,
+  "plugin_capability_claim_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "detail": "post-article universal-machine proof rebinding summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_model_id=`tassadar-article-transformer-trace-bound-trained-v0`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, rebound_encoding_ids=2, proof_transport_audit_complete=true, and proof_rebinding_status=Green.",
+  "summary_digest": "feb6c08e3fdc3fa821957325ecc4bf1be7bf072f69f404bc45f9592cad174c05"
+}

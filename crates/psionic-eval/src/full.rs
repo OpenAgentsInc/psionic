@@ -264,6 +264,8 @@ mod tassadar_pointer_memory_scratchpad;
 mod tassadar_post_article_carrier_split_contract;
 #[path = "tassadar_post_article_control_plane_decision_provenance_proof.rs"]
 mod tassadar_post_article_control_plane_decision_provenance_proof;
+#[path = "tassadar_post_article_universal_machine_proof_rebinding.rs"]
+mod tassadar_post_article_universal_machine_proof_rebinding;
 #[path = "tassadar_post_article_canonical_route_semantic_preservation_audit.rs"]
 mod tassadar_post_article_canonical_route_semantic_preservation_audit;
 #[path = "tassadar_post_article_universality_bridge_contract.rs"]
@@ -503,6 +505,7 @@ pub use tassadar_owned_transformer_stack_audit::*;
 pub use tassadar_pointer_memory_scratchpad::*;
 pub use tassadar_post_article_carrier_split_contract::*;
 pub use tassadar_post_article_control_plane_decision_provenance_proof::*;
+pub use tassadar_post_article_universal_machine_proof_rebinding::*;
 pub use tassadar_post_article_canonical_route_semantic_preservation_audit::*;
 pub use tassadar_post_article_universality_bridge_contract::*;
 pub use tassadar_pre_closeout_universality_audit::*;
