@@ -1320,6 +1320,26 @@ The current scope is:
   current lane operator/internal-only, default-served empty, and weighted
   plugin control, plugin publication, served/public universality, and
   arbitrary software capability blocked
+- the current post-article plugin packet-ABI and Rust-first PDK artifacts are
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_packet_abi_and_rust_pdk_report.json`,
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary.json`,
+  the runtime bundle in
+  `fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json`,
+  the provider receipt in
+  `crates/psionic-provider/src/tassadar_post_article_plugin_packet_abi_and_rust_pdk.rs`,
+  the checker script
+  `scripts/check-tassadar-post-article-plugin-packet-abi-and-rust-pdk.sh`,
+  and the audit note
+  `docs/audits/2026-03-21-tassadar-post-article-plugin-packet-abi-and-rust-pdk.md`,
+  which freeze one `packet.v1` invocation contract and one Rust-first guest
+  PDK above the manifest contract by requiring a single input packet, one
+  output packet or typed refusal, one explicit host-error channel, one host
+  receipt channel, packet-level schema and codec ids, bytes payloads plus
+  metadata envelopes, one `handle_packet` guest export, one typed refusal
+  family, and one narrow packet-host import namespace while keeping the
+  current lane operator/internal-only and leaving weighted plugin control,
+  plugin publication, served/public universality, and arbitrary software
+  capability blocked
 - the current post-article Turing-completeness closeout artifacts are
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_summary.json`,

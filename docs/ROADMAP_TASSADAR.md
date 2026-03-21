@@ -310,6 +310,20 @@ Current honest posture:
   surface beyond operator/internal plugin artifacts; this tranche still keeps
   weighted plugin control, plugin publication, served/public universality,
   and arbitrary software capability blocked
+- the repo now also has one post-article plugin packet ABI and Rust-first
+  PDK contract, with a committed sandbox-owned report at
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_packet_abi_and_rust_pdk_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary.json`,
+  a committed runtime bundle, a provider-facing receipt, a checker script,
+  and an audit note that freeze a single `packet.v1` invocation contract and
+  a single Rust-first guest authoring surface, including one input packet,
+  one output packet or typed refusal, one explicit host-error channel, one
+  host receipt channel, packet-level schema and codec ids, bytes payloads,
+  metadata envelopes, one `handle_packet` export, one typed refusal family,
+  and one narrow packet-host import namespace; this tranche still keeps
+  weighted plugin control, plugin publication, served/public universality,
+  and arbitrary software capability blocked
 - the repo now also has one post-article Turing-completeness closeout audit,
   with a committed eval report at
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
@@ -522,9 +536,9 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-156` is now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-157` through `TAS-198` are now implemented and tracked in
+- `TAS-157` through `TAS-199` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-199` through `TAS-215` remain open in GitHub and are tracked via the
+- `TAS-200` through `TAS-215` remain open in GitHub and are tracked via the
   issue bodies plus `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 
 ## Repo-Local Companion Docs

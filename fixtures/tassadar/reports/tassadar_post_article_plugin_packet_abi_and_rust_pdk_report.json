@@ -1,0 +1,672 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_plugin_packet_abi_and_rust_pdk.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-post-article-plugin-packet-abi-and-rust-pdk.sh",
+  "plugin_manifest_identity_contract_report_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json",
+  "internal_component_abi_report_ref": "fixtures/tassadar/reports/tassadar_internal_component_abi_report.json",
+  "local_plugin_system_spec_ref": "~/code/alpha/tassadar/plugin-system.md",
+  "post_tas_102_final_audit_ref": "docs/audits/2026-03-18-tassadar-post-tas-102-final-audit.md",
+  "supporting_material_refs": [
+    "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json",
+    "fixtures/tassadar/reports/tassadar_internal_component_abi_report.json",
+    "~/code/alpha/tassadar/plugin-system.md",
+    "docs/audits/2026-03-18-tassadar-post-tas-102-final-audit.md",
+    "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json",
+    "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md"
+  ],
+  "machine_identity_binding": {
+    "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+    "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+    "canonical_route_descriptor_digest": "00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032",
+    "canonical_weight_bundle_digest": "99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+    "canonical_weight_primary_artifact_sha256": "e24923e6fe39f0656b3f331fb935e0827a3de43b706014610e513ca5a54e9f84",
+    "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+    "continuation_contract_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
+    "computational_model_statement_id": "tassadar.post_article_universality_bridge.computational_model_statement.v1",
+    "plugin_manifest_report_id": "tassadar.post_article_plugin_manifest_identity_contract.report.v1",
+    "plugin_manifest_report_digest": "28bf89089addd674b19f5298dd4adc409429a08f3679ab9e2e7edbde6b168107",
+    "packet_abi_version": "packet.v1",
+    "rust_first_pdk_id": "tassadar.plugin.rust_first_pdk.v1",
+    "compiler_contract_id": "tassadar.post_article_plugin_packet_abi_and_rust_pdk.compilation_contract.v1",
+    "runtime_bundle_id": "tassadar.post_article_plugin_packet_abi_and_rust_pdk.runtime_bundle.v1",
+    "runtime_bundle_digest": "73f8a2a05f7041567444f3c7764be41cf23c592f90db409f5507daee850342ed",
+    "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json",
+    "canonical_architecture_anchor_crate": "psionic-transformer",
+    "canonical_architecture_boundary_ref": "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
+    "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` plugin_manifest_report_id=`tassadar.post_article_plugin_manifest_identity_contract.report.v1` compiler_contract_id=`tassadar.post_article_plugin_packet_abi_and_rust_pdk.compilation_contract.v1` and runtime_bundle_id=`tassadar.post_article_plugin_packet_abi_and_rust_pdk.runtime_bundle.v1` remain bound to `psionic-transformer`."
+  },
+  "compiler_contract": {
+    "schema_version": 1,
+    "contract_id": "tassadar.post_article_plugin_packet_abi_and_rust_pdk.compilation_contract.v1",
+    "packet_abi_version": "packet.v1",
+    "rust_first_pdk_id": "tassadar.plugin.rust_first_pdk.v1",
+    "packet_field_specs": [
+      {
+        "field_id": "schema_id",
+        "required": true,
+        "detail": "every packet must carry one schema id so guest and host shape drift fail closed instead of hiding translation in adapters."
+      },
+      {
+        "field_id": "codec_id",
+        "required": true,
+        "detail": "every packet must carry one codec id so content framing remains machine-readable and versioned."
+      },
+      {
+        "field_id": "payload_bytes",
+        "required": true,
+        "detail": "payload bytes remain the core transport form; typed schemas layer above bytes instead of replacing them with hidden host-owned structs."
+      },
+      {
+        "field_id": "metadata_envelope",
+        "required": true,
+        "detail": "packet metadata remains an explicit envelope rather than an ambient side channel."
+      }
+    ],
+    "host_import_specs": [
+      {
+        "import_id": "host.read_invocation_context_v1",
+        "namespace_id": "tassadar.plugin_host.packet.v1",
+        "capability_scope": "context_read_only",
+        "deterministic_surface": true,
+        "ambient_authority_allowed": false,
+        "out_of_band_data_allowed": false,
+        "receipt_required": true,
+        "detail": "the guest may read invocation identity and mount-envelope context through one explicit read-only import instead of ambient process globals."
+      },
+      {
+        "import_id": "host.request_capability_packet_v1",
+        "namespace_id": "tassadar.plugin_host.packet.v1",
+        "capability_scope": "capability_mediated_packet_call",
+        "deterministic_surface": true,
+        "ambient_authority_allowed": false,
+        "out_of_band_data_allowed": false,
+        "receipt_required": true,
+        "detail": "all guest-visible external capability use remains packet-shaped and mediated by the host instead of direct ambient IO or host-specific SDK calls."
+      },
+      {
+        "import_id": "host.emit_receipt_fact_v1",
+        "namespace_id": "tassadar.plugin_host.packet.v1",
+        "capability_scope": "receipt_annotation",
+        "deterministic_surface": true,
+        "ambient_authority_allowed": false,
+        "out_of_band_data_allowed": false,
+        "receipt_required": true,
+        "detail": "the guest may emit bounded receipt annotations through one explicit import instead of hidden logging side channels."
+      }
+    ],
+    "guest_signature": {
+      "guest_authoring_posture": "rust_first_supported",
+      "handler_export": "handle_packet",
+      "input_type": "&[u8]",
+      "output_type": "Result<Vec<u8>, PluginRefusalV1>",
+      "refusal_type_id": "tassadar.plugin.refusal.v1",
+      "host_import_namespace_id": "tassadar.plugin_host.packet.v1",
+      "raw_wasm_admission_posture": "later_only_if_packet_abi_conformant_and_profile_admitted",
+      "detail": "the first admitted guest-authoring surface is one Rust crate exporting `handle_packet`, taking packet bytes, returning output bytes or `PluginRefusalV1`, and using only the narrow packet-host namespace."
+    },
+    "case_specs": [
+      {
+        "case_id": "json_echo_success",
+        "input_schema_id": "plugin.echo.input.v1",
+        "input_codec_id": "json",
+        "expected_status": "exact_output_packet",
+        "expected_output_schema_id": "plugin.echo.output.v1",
+        "required_host_import_ids": [
+          "host.read_invocation_context_v1"
+        ],
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json",
+          "fixtures/tassadar/reports/tassadar_internal_compute_package_manager_report.json"
+        ],
+        "note": "the bounded packet ABI admits one pure JSON packet roundtrip without widening to ambient host orchestration."
+      },
+      {
+        "case_id": "artifact_probe_success",
+        "input_schema_id": "plugin.artifact_probe.input.v1",
+        "input_codec_id": "bytes",
+        "expected_status": "exact_output_packet",
+        "expected_output_schema_id": "plugin.artifact_probe.output.v1",
+        "required_host_import_ids": [
+          "host.read_invocation_context_v1",
+          "host.request_capability_packet_v1",
+          "host.emit_receipt_fact_v1"
+        ],
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json",
+          "fixtures/tassadar/reports/tassadar_internal_component_abi_report.json"
+        ],
+        "note": "the bounded packet ABI admits one capability-mediated bytes packet path with explicit receipt annotation instead of a raw host SDK call surface."
+      },
+      {
+        "case_id": "schema_invalid_typed_refusal",
+        "input_schema_id": "plugin.echo.input.v1",
+        "input_codec_id": "json",
+        "expected_status": "exact_typed_refusal",
+        "expected_refusal_id": "schema_invalid",
+        "required_host_import_ids": [
+          "host.read_invocation_context_v1"
+        ],
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json"
+        ],
+        "note": "schema mismatch stays in the guest-visible typed-refusal family rather than falling through to host exceptions."
+      },
+      {
+        "case_id": "codec_unsupported_typed_refusal",
+        "input_schema_id": "plugin.echo.input.v1",
+        "input_codec_id": "cbor",
+        "expected_status": "exact_typed_refusal",
+        "expected_refusal_id": "codec_unsupported",
+        "required_host_import_ids": [
+          "host.read_invocation_context_v1"
+        ],
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json"
+        ],
+        "note": "unsupported codecs remain a typed refusal instead of an implicit best-effort decode path."
+      },
+      {
+        "case_id": "capability_unmounted_host_error",
+        "input_schema_id": "plugin.artifact_probe.input.v1",
+        "input_codec_id": "bytes",
+        "expected_status": "exact_host_error",
+        "expected_host_error_id": "capability_namespace_unmounted",
+        "required_host_import_ids": [
+          "host.read_invocation_context_v1",
+          "host.request_capability_packet_v1"
+        ],
+        "benchmark_refs": [
+          "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json",
+          "fixtures/tassadar/reports/tassadar_internal_component_abi_report.json"
+        ],
+        "note": "unmounted capability namespaces stay in the explicit host-error channel instead of masquerading as a guest-owned typed refusal."
+      }
+    ],
+    "claim_boundary": "this compilation contract freezes one bounded post-article plugin packet ABI and Rust-first guest PDK surface. It defines a single packet-shaped invocation contract, one typed refusal family, one explicit host-error channel, and one narrow host-import namespace for operator/internal plugin work. It does not claim weighted plugin control, public plugin publication, served/public universality, or arbitrary software capability.",
+    "summary": "Post-article plugin packet ABI compilation contract freezes 4 packet fields, 3 host imports, and 5 cases across 2 output, 2 refusal, and 1 host-error expectations.",
+    "contract_digest": "d65d04a6d0a068152710de93d69338d61c7d631773652186058b9f90c1044c01"
+  },
+  "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json",
+  "runtime_bundle": {
+    "schema_version": 1,
+    "bundle_id": "tassadar.post_article_plugin_packet_abi_and_rust_pdk.runtime_bundle.v1",
+    "packet_abi_version": "packet.v1",
+    "rust_first_pdk_id": "tassadar.plugin.rust_first_pdk.v1",
+    "host_import_namespace_id": "tassadar.plugin_host.packet.v1",
+    "packet_field_ids": [
+      "schema_id",
+      "codec_id",
+      "payload_bytes",
+      "metadata_envelope"
+    ],
+    "host_imports": [
+      {
+        "import_id": "host.read_invocation_context_v1",
+        "namespace_id": "tassadar.plugin_host.packet.v1",
+        "capability_scope": "context_read_only",
+        "deterministic_surface": true,
+        "ambient_authority_allowed": false,
+        "out_of_band_data_allowed": false,
+        "receipt_required": true
+      },
+      {
+        "import_id": "host.request_capability_packet_v1",
+        "namespace_id": "tassadar.plugin_host.packet.v1",
+        "capability_scope": "capability_mediated_packet_call",
+        "deterministic_surface": true,
+        "ambient_authority_allowed": false,
+        "out_of_band_data_allowed": false,
+        "receipt_required": true
+      },
+      {
+        "import_id": "host.emit_receipt_fact_v1",
+        "namespace_id": "tassadar.plugin_host.packet.v1",
+        "capability_scope": "receipt_annotation",
+        "deterministic_surface": true,
+        "ambient_authority_allowed": false,
+        "out_of_band_data_allowed": false,
+        "receipt_required": true
+      }
+    ],
+    "typed_refusals": [
+      {
+        "refusal_id": "schema_invalid",
+        "retry_posture": "fail_closed_no_retry",
+        "detail": "schema mismatch remains a guest-visible typed refusal."
+      },
+      {
+        "refusal_id": "codec_unsupported",
+        "retry_posture": "fail_closed_no_retry",
+        "detail": "unsupported codecs remain a typed refusal instead of host-side best effort."
+      }
+    ],
+    "host_error_channel_ids": [
+      "capability_namespace_unmounted"
+    ],
+    "receipt_field_ids": [
+      "invocation_identity_digest",
+      "input_packet_digest",
+      "output_packet_digest",
+      "typed_refusal_id",
+      "host_error_id"
+    ],
+    "case_receipts": [
+      {
+        "case_id": "json_echo_success",
+        "handler_export": "handle_packet",
+        "status": "exact_output_packet",
+        "input_packet": {
+          "schema_id": "plugin.echo.input.v1",
+          "codec_id": "json",
+          "payload_sha256": "9b97635678ce135364678188fb8b0f462a19a8d60d1223e464c2691480f6d732",
+          "payload_bytes_len": 41,
+          "metadata_field_ids": [
+            "mount_envelope_identity",
+            "invocation_id"
+          ]
+        },
+        "output_packet": {
+          "schema_id": "plugin.echo.output.v1",
+          "codec_id": "json",
+          "payload_sha256": "e5e9d039ec9922f8443e291c070e9c9f51bcb624a3c0529642876857b85193fd",
+          "payload_bytes_len": 29,
+          "metadata_field_ids": [
+            "invocation_id"
+          ]
+        },
+        "invoked_host_import_ids": [
+          "host.read_invocation_context_v1"
+        ],
+        "emitted_receipt_field_ids": [
+          "invocation_identity_digest",
+          "input_packet_digest",
+          "output_packet_digest"
+        ],
+        "note": "the first ABI admits one JSON packet roundtrip without widening the host boundary.",
+        "receipt_digest": "d70a80cab347c6cf9867a84e27fa4220d53d77b9542c92914ec0157796b26798"
+      },
+      {
+        "case_id": "artifact_probe_success",
+        "handler_export": "handle_packet",
+        "status": "exact_output_packet",
+        "input_packet": {
+          "schema_id": "plugin.artifact_probe.input.v1",
+          "codec_id": "bytes",
+          "payload_sha256": "0ec8cf03bf08d602ad93ea40838746e5a0c973c1d3807f22752e88fd7947c16a",
+          "payload_bytes_len": 64,
+          "metadata_field_ids": [
+            "mount_envelope_identity",
+            "capability_namespace_id"
+          ]
+        },
+        "output_packet": {
+          "schema_id": "plugin.artifact_probe.output.v1",
+          "codec_id": "bytes",
+          "payload_sha256": "7d870edc7de28985ab9ccc106eee83dfe4fd0f2ea76b644f12be0a678e159c59",
+          "payload_bytes_len": 32,
+          "metadata_field_ids": [
+            "invocation_id",
+            "artifact_ref"
+          ]
+        },
+        "invoked_host_import_ids": [
+          "host.read_invocation_context_v1",
+          "host.request_capability_packet_v1",
+          "host.emit_receipt_fact_v1"
+        ],
+        "emitted_receipt_field_ids": [
+          "invocation_identity_digest",
+          "input_packet_digest",
+          "output_packet_digest"
+        ],
+        "note": "capability-mediated artifact probing stays packet-shaped and receipt-bound.",
+        "receipt_digest": "b2c04520fe4e2a797bb6a42265ab6c0e0f2ec4f6c078e728fd21877bc86a44f3"
+      },
+      {
+        "case_id": "schema_invalid_typed_refusal",
+        "handler_export": "handle_packet",
+        "status": "exact_typed_refusal",
+        "input_packet": {
+          "schema_id": "plugin.echo.input.v1",
+          "codec_id": "json",
+          "payload_sha256": "c2383d03915c03eaf39885058854c3f645ca81e655c2f3ab76b5b49fb0bc445c",
+          "payload_bytes_len": 17,
+          "metadata_field_ids": [
+            "mount_envelope_identity"
+          ]
+        },
+        "typed_refusal_id": "schema_invalid",
+        "invoked_host_import_ids": [
+          "host.read_invocation_context_v1"
+        ],
+        "emitted_receipt_field_ids": [
+          "invocation_identity_digest",
+          "input_packet_digest",
+          "typed_refusal_id"
+        ],
+        "note": "schema drift remains explicit typed refusal truth.",
+        "receipt_digest": "7bfa53082ce6b82fbfeaca33fa2a8197d058f6e2e3566336377eae98f7dc54d0"
+      },
+      {
+        "case_id": "codec_unsupported_typed_refusal",
+        "handler_export": "handle_packet",
+        "status": "exact_typed_refusal",
+        "input_packet": {
+          "schema_id": "plugin.echo.input.v1",
+          "codec_id": "cbor",
+          "payload_sha256": "488351a1bfc1260e6ae960b219ae87357d038c94abfc0c7459413841136d3fb9",
+          "payload_bytes_len": 19,
+          "metadata_field_ids": [
+            "mount_envelope_identity"
+          ]
+        },
+        "typed_refusal_id": "codec_unsupported",
+        "invoked_host_import_ids": [
+          "host.read_invocation_context_v1"
+        ],
+        "emitted_receipt_field_ids": [
+          "invocation_identity_digest",
+          "input_packet_digest",
+          "typed_refusal_id"
+        ],
+        "note": "codec drift remains explicit typed refusal truth.",
+        "receipt_digest": "5a261a3509d134e08f858b0e27ab5bae5d452085200112319cea24f5514ed1dc"
+      },
+      {
+        "case_id": "capability_unmounted_host_error",
+        "handler_export": "handle_packet",
+        "status": "exact_host_error",
+        "input_packet": {
+          "schema_id": "plugin.artifact_probe.input.v1",
+          "codec_id": "bytes",
+          "payload_sha256": "ca337af58a3a56b717187be2901488ba8a92166176c90c3b8ac1fee507eb1d96",
+          "payload_bytes_len": 24,
+          "metadata_field_ids": [
+            "mount_envelope_identity",
+            "capability_namespace_id"
+          ]
+        },
+        "host_error_id": "capability_namespace_unmounted",
+        "invoked_host_import_ids": [
+          "host.read_invocation_context_v1",
+          "host.request_capability_packet_v1"
+        ],
+        "emitted_receipt_field_ids": [
+          "invocation_identity_digest",
+          "input_packet_digest",
+          "host_error_id"
+        ],
+        "note": "unmounted capability namespaces remain an explicit host error channel instead of a guest refusal.",
+        "receipt_digest": "2d7c4620d9b447a0fde3ab84b8696e13ea3a13890435bb0e8170704aaf91c048"
+      }
+    ],
+    "claim_boundary": "this runtime bundle freezes one bounded packet.v1 plugin invocation ABI and Rust-first PDK surface with explicit output-packet, typed-refusal, and host-error cases. It does not claim weighted plugin control, public plugin publication, served/public universality, or arbitrary software capability.",
+    "summary": "Post-article plugin packet ABI runtime bundle covers 5 cases across 2 output, 2 refusal, and 1 host-error receipts.",
+    "bundle_digest": "73f8a2a05f7041567444f3c7764be41cf23c592f90db409f5507daee850342ed"
+  },
+  "dependency_rows": [
+    {
+      "dependency_id": "plugin_manifest_identity_contract",
+      "dependency_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json",
+      "bound_report_id": "tassadar.post_article_plugin_manifest_identity_contract.report.v1",
+      "bound_report_digest": "28bf89089addd674b19f5298dd4adc409429a08f3679ab9e2e7edbde6b168107",
+      "detail": "the packet ABI inherits the closed manifest contract so packet identity and hot-swap posture are not redefined in the runtime layer."
+    },
+    {
+      "dependency_id": "internal_component_abi_precedent",
+      "dependency_class": "runtime_precedent",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_internal_component_abi_report.json",
+      "bound_report_id": "tassadar.internal_component_abi.report.v1",
+      "bound_report_digest": "916adb14fa5cae3815083c0b4501c24bc3930aa9a1833618add2485a335ded19",
+      "detail": "the earlier internal component-ABI lane remains the narrow precedent for explicit interface, refusal, and publication discipline rather than arbitrary plugin composition."
+    },
+    {
+      "dependency_id": "local_plugin_system_spec",
+      "dependency_class": "design_input",
+      "satisfied": true,
+      "source_ref": "~/code/alpha/tassadar/plugin-system.md",
+      "detail": "the local plugin-system draft defines the packet ABI, refusal channel, and Rust-first guest-authoring direction this report freezes."
+    },
+    {
+      "dependency_id": "post_tas_102_final_audit",
+      "dependency_class": "observational_context",
+      "satisfied": true,
+      "source_ref": "docs/audits/2026-03-18-tassadar-post-tas-102-final-audit.md",
+      "detail": "the broader internal-compute audit remains the disclosure-safe posture reminder that named ABI surfaces do not imply public broad-family closure."
+    }
+  ],
+  "abi_rows": [
+    {
+      "abi_id": "single_input_packet_required",
+      "current_posture": "one_packet_input_per_invocation",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md"
+      ],
+      "detail": "every invocation stays packet-shaped with one explicit input packet instead of ambient guest arguments."
+    },
+    {
+      "abi_id": "single_output_packet_or_typed_refusal_required",
+      "current_posture": "one_of_output_refusal_or_host_error",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json"
+      ],
+      "detail": "each invocation ends in one output packet, one typed refusal, or one host error, never an ambiguous mixed channel."
+    },
+    {
+      "abi_id": "explicit_host_error_channel_required",
+      "current_posture": "host_error_channel_separate_from_guest_refusal",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json"
+      ],
+      "detail": "host runtime failures stay on one explicit host-error channel rather than masquerading as guest-authored refusals."
+    },
+    {
+      "abi_id": "explicit_receipt_channel_required",
+      "current_posture": "host_receipt_fields_required",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json"
+      ],
+      "detail": "input, output, refusal, host-error, and invocation identity digests remain explicit host receipt fields."
+    },
+    {
+      "abi_id": "schema_ids_required",
+      "current_posture": "schema_ids_bound_on_every_packet",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json"
+      ],
+      "detail": "schema ids remain mandatory so packet shape drift fails closed."
+    },
+    {
+      "abi_id": "codec_ids_required",
+      "current_posture": "codec_ids_bound_on_every_packet",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json"
+      ],
+      "detail": "codec ids remain mandatory so payload framing is versioned and challengeable."
+    },
+    {
+      "abi_id": "payload_bytes_core_form",
+      "current_posture": "bytes_are_the_core_payload_carrier",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md"
+      ],
+      "detail": "payload bytes remain the core ABI carrier; typed schemas layer above bytes instead of replacing them."
+    },
+    {
+      "abi_id": "metadata_envelope_shape_frozen",
+      "current_posture": "metadata_envelope_optional_and_typed",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md"
+      ],
+      "detail": "metadata remains an explicit envelope instead of a hidden side channel."
+    }
+  ],
+  "pdk_rows": [
+    {
+      "pdk_id": "rust_guest_crate_required",
+      "current_posture": "rust_first_supported",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md"
+      ],
+      "detail": "the admitted guest-authoring path remains Rust-first rather than an open-ended guest-language promise."
+    },
+    {
+      "pdk_id": "handle_packet_export_required",
+      "current_posture": "single_handler_export_required",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json"
+      ],
+      "detail": "the guest surface remains one `handle_packet` export instead of a broad host callback API."
+    },
+    {
+      "pdk_id": "explicit_plugin_refusal_type_required",
+      "current_posture": "plugin_refusal_v1_required",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json"
+      ],
+      "detail": "guest-authored refusals remain typed and bounded instead of collapsing into opaque guest error strings."
+    },
+    {
+      "pdk_id": "narrow_host_import_namespace_required",
+      "current_posture": "single_packet_host_namespace",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md"
+      ],
+      "detail": "the guest may only touch one narrow packet-host namespace instead of a broad engine-specific SDK surface."
+    },
+    {
+      "pdk_id": "no_ambient_authority_required",
+      "current_posture": "ambient_authority_forbidden",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json"
+      ],
+      "detail": "all external guest-visible access remains explicit host imports with no ambient authority or hidden side channels."
+    },
+    {
+      "pdk_id": "raw_wasm_admission_later_only",
+      "current_posture": "later_profile_gated_admission",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md"
+      ],
+      "detail": "raw Wasm admission remains a later profile-gated follow-on rather than part of the first Rust-first support promise."
+    }
+  ],
+  "validation_rows": [
+    {
+      "validation_id": "hidden_host_orchestration_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json",
+        "~/code/alpha/tassadar/plugin-system.md"
+      ],
+      "detail": "the host may carry packet execution and receipt emission, but it may not absorb guest decision logic behind a broader API."
+    },
+    {
+      "validation_id": "schema_drift_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json"
+      ],
+      "detail": "schema and codec drift remain typed refusals rather than implicit best-effort translation."
+    },
+    {
+      "validation_id": "envelope_leakage_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_internal_component_abi_report.json",
+        "~/code/alpha/tassadar/plugin-system.md"
+      ],
+      "detail": "mount-envelope authority stays explicit and capability-mediated instead of leaking ambient access into guest code."
+    },
+    {
+      "validation_id": "side_channel_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json"
+      ],
+      "detail": "guest-visible host data remains explicit, deterministic, and receipt-bound instead of using hidden side channels."
+    },
+    {
+      "validation_id": "overclaim_posture_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json"
+      ],
+      "detail": "the packet ABI and Rust-first PDK do not themselves imply weighted plugin control, public plugin publication, served/public universality, or arbitrary software capability."
+    },
+    {
+      "validation_id": "typed_fail_closed_posture_explicit",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json"
+      ],
+      "detail": "typed refusals and host errors remain explicit fail-closed outcomes when schemas, codecs, or capability mounts do not line up."
+    },
+    {
+      "validation_id": "rust_first_surface_narrow",
+      "green": true,
+      "source_refs": [
+        "~/code/alpha/tassadar/plugin-system.md",
+        "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json"
+      ],
+      "detail": "the first guest-authoring surface stays narrow enough to test and audit."
+    },
+    {
+      "validation_id": "error_channel_separate_from_guest_refusal",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json"
+      ],
+      "detail": "host-error channels remain separate from guest refusals instead of flattening engine/runtime failures into the guest taxonomy."
+    }
+  ],
+  "contract_status": "green",
+  "contract_green": true,
+  "operator_internal_only_posture": true,
+  "packet_abi_frozen": true,
+  "rust_first_pdk_frozen": true,
+  "typed_refusal_channel_frozen": true,
+  "explicit_host_error_channel_frozen": true,
+  "explicit_receipt_channel_required": true,
+  "narrow_host_import_surface_frozen": true,
+  "rebase_claim_allowed": true,
+  "plugin_capability_claim_allowed": false,
+  "weighted_plugin_control_allowed": false,
+  "plugin_publication_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "deferred_issue_ids": [
+    "TAS-200"
+  ],
+  "claim_boundary": "this report freezes the first post-article plugin packet ABI and Rust-first PDK above the rebased machine without widening the current claim surface. It defines a single packet-shaped invocation contract, explicit typed refusal and host-error channels, a host-owned receipt channel, and a narrow Rust-first guest import surface while keeping weighted plugin control, plugin publication, served/public universality, and arbitrary software capability blocked until the later runtime API, engine-abstraction, and controller tranches land.",
+  "summary": "post-article plugin packet ABI report binds machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, contract_status=Green, abi_rows=8, pdk_rows=6, validation_rows=8, and deferred_issue_ids=1.",
+  "report_digest": "e0e52f2ebdcf86e73df6e271f406775ad21a47219ab80ed4e73c52ae947ab2b1"
+}

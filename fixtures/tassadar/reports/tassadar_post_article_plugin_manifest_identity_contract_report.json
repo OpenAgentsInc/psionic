@@ -418,10 +418,8 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "deferred_issue_ids": [
-    "TAS-199"
-  ],
+  "deferred_issue_ids": [],
   "claim_boundary": "this report freezes the canonical plugin manifest, identity, and hot-swap contract above the rebased post-article machine without widening the current claim surface. It defines the required manifest fields, canonical invocation identity, compatibility and hot-swap rules, and explicit linked-bundle packaging posture for named plugin artifacts while preserving operator/internal-only release posture and leaving weighted plugin capability, plugin publication, served/public universality, and arbitrary software capability blocked until later ABI/runtime/controller/platform issues land.",
-  "summary": "post-article plugin manifest contract binds machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, contract_status=Green, dependency_rows=6, manifest_field_rows=12, hot_swap_rule_rows=4, and deferred_issue_ids=1.",
-  "report_digest": "84e3faf954c793d72074b87758bec3fd538e23200eb77976e4f1d3b3a8361c93"
+  "summary": "post-article plugin manifest contract binds machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, contract_status=Green, dependency_rows=6, manifest_field_rows=12, hot_swap_rule_rows=4, and deferred_issue_ids=0.",
+  "report_digest": "28bf89089addd674b19f5298dd4adc409429a08f3679ab9e2e7edbde6b168107"
 }

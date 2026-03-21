@@ -1,0 +1,217 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.post_article_plugin_packet_abi_and_rust_pdk.runtime_bundle.v1",
+  "packet_abi_version": "packet.v1",
+  "rust_first_pdk_id": "tassadar.plugin.rust_first_pdk.v1",
+  "host_import_namespace_id": "tassadar.plugin_host.packet.v1",
+  "packet_field_ids": [
+    "schema_id",
+    "codec_id",
+    "payload_bytes",
+    "metadata_envelope"
+  ],
+  "host_imports": [
+    {
+      "import_id": "host.read_invocation_context_v1",
+      "namespace_id": "tassadar.plugin_host.packet.v1",
+      "capability_scope": "context_read_only",
+      "deterministic_surface": true,
+      "ambient_authority_allowed": false,
+      "out_of_band_data_allowed": false,
+      "receipt_required": true
+    },
+    {
+      "import_id": "host.request_capability_packet_v1",
+      "namespace_id": "tassadar.plugin_host.packet.v1",
+      "capability_scope": "capability_mediated_packet_call",
+      "deterministic_surface": true,
+      "ambient_authority_allowed": false,
+      "out_of_band_data_allowed": false,
+      "receipt_required": true
+    },
+    {
+      "import_id": "host.emit_receipt_fact_v1",
+      "namespace_id": "tassadar.plugin_host.packet.v1",
+      "capability_scope": "receipt_annotation",
+      "deterministic_surface": true,
+      "ambient_authority_allowed": false,
+      "out_of_band_data_allowed": false,
+      "receipt_required": true
+    }
+  ],
+  "typed_refusals": [
+    {
+      "refusal_id": "schema_invalid",
+      "retry_posture": "fail_closed_no_retry",
+      "detail": "schema mismatch remains a guest-visible typed refusal."
+    },
+    {
+      "refusal_id": "codec_unsupported",
+      "retry_posture": "fail_closed_no_retry",
+      "detail": "unsupported codecs remain a typed refusal instead of host-side best effort."
+    }
+  ],
+  "host_error_channel_ids": [
+    "capability_namespace_unmounted"
+  ],
+  "receipt_field_ids": [
+    "invocation_identity_digest",
+    "input_packet_digest",
+    "output_packet_digest",
+    "typed_refusal_id",
+    "host_error_id"
+  ],
+  "case_receipts": [
+    {
+      "case_id": "json_echo_success",
+      "handler_export": "handle_packet",
+      "status": "exact_output_packet",
+      "input_packet": {
+        "schema_id": "plugin.echo.input.v1",
+        "codec_id": "json",
+        "payload_sha256": "9b97635678ce135364678188fb8b0f462a19a8d60d1223e464c2691480f6d732",
+        "payload_bytes_len": 41,
+        "metadata_field_ids": [
+          "mount_envelope_identity",
+          "invocation_id"
+        ]
+      },
+      "output_packet": {
+        "schema_id": "plugin.echo.output.v1",
+        "codec_id": "json",
+        "payload_sha256": "e5e9d039ec9922f8443e291c070e9c9f51bcb624a3c0529642876857b85193fd",
+        "payload_bytes_len": 29,
+        "metadata_field_ids": [
+          "invocation_id"
+        ]
+      },
+      "invoked_host_import_ids": [
+        "host.read_invocation_context_v1"
+      ],
+      "emitted_receipt_field_ids": [
+        "invocation_identity_digest",
+        "input_packet_digest",
+        "output_packet_digest"
+      ],
+      "note": "the first ABI admits one JSON packet roundtrip without widening the host boundary.",
+      "receipt_digest": "d70a80cab347c6cf9867a84e27fa4220d53d77b9542c92914ec0157796b26798"
+    },
+    {
+      "case_id": "artifact_probe_success",
+      "handler_export": "handle_packet",
+      "status": "exact_output_packet",
+      "input_packet": {
+        "schema_id": "plugin.artifact_probe.input.v1",
+        "codec_id": "bytes",
+        "payload_sha256": "0ec8cf03bf08d602ad93ea40838746e5a0c973c1d3807f22752e88fd7947c16a",
+        "payload_bytes_len": 64,
+        "metadata_field_ids": [
+          "mount_envelope_identity",
+          "capability_namespace_id"
+        ]
+      },
+      "output_packet": {
+        "schema_id": "plugin.artifact_probe.output.v1",
+        "codec_id": "bytes",
+        "payload_sha256": "7d870edc7de28985ab9ccc106eee83dfe4fd0f2ea76b644f12be0a678e159c59",
+        "payload_bytes_len": 32,
+        "metadata_field_ids": [
+          "invocation_id",
+          "artifact_ref"
+        ]
+      },
+      "invoked_host_import_ids": [
+        "host.read_invocation_context_v1",
+        "host.request_capability_packet_v1",
+        "host.emit_receipt_fact_v1"
+      ],
+      "emitted_receipt_field_ids": [
+        "invocation_identity_digest",
+        "input_packet_digest",
+        "output_packet_digest"
+      ],
+      "note": "capability-mediated artifact probing stays packet-shaped and receipt-bound.",
+      "receipt_digest": "b2c04520fe4e2a797bb6a42265ab6c0e0f2ec4f6c078e728fd21877bc86a44f3"
+    },
+    {
+      "case_id": "schema_invalid_typed_refusal",
+      "handler_export": "handle_packet",
+      "status": "exact_typed_refusal",
+      "input_packet": {
+        "schema_id": "plugin.echo.input.v1",
+        "codec_id": "json",
+        "payload_sha256": "c2383d03915c03eaf39885058854c3f645ca81e655c2f3ab76b5b49fb0bc445c",
+        "payload_bytes_len": 17,
+        "metadata_field_ids": [
+          "mount_envelope_identity"
+        ]
+      },
+      "typed_refusal_id": "schema_invalid",
+      "invoked_host_import_ids": [
+        "host.read_invocation_context_v1"
+      ],
+      "emitted_receipt_field_ids": [
+        "invocation_identity_digest",
+        "input_packet_digest",
+        "typed_refusal_id"
+      ],
+      "note": "schema drift remains explicit typed refusal truth.",
+      "receipt_digest": "7bfa53082ce6b82fbfeaca33fa2a8197d058f6e2e3566336377eae98f7dc54d0"
+    },
+    {
+      "case_id": "codec_unsupported_typed_refusal",
+      "handler_export": "handle_packet",
+      "status": "exact_typed_refusal",
+      "input_packet": {
+        "schema_id": "plugin.echo.input.v1",
+        "codec_id": "cbor",
+        "payload_sha256": "488351a1bfc1260e6ae960b219ae87357d038c94abfc0c7459413841136d3fb9",
+        "payload_bytes_len": 19,
+        "metadata_field_ids": [
+          "mount_envelope_identity"
+        ]
+      },
+      "typed_refusal_id": "codec_unsupported",
+      "invoked_host_import_ids": [
+        "host.read_invocation_context_v1"
+      ],
+      "emitted_receipt_field_ids": [
+        "invocation_identity_digest",
+        "input_packet_digest",
+        "typed_refusal_id"
+      ],
+      "note": "codec drift remains explicit typed refusal truth.",
+      "receipt_digest": "5a261a3509d134e08f858b0e27ab5bae5d452085200112319cea24f5514ed1dc"
+    },
+    {
+      "case_id": "capability_unmounted_host_error",
+      "handler_export": "handle_packet",
+      "status": "exact_host_error",
+      "input_packet": {
+        "schema_id": "plugin.artifact_probe.input.v1",
+        "codec_id": "bytes",
+        "payload_sha256": "ca337af58a3a56b717187be2901488ba8a92166176c90c3b8ac1fee507eb1d96",
+        "payload_bytes_len": 24,
+        "metadata_field_ids": [
+          "mount_envelope_identity",
+          "capability_namespace_id"
+        ]
+      },
+      "host_error_id": "capability_namespace_unmounted",
+      "invoked_host_import_ids": [
+        "host.read_invocation_context_v1",
+        "host.request_capability_packet_v1"
+      ],
+      "emitted_receipt_field_ids": [
+        "invocation_identity_digest",
+        "input_packet_digest",
+        "host_error_id"
+      ],
+      "note": "unmounted capability namespaces remain an explicit host error channel instead of a guest refusal.",
+      "receipt_digest": "2d7c4620d9b447a0fde3ab84b8696e13ea3a13890435bb0e8170704aaf91c048"
+    }
+  ],
+  "claim_boundary": "this runtime bundle freezes one bounded packet.v1 plugin invocation ABI and Rust-first PDK surface with explicit output-packet, typed-refusal, and host-error cases. It does not claim weighted plugin control, public plugin publication, served/public universality, or arbitrary software capability.",
+  "summary": "Post-article plugin packet ABI runtime bundle covers 5 cases across 2 output, 2 refusal, and 1 host-error receipts.",
+  "bundle_digest": "73f8a2a05f7041567444f3c7764be41cf23c592f90db409f5507daee850342ed"
+}

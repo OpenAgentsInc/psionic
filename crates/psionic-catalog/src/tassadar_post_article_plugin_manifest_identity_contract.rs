@@ -377,7 +377,7 @@ pub fn build_tassadar_post_article_plugin_manifest_identity_contract_report(
         plugin_publication_allowed,
         served_public_universality_allowed,
         arbitrary_software_capability_allowed,
-        deferred_issue_ids: vec![String::from("TAS-199")],
+        deferred_issue_ids: Vec::new(),
         claim_boundary: String::from(
             "this report freezes the canonical plugin manifest, identity, and hot-swap contract above the rebased post-article machine without widening the current claim surface. It defines the required manifest fields, canonical invocation identity, compatibility and hot-swap rules, and explicit linked-bundle packaging posture for named plugin artifacts while preserving operator/internal-only release posture and leaving weighted plugin capability, plugin publication, served/public universality, and arbitrary software capability blocked until later ABI/runtime/controller/platform issues land.",
         ),
@@ -1093,7 +1093,7 @@ mod tests {
         assert_eq!(report.hot_swap_rule_rows.len(), 4);
         assert_eq!(report.packaging_rows.len(), 3);
         assert_eq!(report.validation_rows.len(), 8);
-        assert_eq!(report.deferred_issue_ids, vec![String::from("TAS-199")]);
+        assert!(report.deferred_issue_ids.is_empty());
     }
 
     #[test]

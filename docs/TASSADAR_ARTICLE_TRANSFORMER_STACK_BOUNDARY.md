@@ -872,6 +872,29 @@ This tranche keeps hot-swap compatibility typed, keeps default-served plugin
 lanes empty, and still does not admit weighted plugin control, plugin
 publication, served/public universality, or arbitrary software capability.
 
+`TAS-199` now closes the canonical plugin packet ABI and Rust-first PDK
+tranche at
+`fixtures/tassadar/reports/tassadar_post_article_plugin_packet_abi_and_rust_pdk_report.json`.
+That report freezes one `packet.v1` invocation contract above the manifest
+contract by inheriting the closed manifest surface plus the earlier internal
+component-ABI precedent, binding one input packet, one output packet or typed
+refusal, one explicit host-error channel, one host receipt channel, schema
+and codec ids, bytes payloads, and metadata envelopes to the same canonical
+machine identity and computational-model statement as the manifest contract,
+and freezing one Rust-first guest surface around a single `handle_packet`
+export, one typed refusal family, and one narrow packet-host namespace. The
+operator-readable summary now lives at
+`fixtures/tassadar/reports/tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary.json`,
+the runtime bundle now lives at
+`fixtures/tassadar/runs/tassadar_post_article_plugin_packet_abi_and_rust_pdk_v1/tassadar_post_article_plugin_packet_abi_and_rust_pdk_bundle.json`,
+the provider receipt now lives at
+`crates/psionic-provider/src/tassadar_post_article_plugin_packet_abi_and_rust_pdk.rs`,
+and the dedicated checker now lives at
+`scripts/check-tassadar-post-article-plugin-packet-abi-and-rust-pdk.sh`.
+This tranche keeps the guest surface narrow, keeps host errors separate from
+guest refusals, and still does not admit weighted plugin control, plugin
+publication, served/public universality, or arbitrary software capability.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

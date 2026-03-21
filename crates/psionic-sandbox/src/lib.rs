@@ -30,6 +30,9 @@ pub use tassadar_post_article_plugin_capability_boundary::*;
 mod tassadar_post_article_plugin_charter_authority_boundary;
 pub use tassadar_post_article_plugin_charter_authority_boundary::*;
 
+mod tassadar_post_article_plugin_packet_abi_and_rust_pdk;
+pub use tassadar_post_article_plugin_packet_abi_and_rust_pdk::*;
+
 mod tassadar_simulator_effect_boundary;
 pub use tassadar_simulator_effect_boundary::*;
 

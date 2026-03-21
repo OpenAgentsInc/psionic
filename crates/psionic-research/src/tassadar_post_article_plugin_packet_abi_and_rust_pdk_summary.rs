@@ -9,30 +9,30 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use psionic_catalog::{
-    build_tassadar_post_article_plugin_manifest_identity_contract_report,
-    TassadarPostArticlePluginManifestIdentityContractReport,
-    TassadarPostArticlePluginManifestIdentityContractReportError,
-    TassadarPostArticlePluginManifestIdentityContractStatus,
+use psionic_sandbox::{
+    TassadarPostArticlePluginPacketAbiAndRustPdkReport,
+    TassadarPostArticlePluginPacketAbiAndRustPdkReportError,
+    TassadarPostArticlePluginPacketAbiAndRustPdkStatus,
+    build_tassadar_post_article_plugin_packet_abi_and_rust_pdk_report,
 };
 
-pub const TASSADAR_POST_ARTICLE_PLUGIN_MANIFEST_IDENTITY_CONTRACT_SUMMARY_REF: &str =
-    "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_summary.json";
+pub const TASSADAR_POST_ARTICLE_PLUGIN_PACKET_ABI_AND_RUST_PDK_SUMMARY_REF: &str =
+    "fixtures/tassadar/reports/tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary.json";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassadarPostArticlePluginManifestIdentityContractSummary {
+pub struct TassadarPostArticlePluginPacketAbiAndRustPdkSummary {
     pub schema_version: u16,
     pub report_id: String,
     pub machine_identity_id: String,
     pub canonical_model_id: String,
     pub canonical_route_id: String,
     pub computational_model_statement_id: String,
-    pub contract_status: TassadarPostArticlePluginManifestIdentityContractStatus,
+    pub packet_abi_version: String,
+    pub rust_first_pdk_id: String,
+    pub contract_status: TassadarPostArticlePluginPacketAbiAndRustPdkStatus,
     pub dependency_row_count: u32,
-    pub manifest_field_row_count: u32,
-    pub invocation_identity_row_count: u32,
-    pub hot_swap_rule_row_count: u32,
-    pub packaging_row_count: u32,
+    pub abi_row_count: u32,
+    pub pdk_row_count: u32,
     pub validation_row_count: u32,
     pub deferred_issue_ids: Vec<String>,
     pub operator_internal_only_posture: bool,
@@ -47,9 +47,9 @@ pub struct TassadarPostArticlePluginManifestIdentityContractSummary {
 }
 
 #[derive(Debug, Error)]
-pub enum TassadarPostArticlePluginManifestIdentityContractSummaryError {
+pub enum TassadarPostArticlePluginPacketAbiAndRustPdkSummaryError {
     #[error(transparent)]
-    Catalog(#[from] TassadarPostArticlePluginManifestIdentityContractReportError),
+    Sandbox(#[from] TassadarPostArticlePluginPacketAbiAndRustPdkReportError),
     #[error("failed to create `{path}`: {error}")]
     CreateDir { path: String, error: std::io::Error },
     #[error("failed to write `{path}`: {error}")]
@@ -65,18 +65,18 @@ pub enum TassadarPostArticlePluginManifestIdentityContractSummaryError {
     Json(#[from] serde_json::Error),
 }
 
-pub fn build_tassadar_post_article_plugin_manifest_identity_contract_summary() -> Result<
-    TassadarPostArticlePluginManifestIdentityContractSummary,
-    TassadarPostArticlePluginManifestIdentityContractSummaryError,
+pub fn build_tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary() -> Result<
+    TassadarPostArticlePluginPacketAbiAndRustPdkSummary,
+    TassadarPostArticlePluginPacketAbiAndRustPdkSummaryError,
 > {
-    let report = build_tassadar_post_article_plugin_manifest_identity_contract_report()?;
+    let report = build_tassadar_post_article_plugin_packet_abi_and_rust_pdk_report()?;
     Ok(build_summary_from_report(&report))
 }
 
 fn build_summary_from_report(
-    report: &TassadarPostArticlePluginManifestIdentityContractReport,
-) -> TassadarPostArticlePluginManifestIdentityContractSummary {
-    let mut summary = TassadarPostArticlePluginManifestIdentityContractSummary {
+    report: &TassadarPostArticlePluginPacketAbiAndRustPdkReport,
+) -> TassadarPostArticlePluginPacketAbiAndRustPdkSummary {
+    let mut summary = TassadarPostArticlePluginPacketAbiAndRustPdkSummary {
         schema_version: 1,
         report_id: report.report_id.clone(),
         machine_identity_id: report.machine_identity_binding.machine_identity_id.clone(),
@@ -86,12 +86,12 @@ fn build_summary_from_report(
             .machine_identity_binding
             .computational_model_statement_id
             .clone(),
+        packet_abi_version: report.machine_identity_binding.packet_abi_version.clone(),
+        rust_first_pdk_id: report.machine_identity_binding.rust_first_pdk_id.clone(),
         contract_status: report.contract_status,
         dependency_row_count: report.dependency_rows.len() as u32,
-        manifest_field_row_count: report.manifest_field_rows.len() as u32,
-        invocation_identity_row_count: report.invocation_identity_rows.len() as u32,
-        hot_swap_rule_row_count: report.hot_swap_rule_rows.len() as u32,
-        packaging_row_count: report.packaging_rows.len() as u32,
+        abi_row_count: report.abi_rows.len() as u32,
+        pdk_row_count: report.pdk_rows.len() as u32,
         validation_row_count: report.validation_rows.len() as u32,
         deferred_issue_ids: report.deferred_issue_ids.clone(),
         operator_internal_only_posture: report.operator_internal_only_posture,
@@ -102,47 +102,47 @@ fn build_summary_from_report(
         served_public_universality_allowed: report.served_public_universality_allowed,
         arbitrary_software_capability_allowed: report.arbitrary_software_capability_allowed,
         detail: format!(
-            "post-article plugin-manifest summary keeps machine_identity_id=`{}`, canonical_route_id=`{}`, computational_model_statement_id=`{}`, contract_status={:?}, manifest_field_rows={}, and deferred_issue_ids={}.",
+            "post-article plugin packet ABI summary keeps machine_identity_id=`{}`, packet_abi_version=`{}`, rust_first_pdk_id=`{}`, contract_status={:?}, abi_rows={}, and deferred_issue_ids={}.",
             report.machine_identity_binding.machine_identity_id,
-            report.machine_identity_binding.canonical_route_id,
-            report.machine_identity_binding.computational_model_statement_id,
+            report.machine_identity_binding.packet_abi_version,
+            report.machine_identity_binding.rust_first_pdk_id,
             report.contract_status,
-            report.manifest_field_rows.len(),
+            report.abi_rows.len(),
             report.deferred_issue_ids.len(),
         ),
         summary_digest: String::new(),
     };
     summary.summary_digest = stable_digest(
-        b"psionic_tassadar_post_article_plugin_manifest_identity_contract_summary|",
+        b"psionic_tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary|",
         &summary,
     );
     summary
 }
 
 #[must_use]
-pub fn tassadar_post_article_plugin_manifest_identity_contract_summary_path() -> PathBuf {
-    repo_root().join(TASSADAR_POST_ARTICLE_PLUGIN_MANIFEST_IDENTITY_CONTRACT_SUMMARY_REF)
+pub fn tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary_path() -> PathBuf {
+    repo_root().join(TASSADAR_POST_ARTICLE_PLUGIN_PACKET_ABI_AND_RUST_PDK_SUMMARY_REF)
 }
 
-pub fn write_tassadar_post_article_plugin_manifest_identity_contract_summary(
+pub fn write_tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary(
     output_path: impl AsRef<Path>,
 ) -> Result<
-    TassadarPostArticlePluginManifestIdentityContractSummary,
-    TassadarPostArticlePluginManifestIdentityContractSummaryError,
+    TassadarPostArticlePluginPacketAbiAndRustPdkSummary,
+    TassadarPostArticlePluginPacketAbiAndRustPdkSummaryError,
 > {
     let output_path = output_path.as_ref();
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
-            TassadarPostArticlePluginManifestIdentityContractSummaryError::CreateDir {
+            TassadarPostArticlePluginPacketAbiAndRustPdkSummaryError::CreateDir {
                 path: parent.display().to_string(),
                 error,
             }
         })?;
     }
-    let summary = build_tassadar_post_article_plugin_manifest_identity_contract_summary()?;
+    let summary = build_tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary()?;
     let json = serde_json::to_string_pretty(&summary)?;
     fs::write(output_path, format!("{json}\n")).map_err(|error| {
-        TassadarPostArticlePluginManifestIdentityContractSummaryError::Write {
+        TassadarPostArticlePluginPacketAbiAndRustPdkSummaryError::Write {
             path: output_path.display().to_string(),
             error,
         }
@@ -168,16 +168,16 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 #[cfg(test)]
 fn read_repo_json<T: DeserializeOwned>(
     relative_path: &str,
-) -> Result<T, TassadarPostArticlePluginManifestIdentityContractSummaryError> {
+) -> Result<T, TassadarPostArticlePluginPacketAbiAndRustPdkSummaryError> {
     let path = repo_root().join(relative_path);
     let bytes = fs::read(&path).map_err(|error| {
-        TassadarPostArticlePluginManifestIdentityContractSummaryError::Read {
+        TassadarPostArticlePluginPacketAbiAndRustPdkSummaryError::Read {
             path: path.display().to_string(),
             error,
         }
     })?;
     serde_json::from_slice(&bytes).map_err(|error| {
-        TassadarPostArticlePluginManifestIdentityContractSummaryError::Deserialize {
+        TassadarPostArticlePluginPacketAbiAndRustPdkSummaryError::Deserialize {
             path: path.display().to_string(),
             error,
         }
@@ -186,32 +186,31 @@ fn read_repo_json<T: DeserializeOwned>(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        build_tassadar_post_article_plugin_manifest_identity_contract_summary, read_repo_json,
-        tassadar_post_article_plugin_manifest_identity_contract_summary_path,
-        write_tassadar_post_article_plugin_manifest_identity_contract_summary,
-        TassadarPostArticlePluginManifestIdentityContractSummary,
-        TASSADAR_POST_ARTICLE_PLUGIN_MANIFEST_IDENTITY_CONTRACT_SUMMARY_REF,
-    };
-    use psionic_catalog::TassadarPostArticlePluginManifestIdentityContractStatus;
     use tempfile::tempdir;
 
+    use super::{
+        TASSADAR_POST_ARTICLE_PLUGIN_PACKET_ABI_AND_RUST_PDK_SUMMARY_REF,
+        TassadarPostArticlePluginPacketAbiAndRustPdkSummary,
+        build_tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary, read_repo_json,
+        tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary_path,
+        write_tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary,
+    };
+    use psionic_sandbox::TassadarPostArticlePluginPacketAbiAndRustPdkStatus;
+
     #[test]
-    fn post_article_plugin_manifest_summary_keeps_frontier_explicit() {
+    fn post_article_plugin_packet_abi_summary_keeps_frontier_explicit() {
         let summary =
-            build_tassadar_post_article_plugin_manifest_identity_contract_summary().expect("summary");
+            build_tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary().expect("summary");
 
         assert_eq!(
             summary.contract_status,
-            TassadarPostArticlePluginManifestIdentityContractStatus::Green
+            TassadarPostArticlePluginPacketAbiAndRustPdkStatus::Green
         );
-        assert_eq!(summary.dependency_row_count, 6);
-        assert_eq!(summary.manifest_field_row_count, 12);
-        assert_eq!(summary.invocation_identity_row_count, 3);
-        assert_eq!(summary.hot_swap_rule_row_count, 4);
-        assert_eq!(summary.packaging_row_count, 3);
+        assert_eq!(summary.dependency_row_count, 4);
+        assert_eq!(summary.abi_row_count, 8);
+        assert_eq!(summary.pdk_row_count, 6);
         assert_eq!(summary.validation_row_count, 8);
-        assert!(summary.deferred_issue_ids.is_empty());
+        assert_eq!(summary.deferred_issue_ids, vec![String::from("TAS-200")]);
         assert!(summary.operator_internal_only_posture);
         assert!(summary.rebase_claim_allowed);
         assert!(!summary.plugin_capability_claim_allowed);
@@ -222,33 +221,33 @@ mod tests {
     }
 
     #[test]
-    fn post_article_plugin_manifest_summary_matches_committed_truth() {
+    fn post_article_plugin_packet_abi_summary_matches_committed_truth() {
         let generated =
-            build_tassadar_post_article_plugin_manifest_identity_contract_summary().expect("summary");
-        let committed: TassadarPostArticlePluginManifestIdentityContractSummary = read_repo_json(
-            TASSADAR_POST_ARTICLE_PLUGIN_MANIFEST_IDENTITY_CONTRACT_SUMMARY_REF,
+            build_tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary().expect("summary");
+        let committed: TassadarPostArticlePluginPacketAbiAndRustPdkSummary = read_repo_json(
+            TASSADAR_POST_ARTICLE_PLUGIN_PACKET_ABI_AND_RUST_PDK_SUMMARY_REF,
         )
         .expect("committed summary");
         assert_eq!(generated, committed);
         assert_eq!(
-            tassadar_post_article_plugin_manifest_identity_contract_summary_path()
+            tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary_path()
                 .file_name()
                 .and_then(|name| name.to_str()),
-            Some("tassadar_post_article_plugin_manifest_identity_contract_summary.json")
+            Some("tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary.json")
         );
     }
 
     #[test]
-    fn write_post_article_plugin_manifest_summary_persists_current_truth() {
+    fn write_post_article_plugin_packet_abi_summary_persists_current_truth() {
         let directory = tempdir().expect("tempdir");
         let output_path = directory
             .path()
-            .join("tassadar_post_article_plugin_manifest_identity_contract_summary.json");
-        let written = write_tassadar_post_article_plugin_manifest_identity_contract_summary(
+            .join("tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary.json");
+        let written = write_tassadar_post_article_plugin_packet_abi_and_rust_pdk_summary(
             &output_path,
         )
         .expect("write summary");
-        let persisted: TassadarPostArticlePluginManifestIdentityContractSummary =
+        let persisted: TassadarPostArticlePluginPacketAbiAndRustPdkSummary =
             serde_json::from_slice(&std::fs::read(&output_path).expect("read summary"))
                 .expect("decode summary");
         assert_eq!(written, persisted);

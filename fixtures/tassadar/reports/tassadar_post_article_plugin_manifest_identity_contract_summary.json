@@ -12,9 +12,7 @@
   "hot_swap_rule_row_count": 4,
   "packaging_row_count": 3,
   "validation_row_count": 8,
-  "deferred_issue_ids": [
-    "TAS-199"
-  ],
+  "deferred_issue_ids": [],
   "operator_internal_only_posture": true,
   "rebase_claim_allowed": true,
   "plugin_capability_claim_allowed": false,
@@ -22,6 +20,6 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "detail": "post-article plugin-manifest summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, computational_model_statement_id=`tassadar.post_article_universality_bridge.computational_model_statement.v1`, contract_status=Green, manifest_field_rows=12, and deferred_issue_ids=1.",
-  "summary_digest": "fe9faf4670ff7000deae2ee191373f81838f3b3d8a6c02fb10c1854b348e69cc"
+  "detail": "post-article plugin-manifest summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, computational_model_statement_id=`tassadar.post_article_universality_bridge.computational_model_statement.v1`, contract_status=Green, manifest_field_rows=12, and deferred_issue_ids=0.",
+  "summary_digest": "e18a23463a10ab2983a9019060d14aa6d2f149cd35ef1d8fb4ee2f9a69ec7499"
 }
