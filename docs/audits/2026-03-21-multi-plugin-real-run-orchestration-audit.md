@@ -534,13 +534,166 @@ into another.
 After the current `TAS-216` through `TAS-220` starter-plugin set, the next
 useful issue wave should be:
 
-1. shared plugin-to-tool projection and schema bridge
-2. deterministic starter-workflow controller and real-run pilot
-3. router-owned plugin tool-loop integration on `/v1/responses`
-4. Apple FM plugin tool integration and macOS local pilot
-5. multi-plugin trace corpus and training bootstrap contract
-6. only then the later weighted-controller closure work already represented by
+1. a wave umbrella issue that ties the orchestration tranche together
+2. shared plugin-to-tool projection and schema bridge
+3. deterministic starter-workflow controller and real-run pilot
+4. router-owned plugin tool-loop integration on `/v1/responses`
+5. Apple FM plugin tool integration and macOS local pilot
+6. multi-plugin trace corpus, parity matrix, and training bootstrap contract
+7. only then the later weighted-controller closure work already represented by
    `TAS-204`
+
+Tentative issue slate for GitHub after review:
+
+### `TAS-221`: Publish The First Real-Run Multi-Plugin Orchestration Wave
+
+Draft issue description:
+
+- Purpose:
+  create one umbrella issue for the first real multi-plugin orchestration
+  tranche above the plugin runtime and starter-plugin catalog
+- Why:
+  the repo already has starter plugins and partial plugin substrate truth, but
+  it still lacks one tracked orchestration wave that ties deterministic
+  workflows, served-model tool loops, Apple FM integration, and training
+  bootstrap into one reviewable plan
+- Scope:
+  track `TAS-222` through `TAS-226` as one operator-internal experimental
+  wave; keep the tranche explicitly below `TAS-204` weighted-controller claims
+- Acceptance bar:
+  the issue links the child issues, records the dependency order
+  `TAS-200` -> `TAS-201` -> `TAS-202` -> `TAS-203A` -> orchestration wave, and
+  freezes the claim language that this tranche is experimental controller work
+  above the shared plugin runtime rather than proof-bearing weights-only plugin
+  control
+
+### `TAS-222`: Shared Plugin-To-Tool Projection And Receipt Bridge
+
+Draft issue description:
+
+- Purpose:
+  add one shared adapter layer that projects plugin manifests and packet
+  schemas into model-facing tool definitions and binds tool-step receipts back
+  to plugin invocation receipts
+- Why:
+  without this bridge, the served router lane and Apple FM lane will drift into
+  incompatible tool surfaces and duplicate plugin-schema logic
+- Scope:
+  derive stable tool names from canonical plugin identity; project packet input
+  schema into tool arguments; project packet outputs into controller-visible
+  structured results; attach plugin receipt references and replay class to the
+  controller-visible step result; keep refusal kinds typed instead of turning
+  them into free-form tool text
+- Non-goals:
+  this issue does not close weighted controller logic, plugin publication, or
+  arbitrary third-party plugin registration
+- Acceptance bar:
+  one shared projection surface is reusable by deterministic workflows,
+  `psionic-router` tool loops, and `psionic-apple-fm` tool sessions; the same
+  plugin manifest yields stable tool schema and stable receipt binding in all
+  controller lanes
+
+### `TAS-223`: Deterministic Starter Workflow Controller And Web-Content Pilot
+
+Draft issue description:
+
+- Purpose:
+  add the first host-owned multi-plugin workflow controller for the starter
+  plugin catalog and prove one real web-content workflow end to end
+- Why:
+  the repo needs real multi-plugin runs before weights-only planning is ready,
+  and deterministic workflows are the cleanest way to exercise runtime,
+  admissibility, composition, and receipt truth without overclaiming model
+  intelligence
+- Scope:
+  define one bounded workflow graph over the starter plugins, for example URL
+  extraction followed by fetch-text and then readable HTML extraction or
+  feed parsing based on typed content classification; capture final result
+  bundle plus per-step plugin receipts, refusal rows, and stop condition
+- Non-goals:
+  this issue does not claim open-ended agent planning or generic plugin
+  optimization
+- Acceptance bar:
+  one reproducible pilot run exists in repo-owned docs or fixtures, the
+  workflow controller uses the shared plugin runtime rather than bespoke glue,
+  and every branch or stop decision remains host-owned and explicit
+
+### `TAS-224`: Router-Owned Plugin Tool-Loop Integration On `/v1/responses`
+
+Draft issue description:
+
+- Purpose:
+  let the existing `psionic-router` tool loop execute plugins through the
+  shared plugin runtime instead of only hand-wired tool executors
+- Why:
+  this is the strongest near-term lane for flexible "use multiple plugins
+  smartly in a row" experiments because the router, response-state, and tool
+  loop surfaces already exist on `main`
+- Scope:
+  project admissible plugins into tool definitions for one `/v1/responses`
+  request, wire tool execution through the shared plugin runtime, preserve
+  structured plugin outputs in tool results, and bind each tool-loop step to
+  the underlying plugin invocation receipt
+- Non-goals:
+  this issue does not prove canonical Tassadar weighted control and does not
+  widen article-equivalence claims
+- Acceptance bar:
+  one served-model pilot shows a real directive leading to several plugin calls
+  in sequence through `ToolLoopController`, with bounded step count,
+  response-state continuation, explicit route truth, and step receipts that
+  name both the model tool step and the plugin invocation that satisfied it
+
+### `TAS-225`: Apple FM Plugin Tool Integration And macOS Local Pilot
+
+Draft issue description:
+
+- Purpose:
+  reuse the same plugin catalog and runtime in the Apple FM tool-calling lane
+  and prove one local macOS multi-plugin pilot
+- Why:
+  Apple FM already has session-aware tool callbacks and is the most credible
+  local experimental controller lane for bounded plugin workflows on macOS
+- Scope:
+  project admissible plugins into `AppleFmToolDefinition`s, route callbacks
+  into the shared plugin runtime, preserve structured plugin results and typed
+  refusals, and freeze one session-aware local pilot that exercises more than
+  one plugin in sequence
+- Non-goals:
+  this issue does not claim cross-platform serving closure or canonical
+  weighted plugin control
+- Acceptance bar:
+  one Apple FM session can call multiple projected plugins through the shared
+  runtime, the pilot records transcript and plugin receipt truth, and the lane
+  stays explicitly classified as local Apple FM plugin orchestration rather
+  than Tassadar proof closure
+
+### `TAS-226`: Multi-Plugin Trace Corpus, Parity Matrix, And Training Bootstrap Contract
+
+Draft issue description:
+
+- Purpose:
+  define the first repo-owned corpus and evaluation contract for real
+  multi-plugin orchestration traces captured from the deterministic, served,
+  and Apple FM controller lanes
+- Why:
+  a future weighted controller should be bootstrapped from bounded real traces,
+  not imagined from scratch; the repo also needs a machine-readable parity
+  surface that shows where the three controller lanes agree or diverge
+- Scope:
+  freeze one training-ready record shape containing directive, admissible
+  plugin set, projected tool schemas, controller decision, plugin arguments,
+  plugin outputs or refusals, receipt references, and stop condition; freeze a
+  parity matrix that compares deterministic, served-model, and Apple FM runs on
+  the same starter workflows
+- Non-goals:
+  this issue does not itself train a weighted controller or publish one as a
+  served claim
+- Acceptance bar:
+  committed fixture or report evidence exists for multi-plugin traces from all
+  experimental controller lanes, the parity matrix keeps disagreement rows
+  explicit, and the resulting corpus is positioned as the bootstrap input to
+  later `TAS-204` controller work rather than proof that `TAS-204` is already
+  solved
 
 Those should stay clearly outside the article-equivalence claim route and
 inside bounded operator-internal plugin experimentation until the later
