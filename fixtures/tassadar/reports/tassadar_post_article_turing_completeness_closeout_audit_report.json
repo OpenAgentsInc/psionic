@@ -122,7 +122,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_capability_boundary_report.json",
       "source_artifact_id": "tassadar.post_article_plugin_capability_boundary.report.v1",
-      "source_artifact_digest": "1687166e872b153f8a86113d2d6feeb5a086f74702f15f5b0002acd88df16ba1",
+      "source_artifact_digest": "5bb6b108855b7c84585db48244fa2fc142103171ea389d8da576f8edb798a66a",
       "detail": "the plugin-aware boundary must stay explicit so the rebased closeout does not silently widen into weighted plugin control or plugin publication"
     },
     {
@@ -159,7 +159,7 @@
     "rebased_verdict_report_id": "tassadar.post_article_rebased_universality_verdict_split.report.v1",
     "rebased_verdict_report_digest": "8494555b354367ac81aa71f015db3898defa41c7ff7b09435c9265c580d960d1",
     "plugin_boundary_report_id": "tassadar.post_article_plugin_capability_boundary.report.v1",
-    "plugin_boundary_report_digest": "1687166e872b153f8a86113d2d6feeb5a086f74702f15f5b0002acd88df16ba1",
+    "plugin_boundary_report_digest": "5bb6b108855b7c84585db48244fa2fc142103171ea389d8da576f8edb798a66a",
     "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_model_id=`tassadar-article-transformer-trace-bound-trained-v0` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` keeps the historical closeout bound to the post-`TAS-186` canonical route while carrying the control-plane proof, rebased verdict, and plugin boundary on the same machine identity without embedding the later closure bundle here."
   },
   "dependency_rows": [
@@ -387,5 +387,5 @@
   "arbitrary_software_capability_allowed": false,
   "claim_boundary": "this audit keeps the historical `TAS-156` closeout standing, reissues the bounded Turing-completeness claim on the canonical post-`TAS-186` route, and states machine-readably that control-plane ownership plus decision provenance are part of that truth carrier; it is not the canonical machine closure bundle itself, which remains separated into `TAS-215`.",
   "summary": "Post-article turing-completeness closeout audit keeps supporting_materials=14/14, dependency_rows=11/11, validation_rows=10/10, closeout_status=TheoryGreenOperatorGreenServedSuppressed, and closure_bundle_issue_id=`TAS-215`.",
-  "report_digest": "642169d9f08d53e5a8d7630740ebc180c2a64879220f1ed4d86be4c190733c47"
+  "report_digest": "ca6bc24fec901870cfd46fc1405b7499852baaa3617d2094f98804d4aae3ed45"
 }

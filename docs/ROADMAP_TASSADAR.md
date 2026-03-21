@@ -281,6 +281,21 @@ Current honest posture:
   the first closed-world operator-curated plugin tranche, and still does not
   imply plugin publication, served/public universality, or arbitrary software
   capability
+- the repo now also has one post-article plugin charter and authority
+  boundary contract, with a committed sandbox-owned report at
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_summary.json`,
+  a provider-facing receipt, a checker script, and an audit note that bind
+  the plugin lane to one canonical post-`TAS-186` machine identity and one
+  computational-model statement, inherit the pre-plugin control-plane proof
+  as a hard dependency, freeze explicit data/control/capability planes plus
+  packet-local/instance-local/host-backed/weights-owned state classes, and
+  freeze operator/internal-only publication posture, semantic-preservation,
+  anti-interpreter-smuggling, and governance-receipt rules without widening
+  the current claim surface; this tranche still does not imply weighted
+  plugin control, plugin publication, served/public universality, or
+  arbitrary software capability
 - the repo now also has one post-article Turing-completeness closeout audit,
   with a committed eval report at
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
@@ -493,9 +508,9 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-156` is now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-157` through `TAS-196` are now implemented and tracked in
+- `TAS-157` through `TAS-197` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-197` through `TAS-215` remain open in GitHub and are tracked via the
+- `TAS-198` through `TAS-215` remain open in GitHub and are tracked via the
   issue bodies plus `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 
 ## Repo-Local Companion Docs

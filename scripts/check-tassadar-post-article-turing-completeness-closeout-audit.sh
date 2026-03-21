@@ -70,7 +70,7 @@ jq -e '
 
 jq -e '
   .report_id == "tassadar.post_article_plugin_capability_boundary.report.v1"
-  and (.deferred_issue_ids == ["TAS-197"])
+  and (.deferred_issue_ids == [])
   and .plugin_capability_claim_allowed == false
   and .plugin_publication_allowed == false
 ' fixtures/tassadar/reports/tassadar_post_article_plugin_capability_boundary_report.json >/dev/null

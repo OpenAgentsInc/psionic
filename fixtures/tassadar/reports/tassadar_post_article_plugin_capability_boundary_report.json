@@ -381,10 +381,8 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "deferred_issue_ids": [
-    "TAS-197"
-  ],
+  "deferred_issue_ids": [],
   "claim_boundary": "this report makes the post-`TAS-186` rebased universality lane explicitly plugin-aware without widening `TCM.v1`, the continuation contract, or the rebased verdict into weighted plugin control. It binds one reserved capability plane above the canonical bridge machine identity, keeps plugin execution as a separate software-capability layer, keeps plugin state and receipt identity outside the bounded compute substrate, reserves choice-set integrity/resource transparency/scheduling ownership and a closed-world operator-curated first tranche, and leaves plugin/publication/served/arbitrary software capability claims blocked.",
   "summary": "post-article plugin-capability boundary report binds machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, boundary_status=Green, dependency_rows=7, reserved_invariants=3, rebase_claim_allowed=true, plugin_capability_claim_allowed=false, weighted_plugin_control_allowed=false, and plugin_publication_allowed=false.",
-  "report_digest": "1687166e872b153f8a86113d2d6feeb5a086f74702f15f5b0002acd88df16ba1"
+  "report_digest": "5bb6b108855b7c84585db48244fa2fc142103171ea389d8da576f8edb798a66a"
 }

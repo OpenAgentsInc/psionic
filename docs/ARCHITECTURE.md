@@ -1284,6 +1284,24 @@ The current scope is:
   operator-curated plugin tranche, and keeping weighted plugin control,
   plugin publication, served/public universality, and arbitrary software
   capability blocked
+- the current post-article plugin-charter authority-boundary artifacts are
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json`,
+  `fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_summary.json`,
+  the provider receipt in
+  `crates/psionic-provider/src/tassadar_post_article_plugin_charter_authority_boundary.rs`,
+  the checker script
+  `scripts/check-tassadar-post-article-plugin-charter-authority-boundary.sh`,
+  and the audit note
+  `docs/audits/2026-03-21-tassadar-post-article-plugin-charter-authority-boundary.md`,
+  which freeze the plugin charter above the rebased carrier by inheriting one
+  canonical machine identity and computational-model statement, inheriting the
+  pre-plugin control-plane proof as a hard dependency, fixing the
+  proof-versus-audit and observer-model boundary, freezing explicit data/
+  control/capability planes plus the four plugin state classes, freezing
+  semantic-preservation and anti-interpreter-smuggling laws, and keeping
+  current posture bounded to operator/internal plugin work while weighted
+  plugin control, plugin publication, served/public universality, and
+  arbitrary software capability stay blocked
 - the current post-article Turing-completeness closeout artifacts are
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_summary.json`,

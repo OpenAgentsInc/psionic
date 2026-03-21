@@ -336,7 +336,7 @@ pub fn build_tassadar_post_article_plugin_capability_boundary_report() -> Result
     } else {
         TassadarPostArticlePluginCapabilityBoundaryStatus::Incomplete
     };
-    let deferred_issue_ids = vec![String::from("TAS-197")];
+    let deferred_issue_ids = Vec::new();
 
     let mut report = TassadarPostArticlePluginCapabilityBoundaryReport {
         schema_version: 1,
@@ -1062,7 +1062,7 @@ mod tests {
         assert!(!report.plugin_publication_allowed);
         assert!(!report.served_public_universality_allowed);
         assert!(!report.arbitrary_software_capability_allowed);
-        assert_eq!(report.deferred_issue_ids, vec![String::from("TAS-197")]);
+        assert!(report.deferred_issue_ids.is_empty());
         assert_eq!(report.dependency_rows.len(), 7);
         assert_eq!(report.boundary_rows.len(), 7);
         assert_eq!(report.state_receipt_rows.len(), 5);

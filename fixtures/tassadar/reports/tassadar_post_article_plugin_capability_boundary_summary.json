@@ -18,9 +18,7 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "deferred_issue_ids": [
-    "TAS-197"
-  ],
+  "deferred_issue_ids": [],
   "detail": "post-article plugin-capability boundary summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, boundary_status=Green, reserved_capability_plane_id=`tassadar.post_article_universality_bridge.reserved_capability_plane.v1`, first_plugin_tranche_posture=`closed_world_operator_curated_only_until_audited`, and plugin/publication claims blocked=true.",
-  "summary_digest": "b05ad8a4f7de5740bee5014c4cab52d194bac89ca41d4cb813df67f487ea121d"
+  "summary_digest": "373ff5ae214513fc03eb44a50ffcdd19c68a7fb7df87e93793075f408be99ebd"
 }

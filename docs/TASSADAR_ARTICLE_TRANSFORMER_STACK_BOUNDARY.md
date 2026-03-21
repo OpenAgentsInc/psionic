@@ -830,6 +830,27 @@ This tranche keeps the final canonical machine closure bundle separate for
 `TAS-215`, and it still does not admit weighted plugin control, plugin
 publication, served/public universality, or arbitrary software capability.
 
+`TAS-197` now closes the plugin charter, authority boundary, and platform-law
+tranche at
+`fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json`.
+That report freezes the plugin charter above the rebased carrier by inheriting
+one canonical machine identity and computational-model statement from the
+bridge, inheriting the pre-plugin control-plane proof as a hard dependency,
+freezing the proof-versus-audit and observer-model boundary, fixing the
+data/control/capability plane split and the packet-local/instance-local/
+host-backed/weights-owned state split, and freezing semantic-preservation,
+anti-interpreter-smuggling, and downward-non-influence laws without widening
+the current claim surface. The operator-readable summary now lives at
+`fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_summary.json`,
+the provider receipt now lives at
+`crates/psionic-provider/src/tassadar_post_article_plugin_charter_authority_boundary.rs`,
+and the dedicated checker now lives at
+`scripts/check-tassadar-post-article-plugin-charter-authority-boundary.sh`.
+This tranche keeps current posture operator/internal-only, requires typed
+governance receipts for any later envelope or publication widening, and still
+does not admit weighted plugin control, plugin publication, served/public
+universality, or arbitrary software capability.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_plugin_charter_authority_boundary.report.v1",
+  "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+  "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "computational_model_statement_id": "tassadar.post_article_universality_bridge.computational_model_statement.v1",
+  "charter_status": "green",
+  "dependency_row_count": 11,
+  "law_row_count": 17,
+  "state_class_row_count": 4,
+  "governance_row_count": 4,
+  "validation_row_count": 10,
+  "current_publication_posture": "internal_only_until_later_plugin_platform_gates",
+  "first_plugin_tranche_posture": "closed_world_operator_curated_only_until_audited",
+  "deferred_issue_ids": [
+    "TAS-198"
+  ],
+  "rebase_claim_allowed": true,
+  "plugin_capability_claim_allowed": false,
+  "weighted_plugin_control_allowed": false,
+  "plugin_publication_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "detail": "post-article plugin-charter summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, computational_model_statement_id=`tassadar.post_article_universality_bridge.computational_model_statement.v1`, charter_status=Green, current_publication_posture=`internal_only_until_later_plugin_platform_gates`, and deferred_issue_ids=1.",
+  "summary_digest": "6ef1ce4491a2ebebd4f6c2947df751b03e768e69a83be8bf02b071b6b8fa21a1"
+}
