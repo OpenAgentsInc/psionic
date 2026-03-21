@@ -196,6 +196,9 @@ under the same invariants.
 - Observer Model:
   verifier roles, trust assumptions, and acceptance conditions must be
   machine-readable
+- Machine Closure Bundle:
+  no terminal universality, plugin, or platform claim is valid unless it
+  references one canonical closure bundle by digest
 - Served Conformance:
   served posture may deviate from operator truth only inside an explicit
   conformance envelope and otherwise must fail closed
@@ -341,6 +344,39 @@ artifact must also freeze a concrete formal-object set:
 - a machine-minimality definition
 - a hidden-state-channel closure rule
 - and one observer or acceptance model
+
+## The Missing Composition Layer: Canonical Machine Closure Bundle
+
+Even if the bridge, control proof, plugin substrate, controller trace, and
+anti-drift contracts all land cleanly, the repo can still fail to close as one
+machine if those artifacts remain only loosely related.
+
+What is still needed is one canonical machine closure bundle that binds:
+
+- machine identity tuple
+- computational model statement
+- determinism contract
+- continuation contract
+- control-plane provenance proof
+- execution-semantics equivalence class
+- carrier split contract
+- state ownership and hidden-state closure
+- failure lattice
+- observer and acceptance model
+- portability and minimality bindings
+- proof-carrying artifacts by digest rather than by doc title
+- proof-versus-audit classification
+- invalidation conditions for when the closure stops being valid
+
+The important hard rule is:
+
+no terminal universality, plugin, or platform claim should be treated as valid
+unless it references this exact closure bundle by digest.
+
+That is the difference between:
+
+- a system that has the right proofs, audits, receipts, and controller traces
+- and a closed machine whose claims all bind to the same object
 
 ## What The Plugin-System Spec Actually Requires
 
@@ -1084,6 +1120,43 @@ That inherited proof also needs explicit formal objects for:
 The plugin-specific controller trace should extend this proof to plugin
 selection and sequencing, not invent control ownership from scratch.
 
+### 17. Machine Closure Bundle Dependency
+
+The plugin lane must also inherit one canonical closure object from the
+rebased machine rather than recomposing claims from scattered green artifacts.
+
+That bundle must bind:
+
+- machine identity tuple
+- computational model statement
+- determinism contract
+- continuation contract
+- control-plane provenance proof reference
+- execution-semantics equivalence class
+- carrier split declaration
+- allowed state classes and hidden-state closure
+- failure lattice
+- observer and acceptance model
+- portability and minimality binding
+- proof artifacts by digest
+- proof-versus-audit classification
+- invalidation conditions
+
+Invalidation conditions should include at least:
+
+- route drift
+- determinism mismatch
+- hidden state-channel detection
+- fast-route substitution outside the declared carrier
+- downward influence from later layers
+- observer or acceptance mismatch
+- portability or minimality failure
+- and proof-bundle digest mismatch
+
+The plugin controller, receipts, and publication claims should point at that
+bundle by digest rather than silently recomposing the machine from separate
+artifacts.
+
 ## Does The Plugin System Change The Shape Of The Turing-Completeness Push?
 
 Yes, but only in a constrained way.
@@ -1225,7 +1298,20 @@ Without that artifact, the later plugin controller claim would inherit laws but
 not yet inherit a positive proof that the model is the thing deciding what
 happens next.
 
-#### 6. The Verdict Split Should Keep Plugin Capability Separate
+#### 6. Reserve The Canonical Machine Closure Bundle
+
+The post-`TAS-186` bridge should also reserve one final composition step:
+
+- publish one canonical machine closure bundle by digest
+- bind the bridge, control proof, carrier split, proof artifacts,
+  portability/minimality, and invalidation conditions into that bundle
+- require later plugin-controller and publication claims to reference the
+  bundle rather than reassembling the machine implicitly
+
+Without that step, the repo can have all the right pieces and still fail to
+close as a single machine.
+
+#### 7. The Verdict Split Should Keep Plugin Capability Separate
 
 The final rebased theory/operator/served split should not silently imply:
 
@@ -1261,6 +1347,8 @@ Those are:
 - freeze the determinism, equivalence, failure, time, information, training,
   hidden-state, proof-vs-audit, minimality, and observer contracts through
   that pre-plugin control-plane proof
+- reserve the canonical machine closure bundle as the final claim-bearing
+  object rather than treating audits alone as the machine
 - freeze a semantic-preservation rule for packet-mediated adapters and result
   reinjection before any weighted plugin-controller claim is made
 - reserve choice-set integrity, resource transparency, and scheduling
@@ -1660,6 +1748,8 @@ Description:
 - preserve the separation from the bounded Turing-completeness closeout
 - state that weighted plugin control depends on the inherited control-plane
   proof plus the plugin-specific controller extension
+- keep the final claim-bearing machine closure bundle as a separate object
+  rather than treating the audit itself as the bundle
 - keep operator and served/plugin publication posture explicit
 - refuse any implication that broader served posture already shares operator
   conformance when the envelope is not published
@@ -1671,7 +1761,7 @@ Supporting material:
 - `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
 - `~/code/alpha/tassadar/plugin-system.md`
 
-## Suggested `TAS-207` Through `TAS-214`: Anti-Drift Stability Tranche
+## Suggested `TAS-207` Through `TAS-215`: Anti-Drift Stability Tranche
 
 If the tracker wants the second-order stability constraints called out as
 first-class artifacts rather than only absorbed into `TAS-187` through
@@ -1890,6 +1980,45 @@ Supporting material:
 - `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
 - `~/code/alpha/tassadar/plugin-system.md`
 
+### Suggested `TAS-215`: Publish Canonical Machine Closure Bundle
+
+Suggested GitHub title:
+
+`Tassadar: publish canonical machine closure bundle`
+
+Summary:
+
+Freeze one machine-readable closure object that binds proof, execution,
+control, continuation, invalidation, and plugin inheritance semantics into a
+single claim-bearing machine identity.
+
+Description:
+
+- publish one canonical closure bundle by digest
+- bind the machine identity tuple, computational model statement,
+  determinism contract, continuation contract, control-plane provenance proof,
+  execution-semantics equivalence class, carrier split, state classes,
+  hidden-state closure, failure lattice, observer model, portability binding,
+  minimality binding, and proof-carrying artifact digests into that object
+- classify which entries are proofs and which are audits
+- centralize invalidation conditions for route drift, determinism mismatch,
+  hidden state channels, fast-route substitution, downward influence,
+  observer mismatch, portability failure, minimality failure, and proof-bundle
+  digest mismatch
+- require any terminal universality, plugin, or platform claim to reference
+  this bundle by digest
+- require plugin controller, receipt, and publication claims to inherit this
+  bundle rather than silently recomposing the machine
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+- `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
+- `fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json`
+- `fixtures/tassadar/reports/tassadar_universal_machine_proof_report.json`
+- `fixtures/tassadar/reports/tassadar_universality_witness_suite_report.json`
+- `fixtures/tassadar/reports/tassadar_universality_verdict_split_report.json`
+
 ## Recommended Dependency Order
 
 The dependency order should be:
@@ -1908,7 +2037,8 @@ The dependency order should be:
 8. land plugin authority/promotion/publication policy
 9. if those anti-drift constraints are not already absorbed into the earlier
    issues, land the `TAS-207` through `TAS-214` stability tranche
-10. only then consider any stronger "weighted software platform" closeout
+10. publish the canonical machine closure bundle
+11. only then consider any stronger "weighted software platform" closeout
 
 That order matters because it keeps the repo from using a not-yet-audited
 weighted controller as evidence for a plugin system whose core control-ownership
@@ -1944,6 +2074,8 @@ But the repo does **not** yet have:
 - one canonical machine identity lock inherited across plugin-facing artifacts
 - one canonical computational model statement for the underlying carrier
 - one inherited control-plane ownership and decision-provenance proof
+- one canonical machine closure bundle by digest that plugin claims must
+  inherit
 - a formal determinism class contract for workflow and controller traces
 - a frozen plugin language boundary plus closed-world discovery contract
 - planner-indistinguishability guardrails over choice sets, resources, and
@@ -1974,7 +2106,7 @@ identity, closing host-steering attack surfaces, and then proving weighted
 control ownership while keeping machine identity, computational-model truth,
 choice neutrality, served conformance, control-plane provenance, and the
 determinism/equivalence/failure/time/information/proof-class contracts from
-drifting.
+drifting and then binding them into one non-fragmentable closure bundle.
 
 ## Final Judgment
 
@@ -1999,6 +2131,8 @@ So the right answer is:
   contracts
 - make that rebase plugin-aware at the boundary level
 - then build the plugin system as the next explicit tranche on top of it
+- then publish the canonical machine closure bundle that all terminal claims
+  reference by digest
 
 That is the cleanest way to get both:
 

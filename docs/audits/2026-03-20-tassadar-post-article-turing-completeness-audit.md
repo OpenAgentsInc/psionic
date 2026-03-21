@@ -176,6 +176,9 @@ invariants.
 - Observer Model:
   verifier roles, trust assumptions, and acceptance conditions must be
   machine-readable
+- Machine Closure Bundle:
+  no terminal universality, plugin, or platform claim is valid unless it
+  references one canonical closure bundle by digest
 - Served Conformance:
   served posture may deviate from operator truth only inside an explicit
   conformance envelope and otherwise must fail closed
@@ -307,6 +310,40 @@ artifact must also freeze a concrete formal-object set:
 - a machine-minimality definition
 - a hidden-state-channel closure rule
 - and one observer or acceptance model
+
+## The Missing Composition Layer: Canonical Machine Closure Bundle
+
+Even if the bridge, control proof, carrier split, proof rebinding, witness
+suite, gate, portability, and plugin layers all land cleanly, the repo can
+still fail to close as one machine if those artifacts remain only loosely
+related.
+
+What is still needed is one canonical machine closure bundle that binds:
+
+- machine identity tuple
+- computational model statement
+- determinism contract
+- continuation contract
+- control-plane provenance proof
+- execution-semantics equivalence class
+- carrier split contract
+- state ownership and hidden-state closure
+- failure lattice
+- observer and acceptance model
+- portability and minimality bindings
+- proof-carrying artifacts by digest rather than by doc title
+- proof-versus-audit classification
+- invalidation conditions for when the closure stops being valid
+
+The important hard rule is:
+
+no terminal universality, plugin, or platform claim should be treated as valid
+unless it references this exact closure bundle by digest.
+
+That is the difference between:
+
+- a system that has the right proofs and audits
+- and a closed machine whose claims all bind to the same object
 
 ## What Is Already Real And Still Valid
 
@@ -833,6 +870,42 @@ That proof also needs explicit formal objects for:
 Without this law, the repo can say host control is forbidden without yet
 proving that the canonical route owns workflow decisions.
 
+### 16. Machine Closure Bundle Law
+
+The rebased stack also needs one canonical closure object that composes all of
+its proof-bearing parts into one claim-bearing machine.
+
+That bundle must bind:
+
+- machine identity tuple
+- computational model statement
+- determinism contract
+- continuation contract
+- control-plane provenance proof reference
+- execution-semantics equivalence class
+- carrier split declaration
+- allowed state classes and hidden-state closure
+- failure lattice
+- observer and acceptance model
+- portability and minimality binding
+- proof artifacts by digest
+- proof-versus-audit classification
+- invalidation conditions
+
+Invalidation conditions should include at least:
+
+- route drift
+- determinism mismatch
+- hidden state-channel detection
+- fast-route substitution outside the declared carrier
+- downward influence from later layers
+- observer or acceptance mismatch
+- portability or minimality failure
+- and proof-bundle digest mismatch
+
+Without this law, the repo can end up with all the right pieces while still
+lacking one indivisible machine object that the claim actually refers to.
+
 ## Necessary Work After `TAS-186`
 
 The following follow-on work is `planned` if the goal is to make the new
@@ -1055,6 +1128,22 @@ statement that says:
 This is not a request to build the plugin system inside the rebased
 Turing-completeness tranche. It is a request to make sure that tranche does not
 accidentally preclude the cleaner plugin architecture.
+
+### L. Publish The Canonical Machine Closure Bundle
+
+After the bridge, control proof, carrier split, proof rebinding, witness
+suite, portability, anti-drift contracts, and plugin boundary all exist, the
+repo still needs one final composition step:
+
+- publish one canonical machine closure bundle by digest
+- bind all proof-bearing artifacts to that bundle rather than relying on
+  scattered green rows
+- centralize invalidation conditions so route drift, determinism mismatch,
+  hidden state channels, fast-route substitution, downward influence, and
+  observer mismatch invalidate the closure explicitly
+
+Without this step, the repo can have a system with proofs without yet having a
+single closed machine.
 
 ## Proposed GitHub Issue Roadmap
 
@@ -1405,6 +1494,8 @@ Description:
   the bounded Turing-completeness claim
 - state that the control-plane ownership and decision-provenance proof is part
   of that truth carrier
+- keep the final claim-bearing closure bundle as a separate object rather than
+  treating the audit itself as the bundle
 - keep plugin capability and served/public plugin posture out of scope
 - preserve explicit refusal and publication boundaries
 
@@ -1415,7 +1506,7 @@ Supporting material:
 - `fixtures/tassadar/reports/tassadar_turing_completeness_closeout_audit_report.json`
 - `fixtures/tassadar/reports/tassadar_turing_completeness_closeout_summary.json`
 
-## Suggested `TAS-207` Through `TAS-214`: Anti-Drift Stability Tranche
+## Suggested `TAS-207` Through `TAS-215`: Anti-Drift Stability Tranche
 
 If the tracker wants the second-order stability constraints called out as
 first-class artifacts rather than only absorbed into `TAS-187` through
@@ -1630,6 +1721,43 @@ Supporting material:
 - `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
 - `fixtures/tassadar/reports/tassadar_turing_completeness_closeout_audit_report.json`
 
+### Suggested `TAS-215`: Publish Canonical Machine Closure Bundle
+
+Suggested GitHub title:
+
+`Tassadar: publish canonical machine closure bundle`
+
+Summary:
+
+Freeze one machine-readable closure object that binds proof, execution,
+control, continuation, and invalidation semantics into a single claim-bearing
+machine identity.
+
+Description:
+
+- publish one canonical closure bundle by digest
+- bind the machine identity tuple, computational model statement,
+  determinism contract, continuation contract, control-plane provenance proof,
+  execution-semantics equivalence class, carrier split, state classes,
+  hidden-state closure, failure lattice, observer model, portability binding,
+  minimality binding, and proof-carrying artifact digests into that object
+- classify which entries are proofs and which are audits
+- centralize invalidation conditions for route drift, determinism mismatch,
+  hidden state channels, fast-route substitution, downward influence,
+  observer mismatch, portability failure, minimality failure, and proof-bundle
+  digest mismatch
+- require any terminal universality, plugin, or platform claim to reference
+  this bundle by digest
+
+Supporting material:
+
+- `docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md`
+- `docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md`
+- `fixtures/tassadar/reports/tassadar_tcm_v1_runtime_contract_report.json`
+- `fixtures/tassadar/reports/tassadar_universal_machine_proof_report.json`
+- `fixtures/tassadar/reports/tassadar_universality_witness_suite_report.json`
+- `fixtures/tassadar/reports/tassadar_universality_verdict_split_report.json`
+
 ## Current Honest Statement
 
 The strongest current statement this repo can make is:
@@ -1655,6 +1783,9 @@ It also still cannot say:
   benchmarks, and continuation semantics to the same route family
 - that one control-plane ownership and decision-provenance proof already binds
   workflow decisions to the canonical route
+- that one canonical machine closure bundle already binds proof, execution,
+  control, continuation, and invalidation semantics into a single machine
+  object
 - that determinism classes, equivalent-choice bounds, and the failure
   semantics lattice are already frozen as machine-checkable objects
 - that time semantics and the model-information boundary are already frozen
@@ -1701,4 +1832,5 @@ continuation discipline, fast-route legitimacy, and served conformance before
 the repo treats the rebase as stable. It also needs to freeze determinism,
 equivalence, failure, time, information, proof-class, minimality, hidden-state
 closure, and observer contracts as machine-readable objects rather than
-leaving them as prose-only laws.
+leaving them as prose-only laws, and then bind all of those into one canonical
+closure bundle that the claim actually references.
