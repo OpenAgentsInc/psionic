@@ -301,6 +301,12 @@ struct ProgramPayloadView<'a> {
     instructions: &'a [TassadarInstruction],
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarArticleTransformerGeneralizationEvaluation {
+    pub case_rows: Vec<TassadarArticleTransformerGeneralizationCaseRow>,
+    pub curriculum_runs: Vec<TassadarArticleTransformerGeneralizationCurriculumRunRow>,
+}
+
 pub fn build_tassadar_article_transformer_generalization_gate_report() -> Result<
     TassadarArticleTransformerGeneralizationGateReport,
     TassadarArticleTransformerGeneralizationGateReportError,
@@ -309,19 +315,32 @@ pub fn build_tassadar_article_transformer_generalization_gate_report() -> Result
     let exactness_report: TassadarArticleTransformerReferenceLinearExactnessGateReport =
         read_repo_json(TASSADAR_ARTICLE_TRANSFORMER_REFERENCE_LINEAR_EXACTNESS_GATE_REPORT_REF)?;
     let model = TassadarArticleTransformer::trained_trace_domain_reference()?;
-    let generated_cases = build_generated_cases()?;
-    let case_rows = generated_cases
-        .iter()
-        .map(|case| build_case_row(case, &model))
-        .collect::<Result<Vec<_>, _>>()?;
-    let curriculum_runs = build_curriculum_runs(generated_cases.as_slice(), &model)?;
+    let evaluation = build_tassadar_article_transformer_generalization_evaluation_for_model(&model)?;
     Ok(build_report_from_inputs(
         acceptance_gate_report,
         exactness_report,
         model.descriptor().model.model_id.clone(),
+        evaluation.case_rows,
+        evaluation.curriculum_runs,
+    ))
+}
+
+pub fn build_tassadar_article_transformer_generalization_evaluation_for_model(
+    model: &TassadarArticleTransformer,
+) -> Result<
+    TassadarArticleTransformerGeneralizationEvaluation,
+    TassadarArticleTransformerGeneralizationGateReportError,
+> {
+    let generated_cases = build_generated_cases()?;
+    let case_rows = generated_cases
+        .iter()
+        .map(|case| build_case_row(case, model))
+        .collect::<Result<Vec<_>, _>>()?;
+    let curriculum_runs = build_curriculum_runs(generated_cases.as_slice(), model)?;
+    Ok(TassadarArticleTransformerGeneralizationEvaluation {
         case_rows,
         curriculum_runs,
-    ))
+    })
 }
 
 fn build_report_from_inputs(

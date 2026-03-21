@@ -281,17 +281,37 @@ pub fn build_tassadar_article_transformer_weight_lineage_contract(
     )?;
     let base_model = TassadarArticleTransformer::article_trace_domain_reference()?;
     let produced_model = TassadarArticleTransformer::trained_trace_domain_reference()?;
-    let training_config = training_config_snapshot(&evidence_bundle);
-    let source_inventory = source_inventory(&evidence_bundle)?;
-    let artifact_inventory = artifact_inventory(&evidence_bundle)?;
+    build_tassadar_article_transformer_weight_lineage_contract_for_bundle(
+        TASSADAR_ARTICLE_TRANSFORMER_WEIGHT_PRODUCTION_EVIDENCE_BUNDLE_REF,
+        &evidence_bundle,
+        &base_model,
+        &produced_model,
+        "tassadar.article_transformer_weight_lineage.contract.v1",
+        TIED_REQUIREMENT_ID,
+        "this lineage contract freezes only the first real trained trace-bound article-model weight artifact. It binds the exact workload set, training-config snapshot, source inventory, descriptor digests, checkpoint lineage, and committed artifact digests into one challengeable manifest without implying reference-linear exactness, fast-route closure, benchmark parity, or final article-equivalence green status.",
+    )
+}
+
+pub fn build_tassadar_article_transformer_weight_lineage_contract_for_bundle(
+    evidence_bundle_ref: impl Into<String>,
+    evidence_bundle: &crate::TassadarArticleTransformerWeightProductionEvidenceBundle,
+    base_model: &TassadarArticleTransformer,
+    produced_model: &TassadarArticleTransformer,
+    contract_id: impl Into<String>,
+    tied_requirement_id: impl Into<String>,
+    claim_boundary: impl Into<String>,
+) -> Result<TassadarArticleTransformerWeightLineageContract, TassadarArticleTransformerWeightLineageError>
+{
+    let evidence_bundle_ref = evidence_bundle_ref.into();
+    let training_config = training_config_snapshot(evidence_bundle);
+    let source_inventory = source_inventory(evidence_bundle)?;
+    let artifact_inventory = artifact_inventory(evidence_bundle_ref.as_str(), evidence_bundle)?;
 
     Ok(TassadarArticleTransformerWeightLineageContract {
         schema_version: 1,
-        contract_id: String::from("tassadar.article_transformer_weight_lineage.contract.v1"),
-        tied_requirement_id: String::from(TIED_REQUIREMENT_ID),
-        evidence_bundle_ref: String::from(
-            TASSADAR_ARTICLE_TRANSFORMER_WEIGHT_PRODUCTION_EVIDENCE_BUNDLE_REF,
-        ),
+        contract_id: contract_id.into(),
+        tied_requirement_id: tied_requirement_id.into(),
+        evidence_bundle_ref,
         evidence_bundle_digest: evidence_bundle.bundle_digest.clone(),
         model_module_ref: evidence_bundle.model_module_ref.clone(),
         transformer_module_ref: evidence_bundle.transformer_module_ref.clone(),
@@ -318,9 +338,7 @@ pub fn build_tassadar_article_transformer_weight_lineage_contract(
         base_descriptor_stable_digest: base_model.descriptor().stable_digest(),
         produced_descriptor_stable_digest: produced_model.descriptor().stable_digest(),
         checkpoint: evidence_bundle.checkpoint.clone(),
-        claim_boundary: String::from(
-            "this lineage contract freezes only the first real trained trace-bound article-model weight artifact. It binds the exact workload set, training-config snapshot, source inventory, descriptor digests, checkpoint lineage, and committed artifact digests into one challengeable manifest without implying reference-linear exactness, fast-route closure, benchmark parity, or final article-equivalence green status.",
-        ),
+        claim_boundary: claim_boundary.into(),
         contract_digest: String::new(),
     }
     .with_contract_digest())
@@ -555,13 +573,14 @@ fn source_inventory(
 }
 
 fn artifact_inventory(
+    evidence_bundle_ref: &str,
     evidence_bundle: &crate::TassadarArticleTransformerWeightProductionEvidenceBundle,
 ) -> Result<Vec<TassadarArticleTransformerWeightLineageArtifactRecord>, TassadarArticleTransformerWeightLineageError>
 {
     Ok(vec![
         artifact_record(
             TassadarArticleTransformerWeightLineageArtifactRole::EvidenceBundle,
-            TASSADAR_ARTICLE_TRANSFORMER_WEIGHT_PRODUCTION_EVIDENCE_BUNDLE_REF,
+            evidence_bundle_ref,
         )?,
         artifact_record(
             TassadarArticleTransformerWeightLineageArtifactRole::BaseDescriptor,

@@ -80,6 +80,12 @@ pub struct TassadarArticleTransformerWeightProductionSuite {
 impl TassadarArticleTransformerWeightProductionSuite {
     pub fn reference() -> Result<Self, TassadarArticleTransformerWeightProductionError> {
         let model = TassadarArticleTransformer::article_trace_domain_reference()?;
+        Self::for_model(&model)
+    }
+
+    pub fn for_model(
+        model: &TassadarArticleTransformer,
+    ) -> Result<Self, TassadarArticleTransformerWeightProductionError> {
         let bos_token_id = TassadarTraceTokenizer::new().vocabulary().bos_id().as_u32() as usize;
         let corpus = tassadar_article_class_corpus()
             .into_iter()
@@ -99,7 +105,7 @@ impl TassadarArticleTransformerWeightProductionSuite {
                 TassadarArticleTransformerWeightProductionSplit::Train,
             )?,
             held_out_examples: build_examples(
-                &model,
+                model,
                 &corpus,
                 HELD_OUT_CASE_IDS,
                 TassadarArticleTransformerWeightProductionSplit::HeldOut,
@@ -122,8 +128,14 @@ pub struct TassadarArticleTransformerWeightProductionConfig {
     pub label_smoothing: f32,
     pub finite_difference_epsilon: f32,
     pub trainable_parameter_ids: Vec<String>,
+    pub base_model_id: String,
+    pub base_model_revision: String,
+    pub base_descriptor_ref: String,
+    pub base_artifact_ref: String,
     pub produced_descriptor_ref: String,
     pub produced_artifact_ref: String,
+    pub produced_model_id: String,
+    pub produced_model_revision: String,
 }
 
 impl TassadarArticleTransformerWeightProductionConfig {
@@ -145,12 +157,18 @@ impl TassadarArticleTransformerWeightProductionConfig {
             trainable_parameter_ids: vec![String::from(
                 TassadarArticleTransformer::LOGITS_PROJECTION_BIAS_PARAMETER_ID,
             )],
+            base_model_id: String::from(TassadarArticleTransformer::TRACE_BOUND_MODEL_ID),
+            base_model_revision: String::from("v0"),
+            base_descriptor_ref: String::from(TassadarArticleTransformer::TRACE_BOUND_DESCRIPTOR_REF),
+            base_artifact_ref: String::from(TassadarArticleTransformer::TRACE_BOUND_ARTIFACT_REF),
             produced_descriptor_ref: String::from(
                 TassadarArticleTransformer::TRAINED_TRACE_BOUND_DESCRIPTOR_REF,
             ),
             produced_artifact_ref: String::from(
                 TassadarArticleTransformer::TRAINED_TRACE_BOUND_ARTIFACT_REF,
             ),
+            produced_model_id: String::from(TassadarArticleTransformer::TRAINED_TRACE_BOUND_MODEL_ID),
+            produced_model_revision: String::from("v0"),
         })
     }
 
@@ -166,6 +184,30 @@ impl TassadarArticleTransformerWeightProductionConfig {
         }
         if self.step_duration_ms == 0 {
             return Err(TassadarArticleTransformerWeightProductionError::InvalidStepDuration);
+        }
+        if self.base_model_id.trim().is_empty() {
+            return Err(TassadarArticleTransformerWeightProductionError::MissingBaseModelId);
+        }
+        if self.base_model_revision.trim().is_empty() {
+            return Err(
+                TassadarArticleTransformerWeightProductionError::MissingBaseModelRevision,
+            );
+        }
+        if self.base_descriptor_ref.trim().is_empty() {
+            return Err(
+                TassadarArticleTransformerWeightProductionError::MissingBaseDescriptorRef,
+            );
+        }
+        if self.base_artifact_ref.trim().is_empty() {
+            return Err(TassadarArticleTransformerWeightProductionError::MissingBaseArtifactRef);
+        }
+        if self.produced_model_id.trim().is_empty() {
+            return Err(TassadarArticleTransformerWeightProductionError::MissingProducedModelId);
+        }
+        if self.produced_model_revision.trim().is_empty() {
+            return Err(
+                TassadarArticleTransformerWeightProductionError::MissingProducedModelRevision,
+            );
         }
         if self.model_config != base_model.descriptor().config {
             return Err(TassadarArticleTransformerWeightProductionError::ConfigMismatch);
@@ -241,6 +283,18 @@ pub enum TassadarArticleTransformerWeightProductionError {
     MissingRunId,
     #[error("article Transformer weight production requires a non-empty checkpoint family")]
     MissingCheckpointFamily,
+    #[error("article Transformer weight production requires a non-empty base model id")]
+    MissingBaseModelId,
+    #[error("article Transformer weight production requires a non-empty base model revision")]
+    MissingBaseModelRevision,
+    #[error("article Transformer weight production requires a non-empty base descriptor ref")]
+    MissingBaseDescriptorRef,
+    #[error("article Transformer weight production requires a non-empty base artifact ref")]
+    MissingBaseArtifactRef,
+    #[error("article Transformer weight production requires a non-empty produced model id")]
+    MissingProducedModelId,
+    #[error("article Transformer weight production requires a non-empty produced model revision")]
+    MissingProducedModelRevision,
     #[error("article Transformer weight production requires a non-zero step duration")]
     InvalidStepDuration,
     #[error(
@@ -318,9 +372,19 @@ pub fn run_tassadar_article_transformer_weight_production(
     TassadarArticleTransformerWeightProductionOutcome,
     TassadarArticleTransformerWeightProductionError,
 > {
-    let base_model = TassadarArticleTransformer::article_trace_domain_reference()?;
+    let base_model = TassadarArticleTransformer::paper_faithful_reference(
+        config.model_config.clone(),
+        config.embedding_strategy,
+    )?
+    .with_model_identity(
+        config.base_model_id.clone(),
+        config.base_model_revision.clone(),
+    )?;
     config.validate_against_base_model(&base_model)?;
     validate_suite(suite, &config.model_config)?;
+    let base_descriptor_path = resolve_output_path(&config.base_descriptor_ref);
+    let base_artifact_path = resolve_output_path(&config.base_artifact_ref);
+    base_model.write_artifact_bundle(&base_descriptor_path, &base_artifact_path)?;
 
     let selected_parameters =
         selected_trainable_parameters(&base_model, config.trainable_parameter_ids.as_slice());
@@ -435,8 +499,8 @@ pub fn run_tassadar_article_transformer_weight_production(
     )?;
 
     let produced_model = current_model.with_model_identity(
-        TassadarArticleTransformer::TRAINED_TRACE_BOUND_MODEL_ID,
-        "v0",
+        config.produced_model_id.clone(),
+        config.produced_model_revision.clone(),
     )?;
     let produced_descriptor_path = resolve_output_path(&config.produced_descriptor_ref);
     let produced_artifact_path = resolve_output_path(&config.produced_artifact_ref);
@@ -508,8 +572,8 @@ pub fn build_tassadar_article_transformer_weight_production_evidence_bundle(
         },
         label_smoothing: config.label_smoothing,
         finite_difference_epsilon: config.finite_difference_epsilon,
-        base_descriptor_ref: String::from(TassadarArticleTransformer::TRACE_BOUND_DESCRIPTOR_REF),
-        base_artifact_ref: String::from(TassadarArticleTransformer::TRACE_BOUND_ARTIFACT_REF),
+        base_descriptor_ref: config.base_descriptor_ref.clone(),
+        base_artifact_ref: config.base_artifact_ref.clone(),
         produced_descriptor_ref: config.produced_descriptor_ref.clone(),
         produced_artifact_ref: config.produced_artifact_ref.clone(),
         training_cases: suite_case_evidence(&suite.training_examples),
@@ -1390,6 +1454,16 @@ mod tests {
         let mut config =
             TassadarArticleTransformerWeightProductionConfig::reference().expect("config");
         let directory = tempfile::tempdir().expect("tempdir");
+        config.base_descriptor_ref = directory
+            .path()
+            .join("article_transformer_base_descriptor.json")
+            .display()
+            .to_string();
+        config.base_artifact_ref = directory
+            .path()
+            .join("article_transformer_base_weights.safetensors")
+            .display()
+            .to_string();
         config.produced_descriptor_ref = directory
             .path()
             .join("article_transformer_descriptor.json")

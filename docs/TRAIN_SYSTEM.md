@@ -420,6 +420,19 @@ closure:
   without pretending that provenance closure itself is already reference-linear
   exactness, fast-route promotion, benchmark parity, or final
   article-equivalence green status
+- `TAS-R1` now adds a research-only minimal-size frontier on top of that same
+  bounded lane: `psionic-serve` materializes six reduced article-Transformer
+  candidates under
+  `fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/`,
+  keeps candidate-specific base and trained descriptors, safetensors,
+  weight-production bundles, and lineage manifests explicit, and freezes the
+  aggregate comparison at
+  `fixtures/tassadar/reports/tassadar_article_transformer_minimal_frontier_report.json`;
+  that frontier reads the canonical acceptance-gate, generalization,
+  fast-route-selection, and throughput-floor artifacts as anchors instead of
+  mutating them, and the current report lands `frontier_green=false`, so the
+  canonical `TAS-169A` lineage contract and final article-equivalence claim
+  remain unchanged
 - the Phase 11 scale-out substrate now also exists above that run:
   `psionic-runtime` owns a real `tassadar.wasm.sudoku_9x9_search.v1` profile
   plus a real split-aware 9x9 Sudoku-class corpus, `psionic-eval` and

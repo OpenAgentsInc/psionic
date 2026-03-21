@@ -218,6 +218,21 @@ That keeps "weights exist" separate from "weight provenance is frozen and
 challengeable" and still does not widen the public claim beyond this bounded
 trained artifact.
 
+`TAS-R1` now adds one research-only minimal-size frontier on top of that same
+boundary instead of reopening the canonical closure chain. `psionic-serve`
+freezes six reduced article-Transformer candidates in
+`fixtures/tassadar/runs/tassadar_article_transformer_minimal_frontier_v1/` and
+publishes the aggregate report at
+`fixtures/tassadar/reports/tassadar_article_transformer_minimal_frontier_report.json`.
+The frontier keeps full-corpus Stage B behavior parity explicit, then uses a
+bounded Stage C direct-proof and fast-route subset over Hungarian,
+memory-heavy-kernel, and Sudoku representatives while leaving long-loop
+behavior covered by the earlier full-corpus parity stage. The current report
+lands `frontier_green=false`, so no reduced candidate inherits the canonical
+`HullCache` route claim, the canonical `TAS-169A` lineage contract stays
+unchanged, and the final article-equivalence verdict remains attached only to
+the committed canonical model.
+
 `TAS-170` now closes the bounded replacement-certificate tranche on top of the
 same split. `psionic-eval` now compares the historical fixture-backed
 reference-linear lane against the committed trained trace-bound article wrapper

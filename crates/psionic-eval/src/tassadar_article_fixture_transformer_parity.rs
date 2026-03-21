@@ -189,6 +189,7 @@ pub fn build_tassadar_article_fixture_transformer_parity_report() -> Result<
                 &transformer_model,
                 &transformer_model_artifact,
                 expected_environment_refs.as_slice(),
+                true,
             )
         })
         .collect::<Vec<_>>();
@@ -203,6 +204,83 @@ pub fn build_tassadar_article_fixture_transformer_parity_report() -> Result<
         transformer_model_artifact,
         transformer_model_matches_lineage_contract,
         case_rows,
+    ))
+}
+
+pub fn build_tassadar_article_fixture_transformer_parity_case_rows_for_model(
+    transformer_model: &TassadarArticleTransformer,
+    expected_environment_refs: &[String],
+) -> Result<
+    (
+        Vec<TassadarArticleFixtureTransformerParityCaseRow>,
+        Vec<String>,
+        String,
+        TassadarExecutorFixture,
+        TassadarArticleTransformerModelArtifactBinding,
+    ),
+    TassadarArticleFixtureTransformerParityError,
+> {
+    build_case_rows_for_model(transformer_model, expected_environment_refs, true)
+}
+
+pub fn build_tassadar_article_fixture_transformer_behavior_case_rows_for_model(
+    transformer_model: &TassadarArticleTransformer,
+) -> Result<
+    (
+        Vec<TassadarArticleFixtureTransformerParityCaseRow>,
+        Vec<String>,
+        String,
+        TassadarExecutorFixture,
+        TassadarArticleTransformerModelArtifactBinding,
+    ),
+    TassadarArticleFixtureTransformerParityError,
+> {
+    build_case_rows_for_model(transformer_model, &[], false)
+}
+
+fn build_case_rows_for_model(
+    transformer_model: &TassadarArticleTransformer,
+    expected_environment_refs: &[String],
+    include_forward_evidence: bool,
+) -> Result<
+    (
+        Vec<TassadarArticleFixtureTransformerParityCaseRow>,
+        Vec<String>,
+        String,
+        TassadarExecutorFixture,
+        TassadarArticleTransformerModelArtifactBinding,
+    ),
+    TassadarArticleFixtureTransformerParityError,
+> {
+    let suite = build_tassadar_article_class_suite(ARTICLE_SUITE_VERSION)?;
+    let declared_cases = tassadar_article_class_corpus();
+    let declared_case_ids = declared_cases
+        .iter()
+        .map(|case| case.case_id.clone())
+        .collect::<Vec<_>>();
+    let fixture = TassadarExecutorFixture::article_i32_compute_v1();
+    let transformer_model_artifact = transformer_model.model_artifact_binding();
+    let case_rows = declared_cases
+        .iter()
+        .zip(suite.artifacts.iter())
+        .map(|(case, artifact)| {
+            build_case_row(
+                case,
+                artifact,
+                &fixture,
+                transformer_model,
+                &transformer_model_artifact,
+                expected_environment_refs,
+                include_forward_evidence,
+            )
+        })
+        .collect::<Vec<_>>();
+    Ok((
+        case_rows,
+        declared_case_ids,
+        suite.corpus_digest,
+        fixture,
+        transformer_model_artifact,
     ))
 }
 
@@ -347,6 +425,7 @@ fn build_case_row(
     transformer_model: &TassadarArticleTransformer,
     expected_model_artifact_binding: &TassadarArticleTransformerModelArtifactBinding,
     expected_environment_refs: &[String],
+    include_forward_evidence: bool,
 ) -> TassadarArticleFixtureTransformerParityCaseRow {
     let requested_decode_mode = TassadarExecutorDecodeMode::ReferenceLinear;
     let selection = fixture.runtime_selection_diagnostic(&case.program, requested_decode_mode);
@@ -455,7 +534,7 @@ fn build_case_row(
     row.within_transformer_context_window =
         within_transformer_context_window(transformer_model, &roundtrip.batch);
 
-    if row.within_transformer_context_window {
+    if include_forward_evidence && row.within_transformer_context_window {
         let forward_evidence = match transformer_model.forward_with_runtime_evidence(
             format!(
                 "tassadar.article_transformer.fixture_parity.run.{}",
@@ -493,17 +572,27 @@ fn build_case_row(
         );
         row.forward_replay_stable = forward_evidence.replay_receipt.deterministic_match;
     }
-    row.case_passed = row.fixture_routeable
+    let behavior_parity_passed = row.fixture_routeable
         && row.transformer_routeable
         && row.trace_shape_parity
         && row.output_parity
-        && row.behavior_parity
-        && (!row.within_transformer_context_window
+        && row.behavior_parity;
+    row.case_passed = behavior_parity_passed
+        && (!include_forward_evidence
+            || !row.within_transformer_context_window
             || (row.forward_binding_parity && row.forward_replay_stable));
     row.detail = if row.case_passed {
-        if row.within_transformer_context_window {
+        if include_forward_evidence && row.within_transformer_context_window {
             format!(
                 "fixture reference-linear execution and the trained trace-bound Transformer wrapper stay aligned on {} trace steps, prompt_token_count={}, target_token_count={}, and output_count={}",
+                row.fixture_trace_step_count,
+                row.prompt_token_count,
+                row.target_token_count,
+                row.output_count
+            )
+        } else if !include_forward_evidence {
+            format!(
+                "research-only behavior parity stays exact on {} trace steps, prompt_token_count={}, target_token_count={}, and output_count={} without rebinding canonical forward-artifact identity checks",
                 row.fixture_trace_step_count,
                 row.prompt_token_count,
                 row.target_token_count,
