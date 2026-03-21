@@ -685,10 +685,10 @@ fn blocker_rows() -> Vec<TassadarArticleEquivalenceBlockerRow> {
             ),
             repo_status: TassadarRepoStatus::Partial,
             current_gap_summary: String::from(
-                "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo now closes the joined interpreter-ownership verdict and the explicit KV-cache plus activation-state discipline verdict, but it still lacks cross-machine reproducibility, route-minimality, and the final publication verdicts for that stronger reading",
+                "the article invites a strong reading where decisive execution behavior lives in transformer weights on a minimal route. The public repo now closes the joined interpreter-ownership verdict, the explicit KV-cache plus activation-state discipline verdict, and the cross-machine reproducibility matrix, but it still lacks route-minimality and the final publication verdicts for that stronger reading",
             ),
             current_public_truth: String::from(
-                "the repo now has one canonical TAS-184 interpreter-ownership gate plus one TAS-184A KV-cache and activation-state discipline audit, together making the bounded route's weight sensitivity and mixed same-run state carrier posture machine-readable; it still does not yet have the later cross-machine reproducibility matrix, route-minimality publication verdict, or final article-equivalence claim checker",
+                "the repo now has one canonical TAS-184 interpreter-ownership gate, one TAS-184A KV-cache and activation-state discipline audit, and one TAS-185 cross-machine reproducibility matrix, together making the bounded route's weight sensitivity, mixed same-run state carrier posture, and declared machine-class stability machine-readable; it still does not yet have the later route-minimality publication verdict or final article-equivalence claim checker",
             ),
             closure_requirements: vec![
                 String::from(
@@ -1021,7 +1021,7 @@ fn issue_coverage_rows() -> Vec<TassadarArticleEquivalenceIssueCoverageRow> {
             309,
             "TAS-185: Cross-machine reproducibility matrix",
             TassadarArticleEquivalenceIssueRole::Implementation,
-            "open",
+            "closed",
             &["BEQ-004", "BEQ-005", "BEQ-006", "BEQ-007"],
         ),
         issue_row(

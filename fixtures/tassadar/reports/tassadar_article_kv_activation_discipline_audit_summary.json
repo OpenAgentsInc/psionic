@@ -2,7 +2,7 @@
   "report_id": "tassadar.article_kv_activation_discipline_audit.report.v1",
   "tied_requirement_id": "TAS-184A",
   "tied_requirement_satisfied": true,
-  "blocked_issue_frontier": "TAS-185",
+  "blocked_issue_frontier": "TAS-185A",
   "ownership_gate_green": true,
   "feasible_constraint_case_count": 4,
   "dominance_verdict": "mixed",
@@ -14,5 +14,5 @@
   "kv_activation_discipline_green": true,
   "article_equivalence_green": false,
   "detail": "TAS-184A now records ownership_gate_green=true, feasible_constraint_case_count=4, verdict=Mixed, cache_growth_scales_with_problem_size=true, dynamic_state_exceeds_weight_artifact_bytes=true, cache_truncation_breaks_correctness=true, cache_reset_breaks_correctness=true, constrained_cache_equivalence=false, kv_activation_discipline_green=true, article_equivalence_green=false",
-  "summary_digest": "3f985e070687e0edfc26f19aa12ac12e7c5cb09b5de5b33912dc92cca5071a98"
+  "summary_digest": "8461596e271be0f70f39e9335a828b94b4544d4911b976fac88179cebfd751b2"
 }

@@ -960,7 +960,7 @@ mod tests {
                 .blocked_issue_ids
                 .first()
                 .map(String::as_str),
-            Some("TAS-185")
+            Some("TAS-185A")
         );
         assert_eq!(
             report

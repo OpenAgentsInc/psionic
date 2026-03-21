@@ -9,7 +9,6 @@
     "tied_requirement_satisfied": true,
     "acceptance_status": "blocked",
     "blocked_issue_ids": [
-      "TAS-185",
       "TAS-185A",
       "TAS-186"
     ]
@@ -377,6 +376,6 @@
   "kv_activation_discipline_green": true,
   "article_equivalence_green": false,
   "claim_boundary": "this report closes TAS-184A only. It declares the article-route KV-cache and activation-state discipline verdict for the bounded public envelope, including explicit acceptable versus non-acceptable state carriers and an explicit weight-dominant versus activation-dominant versus mixed verdict. It still does not close cross-machine reproducibility from TAS-185, route minimality from TAS-185A, or the final article-equivalence audit from TAS-186.",
-  "summary": "Article KV-cache and activation-state discipline audit now records tied_requirement_satisfied=true, verdict=Mixed, cache_growth_scales_with_problem_size=true, truncation_breaks_correctness=true, reset_breaks_correctness=true, constrained_cache_equivalence=false, blocked_issue_frontier=Some(\"TAS-185\"), and article_equivalence_green=false.",
-  "report_digest": "2a80c1a7f0a9cc23f6efa68223a696aa41044c1ffdb55f92aa024f738d1fd86a"
+  "summary": "Article KV-cache and activation-state discipline audit now records tied_requirement_satisfied=true, verdict=Mixed, cache_growth_scales_with_problem_size=true, truncation_breaks_correctness=true, reset_breaks_correctness=true, constrained_cache_equivalence=false, blocked_issue_frontier=Some(\"TAS-185A\"), and article_equivalence_green=false.",
+  "report_digest": "599ff68c22dac10f68170390328cb3f65ec7d8ced827d8d78e07185efb7ddd27"
 }

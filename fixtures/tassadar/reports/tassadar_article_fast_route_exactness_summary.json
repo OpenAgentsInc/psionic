@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-185",
         "TAS-185A",
         "TAS-186"
       ]
@@ -108,7 +107,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report closes only TAS-174. It proves the selected HullCache fast path is now exact and no-fallback on the declared canonical article workload families inside the current article profile, and that the served article-session plus hybrid route surfaces expose those workloads as direct HullCache executions on the trained Transformer-backed model. It does not yet claim throughput-floor closure or final article-equivalence green status.",
     "summary": "Article fast-route exactness report now records tied_requirement_satisfied=true, implementation_prerequisite_green=true, all_article_workloads_exact=true, article_session_direct_cases=3, hybrid_direct_cases=3, exactness_green=true, and article_equivalence_green=false.",
-    "report_digest": "1ceefdd15dd9e388e7c4afae5cfc6649d84fbbc31a255b27a8f300728ebcb8ab"
+    "report_digest": "e32b08249abdbd9b03d0fe457ea1c5c14749ec3406e2c68ad48a1a59fa836e6e"
   },
   "tied_requirement_id": "TAS-174",
   "tied_requirement_satisfied": true,
@@ -121,5 +120,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-174 fast-route exactness tranche. It keeps the zero-fallback article-workload closure operator-readable without pretending that TAS-175 throughput closure or final article-equivalence green status are already closed.",
   "summary": "Article fast-route exactness summary now records tied_requirement_satisfied=true, implementation_prerequisite_green=true, all_article_workloads_exact=true, article_session_direct_case_count=3, hybrid_direct_case_count=3, exactness_green=true, and article_equivalence_green=false.",
-  "report_digest": "9d80a20ad7c44996060c0751bf2f78d43c54b0bcc286309f40f21fbfa3c2d2c5"
+  "report_digest": "66eb32ce25243a58bfaed54e823e4b0e0ae5a8b7c10a85645c4c6335f76221c5"
 }

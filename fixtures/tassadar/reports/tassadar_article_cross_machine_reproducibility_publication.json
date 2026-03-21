@@ -1,0 +1,19 @@
+{
+  "product_id": "psionic.executor_trace",
+  "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "report_ref": "fixtures/tassadar/reports/tassadar_article_cross_machine_reproducibility_matrix_report.json",
+  "summary_ref": "fixtures/tassadar/reports/tassadar_article_cross_machine_reproducibility_matrix_summary.json",
+  "current_host_machine_class_id": "host_cpu_x86_64",
+  "supported_machine_class_ids": [
+    "host_cpu_aarch64",
+    "host_cpu_x86_64"
+  ],
+  "selected_decode_mode": "hull_cache",
+  "deterministic_mode_green": true,
+  "throughput_floor_stability_green": true,
+  "stochastic_mode_out_of_scope": true,
+  "reproducibility_matrix_green": true,
+  "article_equivalence_green": false,
+  "claim_boundary": "this served publication cites the canonical TAS-185 cross-machine reproducibility matrix for the selected deterministic fast article route only. It freezes the declared supported CPU machine classes, the selected HullCache decode mode, and the explicit out-of-scope stochastic posture without widening the served claim to route minimality, stochastic execution, or final article-equivalence green status.",
+  "publication_digest": "3a1afd976916b771fb2639d093d7c6a63bae3cb14a5b0bc3e8ca5281db3eb92a"
+}

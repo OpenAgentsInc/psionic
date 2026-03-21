@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-185",
         "TAS-185A",
         "TAS-186"
       ]
@@ -514,12 +513,12 @@
     "hard_sudoku_benchmark_closure_green": true,
     "article_equivalence_green": false,
     "claim_boundary": "this report closes TAS-181 only. It binds the canonical Sudoku article source, the existing no-tool Sudoku reproducer, the declared hard-Sudoku suite manifest, two served HullCache artifacts, and the runtime hard-Sudoku benchmark bundle into one machine-readable closure surface for the named Arto Inkala instance plus the declared benchmark suite. It does not yet claim the later unified demo-and-benchmark equivalence gate, no-spill single-run closure, or final article-equivalence green status.",
-    "summary": "Hard-Sudoku benchmark closure now records tied_requirement_satisfied=true, manifest_green=true, frontend_green=true, no_tool_proof_green=true, session_suite_green=true, hybrid_suite_green=true, runtime_suite_green=true, named_arto_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-185\"), and article_equivalence_green=false.",
-    "report_digest": "bae30dee87f6b77207d8c7345748352ab443d3a2f86c315991e29824ddbecc2e"
+    "summary": "Hard-Sudoku benchmark closure now records tied_requirement_satisfied=true, manifest_green=true, frontend_green=true, no_tool_proof_green=true, session_suite_green=true, hybrid_suite_green=true, runtime_suite_green=true, named_arto_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-185A\"), and article_equivalence_green=false.",
+    "report_digest": "6f93786a7fe314a03b0d46dee13f620f53a9f851337eac09153c4e46113e50a9"
   },
   "tied_requirement_id": "TAS-181",
   "tied_requirement_satisfied": true,
-  "blocked_issue_frontier": "TAS-185",
+  "blocked_issue_frontier": "TAS-185A",
   "named_arto_green": true,
   "hard_sudoku_suite_green": true,
   "session_fast_route_green": true,
@@ -529,6 +528,6 @@
   "hard_sudoku_benchmark_closure_green": true,
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-181 hard-Sudoku tranche. It keeps the named Arto case, the declared hard-Sudoku suite, the served HullCache artifacts, and the runtime ceiling bundle operator-readable without pretending that the later unified demo-and-benchmark gate or final article-equivalence tranches are already green.",
-  "summary": "Hard-Sudoku benchmark closure summary now records tied_requirement_satisfied=true, named_arto_green=true, hard_sudoku_suite_green=true, session_fast_route_green=true, hybrid_fast_route_green=true, runtime_suite_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-185\"), and article_equivalence_green=false.",
-  "report_digest": "bb6fc2e8c4254a0f3cbeece60913199f5c9ca7e151bff6d2f490f0160d23e917"
+  "summary": "Hard-Sudoku benchmark closure summary now records tied_requirement_satisfied=true, named_arto_green=true, hard_sudoku_suite_green=true, session_fast_route_green=true, hybrid_fast_route_green=true, runtime_suite_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-185A\"), and article_equivalence_green=false.",
+  "report_digest": "3662d64ccc1ccbdfbe3516bd90cb460d4dde866851388080f4f1da20fae7ffbd"
 }

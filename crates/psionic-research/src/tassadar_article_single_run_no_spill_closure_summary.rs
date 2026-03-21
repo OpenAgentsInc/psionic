@@ -198,7 +198,7 @@ mod tests {
         assert!(summary.perturbation_negative_control_green);
         assert!(summary.stochastic_mode_robustness_green);
         assert!(summary.single_run_no_spill_closure_green);
-        assert_eq!(summary.blocked_issue_frontier.as_deref(), Some("TAS-185"));
+        assert_eq!(summary.blocked_issue_frontier.as_deref(), Some("TAS-185A"));
         assert!(!summary.article_equivalence_green);
     }
 

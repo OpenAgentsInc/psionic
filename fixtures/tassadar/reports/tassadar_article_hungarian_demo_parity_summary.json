@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-185",
         "TAS-185A",
         "TAS-186"
       ]
@@ -122,14 +121,14 @@
       "public_anchor_token_throughput_per_second": 33409,
       "public_anchor_line_throughput_per_second": 7263,
       "public_anchor_total_token_count": 158396,
-      "measured_tokens_per_second": 3033965288.0890765,
-      "measured_lines_per_second": 12820445.363940485,
+      "measured_tokens_per_second": 3104357153.912932,
+      "measured_lines_per_second": 13117896.054429092,
       "measured_total_token_count": 11532454,
       "public_token_anchor_status": "passed",
       "public_line_anchor_status": "passed",
       "internal_token_floor_status": "passed",
       "declared_floor_green": true,
-      "detail": "throughput report kept `hungarian_10x10_test_a` direct on HullCache with exactness_bps=10000 and public token/line anchors 33409/7263 at measured tok/s 3033965288.09."
+      "detail": "throughput report kept `hungarian_10x10_test_a` direct on HullCache with exactness_bps=10000 and public token/line anchors 33409/7263 at measured tok/s 3104357153.91."
     },
     "binding_review": {
       "frontend_source_matches_reproducer": true,
@@ -144,12 +143,12 @@
     "hungarian_demo_parity_green": true,
     "article_equivalence_green": false,
     "claim_boundary": "this report closes TAS-180 only. It binds the canonical 10x10 Hungarian article demo source to one direct HullCache fast-route session, one planner-owned HullCache hybrid workflow, the declared throughput-floor artifact, and the existing no-tool reproducer proof surface. It does not yet claim Arto closure, benchmark-wide hard-Sudoku closure, unified demo-and-benchmark equivalence, single-run closure, or final article-equivalence green status.",
-    "summary": "Hungarian article demo parity now records tied_requirement_satisfied=true, frontend_green=true, no_tool_proof_green=true, session_fast_route_green=true, hybrid_fast_route_green=true, throughput_floor_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-185\"), and article_equivalence_green=false.",
-    "report_digest": "f4bf4b931088355d9658b75fd7f902a96216c44f0a9881be938465ebe5a614ac"
+    "summary": "Hungarian article demo parity now records tied_requirement_satisfied=true, frontend_green=true, no_tool_proof_green=true, session_fast_route_green=true, hybrid_fast_route_green=true, throughput_floor_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-185A\"), and article_equivalence_green=false.",
+    "report_digest": "d57d6d342b897eac44edc6031c57eb2fbde43e32983b7d3d9c4ec90129b1fd3c"
   },
   "tied_requirement_id": "TAS-180",
   "tied_requirement_satisfied": true,
-  "blocked_issue_frontier": "TAS-185",
+  "blocked_issue_frontier": "TAS-185A",
   "session_fast_route_green": true,
   "hybrid_fast_route_green": true,
   "throughput_floor_green": true,
@@ -158,6 +157,6 @@
   "hungarian_demo_parity_green": true,
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-180 Hungarian article demo parity tranche. It keeps the 10x10 Hungarian fast-route, throughput-floor, and no-tool-proof binding operator-readable without pretending that the hard-Sudoku benchmark or final article-equivalence tranches are already green.",
-  "summary": "Hungarian article demo parity summary now records tied_requirement_satisfied=true, session_fast_route_green=true, hybrid_fast_route_green=true, throughput_floor_green=true, no_tool_proof_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-185\"), and article_equivalence_green=false.",
-  "report_digest": "ed7c74f3f9fc731f9fa540fbc034385fb8065f35d9abacb7f7f0f6e1d9842f9f"
+  "summary": "Hungarian article demo parity summary now records tied_requirement_satisfied=true, session_fast_route_green=true, hybrid_fast_route_green=true, throughput_floor_green=true, no_tool_proof_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-185A\"), and article_equivalence_green=false.",
+  "report_digest": "88000ce9db74080bd3740ba9fd6ada72381218b9f13ebb26c13253884eaece7f"
 }

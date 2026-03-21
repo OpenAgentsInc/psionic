@@ -588,6 +588,25 @@ history channels remain outside the admitted route. Cross-machine
 reproducibility, route minimality, and final article-equivalence tranches
 still remain open.
 
+`TAS-185` now closes the next declared-machine reproducibility tranche on top
+of the same route. `psionic-eval` now commits the joined matrix artifact at
+`fixtures/tassadar/reports/tassadar_article_cross_machine_reproducibility_matrix_report.json`,
+which ties the selected `HullCache` fast route to the declared
+`host_cpu_x86_64` and `host_cpu_aarch64` machine classes, the canonical
+Hungarian and Sudoku demo evidence, the deterministic single-run long-horizon
+closure, and the zero-drift throughput-floor policy already frozen for the
+bounded article lane. `psionic-research` now mirrors the operator-readable
+summary at
+`fixtures/tassadar/reports/tassadar_article_cross_machine_reproducibility_matrix_summary.json`,
+`psionic-provider` now projects the same verdict into
+`crates/psionic-provider/src/tassadar_article_cross_machine_reproducibility_matrix.rs`,
+and `psionic-serve` now freezes the bounded served portability statement at
+`fixtures/tassadar/reports/tassadar_article_cross_machine_reproducibility_publication.json`.
+The canonical fast route is now machine-readably reproducible on the declared
+CPU machine envelope, while stochastic execution remains explicitly out of
+scope for this article route and route-minimality plus the final claim checker
+still remain open.
+
 ## Route Requirement
 
 Any canonical article-equivalence Transformer route must use this boundary.

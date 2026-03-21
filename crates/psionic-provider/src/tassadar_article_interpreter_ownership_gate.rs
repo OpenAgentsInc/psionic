@@ -92,7 +92,7 @@ mod tests {
         assert_eq!(receipt.tied_requirement_id, "TAS-184");
         assert_eq!(
             receipt.blocked_issue_ids.first().map(String::as_str),
-            Some("TAS-185")
+            Some("TAS-185A")
         );
         assert_eq!(receipt.generic_direct_proof_case_count, 6);
         assert!(receipt.generic_direct_proof_suite_green);

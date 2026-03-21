@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-185",
         "TAS-185A",
         "TAS-186"
       ]
@@ -22,13 +21,13 @@
       "report_id": "tassadar.article_demo_benchmark_equivalence_gate.report.v1",
       "tied_requirement_id": "TAS-182",
       "tied_requirement_satisfied": true,
-      "blocked_issue_frontier": "TAS-185",
+      "blocked_issue_frontier": "TAS-185A",
       "hungarian_demo_parity_green": true,
       "named_arto_parity_green": true,
       "benchmark_wide_sudoku_parity_green": true,
       "binding_green": true,
       "article_demo_benchmark_equivalence_gate_green": true,
-      "detail": "Benchmark prerequisite `tassadar.article_demo_benchmark_equivalence_gate.report.v1` keeps tied_requirement_id=TAS-182, blocked_issue_frontier=Some(\"TAS-185\"), Hungarian=true, named_arto=true, hard_sudoku_suite=true, binding_green=true, and gate_green=true."
+      "detail": "Benchmark prerequisite `tassadar.article_demo_benchmark_equivalence_gate.report.v1` keeps tied_requirement_id=TAS-182, blocked_issue_frontier=Some(\"TAS-185A\"), Hungarian=true, named_arto=true, hard_sudoku_suite=true, binding_green=true, and gate_green=true."
     },
     "operator_envelope": {
       "token_stream_continuity_contract_id": "tassadar.article_single_run.token_stream_continuity.v1",
@@ -216,12 +215,12 @@
     "single_run_no_spill_closure_green": true,
     "article_equivalence_green": false,
     "claim_boundary": "this report closes TAS-183 only. It freezes one no-resume single-run operator envelope on top of the canonical owned `psionic-transformer` route boundary by requiring the unified TAS-182 benchmark gate to stay green, the declared million-step and multi-million-step horizon receipts to stay exact and under floor, the context window to remain small relative to horizon size, and checkpoint/spill/resume lanes to stay explicit negative controls instead of inheriting article closure. It does not imply clean-room weight causality, route minimality, or final article-equivalence green status.",
-    "summary": "Article single-run no-spill closure now records tied_requirement_satisfied=true, benchmark_gate_green=true, operator_envelope_green=true, deterministic_exactness_green=true, step_consistency_green=true, context_sensitivity_green=true, perturbation_negative_control_green=true, stochastic_mode_robustness_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-185\"), and article_equivalence_green=false.",
-    "report_digest": "03c0bf4fafb8d0d167a97ea5d80166b1870ac0e7c7ca841d08987cbac157ef20"
+    "summary": "Article single-run no-spill closure now records tied_requirement_satisfied=true, benchmark_gate_green=true, operator_envelope_green=true, deterministic_exactness_green=true, step_consistency_green=true, context_sensitivity_green=true, perturbation_negative_control_green=true, stochastic_mode_robustness_green=true, binding_green=true, blocked_issue_frontier=Some(\"TAS-185A\"), and article_equivalence_green=false.",
+    "report_digest": "63f9158385a91cdfe0bd41bae19569d64e118641cb7101edc4ddf95462f2e711"
   },
   "tied_requirement_id": "TAS-183",
   "tied_requirement_satisfied": true,
-  "blocked_issue_frontier": "TAS-185",
+  "blocked_issue_frontier": "TAS-185A",
   "deterministic_exactness_green": true,
   "step_consistency_green": true,
   "context_sensitivity_green": true,
@@ -230,6 +229,6 @@
   "single_run_no_spill_closure_green": true,
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-183 single-run no-spill closure gate. It keeps the no-resume operator envelope, long-horizon exactness, context-sensitivity bound, and continuation negative controls operator-readable without pretending that clean-room weight causality, route minimality, or final article-equivalence green status are already true.",
-  "summary": "Article single-run no-spill closure summary now records tied_requirement_satisfied=true, deterministic_exactness_green=true, step_consistency_green=true, context_sensitivity_green=true, perturbation_negative_control_green=true, stochastic_mode_robustness_green=true, gate_green=true, blocked_issue_frontier=Some(\"TAS-185\"), and article_equivalence_green=false.",
-  "report_digest": "276fee0c560fff3757d92fda2bc380800e2c46cb28bf39bb1a97cd945ab80b62"
+  "summary": "Article single-run no-spill closure summary now records tied_requirement_satisfied=true, deterministic_exactness_green=true, step_consistency_green=true, context_sensitivity_green=true, perturbation_negative_control_green=true, stochastic_mode_robustness_green=true, gate_green=true, blocked_issue_frontier=Some(\"TAS-185A\"), and article_equivalence_green=false.",
+  "report_digest": "062897712d13a975204240c5f8e56a845dfbf42a537751f311298cec11598dfe"
 }

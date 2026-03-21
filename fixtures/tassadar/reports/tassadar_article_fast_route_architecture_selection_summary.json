@@ -12,7 +12,6 @@
       "tied_requirement_satisfied": true,
       "acceptance_status": "blocked",
       "blocked_issue_ids": [
-        "TAS-185",
         "TAS-185A",
         "TAS-186"
       ]
@@ -562,7 +561,7 @@
     "article_equivalence_green": false,
     "claim_boundary": "this report selects exactly one fast architecture for the canonical article route without pretending that the fast path is already integrated into the owned Transformer-backed model. It keeps same-harness exactness, direct-versus-fallback posture, route-contract fit, promoted runtime truth, and research-only candidates separate so TAS-173 through TAS-175 can close the integration, no-fallback, and throughput tranches explicitly rather than collapsing them into one weak headline.",
     "summary": "Article fast-route architecture selection now chooses `hull_cache_runtime` as the canonical fast article route with routeable_candidate_count=1, exact_article_matrix_candidate_count=3, selected_direct_module_class_count=6, selected_fallback_module_class_count=0, tied_requirement_satisfied=true, and article_equivalence_green=false.",
-    "report_digest": "567977134a4a71f22402495322b89ec380d7d35991253b1a4ddde2c3e8010e80"
+    "report_digest": "0cd332862a03eb2629b8f0a05183f57c6d288d319974b3174bd1efd17b7be173"
   },
   "tied_requirement_id": "TAS-172",
   "tied_requirement_satisfied": true,
@@ -576,5 +575,5 @@
   "article_equivalence_green": false,
   "claim_boundary": "this summary mirrors only the TAS-172 fast-route architecture selection. It keeps the chosen fast family, candidate counts, and projected routeability split operator-readable without pretending that TAS-173 through TAS-175 are already closed.",
   "summary": "Article fast-route selection summary now records selected_candidate_kind=`hull_cache_runtime`, routeable_candidate_count=1, exact_article_matrix_candidate_count=3, selected_direct_module_class_count=6, selected_fallback_module_class_count=0, fast_route_selection_green=true, and article_equivalence_green=false.",
-  "report_digest": "264bec7be9fb29bbbb481dc7e094cc5542cbe2c8696d11dda4c2338b2e7b186e"
+  "report_digest": "5c9bc1ff48a6ec8015ee9391bbc011deb2f031b0a42a6efde6cfb510ba2cb662"
 }

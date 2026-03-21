@@ -12,7 +12,7 @@ cargo run -p psionic-research --example tassadar_article_kv_activation_disciplin
 jq -e '
   .acceptance_gate_tie.tied_requirement_id == "TAS-184A"
   and .acceptance_gate_tie.tied_requirement_satisfied == true
-  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-185")
+  and (.acceptance_gate_tie.blocked_issue_ids[0] == "TAS-185A")
   and .ownership_gate_green == true
   and .growth_report.cache_growth_scales_with_problem_size == true
   and .growth_report.dynamic_state_exceeds_weight_artifact_bytes == true
@@ -28,7 +28,7 @@ jq -e '
 jq -e '
   .tied_requirement_id == "TAS-184A"
   and .tied_requirement_satisfied == true
-  and .blocked_issue_frontier == "TAS-185"
+  and .blocked_issue_frontier == "TAS-185A"
   and .ownership_gate_green == true
   and .feasible_constraint_case_count == 4
   and .dominance_verdict == "mixed"

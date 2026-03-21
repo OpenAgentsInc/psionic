@@ -22,6 +22,7 @@ mod gguf;
 mod gpt_oss;
 mod openai_http;
 mod tassadar;
+mod tassadar_article_cross_machine_reproducibility_publication;
 mod tassadar_broad_internal_compute_profile_publication;
 mod tassadar_broad_internal_compute_publication_gate;
 mod tassadar_direct_model_weight_execution_proof;
@@ -108,6 +109,7 @@ pub use psionic_transformer::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use tassadar::*;
+pub use tassadar_article_cross_machine_reproducibility_publication::*;
 pub use tassadar_broad_internal_compute_profile_publication::*;
 pub use tassadar_broad_internal_compute_publication_gate::*;
 pub use tassadar_direct_model_weight_execution_proof::*;

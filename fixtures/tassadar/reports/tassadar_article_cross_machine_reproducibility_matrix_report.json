@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.article_cross_machine_reproducibility_matrix.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-article-cross-machine-reproducibility-matrix.sh",
+  "acceptance_gate_tie": {
+    "acceptance_gate_report_ref": "fixtures/tassadar/reports/tassadar_article_equivalence_acceptance_gate_report.json",
+    "tied_requirement_id": "TAS-185",
+    "tied_requirement_satisfied": true,
+    "acceptance_status": "blocked",
+    "blocked_issue_ids": [
+      "TAS-185A",
+      "TAS-186"
+    ]
+  },
+  "machine_matrix_review": {
+    "report_ref": "fixtures/tassadar/reports/tassadar_article_cpu_reproducibility_report.json",
+    "current_host_machine_class_id": "host_cpu_x86_64",
+    "supported_machine_class_ids": [
+      "host_cpu_aarch64",
+      "host_cpu_x86_64"
+    ],
+    "unsupported_machine_class_ids": [
+      "other_host_cpu"
+    ],
+    "current_host_measured_green": true,
+    "machine_class_alignment_green": true,
+    "detail": "CPU matrix keeps current_host_machine_class_id=`host_cpu_x86_64`, current_host_measured_green=true, supported_classes=2, unsupported_classes=1, and machine_class_alignment_green=true."
+  },
+  "route_stability_review": {
+    "architecture_selection_report_ref": "fixtures/tassadar/reports/tassadar_article_fast_route_architecture_selection_report.json",
+    "exactness_report_ref": "fixtures/tassadar/reports/tassadar_article_fast_route_exactness_report.json",
+    "selected_candidate_kind": "hull_cache_runtime",
+    "selected_decode_mode": "hull_cache",
+    "transformer_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "direct_case_ids": [
+      "long_loop_kernel",
+      "sudoku_v0_test_a",
+      "hungarian_matching"
+    ],
+    "hybrid_case_ids": [
+      "long_loop_kernel",
+      "sudoku_v0_test_a",
+      "hungarian_matching"
+    ],
+    "direct_case_count": 3,
+    "hybrid_case_count": 3,
+    "all_direct_routes_hull_cache": true,
+    "all_hybrid_routes_hull_cache": true,
+    "route_stability_green": true,
+    "detail": "Route stability keeps selected_candidate_kind=`HullCacheRuntime`, selected_decode_mode=`tassadar.decode.hull_cache.v1`, direct_case_count=3, hybrid_case_count=3, all_direct_routes_hull_cache=true, all_hybrid_routes_hull_cache=true, and route_stability_green=true."
+  },
+  "demo_review": {
+    "report_ref": "fixtures/tassadar/reports/tassadar_article_demo_benchmark_equivalence_gate_report.json",
+    "hungarian_demo_case_id": "hungarian_10x10_test_a",
+    "sudoku_demo_case_ids": [
+      "sudoku_9x9_test_a",
+      "sudoku_9x9_arto_inkala"
+    ],
+    "canonical_demo_case_ids": [
+      "hungarian_10x10_test_a",
+      "sudoku_9x9_arto_inkala",
+      "sudoku_9x9_test_a"
+    ],
+    "binding_green": true,
+    "demo_benchmark_equivalence_green": true,
+    "detail": "Demo review keeps Hungarian case=`hungarian_10x10_test_a`, Sudoku case_count=2, binding_green=true, and demo_benchmark_equivalence_green=true."
+  },
+  "long_horizon_review": {
+    "report_ref": "fixtures/tassadar/reports/tassadar_article_single_run_no_spill_closure_report.json",
+    "selected_candidate_kind": "hull_cache_runtime",
+    "selected_decode_mode": "tassadar.decode.hull_cache.v1",
+    "million_step_horizon_ids": [
+      "long_loop_kernel.million_step",
+      "state_machine_kernel.million_step"
+    ],
+    "multi_million_step_horizon_ids": [
+      "long_loop_kernel.two_million_step",
+      "state_machine_kernel.two_million_step"
+    ],
+    "all_horizon_rows_exact": true,
+    "all_horizon_rows_fast_route_direct": true,
+    "all_horizon_rows_floor_passed": true,
+    "deterministic_exactness_green": true,
+    "single_run_no_spill_closure_green": true,
+    "detail": "Long-horizon review keeps selected_candidate_kind=`hull_cache_runtime`, selected_decode_mode=`tassadar.decode.hull_cache.v1`, million_step_horizons=2, multi_million_step_horizons=2, all_horizon_rows_exact=true, all_horizon_rows_floor_passed=true, deterministic_exactness_green=true, and single_run_no_spill_closure_green=true."
+  },
+  "throughput_drift_review": {
+    "report_ref": "fixtures/tassadar/reports/tassadar_article_fast_route_throughput_floor_report.json",
+    "current_host_machine_class_id": "host_cpu_x86_64",
+    "supported_machine_class_ids": [
+      "host_cpu_aarch64",
+      "host_cpu_x86_64"
+    ],
+    "allowed_floor_drift_bps": 0,
+    "drift_policy_green": true,
+    "throughput_floor_green": true,
+    "kernel_horizon_ids": [
+      "long_loop_kernel.million_step",
+      "long_loop_kernel.two_million_step",
+      "state_machine_kernel.million_step",
+      "state_machine_kernel.two_million_step"
+    ],
+    "detail": "the fast-route throughput floors stay identical across the declared `host_cpu_aarch64` and `host_cpu_x86_64` classes with zero allowed floor drift; other CPU classes remain outside the TAS-175 closure envelope"
+  },
+  "stochastic_mode_review": {
+    "report_ref": "fixtures/tassadar/reports/tassadar_article_single_run_no_spill_closure_report.json",
+    "stochastic_mode_supported": false,
+    "stochastic_mode_robustness_green": true,
+    "out_of_scope": true,
+    "detail": "stochastic execution stays out of scope for the canonical fast article route; TAS-185 freezes deterministic HullCache reproducibility only and refuses to widen the claim to stochastic execution"
+  },
+  "machine_rows": [
+    {
+      "machine_class_id": "host_cpu_aarch64",
+      "machine_class_status": "supported_declared_class",
+      "supported_machine_class": true,
+      "deterministic_demo_exactness_posture": "exact_required_declared_class",
+      "deterministic_long_horizon_exactness_posture": "exact_required_declared_class",
+      "throughput_floor_stability_posture": "passed_required_declared_class",
+      "stochastic_mode_posture": "out_of_scope",
+      "route_stability_green": true,
+      "row_green": true,
+      "detail": "machine_class_id=`host_cpu_aarch64` keeps status=`SupportedDeclaredClass`, supported_machine_class=true, demo_exactness_posture=`ExactRequiredDeclaredClass`, long_horizon_exactness_posture=`ExactRequiredDeclaredClass`, throughput_posture=`PassedRequiredDeclaredClass`, stochastic_mode_posture=`OutOfScope`, route_stability_green=true, and row_green=true."
+    },
+    {
+      "machine_class_id": "host_cpu_x86_64",
+      "machine_class_status": "supported_measured_current_host",
+      "supported_machine_class": true,
+      "deterministic_demo_exactness_posture": "exact_measured_current_host",
+      "deterministic_long_horizon_exactness_posture": "exact_measured_current_host",
+      "throughput_floor_stability_posture": "passed_measured_current_host",
+      "stochastic_mode_posture": "out_of_scope",
+      "route_stability_green": true,
+      "row_green": true,
+      "detail": "machine_class_id=`host_cpu_x86_64` keeps status=`SupportedMeasuredCurrentHost`, supported_machine_class=true, demo_exactness_posture=`ExactMeasuredCurrentHost`, long_horizon_exactness_posture=`ExactMeasuredCurrentHost`, throughput_posture=`PassedMeasuredCurrentHost`, stochastic_mode_posture=`OutOfScope`, route_stability_green=true, and row_green=true."
+    },
+    {
+      "machine_class_id": "other_host_cpu",
+      "machine_class_status": "unsupported",
+      "supported_machine_class": false,
+      "deterministic_demo_exactness_posture": "refused",
+      "deterministic_long_horizon_exactness_posture": "refused",
+      "throughput_floor_stability_posture": "refused",
+      "stochastic_mode_posture": "out_of_scope",
+      "route_stability_green": true,
+      "row_green": true,
+      "detail": "machine_class_id=`other_host_cpu` keeps status=`Unsupported`, supported_machine_class=false, demo_exactness_posture=`Refused`, long_horizon_exactness_posture=`Refused`, throughput_posture=`Refused`, stochastic_mode_posture=`OutOfScope`, route_stability_green=true, and row_green=true."
+    }
+  ],
+  "deterministic_mode_green": true,
+  "throughput_floor_stability_green": true,
+  "reproducibility_matrix_green": true,
+  "article_equivalence_green": false,
+  "claim_boundary": "this report closes TAS-185 only. It freezes one cross-machine reproducibility matrix for the canonical fast article route over the declared `host_cpu_x86_64` and `host_cpu_aarch64` machine classes, binding deterministic demo exactness, deterministic long-horizon exactness, and throughput-floor stability to the selected HullCache route while keeping stochastic execution explicit and out of scope for the current canonical route. It does not by itself close route minimality, final publication verdicts, or article-equivalence green status.",
+  "summary": "Cross-machine reproducibility now records tied_requirement_satisfied=true, current_host_machine_class_id=`host_cpu_x86_64`, supported_machine_classes=2, deterministic_mode_green=true, throughput_floor_stability_green=true, stochastic_out_of_scope=true, and reproducibility_matrix_green=true.",
+  "report_digest": "115a1ce6689570d3f38ee18a7c5f45ae19f2e168500111db26509824312b319f"
+}

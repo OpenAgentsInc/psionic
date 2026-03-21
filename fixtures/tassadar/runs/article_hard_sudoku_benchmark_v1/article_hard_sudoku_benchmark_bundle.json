@@ -188,7 +188,7 @@
       "exact_behavior_match": true,
       "halt_reason_match": true,
       "exactness_green": true,
-      "measured_run_time_seconds": 0.057364624,
+      "measured_run_time_seconds": 0.05516182,
       "runtime_ceiling_seconds": 180.0,
       "under_runtime_ceiling": true,
       "note": "case `sudoku_9x9_test_a` stays direct on HullCache and is checked against the CPU reference plus the declared 180 second ceiling."
@@ -376,7 +376,7 @@
       "exact_behavior_match": true,
       "halt_reason_match": true,
       "exactness_green": true,
-      "measured_run_time_seconds": 0.000116185,
+      "measured_run_time_seconds": 0.000116513,
       "runtime_ceiling_seconds": 180.0,
       "under_runtime_ceiling": true,
       "note": "case `sudoku_9x9_arto_inkala` stays direct on HullCache and is checked against the CPU reference plus the declared 180 second ceiling."
@@ -388,5 +388,5 @@
   "hard_sudoku_suite_green": true,
   "claim_boundary": "this runtime bundle closes the TAS-181 hard-Sudoku runtime tranche only. It proves that the declared hard-Sudoku suite stays exact on the canonical HullCache fast route and that the named Arto Inkala fixture plus the committed hard-Sudoku stand-in remain under the article's stated three-minute ceiling. It does not yet claim the later unified demo-and-benchmark gate, no-spill single-run closure, or final article-equivalence green status.",
   "summary": "Hard-Sudoku benchmark bundle now records suite_exact_case_count=2/2, suite_runtime_ceiling_pass_count=2/2, named_arto_green=true, and hard_sudoku_suite_green=true.",
-  "bundle_digest": "8790ae73851c645f387603a75fcad80a6eb15a14f292b552a5c76bf006f30115"
+  "bundle_digest": "a81bb8e38abf306c2e746c98e8e510867d63eb957d0355d837cc3d492009cdf5"
 }
