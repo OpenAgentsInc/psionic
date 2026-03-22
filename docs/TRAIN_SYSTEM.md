@@ -87,6 +87,11 @@ and now also has:
 - `docs/PSION_PROGRAM_MAP.md` is the canonical umbrella map for the `Psion`
   learned-model lane and freezes the dependency-ordered track split plus the
   learned-versus-executor claim boundary that all later `Psion` docs inherit.
+- `docs/TASSION_PROGRAM_MAP.md` is the canonical convergence map for the next
+  `Psion x Tassadar` plugin-conditioned training tranche and freezes the
+  dependency-ordered training, benchmark, guest-artifact, and operator-proof
+  split that later learned-plugin-use work must follow without widening
+  publication or executor claims.
 - `docs/PSION_CORPUS_ADMISSION.md` is the canonical first governance doc for
   the `Psion` learned-model lane and freezes the versioned source-admission
   contract that later ingestion, tokenizer, and training work must follow.
