@@ -1,0 +1,5 @@
+[[SECTION:arch_textbook_foster_1985:ch02:s01|2.1 Tail Latency Budgets]]
+bursty_latency service favors tail_latency_budget protection when the slowest queue controls the user visible deadline.
+
+[[SECTION:arch_textbook_foster_1985:ch02:s02|2.2 Cost Ceilings]]
+cost_capped deployment keeps throughput and resilience balanced under a strict cost_ceiling rather than chasing peak speed alone.

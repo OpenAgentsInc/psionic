@@ -12,6 +12,7 @@ mod parameter_golf;
 mod psion_benchmark_isolation;
 mod psion_corpus_admission;
 mod psion_raw_source_ingestion;
+mod psion_reference_corpus;
 mod psion_source_lifecycle;
 mod psion_tokenized_corpus;
 mod psion_tokenizer_training;
@@ -52,6 +53,7 @@ pub use parameter_golf::*;
 pub use psion_benchmark_isolation::*;
 pub use psion_corpus_admission::*;
 pub use psion_raw_source_ingestion::*;
+pub use psion_reference_corpus::*;
 pub use psion_source_lifecycle::*;
 pub use psion_tokenized_corpus::*;
 pub use psion_tokenizer_training::*;
@@ -2393,7 +2395,9 @@ pub enum DistributedDataFeedContractError {
     Determinism(#[from] DeterminismContractError),
     #[error("distributed data feed expected split `{split_name}` to exist in the manifest")]
     UnknownSplit { split_name: String },
-    #[error("distributed replay ordering requires a seeded or strict runtime determinism contract")]
+    #[error(
+        "distributed replay ordering requires a seeded or strict runtime determinism contract"
+    )]
     BestEffortReplayUnsupported,
     #[error("worker coordination requires a non-empty replica group")]
     MissingReplicaGroup,
@@ -3082,18 +3086,16 @@ mod tests {
             DatasetRecordEncoding::TokenIdsLeU32,
             sample_tokenizer(),
         )
-        .with_splits(vec![
-            DatasetSplitDeclaration::new(
-                &dataset,
-                "train",
-                DatasetSplitKind::Train,
-                vec![
-                    sample_shard(&dataset, "train", "shard-0", 3, 24),
-                    sample_shard(&dataset, "train", "shard-1", 2, 18),
-                ],
-            )
-            .expect("split should validate"),
-        ]);
+        .with_splits(vec![DatasetSplitDeclaration::new(
+            &dataset,
+            "train",
+            DatasetSplitKind::Train,
+            vec![
+                sample_shard(&dataset, "train", "shard-0", 3, 24),
+                sample_shard(&dataset, "train", "shard-1", 2, 18),
+            ],
+        )
+        .expect("split should validate")]);
 
         let contract = DatasetIterationContract::new(dataset, "train")
             .with_mode(DatasetIterationMode::Repeat)
@@ -3165,12 +3167,10 @@ mod tests {
         let report = builtin_data_ingress_semantics_report();
         assert_eq!(report.schema_version, 1);
         assert_eq!(report.current_scope_window, "psionic_data_ingress_v1");
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("report_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("report_digest=")));
 
         let direct_host = report
             .cases
@@ -3303,12 +3303,10 @@ mod tests {
             report.current_scope_window,
             "psionic_distributed_data_feed_v1"
         );
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("report_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("report_digest=")));
 
         let contiguous = report
             .cases
@@ -3357,12 +3355,10 @@ mod tests {
             .expect("missing elastic-membership refusal");
         assert_eq!(refused.status, DistributedDataFeedCapabilityStatus::Refused);
         assert!(refused.refusal.is_some());
-        assert!(
-            refused
-                .refusal
-                .as_ref()
-                .expect("refusal should exist")
-                .contains("elastic_membership")
-        );
+        assert!(refused
+            .refusal
+            .as_ref()
+            .expect("refusal should exist")
+            .contains("elastic_membership"));
     }
 }

@@ -1,0 +1,38 @@
+[[SECTION:spec_quiz_eval_pack_v1:record:arch-constraint|Architecture Constraint]]
+arch_case_constraint cache_sensitive dominant_constraint memory_bandwidth
+
+[[SECTION:spec_quiz_eval_pack_v1:record:arch-bottleneck|Architecture Bottleneck]]
+arch_case_bottleneck high_fanout dominant_constraint queueing_pressure
+
+[[SECTION:spec_quiz_eval_pack_v1:record:arch-scheduling|Architecture Scheduling]]
+arch_case_scheduling bursty_latency dominant_constraint tail_latency_budget
+
+[[SECTION:spec_quiz_eval_pack_v1:record:arch-tradeoff|Architecture Tradeoff]]
+arch_case_tradeoff cost_capped dominant_constraint cost_ceiling
+
+[[SECTION:spec_quiz_eval_pack_v1:record:route-answer|Route Answer]]
+route_case_answer answer_in_language
+
+[[SECTION:spec_quiz_eval_pack_v1:record:route-uncertainty|Route Uncertainty]]
+route_case_uncertainty answer_with_uncertainty
+
+[[SECTION:spec_quiz_eval_pack_v1:record:route-structure|Route Structure]]
+route_case_structure request_structured_inputs
+
+[[SECTION:spec_quiz_eval_pack_v1:record:route-delegate|Route Delegate]]
+route_case_delegate delegate_to_exact_executor
+
+[[SECTION:spec_quiz_eval_pack_v1:record:refusal-exactness|Refusal Exactness]]
+refusal_case_exactness unsupported_exactness_request
+
+[[SECTION:spec_quiz_eval_pack_v1:record:refusal-missing-constraints|Refusal Missing Constraints]]
+refusal_case_missing_constraints missing_required_constraints
+
+[[SECTION:spec_quiz_eval_pack_v1:record:refusal-over-context|Refusal Over Context]]
+refusal_case_over_context unsupported_context_length
+
+[[SECTION:spec_quiz_eval_pack_v1:record:refusal-freshness|Refusal Freshness]]
+refusal_case_freshness currentness_or_run_artifact_dependency
+
+[[SECTION:spec_quiz_eval_pack_v1:record:refusal-open-ended|Refusal Open Ended]]
+refusal_case_open_ended open_ended_general_assistant_unsupported

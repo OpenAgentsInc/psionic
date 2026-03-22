@@ -1,0 +1,5 @@
+[[SECTION:wasm_core_spec_release_2:1.1|1.1 Values]]
+values carry typed state and preserve explicit validation_contexts before execution.
+
+[[SECTION:wasm_core_spec_release_2:1.2|1.2 Instructions]]
+instructions remain well formed only when instruction_validation keeps stack effects explicit.

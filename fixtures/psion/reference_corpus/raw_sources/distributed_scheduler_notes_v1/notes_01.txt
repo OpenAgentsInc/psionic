@@ -1,0 +1,5 @@
+[[SECTION:distributed_scheduler_notes_v1:notes:s01|Scheduler Pressure Notes]]
+memory_bandwidth and queueing_pressure interact when a bounded_three_stage_pipeline feeds too many cache_sensitive batches into one decode queue.
+
+[[SECTION:distributed_scheduler_notes_v1:notes:s02|Burst Control Notes]]
+tail_latency_budget stays dominant when bursty_latency traffic forces the scheduler to protect the slowest worker first.

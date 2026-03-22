@@ -1,0 +1,5 @@
+[[SECTION:distributed_scheduler_notes_v1:notes:s03|Cost Tradeoff Notes]]
+cost_ceiling becomes the governing limit when the operator must choose between extra throughput and extra resilience inside the same bounded_three_stage_pipeline.
+
+[[SECTION:distributed_scheduler_notes_v1:notes:s04|Structured Inputs Note]]
+request_structured_inputs before proposing a scheduler change when the workload shape or failure budget is missing.

@@ -1,0 +1,5 @@
+[[SECTION:wasm_core_spec_release_2:2.1|2.1 Validation Contexts]]
+validation_contexts define the assumptions that instruction_validation may rely on and they must stay visible in a normative explanation.
+
+[[SECTION:wasm_core_spec_release_2:2.2|2.2 Instruction Validation]]
+instruction_validation must separate guaranteed behavior from inferred scheduler_behavior when the text does not promise a throughput outcome.

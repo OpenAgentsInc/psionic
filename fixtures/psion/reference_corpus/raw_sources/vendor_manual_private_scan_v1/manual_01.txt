@@ -1,0 +1,5 @@
+[[SECTION:vendor_manual_private_scan_v1:manual:s01|Private Service Mode]]
+service_mode and microcode_patch_matrix are tokenizer_only material and must not enter model_training.
+
+[[SECTION:vendor_manual_private_scan_v1:manual:s02|Field Diagnostics]]
+diagnostic jumper layouts expose vendor specific labels that may help tokenizer coverage without widening the training rights posture.

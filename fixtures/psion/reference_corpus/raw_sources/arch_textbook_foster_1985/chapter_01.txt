@@ -1,0 +1,5 @@
+[[SECTION:arch_textbook_foster_1985:ch01:s01|1.1 Memory Bandwidth In Cache-Sensitive Pipelines]]
+cache_sensitive ingest workloads hit memory_bandwidth when every stage rereads the same cache line and the accumulator cannot hide the fetch delay.
+
+[[SECTION:arch_textbook_foster_1985:ch01:s02|1.2 Queueing Pressure In High-Fanout Dispatch]]
+high_fanout dispatch turns into queueing_pressure when the front stage admits work faster than the shared decode queue can drain.
