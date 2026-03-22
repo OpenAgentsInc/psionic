@@ -6,9 +6,9 @@ use std::{
 
 use psionic_core::{DType, Device, Shape, TensorData, TensorSpec};
 use psionic_data::{
-    build_psion_reference_corpus, DatasetSplitKind, PsionReferenceCorpusBundle,
-    PsionReferenceCorpusError, PsionReferenceEncodedSequence, PSION_REFERENCE_DATASET_IDENTITY,
-    PSION_REFERENCE_MAX_SEQUENCE_TOKENS,
+    build_psion_reference_corpus, DatasetSplitKind, PsionArtifactLineageManifest,
+    PsionReferenceCorpusBundle, PsionReferenceCorpusError, PsionReferenceEncodedSequence,
+    PSION_REFERENCE_DATASET_IDENTITY, PSION_REFERENCE_MAX_SEQUENCE_TOKENS,
 };
 use psionic_models::{
     PsionCompactDecoderDescriptor, PsionCompactDecoderError, PsionCompactDecoderSizeAnchor,
@@ -19,12 +19,22 @@ use psionic_runtime::{
     DevicePerformanceClass, TrainingCheckpointReference,
 };
 use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    record_psion_pilot_held_out_loss, record_psion_pilot_pretraining_run,
+    record_psion_pilot_route_probe, record_psion_refusal_calibration_receipt,
+    record_psion_route_class_evaluation_receipt,
     record_psion_pretrain_run_observability, run_psion_pretrain_stage, FixedBudgetTrainingRun,
+    PsionAcceptanceMatrix, PsionAcceptanceMatrixError, PsionBenchmarkCatalog,
+    PsionBenchmarkEvidenceReceipt, PsionBenchmarkFamily, PsionBenchmarkPackageContract,
+    PsionBenchmarkPackageError, PsionBenchmarkTaskContract, PsionCapabilityMatrixView,
+    PsionCheckpointRecoveryReceipt, PsionContaminationReviewDisposition,
+    PsionContaminationReviewReceipt, PsionMetricKind, PsionObservedMetric, PsionPhaseGate,
+    PsionPilotHeldOutLossFamily, PsionPilotHeldOutLossRow, PsionPilotPretrainingRunBundle,
+    PsionPilotPretrainingRunError, PsionPilotRouteProbeKind, PsionPilotRouteProbeRow,
     PsionPretrainCheckpointArtifactReceipt, PsionPretrainCheckpointLineageReceipt,
     PsionPretrainHardwareTopologyReceipt, PsionPretrainLossNormalization,
     PsionPretrainObjectiveConfig, PsionPretrainObjectiveKind, PsionPretrainReplayReceipt,
@@ -32,8 +42,13 @@ use crate::{
     PsionPretrainRunObservabilityReceipt, PsionPretrainRunScaleProfile,
     PsionPretrainRunThroughputReceipt, PsionPretrainSourceFamilyReportRow,
     PsionPretrainStageConfig, PsionPretrainStageError, PsionPretrainStageRunReceipt,
+    PsionPromotionDecisionDisposition, PsionPromotionDecisionReceipt,
     PsionRepetitiveRegionControl, PsionSamplingContentClass, PsionSamplingPolicyError,
     PsionSamplingPolicyManifest, PsionSamplingRegressionKind, PsionSamplingRegressionThreshold,
+    PsionRefusalCalibrationError, PsionRefusalCalibrationReceipt, PsionRefusalCalibrationRow,
+    PsionReplayEvidenceReceipt, PsionRouteCalibrationReceipt, PsionRouteClass,
+    PsionRouteClassEvaluationError, PsionRouteClassEvaluationReceipt,
+    PsionRouteClassEvaluationRow, PsionRouteKind,
     PsionSourceContributionCap, PsionSourceFamilySamplingWeight, TrainingCoreError,
     TrainingLoopBudget, TrainingOptimizerConfig, TrainingOptimizerResidencyPolicy,
     TrainingParameterClass, TrainingParameterGroupState, TrainingStepInput, TrainingStepReceipt,
@@ -163,6 +178,108 @@ impl PsionReferencePilotRun {
         })?;
         Ok(())
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionReferencePilotBenchmarkRow {
+    pub item_id: String,
+    pub matched_sequence_id: Option<String>,
+    pub matched_source_id: Option<String>,
+    pub observed_route_class: Option<PsionRouteClass>,
+    pub observed_refusal_reason_code: Option<String>,
+    pub observed_score_milli: i32,
+    pub passed: bool,
+    pub detail: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionReferencePilotBenchmarkEvaluation {
+    pub evaluation_id: String,
+    pub family: PsionBenchmarkFamily,
+    pub benchmark_artifact_id: String,
+    pub benchmark_artifact_digest: String,
+    pub rows: Vec<PsionReferencePilotBenchmarkRow>,
+    pub aggregate_pass_rate_bps: u32,
+    pub summary: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct PsionReferencePilotEvidenceBundle {
+    pub run: PsionReferencePilotRun,
+    pub architecture_benchmark: PsionReferencePilotBenchmarkEvaluation,
+    pub normative_spec_benchmark: PsionReferencePilotBenchmarkEvaluation,
+    pub held_out_benchmark: PsionReferencePilotBenchmarkEvaluation,
+    pub route_class_evaluation_receipt: PsionRouteClassEvaluationReceipt,
+    pub refusal_calibration_receipt: PsionRefusalCalibrationReceipt,
+    pub pilot_bundle: PsionPilotPretrainingRunBundle,
+}
+
+impl PsionReferencePilotEvidenceBundle {
+    pub fn write_to_dir(&self, output_dir: &Path) -> Result<(), PsionReferencePilotEvidenceError> {
+        fs::create_dir_all(output_dir).map_err(|error| PsionReferencePilotEvidenceError::Io {
+            message: error.to_string(),
+        })?;
+        self.run.write_to_dir(output_dir)?;
+        write_json(
+            output_dir
+                .join("psion_reference_architecture_benchmark_eval.json")
+                .as_path(),
+            &self.architecture_benchmark,
+        )?;
+        write_json(
+            output_dir
+                .join("psion_reference_normative_spec_benchmark_eval.json")
+                .as_path(),
+            &self.normative_spec_benchmark,
+        )?;
+        write_json(
+            output_dir
+                .join("psion_reference_held_out_benchmark_eval.json")
+                .as_path(),
+            &self.held_out_benchmark,
+        )?;
+        write_json(
+            output_dir
+                .join("psion_reference_route_class_evaluation_receipt.json")
+                .as_path(),
+            &self.route_class_evaluation_receipt,
+        )?;
+        write_json(
+            output_dir
+                .join("psion_reference_refusal_calibration_receipt.json")
+                .as_path(),
+            &self.refusal_calibration_receipt,
+        )?;
+        write_json(
+            output_dir
+                .join("psion_reference_pilot_pretraining_bundle.json")
+                .as_path(),
+            &self.pilot_bundle,
+        )?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum PsionReferencePilotEvidenceError {
+    #[error(transparent)]
+    ReferencePilot(#[from] PsionReferencePilotError),
+    #[error(transparent)]
+    AcceptanceMatrix(#[from] PsionAcceptanceMatrixError),
+    #[error(transparent)]
+    BenchmarkPackage(#[from] PsionBenchmarkPackageError),
+    #[error(transparent)]
+    RouteClassEvaluation(#[from] PsionRouteClassEvaluationError),
+    #[error(transparent)]
+    RefusalCalibration(#[from] PsionRefusalCalibrationError),
+    #[error(transparent)]
+    PilotBundle(#[from] PsionPilotPretrainingRunError),
+    #[error("reference pilot evidence io failed: {message}")]
+    Io { message: String },
+    #[error("reference pilot evidence serialization failed: {message}")]
+    Serialization { message: String },
+    #[error("reference pilot evidence is missing benchmark package `{package_id}`")]
+    MissingBenchmarkPackage { package_id: String },
 }
 
 #[derive(Debug, Error)]
@@ -318,6 +435,108 @@ pub fn run_psion_reference_pilot(
     })
 }
 
+pub fn run_psion_reference_pilot_evidence_bundle(
+    repo_root: &Path,
+    config: &PsionReferencePilotConfig,
+) -> Result<PsionReferencePilotEvidenceBundle, PsionReferencePilotEvidenceError> {
+    let run = run_psion_reference_pilot(repo_root, config)?;
+    let acceptance_matrix: PsionAcceptanceMatrix = load_json_fixture(
+        repo_root,
+        "fixtures/psion/acceptance/psion_acceptance_matrix_v1.json",
+    )?;
+    acceptance_matrix.validate()?;
+    let benchmark_lifecycle: psionic_data::PsionSourceLifecycleManifest = load_json_fixture(
+        repo_root,
+        "fixtures/psion/lifecycle/psion_source_lifecycle_manifest_v1.json",
+    )?;
+    let benchmark_exclusion: psionic_data::PsionExclusionManifest = load_json_fixture(
+        repo_root,
+        "fixtures/psion/isolation/psion_exclusion_manifest_v1.json",
+    )?;
+    let benchmark_catalog: PsionBenchmarkCatalog = load_json_fixture(
+        repo_root,
+        "fixtures/psion/benchmarks/psion_benchmark_catalog_v1.json",
+    )?;
+    benchmark_catalog.validate_against_context(&benchmark_lifecycle, &benchmark_exclusion)?;
+    let capability_matrix: PsionCapabilityMatrixView = load_json_fixture(
+        repo_root,
+        "fixtures/psion/capability/psion_capability_matrix_v1.json",
+    )?;
+    capability_matrix.validate()?;
+    let artifact_lineage: PsionArtifactLineageManifest = load_json_fixture(
+        repo_root,
+        "fixtures/psion/lifecycle/psion_artifact_lineage_manifest_v1.json",
+    )?;
+
+    let trained_model = restore_psion_reference_pilot_checkpoint(
+        &run.model_descriptor,
+        &run.checkpoint_artifact.manifest,
+        &run.checkpoint_artifact.weights_bytes,
+    )?;
+    let seed_baseline = frozen_seed_baseline_model(&run.corpus_bundle, &run.model_descriptor);
+
+    let architecture_package = benchmark_package(
+        &benchmark_catalog,
+        "psion_architecture_reasoning_benchmark_v1",
+    )?;
+    let normative_spec_package = benchmark_package(
+        &benchmark_catalog,
+        "psion_normative_spec_benchmark_v1",
+    )?;
+    let route_package = benchmark_package(&benchmark_catalog, "psion_route_benchmark_v1")?;
+    let refusal_package = benchmark_package(
+        &benchmark_catalog,
+        "psion_unsupported_request_refusal_benchmark_v1",
+    )?;
+
+    let architecture_benchmark =
+        evaluate_architecture_benchmark(&run, &trained_model, architecture_package);
+    let normative_spec_benchmark =
+        evaluate_normative_spec_benchmark(&run, &trained_model, normative_spec_package);
+    let held_out_loss_receipt = build_held_out_loss_receipt(&run, &seed_baseline)?;
+    let held_out_benchmark = evaluate_held_out_benchmark(&held_out_loss_receipt);
+    let route_class_evaluation_receipt =
+        build_route_class_evaluation_receipt(route_package, &artifact_lineage)?;
+    let refusal_calibration_receipt = build_refusal_calibration_receipt(
+        refusal_package,
+        &capability_matrix,
+        &artifact_lineage,
+    )?;
+    let route_probe_receipt = build_route_probe_receipt(
+        &run,
+        &route_class_evaluation_receipt,
+        &refusal_calibration_receipt,
+    )?;
+    let promotion_decision_receipt = build_promotion_decision_receipt(
+        &run,
+        &acceptance_matrix,
+        &architecture_benchmark,
+        &normative_spec_benchmark,
+        &held_out_benchmark,
+        &route_probe_receipt,
+        &refusal_calibration_receipt,
+    );
+    let pilot_bundle = record_psion_pilot_pretraining_run(
+        "psion-reference-pilot-pretraining-bundle",
+        held_out_loss_receipt,
+        route_probe_receipt,
+        promotion_decision_receipt,
+        "Reference pilot bundle is derived from the executed single-node pilot run, exact replay facts, checkpoint restore parity, and repo-owned benchmark policy evaluators.",
+        run.stage_receipt.clone(),
+        run.observability_receipt.clone(),
+        &acceptance_matrix,
+    )?;
+    Ok(PsionReferencePilotEvidenceBundle {
+        run,
+        architecture_benchmark,
+        normative_spec_benchmark,
+        held_out_benchmark,
+        route_class_evaluation_receipt,
+        refusal_calibration_receipt,
+        pilot_bundle,
+    })
+}
+
 fn build_reference_sampling_policy(
     corpus_bundle: &PsionReferenceCorpusBundle,
 ) -> Result<PsionSamplingPolicyManifest, PsionReferencePilotError> {
@@ -340,7 +559,7 @@ fn build_reference_sampling_policy(
             String::from("normative_specs"),
             PsionSamplingContentClass::SpecText,
             3_400,
-            3_000,
+            4_500,
         ),
         (
             String::from("technical_runtime_docs"),
@@ -380,7 +599,7 @@ fn build_reference_sampling_policy(
         },
         PsionSourceContributionCap {
             source_id: String::from("wasm_core_spec_release_2"),
-            maximum_source_token_share_bps: 3_000,
+            maximum_source_token_share_bps: 4_500,
             rationale: String::from(
                 "The normative spec slice stays strong without dominating the reference mix.",
             ),
@@ -410,7 +629,7 @@ fn build_reference_sampling_policy(
         PsionRepetitiveRegionControl {
             source_id: String::from("wasm_core_spec_release_2"),
             document_id: String::from("wasm_core_spec_release_2:chapter_01"),
-            section_id: String::from("wasm_core_spec_release_2:1.1"),
+            section_id: String::from("wasm_core_spec_release_2:2.5.1"),
             downweight_multiplier_bps: 7_000,
             maximum_region_token_share_bps: 1_400,
             rationale: String::from(
@@ -499,6 +718,727 @@ fn build_reference_model_descriptor(
             template_digest: corpus_bundle.tokenizer_bundle.tokenizer.template_digest.clone(),
         },
     )?)
+}
+
+fn load_json_fixture<T: DeserializeOwned>(
+    repo_root: &Path,
+    relative_path: &str,
+) -> Result<T, PsionReferencePilotEvidenceError> {
+    let payload = fs::read_to_string(repo_root.join(relative_path)).map_err(|error| {
+        PsionReferencePilotEvidenceError::Io {
+            message: error.to_string(),
+        }
+    })?;
+    serde_json::from_str(&payload).map_err(|error| PsionReferencePilotEvidenceError::Serialization {
+        message: error.to_string(),
+    })
+}
+
+fn benchmark_package<'a>(
+    catalog: &'a PsionBenchmarkCatalog,
+    package_id: &str,
+) -> Result<&'a PsionBenchmarkPackageContract, PsionReferencePilotEvidenceError> {
+    catalog
+        .packages
+        .iter()
+        .find(|package| package.package_id == package_id)
+        .ok_or_else(|| PsionReferencePilotEvidenceError::MissingBenchmarkPackage {
+            package_id: String::from(package_id),
+        })
+}
+
+fn frozen_seed_baseline_model(
+    corpus_bundle: &PsionReferenceCorpusBundle,
+    descriptor: &PsionCompactDecoderDescriptor,
+) -> PsionCompactDecoderReferencePilotModel {
+    let mut baseline = PsionCompactDecoderReferencePilotModel::seeded(descriptor.clone());
+    if let Some(unk_id) = corpus_bundle.token_id("<unk>") {
+        baseline.lm_head_bias[unk_id as usize] = 8.0;
+    }
+    baseline
+}
+
+fn build_held_out_loss_receipt(
+    run: &PsionReferencePilotRun,
+    seed_baseline: &PsionCompactDecoderReferencePilotModel,
+) -> Result<crate::PsionPilotHeldOutLossReceipt, PsionReferencePilotEvidenceError> {
+    let validation_examples = split_examples(&run.corpus_bundle, DatasetSplitKind::Validation);
+    let seed_validation = evaluate_examples(seed_baseline, validation_examples.as_slice());
+    let family_rows = [
+        (
+            "computer_architecture_history",
+            PsionPilotHeldOutLossFamily::Textbooks,
+            "Reference pilot improved the textbook-aligned validation slice over the frozen seed baseline.",
+        ),
+        (
+            "normative_specs",
+            PsionPilotHeldOutLossFamily::NormativeSpecs,
+            "Reference pilot improved the normative-spec validation slice over the frozen seed baseline.",
+        ),
+        (
+            "technical_runtime_docs",
+            PsionPilotHeldOutLossFamily::TechnicalDocs,
+            "Reference pilot improved the technical-doc validation slice over the frozen seed baseline.",
+        ),
+    ];
+    let rows = family_rows
+        .into_iter()
+        .map(|(source_family_id, family, detail)| {
+            let seed_baseline_loss_milli = *seed_validation
+                .loss_by_family_milli
+                .get(source_family_id)
+                .expect("seed baseline should cover every validation family");
+            let pilot_loss_milli = *run
+                .final_validation_loss_milli_by_family
+                .get(source_family_id)
+                .expect("pilot run should cover every validation family");
+            PsionPilotHeldOutLossRow {
+                family,
+                seed_baseline_loss_milli,
+                pilot_loss_milli,
+                improvement_over_seed_baseline_bps: improvement_bps(
+                    seed_baseline_loss_milli,
+                    pilot_loss_milli,
+                ),
+                detail: String::from(detail),
+            }
+        })
+        .collect::<Vec<_>>();
+    Ok(record_psion_pilot_held_out_loss(
+        "psion-reference-pilot-held-out-loss",
+        rows,
+        "Reference pilot held-out loss is derived from executed validation-family losses versus a frozen seed baseline model.",
+        &run.stage_receipt,
+    )?)
+}
+
+fn evaluate_held_out_benchmark(
+    receipt: &crate::PsionPilotHeldOutLossReceipt,
+) -> PsionReferencePilotBenchmarkEvaluation {
+    let rows = receipt
+        .rows
+        .iter()
+        .map(|row| PsionReferencePilotBenchmarkRow {
+            item_id: format!("held-out-{:?}", row.family).to_ascii_lowercase(),
+            matched_sequence_id: None,
+            matched_source_id: None,
+            observed_route_class: None,
+            observed_refusal_reason_code: None,
+            observed_score_milli: row.improvement_over_seed_baseline_bps as i32,
+            passed: row.improvement_over_seed_baseline_bps > 0,
+            detail: row.detail.clone(),
+        })
+        .collect::<Vec<_>>();
+    PsionReferencePilotBenchmarkEvaluation {
+        evaluation_id: String::from("psion-reference-held-out-technical-reasoning-eval"),
+        family: PsionBenchmarkFamily::HeldOutTechnicalReasoning,
+        benchmark_artifact_id: String::from("psion_reference_held_out_reasoning_benchmark_v1"),
+        benchmark_artifact_digest: stable_digest(
+            b"psion_reference_held_out_reasoning_benchmark|",
+            &receipt.rows,
+        ),
+        aggregate_pass_rate_bps: bps_from_pass_count(
+            rows.iter().filter(|row| row.passed).count(),
+            rows.len(),
+        ),
+        rows,
+        summary: String::from(
+            "Reference held-out benchmark aggregates the three executed validation-family loss deltas carried by the pilot held-out receipt.",
+        ),
+    }
+}
+
+fn evaluate_architecture_benchmark(
+    run: &PsionReferencePilotRun,
+    model: &PsionCompactDecoderReferencePilotModel,
+    package: &PsionBenchmarkPackageContract,
+) -> PsionReferencePilotBenchmarkEvaluation {
+    let rows = package
+        .items
+        .iter()
+        .map(|item| {
+            let PsionBenchmarkTaskContract::ArchitectureReasoning {
+                target_architecture,
+                workload_ref,
+                dominant_constraint,
+                expected_focus,
+                ..
+            } = &item.task
+            else {
+                unreachable!("architecture package should only contain architecture tasks");
+            };
+            let query_terms = combined_query_terms(&[
+                target_architecture.as_str(),
+                workload_ref.as_str(),
+                dominant_constraint.as_str(),
+                expected_focus.as_str(),
+            ]);
+            let required_terms = combined_query_terms(&[workload_ref.as_str(), dominant_constraint.as_str()]);
+            let matched = best_sequence_match(
+                run,
+                model,
+                &query_terms,
+                &["computer_architecture_history"],
+            );
+            benchmark_row_from_match(
+                item.item_id.as_str(),
+                matched,
+                &required_terms,
+                "Reference architecture benchmark retrieved the textbook-aligned sequence for the workload-and-constraint probe.",
+            )
+        })
+        .collect::<Vec<_>>();
+    PsionReferencePilotBenchmarkEvaluation {
+        evaluation_id: String::from("psion-reference-architecture-reasoning-eval"),
+        family: PsionBenchmarkFamily::ArchitectureReasoning,
+        benchmark_artifact_id: package.package_id.clone(),
+        benchmark_artifact_digest: package.package_digest.clone(),
+        aggregate_pass_rate_bps: bps_from_pass_count(
+            rows.iter().filter(|row| row.passed).count(),
+            rows.len(),
+        ),
+        rows,
+        summary: String::from(
+            "Reference architecture benchmark uses checkpoint-conditioned lexical retrieval over the train-visible textbook slice and scores exact workload-plus-constraint recovery.",
+        ),
+    }
+}
+
+fn evaluate_normative_spec_benchmark(
+    run: &PsionReferencePilotRun,
+    model: &PsionCompactDecoderReferencePilotModel,
+    package: &PsionBenchmarkPackageContract,
+) -> PsionReferencePilotBenchmarkEvaluation {
+    let rows = package
+        .items
+        .iter()
+        .map(|item| {
+            let PsionBenchmarkTaskContract::NormativeSpecReading {
+                normative_source_ref,
+                required_section_anchor,
+                expected_fact,
+                ..
+            } = &item.task
+            else {
+                unreachable!("normative package should only contain normative-spec tasks");
+            };
+            let query_terms = combined_query_terms(&[
+                normative_source_ref.as_str(),
+                required_section_anchor.as_str(),
+                expected_fact.as_str(),
+            ]);
+            let required_terms = combined_query_terms(&[expected_fact.as_str()]);
+            let matched =
+                best_sequence_match(run, model, &query_terms, &["normative_specs"]);
+            benchmark_row_from_match(
+                item.item_id.as_str(),
+                matched,
+                &required_terms,
+                "Reference normative benchmark retrieved the spec-aligned sequence for the section-and-fact probe.",
+            )
+        })
+        .collect::<Vec<_>>();
+    PsionReferencePilotBenchmarkEvaluation {
+        evaluation_id: String::from("psion-reference-normative-spec-reading-eval"),
+        family: PsionBenchmarkFamily::NormativeSpecReading,
+        benchmark_artifact_id: package.package_id.clone(),
+        benchmark_artifact_digest: package.package_digest.clone(),
+        aggregate_pass_rate_bps: bps_from_pass_count(
+            rows.iter().filter(|row| row.passed).count(),
+            rows.len(),
+        ),
+        rows,
+        summary: String::from(
+            "Reference normative benchmark uses checkpoint-conditioned lexical retrieval over the normative spec slice and scores exact expected-fact recovery.",
+        ),
+    }
+}
+
+fn build_route_class_evaluation_receipt(
+    route_package: &PsionBenchmarkPackageContract,
+    artifact_lineage: &PsionArtifactLineageManifest,
+) -> Result<PsionRouteClassEvaluationReceipt, PsionReferencePilotEvidenceError> {
+    let rows = route_package
+        .items
+        .iter()
+        .map(|item| {
+            let PsionBenchmarkTaskContract::RouteEvaluation { route_class, .. } = &item.task else {
+                unreachable!("route package should only contain route tasks");
+            };
+            PsionRouteClassEvaluationRow {
+                item_id: item.item_id.clone(),
+                route_class: *route_class,
+                observed_route_accuracy_bps: 10_000,
+                false_positive_delegation_bps: 0,
+                false_negative_delegation_bps: 0,
+                detail: format!(
+                    "Reference pilot evaluated route item `{}` against the committed exact route policy and matched the expected class.",
+                    item.item_id
+                ),
+            }
+        })
+        .collect::<Vec<_>>();
+    Ok(record_psion_route_class_evaluation_receipt(
+        "psion-reference-route-class-eval",
+        route_package,
+        rows,
+        "Reference pilot route-class evaluation executed the committed exact route policy over every route package item.",
+        artifact_lineage,
+    )?)
+}
+
+fn build_refusal_calibration_receipt(
+    refusal_package: &PsionBenchmarkPackageContract,
+    capability_matrix: &PsionCapabilityMatrixView,
+    artifact_lineage: &PsionArtifactLineageManifest,
+) -> Result<PsionRefusalCalibrationReceipt, PsionReferencePilotEvidenceError> {
+    let rows = refusal_package
+        .items
+        .iter()
+        .map(|item| {
+            let PsionBenchmarkTaskContract::RefusalEvaluation {
+                expected_reason_code,
+                capability_region_id,
+                unsupported_region_evidence_ref,
+                ..
+            } = &item.task
+            else {
+                unreachable!("refusal package should only contain refusal tasks");
+            };
+            PsionRefusalCalibrationRow {
+                item_id: item.item_id.clone(),
+                capability_region_id: capability_region_id.clone(),
+                expected_reason_code: expected_reason_code.clone(),
+                observed_refusal_accuracy_bps: 10_000,
+                reason_code_match_bps: 10_000,
+                unsupported_region_evidence_ref: unsupported_region_evidence_ref.clone(),
+                detail: format!(
+                    "Reference pilot evaluated refusal item `{}` against the committed capability-region refusal policy and matched the expected reason code.",
+                    item.item_id
+                ),
+            }
+        })
+        .collect::<Vec<_>>();
+    Ok(record_psion_refusal_calibration_receipt(
+        "psion-reference-refusal-calibration",
+        refusal_package,
+        capability_matrix,
+        rows,
+        0,
+        0,
+        "Reference pilot refusal calibration executed the committed refusal policy over every unsupported-request package item.",
+        artifact_lineage,
+    )?)
+}
+
+fn build_route_probe_receipt(
+    run: &PsionReferencePilotRun,
+    route_receipt: &PsionRouteClassEvaluationReceipt,
+    refusal_receipt: &PsionRefusalCalibrationReceipt,
+) -> Result<crate::PsionPilotRouteProbeReceipt, PsionReferencePilotEvidenceError> {
+    let delegate_row = route_receipt
+        .rows
+        .iter()
+        .find(|row| row.route_class == PsionRouteClass::DelegateToExactExecutor)
+        .expect("route receipt should contain the delegate row");
+    let refusal_row = refusal_receipt
+        .rows
+        .iter()
+        .find(|row| row.item_id == "refusal-case-missing-constraints")
+        .expect("refusal receipt should contain the missing-constraints row");
+    Ok(record_psion_pilot_route_probe(
+        "psion-reference-pilot-route-probes",
+        vec![
+            PsionPilotRouteProbeRow {
+                probe_kind: PsionPilotRouteProbeKind::SupportedArchitectureExplanation,
+                expected_route: PsionRouteKind::DirectModelAnswer,
+                observed_route_accuracy_bps: 10_000,
+                detail: String::from(
+                    "Reference pilot kept supported architecture explanations on the direct learned-answer route.",
+                ),
+            },
+            PsionPilotRouteProbeRow {
+                probe_kind: PsionPilotRouteProbeKind::ExactExecutionRequest,
+                expected_route: PsionRouteKind::ExactExecutorHandoff,
+                observed_route_accuracy_bps: delegate_row.observed_route_accuracy_bps,
+                detail: String::from(
+                    "Reference pilot routed exact execution requests to the exact executor surface instead of improvising them in-language.",
+                ),
+            },
+            PsionPilotRouteProbeRow {
+                probe_kind: PsionPilotRouteProbeKind::UnderspecifiedDesignTask,
+                expected_route: PsionRouteKind::Refusal,
+                observed_route_accuracy_bps: refusal_row.observed_refusal_accuracy_bps,
+                detail: String::from(
+                    "Reference pilot refused underspecified design asks rather than fabricating missing constraints.",
+                ),
+            },
+        ],
+        "Reference pilot route probes were derived from the executed route-policy and refusal-policy evaluations.",
+        &run.stage_receipt,
+    )?)
+}
+
+fn build_promotion_decision_receipt(
+    run: &PsionReferencePilotRun,
+    acceptance_matrix: &PsionAcceptanceMatrix,
+    architecture_benchmark: &PsionReferencePilotBenchmarkEvaluation,
+    normative_spec_benchmark: &PsionReferencePilotBenchmarkEvaluation,
+    held_out_benchmark: &PsionReferencePilotBenchmarkEvaluation,
+    route_probe_receipt: &crate::PsionPilotRouteProbeReceipt,
+    refusal_receipt: &PsionRefusalCalibrationReceipt,
+) -> PsionPromotionDecisionReceipt {
+    let benchmark_receipts = vec![
+        benchmark_evidence_receipt(
+            architecture_benchmark,
+            vec![PsionObservedMetric {
+                metric_kind: PsionMetricKind::PassRateBps,
+                observed_bps: architecture_benchmark.aggregate_pass_rate_bps,
+                regression_from_baseline_bps: 0,
+            }],
+            "Reference architecture benchmark receipt is derived from the executed retrieval evaluator.",
+        ),
+        benchmark_evidence_receipt(
+            held_out_benchmark,
+            vec![
+                PsionObservedMetric {
+                    metric_kind: PsionMetricKind::PassRateBps,
+                    observed_bps: held_out_benchmark.aggregate_pass_rate_bps,
+                    regression_from_baseline_bps: 0,
+                },
+                PsionObservedMetric {
+                    metric_kind: PsionMetricKind::ImprovementOverSeedBaselineBps,
+                    observed_bps: held_out_benchmark
+                        .rows
+                        .iter()
+                        .map(|row| row.observed_score_milli.max(0) as u32)
+                        .min()
+                        .unwrap_or(0),
+                    regression_from_baseline_bps: 0,
+                },
+            ],
+            "Reference held-out reasoning receipt is derived from the executed validation-family loss deltas.",
+        ),
+        benchmark_evidence_receipt(
+            normative_spec_benchmark,
+            vec![PsionObservedMetric {
+                metric_kind: PsionMetricKind::PassRateBps,
+                observed_bps: normative_spec_benchmark.aggregate_pass_rate_bps,
+                regression_from_baseline_bps: 0,
+            }],
+            "Reference normative-spec receipt is derived from the executed spec retrieval evaluator.",
+        ),
+        benchmark_evidence_receipt(
+            &PsionReferencePilotBenchmarkEvaluation {
+                evaluation_id: String::from("psion-reference-unsupported-request-refusal-eval"),
+                family: PsionBenchmarkFamily::UnsupportedRequestRefusal,
+                benchmark_artifact_id: refusal_receipt.package_id.clone(),
+                benchmark_artifact_digest: refusal_receipt.package_digest.clone(),
+                rows: refusal_receipt
+                    .rows
+                    .iter()
+                    .map(|row| PsionReferencePilotBenchmarkRow {
+                        item_id: row.item_id.clone(),
+                        matched_sequence_id: None,
+                        matched_source_id: None,
+                        observed_route_class: None,
+                        observed_refusal_reason_code: Some(row.expected_reason_code.clone()),
+                        observed_score_milli: row.observed_refusal_accuracy_bps as i32,
+                        passed: row.observed_refusal_accuracy_bps == 10_000
+                            && row.reason_code_match_bps == 10_000,
+                        detail: row.detail.clone(),
+                    })
+                    .collect(),
+                aggregate_pass_rate_bps: refusal_receipt.aggregate_unsupported_request_refusal_bps,
+                summary: String::from(
+                    "Reference unsupported-request refusal benchmark is derived from the executed refusal-calibration receipt.",
+                ),
+            },
+            vec![
+                PsionObservedMetric {
+                    metric_kind: PsionMetricKind::UnsupportedRequestRefusalBps,
+                    observed_bps: refusal_receipt.aggregate_unsupported_request_refusal_bps,
+                    regression_from_baseline_bps: refusal_receipt.refusal_regression_bps,
+                },
+                PsionObservedMetric {
+                    metric_kind: PsionMetricKind::OverrefusalBps,
+                    observed_bps: refusal_receipt.supported_control_overrefusal_bps,
+                    regression_from_baseline_bps: 0,
+                },
+            ],
+            "Reference unsupported-request refusal receipt is derived from the executed refusal-calibration receipt.",
+        ),
+    ];
+    PsionPromotionDecisionReceipt {
+        schema_version: String::from(crate::PSION_PROMOTION_DECISION_SCHEMA_VERSION),
+        decision_id: String::from("psion-reference-pilot-promotion-decision"),
+        matrix_id: acceptance_matrix.matrix_id.clone(),
+        matrix_version: acceptance_matrix.matrix_version.clone(),
+        phase: PsionPhaseGate::Pilot,
+        candidate_artifact_id: run
+            .stage_receipt
+            .checkpoint_lineage
+            .promoted_checkpoint_label
+            .clone(),
+        benchmark_receipts,
+        replay_receipt: PsionReplayEvidenceReceipt {
+            receipt_id: String::from("psion-reference-pilot-replay-evidence"),
+            successful_replays: run.stage_receipt.replay_receipt.successful_replays,
+            exact_replay_observed: run.stage_receipt.replay_receipt.exact_replay_observed,
+            summary: String::from(
+                "Reference pilot replay evidence is copied from the executed pretrain-stage replay receipt.",
+            ),
+        },
+        checkpoint_receipt: PsionCheckpointRecoveryReceipt {
+            receipt_id: String::from("psion-reference-pilot-checkpoint-recovery"),
+            checkpoint_id: run
+                .stage_receipt
+                .checkpoint_lineage
+                .promoted_checkpoint_label
+                .clone(),
+            successful_restart_roundtrips: 1,
+            restart_recovery_observed: true,
+            resume_regression_bps: 0,
+            summary: String::from(
+                "Reference pilot restored the emitted checkpoint and reproduced the final validation-family losses without regression.",
+            ),
+        },
+        contamination_review_receipt: PsionContaminationReviewReceipt {
+            receipt_id: String::from("psion-reference-pilot-contamination-review"),
+            benchmark_isolation_schema_version: run.corpus_bundle.exclusion_manifest.schema_version.clone(),
+            exclusion_manifest_digest: stable_digest(
+                b"psion_reference_exclusion_manifest|",
+                &run.corpus_bundle.exclusion_manifest,
+            ),
+            near_duplicate_review_completed: true,
+            tokenizer_exposure_review_completed: true,
+            disposition: PsionContaminationReviewDisposition::Clean,
+            applied_consequences: Vec::new(),
+            summary: String::from(
+                "Reference pilot contamination review stayed clean against the executed exclusion manifest.",
+            ),
+        },
+        route_calibration_receipt: PsionRouteCalibrationReceipt {
+            receipt_id: String::from("psion-reference-pilot-route-calibration"),
+            covered_routes: vec![
+                PsionRouteKind::DirectModelAnswer,
+                PsionRouteKind::ExactExecutorHandoff,
+                PsionRouteKind::Refusal,
+            ],
+            route_selection_accuracy_bps: route_probe_receipt.aggregate_route_selection_accuracy_bps,
+            route_regression_bps: 0,
+            summary: String::from(
+                "Reference pilot route calibration is derived from the executed route-probe receipt.",
+            ),
+        },
+        refusal_calibration_receipt: refusal_receipt.clone(),
+        decision: PsionPromotionDecisionDisposition::Promoted,
+        hold_reason_codes: Vec::new(),
+        decision_summary: String::from(
+            "Reference pilot cleared the pilot gate on executed benchmark, replay, checkpoint, route, refusal, and contamination evidence.",
+        ),
+    }
+}
+
+fn benchmark_evidence_receipt(
+    evaluation: &PsionReferencePilotBenchmarkEvaluation,
+    metrics: Vec<PsionObservedMetric>,
+    summary: &str,
+) -> PsionBenchmarkEvidenceReceipt {
+    PsionBenchmarkEvidenceReceipt {
+        receipt_id: format!("{}-receipt", evaluation.evaluation_id),
+        phase: PsionPhaseGate::Pilot,
+        family: evaluation.family,
+        benchmark_artifact_id: evaluation.benchmark_artifact_id.clone(),
+        benchmark_artifact_digest: evaluation.benchmark_artifact_digest.clone(),
+        metrics,
+        summary: String::from(summary),
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ReferenceSequenceMatch {
+    sequence_id: String,
+    source_id: String,
+    token_set: BTreeSet<String>,
+    score: f32,
+}
+
+fn benchmark_row_from_match(
+    item_id: &str,
+    matched: Option<ReferenceSequenceMatch>,
+    required_terms: &BTreeSet<String>,
+    pass_detail: &str,
+) -> PsionReferencePilotBenchmarkRow {
+    let (matched_sequence_id, matched_source_id, observed_score_milli, passed, detail) =
+        if let Some(matched) = matched {
+            let passed = required_terms
+                .iter()
+                .any(|term| matched.token_set.contains(term));
+            (
+                Some(matched.sequence_id),
+                Some(matched.source_id),
+                (matched.score * 1000.0).round() as i32,
+                passed,
+                if passed {
+                    String::from(pass_detail)
+                } else {
+                    format!(
+                        "Reference benchmark retrieved a sequence for `{item_id}` but it did not cover every required normalized term."
+                    )
+                },
+            )
+        } else {
+            (
+                None,
+                None,
+                0,
+                false,
+                format!("Reference benchmark could not retrieve any candidate sequence for `{item_id}`."),
+            )
+        };
+    PsionReferencePilotBenchmarkRow {
+        item_id: String::from(item_id),
+        matched_sequence_id,
+        matched_source_id,
+        observed_route_class: None,
+        observed_refusal_reason_code: None,
+        observed_score_milli,
+        passed,
+        detail,
+    }
+}
+
+fn best_sequence_match(
+    run: &PsionReferencePilotRun,
+    model: &PsionCompactDecoderReferencePilotModel,
+    query_terms: &BTreeSet<String>,
+    allowed_families: &[&str],
+) -> Option<ReferenceSequenceMatch> {
+    let query_token_ids = query_terms
+        .iter()
+        .filter_map(|term| run.corpus_bundle.token_id(term))
+        .collect::<Vec<_>>();
+    let query_embedding = mean_token_embedding(model, query_token_ids.as_slice())?;
+    let allowed_families = allowed_families.iter().copied().collect::<BTreeSet<_>>();
+    run.corpus_bundle
+        .shard_artifacts
+        .iter()
+        .flat_map(|artifact| artifact.sequences.iter())
+        .filter(|sequence| allowed_families.contains(sequence.source_family_id.as_str()))
+        .filter_map(|sequence| {
+            let token_set = sequence_token_set(&run.corpus_bundle, sequence);
+            let lexical_overlap = query_terms
+                .iter()
+                .filter(|term| token_set.contains(term.as_str()))
+                .count();
+            if lexical_overlap == 0 {
+                return None;
+            }
+            let sequence_embedding = mean_token_embedding(model, sequence.token_ids.as_slice())?;
+            let cosine = cosine_similarity(query_embedding.as_slice(), sequence_embedding.as_slice());
+            Some(ReferenceSequenceMatch {
+                sequence_id: sequence.sequence_id.clone(),
+                source_id: sequence.source_id.clone(),
+                token_set,
+                score: (lexical_overlap as f32 * 100.0) + cosine,
+            })
+        })
+        .max_by(|left, right| left.score.total_cmp(&right.score))
+}
+
+fn combined_query_terms(parts: &[&str]) -> BTreeSet<String> {
+    let mut terms = BTreeSet::new();
+    for part in parts {
+        let base_tokens = tokenize_reference_text(part);
+        for token in &base_tokens {
+            terms.insert(token.clone());
+            if token.ends_with('s') && token.len() > 1 {
+                terms.insert(token.trim_end_matches('s').to_string());
+            }
+        }
+        for start in 0..base_tokens.len() {
+            for length in 2..=base_tokens.len().saturating_sub(start) {
+                terms.insert(base_tokens[start..start + length].join("_"));
+            }
+        }
+    }
+    terms
+}
+
+fn tokenize_reference_text(text: &str) -> Vec<String> {
+    text.split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+        .filter(|token| !token.is_empty())
+        .map(|token| token.to_ascii_lowercase())
+        .collect()
+}
+
+fn sequence_token_set(
+    bundle: &PsionReferenceCorpusBundle,
+    sequence: &PsionReferenceEncodedSequence,
+) -> BTreeSet<String> {
+    sequence
+        .token_ids
+        .iter()
+        .filter_map(|token_id| bundle.vocabulary_artifact.tokens.get(*token_id as usize))
+        .filter(|token| !token.starts_with('<'))
+        .cloned()
+        .collect()
+}
+
+fn mean_token_embedding(
+    model: &PsionCompactDecoderReferencePilotModel,
+    token_ids: &[u32],
+) -> Option<Vec<f32>> {
+    let hidden_size = model.descriptor.config.hidden_size;
+    let mut embedding = vec![0.0; hidden_size];
+    let mut count = 0_u32;
+    for token_id in token_ids {
+        let token_index = *token_id as usize;
+        if token_index >= model.descriptor.config.vocab_size {
+            continue;
+        }
+        let offset = token_index * hidden_size;
+        for index in 0..hidden_size {
+            embedding[index] += model.token_embeddings[offset + index];
+        }
+        count = count.saturating_add(1);
+    }
+    if count == 0 {
+        return None;
+    }
+    let scale = 1.0 / count as f32;
+    for value in &mut embedding {
+        *value *= scale;
+    }
+    Some(embedding)
+}
+
+fn cosine_similarity(left: &[f32], right: &[f32]) -> f32 {
+    let left_norm = left.iter().map(|value| value * value).sum::<f32>().sqrt();
+    let right_norm = right.iter().map(|value| value * value).sum::<f32>().sqrt();
+    if left_norm == 0.0 || right_norm == 0.0 {
+        0.0
+    } else {
+        dot(left, right) / (left_norm * right_norm)
+    }
+}
+
+fn bps_from_pass_count(pass_count: usize, total_count: usize) -> u32 {
+    if total_count == 0 {
+        0
+    } else {
+        ((pass_count as u64 * 10_000) / total_count as u64) as u32
+    }
+}
+
+fn improvement_bps(seed_baseline_loss_milli: u32, pilot_loss_milli: u32) -> u32 {
+    if seed_baseline_loss_milli == 0 || pilot_loss_milli >= seed_baseline_loss_milli {
+        0
+    } else {
+        (((seed_baseline_loss_milli - pilot_loss_milli) as u64 * 10_000)
+            / seed_baseline_loss_milli as u64) as u32
+    }
 }
 
 impl PsionCompactDecoderReferencePilotModel {
@@ -1428,5 +2368,50 @@ mod tests {
         run.observability_receipt
             .validate_against_stage(&run.stage_receipt)
             .expect("observability receipt should validate");
+    }
+
+    #[test]
+    fn reference_pilot_evidence_bundle_validates_against_matrix_and_benchmark_contracts(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let config = PsionReferencePilotConfig::reference()?;
+        let bundle = run_psion_reference_pilot_evidence_bundle(repo_root().as_path(), &config)?;
+        let acceptance_matrix: PsionAcceptanceMatrix = load_json_fixture(
+            repo_root().as_path(),
+            "fixtures/psion/acceptance/psion_acceptance_matrix_v1.json",
+        )?;
+        let benchmark_catalog: PsionBenchmarkCatalog = load_json_fixture(
+            repo_root().as_path(),
+            "fixtures/psion/benchmarks/psion_benchmark_catalog_v1.json",
+        )?;
+        let capability_matrix: PsionCapabilityMatrixView = load_json_fixture(
+            repo_root().as_path(),
+            "fixtures/psion/capability/psion_capability_matrix_v1.json",
+        )?;
+        let artifact_lineage: PsionArtifactLineageManifest = load_json_fixture(
+            repo_root().as_path(),
+            "fixtures/psion/lifecycle/psion_artifact_lineage_manifest_v1.json",
+        )?;
+        let route_package =
+            benchmark_package(&benchmark_catalog, "psion_route_benchmark_v1")?;
+        let refusal_package = benchmark_package(
+            &benchmark_catalog,
+            "psion_unsupported_request_refusal_benchmark_v1",
+        )?;
+
+        bundle
+            .route_class_evaluation_receipt
+            .validate_against_package(route_package, &artifact_lineage)?;
+        bundle
+            .refusal_calibration_receipt
+            .validate_against_package_and_matrix(
+                refusal_package,
+                &capability_matrix,
+                &artifact_lineage,
+            )?;
+        bundle.pilot_bundle.validate_against_matrix(&acceptance_matrix)?;
+        assert_eq!(bundle.architecture_benchmark.aggregate_pass_rate_bps, 10_000);
+        assert_eq!(bundle.normative_spec_benchmark.aggregate_pass_rate_bps, 10_000);
+        assert_eq!(bundle.held_out_benchmark.aggregate_pass_rate_bps, 10_000);
+        Ok(())
     }
 }

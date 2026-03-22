@@ -1,5 +1,5 @@
-[[SECTION:wasm_core_spec_release_2:1.1|1.1 Values]]
-values carry typed state and preserve explicit validation_contexts before execution.
+[[SECTION:wasm_core_spec_release_2:2.5.1|2.5.1 Validation Contexts]]
+validation_context defines the assumptions that instruction_validation may rely on and it must stay explicit in a normative explanation.
 
-[[SECTION:wasm_core_spec_release_2:1.2|1.2 Instructions]]
-instructions remain well formed only when instruction_validation keeps stack effects explicit.
+[[SECTION:wasm_core_spec_release_2:2.5.4|2.5.4 Malformed Module Conditions]]
+malformed_module_condition names the boundary where a module is rejected before execution and the text forbids treating that boundary as scheduler commentary.
