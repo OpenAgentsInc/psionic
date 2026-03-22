@@ -1247,6 +1247,27 @@ mod tests {
         .expect("candidate sampling policy should parse")
     }
 
+    fn code_heavy_policy() -> PsionSamplingPolicyManifest {
+        let mut policy = candidate_policy();
+        policy.maximum_code_token_ratio_bps = 100;
+        policy.source_family_weights[0].content_class = PsionSamplingContentClass::Code;
+        policy.content_class_token_share_report = vec![
+            PsionContentClassTokenShare {
+                content_class: PsionSamplingContentClass::Prose,
+                observed_token_share_bps: 0,
+            },
+            PsionContentClassTokenShare {
+                content_class: PsionSamplingContentClass::SpecText,
+                observed_token_share_bps: 4400,
+            },
+            PsionContentClassTokenShare {
+                content_class: PsionSamplingContentClass::Code,
+                observed_token_share_bps: 5600,
+            },
+        ];
+        policy
+    }
+
     fn comparison_receipt() -> PsionSamplingPolicyComparisonReceipt {
         serde_json::from_str(include_str!(
             "../../../fixtures/psion/sampling/psion_sampling_policy_comparison_receipt_v1.json"
@@ -1263,9 +1284,7 @@ mod tests {
 
     #[test]
     fn code_token_ratio_must_not_exceed_the_declared_limit() {
-        let mut policy = candidate_policy();
-        policy.maximum_code_token_ratio_bps = 100;
-        let error = policy
+        let error = code_heavy_policy()
             .validate_against_inputs(&tokenized_corpus(), &raw_source_manifest())
             .expect_err("code token ratio above the maximum should be rejected");
         assert!(matches!(
