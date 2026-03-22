@@ -1,4 +1,4 @@
-# 2026-03-22 OpenAgentsGemini GPU Training Pilot Audit
+# 2026-03-22 OpenAgentsGemini Single-GPU Training Pilot Readiness Audit
 
 This audit checks whether the current Google Cloud project can honestly launch
 one bounded Psion GPU training pilot and retain enough infra, artifact, and
@@ -6,6 +6,20 @@ cost evidence to make the run useful.
 
 I did not allocate a GPU VM in this audit. This is a control-plane and quota
 readiness pass over the current `gcloud`-visible project state.
+
+## Non-goals Of This Audit
+
+This audit does not claim:
+
+- live zonal GPU stock proof
+- benchmark success for the training run itself
+- trusted-cluster readiness
+- cross-region or multi-node training readiness
+- production serving readiness for trained checkpoints
+- broad cost optimality across machine families
+
+It is strictly a single-project, single-region, single-node readiness audit for
+one bounded Psion GPU pilot with retained evidence.
 
 ## Scope
 
@@ -180,14 +194,24 @@ Recommended order:
 3. leave Spot or preemptible usage for later once checkpoint persistence is
    proven, even though spot-like quota exists
 
+Preferred zonal fallback order for the first L4 pilot:
+
+1. `us-central1-a`
+2. `us-central1-b`
+3. `us-central1-c`
+
 Initial zone fallback order for the first launch:
 
-- L4 plus `g2`: `us-central1-b`, then `us-central1-c`, then `us-central1-a`
+- L4 plus `g2`: `us-central1-a`, then `us-central1-b`, then `us-central1-c`
 - A100 plus `a2-highgpu-1g`: `us-central1-b`, then `us-central1-c`, then
   `us-central1-a`, then `us-central1-f`
 
 These are only operator defaults. Actual launch truth still depends on live
 zonal stock at allocation time.
+
+If all preferred L4 zones fail for live capacity reasons, do not silently
+upgrade to A100. Record the capacity miss and require an explicit operator
+decision before changing machine profile.
 
 ## Minimum Setup Before Launch
 
@@ -202,6 +226,17 @@ zonal stock at allocation time.
   and cost drift are not invisible during the run
 - define one launch wrapper that snapshots quota, instance metadata, machine
   details, and training outputs into the bucket
+
+## Launch Decision Rule
+
+A first real Google Psion pilot may be launched only when:
+
+- Issues 1 through 9 are closed
+- the preferred machine profile still passes quota preflight
+- the launch manifest has a declared cost ceiling
+- the immutable input package has been materialized
+- cold-restore procedure has already passed on archived checkpoints or the run
+  is explicitly classified as a non-resumable smoke pass
 
 ## Remaining Operational Risks
 
@@ -557,6 +592,17 @@ Description:
 After the setup issues are closed, the repo still needs one actual bounded run
 on Google infra. Until that exists, the project only has inferred launch
 readiness, not proved execution readiness.
+
+Result classes for the follow-up audit:
+
+- `launch_capacity_failure`
+- `bootstrap_failure`
+- `input_materialization_failure`
+- `training_runtime_failure`
+- `checkpoint_archive_failure`
+- `checkpoint_restore_failure`
+- `cost_guardrail_abort`
+- `bounded_success`
 
 Required details:
 
