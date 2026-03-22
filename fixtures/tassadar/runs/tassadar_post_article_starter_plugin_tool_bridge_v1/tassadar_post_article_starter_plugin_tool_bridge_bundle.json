@@ -1,0 +1,435 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.post_article.starter_plugin_tool_bridge.bundle.v1",
+  "surface_ids": [
+    "deterministic_workflow",
+    "router_responses",
+    "apple_fm_session"
+  ],
+  "projection_rows": [
+    {
+      "plugin_id": "plugin.text.url_extract",
+      "tool_name": "plugin_text_url_extract",
+      "result_schema_id": "plugin.text.url_extract.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.packet_too_large.v1",
+        "plugin.refusal.unsupported_codec.v1",
+        "plugin.refusal.runtime_resource_limit.v1"
+      ],
+      "replay_class_id": "deterministic_replayable",
+      "deterministic_projection": {
+        "plugin_id": "plugin.text.url_extract",
+        "tool_name": "plugin_text_url_extract",
+        "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "description": "packet-local input text scanned with the bounded https?://[^\\\\s]+ rule.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        },
+        "result_schema_id": "plugin.text.url_extract.output.v1",
+        "refusal_schema_ids": [
+          "plugin.refusal.schema_invalid.v1",
+          "plugin.refusal.packet_too_large.v1",
+          "plugin.refusal.unsupported_codec.v1",
+          "plugin.refusal.runtime_resource_limit.v1"
+        ],
+        "replay_class_id": "deterministic_replayable"
+      },
+      "router_projection": {
+        "kind": "function",
+        "name": "plugin_text_url_extract",
+        "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "description": "packet-local input text scanned with the bounded https?://[^\\\\s]+ rule.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        }
+      },
+      "apple_fm_projection": {
+        "name": "plugin_text_url_extract",
+        "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "description": "packet-local input text scanned with the bounded https?://[^\\\\s]+ rule.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        }
+      },
+      "arguments_schema_digest": "dc77cf65726337d506f1ef2070df9d9fd26dde8836cd04c7b092b037e5a46b5c",
+      "router_parameters_digest": "dc77cf65726337d506f1ef2070df9d9fd26dde8836cd04c7b092b037e5a46b5c",
+      "apple_fm_schema_digest": "dc77cf65726337d506f1ef2070df9d9fd26dde8836cd04c7b092b037e5a46b5c",
+      "stable_across_surfaces": true,
+      "detail": "the shared bridge derives deterministic, router-owned, and Apple FM tool definitions from one starter-plugin projection without inventing a second schema vocabulary."
+    },
+    {
+      "plugin_id": "plugin.http.fetch_text",
+      "tool_name": "plugin_http_fetch_text",
+      "result_schema_id": "plugin.http.fetch_text.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.unsupported_codec.v1",
+        "plugin.refusal.network_denied.v1",
+        "plugin.refusal.url_not_permitted.v1",
+        "plugin.refusal.timeout.v1",
+        "plugin.refusal.response_too_large.v1",
+        "plugin.refusal.content_type_unsupported.v1",
+        "plugin.refusal.decode_failed.v1",
+        "plugin.refusal.upstream_failure.v1"
+      ],
+      "replay_class_id": "replayable_with_snapshots",
+      "deterministic_projection": {
+        "plugin_id": "plugin.http.fetch_text",
+        "tool_name": "plugin_http_fetch_text",
+        "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "description": "allowlisted absolute URL fetched with one bounded GET-only runtime path.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "type": "object"
+        },
+        "result_schema_id": "plugin.http.fetch_text.output.v1",
+        "refusal_schema_ids": [
+          "plugin.refusal.schema_invalid.v1",
+          "plugin.refusal.unsupported_codec.v1",
+          "plugin.refusal.network_denied.v1",
+          "plugin.refusal.url_not_permitted.v1",
+          "plugin.refusal.timeout.v1",
+          "plugin.refusal.response_too_large.v1",
+          "plugin.refusal.content_type_unsupported.v1",
+          "plugin.refusal.decode_failed.v1",
+          "plugin.refusal.upstream_failure.v1"
+        ],
+        "replay_class_id": "replayable_with_snapshots"
+      },
+      "router_projection": {
+        "kind": "function",
+        "name": "plugin_http_fetch_text",
+        "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "description": "allowlisted absolute URL fetched with one bounded GET-only runtime path.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "type": "object"
+        }
+      },
+      "apple_fm_projection": {
+        "name": "plugin_http_fetch_text",
+        "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "description": "allowlisted absolute URL fetched with one bounded GET-only runtime path.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "type": "object"
+        }
+      },
+      "arguments_schema_digest": "ac666cca44c1c1cd89dca49d313e5776581c71ca1f5175011183721e2956c1dc",
+      "router_parameters_digest": "ac666cca44c1c1cd89dca49d313e5776581c71ca1f5175011183721e2956c1dc",
+      "apple_fm_schema_digest": "ac666cca44c1c1cd89dca49d313e5776581c71ca1f5175011183721e2956c1dc",
+      "stable_across_surfaces": true,
+      "detail": "the shared bridge derives deterministic, router-owned, and Apple FM tool definitions from one starter-plugin projection without inventing a second schema vocabulary."
+    },
+    {
+      "plugin_id": "plugin.html.extract_readable",
+      "tool_name": "plugin_html_extract_readable",
+      "result_schema_id": "plugin.html.extract_readable.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.unsupported_codec.v1",
+        "plugin.refusal.input_too_large.v1",
+        "plugin.refusal.content_type_unsupported.v1"
+      ],
+      "replay_class_id": "deterministic_replayable",
+      "deterministic_projection": {
+        "plugin_id": "plugin.html.extract_readable",
+        "tool_name": "plugin_html_extract_readable",
+        "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "body_text": {
+              "type": "string"
+            },
+            "content_type": {
+              "type": "string"
+            },
+            "source_url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source_url",
+            "content_type",
+            "body_text"
+          ],
+          "type": "object"
+        },
+        "result_schema_id": "plugin.html.extract_readable.output.v1",
+        "refusal_schema_ids": [
+          "plugin.refusal.schema_invalid.v1",
+          "plugin.refusal.unsupported_codec.v1",
+          "plugin.refusal.input_too_large.v1",
+          "plugin.refusal.content_type_unsupported.v1"
+        ],
+        "replay_class_id": "deterministic_replayable"
+      },
+      "router_projection": {
+        "kind": "function",
+        "name": "plugin_html_extract_readable",
+        "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "body_text": {
+              "type": "string"
+            },
+            "content_type": {
+              "type": "string"
+            },
+            "source_url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source_url",
+            "content_type",
+            "body_text"
+          ],
+          "type": "object"
+        }
+      },
+      "apple_fm_projection": {
+        "name": "plugin_html_extract_readable",
+        "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "body_text": {
+              "type": "string"
+            },
+            "content_type": {
+              "type": "string"
+            },
+            "source_url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source_url",
+            "content_type",
+            "body_text"
+          ],
+          "type": "object"
+        }
+      },
+      "arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
+      "router_parameters_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
+      "apple_fm_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
+      "stable_across_surfaces": true,
+      "detail": "the shared bridge derives deterministic, router-owned, and Apple FM tool definitions from one starter-plugin projection without inventing a second schema vocabulary."
+    },
+    {
+      "plugin_id": "plugin.feed.rss_atom_parse",
+      "tool_name": "plugin_feed_rss_atom_parse",
+      "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.input_too_large.v1",
+        "plugin.refusal.unsupported_feed_format.v1"
+      ],
+      "replay_class_id": "deterministic_replayable",
+      "deterministic_projection": {
+        "plugin_id": "plugin.feed.rss_atom_parse",
+        "tool_name": "plugin_feed_rss_atom_parse",
+        "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "content_type": {
+              "type": "string"
+            },
+            "feed_text": {
+              "type": "string"
+            },
+            "source_url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source_url",
+            "content_type",
+            "feed_text"
+          ],
+          "type": "object"
+        },
+        "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+        "refusal_schema_ids": [
+          "plugin.refusal.schema_invalid.v1",
+          "plugin.refusal.input_too_large.v1",
+          "plugin.refusal.unsupported_feed_format.v1"
+        ],
+        "replay_class_id": "deterministic_replayable"
+      },
+      "router_projection": {
+        "kind": "function",
+        "name": "plugin_feed_rss_atom_parse",
+        "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "content_type": {
+              "type": "string"
+            },
+            "feed_text": {
+              "type": "string"
+            },
+            "source_url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source_url",
+            "content_type",
+            "feed_text"
+          ],
+          "type": "object"
+        }
+      },
+      "apple_fm_projection": {
+        "name": "plugin_feed_rss_atom_parse",
+        "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "content_type": {
+              "type": "string"
+            },
+            "feed_text": {
+              "type": "string"
+            },
+            "source_url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source_url",
+            "content_type",
+            "feed_text"
+          ],
+          "type": "object"
+        }
+      },
+      "arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
+      "router_parameters_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
+      "apple_fm_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
+      "stable_across_surfaces": true,
+      "detail": "the shared bridge derives deterministic, router-owned, and Apple FM tool definitions from one starter-plugin projection without inventing a second schema vocabulary."
+    }
+  ],
+  "execution_cases": [
+    {
+      "case_id": "url_extract_success_bridge",
+      "tool_name": "plugin_text_url_extract",
+      "plugin_id": "plugin.text.url_extract",
+      "status": "success",
+      "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+      "structured_payload_digest": "43e62e7d6a0b41eb0a3f16b6858e983d4020d9a73a62594f502761b217fb6e0e",
+      "rendered_output_digest": "b0c0783efaf11dd5191baad14e03196f4e802e35af8158e980fb00e0fef9eb50",
+      "plugin_receipt_id": "receipt.plugin.text.url_extract.3a0a2ab4eadb8642.v1",
+      "plugin_receipt_digest": "448639570a2b7fb652307cb8e93a23b0a4cc65800d5f7082d788f1853ee414b6",
+      "receipt_binding_preserved": true,
+      "typed_refusal_preserved": false,
+      "detail": "success results stay receipt-bound and structured at the shared bridge boundary."
+    },
+    {
+      "case_id": "fetch_text_success_bridge",
+      "tool_name": "plugin_http_fetch_text",
+      "plugin_id": "plugin.http.fetch_text",
+      "status": "success",
+      "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+      "structured_payload_digest": "890fee360c6fcee38f9a2ef3f2507e2e2ad3233ff9106c5f4cc1fe789d164c6c",
+      "rendered_output_digest": "f9443a737cf0fc0e3ed66b74778987be1902aff64a748ffad819d13a7e052d8c",
+      "plugin_receipt_id": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+      "plugin_receipt_digest": "beb2b5da6ad6c23aaa111962cc4663cec3a82335864b4fe36b2370d27e3593f9",
+      "receipt_binding_preserved": true,
+      "typed_refusal_preserved": false,
+      "detail": "read-only network results stay structured and receipt-bound at the same bridge boundary."
+    },
+    {
+      "case_id": "extract_readable_success_bridge",
+      "tool_name": "plugin_html_extract_readable",
+      "plugin_id": "plugin.html.extract_readable",
+      "status": "success",
+      "output_or_refusal_schema_id": "plugin.html.extract_readable.output.v1",
+      "structured_payload_digest": "f5756d1d32bd9d7ffed8550af839ea47782dcb9f7dc5e16e1998e9c7ac93d3ff",
+      "rendered_output_digest": "fb3c336e8d73da46c292780c4cb61d023e5d1c601deb73ea88ef29c1e5cc0d0d",
+      "plugin_receipt_id": "receipt.plugin.html.extract_readable.2e53ee21f594f758.v1",
+      "plugin_receipt_digest": "aa0ac963f5b9b0220ff32f3043ae00756b2ad1ff6f868db4f32e6d220fe8c150",
+      "receipt_binding_preserved": true,
+      "typed_refusal_preserved": false,
+      "detail": "local deterministic readability results carry the underlying plugin receipt across the tool boundary."
+    },
+    {
+      "case_id": "feed_parse_refusal_bridge",
+      "tool_name": "plugin_feed_rss_atom_parse",
+      "plugin_id": "plugin.feed.rss_atom_parse",
+      "status": "refusal",
+      "output_or_refusal_schema_id": "plugin.refusal.unsupported_feed_format.v1",
+      "structured_payload_digest": "f11dee2fe26d415bac6ac05be79d198612ad05cf1f93632e7e20340830ffe0fd",
+      "rendered_output_digest": "52c1a39f2f4c506ab86da22cb88cedf3862445c84709f0ae8c1648bb817e3715",
+      "plugin_receipt_id": "receipt.plugin.feed.rss_atom_parse.d9d065858942deb8.v1",
+      "plugin_receipt_digest": "6a970c808ea300393efd7c3b7acb16c937fe8ac5dc4c2ee5053a1ea74d54a33e",
+      "receipt_binding_preserved": true,
+      "typed_refusal_preserved": true,
+      "detail": "typed plugin refusals stay typed and receipt-bound instead of degrading into free-form tool text."
+    }
+  ],
+  "plugin_count": 4,
+  "claim_boundary": "this bundle freezes one shared starter-plugin projection and receipt bridge above the plugin runtime and below deterministic, router-owned, and Apple FM controller lanes. It keeps tool-schema derivation, structured outputs, typed refusals, and plugin receipt identity explicit without claiming weighted controller closure.",
+  "summary": "starter plugin tool bridge covers projection_rows=4 and execution_cases=4 across deterministic, router-owned, and Apple FM controller surfaces.",
+  "bundle_digest": "c8feb8c7cd1caa9f340a7b2cfafacc67b2cba7bcf5d33a7c17e0c1a6058b82f4"
+}

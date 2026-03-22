@@ -36,5 +36,5 @@ plugin above the fetch-text lane.
 
 ## Next Frontier
 
-The next open orchestration frontier above the starter-plugin runtime tranche is
-`TAS-222`: the shared plugin-to-tool projection and receipt bridge.
+The next open orchestration frontier above the shared starter-plugin bridge is
+`TAS-223`: the deterministic starter workflow controller and web-content pilot.

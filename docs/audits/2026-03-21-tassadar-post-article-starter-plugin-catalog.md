@@ -77,5 +77,11 @@ runtime implementation in the same starter-runtime module and its committed
 bundle at
 `fixtures/tassadar/runs/tassadar_post_article_plugin_feed_rss_atom_parse_v1/tassadar_post_article_plugin_feed_rss_atom_parse_bundle.json`.
 
-The next open orchestration frontier above this starter catalog is `TAS-222`,
-which begins the shared plugin-to-tool projection and receipt bridge.
+`TAS-222` is now also closed by the shared starter-plugin tool bridge in
+`crates/psionic-runtime/src/tassadar_post_article_starter_plugin_tool_bridge.rs`
+and its committed bundle at
+`fixtures/tassadar/runs/tassadar_post_article_starter_plugin_tool_bridge_v1/tassadar_post_article_starter_plugin_tool_bridge_bundle.json`.
+
+The next open orchestration frontier above this starter catalog is `TAS-223`,
+which begins the deterministic starter workflow controller and web-content
+pilot.

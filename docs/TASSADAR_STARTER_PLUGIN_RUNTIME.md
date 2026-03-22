@@ -204,9 +204,15 @@ Negative claims stay explicit:
 - no OPML support
 - no general document-parsing closure
 
+## Adjacent Surface
+
+The shared controller-facing bridge above these runtime entries now lives in
+`docs/TASSADAR_STARTER_PLUGIN_TOOL_BRIDGE.md`. That bridge keeps tool
+definitions, structured result envelopes, typed refusals, and plugin receipt
+identity stable across deterministic, router-owned, and Apple FM controller
+lanes without widening this runtime tranche into weighted control claims.
+
 ## Planned
 
-- shared plugin-to-tool projection across deterministic, router-owned, and Apple
-  FM controller lanes
 - deterministic, served, and Apple FM multi-plugin pilot traces above the same
   runtime-owned starter plugin substrate

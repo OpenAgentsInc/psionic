@@ -1377,6 +1377,16 @@ That closes one bounded RSS 2.0 or Atom 1.0 feed parser plus one green
 fetch-to-feed composition case without widening the boundary to arbitrary XML,
 OPML, or general document-parsing closure, and moves the next open bridge
 frontier to `TAS-222`.
+`TAS-222` now adds the shared starter-plugin tool bridge in
+`crates/psionic-runtime/src/tassadar_post_article_starter_plugin_tool_bridge.rs`,
+with committed evidence at
+`fixtures/tassadar/runs/tassadar_post_article_starter_plugin_tool_bridge_v1/tassadar_post_article_starter_plugin_tool_bridge_bundle.json`
+plus the checker
+`scripts/check-tassadar-post-article-starter-plugin-tool-bridge.sh`.
+That closes the shared projection and receipt bridge across deterministic,
+router-owned, and Apple FM controller surfaces without widening the boundary to
+weighted controller closure, and moves the next open bridge frontier to
+`TAS-223`.
 
 ## Route Requirement
 

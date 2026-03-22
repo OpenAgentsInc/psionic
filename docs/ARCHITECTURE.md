@@ -1770,8 +1770,17 @@ The current scope is:
   audit note
   `docs/audits/2026-03-22-tassadar-post-article-plugin-feed-rss-atom-parse.md`,
   which freeze one bounded RSS 2.0 or Atom 1.0 ingestion path plus one green
-  fetch-to-feed composition case while moving the next open bridge frontier to
-  `TAS-222`.
+  fetch-to-feed composition case
+- the current starter-plugin tool-bridge artifacts are
+  `fixtures/tassadar/runs/tassadar_post_article_starter_plugin_tool_bridge_v1/tassadar_post_article_starter_plugin_tool_bridge_bundle.json`,
+  the checker
+  `scripts/check-tassadar-post-article-starter-plugin-tool-bridge.sh`, the
+  bridge doc `docs/TASSADAR_STARTER_PLUGIN_TOOL_BRIDGE.md`, and the audit note
+  `docs/audits/2026-03-22-tassadar-post-article-starter-plugin-tool-bridge.md`,
+  which publish one shared projection and receipt bridge above the starter
+  runtime, keep tool-schema derivation stable across deterministic,
+  router-owned, and Apple FM controller surfaces, and move the next open
+  orchestration frontier to `TAS-223`.
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and
