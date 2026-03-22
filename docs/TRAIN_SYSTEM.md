@@ -127,6 +127,11 @@ and now also has:
   for the `Psion` learned-model lane and freezes the bounded pilot bundle,
   held-out-loss receipt, route/refusal probes, and acceptance-matrix promotion
   decision that must exist before broader pretraining is honest.
+- `docs/PSION_CHECKPOINT_RECOVERY.md` is the canonical first dense-versus-
+  sharded checkpoint-recovery doc for the `Psion` learned-model lane and
+  freezes the explicit restart, rollback, corruption-detection, and
+  invalidation bundle that later rented-cluster and trusted-cluster work must
+  preserve.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical first phase-gate and
   promotion-decision doc for the `Psion` learned-model lane and freezes the
   acceptance-matrix plus evidence-bound promotion contract that later pilot,

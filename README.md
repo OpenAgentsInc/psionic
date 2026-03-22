@@ -45,6 +45,9 @@ clustered execution, and machine-legible execution truth.
   learned-model lane.
 - `docs/PSION_PILOT_PRETRAINING_RUN.md` is the canonical first pilot-run and
   promotion-evidence doc for the `Psion` learned-model lane.
+- `docs/PSION_CHECKPOINT_RECOVERY.md` is the canonical dense-versus-sharded
+  checkpoint restart, rollback, and invalidation doc for the `Psion`
+  learned-model lane.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical phase-gate and
   promotion-decision doc for the `Psion` learned-model lane.
 - `docs/PSION_CAPABILITY_MATRIX.md` is the canonical served capability and
