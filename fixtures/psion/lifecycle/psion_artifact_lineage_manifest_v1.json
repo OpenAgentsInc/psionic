@@ -62,7 +62,7 @@
     },
     {
       "benchmark_id": "psion_architecture_reasoning_benchmark_v1",
-      "benchmark_digest": "0aa2a13d57576c0c0c0bfb2644140224ffad1e75901770ef17a23c6684e147ad",
+      "benchmark_digest": "703142f680a8a2702700fcdd18309b24d6e7889e07c4621e287178c9ac6af674",
       "source_ids": [
         "spec_quiz_eval_pack_v1"
       ]

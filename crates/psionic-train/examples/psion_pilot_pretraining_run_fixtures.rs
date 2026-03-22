@@ -112,7 +112,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 family: PsionBenchmarkFamily::ArchitectureReasoning,
                 benchmark_artifact_id: String::from("psion_architecture_reasoning_benchmark_v1"),
                 benchmark_artifact_digest: String::from(
-                    "sha256:psion_architecture_reasoning_benchmark_v1",
+                    "703142f680a8a2702700fcdd18309b24d6e7889e07c4621e287178c9ac6af674",
                 ),
                 metrics: vec![PsionObservedMetric {
                     metric_kind: PsionMetricKind::PassRateBps,

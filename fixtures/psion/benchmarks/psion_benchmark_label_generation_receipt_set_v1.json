@@ -1,24 +1,24 @@
 {
   "schema_version": "psion.benchmark_label_generation_receipt_set.v1",
   "receipt_set_id": "psion-benchmark-label-generation-receipt-set-v1",
-  "catalog_digest": "9c7d3e9530cd1ba4becb2cdbfa52b7c659f8c70314a47129559d7c221996a5e5",
+  "catalog_digest": "02b2be8b7ce308d87c084d37f7a62ab3a80d5037dbdd53bbd732093403915723",
   "lineage_schema_version": "psion.artifact_lineage.v1",
   "receipts": [
     {
       "schema_version": "psion.benchmark_label_generation_receipt.v1",
       "receipt_id": "psion_architecture_reasoning_benchmark_v1-label-generation-receipt-v1",
       "package_id": "psion_architecture_reasoning_benchmark_v1",
-      "package_digest": "0aa2a13d57576c0c0c0bfb2644140224ffad1e75901770ef17a23c6684e147ad",
+      "package_digest": "703142f680a8a2702700fcdd18309b24d6e7889e07c4621e287178c9ac6af674",
       "package_family": "architecture_reasoning",
       "contamination_input_digest": "57caf81f4cd0d54fea05946aadb7078111414de617e3d277225e1a159d7b20b4",
       "generation_mode": "rubric_backed",
       "item_receipts": [
         {
-          "item_id": "arch-case-1",
+          "item_id": "arch-case-constraint",
           "grader_id": "rubric_reasoning_v1",
           "generation_mode": "rubric_backed",
           "label_logic": {
-            "logic_id": "arch-case-1-labelgen",
+            "logic_id": "arch-case-constraint-labelgen",
             "logic_version": "v1",
             "generator_ref": "generator://psion/benchmark/rubric-label-assembly-v1",
             "detail": "Rubric-backed items pin the label-generation logic version used to assemble reasoning labels."
@@ -30,8 +30,110 @@
             "detail": "Rubric-backed labels pin the rubric reference, rubric version, and reviewer guidance used to score the item."
           },
           "derived_data_lineage": {
-            "generated_item_digest": "derived-item-arch-case-1",
-            "generated_label_digest": "derived-label-arch-case-1",
+            "generated_item_digest": "derived-item-arch-case-constraint",
+            "generated_label_digest": "derived-label-arch-case-constraint",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/rubric-label-assembly-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent reviewed sources, parent artifact reference, and rubric generator reference for the item and its label."
+          },
+          "detail": "Rubric-backed item records rubric versioning and derived-data lineage."
+        },
+        {
+          "item_id": "arch-case-bottleneck",
+          "grader_id": "rubric_reasoning_v1",
+          "generation_mode": "rubric_backed",
+          "label_logic": {
+            "logic_id": "arch-case-bottleneck-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/rubric-label-assembly-v1",
+            "detail": "Rubric-backed items pin the label-generation logic version used to assemble reasoning labels."
+          },
+          "rubric_binding": {
+            "rubric_ref": "rubric://psion/benchmark/reasoning",
+            "rubric_version": "2026.03.22",
+            "reviewer_guidance_ref": "guidance://psion/benchmark/rubric/reasoning-v1",
+            "detail": "Rubric-backed labels pin the rubric reference, rubric version, and reviewer guidance used to score the item."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-arch-case-bottleneck",
+            "generated_label_digest": "derived-label-arch-case-bottleneck",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/rubric-label-assembly-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent reviewed sources, parent artifact reference, and rubric generator reference for the item and its label."
+          },
+          "detail": "Rubric-backed item records rubric versioning and derived-data lineage."
+        },
+        {
+          "item_id": "arch-case-scheduling",
+          "grader_id": "rubric_reasoning_v1",
+          "generation_mode": "rubric_backed",
+          "label_logic": {
+            "logic_id": "arch-case-scheduling-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/rubric-label-assembly-v1",
+            "detail": "Rubric-backed items pin the label-generation logic version used to assemble reasoning labels."
+          },
+          "rubric_binding": {
+            "rubric_ref": "rubric://psion/benchmark/reasoning",
+            "rubric_version": "2026.03.22",
+            "reviewer_guidance_ref": "guidance://psion/benchmark/rubric/reasoning-v1",
+            "detail": "Rubric-backed labels pin the rubric reference, rubric version, and reviewer guidance used to score the item."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-arch-case-scheduling",
+            "generated_label_digest": "derived-label-arch-case-scheduling",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/rubric-label-assembly-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent reviewed sources, parent artifact reference, and rubric generator reference for the item and its label."
+          },
+          "detail": "Rubric-backed item records rubric versioning and derived-data lineage."
+        },
+        {
+          "item_id": "arch-case-tradeoff",
+          "grader_id": "rubric_reasoning_v1",
+          "generation_mode": "rubric_backed",
+          "label_logic": {
+            "logic_id": "arch-case-tradeoff-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/rubric-label-assembly-v1",
+            "detail": "Rubric-backed items pin the label-generation logic version used to assemble reasoning labels."
+          },
+          "rubric_binding": {
+            "rubric_ref": "rubric://psion/benchmark/reasoning",
+            "rubric_version": "2026.03.22",
+            "reviewer_guidance_ref": "guidance://psion/benchmark/rubric/reasoning-v1",
+            "detail": "Rubric-backed labels pin the rubric reference, rubric version, and reviewer guidance used to score the item."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-arch-case-tradeoff",
+            "generated_label_digest": "derived-label-arch-case-tradeoff",
             "parent_source_ids": [
               "spec_quiz_eval_pack_v1"
             ],
@@ -49,7 +151,7 @@
         }
       ],
       "summary": "Label-generation receipt for `psion_architecture_reasoning_benchmark_v1` proving benchmark labels stay bound to exact-truth or rubric-version contracts with explicit derived-data lineage.",
-      "receipt_digest": "63134d3383a10ed0ebdfce6c771160c4dbdb2733d75270bc933857044fc2cd07"
+      "receipt_digest": "e066241e04ec8f0af0fc2db34c33a2225b779a281efc941c9d13eb5ca2fdc970"
     },
     {
       "schema_version": "psion.benchmark_label_generation_receipt.v1",
@@ -344,5 +446,5 @@
     }
   ],
   "summary": "Canonical receipt set proving the main Psion benchmark families record exact-truth bindings, rubric versions, and derived-data lineage back to reviewed parent sources or generators instead of treating benchmark labels as opaque hand-maintained state.",
-  "receipt_set_digest": "68d47825d1aec237fe669b1fba32c7b9bdf23cd7f615f5d403787250f434554e"
+  "receipt_set_digest": "82230bfa43895674b60501c29105d1a0d212625e078c53a7655f524de6004ba2"
 }

@@ -140,6 +140,10 @@ and now also has:
   freezes the exact-truth, rubric-version, label-generation-logic, and
   derived-data-lineage contract that later benchmark evidence and
   contamination review must preserve.
+- `docs/PSION_ARCHITECTURE_REASONING_BENCHMARK.md` is the canonical first
+  family-specific benchmark doc for the `Psion` learned-model lane and
+  freezes the typed architecture item coverage, contamination attachment, and
+  direct acceptance-matrix binding for the architecture-reasoning package.
 - `docs/PSION_CHECKPOINT_RECOVERY.md` is the canonical first dense-versus-
   sharded checkpoint-recovery doc for the `Psion` learned-model lane and
   freezes the explicit restart, rollback, corruption-detection, and

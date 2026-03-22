@@ -52,6 +52,12 @@ The pilot success criteria are intentionally frozen in one place:
 - unsupported requests must be refused at the declared minimum band
 - later scale-up remains blocked without a clean contamination review
 
+`PSION-21` tightens the architecture gate further: the architecture reasoning
+requirements now bind directly to the concrete benchmark package
+`psion_architecture_reasoning_benchmark_v1` instead of only naming the family.
+Pilot and later scale-up decisions therefore cannot satisfy the architecture
+gate with an arbitrary receipt from another package.
+
 ## Promotion Contract
 
 `Psion` phase promotion is recorded through the training-owned

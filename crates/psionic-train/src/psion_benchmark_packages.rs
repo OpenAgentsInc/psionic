@@ -49,6 +49,16 @@ impl PsionBenchmarkPackageFamily {
     }
 }
 
+/// Probe kind for architecture-reasoning benchmark items.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsionArchitectureReasoningProbeKind {
+    DominantConstraint,
+    Bottleneck,
+    SchedulingBehavior,
+    TradeoffAnalysis,
+}
+
 /// Prompt envelope shared by the bounded Psion benchmark families.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -283,6 +293,10 @@ impl PsionBenchmarkGraderInterface {
 pub enum PsionBenchmarkTaskContract {
     ArchitectureReasoning {
         target_architecture: String,
+        workload_ref: String,
+        probe_kind: PsionArchitectureReasoningProbeKind,
+        dominant_constraint: String,
+        explicit_assumptions_required: bool,
         expected_focus: String,
     },
     NormativeSpecReading {
@@ -318,13 +332,29 @@ impl PsionBenchmarkTaskContract {
                 PsionBenchmarkPackageFamily::ArchitectureReasoning,
                 Self::ArchitectureReasoning {
                     target_architecture,
+                    workload_ref,
+                    dominant_constraint,
+                    explicit_assumptions_required,
                     expected_focus,
+                    ..
                 },
             ) => {
                 ensure_nonempty(
                     target_architecture.as_str(),
                     "architecture_reasoning.target_architecture",
                 )?;
+                ensure_nonempty(workload_ref.as_str(), "architecture_reasoning.workload_ref")?;
+                ensure_nonempty(
+                    dominant_constraint.as_str(),
+                    "architecture_reasoning.dominant_constraint",
+                )?;
+                if !explicit_assumptions_required {
+                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                        field: String::from("architecture_reasoning.explicit_assumptions_required"),
+                        expected: String::from("true"),
+                        actual: String::from("false"),
+                    });
+                }
                 ensure_nonempty(
                     expected_focus.as_str(),
                     "architecture_reasoning.expected_focus",
@@ -1922,13 +1952,13 @@ mod tests {
     use super::{
         record_psion_benchmark_catalog, record_psion_benchmark_package,
         record_psion_benchmark_package_receipt, record_psion_benchmark_receipt_set,
-        stable_contamination_input_digest, PsionBenchmarkContaminationInputs,
-        PsionBenchmarkExactLabelGrader, PsionBenchmarkExactRefusalGrader,
-        PsionBenchmarkExactRouteGrader, PsionBenchmarkExpectedResponseFormat,
-        PsionBenchmarkGraderInterface, PsionBenchmarkItem, PsionBenchmarkPackageContract,
-        PsionBenchmarkPackageError, PsionBenchmarkPackageFamily, PsionBenchmarkPromptEnvelope,
-        PsionBenchmarkPromptFormat, PsionBenchmarkRubricDimension, PsionBenchmarkRubricGrader,
-        PsionBenchmarkTaskContract,
+        stable_contamination_input_digest, PsionArchitectureReasoningProbeKind,
+        PsionBenchmarkContaminationInputs, PsionBenchmarkExactLabelGrader,
+        PsionBenchmarkExactRefusalGrader, PsionBenchmarkExactRouteGrader,
+        PsionBenchmarkExpectedResponseFormat, PsionBenchmarkGraderInterface, PsionBenchmarkItem,
+        PsionBenchmarkPackageContract, PsionBenchmarkPackageError, PsionBenchmarkPackageFamily,
+        PsionBenchmarkPromptEnvelope, PsionBenchmarkPromptFormat, PsionBenchmarkRubricDimension,
+        PsionBenchmarkRubricGrader, PsionBenchmarkTaskContract,
     };
     use crate::{PsionMetricKind, PsionObservedMetric, PsionPhaseGate, PsionRouteKind};
     use psionic_data::{PsionExclusionManifest, PsionSourceLifecycleManifest};
@@ -2080,24 +2110,97 @@ mod tests {
             record_psion_benchmark_package(
                 "psion_architecture_reasoning_benchmark_v1",
                 PsionBenchmarkPackageFamily::ArchitectureReasoning,
-                benchmark_package("psion_architecture_reasoning_benchmark_v1", &["arch-case-1"]),
+                benchmark_package(
+                    "psion_architecture_reasoning_benchmark_v1",
+                    &[
+                        "arch-case-constraint",
+                        "arch-case-bottleneck",
+                        "arch-case-scheduling",
+                        "arch-case-tradeoff",
+                    ],
+                ),
                 vec![explanation_prompt_format()],
                 vec![rubric_grader()],
                 contamination_inputs(&["spec_quiz_eval_pack_v1"]),
-                vec![PsionBenchmarkItem {
-                    item_id: String::from("arch-case-1"),
-                    family: PsionBenchmarkPackageFamily::ArchitectureReasoning,
-                    prompt_format_id: String::from("bounded_explanation_v1"),
-                    grader_id: String::from("rubric_reasoning_v1"),
-                    prompt_digest: String::from("arch-prompt-digest-1"),
-                    source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
-                    task: PsionBenchmarkTaskContract::ArchitectureReasoning {
-                        target_architecture: String::from("bounded_three_stage_pipeline"),
-                        expected_focus: String::from("memory hierarchy tradeoff"),
+                vec![
+                    PsionBenchmarkItem {
+                        item_id: String::from("arch-case-constraint"),
+                        family: PsionBenchmarkPackageFamily::ArchitectureReasoning,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("rubric_reasoning_v1"),
+                        prompt_digest: String::from("arch-prompt-digest-1"),
+                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                        task: PsionBenchmarkTaskContract::ArchitectureReasoning {
+                            target_architecture: String::from("bounded_three_stage_pipeline"),
+                            workload_ref: String::from("workload://psion/ingest/cache-sensitive"),
+                            probe_kind: PsionArchitectureReasoningProbeKind::DominantConstraint,
+                            dominant_constraint: String::from("memory bandwidth"),
+                            explicit_assumptions_required: true,
+                            expected_focus: String::from("dominant resource constraint"),
+                        },
+                        detail: String::from(
+                            "Architecture constraint item requires explicit assumptions about the bounded ingest workload before naming the dominant constraint.",
+                        ),
                     },
-                    detail: String::from("Architecture benchmark item checks bounded system reasoning."),
-                }],
-                "Architecture reasoning benchmark package uses the shared prompt, item, and rubric-grader contracts.",
+                    PsionBenchmarkItem {
+                        item_id: String::from("arch-case-bottleneck"),
+                        family: PsionBenchmarkPackageFamily::ArchitectureReasoning,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("rubric_reasoning_v1"),
+                        prompt_digest: String::from("arch-prompt-digest-2"),
+                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                        task: PsionBenchmarkTaskContract::ArchitectureReasoning {
+                            target_architecture: String::from("bounded_three_stage_pipeline"),
+                            workload_ref: String::from("workload://psion/ingest/high-fanout"),
+                            probe_kind: PsionArchitectureReasoningProbeKind::Bottleneck,
+                            dominant_constraint: String::from("queueing pressure"),
+                            explicit_assumptions_required: true,
+                            expected_focus: String::from("steady-state bottleneck"),
+                        },
+                        detail: String::from(
+                            "Architecture bottleneck item requires the answer to surface the limiting stage under the stated assumptions instead of generic optimization advice.",
+                        ),
+                    },
+                    PsionBenchmarkItem {
+                        item_id: String::from("arch-case-scheduling"),
+                        family: PsionBenchmarkPackageFamily::ArchitectureReasoning,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("rubric_reasoning_v1"),
+                        prompt_digest: String::from("arch-prompt-digest-3"),
+                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                        task: PsionBenchmarkTaskContract::ArchitectureReasoning {
+                            target_architecture: String::from("bounded_three_stage_pipeline"),
+                            workload_ref: String::from("workload://psion/ingest/bursty-latency"),
+                            probe_kind: PsionArchitectureReasoningProbeKind::SchedulingBehavior,
+                            dominant_constraint: String::from("tail-latency budget"),
+                            explicit_assumptions_required: true,
+                            expected_focus: String::from("scheduler behavior under burst load"),
+                        },
+                        detail: String::from(
+                            "Architecture scheduling item checks whether the answer reasons about bounded scheduling behavior rather than only naming hardware resources.",
+                        ),
+                    },
+                    PsionBenchmarkItem {
+                        item_id: String::from("arch-case-tradeoff"),
+                        family: PsionBenchmarkPackageFamily::ArchitectureReasoning,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("rubric_reasoning_v1"),
+                        prompt_digest: String::from("arch-prompt-digest-4"),
+                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                        task: PsionBenchmarkTaskContract::ArchitectureReasoning {
+                            target_architecture: String::from("bounded_three_stage_pipeline"),
+                            workload_ref: String::from("workload://psion/ingest/cost-capped"),
+                            probe_kind: PsionArchitectureReasoningProbeKind::TradeoffAnalysis,
+                            dominant_constraint: String::from("cost ceiling"),
+                            explicit_assumptions_required: true,
+                            expected_focus: String::from("throughput versus resilience tradeoff"),
+                        },
+                        detail: String::from(
+                            "Architecture tradeoff item checks whether the answer keeps the stated assumptions explicit while reasoning about bounded tradeoffs.",
+                        ),
+                    },
+                ],
+                "Architecture reasoning benchmark package uses typed items that explicitly cover dominant constraints, bottlenecks, scheduling behavior, and tradeoff analysis under stated assumptions.",
             )?,
             record_psion_benchmark_package(
                 "psion_normative_spec_benchmark_v1",

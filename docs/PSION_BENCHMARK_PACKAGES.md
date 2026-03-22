@@ -17,6 +17,11 @@ Label-production provenance now lives in
 package shape, not on how exact labels, rubric-backed labels, or derived-data
 lineage receipts are produced.
 
+The first family-specific package contract now also has a dedicated doc:
+`docs/PSION_ARCHITECTURE_REASONING_BENCHMARK.md` freezes the typed
+architecture item coverage and direct acceptance binding for
+`psion_architecture_reasoning_benchmark_v1`.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_benchmark_packages.rs` owns the shared

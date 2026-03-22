@@ -284,7 +284,7 @@
         "phase": "pilot",
         "family": "architecture_reasoning",
         "benchmark_artifact_id": "psion_architecture_reasoning_benchmark_v1",
-        "benchmark_artifact_digest": "sha256:psion_architecture_reasoning_benchmark_v1",
+        "benchmark_artifact_digest": "703142f680a8a2702700fcdd18309b24d6e7889e07c4621e287178c9ac6af674",
         "metrics": [
           {
             "metric_kind": "pass_rate_bps",

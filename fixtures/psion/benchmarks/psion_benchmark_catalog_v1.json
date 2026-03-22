@@ -30,7 +30,16 @@
         },
         "cases": [
           {
-            "case_id": "arch-case-1"
+            "case_id": "arch-case-constraint"
+          },
+          {
+            "case_id": "arch-case-bottleneck"
+          },
+          {
+            "case_id": "arch-case-scheduling"
+          },
+          {
+            "case_id": "arch-case-tradeoff"
           }
         ]
       },
@@ -82,7 +91,7 @@
       },
       "items": [
         {
-          "item_id": "arch-case-1",
+          "item_id": "arch-case-constraint",
           "family": "architecture_reasoning",
           "prompt_format_id": "bounded_explanation_v1",
           "grader_id": "rubric_reasoning_v1",
@@ -93,13 +102,77 @@
           "task": {
             "task_kind": "architecture_reasoning",
             "target_architecture": "bounded_three_stage_pipeline",
-            "expected_focus": "memory hierarchy tradeoff"
+            "workload_ref": "workload://psion/ingest/cache-sensitive",
+            "probe_kind": "dominant_constraint",
+            "dominant_constraint": "memory bandwidth",
+            "explicit_assumptions_required": true,
+            "expected_focus": "dominant resource constraint"
           },
-          "detail": "Architecture benchmark item checks bounded system reasoning."
+          "detail": "Architecture constraint item requires explicit assumptions about the bounded ingest workload before naming the dominant constraint."
+        },
+        {
+          "item_id": "arch-case-bottleneck",
+          "family": "architecture_reasoning",
+          "prompt_format_id": "bounded_explanation_v1",
+          "grader_id": "rubric_reasoning_v1",
+          "prompt_digest": "arch-prompt-digest-2",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1"
+          ],
+          "task": {
+            "task_kind": "architecture_reasoning",
+            "target_architecture": "bounded_three_stage_pipeline",
+            "workload_ref": "workload://psion/ingest/high-fanout",
+            "probe_kind": "bottleneck",
+            "dominant_constraint": "queueing pressure",
+            "explicit_assumptions_required": true,
+            "expected_focus": "steady-state bottleneck"
+          },
+          "detail": "Architecture bottleneck item requires the answer to surface the limiting stage under the stated assumptions instead of generic optimization advice."
+        },
+        {
+          "item_id": "arch-case-scheduling",
+          "family": "architecture_reasoning",
+          "prompt_format_id": "bounded_explanation_v1",
+          "grader_id": "rubric_reasoning_v1",
+          "prompt_digest": "arch-prompt-digest-3",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1"
+          ],
+          "task": {
+            "task_kind": "architecture_reasoning",
+            "target_architecture": "bounded_three_stage_pipeline",
+            "workload_ref": "workload://psion/ingest/bursty-latency",
+            "probe_kind": "scheduling_behavior",
+            "dominant_constraint": "tail-latency budget",
+            "explicit_assumptions_required": true,
+            "expected_focus": "scheduler behavior under burst load"
+          },
+          "detail": "Architecture scheduling item checks whether the answer reasons about bounded scheduling behavior rather than only naming hardware resources."
+        },
+        {
+          "item_id": "arch-case-tradeoff",
+          "family": "architecture_reasoning",
+          "prompt_format_id": "bounded_explanation_v1",
+          "grader_id": "rubric_reasoning_v1",
+          "prompt_digest": "arch-prompt-digest-4",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1"
+          ],
+          "task": {
+            "task_kind": "architecture_reasoning",
+            "target_architecture": "bounded_three_stage_pipeline",
+            "workload_ref": "workload://psion/ingest/cost-capped",
+            "probe_kind": "tradeoff_analysis",
+            "dominant_constraint": "cost ceiling",
+            "explicit_assumptions_required": true,
+            "expected_focus": "throughput versus resilience tradeoff"
+          },
+          "detail": "Architecture tradeoff item checks whether the answer keeps the stated assumptions explicit while reasoning about bounded tradeoffs."
         }
       ],
-      "summary": "Architecture reasoning benchmark package uses the shared prompt, item, and rubric-grader contracts.",
-      "package_digest": "0aa2a13d57576c0c0c0bfb2644140224ffad1e75901770ef17a23c6684e147ad"
+      "summary": "Architecture reasoning benchmark package uses typed items that explicitly cover dominant constraints, bottlenecks, scheduling behavior, and tradeoff analysis under stated assumptions.",
+      "package_digest": "703142f680a8a2702700fcdd18309b24d6e7889e07c4621e287178c9ac6af674"
     },
     {
       "schema_version": "psion.benchmark_package_contract.v1",
@@ -580,5 +653,5 @@
     }
   ],
   "summary": "Canonical catalog proving the main Psion benchmark families can all build on one shared prompt, item, grader, contamination-input, and receipt contract.",
-  "catalog_digest": "9c7d3e9530cd1ba4becb2cdbfa52b7c659f8c70314a47129559d7c221996a5e5"
+  "catalog_digest": "02b2be8b7ce308d87c084d37f7a62ab3a80d5037dbdd53bbd732093403915723"
 }

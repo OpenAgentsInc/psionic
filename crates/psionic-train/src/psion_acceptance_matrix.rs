@@ -146,6 +146,12 @@ pub struct PsionMetricThresholdBand {
 pub struct PsionBenchmarkRequirement {
     /// Benchmark family under gate review.
     pub family: PsionBenchmarkFamily,
+    /// Bound benchmark artifact id when the phase must target one concrete package.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub benchmark_artifact_id: Option<String>,
+    /// Bound benchmark artifact digest when the phase must target one concrete package.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub benchmark_artifact_digest: Option<String>,
     /// Threshold bands that must all be satisfied.
     pub threshold_bands: Vec<PsionMetricThresholdBand>,
     /// Short explanation of why the family is required.
@@ -430,6 +436,47 @@ impl PsionAcceptanceMatrix {
             )
             .as_str(),
         )?;
+        match (
+            requirement.benchmark_artifact_id.as_deref(),
+            requirement.benchmark_artifact_digest.as_deref(),
+        ) {
+            (Some(artifact_id), Some(artifact_digest)) => {
+                ensure_nonempty(
+                    artifact_id,
+                    format!(
+                        "phase_gates.{:?}.benchmark_requirements.{:?}.benchmark_artifact_id",
+                        phase, requirement.family
+                    )
+                    .as_str(),
+                )?;
+                ensure_nonempty(
+                    artifact_digest,
+                    format!(
+                        "phase_gates.{:?}.benchmark_requirements.{:?}.benchmark_artifact_digest",
+                        phase, requirement.family
+                    )
+                    .as_str(),
+                )?;
+            }
+            (None, None) => {
+                if requirement.family == PsionBenchmarkFamily::ArchitectureReasoning {
+                    return Err(PsionAcceptanceMatrixError::MissingField {
+                        field: format!(
+                            "phase_gates.{:?}.benchmark_requirements.{:?}.benchmark_artifact_id",
+                            phase, requirement.family
+                        ),
+                    });
+                }
+            }
+            _ => {
+                return Err(PsionAcceptanceMatrixError::MissingField {
+                    field: format!(
+                        "phase_gates.{:?}.benchmark_requirements.{:?}.benchmark_artifact_binding",
+                        phase, requirement.family
+                    ),
+                });
+            }
+        }
         if requirement.threshold_bands.is_empty() {
             return Err(PsionAcceptanceMatrixError::MissingField {
                 field: format!(
@@ -1457,6 +1504,24 @@ pub enum PsionAcceptanceMatrixError {
         /// Missing benchmark family.
         family: PsionBenchmarkFamily,
     },
+    /// One benchmark receipt referenced the wrong concrete artifact for the gate.
+    #[error(
+        "Psion phase `{phase:?}` benchmark family `{family:?}` expected artifact `{expected_id}` `{expected_digest}`, found `{actual_id}` `{actual_digest}`"
+    )]
+    BenchmarkArtifactMismatch {
+        /// Phase under review.
+        phase: PsionPhaseGate,
+        /// Benchmark family.
+        family: PsionBenchmarkFamily,
+        /// Expected artifact id.
+        expected_id: String,
+        /// Expected artifact digest.
+        expected_digest: String,
+        /// Actual artifact id.
+        actual_id: String,
+        /// Actual artifact digest.
+        actual_digest: String,
+    },
     /// The decision repeated a benchmark family.
     #[error("Psion phase `{phase:?}` decision repeated benchmark receipt `{family:?}`")]
     DuplicateBenchmarkReceipt {
@@ -1638,6 +1703,23 @@ fn benchmark_requirement_satisfied(
     requirement: &PsionBenchmarkRequirement,
     receipt: &PsionBenchmarkEvidenceReceipt,
 ) -> Result<bool, PsionAcceptanceMatrixError> {
+    if let (Some(expected_id), Some(expected_digest)) = (
+        requirement.benchmark_artifact_id.as_deref(),
+        requirement.benchmark_artifact_digest.as_deref(),
+    ) {
+        if receipt.benchmark_artifact_id != expected_id
+            || receipt.benchmark_artifact_digest != expected_digest
+        {
+            return Err(PsionAcceptanceMatrixError::BenchmarkArtifactMismatch {
+                phase,
+                family: requirement.family,
+                expected_id: expected_id.to_string(),
+                expected_digest: expected_digest.to_string(),
+                actual_id: receipt.benchmark_artifact_id.clone(),
+                actual_digest: receipt.benchmark_artifact_digest.clone(),
+            });
+        }
+    }
     for band in &requirement.threshold_bands {
         let metric = receipt.metric(band.metric_kind).ok_or(
             PsionAcceptanceMatrixError::MissingObservedMetric {
