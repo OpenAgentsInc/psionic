@@ -38,5 +38,9 @@ catalog shell and the new starter-runtime substrate.
 
 ## Next Frontier
 
-The next starter-plugin runtime frontier is `TAS-219`:
-`plugin.html.extract_readable`.
+`TAS-219` is now also closed by the dedicated
+`plugin.html.extract_readable` runtime bundle in
+`fixtures/tassadar/runs/tassadar_post_article_plugin_html_extract_readable_v1/tassadar_post_article_plugin_html_extract_readable_bundle.json`.
+
+The next starter-plugin runtime frontier is `TAS-220`:
+`plugin.feed.rss_atom_parse`.

@@ -1358,7 +1358,16 @@ plus the checker
 `scripts/check-tassadar-post-article-plugin-http-fetch-text.sh`.
 That closes one allowlist-bound text-fetch path without widening the boundary
 to browser execution, JavaScript, cookies, auth sessions, or unrestricted web
-access, and moves the next open bridge frontier to `TAS-219`.
+access, and `TAS-219` now adds one local deterministic
+`plugin.html.extract_readable` runtime in the same starter-runtime module, with
+committed evidence at
+`fixtures/tassadar/runs/tassadar_post_article_plugin_html_extract_readable_v1/tassadar_post_article_plugin_html_extract_readable_bundle.json`
+plus the checker
+`scripts/check-tassadar-post-article-plugin-html-extract-readable.sh`.
+That closes one bounded readability extractor plus one green fetch-to-extract
+composition case without widening the boundary to browser rendering,
+JavaScript, CSS layout truth, or DOM-event semantics, and moves the next open
+bridge frontier to `TAS-220`.
 
 ## Route Requirement
 

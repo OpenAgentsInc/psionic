@@ -106,9 +106,60 @@ Negative claims stay explicit:
 - no arbitrary header surface
 - no unrestricted web access
 
+### `plugin.html.extract_readable`
+
+- runtime bundle:
+  `fixtures/tassadar/runs/tassadar_post_article_plugin_html_extract_readable_v1/tassadar_post_article_plugin_html_extract_readable_bundle.json`
+- example writer:
+  `cargo run -p psionic-runtime --example tassadar_post_article_plugin_html_extract_readable_bundle`
+- checker:
+  `scripts/check-tassadar-post-article-plugin-html-extract-readable.sh`
+
+`plugin.html.extract_readable` is now a real local deterministic starter
+plugin. It accepts already-fetched HTML-shaped input:
+
+- `source_url`
+- `content_type`
+- `body_text`
+
+and returns bounded readability-oriented output:
+
+- `title`
+- `canonical_url`
+- `site_name`
+- `excerpt`
+- `readable_text`
+- `harvested_links`
+- `content_language`
+
+The committed bundle also freezes one green composition case where
+`plugin.http.fetch_text` output feeds this plugin without hidden host schema
+repair.
+
+Typed refusal surface:
+
+- `plugin.refusal.schema_invalid.v1`
+- `plugin.refusal.unsupported_codec.v1`
+- `plugin.refusal.input_too_large.v1`
+- `plugin.refusal.content_type_unsupported.v1`
+
+Tool projection is explicit and stable:
+
+- tool name: `plugin_html_extract_readable`
+- argument schema remains JSON-schema-shaped and packet-derived
+- replay class remains `deterministic_replayable`
+- mount envelope remains
+  `mount.plugin.html.extract_readable.no_capabilities.v1`
+
+Negative claims stay explicit:
+
+- no browser rendering
+- no JavaScript evaluation
+- no CSS layout truth
+- no full DOM-semantics claim
+
 ## Planned
 
-- `plugin.html.extract_readable`
 - `plugin.feed.rss_atom_parse`
 - shared plugin-to-tool projection across deterministic, router-owned, and Apple
   FM controller lanes

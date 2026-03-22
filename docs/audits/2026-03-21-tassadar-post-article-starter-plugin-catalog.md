@@ -67,6 +67,11 @@ and its committed bundle at
 implementation in the same starter-runtime module and its committed bundle at
 `fixtures/tassadar/runs/tassadar_post_article_plugin_http_fetch_text_v1/tassadar_post_article_plugin_http_fetch_text_bundle.json`.
 
-The next open starter-plugin frontier is `TAS-219`, which continues the
+`TAS-219` is now also closed by the dedicated
+`plugin.html.extract_readable` runtime implementation in the same
+starter-runtime module and its committed bundle at
+`fixtures/tassadar/runs/tassadar_post_article_plugin_html_extract_readable_v1/tassadar_post_article_plugin_html_extract_readable_bundle.json`.
+
+The next open starter-plugin frontier is `TAS-220`, which continues the
 plugin-by-plugin runtime wave on top of this catalog shell with
-`plugin.html.extract_readable`.
+`plugin.feed.rss_atom_parse`.

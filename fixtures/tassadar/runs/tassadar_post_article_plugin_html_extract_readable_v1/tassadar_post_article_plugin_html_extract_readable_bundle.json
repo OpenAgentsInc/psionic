@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.post_article.plugin_html_extract_readable.runtime_bundle.v1",
+  "plugin_id": "plugin.html.extract_readable",
+  "plugin_version": "v1",
+  "manifest_id": "manifest.plugin.html.extract_readable.v1",
+  "artifact_id": "artifact.plugin.html.extract_readable.v1",
+  "packet_abi_version": "packet.v1",
+  "mount_envelope_id": "mount.plugin.html.extract_readable.no_capabilities.v1",
+  "tool_projection": {
+    "plugin_id": "plugin.html.extract_readable",
+    "tool_name": "plugin_html_extract_readable",
+    "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+    "arguments_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "body_text": {
+          "type": "string"
+        },
+        "content_type": {
+          "type": "string"
+        },
+        "source_url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_url",
+        "content_type",
+        "body_text"
+      ],
+      "type": "object"
+    },
+    "result_schema_id": "plugin.html.extract_readable.output.v1",
+    "refusal_schema_ids": [
+      "plugin.refusal.schema_invalid.v1",
+      "plugin.refusal.unsupported_codec.v1",
+      "plugin.refusal.input_too_large.v1",
+      "plugin.refusal.content_type_unsupported.v1"
+    ],
+    "replay_class_id": "deterministic_replayable"
+  },
+  "negative_claim_ids": [
+    "browser_rendering_not_claimed",
+    "javascript_evaluation_not_claimed",
+    "css_layout_truth_not_claimed",
+    "full_dom_semantics_not_claimed"
+  ],
+  "case_rows": [
+    {
+      "case_id": "extract_readable_success",
+      "status": "exact_success",
+      "codec_id": "json",
+      "request_packet_digest": "920dfaabb3486bd189b9de694a8b987f797ca55db15933961f2fd104ee5145a5",
+      "response_or_refusal_schema_id": "plugin.html.extract_readable.output.v1",
+      "response_or_refusal_digest": "ad2b28a39497279e543196a379445d0255330322119f985a7a70ebbdd603ca44",
+      "receipt": {
+        "receipt_id": "receipt.plugin.html.extract_readable.920dfaabb3486bd1.v1",
+        "plugin_id": "plugin.html.extract_readable",
+        "plugin_version": "v1",
+        "tool_name": "plugin_html_extract_readable",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.html.extract_readable.no_capabilities.v1",
+        "capability_namespace_ids": [],
+        "replay_class_id": "deterministic_replayable",
+        "status": "success",
+        "input_schema_id": "plugin.html.extract_readable.input.v1",
+        "input_packet_digest": "920dfaabb3486bd189b9de694a8b987f797ca55db15933961f2fd104ee5145a5",
+        "output_or_refusal_schema_id": "plugin.html.extract_readable.output.v1",
+        "output_or_refusal_digest": "ad2b28a39497279e543196a379445d0255330322119f985a7a70ebbdd603ca44",
+        "detail": "extract-readable keeps bounded readability rules explicit and local instead of hiding them in host glue or browser state.",
+        "receipt_digest": "3c654cb050cf91035bf359eea8d51e1a0bb4b14b3c21b8fdc80c33f6fafddbd6"
+      },
+      "detail": "deterministic readability extraction returns metadata, readable text, and harvested links from fetched HTML."
+    },
+    {
+      "case_id": "extract_readable_malformed_but_recoverable_success",
+      "status": "exact_success",
+      "codec_id": "json",
+      "request_packet_digest": "5b9550b1713fa33ea78f74244450193c9c258b2d8529157816ade5f62840bca0",
+      "response_or_refusal_schema_id": "plugin.html.extract_readable.output.v1",
+      "response_or_refusal_digest": "ed037dbb49e804861117a58a862b6d48f2d0171be035543012a6c1c53f1293fe",
+      "receipt": {
+        "receipt_id": "receipt.plugin.html.extract_readable.5b9550b1713fa33e.v1",
+        "plugin_id": "plugin.html.extract_readable",
+        "plugin_version": "v1",
+        "tool_name": "plugin_html_extract_readable",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.html.extract_readable.no_capabilities.v1",
+        "capability_namespace_ids": [],
+        "replay_class_id": "deterministic_replayable",
+        "status": "success",
+        "input_schema_id": "plugin.html.extract_readable.input.v1",
+        "input_packet_digest": "5b9550b1713fa33ea78f74244450193c9c258b2d8529157816ade5f62840bca0",
+        "output_or_refusal_schema_id": "plugin.html.extract_readable.output.v1",
+        "output_or_refusal_digest": "ed037dbb49e804861117a58a862b6d48f2d0171be035543012a6c1c53f1293fe",
+        "detail": "extract-readable keeps bounded readability rules explicit and local instead of hiding them in host glue or browser state.",
+        "receipt_digest": "80bbba1677e3220b5ca20651b729c276000231e99db4bb9b16cc0098cd29fbd7"
+      },
+      "detail": "malformed-but-recoverable HTML still resolves under the bounded parser rules without browser semantics."
+    },
+    {
+      "case_id": "schema_invalid_missing_body_text",
+      "status": "typed_malformed_packet",
+      "codec_id": "json",
+      "request_packet_digest": "89705209a056145c5b4e8c02594f7b94faab6f569b61b153a6c4d18b2c5a43c7",
+      "response_or_refusal_schema_id": "plugin.refusal.schema_invalid.v1",
+      "response_or_refusal_digest": "35024aa8fffc01d1d82fadf50d344e82362180e78d0c867124c887aa89dbb459",
+      "receipt": {
+        "receipt_id": "receipt.plugin.html.extract_readable.89705209a056145c.v1",
+        "plugin_id": "plugin.html.extract_readable",
+        "plugin_version": "v1",
+        "tool_name": "plugin_html_extract_readable",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.html.extract_readable.no_capabilities.v1",
+        "capability_namespace_ids": [],
+        "replay_class_id": "deterministic_replayable",
+        "status": "refusal",
+        "input_schema_id": "plugin.html.extract_readable.input.v1",
+        "input_packet_digest": "89705209a056145c5b4e8c02594f7b94faab6f569b61b153a6c4d18b2c5a43c7",
+        "output_or_refusal_schema_id": "plugin.refusal.schema_invalid.v1",
+        "output_or_refusal_digest": "35024aa8fffc01d1d82fadf50d344e82362180e78d0c867124c887aa89dbb459",
+        "refusal_class_id": "schema_invalid",
+        "detail": "extract-readable refuses malformed packets without host-side schema repair.",
+        "receipt_digest": "5a73e5010b4e9bdd09aead16171baac7809fbaffd02efd4a1ee3784a30c28a2d"
+      },
+      "detail": "missing `body_text` fails closed into a typed schema-invalid refusal."
+    },
+    {
+      "case_id": "content_type_unsupported_refusal",
+      "status": "typed_refusal",
+      "codec_id": "json",
+      "request_packet_digest": "f6496e742ffbe5aa4d9a954d89b5a33c06c7d32003a21adf6b1b4c5e7ff20e5b",
+      "response_or_refusal_schema_id": "plugin.refusal.content_type_unsupported.v1",
+      "response_or_refusal_digest": "d3a953206753b7a08aa9b0e886080107f7cb340b6d98588615aea1829980bad8",
+      "receipt": {
+        "receipt_id": "receipt.plugin.html.extract_readable.f6496e742ffbe5aa.v1",
+        "plugin_id": "plugin.html.extract_readable",
+        "plugin_version": "v1",
+        "tool_name": "plugin_html_extract_readable",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.html.extract_readable.no_capabilities.v1",
+        "capability_namespace_ids": [],
+        "replay_class_id": "deterministic_replayable",
+        "status": "refusal",
+        "input_schema_id": "plugin.html.extract_readable.input.v1",
+        "input_packet_digest": "f6496e742ffbe5aa4d9a954d89b5a33c06c7d32003a21adf6b1b4c5e7ff20e5b",
+        "output_or_refusal_schema_id": "plugin.refusal.content_type_unsupported.v1",
+        "output_or_refusal_digest": "d3a953206753b7a08aa9b0e886080107f7cb340b6d98588615aea1829980bad8",
+        "refusal_class_id": "content_type_unsupported",
+        "detail": "extract-readable stays bounded to html and xhtml input content types.",
+        "receipt_digest": "489c7d79f825a3a56669676ec9376dc087e50e66db97d3fd609fd95e81fded57"
+      },
+      "detail": "non-html content types remain outside the bounded readability window."
+    },
+    {
+      "case_id": "input_too_large_refusal",
+      "status": "typed_refusal",
+      "codec_id": "json",
+      "request_packet_digest": "a8365712e26f18726cc15ae41348fb23778291ef4590f24083fd84e09bf897c0",
+      "response_or_refusal_schema_id": "plugin.refusal.input_too_large.v1",
+      "response_or_refusal_digest": "8dc054025b04fc3122da7245cd752752a46f14069669950ccf5c3170d0efb502",
+      "receipt": {
+        "receipt_id": "receipt.plugin.html.extract_readable.a8365712e26f1872.v1",
+        "plugin_id": "plugin.html.extract_readable",
+        "plugin_version": "v1",
+        "tool_name": "plugin_html_extract_readable",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.html.extract_readable.no_capabilities.v1",
+        "capability_namespace_ids": [],
+        "replay_class_id": "deterministic_replayable",
+        "status": "refusal",
+        "input_schema_id": "plugin.html.extract_readable.input.v1",
+        "input_packet_digest": "a8365712e26f18726cc15ae41348fb23778291ef4590f24083fd84e09bf897c0",
+        "output_or_refusal_schema_id": "plugin.refusal.input_too_large.v1",
+        "output_or_refusal_digest": "8dc054025b04fc3122da7245cd752752a46f14069669950ccf5c3170d0efb502",
+        "refusal_class_id": "input_too_large",
+        "detail": "extract-readable keeps input size ceilings explicit instead of relying on parser allocation behavior.",
+        "receipt_digest": "82f235ecd54c91be43871cadf1fed025c6aa07cd8bbd97414621b0e7f190d5bf"
+      },
+      "detail": "input ceilings remain explicit instead of letting parser recovery define semantics."
+    }
+  ],
+  "composition_case": {
+    "case_id": "fetch_then_extract_readable",
+    "step_plugin_ids": [
+      "plugin.http.fetch_text",
+      "plugin.html.extract_readable"
+    ],
+    "step_receipt_ids": [
+      "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+      "receipt.plugin.html.extract_readable.920dfaabb3486bd1.v1"
+    ],
+    "schema_repair_allowed": false,
+    "hidden_host_extraction_allowed": false,
+    "green": true,
+    "detail": "the fetch-text response binds directly into extract-readable input fields without hidden host schema repair or host-side readability glue."
+  },
+  "claim_boundary": "this runtime bundle closes one local deterministic readability extractor over already-fetched HTML. It does not claim browser rendering, JavaScript evaluation, CSS layout truth, or full DOM semantics.",
+  "summary": "extract-readable runtime bundle covers 5 cases plus one green fetch-to-extract composition harness.",
+  "bundle_digest": "f39f6e86cb2f69f41c0491aca5810d3552e04b76c6dabe0823b2bcb91a1f78ae"
+}

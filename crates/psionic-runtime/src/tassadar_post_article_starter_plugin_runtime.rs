@@ -23,6 +23,10 @@ pub const TASSADAR_POST_ARTICLE_PLUGIN_HTTP_FETCH_TEXT_RUNTIME_BUNDLE_REF: &str 
     "fixtures/tassadar/runs/tassadar_post_article_plugin_http_fetch_text_v1/tassadar_post_article_plugin_http_fetch_text_bundle.json";
 pub const TASSADAR_POST_ARTICLE_PLUGIN_HTTP_FETCH_TEXT_RUN_ROOT_REF: &str =
     "fixtures/tassadar/runs/tassadar_post_article_plugin_http_fetch_text_v1";
+pub const TASSADAR_POST_ARTICLE_PLUGIN_HTML_EXTRACT_READABLE_RUNTIME_BUNDLE_REF: &str =
+    "fixtures/tassadar/runs/tassadar_post_article_plugin_html_extract_readable_v1/tassadar_post_article_plugin_html_extract_readable_bundle.json";
+pub const TASSADAR_POST_ARTICLE_PLUGIN_HTML_EXTRACT_READABLE_RUN_ROOT_REF: &str =
+    "fixtures/tassadar/runs/tassadar_post_article_plugin_html_extract_readable_v1";
 
 pub const STARTER_PLUGIN_VERSION: &str = "v1";
 pub const STARTER_PLUGIN_TEXT_URL_EXTRACT_ID: &str = "plugin.text.url_extract";
@@ -42,6 +46,13 @@ pub const STARTER_PLUGIN_HTTP_FETCH_TEXT_INPUT_SCHEMA_ID: &str =
     "plugin.http.fetch_text.input.v1";
 pub const STARTER_PLUGIN_HTTP_FETCH_TEXT_OUTPUT_SCHEMA_ID: &str =
     "plugin.http.fetch_text.output.v1";
+pub const STARTER_PLUGIN_HTML_EXTRACT_READABLE_ID: &str = "plugin.html.extract_readable";
+pub const STARTER_PLUGIN_HTML_EXTRACT_READABLE_TOOL_NAME: &str =
+    "plugin_html_extract_readable";
+pub const STARTER_PLUGIN_HTML_EXTRACT_READABLE_INPUT_SCHEMA_ID: &str =
+    "plugin.html.extract_readable.input.v1";
+pub const STARTER_PLUGIN_HTML_EXTRACT_READABLE_OUTPUT_SCHEMA_ID: &str =
+    "plugin.html.extract_readable.output.v1";
 pub const STARTER_PLUGIN_REFUSAL_NETWORK_DENIED_ID: &str = "plugin.refusal.network_denied.v1";
 pub const STARTER_PLUGIN_REFUSAL_URL_NOT_PERMITTED_ID: &str =
     "plugin.refusal.url_not_permitted.v1";
@@ -54,6 +65,8 @@ pub const STARTER_PLUGIN_REFUSAL_DECODE_FAILED_ID: &str =
     "plugin.refusal.decode_failed.v1";
 pub const STARTER_PLUGIN_REFUSAL_UPSTREAM_FAILURE_ID: &str =
     "plugin.refusal.upstream_failure.v1";
+pub const STARTER_PLUGIN_REFUSAL_INPUT_TOO_LARGE_ID: &str =
+    "plugin.refusal.input_too_large.v1";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -277,6 +290,103 @@ pub struct FetchTextRuntimeBundle {
     pub supported_replay_class_ids: Vec<String>,
     pub negative_claim_ids: Vec<String>,
     pub case_rows: Vec<FetchTextRuntimeCase>,
+    pub claim_boundary: String,
+    pub summary: String,
+    pub bundle_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtractReadableRequest {
+    pub source_url: String,
+    pub content_type: String,
+    pub body_text: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtractReadableResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canonical_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub site_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub excerpt: Option<String>,
+    pub readable_text: String,
+    pub harvested_links: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_language: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtractReadableConfig {
+    pub input_size_limit_bytes: usize,
+    pub max_links: usize,
+}
+
+impl Default for ExtractReadableConfig {
+    fn default() -> Self {
+        Self {
+            input_size_limit_bytes: 64 * 1024,
+            max_links: 128,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtractReadableInvocationOutcome {
+    pub receipt: StarterPluginInvocationReceipt,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response: Option<ExtractReadableResponse>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refusal: Option<StarterPluginRefusal>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtractReadableRuntimeCaseStatus {
+    ExactSuccess,
+    TypedMalformedPacket,
+    TypedRefusal,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtractReadableRuntimeCase {
+    pub case_id: String,
+    pub status: ExtractReadableRuntimeCaseStatus,
+    pub codec_id: String,
+    pub request_packet_digest: String,
+    pub response_or_refusal_schema_id: String,
+    pub response_or_refusal_digest: String,
+    pub receipt: StarterPluginInvocationReceipt,
+    pub detail: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtractReadableCompositionCase {
+    pub case_id: String,
+    pub step_plugin_ids: Vec<String>,
+    pub step_receipt_ids: Vec<String>,
+    pub schema_repair_allowed: bool,
+    pub hidden_host_extraction_allowed: bool,
+    pub green: bool,
+    pub detail: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtractReadableRuntimeBundle {
+    pub schema_version: u16,
+    pub bundle_id: String,
+    pub plugin_id: String,
+    pub plugin_version: String,
+    pub manifest_id: String,
+    pub artifact_id: String,
+    pub packet_abi_version: String,
+    pub mount_envelope_id: String,
+    pub tool_projection: StarterPluginToolProjection,
+    pub negative_claim_ids: Vec<String>,
+    pub case_rows: Vec<ExtractReadableRuntimeCase>,
+    pub composition_case: ExtractReadableCompositionCase,
     pub claim_boundary: String,
     pub summary: String,
     pub bundle_digest: String,
@@ -1003,6 +1113,347 @@ pub fn load_fetch_text_runtime_bundle(
     read_json(path)
 }
 
+#[must_use]
+pub fn extract_readable_tool_projection() -> StarterPluginToolProjection {
+    StarterPluginToolProjection {
+        plugin_id: String::from(STARTER_PLUGIN_HTML_EXTRACT_READABLE_ID),
+        tool_name: String::from(STARTER_PLUGIN_HTML_EXTRACT_READABLE_TOOL_NAME),
+        description: String::from(
+            "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+        ),
+        arguments_schema: json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source_url", "content_type", "body_text"],
+            "properties": {
+                "source_url": { "type": "string" },
+                "content_type": { "type": "string" },
+                "body_text": { "type": "string" }
+            }
+        }),
+        result_schema_id: String::from(STARTER_PLUGIN_HTML_EXTRACT_READABLE_OUTPUT_SCHEMA_ID),
+        refusal_schema_ids: vec![
+            String::from(STARTER_PLUGIN_REFUSAL_SCHEMA_INVALID_ID),
+            String::from(STARTER_PLUGIN_REFUSAL_UNSUPPORTED_CODEC_ID),
+            String::from(STARTER_PLUGIN_REFUSAL_INPUT_TOO_LARGE_ID),
+            String::from(STARTER_PLUGIN_REFUSAL_CONTENT_TYPE_UNSUPPORTED_ID),
+        ],
+        replay_class_id: String::from("deterministic_replayable"),
+    }
+}
+
+#[must_use]
+pub fn invoke_extract_readable_json_packet(
+    codec_id: &str,
+    packet_bytes: &[u8],
+    config: &ExtractReadableConfig,
+) -> ExtractReadableInvocationOutcome {
+    let input_packet_digest = sha256_digest(packet_bytes);
+    if codec_id != "json" {
+        return extract_readable_refusal_outcome(
+            &input_packet_digest,
+            STARTER_PLUGIN_REFUSAL_UNSUPPORTED_CODEC_ID,
+            "unsupported_codec",
+            "extract-readable accepts only json packet input under packet.v1.",
+        );
+    }
+    if packet_bytes.len() > config.input_size_limit_bytes {
+        return extract_readable_refusal_outcome(
+            &input_packet_digest,
+            STARTER_PLUGIN_REFUSAL_INPUT_TOO_LARGE_ID,
+            "input_too_large",
+            "extract-readable keeps input size ceilings explicit instead of relying on parser allocation behavior.",
+        );
+    }
+    let request = match serde_json::from_slice::<ExtractReadableRequest>(packet_bytes) {
+        Ok(request) => request,
+        Err(_) => {
+            return extract_readable_refusal_outcome(
+                &input_packet_digest,
+                STARTER_PLUGIN_REFUSAL_SCHEMA_INVALID_ID,
+                "schema_invalid",
+                "extract-readable refuses malformed packets without host-side schema repair.",
+            );
+        }
+    };
+    let source_url = match Url::parse(&request.source_url) {
+        Ok(url) => url,
+        Err(_) => {
+            return extract_readable_refusal_outcome(
+                &input_packet_digest,
+                STARTER_PLUGIN_REFUSAL_SCHEMA_INVALID_ID,
+                "schema_invalid",
+                "extract-readable requires one absolute `source_url` for canonical-link and link-resolution rules.",
+            );
+        }
+    };
+    let (content_type, _) = parse_content_type(&request.content_type);
+    if content_type != "text/html" && content_type != "application/xhtml+xml" {
+        return extract_readable_refusal_outcome(
+            &input_packet_digest,
+            STARTER_PLUGIN_REFUSAL_CONTENT_TYPE_UNSUPPORTED_ID,
+            "content_type_unsupported",
+            "extract-readable stays bounded to html and xhtml input content types.",
+        );
+    }
+
+    let document = scraper::Html::parse_document(&request.body_text);
+    let readable_text = readable_text_from_document(&document);
+    let title = first_text_for_selector(&document, "title")
+        .or_else(|| meta_content(&document, "property", "og:title"));
+    let canonical_url = first_attr_for_selector(&document, r#"link[rel="canonical"]"#, "href")
+        .map(|href| resolve_link(&source_url, href.as_str()));
+    let site_name = meta_content(&document, "property", "og:site_name")
+        .or_else(|| source_url.host_str().map(String::from));
+    let excerpt = meta_content(&document, "name", "description")
+        .or_else(|| excerpt_from_text(&readable_text));
+    let content_language = first_attr_for_selector(&document, "html", "lang")
+        .or_else(|| meta_content(&document, "http-equiv", "content-language"));
+    let harvested_links = harvested_links_from_document(&document, &source_url, config.max_links);
+    let response = ExtractReadableResponse {
+        title,
+        canonical_url,
+        site_name,
+        excerpt,
+        readable_text,
+        harvested_links,
+        content_language,
+    };
+    let output_or_refusal_digest = stable_json_digest(b"extract_readable_response|", &response);
+    let mut receipt = StarterPluginInvocationReceipt {
+        receipt_id: format!(
+            "receipt.{}.{}.v1",
+            STARTER_PLUGIN_HTML_EXTRACT_READABLE_ID,
+            &input_packet_digest[..16]
+        ),
+        plugin_id: String::from(STARTER_PLUGIN_HTML_EXTRACT_READABLE_ID),
+        plugin_version: String::from(STARTER_PLUGIN_VERSION),
+        tool_name: String::from(STARTER_PLUGIN_HTML_EXTRACT_READABLE_TOOL_NAME),
+        packet_abi_version: String::from(TASSADAR_POST_ARTICLE_PLUGIN_PACKET_ABI_VERSION),
+        mount_envelope_id: String::from("mount.plugin.html.extract_readable.no_capabilities.v1"),
+        capability_namespace_ids: Vec::new(),
+        replay_class_id: String::from("deterministic_replayable"),
+        status: StarterPluginInvocationStatus::Success,
+        input_schema_id: String::from(STARTER_PLUGIN_HTML_EXTRACT_READABLE_INPUT_SCHEMA_ID),
+        input_packet_digest,
+        output_or_refusal_schema_id: String::from(
+            STARTER_PLUGIN_HTML_EXTRACT_READABLE_OUTPUT_SCHEMA_ID,
+        ),
+        output_or_refusal_digest,
+        refusal_class_id: None,
+        detail: String::from(
+            "extract-readable keeps bounded readability rules explicit and local instead of hiding them in host glue or browser state.",
+        ),
+        receipt_digest: String::new(),
+    };
+    receipt.receipt_digest = stable_json_digest(b"extract_readable_receipt|", &receipt);
+    ExtractReadableInvocationOutcome {
+        receipt,
+        response: Some(response),
+        refusal: None,
+    }
+}
+
+#[must_use]
+pub fn build_extract_readable_runtime_bundle() -> ExtractReadableRuntimeBundle {
+    let article_html = "<html lang=\"en\"><head><title>Snapshot Article</title><meta name=\"description\" content=\"Bounded HTML extraction fixture.\" /><meta property=\"og:site_name\" content=\"Snapshot Example\" /><link rel=\"canonical\" href=\"/article\" /></head><body><main><h1>Snapshot Article</h1><p>Bounded starter plugin content.</p><a href=\"/alpha\">Alpha</a><a href=\"https://snapshot.example/beta\">Beta</a></main></body></html>";
+    let malformed_html =
+        "<html><head><title>Broken but readable<title></head><body><article><p>Recovered text<a href=\"/link\">Link";
+    let success_packet = serde_json::to_vec(&json!({
+        "source_url": "https://snapshot.example/article",
+        "content_type": "text/html; charset=utf-8",
+        "body_text": article_html
+    }))
+    .unwrap_or_else(|_| Vec::new());
+    let malformed_packet = serde_json::to_vec(&json!({
+        "source_url": "https://snapshot.example/article",
+        "content_type": "text/html",
+        "body_text": malformed_html
+    }))
+    .unwrap_or_else(|_| Vec::new());
+    let missing_packet = br#"{"source_url":"https://snapshot.example/article","content_type":"text/html"}"#.to_vec();
+    let wrong_type_packet = serde_json::to_vec(&json!({
+        "source_url": "https://snapshot.example/article",
+        "content_type": "application/json",
+        "body_text": "{}"
+    }))
+    .unwrap_or_else(|_| Vec::new());
+    let oversized_packet = serde_json::to_vec(&json!({
+        "source_url": "https://snapshot.example/article",
+        "content_type": "text/html",
+        "body_text": "x".repeat(64 * 1024)
+    }))
+    .unwrap_or_else(|_| Vec::new());
+
+    let success =
+        invoke_extract_readable_json_packet("json", &success_packet, &ExtractReadableConfig::default());
+    let malformed = invoke_extract_readable_json_packet(
+        "json",
+        &malformed_packet,
+        &ExtractReadableConfig::default(),
+    );
+    let schema_invalid = invoke_extract_readable_json_packet(
+        "json",
+        &missing_packet,
+        &ExtractReadableConfig::default(),
+    );
+    let wrong_type = invoke_extract_readable_json_packet(
+        "json",
+        &wrong_type_packet,
+        &ExtractReadableConfig::default(),
+    );
+    let oversized = invoke_extract_readable_json_packet(
+        "json",
+        &oversized_packet,
+        &ExtractReadableConfig {
+            input_size_limit_bytes: 1024,
+            max_links: 64,
+        },
+    );
+
+    let fetch_packet = br#"{"url":"https://snapshot.example/article"}"#;
+    let fetch_result = invoke_fetch_text_json_packet(
+        "json",
+        fetch_packet,
+        &FetchTextConfig::snapshot(sample_fetch_text_snapshot_entries()),
+    );
+
+    let case_rows = vec![
+        extract_readable_case(
+            "extract_readable_success",
+            ExtractReadableRuntimeCaseStatus::ExactSuccess,
+            "json",
+            sha256_digest(&success_packet),
+            STARTER_PLUGIN_HTML_EXTRACT_READABLE_OUTPUT_SCHEMA_ID,
+            success.receipt.output_or_refusal_digest.clone(),
+            success.receipt.clone(),
+            "deterministic readability extraction returns metadata, readable text, and harvested links from fetched HTML.",
+        ),
+        extract_readable_case(
+            "extract_readable_malformed_but_recoverable_success",
+            ExtractReadableRuntimeCaseStatus::ExactSuccess,
+            "json",
+            sha256_digest(&malformed_packet),
+            STARTER_PLUGIN_HTML_EXTRACT_READABLE_OUTPUT_SCHEMA_ID,
+            malformed.receipt.output_or_refusal_digest.clone(),
+            malformed.receipt.clone(),
+            "malformed-but-recoverable HTML still resolves under the bounded parser rules without browser semantics.",
+        ),
+        extract_readable_case(
+            "schema_invalid_missing_body_text",
+            ExtractReadableRuntimeCaseStatus::TypedMalformedPacket,
+            "json",
+            sha256_digest(&missing_packet),
+            STARTER_PLUGIN_REFUSAL_SCHEMA_INVALID_ID,
+            schema_invalid.receipt.output_or_refusal_digest.clone(),
+            schema_invalid.receipt.clone(),
+            "missing `body_text` fails closed into a typed schema-invalid refusal.",
+        ),
+        extract_readable_case(
+            "content_type_unsupported_refusal",
+            ExtractReadableRuntimeCaseStatus::TypedRefusal,
+            "json",
+            sha256_digest(&wrong_type_packet),
+            STARTER_PLUGIN_REFUSAL_CONTENT_TYPE_UNSUPPORTED_ID,
+            wrong_type.receipt.output_or_refusal_digest.clone(),
+            wrong_type.receipt.clone(),
+            "non-html content types remain outside the bounded readability window.",
+        ),
+        extract_readable_case(
+            "input_too_large_refusal",
+            ExtractReadableRuntimeCaseStatus::TypedRefusal,
+            "json",
+            sha256_digest(&oversized_packet),
+            STARTER_PLUGIN_REFUSAL_INPUT_TOO_LARGE_ID,
+            oversized.receipt.output_or_refusal_digest.clone(),
+            oversized.receipt.clone(),
+            "input ceilings remain explicit instead of letting parser recovery define semantics.",
+        ),
+    ];
+    let composition_case = ExtractReadableCompositionCase {
+        case_id: String::from("fetch_then_extract_readable"),
+        step_plugin_ids: vec![
+            String::from(STARTER_PLUGIN_HTTP_FETCH_TEXT_ID),
+            String::from(STARTER_PLUGIN_HTML_EXTRACT_READABLE_ID),
+        ],
+        step_receipt_ids: vec![
+            fetch_result.receipt.receipt_id.clone(),
+            success.receipt.receipt_id.clone(),
+        ],
+        schema_repair_allowed: false,
+        hidden_host_extraction_allowed: false,
+        green: fetch_result.response.is_some() && success.response.is_some(),
+        detail: String::from(
+            "the fetch-text response binds directly into extract-readable input fields without hidden host schema repair or host-side readability glue.",
+        ),
+    };
+
+    let mut bundle = ExtractReadableRuntimeBundle {
+        schema_version: 1,
+        bundle_id: String::from(
+            "tassadar.post_article.plugin_html_extract_readable.runtime_bundle.v1",
+        ),
+        plugin_id: String::from(STARTER_PLUGIN_HTML_EXTRACT_READABLE_ID),
+        plugin_version: String::from(STARTER_PLUGIN_VERSION),
+        manifest_id: String::from("manifest.plugin.html.extract_readable.v1"),
+        artifact_id: String::from("artifact.plugin.html.extract_readable.v1"),
+        packet_abi_version: String::from(TASSADAR_POST_ARTICLE_PLUGIN_PACKET_ABI_VERSION),
+        mount_envelope_id: String::from("mount.plugin.html.extract_readable.no_capabilities.v1"),
+        tool_projection: extract_readable_tool_projection(),
+        negative_claim_ids: vec![
+            String::from("browser_rendering_not_claimed"),
+            String::from("javascript_evaluation_not_claimed"),
+            String::from("css_layout_truth_not_claimed"),
+            String::from("full_dom_semantics_not_claimed"),
+        ],
+        case_rows,
+        composition_case,
+        claim_boundary: String::from(
+            "this runtime bundle closes one local deterministic readability extractor over already-fetched HTML. It does not claim browser rendering, JavaScript evaluation, CSS layout truth, or full DOM semantics.",
+        ),
+        summary: String::new(),
+        bundle_digest: String::new(),
+    };
+    bundle.summary = format!(
+        "extract-readable runtime bundle covers {} cases plus one green fetch-to-extract composition harness.",
+        bundle.case_rows.len(),
+    );
+    bundle.bundle_digest = stable_json_digest(b"extract_readable_runtime_bundle|", &bundle);
+    bundle
+}
+
+#[must_use]
+pub fn tassadar_post_article_plugin_html_extract_readable_runtime_bundle_path() -> PathBuf {
+    repo_root().join(TASSADAR_POST_ARTICLE_PLUGIN_HTML_EXTRACT_READABLE_RUNTIME_BUNDLE_REF)
+}
+
+pub fn write_extract_readable_runtime_bundle(
+    output_path: impl AsRef<Path>,
+) -> Result<ExtractReadableRuntimeBundle, StarterPluginRuntimeError> {
+    let output_path = output_path.as_ref();
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| StarterPluginRuntimeError::CreateDir {
+            path: parent.display().to_string(),
+            error,
+        })?;
+    }
+    let bundle = build_extract_readable_runtime_bundle();
+    let json = serde_json::to_string_pretty(&bundle)?;
+    fs::write(output_path, format!("{json}\n")).map_err(|error| {
+        StarterPluginRuntimeError::Write {
+            path: output_path.display().to_string(),
+            error,
+        }
+    })?;
+    Ok(bundle)
+}
+
+pub fn load_extract_readable_runtime_bundle(
+    path: impl AsRef<Path>,
+) -> Result<ExtractReadableRuntimeBundle, StarterPluginRuntimeError> {
+    read_json(path)
+}
+
 fn url_extract_refusal_outcome(
     input_packet_digest: &str,
     schema_id: &str,
@@ -1407,6 +1858,203 @@ fn decode_text_body(bytes: &[u8], charset: Option<&str>) -> Result<String, Strin
     }
 }
 
+fn sample_fetch_text_snapshot_entries() -> BTreeMap<String, FetchTextSnapshotResult> {
+    BTreeMap::from([
+        (
+            String::from("https://snapshot.example/article"),
+            FetchTextSnapshotResult::Success(FetchTextSnapshotResponse {
+                final_url: String::from("https://snapshot.example/article"),
+                status_code: 200,
+                content_type: String::from("text/html"),
+                charset: Some(String::from("utf-8")),
+                body_bytes: b"<html lang=\"en\"><head><title>Snapshot Article</title><meta name=\"description\" content=\"Bounded HTML extraction fixture.\" /><meta property=\"og:site_name\" content=\"Snapshot Example\" /><link rel=\"canonical\" href=\"/article\" /></head><body><main><h1>Snapshot Article</h1><p>Bounded starter plugin content.</p><a href=\"/alpha\">Alpha</a><a href=\"https://snapshot.example/beta\">Beta</a></main></body></html>".to_vec(),
+            }),
+        ),
+        (
+            String::from("https://snapshot.example/slow"),
+            FetchTextSnapshotResult::Timeout,
+        ),
+        (
+            String::from("https://snapshot.example/binary"),
+            FetchTextSnapshotResult::Success(FetchTextSnapshotResponse {
+                final_url: String::from("https://snapshot.example/binary"),
+                status_code: 200,
+                content_type: String::from("image/png"),
+                charset: None,
+                body_bytes: vec![0x89, 0x50, 0x4e, 0x47],
+            }),
+        ),
+        (
+            String::from("https://snapshot.example/large"),
+            FetchTextSnapshotResult::Success(FetchTextSnapshotResponse {
+                final_url: String::from("https://snapshot.example/large"),
+                status_code: 200,
+                content_type: String::from("text/plain"),
+                charset: Some(String::from("utf-8")),
+                body_bytes: vec![b'x'; 16 * 1024 + 8],
+            }),
+        ),
+        (
+            String::from("https://snapshot.example/bad-utf8"),
+            FetchTextSnapshotResult::Success(FetchTextSnapshotResponse {
+                final_url: String::from("https://snapshot.example/bad-utf8"),
+                status_code: 200,
+                content_type: String::from("text/plain"),
+                charset: Some(String::from("utf-8")),
+                body_bytes: vec![0xff, 0xfe, 0xfd],
+            }),
+        ),
+        (
+            String::from("https://snapshot.example/broken"),
+            FetchTextSnapshotResult::UpstreamFailure {
+                detail: String::from(
+                    "the mounted snapshot marks this URL as an upstream transport failure.",
+                ),
+            },
+        ),
+    ])
+}
+
+fn extract_readable_refusal_outcome(
+    input_packet_digest: &str,
+    schema_id: &str,
+    refusal_class_id: &str,
+    detail: impl Into<String>,
+) -> ExtractReadableInvocationOutcome {
+    let refusal = StarterPluginRefusal {
+        schema_id: String::from(schema_id),
+        refusal_class_id: String::from(refusal_class_id),
+        detail: detail.into(),
+    };
+    let output_or_refusal_digest = stable_json_digest(b"extract_readable_refusal|", &refusal);
+    let mut receipt = StarterPluginInvocationReceipt {
+        receipt_id: format!(
+            "receipt.{}.{}.v1",
+            STARTER_PLUGIN_HTML_EXTRACT_READABLE_ID,
+            &input_packet_digest[..16]
+        ),
+        plugin_id: String::from(STARTER_PLUGIN_HTML_EXTRACT_READABLE_ID),
+        plugin_version: String::from(STARTER_PLUGIN_VERSION),
+        tool_name: String::from(STARTER_PLUGIN_HTML_EXTRACT_READABLE_TOOL_NAME),
+        packet_abi_version: String::from(TASSADAR_POST_ARTICLE_PLUGIN_PACKET_ABI_VERSION),
+        mount_envelope_id: String::from("mount.plugin.html.extract_readable.no_capabilities.v1"),
+        capability_namespace_ids: Vec::new(),
+        replay_class_id: String::from("deterministic_replayable"),
+        status: StarterPluginInvocationStatus::Refusal,
+        input_schema_id: String::from(STARTER_PLUGIN_HTML_EXTRACT_READABLE_INPUT_SCHEMA_ID),
+        input_packet_digest: String::from(input_packet_digest),
+        output_or_refusal_schema_id: String::from(schema_id),
+        output_or_refusal_digest,
+        refusal_class_id: Some(String::from(refusal_class_id)),
+        detail: refusal.detail.clone(),
+        receipt_digest: String::new(),
+    };
+    receipt.receipt_digest = stable_json_digest(b"extract_readable_receipt|", &receipt);
+    ExtractReadableInvocationOutcome {
+        receipt,
+        response: None,
+        refusal: Some(refusal),
+    }
+}
+
+fn extract_readable_case(
+    case_id: &str,
+    status: ExtractReadableRuntimeCaseStatus,
+    codec_id: &str,
+    request_packet_digest: String,
+    response_or_refusal_schema_id: &str,
+    response_or_refusal_digest: String,
+    receipt: StarterPluginInvocationReceipt,
+    detail: &str,
+) -> ExtractReadableRuntimeCase {
+    ExtractReadableRuntimeCase {
+        case_id: String::from(case_id),
+        status,
+        codec_id: String::from(codec_id),
+        request_packet_digest,
+        response_or_refusal_schema_id: String::from(response_or_refusal_schema_id),
+        response_or_refusal_digest,
+        receipt,
+        detail: String::from(detail),
+    }
+}
+
+fn readable_text_from_document(document: &scraper::Html) -> String {
+    let candidate = text_for_selector(document, "article")
+        .filter(|text| !text.is_empty())
+        .or_else(|| text_for_selector(document, "main").filter(|text| !text.is_empty()))
+        .or_else(|| text_for_selector(document, "body").filter(|text| !text.is_empty()))
+        .unwrap_or_default();
+    normalize_text(&candidate)
+}
+
+fn harvested_links_from_document(
+    document: &scraper::Html,
+    base_url: &Url,
+    max_links: usize,
+) -> Vec<String> {
+    let Some(selector) = selector("a") else {
+        return Vec::new();
+    };
+    document
+        .select(&selector)
+        .filter_map(|node| node.value().attr("href"))
+        .take(max_links)
+        .map(|href| resolve_link(base_url, href))
+        .collect()
+}
+
+fn excerpt_from_text(text: &str) -> Option<String> {
+    let excerpt = text.chars().take(240).collect::<String>();
+    (!excerpt.is_empty()).then_some(excerpt)
+}
+
+fn resolve_link(base_url: &Url, href: &str) -> String {
+    match base_url.join(href) {
+        Ok(url) => url.to_string(),
+        Err(_) => String::from(href),
+    }
+}
+
+fn meta_content(document: &scraper::Html, attr_name: &str, attr_value: &str) -> Option<String> {
+    let selector = selector(&format!(r#"meta[{attr_name}="{attr_value}"]"#))?;
+    document
+        .select(&selector)
+        .find_map(|node| node.value().attr("content").map(normalize_text))
+        .filter(|value| !value.is_empty())
+}
+
+fn first_attr_for_selector(
+    document: &scraper::Html,
+    selector_text: &str,
+    attr_name: &str,
+) -> Option<String> {
+    let selector = selector(selector_text)?;
+    document
+        .select(&selector)
+        .find_map(|node| node.value().attr(attr_name).map(String::from))
+}
+
+fn first_text_for_selector(document: &scraper::Html, selector_text: &str) -> Option<String> {
+    text_for_selector(document, selector_text).filter(|value| !value.is_empty())
+}
+
+fn text_for_selector(document: &scraper::Html, selector_text: &str) -> Option<String> {
+    let selector = selector(selector_text)?;
+    document
+        .select(&selector)
+        .next()
+        .map(|node| normalize_text(&node.text().collect::<Vec<_>>().join(" ")))
+}
+
+fn selector(selector_text: &str) -> Option<scraper::Selector> {
+    scraper::Selector::parse(selector_text).ok()
+}
+
+fn normalize_text(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 fn stable_json_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
     let encoded = serde_json::to_vec(value)
         .unwrap_or_else(|error| format!("serialization_error:{error}").into_bytes());
@@ -1463,22 +2111,28 @@ fn read_json<T: for<'de> Deserialize<'de>>(
 #[cfg(test)]
 mod tests {
     use super::{
-        FetchTextConfig, FetchTextRuntimeCaseStatus, FetchTextSnapshotResponse,
-        FetchTextSnapshotResult, STARTER_PLUGIN_HTTP_FETCH_TEXT_OUTPUT_SCHEMA_ID,
+        ExtractReadableConfig, ExtractReadableRuntimeCaseStatus, FetchTextConfig,
+        FetchTextRuntimeCaseStatus, FetchTextSnapshotResponse, FetchTextSnapshotResult,
+        STARTER_PLUGIN_HTML_EXTRACT_READABLE_OUTPUT_SCHEMA_ID,
+        STARTER_PLUGIN_HTTP_FETCH_TEXT_OUTPUT_SCHEMA_ID,
         STARTER_PLUGIN_REFUSAL_CONTENT_TYPE_UNSUPPORTED_ID,
         STARTER_PLUGIN_REFUSAL_DECODE_FAILED_ID, STARTER_PLUGIN_REFUSAL_NETWORK_DENIED_ID,
+        STARTER_PLUGIN_REFUSAL_INPUT_TOO_LARGE_ID,
         STARTER_PLUGIN_REFUSAL_PACKET_TOO_LARGE_ID,
         STARTER_PLUGIN_REFUSAL_RESPONSE_TOO_LARGE_ID,
         STARTER_PLUGIN_REFUSAL_RUNTIME_RESOURCE_LIMIT_ID, STARTER_PLUGIN_REFUSAL_SCHEMA_INVALID_ID,
         STARTER_PLUGIN_REFUSAL_TIMEOUT_ID, STARTER_PLUGIN_REFUSAL_UNSUPPORTED_CODEC_ID,
         STARTER_PLUGIN_REFUSAL_UPSTREAM_FAILURE_ID, STARTER_PLUGIN_REFUSAL_URL_NOT_PERMITTED_ID,
         STARTER_PLUGIN_TEXT_URL_EXTRACT_OUTPUT_SCHEMA_ID, UrlExtractConfig,
-        UrlExtractRuntimeCaseStatus, build_fetch_text_runtime_bundle,
-        build_url_extract_runtime_bundle, invoke_fetch_text_json_packet,
+        UrlExtractRuntimeCaseStatus, build_extract_readable_runtime_bundle,
+        build_fetch_text_runtime_bundle, build_url_extract_runtime_bundle,
+        invoke_extract_readable_json_packet, invoke_fetch_text_json_packet,
         invoke_url_extract_json_packet,
+        tassadar_post_article_plugin_html_extract_readable_runtime_bundle_path,
         tassadar_post_article_plugin_http_fetch_text_runtime_bundle_path,
         tassadar_post_article_plugin_text_url_extract_runtime_bundle_path,
-        write_fetch_text_runtime_bundle, write_url_extract_runtime_bundle,
+        write_extract_readable_runtime_bundle, write_fetch_text_runtime_bundle,
+        write_url_extract_runtime_bundle,
     };
     use tempfile::tempdir;
 
@@ -1816,6 +2470,120 @@ mod tests {
         let path = tassadar_post_article_plugin_http_fetch_text_runtime_bundle_path();
         assert!(path.ends_with(
             "fixtures/tassadar/runs/tassadar_post_article_plugin_http_fetch_text_v1/tassadar_post_article_plugin_http_fetch_text_bundle.json"
+        ));
+    }
+
+    #[test]
+    fn extract_readable_success_returns_metadata_and_links() {
+        let packet = serde_json::to_vec(&serde_json::json!({
+            "source_url": "https://snapshot.example/article",
+            "content_type": "text/html",
+            "body_text": "<html lang=\"en\"><head><title>Example</title><meta name=\"description\" content=\"summary\" /><link rel=\"canonical\" href=\"/article\" /></head><body><main><h1>Example</h1><p>Readable body.</p><a href=\"/alpha\">Alpha</a></main></body></html>"
+        }))
+        .expect("packet");
+        let outcome = invoke_extract_readable_json_packet(
+            "json",
+            &packet,
+            &ExtractReadableConfig::default(),
+        );
+
+        assert_eq!(
+            outcome.receipt.output_or_refusal_schema_id,
+            STARTER_PLUGIN_HTML_EXTRACT_READABLE_OUTPUT_SCHEMA_ID
+        );
+        let response = outcome.response.expect("response");
+        assert_eq!(response.title.as_deref(), Some("Example"));
+        assert_eq!(response.canonical_url.as_deref(), Some("https://snapshot.example/article"));
+        assert_eq!(response.content_language.as_deref(), Some("en"));
+        assert_eq!(
+            response.harvested_links,
+            vec![String::from("https://snapshot.example/alpha")]
+        );
+    }
+
+    #[test]
+    fn extract_readable_refuses_schema_invalid_content_type_and_size() {
+        let schema_invalid = invoke_extract_readable_json_packet(
+            "json",
+            br#"{"source_url":"https://snapshot.example/article","content_type":"text/html"}"#,
+            &ExtractReadableConfig::default(),
+        );
+        assert_eq!(
+            schema_invalid.receipt.output_or_refusal_schema_id,
+            STARTER_PLUGIN_REFUSAL_SCHEMA_INVALID_ID
+        );
+
+        let wrong_type = invoke_extract_readable_json_packet(
+            "json",
+            br#"{"source_url":"https://snapshot.example/article","content_type":"application/json","body_text":"{}"}"#,
+            &ExtractReadableConfig::default(),
+        );
+        assert_eq!(
+            wrong_type.receipt.output_or_refusal_schema_id,
+            STARTER_PLUGIN_REFUSAL_CONTENT_TYPE_UNSUPPORTED_ID
+        );
+
+        let oversized = invoke_extract_readable_json_packet(
+            "json",
+            br#"{"source_url":"https://snapshot.example/article","content_type":"text/html","body_text":"xxxxxxxxxxxxxxxx"}"#,
+            &ExtractReadableConfig {
+                input_size_limit_bytes: 8,
+                max_links: 8,
+            },
+        );
+        assert_eq!(
+            oversized.receipt.output_or_refusal_schema_id,
+            STARTER_PLUGIN_REFUSAL_INPUT_TOO_LARGE_ID
+        );
+    }
+
+    #[test]
+    fn extract_readable_runtime_bundle_covers_declared_cases() {
+        let bundle = build_extract_readable_runtime_bundle();
+
+        assert_eq!(bundle.case_rows.len(), 5);
+        assert!(bundle
+            .case_rows
+            .iter()
+            .any(|row| row.status == ExtractReadableRuntimeCaseStatus::ExactSuccess));
+        assert!(bundle.case_rows.iter().any(|row| {
+            row.status == ExtractReadableRuntimeCaseStatus::TypedMalformedPacket
+                && row.response_or_refusal_schema_id == STARTER_PLUGIN_REFUSAL_SCHEMA_INVALID_ID
+        }));
+        assert!(bundle.case_rows.iter().any(|row| {
+            row.response_or_refusal_schema_id
+                == STARTER_PLUGIN_REFUSAL_CONTENT_TYPE_UNSUPPORTED_ID
+        }));
+        assert!(bundle.case_rows.iter().any(|row| {
+            row.response_or_refusal_schema_id == STARTER_PLUGIN_REFUSAL_INPUT_TOO_LARGE_ID
+        }));
+        assert!(bundle.composition_case.green);
+        assert_eq!(
+            bundle.composition_case.step_plugin_ids,
+            vec![
+                String::from("plugin.http.fetch_text"),
+                String::from("plugin.html.extract_readable"),
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_readable_runtime_bundle_writes_and_loads() {
+        let tempdir = tempdir().expect("tempdir");
+        let output_path = tempdir.path().join("extract_readable_bundle.json");
+        let written = write_extract_readable_runtime_bundle(&output_path).expect("write bundle");
+        let loaded: super::ExtractReadableRuntimeBundle =
+            super::load_extract_readable_runtime_bundle(&output_path).expect("load bundle");
+
+        assert_eq!(written, loaded);
+        assert!(output_path.exists());
+    }
+
+    #[test]
+    fn extract_readable_runtime_bundle_repo_path_is_under_fixtures() {
+        let path = tassadar_post_article_plugin_html_extract_readable_runtime_bundle_path();
+        assert!(path.ends_with(
+            "fixtures/tassadar/runs/tassadar_post_article_plugin_html_extract_readable_v1/tassadar_post_article_plugin_html_extract_readable_bundle.json"
         ));
     }
 }

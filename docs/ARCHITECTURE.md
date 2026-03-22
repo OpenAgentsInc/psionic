@@ -1752,7 +1752,17 @@ The current scope is:
   `docs/audits/2026-03-22-tassadar-post-article-plugin-http-fetch-text.md`,
   which freeze one allowlist-bound host-mediated HTTP fetch path with explicit
   mount-envelope policy, replay-class posture, typed refusal classes, and
-  negative claims while moving the next open bridge frontier to `TAS-219`.
+  negative claims.
+- the same starter-runtime surface now also closes one local deterministic
+  `plugin.html.extract_readable` plugin with the runtime bundle
+  `fixtures/tassadar/runs/tassadar_post_article_plugin_html_extract_readable_v1/tassadar_post_article_plugin_html_extract_readable_bundle.json`,
+  the checker
+  `scripts/check-tassadar-post-article-plugin-html-extract-readable.sh`, and
+  the audit note
+  `docs/audits/2026-03-22-tassadar-post-article-plugin-html-extract-readable.md`,
+  which freeze one bounded readability-oriented HTML extraction path plus one
+  green fetch-to-extract composition case while moving the next open bridge
+  frontier to `TAS-220`.
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and
