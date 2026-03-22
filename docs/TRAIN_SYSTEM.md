@@ -87,6 +87,10 @@ and now also has:
 - `docs/PSION_CORPUS_ADMISSION.md` is the canonical first governance doc for
   the `Psion` learned-model lane and freezes the versioned source-admission
   contract that later ingestion, tokenizer, and training work must follow.
+- `docs/PSION_SOURCE_LIFECYCLE.md` is the canonical first lifecycle and
+  downstream-lineage doc for the `Psion` learned-model lane and freezes how
+  source-state changes trigger artifact review, retraining review, and
+  depublication review.
 - `docs/audits/2026-03-13-intellect-lessons-for-psionic-train-audit.md` is
   research rationale, not the canonical current-state spec.
 - `docs/audits/2026-03-14-covenant-code-lessons-for-psionic-train-audit.md`
