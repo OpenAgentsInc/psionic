@@ -8,7 +8,8 @@
 This document freezes the shared benchmark contract for plugin-conditioned
 evaluation.
 
-It is not the package-specific content for interpretation.
+All five host-native package-specific family contracts now exist on top of this
+shared surface.
 
 It is the common contract that those package families must now share.
 
@@ -28,6 +29,10 @@ The first package-specific refusal/request-for-structure contract now also
 lives in `docs/PSION_PLUGIN_REFUSAL_REQUEST_STRUCTURE_BENCHMARK.md` and
 reuses the same shared item, receipt, and grader surfaces.
 
+The first package-specific result-interpretation contract now also lives in
+`docs/PSION_PLUGIN_RESULT_INTERPRETATION_BENCHMARK.md` and reuses the same
+shared item, receipt, and grader surfaces.
+
 ## Canonical Artifacts
 
 - `docs/PSION_PLUGIN_BENCHMARK_PACKAGES.md` is the canonical human-readable
@@ -42,6 +47,8 @@ reuses the same shared item, receipt, and grader surfaces.
 - `docs/PSION_PLUGIN_SEQUENCING_BENCHMARK.md` is the third package-specific
   child contract built on top of this shared surface.
 - `docs/PSION_PLUGIN_REFUSAL_REQUEST_STRUCTURE_BENCHMARK.md` is the fourth
+  package-specific child contract built on top of this shared surface.
+- `docs/PSION_PLUGIN_RESULT_INTERPRETATION_BENCHMARK.md` is the fifth
   package-specific child contract built on top of this shared surface.
 
 The stable schema version is
