@@ -6,17 +6,35 @@ use std::{
 };
 
 use psionic_mlx_catalog::{
-    MlxCatalogRoots, MlxMetadataTrustMode, MlxRemoteMetadataPolicy,
-    default_hugging_face_hub_root, default_ollama_models_root,
+    MlxCatalogRoots, MlxMetadataTrustMode, MlxRemoteMetadataPolicy, default_hugging_face_hub_root,
+    default_ollama_models_root,
 };
-use psionic_mlx_serve::{
-    MlxServeResponseStateStorage, MlxTextServeConfig, MlxTextServeWorkspace,
-};
+use psionic_mlx_serve::{MlxServeResponseStateStorage, MlxTextServeConfig, MlxTextServeWorkspace};
+use psionic_observe::{TokioRuntimeTelemetryConfig, build_main_runtime};
 use tokio::net::TcpListener;
 
-#[tokio::main]
-async fn main() -> ExitCode {
-    match run().await {
+#[derive(Debug)]
+enum CliError {
+    Usage(String),
+    Message(String),
+}
+
+fn main() -> ExitCode {
+    let mut args = env::args().skip(1);
+    let Some(command) = args.next() else {
+        let _ = writeln!(io::stdout(), "{}", usage());
+        return ExitCode::SUCCESS;
+    };
+    let result = match command.as_str() {
+        "plan" => run_plan(args),
+        "serve" => run_serve_main(args),
+        "-h" | "--help" => Result::<(), CliError>::Err(CliError::Usage(usage())),
+        other => Result::<(), CliError>::Err(CliError::Message(format!(
+            "unrecognized subcommand `{other}`\n\n{}",
+            usage()
+        ))),
+    };
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(CliError::Usage(message)) => {
             let _ = writeln!(io::stdout(), "{message}");
@@ -29,28 +47,6 @@ async fn main() -> ExitCode {
     }
 }
 
-#[derive(Debug)]
-enum CliError {
-    Usage(String),
-    Message(String),
-}
-
-async fn run() -> Result<(), CliError> {
-    let mut args = env::args().skip(1);
-    let Some(command) = args.next() else {
-        return Err(CliError::Usage(usage()));
-    };
-    match command.as_str() {
-        "plan" => run_plan(args),
-        "serve" => run_serve(args).await,
-        "-h" | "--help" => Err(CliError::Usage(usage())),
-        other => Err(CliError::Message(format!(
-            "unrecognized subcommand `{other}`\n\n{}",
-            usage()
-        ))),
-    }
-}
-
 fn run_plan(args: impl IntoIterator<Item = String>) -> Result<(), CliError> {
     let parsed = parse_common(args).map_err(CliError::Message)?;
     let package = parsed
@@ -60,14 +56,24 @@ fn run_plan(args: impl IntoIterator<Item = String>) -> Result<(), CliError> {
     write_json_output(package.report(), parsed.json_out).map_err(CliError::Message)
 }
 
+fn run_serve_main(args: impl IntoIterator<Item = String>) -> Result<(), CliError> {
+    let telemetry = TokioRuntimeTelemetryConfig::from_env().map_err(|error| {
+        CliError::Message(format!("failed to load Tokio telemetry config: {error}"))
+    })?;
+    let (runtime, _telemetry_guard) = build_main_runtime(&telemetry)
+        .map_err(|error| CliError::Message(format!("failed to build Tokio runtime: {error}")))?;
+    runtime.block_on(run_serve(args))
+}
+
 async fn run_serve(args: impl IntoIterator<Item = String>) -> Result<(), CliError> {
     let parsed = parse_common(args).map_err(CliError::Message)?;
     let config = parsed.config();
-    let listener = TcpListener::bind(config.socket_addr().map_err(|error| {
-        CliError::Message(format!("invalid host/port configuration: {error}"))
-    })?)
-    .await
-    .map_err(|error| CliError::Message(format!("failed to bind listener: {error}")))?;
+    let listener =
+        TcpListener::bind(config.socket_addr().map_err(|error| {
+            CliError::Message(format!("invalid host/port configuration: {error}"))
+        })?)
+        .await
+        .map_err(|error| CliError::Message(format!("failed to bind listener: {error}")))?;
     let package = parsed
         .workspace()
         .plan_server(&config)
@@ -205,8 +211,10 @@ fn parse_common(args: impl IntoIterator<Item = String>) -> Result<CommonArgs, St
                     .map_err(|error| format!("invalid --reasoning-budget value: {error}"))?;
             }
             "--response-state-json" => {
-                response_state_json =
-                    Some(PathBuf::from(next_value(&mut args, "--response-state-json")?));
+                response_state_json = Some(PathBuf::from(next_value(
+                    &mut args,
+                    "--response-state-json",
+                )?));
             }
             "--json-out" => json_out = Some(PathBuf::from(next_value(&mut args, "--json-out")?)),
             "-h" | "--help" => return Err(usage()),

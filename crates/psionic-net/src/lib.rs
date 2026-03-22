@@ -14,6 +14,7 @@ use std::{
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use psionic_observe::spawn_runtime_task;
 use psionic_runtime::{
     ClusterEvidenceBundleVerificationError, RuntimeManifest, SignedClusterEvidenceBundle,
 };
@@ -3163,7 +3164,7 @@ impl LocalClusterNode {
         )));
         let (transport_command_tx, transport_command_rx) = mpsc::unbounded_channel();
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        let task = tokio::spawn(run_transport(
+        let task = spawn_runtime_task(run_transport(
             socket,
             state.clone(),
             transport_config,
@@ -3510,7 +3511,7 @@ impl ClusterRelayServer {
         );
         let local_addr = socket.local_addr().map_err(ClusterError::LocalAddr)?;
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        let task = tokio::spawn(run_relay_server(socket, shutdown_rx));
+        let task = spawn_runtime_task(run_relay_server(socket, shutdown_rx));
         Ok(Self {
             local_addr,
             shutdown_tx: Some(shutdown_tx),

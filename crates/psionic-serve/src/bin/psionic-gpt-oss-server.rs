@@ -6,21 +6,29 @@ use std::{
     process::ExitCode,
 };
 
+use psionic_observe::{TokioRuntimeTelemetryConfig, build_main_runtime};
 use psionic_serve::{
     GptOssMetalExecutionMode, GptOssOpenAiCompatBackend, GptOssOpenAiCompatConfig,
     GptOssOpenAiCompatServer,
 };
 use tokio::net::TcpListener;
 
-#[tokio::main]
-async fn main() -> ExitCode {
-    match run().await {
+fn main() -> ExitCode {
+    match run_main() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             let _ = writeln!(io::stderr(), "{error}");
             ExitCode::FAILURE
         }
     }
+}
+
+fn run_main() -> Result<(), String> {
+    let telemetry = TokioRuntimeTelemetryConfig::from_env()
+        .map_err(|error| format!("failed to load Tokio telemetry config: {error}"))?;
+    let (runtime, _telemetry_guard) = build_main_runtime(&telemetry)
+        .map_err(|error| format!("failed to build Tokio runtime: {error}"))?;
+    runtime.block_on(run())
 }
 
 async fn run() -> Result<(), String> {

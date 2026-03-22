@@ -13,9 +13,20 @@ workspace = true
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = []
+tokio-runtime-telemetry = ["psionic-observe/tokio-runtime-telemetry"]
+tokio-runtime-telemetry-cpu = [
+  "tokio-runtime-telemetry",
+  "psionic-observe/tokio-runtime-telemetry-cpu",
+]
+
 [dependencies]
 axum = "0.8"
+futures-util = "0.3"
 hex = { workspace = true }
+hyper = "1"
+hyper-util = { version = "0.1", features = ["server", "service", "tokio", "http1", "http2"] }
 psionic-data = { path = "../psionic-data" }
 psionic-adapters = { path = "../psionic-adapters" }
 psionic-backend-cuda = { path = "../psionic-backend-cuda" }
@@ -27,6 +38,7 @@ psionic-core = { path = "../psionic-core" }
 psionic-eval = { path = "../psionic-eval" }
 psionic-ir = { path = "../psionic-ir" }
 psionic-models = { path = "../psionic-models" }
+psionic-observe = { path = "../psionic-observe" }
 psionic-research = { path = "../psionic-research" }
 psionic-router = { path = "../psionic-router" }
 psionic-runtime = { path = "../psionic-runtime" }
@@ -40,6 +52,8 @@ sha2 = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = "0.1"
+tower = "0.5"
+tower-service = "0.3"
 
 [dev-dependencies]
 psionic-provider = { path = "../psionic-provider" }

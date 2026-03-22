@@ -10,6 +10,8 @@ than just run tensor math.
 - token streaming or equivalent delivery model
 - KV cache lifecycle
 - deterministic execution metadata
+- runtime-side latency telemetry that keeps Tokio scheduling and async wait
+  time separate from backend compute profiling
 - backend capability gating
 - served capability publication that keeps supported, route-required,
   refusal-required, and unsupported regions explicit together with context and

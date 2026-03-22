@@ -48,6 +48,7 @@ mod tassadar_quantization_truth_envelope;
 mod tassadar_rust_only_article_acceptance_gate_v2;
 mod tassadar_rust_only_article_reproduction;
 mod tassadar_semantic_window_publication_policy;
+mod tokio_runtime_telemetry_axum;
 mod tassadar_universality_verdict_publication;
 
 use std::{

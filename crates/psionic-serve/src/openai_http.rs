@@ -64,6 +64,7 @@ use crate::{
     ReferenceTextGenerationError, TerminationReason, TextGenerationExecutor, TokenSequence,
     continuous_batch_text_generation_execution_profile, default_embeddings_execution_profile,
     default_generation_scheduler_policy,
+    tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
 };
 
 const DEFAULT_MAX_TOKENS: usize = 256;
@@ -679,7 +680,7 @@ impl GptOssOpenAiCompatServer {
     }
 
     pub async fn serve(&self, listener: TcpListener) -> Result<(), OpenAiCompatServerError> {
-        axum::serve(listener, self.router())
+        serve_with_runtime_telemetry(listener, self.router())
             .await
             .map_err(OpenAiCompatServerError::Io)
     }
@@ -1040,7 +1041,7 @@ impl OpenAiCompatServer {
     }
 
     pub async fn serve(&self, listener: TcpListener) -> Result<(), OpenAiCompatServerError> {
-        axum::serve(listener, self.router())
+        serve_with_runtime_telemetry(listener, self.router())
             .await
             .map_err(OpenAiCompatServerError::Io)
     }
@@ -7637,12 +7638,10 @@ mod tests {
     }
 
     #[test]
-    fn chat_completion_response_serializes_psion_claim_posture(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn chat_completion_response_serializes_psion_claim_posture()
+    -> Result<(), Box<dyn std::error::Error>> {
         let psion_claim_posture: crate::PsionServedOutputClaimPosture = serde_json::from_str(
-            include_str!(
-                "../../../fixtures/psion/serve/psion_served_output_claim_direct_v1.json"
-            ),
+            include_str!("../../../fixtures/psion/serve/psion_served_output_claim_direct_v1.json"),
         )?;
         let payload = serde_json::to_value(super::ChatCompletionResponse {
             id: String::from("chatcmpl-test"),

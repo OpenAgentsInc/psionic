@@ -13,10 +13,19 @@ workspace = true
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = []
+tokio-runtime-telemetry = ["psionic-observe/tokio-runtime-telemetry"]
+tokio-runtime-telemetry-cpu = [
+  "tokio-runtime-telemetry",
+  "psionic-observe/tokio-runtime-telemetry-cpu",
+]
+
 [dependencies]
 axum = "0.8"
 psionic-mlx-catalog = { path = "../psionic-mlx-catalog" }
 psionic-models = { path = "../psionic-models" }
+psionic-observe = { path = "../psionic-observe" }
 psionic-router = { path = "../psionic-router" }
 psionic-runtime = { path = "../psionic-runtime" }
 psionic-serve = { path = "../psionic-serve" }

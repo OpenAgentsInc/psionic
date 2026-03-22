@@ -21,6 +21,8 @@ clustered execution, and machine-legible execution truth.
   completion bar for tensor, compiler, IO, replay, and local multi-device
   behavior.
 - `docs/INFERENCE_ENGINE.md` is the canonical inference-engine completion doc.
+- `docs/TOKIO_RUNTIME_TELEMETRY.md` is the canonical Tokio runtime telemetry
+  and operator runbook for serving and transport surfaces.
 - `docs/TRAIN_SYSTEM.md` is the canonical training subsystem spec.
 - `docs/PSION_PROGRAM_MAP.md` is the canonical umbrella map for the `Psion`
   learned-model lane.
