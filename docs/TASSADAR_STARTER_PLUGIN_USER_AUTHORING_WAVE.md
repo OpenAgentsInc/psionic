@@ -10,6 +10,8 @@ The boundary is narrow on purpose:
   controller surfaces
 - the first-class path remains capability-free local deterministic starter
   plugins
+- one manual `networked_read_only` proof now exists, but it remains narrower
+  and more policy-heavy than the capability-free path
 - every surface keeps registration, schema, refusal, receipt, and claim
   boundaries explicit
 - completion of this wave still does not claim a public plugin marketplace,
@@ -38,18 +40,24 @@ The wave now publishes one dependency-ordered user-authoring path:
 6. keep capability-free and networked authoring classes explicitly separate
 7. admit the bounded user-added capability-free path into the canonical
    weighted Tassadar controller lane
+8. keep the proved user-added `networked_read_only` path narrow and explicit
+   instead of treating it as broad networked authoring closure
 
 ## What Is Green
 
 - one central starter-plugin registration source instead of repeated per-surface
   tables
-- one proven user-added starter plugin, `plugin.text.stats`, that now runs from
-  runtime truth through the shared bridge, starter catalog, deterministic
-  workflow controller, and canonical weighted controller lane
+- two proven user-added starter plugins:
+  `plugin.text.stats` for the capability-free class and
+  `plugin.http.fetch_text` for the first manual `networked_read_only` class
+- both user-added plugins now run from runtime truth through the shared bridge,
+  starter catalog, deterministic workflow controller, and canonical weighted
+  controller lane
 - one published authoring contract and one narrow scaffold helper for the
   capability-free class
-- one explicit boundary keeping networked starter-plugin authoring manual
-  instead of inheriting unsafe defaults from the capability-free path
+- one explicit boundary keeping networked starter-plugin authoring manual and
+  policy-heavy instead of inheriting unsafe defaults from the capability-free
+  path
 
 ## What Is Still Refused
 
@@ -63,5 +71,8 @@ The wave now publishes one dependency-ordered user-authoring path:
 - future user-added capability-free starter plugins should follow the same
   shared-registry path and reach later controller surfaces without new parallel
   metadata tables
-- broader publication, trust-tier widening, or networked-authoring automation
-  remain later separate issues
+- future `networked_read_only` plugins should follow the same manual shared
+  path only when their mount, replay, and refusal contracts are equally
+  explicit
+- broader publication, trust-tier widening, secret-backed classes, stateful
+  classes, or networked-authoring automation remain later separate issues

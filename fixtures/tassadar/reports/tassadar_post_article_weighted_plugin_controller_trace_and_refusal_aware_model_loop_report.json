@@ -38,7 +38,7 @@
     "control_trace_profile_id": "tassadar.weighted_plugin.control_trace_profile.v1",
     "determinism_profile_id": "tassadar.weighted_plugin.controller_determinism_profile.v1",
     "runtime_bundle_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.runtime_bundle.v1",
-    "runtime_bundle_digest": "5f6ec4b486f430312ea8f3a63b6a20a3f9ab080a36e16c5750bd4912847f5152",
+    "runtime_bundle_digest": "01079b6cb8607d60a3d936134db658b502c2b558d525883c4d58d04b3d2cfa6a",
     "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_v1/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_bundle.json",
     "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` result_binding_report_id=`tassadar.post_article_plugin_result_binding_schema_stability_and_composition.report.v1` control_plane_report_id=`tassadar.post_article_control_plane_decision_provenance_proof.report.v1` and runtime_bundle_id=`tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.runtime_bundle.v1` remain bound together."
   },
@@ -66,7 +66,17 @@
         "catalog_entry_id": "plugin.text.stats@v1",
         "derived_from_shared_registration": true,
         "derived_from_catalog_exposure": true,
-        "detail": "`plugin.text.stats` is admitted to the canonical weighted controller lane because it is a shared-registry user-added starter plugin with capability-free authoring class, bridge exposure, and catalog entry `plugin.text.stats@v1`."
+        "detail": "`plugin.text.stats` is admitted to the canonical weighted controller lane because it is a shared-registry user-added starter plugin with authoring class `capability_free_local_deterministic`, bridge exposure, and catalog entry `plugin.text.stats@v1`."
+      },
+      {
+        "plugin_id": "plugin.http.fetch_text",
+        "tool_name": "plugin_http_fetch_text",
+        "authoring_class_id": "networked_read_only",
+        "origin_class_id": "user_added",
+        "catalog_entry_id": "plugin.http.fetch_text@v1",
+        "derived_from_shared_registration": true,
+        "derived_from_catalog_exposure": true,
+        "detail": "`plugin.http.fetch_text` is admitted to the canonical weighted controller lane because it is a shared-registry user-added starter plugin with authoring class `networked_read_only`, bridge exposure, and catalog entry `plugin.http.fetch_text@v1`."
       }
     ],
     "controller_case_rows": [
@@ -981,8 +991,8 @@
       }
     ],
     "claim_boundary": "this runtime bundle freezes the canonical post-article weighted plugin controller trace above the result-binding contract, host-owned runtime API, and invocation-receipt layer. It keeps plugin selection, export selection, packet encoding, multi-step continuation, retry, typed refusal return, stop conditions, and bounded user-added capability-free starter-plugin admission from the shared registration and catalog path machine-readable while making host execution-only steps explicit and keeping publication, served/public universality, and arbitrary software capability blocked.",
-    "summary": "Post-article weighted plugin controller bundle covers starter_plugin_admission_rows=1, controller_case_rows=5, control_trace_rows=40, host_negative_rows=10.",
-    "bundle_digest": "5f6ec4b486f430312ea8f3a63b6a20a3f9ab080a36e16c5750bd4912847f5152"
+    "summary": "Post-article weighted plugin controller bundle covers starter_plugin_admission_rows=2, controller_case_rows=5, control_trace_rows=40, host_negative_rows=10.",
+    "bundle_digest": "01079b6cb8607d60a3d936134db658b502c2b558d525883c4d58d04b3d2cfa6a"
   },
   "dependency_rows": [
     {
@@ -1018,8 +1028,8 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/runs/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_v1/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_bundle.json",
       "bound_report_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.runtime_bundle.v1",
-      "bound_report_digest": "5f6ec4b486f430312ea8f3a63b6a20a3f9ab080a36e16c5750bd4912847f5152",
-      "detail": "the runtime bundle must carry explicit plugin selection, refusal, retry, continue, and stop rows against the same result-binding contract ids, and it must admit at least one user-added capability-free starter plugin from the shared registration and catalog path into the canonical weighted controller lane."
+      "bound_report_digest": "01079b6cb8607d60a3d936134db658b502c2b558d525883c4d58d04b3d2cfa6a",
+      "detail": "the runtime bundle must carry explicit plugin selection, refusal, retry, continue, and stop rows against the same result-binding contract ids, and it must admit both the capability-free and networked_read_only user-added starter plugins from the shared registration and catalog path into the canonical weighted controller lane."
     },
     {
       "dependency_id": "plugin_system_spec_declared",
@@ -2082,5 +2092,5 @@
   "deferred_issue_ids": [],
   "claim_boundary": "this sandbox report closes the bounded weighted plugin controller trace on the canonical post-article machine identity. It proves that plugin selection, export selection, packet encoding, sequencing, typed-refusal handling, retry, and stop conditions remain model-owned while the host validates and executes declared calls without becoming the planner. It still does not widen plugin authority into publication, trust-tier promotion, served/public universality, or arbitrary public software execution.",
   "summary": "Post-article weighted plugin controller sandbox report keeps contract_status=Green, dependency_rows=6, controller_case_rows=5, control_trace_rows=40, host_negative_rows=10, validation_rows=12, weighted_plugin_control_allowed=true, and deferred_issue_ids=0.",
-  "report_digest": "e3e30045a3372ae5278c8461d2ac6038f9828061878737a648fe2df22d1f8fc7"
+  "report_digest": "38e04844e8e02ab87ccf94d1e35ae9a446e061488beff1229b4d6b08212edf2c"
 }

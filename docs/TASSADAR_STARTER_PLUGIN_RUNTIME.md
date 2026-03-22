@@ -119,10 +119,11 @@ catalog path, rather than a controller-local one-off whitelist.
 - checker:
   `scripts/check-tassadar-post-article-plugin-http-fetch-text.sh`
 
-`plugin.http.fetch_text` is now a real read-only network starter plugin. It
-accepts one JSON packet shaped like `{ "url": string }`, enforces URL policy
-from the mounted envelope instead of the guest packet, and returns structured
-fetch truth:
+`plugin.http.fetch_text` is now a real read-only network starter plugin and
+the first manual user-authored `networked_read_only` starter entry. It accepts
+one JSON packet shaped like `{ "url": string }`, enforces URL policy from the
+mounted envelope instead of the guest packet, and returns structured fetch
+truth:
 
 - `final_url`
 - `status_code`
@@ -163,6 +164,12 @@ Negative claims stay explicit:
 - no cookie or auth-session support
 - no arbitrary header surface
 - no unrestricted web access
+
+`plugin.http.fetch_text` is also now admitted into the canonical weighted
+controller lane through the same shared registration plus catalog path used by
+the capability-free user-added proof, which means the repo now has one narrow
+user-authored networked starter-plugin proof without claiming broad networked
+authoring closure.
 
 ### `plugin.html.extract_readable`
 

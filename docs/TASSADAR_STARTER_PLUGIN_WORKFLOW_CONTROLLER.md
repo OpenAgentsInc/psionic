@@ -49,7 +49,8 @@ Each case carries:
 ## What Is Green
 
 - one reproducible multi-plugin success pilot with six sequential plugin steps,
-  including one user-added `plugin_text_stats` enrichment step
+  including the user-added `plugin_http_fetch_text` network step and the
+  user-added `plugin_text_stats` enrichment step
 - one refusal pilot that stops on typed fetch refusal instead of hiding retry
   logic
 - explicit html-versus-feed branch decisions

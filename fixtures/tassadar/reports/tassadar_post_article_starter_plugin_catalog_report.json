@@ -34,7 +34,7 @@
     "authority_gate_report_id": "tassadar.post_article_plugin_authority_promotion_publication_and_trust_tier_gate.report.v1",
     "authority_gate_report_digest": "1e1826667fd8aab0e314d3286d25628a940489be2eba6a5ac5f32a9dbc4871f8",
     "runtime_bundle_id": "tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1",
-    "runtime_bundle_digest": "241b524b65e4de7b1aedf72c8650924a52ffe6fd0518fdc30be5c395b2aeb353",
+    "runtime_bundle_digest": "e84c0137c3ae6f45f55f6418f1e29997b1204065e91dcb26bbff6385a1768ec1",
     "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json",
     "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` closure_bundle_digest=`9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003` and runtime_bundle_id=`tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1` stay bound together for the starter plugin catalog."
   },
@@ -45,8 +45,8 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json",
       "bound_report_id": "tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1",
-      "bound_report_digest": "241b524b65e4de7b1aedf72c8650924a52ffe6fd0518fdc30be5c395b2aeb353",
-      "detail": "the runtime-owned starter catalog bundle exists and names the five bounded starter plugins explicitly, including the first user-added capability-free entry."
+      "bound_report_digest": "e84c0137c3ae6f45f55f6418f1e29997b1204065e91dcb26bbff6385a1768ec1",
+      "detail": "the runtime-owned starter catalog bundle exists and names the five bounded starter plugins explicitly, including the user-added capability-free and manual networked_read_only entries."
     },
     {
       "dependency_id": "bounded_platform_closeout_green",
@@ -143,7 +143,7 @@
       "operator_only": true,
       "local_deterministic": false,
       "read_only_network": true,
-      "detail": "the first network starter plugin freezes GET-only read-only text fetch behind host-mediated allowlist, timeout, redirect, and response-size policy."
+      "detail": "the first manual user-added network starter plugin freezes GET-only read-only text fetch behind host-mediated allowlist, timeout, redirect, and response-size policy."
     },
     {
       "plugin_id": "plugin.html.extract_readable",
@@ -205,7 +205,7 @@
       "mount_required": true,
       "host_mediated_network_only": true,
       "green": true,
-      "detail": "the fetch-text starter plugin is the only networked starter entry and remains bounded to host-mediated read-only HTTP."
+      "detail": "the fetch-text starter plugin is the only networked starter entry, remains bounded to host-mediated read-only HTTP, and now proves the first manual user-added networked lane."
     },
     {
       "plugin_id": "plugin.html.extract_readable",
@@ -262,7 +262,7 @@
       "source_refs": [
         "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json"
       ],
-      "detail": "the starter catalog names exactly five operator-curated plugins, including one user-added capability-free entry, and does not imply a broader marketplace."
+      "detail": "the starter catalog names exactly five operator-curated plugins, including two user-added entries across the capability-free and networked_read_only classes, and does not imply a broader marketplace."
     },
     {
       "validation_id": "local_vs_network_distinction_explicit",
@@ -357,5 +357,5 @@
   "next_issue_id": "TAS-217",
   "claim_boundary": "this catalog report publishes one small operator-curated starter plugin set above the bounded weighted-plugin platform while keeping plugin publication suppressed, served or public universality suppressed, arbitrary public tool use suppressed, and public marketplace language refused.",
   "summary": "starter catalog report binds 5 starter plugins, 4 local deterministic entries, 1 read-only network entry, and 2 bounded composition flows to the canonical machine closure bundle while keeping operator-only posture explicit.",
-  "report_digest": "dc7b4cb1f4ff269f583e23ec730204d5337a53f62e551913e0f7780601b198c8"
+  "report_digest": "a6662b967ad3cd91d9d4dff2ed2347a0ec41412998c2ac5c7d80b6001dfb2292"
 }

@@ -89,9 +89,10 @@ and now also has:
   learned-versus-executor claim boundary that all later `Psion` docs inherit.
 - `docs/PSION_PLUGIN_PROGRAM_MAP.md` is the canonical convergence map for the next
   `Psion x Tassadar` plugin-conditioned training tranche and freezes the
-  dependency-ordered training, benchmark, `networked_read_only` substrate-
-  proof, guest-artifact, and operator-proof split that later learned-plugin-
-  use work must follow without widening publication or executor claims.
+  dependency-ordered training, benchmark, bounded `networked_read_only`
+  substrate-proof, guest-artifact, and operator-proof split that later
+  learned-plugin-use work must follow without widening publication or executor
+  claims.
 - `docs/PSION_PLUGIN_CLAIM_BOUNDARY_AND_CAPABILITY_POSTURE.md` is the canonical
   claim-boundary and capability-posture contract for the convergence tranche
   and freezes which plugin classes are currently proved, not yet proved, later
@@ -162,9 +163,10 @@ and now also has:
   posture against the named non-plugin baseline.
 - `docs/PSION_PLUGIN_HOST_NATIVE_CAPABILITY_MATRIX_V1.md` is the canonical
   first publication doc for the host-native plugin-conditioned learned lane
-  and freezes the served capability rows, explicit not-yet-proved versus
-  unsupported versus blocked plugin-class split, and the executor-backed
-  statement posture for outputs that cite the bounded host-native matrix.
+  and freezes the served capability rows, explicit substrate-proved-but-outside
+  the first learned publication versus unsupported versus blocked plugin-class
+  split, and the executor-backed statement posture for outputs that cite the
+  bounded host-native matrix.
 - `docs/audits/2026-03-22-tassadar-full-plugin-system-state-audit.md` is the
   canonical current-state proof record for the bounded Tassadar plugin system
   and freezes the present authoring-class, publication, and guest-artifact

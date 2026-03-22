@@ -21,7 +21,17 @@
       "catalog_entry_id": "plugin.text.stats@v1",
       "derived_from_shared_registration": true,
       "derived_from_catalog_exposure": true,
-      "detail": "`plugin.text.stats` is admitted to the canonical weighted controller lane because it is a shared-registry user-added starter plugin with capability-free authoring class, bridge exposure, and catalog entry `plugin.text.stats@v1`."
+      "detail": "`plugin.text.stats` is admitted to the canonical weighted controller lane because it is a shared-registry user-added starter plugin with authoring class `capability_free_local_deterministic`, bridge exposure, and catalog entry `plugin.text.stats@v1`."
+    },
+    {
+      "plugin_id": "plugin.http.fetch_text",
+      "tool_name": "plugin_http_fetch_text",
+      "authoring_class_id": "networked_read_only",
+      "origin_class_id": "user_added",
+      "catalog_entry_id": "plugin.http.fetch_text@v1",
+      "derived_from_shared_registration": true,
+      "derived_from_catalog_exposure": true,
+      "detail": "`plugin.http.fetch_text` is admitted to the canonical weighted controller lane because it is a shared-registry user-added starter plugin with authoring class `networked_read_only`, bridge exposure, and catalog entry `plugin.http.fetch_text@v1`."
     }
   ],
   "controller_case_rows": [
@@ -936,6 +946,6 @@
     }
   ],
   "claim_boundary": "this runtime bundle freezes the canonical post-article weighted plugin controller trace above the result-binding contract, host-owned runtime API, and invocation-receipt layer. It keeps plugin selection, export selection, packet encoding, multi-step continuation, retry, typed refusal return, stop conditions, and bounded user-added capability-free starter-plugin admission from the shared registration and catalog path machine-readable while making host execution-only steps explicit and keeping publication, served/public universality, and arbitrary software capability blocked.",
-  "summary": "Post-article weighted plugin controller bundle covers starter_plugin_admission_rows=1, controller_case_rows=5, control_trace_rows=40, host_negative_rows=10.",
-  "bundle_digest": "5f6ec4b486f430312ea8f3a63b6a20a3f9ab080a36e16c5750bd4912847f5152"
+  "summary": "Post-article weighted plugin controller bundle covers starter_plugin_admission_rows=2, controller_case_rows=5, control_trace_rows=40, host_negative_rows=10.",
+  "bundle_digest": "01079b6cb8607d60a3d936134db658b502c2b558d525883c4d58d04b3d2cfa6a"
 }

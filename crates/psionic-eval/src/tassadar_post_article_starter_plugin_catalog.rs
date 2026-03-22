@@ -224,7 +224,7 @@ pub fn build_tassadar_post_article_starter_plugin_catalog_eval_report() -> Resul
             "starter_plugin_count_exact",
             starter_plugin_count == 5,
             &[&catalog.runtime_bundle_ref],
-            "the eval report keeps the starter catalog fixed to five operator-curated entries, including one user-added capability-free plugin.",
+            "the eval report keeps the starter catalog fixed to five operator-curated entries, including the user-added capability-free and manual networked_read_only plugins.",
         ),
         validation_row(
             "local_network_distinction_explicit",

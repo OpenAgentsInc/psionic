@@ -439,7 +439,7 @@ pub fn build_tassadar_post_article_starter_plugin_catalog_report() -> Result<
             STARTER_PLUGIN_CATALOG_RUNTIME_BUNDLE_REF,
             Some(runtime.bundle_id.clone()),
             Some(runtime.bundle_digest.clone()),
-            "the runtime-owned starter catalog bundle exists and names the five bounded starter plugins explicitly, including the first user-added capability-free entry.",
+            "the runtime-owned starter catalog bundle exists and names the five bounded starter plugins explicitly, including the user-added capability-free and manual networked_read_only entries.",
         ),
         dependency_row(
             "bounded_platform_closeout_green",
@@ -568,7 +568,7 @@ pub fn build_tassadar_post_article_starter_plugin_catalog_report() -> Result<
             "starter_plugin_count_exact",
             runtime.plugin_count == 5,
             &[STARTER_PLUGIN_CATALOG_RUNTIME_BUNDLE_REF],
-            "the starter catalog names exactly five operator-curated plugins, including one user-added capability-free entry, and does not imply a broader marketplace.",
+            "the starter catalog names exactly five operator-curated plugins, including two user-added entries across the capability-free and networked_read_only classes, and does not imply a broader marketplace.",
         ),
         validation_row(
             "local_vs_network_distinction_explicit",

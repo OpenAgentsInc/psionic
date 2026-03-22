@@ -90,7 +90,7 @@ The current posture for each class is:
 | Plugin class | Current posture | Meaning |
 | --- | --- | --- |
 | `host_native_capability_free_local_deterministic` | `proved_supported_substrate` | real runtime, bridge, catalog, controller, weighted-controller, and user-authoring proof already exist |
-| `host_native_networked_read_only` | `not_yet_proved_substrate` | class is documented, but the full end-to-end user-authored proof is still a named plugin-program task |
+| `host_native_networked_read_only` | `proved_supported_substrate` | one bounded manual user-authored proof now exists across runtime, bridge, catalog, controller, weighted-controller, and receipt truth, but the first trained publication still excludes this class |
 | `host_native_secret_backed_or_stateful` | `out_of_scope_for_this_tranche` | class remains later bounded substrate work and must not be implied by the current convergence lane |
 | `guest_artifact_digest_bound` | `later_separate_bounded_lane` | class does not describe present-tense starter-plugin truth and remains separate from the current host-native substrate |
 
@@ -132,14 +132,15 @@ second route/refusal vocabulary.
 
 ## Served Posture For This Tranche
 
-Until `PSION_PLUGIN-16`, any served description of the convergence tranche must stay
-strictly inside the following posture:
+Any served description of the convergence tranche must stay strictly inside the
+following posture:
 
 - the lane is operator-internal
 - plugin publication remains blocked
-- the only fully proved authoring class is host-native capability-free local
-  deterministic
-- `networked_read_only` remains not-yet-proved even if the class exists in docs
+- the first trained host-native capability publication remains limited to the
+  capability-free local deterministic class
+- one manual `networked_read_only` substrate proof now exists, but it remains
+  outside the first trained capability publication
 - secret-backed and stateful classes remain unsupported in this tranche
 - guest-artifact support remains later and separate
 - execution claims require explicit runtime receipts
@@ -151,6 +152,8 @@ This means allowed summary language today looks like:
 - “plugin-conditioned learned lane over the bounded admitted host-native
   starter-plugin substrate”
 - “operator-internal bounded plugin-use training tranche”
+- “one manual networked_read_only substrate proof exists, but the first trained
+  capability publication remains local-deterministic only”
 - “receipt-backed plugin execution remains runtime-owned”
 
 Disallowed summary language today includes:

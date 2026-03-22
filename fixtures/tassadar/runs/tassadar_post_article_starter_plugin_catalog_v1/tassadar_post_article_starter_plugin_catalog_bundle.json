@@ -104,7 +104,7 @@
       "catalog_entry_id": "plugin.http.fetch_text@v1",
       "manifest_id": "manifest.plugin.http.fetch_text.v1",
       "artifact_id": "artifact.plugin.http.fetch_text.v1",
-      "artifact_digest": "6d714eabebb088d9ced5fcbb97ffc925480c68d20fc53a6a12260150ff73a391",
+      "artifact_digest": "1223051b59c8bac9acd2c5996cef0f3c4403e1c8d90a5213fcfef2229407e7fb",
       "packet_abi_version": "packet.v1",
       "packet_schemas": {
         "input_schema_id": "plugin.http.fetch_text.input.v1",
@@ -138,7 +138,7 @@
       "descriptor_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_http_fetch_text_descriptor.json",
       "fixture_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_http_fetch_text_fixture_bundle.json",
       "sample_mount_envelope_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_http_fetch_text_mount_envelope.json",
-      "detail": "the first network starter plugin freezes GET-only read-only text fetch behind host-mediated allowlist, timeout, redirect, and response-size policy."
+      "detail": "the first manual user-added network starter plugin freezes GET-only read-only text fetch behind host-mediated allowlist, timeout, redirect, and response-size policy."
     },
     {
       "plugin_id": "plugin.html.extract_readable",
@@ -250,7 +250,7 @@
       "host_mediated_network_only": true,
       "schema_local_composition": true,
       "operator_only": true,
-      "detail": "the fetch-text starter plugin is the only networked starter entry and remains bounded to host-mediated read-only HTTP."
+      "detail": "the fetch-text starter plugin is the only networked starter entry, remains bounded to host-mediated read-only HTTP, and now proves the first manual user-added networked lane."
     },
     {
       "plugin_id": "plugin.html.extract_readable",
@@ -384,5 +384,5 @@
   "public_marketplace_implication_allowed": false,
   "claim_boundary": "this runtime-owned starter catalog freezes one small operator-curated plugin set above the canonical post-article machine closure bundle without implying served or public plugin rights, arbitrary public Wasm execution, arbitrary public tool use, or a public plugin marketplace.",
   "summary": "starter catalog bundle publishes four operator-curated plugins, four per-plugin descriptor or fixture or mount sidecars, and two bounded composition flows across local deterministic and read-only network capability classes.",
-  "bundle_digest": "241b524b65e4de7b1aedf72c8650924a52ffe6fd0518fdc30be5c395b2aeb353"
+  "bundle_digest": "e84c0137c3ae6f45f55f6418f1e29997b1204065e91dcb26bbff6385a1768ec1"
 }

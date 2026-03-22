@@ -1149,17 +1149,19 @@ fn starter_plugin_admission_row(
     let catalog = registration
         .catalog
         .expect("weighted controller admission requires catalog metadata");
+    let authoring_class_id = authoring_class_id(registration.authoring_class);
     TassadarPostArticleWeightedPluginStarterPluginAdmissionRow {
         plugin_id: String::from(registration.plugin_id),
         tool_name: String::from(registration.tool_name),
-        authoring_class_id: authoring_class_id(registration.authoring_class),
+        authoring_class_id: authoring_class_id.clone(),
         origin_class_id: origin_class_id(registration.origin_class),
         catalog_entry_id: String::from(catalog.catalog_entry_id),
         derived_from_shared_registration: true,
         derived_from_catalog_exposure: registration.catalog_exposed,
         detail: format!(
-            "`{}` is admitted to the canonical weighted controller lane because it is a shared-registry user-added starter plugin with capability-free authoring class, bridge exposure, and catalog entry `{}`.",
+            "`{}` is admitted to the canonical weighted controller lane because it is a shared-registry user-added starter plugin with authoring class `{}`, bridge exposure, and catalog entry `{}`.",
             registration.plugin_id,
+            authoring_class_id,
             catalog.catalog_entry_id,
         ),
     }
@@ -1269,12 +1271,19 @@ mod tests {
             bundle.bundle_id,
             "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.runtime_bundle.v1"
         );
-        assert_eq!(bundle.starter_plugin_admission_rows.len(), 1);
+        assert_eq!(bundle.starter_plugin_admission_rows.len(), 2);
         assert_eq!(bundle.controller_case_rows.len(), 5);
         assert_eq!(bundle.control_trace_rows.len(), 40);
         assert_eq!(bundle.host_negative_rows.len(), 10);
         assert!(bundle.starter_plugin_admission_rows.iter().any(|row| {
             row.plugin_id == "plugin.text.stats"
+                && row.derived_from_shared_registration
+                && row.derived_from_catalog_exposure
+        }));
+        assert!(bundle.starter_plugin_admission_rows.iter().any(|row| {
+            row.plugin_id == "plugin.http.fetch_text"
+                && row.authoring_class_id == "networked_read_only"
+                && row.origin_class_id == "user_added"
                 && row.derived_from_shared_registration
                 && row.derived_from_catalog_exposure
         }));

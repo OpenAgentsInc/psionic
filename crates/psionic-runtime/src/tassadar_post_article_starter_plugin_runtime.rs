@@ -809,7 +809,7 @@ const STARTER_PLUGIN_REGISTRATIONS: &[StarterPluginRegistration] = &[
         replay_class_id: "replayable_with_snapshots",
         capability_class: StarterPluginCapabilityClass::ReadOnlyNetwork,
         authoring_class: StarterPluginAuthoringClass::NetworkedReadOnly,
-        origin_class: StarterPluginOriginClass::OperatorBuiltin,
+        origin_class: StarterPluginOriginClass::UserAdded,
         capability_namespace_ids: FETCH_TEXT_CAPABILITY_NAMESPACE_IDS,
         negative_claim_ids: FETCH_TEXT_NEGATIVE_CLAIM_IDS,
         mount_envelope_id: "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
@@ -829,8 +829,8 @@ const STARTER_PLUGIN_REGISTRATIONS: &[StarterPluginRegistration] = &[
             descriptor_ref: "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_http_fetch_text_descriptor.json",
             fixture_bundle_ref: "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_http_fetch_text_fixture_bundle.json",
             sample_mount_envelope_ref: "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_http_fetch_text_mount_envelope.json",
-            descriptor_detail: "the first network starter plugin freezes GET-only read-only text fetch behind host-mediated allowlist, timeout, redirect, and response-size policy.",
-            capability_matrix_detail: "the fetch-text starter plugin is the only networked starter entry and remains bounded to host-mediated read-only HTTP.",
+            descriptor_detail: "the first manual user-added network starter plugin freezes GET-only read-only text fetch behind host-mediated allowlist, timeout, redirect, and response-size policy.",
+            capability_matrix_detail: "the fetch-text starter plugin is the only networked starter entry, remains bounded to host-mediated read-only HTTP, and now proves the first manual user-added networked lane.",
         }),
     },
     StarterPluginRegistration {
@@ -978,8 +978,11 @@ pub fn weighted_controller_admissible_user_added_starter_plugin_registrations(
         .iter()
         .filter(|registration| {
             registration.origin_class == StarterPluginOriginClass::UserAdded
-                && registration.authoring_class
-                    == StarterPluginAuthoringClass::CapabilityFreeLocalDeterministic
+                && matches!(
+                    registration.authoring_class,
+                    StarterPluginAuthoringClass::CapabilityFreeLocalDeterministic
+                        | StarterPluginAuthoringClass::NetworkedReadOnly
+                )
                 && registration.bridge_exposed
                 && registration.catalog_exposed
                 && registration.catalog.is_some()
@@ -3483,30 +3486,37 @@ mod tests {
 
     #[test]
     fn starter_plugin_registry_keeps_user_plugin_visible_across_bridge_and_catalog() {
-        let registration = starter_plugin_registration_by_plugin_id("plugin.text.stats")
+        let text_stats = starter_plugin_registration_by_plugin_id("plugin.text.stats")
             .expect("text-stats registration");
+        let fetch_text = starter_plugin_registration_by_plugin_id("plugin.http.fetch_text")
+            .expect("fetch-text registration");
 
         assert_eq!(starter_plugin_registrations().len(), 5);
         assert_eq!(bridge_exposed_starter_plugin_registrations().len(), 5);
         assert_eq!(catalog_exposed_starter_plugin_registrations().len(), 5);
         assert_eq!(capability_free_starter_plugin_registrations().len(), 4);
         assert_eq!(networked_starter_plugin_registrations().len(), 1);
-        assert_eq!(user_added_starter_plugin_registrations().len(), 1);
+        assert_eq!(user_added_starter_plugin_registrations().len(), 2);
         assert_eq!(
             weighted_controller_admissible_user_added_starter_plugin_registrations().len(),
-            1
+            2
         );
-        assert_eq!(registration.tool_name, "plugin_text_stats");
+        assert_eq!(text_stats.tool_name, "plugin_text_stats");
         assert_eq!(
-            registration.authoring_class,
+            text_stats.authoring_class,
             StarterPluginAuthoringClass::CapabilityFreeLocalDeterministic
         );
+        assert_eq!(text_stats.origin_class, StarterPluginOriginClass::UserAdded);
+        assert!(text_stats.bridge_exposed);
+        assert!(text_stats.catalog_exposed);
+        assert_eq!(fetch_text.tool_name, "plugin_http_fetch_text");
         assert_eq!(
-            registration.origin_class,
-            StarterPluginOriginClass::UserAdded
+            fetch_text.authoring_class,
+            StarterPluginAuthoringClass::NetworkedReadOnly
         );
-        assert!(registration.bridge_exposed);
-        assert!(registration.catalog_exposed);
+        assert_eq!(fetch_text.origin_class, StarterPluginOriginClass::UserAdded);
+        assert!(fetch_text.bridge_exposed);
+        assert!(fetch_text.catalog_exposed);
     }
 
     #[test]

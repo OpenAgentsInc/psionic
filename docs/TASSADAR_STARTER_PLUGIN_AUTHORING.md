@@ -10,6 +10,10 @@ The first-class path in this pass is intentionally narrow:
 - explicit packet schemas, typed refusals, receipts, and runtime artifacts
 - no public marketplace, external binary loading, or automatic publication
 
+One manual `networked_read_only` proof now exists through
+`plugin.http.fetch_text`, but it remains a narrower hand-built path with
+explicit mount and replay policy rather than the low-friction default.
+
 If a contributor can follow this document, they should be able to add a new
 capability-free starter plugin without reverse engineering unrelated files.
 
@@ -84,7 +88,8 @@ surfaces derive from that registration instead of inventing parallel metadata.
 
 The registry now also carries a machine-readable `origin_class`. Use
 `operator_builtin` for the original repo-owned starter set and `user_added`
-for new contributor-authored starter plugins such as `plugin.text.stats`.
+for new contributor-authored starter plugins such as `plugin.text.stats` and
+the first manual `networked_read_only` proof target `plugin.http.fetch_text`.
 
 ## Minimum Registration Template
 
@@ -121,10 +126,10 @@ plugin is runtime-only. Later issues or explicit follow-on work can widen it to
 the shared bridge, catalog, and controller lanes.
 
 For the bounded canonical weighted-controller lane, the current admission rule
-is also explicit: only `user_added` starter plugins that are
-`capability_free_local_deterministic`, bridge-exposed, and catalog-exposed are
-eligible for the shared admission helper consumed by the weighted-controller
-trace.
+is also explicit: only `user_added` starter plugins that are either
+`capability_free_local_deterministic` or `networked_read_only`, are
+bridge-exposed, and are catalog-exposed are eligible for the shared admission
+helper consumed by the weighted-controller trace.
 
 ## Refusal Contract
 
@@ -207,6 +212,15 @@ generation on purpose and tells you to use the manual networked path instead.
 
 Use that plugin as the reference implementation when the checklist above feels
 too abstract.
+
+`plugin.http.fetch_text` is the canonical manual example for the
+`networked_read_only` class:
+
+- explicit capability namespace
+- explicit mount envelope
+- explicit replay posture
+- typed network refusal surface
+- shared bridge, catalog, workflow-controller, and weighted-controller proof
 
 ## Non-Goals
 

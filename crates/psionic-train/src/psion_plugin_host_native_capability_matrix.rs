@@ -259,7 +259,7 @@ impl PsionPluginHostNativeCapabilityMatrix {
         let learned_plugin_ids =
             sorted_unique_strings(run_bundle.model_artifact.learned_plugin_ids.as_slice());
         let mut supported_region_count = 0_u32;
-        let mut saw_networked_not_yet_proved = false;
+        let mut saw_networked_substrate_proved_but_out_of_v1 = false;
         let mut saw_secret_backed_unsupported = false;
         let mut saw_guest_artifact_unsupported = false;
         let mut saw_publication_blocked = false;
@@ -339,12 +339,10 @@ impl PsionPluginHostNativeCapabilityMatrix {
                         });
                     }
                 }
-                PsionPluginHostNativeCapabilityPosture::NotYetProved => {
-                    if row.plugin_class == Some(PsionPluginClass::HostNativeNetworkedReadOnly) {
-                        saw_networked_not_yet_proved = true;
-                    }
-                }
                 PsionPluginHostNativeCapabilityPosture::Unsupported => {
+                    if row.plugin_class == Some(PsionPluginClass::HostNativeNetworkedReadOnly) {
+                        saw_networked_substrate_proved_but_out_of_v1 = true;
+                    }
                     if row.region_id
                         == "host_native_capability_free_local_deterministic.sequencing_multi_call"
                     {
@@ -369,6 +367,7 @@ impl PsionPluginHostNativeCapabilityMatrix {
                         saw_arbitrary_software_blocked = true;
                     }
                 }
+                PsionPluginHostNativeCapabilityPosture::NotYetProved => {}
             }
         }
         if supported_region_count == 0 {
@@ -377,8 +376,8 @@ impl PsionPluginHostNativeCapabilityMatrix {
             });
         }
         ensure_bool_true(
-            saw_networked_not_yet_proved,
-            "psion_plugin_host_native_capability_matrix.networked_read_only_not_yet_proved",
+            saw_networked_substrate_proved_but_out_of_v1,
+            "psion_plugin_host_native_capability_matrix.networked_read_only_outside_supported_v1",
         )?;
         ensure_bool_true(
             saw_multi_call_gap,
@@ -600,12 +599,13 @@ impl PsionPluginHostNativeServedPosture {
         )?;
         check_debug_slice_match(
             self.not_yet_proved_plugin_classes.as_slice(),
-            [PsionPluginClass::HostNativeNetworkedReadOnly].as_slice(),
+            [].as_slice(),
             "psion_plugin_host_native_served_posture.not_yet_proved_plugin_classes",
         )?;
         check_debug_slice_match(
             self.unsupported_plugin_classes.as_slice(),
             [
+                PsionPluginClass::HostNativeNetworkedReadOnly,
                 PsionPluginClass::HostNativeSecretBackedOrStateful,
                 PsionPluginClass::GuestArtifactDigestBound,
             ]
@@ -697,17 +697,15 @@ pub fn record_psion_plugin_host_native_capability_matrix(
             )?,
         ),
         PsionPluginHostNativeCapabilityRow {
-            region_id: String::from(
-                "host_native_networked_read_only.documented_substrate_not_yet_proved",
-            ),
-            posture: PsionPluginHostNativeCapabilityPosture::NotYetProved,
+            region_id: String::from("host_native_networked_read_only.substrate_proved_outside_v1"),
+            posture: PsionPluginHostNativeCapabilityPosture::Unsupported,
             claim_class: PsionPluginHostNativeCapabilityClaimClass::PluginClassBoundary,
             plugin_class: Some(PsionPluginClass::HostNativeNetworkedReadOnly),
             route_labels: vec![],
             admitted_plugin_ids: vec![],
             benchmark_evidence: None,
             detail: String::from(
-                "The networked_read_only class is documented but still awaits the first end-to-end user-authored substrate proof before it may enter served capability claims.",
+                "The networked_read_only class now has one bounded user-authored substrate proof, but it remains outside the first trained host-native capability publication until a later learned lane explicitly trains and evaluates it.",
             ),
         },
         PsionPluginHostNativeCapabilityRow {
@@ -803,7 +801,7 @@ pub fn record_psion_plugin_host_native_capability_matrix(
         served_output_claim_doc_ref: String::from(PSION_SERVED_OUTPUT_CLAIMS_DOC_REF),
         rows,
         summary: String::from(
-            "The first host-native plugin-conditioned capability matrix publishes only the proved local-deterministic plugin-use regions, marks networked_read_only not yet proved, and blocks publication or arbitrary software overread.",
+            "The first host-native plugin-conditioned capability matrix publishes only the proved local-deterministic plugin-use regions, keeps the newly proved networked_read_only substrate outside supported v1, and blocks publication or arbitrary software overread.",
         ),
         matrix_digest: String::new(),
     };
@@ -836,8 +834,9 @@ pub fn record_psion_plugin_host_native_served_posture(
         supported_route_labels: required_route_labels(),
         supported_claim_surfaces: supported_claim_surfaces(),
         blocked_claim_surfaces: blocked_claim_surfaces(),
-        not_yet_proved_plugin_classes: vec![PsionPluginClass::HostNativeNetworkedReadOnly],
+        not_yet_proved_plugin_classes: vec![],
         unsupported_plugin_classes: vec![
+            PsionPluginClass::HostNativeNetworkedReadOnly,
             PsionPluginClass::HostNativeSecretBackedOrStateful,
             PsionPluginClass::GuestArtifactDigestBound,
         ],
@@ -849,7 +848,7 @@ pub fn record_psion_plugin_host_native_served_posture(
             "benchmark_backed_capability_claim may cite only supported host-native rows published in the capability matrix and may not widen plugin class or publication posture",
         ),
         summary: String::from(
-            "The first host-native served posture freezes an operator-internal learned-versus-executor statement policy for the bounded local-deterministic plugin lane and keeps networked, secret-backed, stateful, guest-artifact, publication, and arbitrary software claims out of scope.",
+            "The first host-native served posture freezes an operator-internal learned-versus-executor statement policy for the bounded local-deterministic plugin lane, keeps the now-proved networked_read_only substrate outside the supported v1 learned surface, and leaves secret-backed, stateful, guest-artifact, publication, and arbitrary software claims out of scope.",
         ),
         posture_digest: String::new(),
     };
@@ -1277,9 +1276,8 @@ mod tests {
         let run_bundle = run_bundle();
         let matrix = record_psion_plugin_host_native_capability_matrix(&run_bundle)?;
         assert!(matrix.rows.iter().any(|row| {
-            row.posture == PsionPluginHostNativeCapabilityPosture::NotYetProved
-                && row.region_id
-                    == "host_native_networked_read_only.documented_substrate_not_yet_proved"
+            row.posture == PsionPluginHostNativeCapabilityPosture::Unsupported
+                && row.region_id == "host_native_networked_read_only.substrate_proved_outside_v1"
         }));
         assert!(matrix.rows.iter().all(|row| {
             row.admitted_plugin_ids

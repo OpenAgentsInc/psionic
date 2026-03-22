@@ -135,10 +135,17 @@ metadata tables.
 
 ### 3. User-added starter-plugin path
 
-The first real user-added starter plugin is now `plugin.text.stats`.
+The repo now has two real user-added starter-plugin proofs:
 
-That plugin proves the current bounded authoring path for a
-capability-free local deterministic plugin:
+- `plugin.text.stats` for the capability-free local deterministic class
+- `plugin.http.fetch_text` for the first manual `networked_read_only` class
+
+Together they prove two different bounded authoring paths:
+
+- one low-friction capability-free local deterministic path
+- one narrower manual networked path with explicit mount and replay policy
+
+The shared proof shape is:
 
 - add one plugin registration row in the runtime registry
 - define typed packet structs and invocation code
@@ -148,9 +155,10 @@ capability-free local deterministic plugin:
 - run it in a deterministic controller flow
 - admit it into the canonical weighted controller lane
 
-This is the first point where the repo proves that a user-added plugin is not
-just runnable in isolation, but can actually move through the same shared path
-used by the existing starter-plugin system.
+This is the point where the repo proves that user-added plugins are not just
+runnable in isolation, but can actually move through the same shared path used
+by the existing starter-plugin system across both the capability-free and
+bounded networked classes.
 
 ### 4. Shared bridge and controller surfaces
 
@@ -186,9 +194,13 @@ machine-legible:
 - 10 explicit host-negative rows
 - `weighted_plugin_control_allowed = true`
 
-The weighted controller lane also now includes one bounded admission row and
-one explicit model-selected success trace for the user-added
-`plugin.text.stats` plugin.
+The weighted controller lane also now includes two bounded admission rows:
+
+- `plugin.text.stats`
+- `plugin.http.fetch_text`
+
+and it still carries explicit model-selected success traces instead of hidden
+host-only admission logic.
 
 ### 5. Catalog and corpus surfaces
 
@@ -352,7 +364,7 @@ The strongest honest statement today is:
 
 - the lower bounded plugin platform is implemented
 - the starter-plugin runtime and controller wave are implemented
-- one bounded user-added plugin path is implemented end to end
+- two bounded user-added plugin paths are implemented end to end
 - canonical weighted plugin control is implemented for the bounded admitted set
 - publication and broader platform widening remain intentionally blocked
 
@@ -371,21 +383,7 @@ The strongest honest negative statement today is:
 
 The next logical steps should stay ordered and explicit.
 
-### 1. Finish the starter-authoring ladder for the second class
-
-Land one full end-to-end `networked_read_only` user-authored plugin path that
-reaches:
-
-- runtime registry
-- shared bridge
-- starter catalog
-- at least one controller surface
-- the weighted controller lane where admissible
-
-The point is to prove that the second current authoring class is real, not just
-named in docs.
-
-### 2. Add the first secret-backed starter plugin only after the secret mount contract is explicit
+### 1. Add the first secret-backed starter plugin only after the secret mount contract is explicit
 
 The alpha memo correctly treated secret-backed plugins as a separate class.
 
@@ -397,15 +395,25 @@ The next plugin wave should keep these invariants:
 - explicit receipt posture for upstream secret-backed calls
 
 One clean Class C plugin would do more to prove the platform than adding many
-more capability-free plugins.
+more capability-free or networked starter plugins.
 
-### 3. Defer the first stateful adapter until durable truth is clearly host-backed
+### 2. Defer the first stateful adapter until durable truth is clearly host-backed
 
 The alpha memo also correctly separated the stateful adapter class.
 
 Do not blur this with ordinary network adapters. The first stateful plugin
 should land only after the store-capability and durable-truth contract is
 explicit enough that plugin-local cache cannot masquerade as canonical state.
+
+### 3. Keep the networked class narrow even after the first proof
+
+The first `networked_read_only` proof should not be mistaken for broad
+automation or relaxed policy.
+
+- no silent fallback from capability-free scaffolding into networked authoring
+- no hidden widening of mount envelopes or replay posture
+- no networked plugin admission without explicit refusal, receipt, and
+  controller evidence
 
 ### 4. Expand the starter suite deliberately, not by one-off exceptions
 
@@ -456,8 +464,8 @@ The current authority and closeout docs are correct to keep publication off.
 
 Before any widening of publication posture, the repo should first prove:
 
-- more than one user-added plugin family
-- more than one authoring class
+- more than the current two bounded user-added starter-plugin examples
+- more than the current two authoring classes
 - stable authority, trust-tier, and revocation posture across those classes
 - no drift between runtime truth, catalog truth, controller truth, and receipt
   truth

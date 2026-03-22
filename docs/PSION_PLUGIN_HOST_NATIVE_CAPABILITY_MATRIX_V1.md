@@ -9,8 +9,8 @@ host-native plugin-conditioned lane.
 
 It is intentionally narrower than generic "plugin support."
 
-The v1 publication is only for the first trained lane over the currently fully
-proved starter-plugin authoring class:
+The v1 publication is only for the first trained lane over the currently
+trained subset of the proved starter-plugin substrate:
 
 - host-native
 - capability-free
@@ -57,13 +57,15 @@ The admitted plugin ids in this first publication are exactly:
 - `plugin.html.extract_readable`
 - `plugin.text.url_extract`
 
-`plugin.http.fetch_text` is intentionally absent from the supported v1 surface.
+`plugin.http.fetch_text` is intentionally absent from the supported v1 surface
+even though the repo now has one bounded manual `networked_read_only`
+substrate proof for it.
 
 ## Explicit Non-Supported Rows
 
 The matrix also publishes the rows it is not allowed to flatten away:
 
-- `host_native_networked_read_only` is `not_yet_proved`
+- `host_native_networked_read_only` is `substrate_proved_but_outside_supported_v1`
 - local-deterministic `sequencing_multi_call` remains outside supported v1
   because the current bounded evaluation receipt has zero eligible in-boundary
   items
@@ -74,7 +76,8 @@ The matrix also publishes the rows it is not allowed to flatten away:
 - arbitrary software-capability claims remain `blocked`
 
 That split is the point of the publication. The matrix is only honest if it
-keeps proved, not-yet-proved, unsupported, and blocked rows explicit.
+keeps supported, substrate-proved-but-outside-v1, unsupported, and blocked
+rows explicit.
 
 ## Served Posture
 

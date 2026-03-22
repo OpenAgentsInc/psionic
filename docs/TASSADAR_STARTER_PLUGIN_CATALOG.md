@@ -40,15 +40,15 @@ Capability posture stays explicit:
 - one read-only network entry
 - two bounded composition flows
 
-`plugin.text.stats` is now part of the cataloged starter-plugin surface with
-its own descriptor, fixture bundle, and capability-free sample mount envelope,
-which means the repo can now point to one machine-legible path from runtime
-plugin truth to catalog, eval, summary, and provider-report truth for a
-user-added starter plugin.
+`plugin.text.stats` and `plugin.http.fetch_text` are now part of the cataloged
+starter-plugin surface with their own descriptor, fixture bundle, and sample
+mount-envelope sidecars, which means the repo can now point to one
+machine-legible path from runtime plugin truth to catalog, eval, summary, and
+provider-report truth for both the capability-free and manual
+`networked_read_only` user-added classes.
 
 ## Planned
 
-- controller-level composition with a user-added starter plugin lands
-  separately in the controller issue wave
-- weighted-controller admission for user-added starter plugins lands
-  separately in the canonical weighted-lane issue
+- broader secret-backed or stateful user-authored starter-plugin classes remain
+  separate later work
+- public publication or marketplace widening remains separate later work

@@ -33,14 +33,16 @@ The current repo truth is:
      accelerator-backed pretraining remains later
 2. `Tassadar` plugin substrate
    - the repo now has five host-native starter plugins, including the first
-     user-added capability-free plugin
+     user-added capability-free plugin and the first manual user-added
+     `networked_read_only` plugin
    - the shared starter-plugin bridge, deterministic workflow controller,
      router-owned tool loop, Apple FM tool lane, and lane-neutral multi-plugin
      trace corpus are all implemented
-   - the only fully proved user-authoring path today is still host-native,
-     capability-free, and local deterministic
-   - the `networked_read_only` class is documented but still intentionally
-     narrower and more manual than the capability-free authoring path
+   - the capability-free local deterministic path remains the only fully
+     scaffolded and low-friction user-authoring path
+   - the `networked_read_only` class now has one narrow end-to-end manual proof
+     through `plugin.http.fetch_text`, but it remains intentionally more manual
+     and more policy-heavy than the capability-free path
    - secret-backed and stateful starter-plugin authoring remain later bounded
      substrate work, not already-closed platform facts
    - weighted-controller and publication posture remain bounded and internal
@@ -128,8 +130,8 @@ The current plugin-system audit already narrowed a few things that later
 
 - the live first-class authoring lane is still the capability-free local
   deterministic host-native path
-- the `networked_read_only` lane should be treated as an immediate substrate
-  proof target, not as something already closed by the current repo state
+- the `networked_read_only` lane now has one bounded manual substrate proof,
+  but it should not be treated as broad low-friction authoring closure
 - secret-backed and stateful plugin classes stay separate bounded follow-on
   substrate work until their host-mediated secret and durable-state contracts
   are explicit
@@ -195,8 +197,9 @@ The Psion plugin convergence program is dependency-ordered in nine tracks:
   local deterministic starter plugins
 - `PSION_PLUGIN-16`: capability matrix and served posture v1 for the host-native
   plugin-conditioned model, explicitly distinguishing supported host-native
-  capability-free behavior from not-yet-proved `networked_read_only` behavior
-  and unsupported secret-backed, stateful, and guest-artifact classes
+  capability-free behavior from substrate-proved-but-outside-v1
+  `networked_read_only` behavior and unsupported secret-backed, stateful, and
+  guest-artifact classes
 
 ### Track 5: `networked_read_only` substrate proof
 

@@ -15,9 +15,9 @@
     "computational_model_statement_id": "tassadar.post_article.canonical_computational_model.statement.v1",
     "closure_bundle_digest": "9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003",
     "catalog_report_id": "tassadar.post_article.starter_plugin_catalog.report.v1",
-    "catalog_report_digest": "dc7b4cb1f4ff269f583e23ec730204d5337a53f62e551913e0f7780601b198c8",
+    "catalog_report_digest": "a6662b967ad3cd91d9d4dff2ed2347a0ec41412998c2ac5c7d80b6001dfb2292",
     "runtime_bundle_id": "tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1",
-    "runtime_bundle_digest": "241b524b65e4de7b1aedf72c8650924a52ffe6fd0518fdc30be5c395b2aeb353",
+    "runtime_bundle_digest": "e84c0137c3ae6f45f55f6418f1e29997b1204065e91dcb26bbff6385a1768ec1",
     "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json",
     "detail": "starter catalog eval keeps catalog_report_id=`tassadar.post_article.starter_plugin_catalog.report.v1`, runtime_bundle_id=`tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1`, machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, and closure_bundle_digest=`9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003` aligned."
   },
@@ -28,7 +28,7 @@
       "satisfied": true,
       "source_ref": "tassadar.post_article.starter_plugin_catalog.report.v1",
       "bound_report_id": "tassadar.post_article.starter_plugin_catalog.report.v1",
-      "bound_report_digest": "dc7b4cb1f4ff269f583e23ec730204d5337a53f62e551913e0f7780601b198c8",
+      "bound_report_digest": "a6662b967ad3cd91d9d4dff2ed2347a0ec41412998c2ac5c7d80b6001dfb2292",
       "detail": "the catalog-owned starter plugin report is green and keeps the catalog digest-bound and operator-only."
     },
     {
@@ -48,7 +48,7 @@
       "source_refs": [
         "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json"
       ],
-      "detail": "the eval report keeps the starter catalog fixed to five operator-curated entries, including one user-added capability-free plugin."
+      "detail": "the eval report keeps the starter catalog fixed to five operator-curated entries, including the user-added capability-free and manual networked_read_only plugins."
     },
     {
       "validation_id": "local_network_distinction_explicit",
@@ -99,5 +99,5 @@
   "next_issue_id": "TAS-217",
   "claim_boundary": "this eval report keeps the starter catalog within the same operator-only, digest-bound, no-public-marketplace boundary as the catalog report and does not widen to served or public plugin rights.",
   "summary": "starter catalog eval binds 5 starter plugins and 2 bounded flows to the catalog report with operator-only posture, marketplace suppression, and closure-bundle binding still explicit.",
-  "report_digest": "e87f944fafc8b725a37a29b0fd9865bdeb053751c0fd5db2dd8d27f24fc19591"
+  "report_digest": "7dec82cd4d10a3740d0c99bf1437bd146a2393c3a2947dbeba28fc3067959f3d"
 }
