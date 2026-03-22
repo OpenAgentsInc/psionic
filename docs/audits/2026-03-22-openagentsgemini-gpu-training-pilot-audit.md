@@ -158,6 +158,23 @@ Current billing guardrails:
 - the repo now has the quota preflight command
   `scripts/psion-google-quota-preflight.sh` for those two first-launch profiles
 
+Current launch bundle:
+
+- the repo now has the launch entrypoint
+  `scripts/psion-google-launch-single-node.sh`
+- the repo now has the startup path
+  `scripts/psion-google-single-node-startup.sh`
+- the repo now has the teardown companion
+  `scripts/psion-google-delete-single-node.sh`
+- the committed launch-profile authority now lives at
+  `fixtures/psion/google/psion_google_single_node_launch_profiles_v1.json`
+- the launch bundle now resolves and records the exact GPU image from
+  `deeplearning-platform-release` family
+  `common-cu128-ubuntu-2204-nvidia-570`
+- a manifest-only run now uploads a full launch manifest, startup-script
+  snapshot, and quota-preflight receipt into the training bucket without yet
+  allocating a GPU host
+
 Current service-account posture:
 
 - the project now has the dedicated training service account
@@ -195,13 +212,16 @@ What is green:
   host, Cloud NAT egress, and IAP-only SSH through `psion-train-host`
 - a monthly billing budget, Pub/Sub budget-notification topic, BigQuery FinOps
   dataset, and repo-owned quota preflight now exist for the first bounded run
+- the repo now has one committed single-node Google launch surface with pinned
+  image-family resolution, machine-profile authority, low-disk policy, and a
+  teardown companion
 
 What is still only `partial`:
 
 - no runbook exists yet for preserving the full infra evidence bundle around a
   GPU launch
-- there is still no repo-owned launch bundle, immutable remote input package,
-  checkpoint archive proof, or Google-host evidence collector yet
+- there is still no immutable remote input package, checkpoint archive proof,
+  or Google-host evidence collector yet
 - exact Cloud Billing export to BigQuery is still console-managed; the current
   repo-owned machine-queryable cost sink is the live price-catalog table plus
   budget notifications rather than invoice-grade billing-export rows
@@ -254,8 +274,6 @@ decision before changing machine profile.
 
 ## Minimum Setup Before Launch
 
-- define one launch wrapper that snapshots quota, instance metadata, machine
-  details, and training outputs into the bucket
 - define the immutable remote input package, checkpoint archive path, and final
   evidence collector before the first paid run
 - decide whether the first bounded pilot needs console-managed Cloud Billing

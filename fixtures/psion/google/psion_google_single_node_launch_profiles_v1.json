@@ -1,0 +1,79 @@
+{
+  "schema_version": "psion.google_single_node_launch_profiles.v1",
+  "launch_bundle_id": "openagentsgemini-psion-google-single-node-launch-v1",
+  "project_id": "openagentsgemini",
+  "bucket_url": "gs://openagentsgemini-psion-train-us-central1",
+  "repo_clone_url": "https://github.com/OpenAgentsInc/psionic.git",
+  "service_account_email": "psion-train-single-node@openagentsgemini.iam.gserviceaccount.com",
+  "network": "oa-lightning",
+  "subnetwork": "oa-lightning-us-central1",
+  "target_tags": [
+    "psion-train-host"
+  ],
+  "external_ip": false,
+  "os_login": true,
+  "provisioning_model": "STANDARD",
+  "maintenance_policy": "TERMINATE",
+  "restart_on_failure": false,
+  "image_policy": {
+    "image_project": "deeplearning-platform-release",
+    "image_family": "common-cu128-ubuntu-2204-nvidia-570",
+    "driver_posture": "verify_prevalidated_gpu_image"
+  },
+  "startup_policy": {
+    "script_path": "scripts/psion-google-single-node-startup.sh",
+    "workspace_root": "/var/lib/psion-google",
+    "package_install": [
+      "build-essential",
+      "pkg-config",
+      "libssl-dev",
+      "clang",
+      "cmake",
+      "git",
+      "curl",
+      "jq",
+      "ca-certificates"
+    ],
+    "rustup_default_toolchain": "stable",
+    "training_command": "cargo run -p psionic-train --example psion_reference_pilot_bundle -- \"$PSION_OUTPUT_DIR\""
+  },
+  "teardown_policy": {
+    "final_manifest_object": "final/psion_google_run_final_manifest.json",
+    "force_flag": "--force"
+  },
+  "profiles": [
+    {
+      "profile_id": "g2_l4_single_node",
+      "profile_label": "g2-l4",
+      "machine_type": "g2-standard-8",
+      "accelerator_type": "nvidia-l4",
+      "accelerator_count": 1,
+      "boot_disk_type": "pd-balanced",
+      "boot_disk_gb": 200,
+      "low_disk_watermark_gb": 40,
+      "zone_fallback_order": [
+        "us-central1-a",
+        "us-central1-b",
+        "us-central1-c"
+      ],
+      "declared_run_cost_ceiling_usd": 15.0
+    },
+    {
+      "profile_id": "a2_a100_single_node",
+      "profile_label": "a2-a100",
+      "machine_type": "a2-highgpu-1g",
+      "accelerator_type": "nvidia-tesla-a100",
+      "accelerator_count": 1,
+      "boot_disk_type": "pd-balanced",
+      "boot_disk_gb": 250,
+      "low_disk_watermark_gb": 60,
+      "zone_fallback_order": [
+        "us-central1-b",
+        "us-central1-c",
+        "us-central1-a",
+        "us-central1-f"
+      ],
+      "declared_run_cost_ceiling_usd": 50.0
+    }
+  ]
+}
