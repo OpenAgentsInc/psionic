@@ -36,6 +36,8 @@ clustered execution, and machine-legible execution truth.
   replay-identity doc for the `Psion` learned-model lane.
 - `docs/PSION_SAMPLING_POLICY.md` is the canonical sampling, weighting, and
   code-dominance-control doc for the `Psion` learned-model lane.
+- `docs/PSION_COMPACT_DECODER.md` is the canonical compact decoder-family and
+  checkpoint/export naming doc for the `Psion` learned-model lane.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical phase-gate and
   promotion-decision doc for the `Psion` learned-model lane.
 - `docs/PSION_CAPABILITY_MATRIX.md` is the canonical served capability and

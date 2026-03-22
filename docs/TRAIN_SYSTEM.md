@@ -111,6 +111,10 @@ and now also has:
   policy doc for the `Psion` learned-model lane and freezes the family
   weights, source caps, repetitive-region down-weighting, code-token ceiling,
   and regression-comparison contract that later pretraining runs must follow.
+- `docs/PSION_COMPACT_DECODER.md` is the canonical first compact decoder-family
+  doc for the `Psion` learned-model lane and freezes tokenizer binding,
+  context-length configuration, checkpoint tensor naming, and export naming
+  that later pretraining, evaluation, and serving work must follow.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical first phase-gate and
   promotion-decision doc for the `Psion` learned-model lane and freezes the
   acceptance-matrix plus evidence-bound promotion contract that later pilot,
