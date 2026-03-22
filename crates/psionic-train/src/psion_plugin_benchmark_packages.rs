@@ -705,6 +705,8 @@ pub enum PsionPluginBenchmarkMetricKind {
     ContinuationBoundaryAccuracyBps,
     WrongToolRejectionAccuracyBps,
     UnsupportedToolRefusalAccuracyBps,
+    UnsupportedCapabilityRefusalAccuracyBps,
+    OverdelegationRejectionAccuracyBps,
     RequestForStructureAccuracyBps,
     TypedRuntimeRefusalAccuracyBps,
     InterpretationScoreBps,

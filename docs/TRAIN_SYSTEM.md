@@ -135,6 +135,11 @@ and now also has:
   freezes the serial-versus-parallel plan package, explicit continuation
   posture contract, and held-out refusal-stop evidence surface for the first
   host-native sequencing family.
+- `docs/PSION_PLUGIN_REFUSAL_REQUEST_STRUCTURE_BENCHMARK.md` is the canonical
+  fourth package-specific plugin benchmark doc for the convergence tranche and
+  freezes the unsupported-capability refusal package, missing-input
+  request-for-structure package, and separate overdelegation-negative scoring
+  surface for the first host-native refusal family.
 - `docs/audits/2026-03-22-tassadar-full-plugin-system-state-audit.md` is the
   canonical current-state proof record for the bounded Tassadar plugin system
   and freezes the present authoring-class, publication, and guest-artifact
