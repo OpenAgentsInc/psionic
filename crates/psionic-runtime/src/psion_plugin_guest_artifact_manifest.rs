@@ -9,6 +9,10 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
+use wasm_encoder::{
+    CodeSection, ExportKind, ExportSection, Function, FunctionSection, Instruction, MemorySection,
+    MemoryType, Module, TypeSection, ValType,
+};
 
 pub const PSION_PLUGIN_GUEST_ARTIFACT_MANIFEST_SCHEMA_VERSION: &str =
     "psionic.psion.plugin_guest_artifact_manifest.v1";
@@ -27,7 +31,7 @@ const REFERENCE_PLUGIN_VERSION: &str = "v1";
 const REFERENCE_ARTIFACT_ID: &str = "artifact.plugin.example.echo_guest.v1";
 const REFERENCE_DECLARED_ARTIFACT_REF: &str =
     "artifacts/operator_internal/plugin_example_echo_guest.wasm";
-const REFERENCE_WASM_BYTES: &[u8] = &[0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+const REFERENCE_GUEST_MEMORY_PAGES: u64 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -392,7 +396,8 @@ pub enum PsionPluginGuestArtifactManifestError {
 
 #[must_use]
 pub fn reference_psion_plugin_guest_artifact_manifest() -> PsionPluginGuestArtifactManifest {
-    let artifact_digest = sha256_hex(REFERENCE_WASM_BYTES);
+    let artifact_bytes = reference_psion_plugin_guest_artifact_bytes();
+    let artifact_digest = sha256_hex(artifact_bytes.as_slice());
     let mut manifest = PsionPluginGuestArtifactManifest {
         schema_version: String::from(PSION_PLUGIN_GUEST_ARTIFACT_MANIFEST_SCHEMA_VERSION),
         manifest_id: String::from("psion_plugin_guest_artifact_manifest_reference"),
@@ -401,14 +406,16 @@ pub fn reference_psion_plugin_guest_artifact_manifest() -> PsionPluginGuestArtif
         artifact_id: String::from(REFERENCE_ARTIFACT_ID),
         artifact_format: PsionPluginGuestArtifactFormat::WasmModulePacketV1,
         artifact_digest,
-        artifact_byte_len: REFERENCE_WASM_BYTES.len() as u64,
+        artifact_byte_len: artifact_bytes.len() as u64,
         packet_abi_version: String::from(REFERENCE_PACKET_ABI_VERSION),
         guest_export_name: String::from(REFERENCE_GUEST_EXPORT_NAME),
         input_schema_id: String::from("plugin.example.echo_guest.input.v1"),
         success_output_schema_id: String::from("plugin.example.echo_guest.output.v1"),
         refusal_schema_ids: vec![
             String::from("plugin.refusal.schema_invalid.v1"),
+            String::from("plugin.refusal.packet_too_large.v1"),
             String::from("plugin.refusal.runtime_resource_limit.v1"),
+            String::from("plugin.refusal.runtime_unavailable.v1"),
         ],
         capability_namespace_ids: vec![],
         replay_class_id: String::from(REFERENCE_REPLAY_CLASS_ID),
@@ -430,7 +437,7 @@ pub fn reference_psion_plugin_guest_artifact_manifest() -> PsionPluginGuestArtif
             receipt_emission_required: true,
         },
         detail: String::from(
-            "This reference manifest freezes the minimum digest-bound guest-artifact contract for one later user-provided Wasm lane without claiming runtime loading, controller admission, or publication support in the present tense.",
+            "This reference manifest freezes the minimum digest-bound guest-artifact contract for one later user-provided Wasm lane while keeping bridge admission, controller admission, and publication support closed until the later guest-artifact issues land.",
         ),
         manifest_digest: String::new(),
     };
@@ -439,8 +446,8 @@ pub fn reference_psion_plugin_guest_artifact_manifest() -> PsionPluginGuestArtif
 }
 
 #[must_use]
-pub fn reference_psion_plugin_guest_artifact_bytes() -> &'static [u8] {
-    REFERENCE_WASM_BYTES
+pub fn reference_psion_plugin_guest_artifact_bytes() -> Vec<u8> {
+    build_reference_psion_plugin_guest_artifact_wasm()
 }
 
 pub fn refresh_psion_plugin_guest_artifact_manifest_digest(
@@ -542,6 +549,51 @@ fn stable_manifest_digest(manifest: &PsionPluginGuestArtifactManifest) -> String
     hasher.update([manifest.evidence_settings.receipt_emission_required as u8]);
     hasher.update(manifest.detail.as_bytes());
     format!("{:x}", hasher.finalize())
+}
+
+fn build_reference_psion_plugin_guest_artifact_wasm() -> Vec<u8> {
+    let mut module = Module::new();
+
+    let mut types = TypeSection::new();
+    types
+        .ty()
+        .function([ValType::I32, ValType::I32, ValType::I32], [ValType::I32]);
+    module.section(&types);
+
+    let mut functions = FunctionSection::new();
+    functions.function(0);
+    module.section(&functions);
+
+    let mut memories = MemorySection::new();
+    memories.memory(MemoryType {
+        minimum: REFERENCE_GUEST_MEMORY_PAGES,
+        maximum: Some(REFERENCE_GUEST_MEMORY_PAGES),
+        memory64: false,
+        shared: false,
+        page_size_log2: None,
+    });
+    module.section(&memories);
+
+    let mut exports = ExportSection::new();
+    exports.export("memory", ExportKind::Memory, 0);
+    exports.export(REFERENCE_GUEST_EXPORT_NAME, ExportKind::Func, 0);
+    module.section(&exports);
+
+    let mut code = CodeSection::new();
+    let mut function = Function::new(Vec::<(u32, ValType)>::new());
+    function.instruction(&Instruction::LocalGet(2));
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::LocalGet(1));
+    function.instruction(&Instruction::MemoryCopy {
+        dst_mem: 0,
+        src_mem: 0,
+    });
+    function.instruction(&Instruction::LocalGet(1));
+    function.instruction(&Instruction::End);
+    code.function(&function);
+    module.section(&code);
+
+    module.finish()
 }
 
 fn stable_identity_digest(identity: &PsionPluginGuestArtifactIdentity) -> String {

@@ -21,7 +21,7 @@ pub const PSION_PLUGIN_GUEST_ARTIFACT_RUNTIME_LOADING_SCHEMA_VERSION: &str =
 pub const PSION_PLUGIN_GUEST_ARTIFACT_RUNTIME_LOADING_REF: &str =
     "fixtures/psion/plugins/guest_artifact/psion_plugin_guest_artifact_runtime_loading_v1.json";
 
-const GUEST_ARTIFACT_HOST_OWNED_MOUNT_POLICY_ID: &str =
+pub const GUEST_ARTIFACT_HOST_OWNED_MOUNT_POLICY_ID: &str =
     "psion.plugin_guest_artifact.host_owned_mount_policy.v1";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -392,10 +392,11 @@ pub fn load_psion_plugin_guest_artifact(
 pub fn build_psion_plugin_guest_artifact_runtime_loading_bundle(
 ) -> PsionPluginGuestArtifactRuntimeLoadingBundle {
     let manifest = reference_psion_plugin_guest_artifact_manifest();
+    let reference_artifact_bytes = reference_psion_plugin_guest_artifact_bytes();
     let success_case =
-        load_psion_plugin_guest_artifact(&manifest, reference_psion_plugin_guest_artifact_bytes())
+        load_psion_plugin_guest_artifact(&manifest, reference_artifact_bytes.as_slice())
             .expect("reference guest artifact should load");
-    let mut malformed_bytes = reference_psion_plugin_guest_artifact_bytes().to_vec();
+    let mut malformed_bytes = reference_artifact_bytes.clone();
     malformed_bytes[0] = 0xff;
     let refusal_cases = vec![
         load_psion_plugin_guest_artifact(&manifest, b"definitely-not-the-declared-wasm")
@@ -412,11 +413,8 @@ pub fn build_psion_plugin_guest_artifact_runtime_loading_bundle(
             capability_mount.capability_namespace_ids =
                 vec![String::from("capability.http.read_only.v1")];
             refresh_psion_plugin_guest_artifact_manifest_digest(&mut capability_mount);
-            load_psion_plugin_guest_artifact(
-                &capability_mount,
-                reference_psion_plugin_guest_artifact_bytes(),
-            )
-            .expect("capability mount request should refuse")
+            load_psion_plugin_guest_artifact(&capability_mount, reference_artifact_bytes.as_slice())
+                .expect("capability mount request should refuse")
         },
     ];
     let mut bundle = PsionPluginGuestArtifactRuntimeLoadingBundle {
@@ -636,7 +634,7 @@ mod tests {
         let manifest = reference_psion_plugin_guest_artifact_manifest();
         let loaded = load_psion_plugin_guest_artifact(
             &manifest,
-            reference_psion_plugin_guest_artifact_bytes(),
+            reference_psion_plugin_guest_artifact_bytes().as_slice(),
         )?;
         assert_eq!(loaded.status, PsionPluginGuestArtifactLoadStatus::Loaded);
         assert!(loaded.loaded_artifact.is_some());

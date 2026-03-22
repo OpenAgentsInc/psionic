@@ -5,15 +5,17 @@
   "plugin_version": "v1",
   "artifact_id": "artifact.plugin.example.echo_guest.v1",
   "artifact_format": "wasm_module_packet_v1",
-  "artifact_digest": "93a44bbb96c751218e4c00d479e4c14358122a389acca16205b1e4d0dc5f9476",
-  "artifact_byte_len": 8,
+  "artifact_digest": "a51efa6038f402bab8a0d40e25740b0fafb6a730294cbb927304586caaf4d424",
+  "artifact_byte_len": 74,
   "packet_abi_version": "packet.v1",
   "guest_export_name": "handle_packet",
   "input_schema_id": "plugin.example.echo_guest.input.v1",
   "success_output_schema_id": "plugin.example.echo_guest.output.v1",
   "refusal_schema_ids": [
     "plugin.refusal.schema_invalid.v1",
-    "plugin.refusal.runtime_resource_limit.v1"
+    "plugin.refusal.packet_too_large.v1",
+    "plugin.refusal.runtime_resource_limit.v1",
+    "plugin.refusal.runtime_unavailable.v1"
   ],
   "replay_class_id": "guest_artifact_digest_replay_only.v1",
   "trust_tier": "operator_reviewed_digest_bound_internal_only",
@@ -30,6 +32,6 @@
     "output_digest_required": true,
     "receipt_emission_required": true
   },
-  "detail": "This reference manifest freezes the minimum digest-bound guest-artifact contract for one later user-provided Wasm lane without claiming runtime loading, controller admission, or publication support in the present tense.",
-  "manifest_digest": "ce47b86bae51eba7598b5cc73f3ab69c7992732a4f710c12e7726b3622f34395"
+  "detail": "This reference manifest freezes the minimum digest-bound guest-artifact contract for one later user-provided Wasm lane while keeping bridge admission, controller admission, and publication support closed until the later guest-artifact issues land.",
+  "manifest_digest": "2b7f26c57a3af87c5ca7f0b5e1130a67b51c184afc8b8b832046985936b2f37d"
 }

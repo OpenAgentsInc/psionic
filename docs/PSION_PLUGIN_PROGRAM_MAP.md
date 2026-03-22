@@ -47,7 +47,9 @@ The current repo truth is:
      substrate work, not already-closed platform facts
    - weighted-controller and publication posture remain bounded and internal
    - the old guest-artifact / user-provided Wasm path is still not a live
-     runtime lane
+     shared catalog/controller lane, but the repo now has bounded digest-bound
+     manifest, load, and receipt-equivalent invocation proofs for one later
+     guest-artifact class
 3. Convergence gap
    - the plugin runtime now emits enough truth to bootstrap learned plugin-use
      training

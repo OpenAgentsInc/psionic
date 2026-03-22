@@ -2,22 +2,22 @@
   "schema_version": "psionic.psion.plugin_guest_artifact_runtime_loading.v1",
   "bundle_id": "psion_plugin_guest_artifact_runtime_loading",
   "manifest_id": "psion_plugin_guest_artifact_manifest_reference",
-  "manifest_digest": "ce47b86bae51eba7598b5cc73f3ab69c7992732a4f710c12e7726b3622f34395",
+  "manifest_digest": "2b7f26c57a3af87c5ca7f0b5e1130a67b51c184afc8b8b832046985936b2f37d",
   "success_case": {
     "case_id": "guest_artifact_reference_load_success",
     "status": "loaded",
     "loaded_artifact": {
       "loaded_artifact_id": "loaded.artifact.plugin.example.echo_guest.v1",
       "manifest_id": "psion_plugin_guest_artifact_manifest_reference",
-      "identity_digest": "9b65b3c2ad8818e51814068ad6adfd132b6c244b8fc728134803622b3b5c239d",
-      "artifact_digest": "93a44bbb96c751218e4c00d479e4c14358122a389acca16205b1e4d0dc5f9476",
+      "identity_digest": "b1929f64a0732e2f30581215d901942bffea6a538a69ee3569169456ec1369e9",
+      "artifact_digest": "a51efa6038f402bab8a0d40e25740b0fafb6a730294cbb927304586caaf4d424",
       "packet_abi_version": "packet.v1",
       "guest_export_name": "handle_packet",
       "host_owned_mount_policy_id": "psion.plugin_guest_artifact.host_owned_mount_policy.v1",
       "host_owned_capability_mediation": true,
       "publication_blocked": true,
       "wasm_header_hex": "0061736d01000000",
-      "loaded_digest": "d4a88932fc78d7a84f366b41e4758d0eaa2c3ad8739f66ef9143dce4b681e50a"
+      "loaded_digest": "91d94ebd60b16d6d468c83da1a9a6af792137c30710f6cf3873117ec638589f8"
     },
     "detail": "the bounded guest-artifact loader admits one digest-matched Wasm packet artifact while keeping capability mediation host-owned and publication blocked."
   },
@@ -52,5 +52,5 @@
   ],
   "claim_boundary": "this bundle closes only the bounded guest-artifact runtime-loading path. It proves manifest-bound byte admission, digest verification, minimal Wasm header validation, host-owned capability mediation, and explicit typed load refusal while keeping invocation, bridge exposure, controller admission, publication, and arbitrary binary loading blocked.",
   "summary": "Guest-artifact runtime loading bundle covers refusal_cases=3 and keeps host_owned_capability_mediation=true with publication blocked.",
-  "bundle_digest": "f179d50d8518d64f60c4f3ffa588621ad66a61c4f8cb1a1216a777a64a8ad6f6"
+  "bundle_digest": "cc0a11a99fddcf606cbd12b82c2ca5e042ef1fc7b15bd344d561086cdc9df169"
 }

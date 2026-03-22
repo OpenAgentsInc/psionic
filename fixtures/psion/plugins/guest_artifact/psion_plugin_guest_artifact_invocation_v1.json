@@ -1,0 +1,205 @@
+{
+  "schema_version": "psionic.psion.plugin_guest_artifact_invocation.v1",
+  "bundle_id": "psion_plugin_guest_artifact_invocation",
+  "manifest_id": "psion_plugin_guest_artifact_manifest_reference",
+  "manifest_digest": "2b7f26c57a3af87c5ca7f0b5e1130a67b51c184afc8b8b832046985936b2f37d",
+  "tool_projection": {
+    "plugin_id": "plugin.example.echo_guest",
+    "tool_name": "plugin_example_echo_guest",
+    "description": "Echo one text field through the bounded guest-artifact packet path while preserving the host-native receipt and replay envelope.",
+    "arguments_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "Text echoed by the bounded guest-artifact reference plugin.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    },
+    "result_schema_id": "plugin.example.echo_guest.output.v1",
+    "refusal_schema_ids": [
+      "plugin.refusal.schema_invalid.v1",
+      "plugin.refusal.packet_too_large.v1",
+      "plugin.refusal.runtime_resource_limit.v1",
+      "plugin.refusal.runtime_unavailable.v1"
+    ],
+    "replay_class_id": "guest_artifact_digest_replay_only.v1"
+  },
+  "success_case": {
+    "case_id": "guest_artifact_echo_success",
+    "status": "exact_success",
+    "request_packet_digest": "0cabf8eb3bc773790a70725c508a206377f6bb6d98afd973bb6615763e21a43f",
+    "response_or_refusal_schema_id": "plugin.example.echo_guest.output.v1",
+    "response_or_refusal_digest": "0cabf8eb3bc773790a70725c508a206377f6bb6d98afd973bb6615763e21a43f",
+    "replay_class_id": "guest_artifact_digest_replay_only.v1",
+    "projected_result": {
+      "tool_name": "plugin_example_echo_guest",
+      "plugin_id": "plugin.example.echo_guest",
+      "plugin_version": "v1",
+      "status": "success",
+      "output_or_refusal_schema_id": "plugin.example.echo_guest.output.v1",
+      "replay_class_id": "guest_artifact_digest_replay_only.v1",
+      "structured_payload": {
+        "text": "guest-artifact echo proof"
+      },
+      "plugin_receipt": {
+        "receipt_id": "receipt.plugin.example.echo_guest.0cabf8eb3bc77379.v1",
+        "plugin_id": "plugin.example.echo_guest",
+        "plugin_version": "v1",
+        "tool_name": "plugin_example_echo_guest",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "psion.plugin_guest_artifact.mount_envelope.reference.v1",
+        "capability_namespace_ids": [],
+        "replay_class_id": "guest_artifact_digest_replay_only.v1",
+        "status": "success",
+        "input_schema_id": "plugin.example.echo_guest.input.v1",
+        "input_packet_digest": "0cabf8eb3bc773790a70725c508a206377f6bb6d98afd973bb6615763e21a43f",
+        "output_or_refusal_schema_id": "plugin.example.echo_guest.output.v1",
+        "output_or_refusal_digest": "0cabf8eb3bc773790a70725c508a206377f6bb6d98afd973bb6615763e21a43f",
+        "detail": "guest-artifact invocation emits the same receipt class as host-native starter plugins while keeping the guest lane digest-bound and replay-explicit.",
+        "receipt_digest": "cd61e48b7831b01a7823af008a829b45fb2b1d91f6aacd3a48ee2d5996affc63"
+      }
+    },
+    "receipt_binding_preserved": true,
+    "typed_refusal_preserved": false,
+    "detail": "the bounded guest-artifact invocation path executes one digest-bound Wasm echo handler and emits a host-native-equivalent receipt-bound tool result."
+  },
+  "refusal_cases": [
+    {
+      "case_id": "guest_artifact_schema_invalid",
+      "status": "typed_refusal",
+      "request_packet_digest": "951aa16a2ebd56eb79e1ebb5313d2e2b5d2ef02621f267c94817f111858de699",
+      "response_or_refusal_schema_id": "plugin.refusal.schema_invalid.v1",
+      "response_or_refusal_digest": "d682acdf8e0277ffe1b451a8085a06d5bef47b09a1704628607ce01379a8abe1",
+      "replay_class_id": "guest_artifact_digest_replay_only.v1",
+      "refusal_code": "schema_invalid",
+      "projected_result": {
+        "tool_name": "plugin_example_echo_guest",
+        "plugin_id": "plugin.example.echo_guest",
+        "plugin_version": "v1",
+        "status": "refusal",
+        "output_or_refusal_schema_id": "plugin.refusal.schema_invalid.v1",
+        "replay_class_id": "guest_artifact_digest_replay_only.v1",
+        "structured_payload": {
+          "detail": "guest-artifact invocation accepts only the bounded JSON packet form for the reference echo plugin.",
+          "refusal_class_id": "schema_invalid",
+          "schema_id": "plugin.refusal.schema_invalid.v1"
+        },
+        "plugin_receipt": {
+          "receipt_id": "receipt.plugin.example.echo_guest.951aa16a2ebd56eb.v1",
+          "plugin_id": "plugin.example.echo_guest",
+          "plugin_version": "v1",
+          "tool_name": "plugin_example_echo_guest",
+          "packet_abi_version": "packet.v1",
+          "mount_envelope_id": "psion.plugin_guest_artifact.mount_envelope.reference.v1",
+          "capability_namespace_ids": [],
+          "replay_class_id": "guest_artifact_digest_replay_only.v1",
+          "status": "refusal",
+          "input_schema_id": "plugin.example.echo_guest.input.v1",
+          "input_packet_digest": "951aa16a2ebd56eb79e1ebb5313d2e2b5d2ef02621f267c94817f111858de699",
+          "output_or_refusal_schema_id": "plugin.refusal.schema_invalid.v1",
+          "output_or_refusal_digest": "d682acdf8e0277ffe1b451a8085a06d5bef47b09a1704628607ce01379a8abe1",
+          "refusal_class_id": "schema_invalid",
+          "detail": "guest-artifact invocation accepts only the bounded JSON packet form for the reference echo plugin.",
+          "receipt_digest": "20478244ccbb783114c2f56b53014712930d3e6fcca29741a0c6271b33b912ad"
+        }
+      },
+      "receipt_binding_preserved": true,
+      "typed_refusal_preserved": true,
+      "detail": "guest-artifact invocation accepts only the bounded JSON packet form for the reference echo plugin."
+    },
+    {
+      "case_id": "guest_artifact_packet_too_large",
+      "status": "typed_refusal",
+      "request_packet_digest": "dc375bfa5e14d0a4736b2b38969facf08d773fbd553982bb6756283dce5e83f2",
+      "response_or_refusal_schema_id": "plugin.refusal.packet_too_large.v1",
+      "response_or_refusal_digest": "20e560d1f72f51d165f930c40144b69c6d44240e5e73afc40ab9368090f88502",
+      "replay_class_id": "guest_artifact_digest_replay_only.v1",
+      "refusal_code": "packet_too_large",
+      "projected_result": {
+        "tool_name": "plugin_example_echo_guest",
+        "plugin_id": "plugin.example.echo_guest",
+        "plugin_version": "v1",
+        "status": "refusal",
+        "output_or_refusal_schema_id": "plugin.refusal.packet_too_large.v1",
+        "replay_class_id": "guest_artifact_digest_replay_only.v1",
+        "structured_payload": {
+          "detail": "guest-artifact invocation refuses packets above 4096 bytes to keep the first guest lane bounded.",
+          "refusal_class_id": "packet_too_large",
+          "schema_id": "plugin.refusal.packet_too_large.v1"
+        },
+        "plugin_receipt": {
+          "receipt_id": "receipt.plugin.example.echo_guest.dc375bfa5e14d0a4.v1",
+          "plugin_id": "plugin.example.echo_guest",
+          "plugin_version": "v1",
+          "tool_name": "plugin_example_echo_guest",
+          "packet_abi_version": "packet.v1",
+          "mount_envelope_id": "psion.plugin_guest_artifact.mount_envelope.reference.v1",
+          "capability_namespace_ids": [],
+          "replay_class_id": "guest_artifact_digest_replay_only.v1",
+          "status": "refusal",
+          "input_schema_id": "plugin.example.echo_guest.input.v1",
+          "input_packet_digest": "dc375bfa5e14d0a4736b2b38969facf08d773fbd553982bb6756283dce5e83f2",
+          "output_or_refusal_schema_id": "plugin.refusal.packet_too_large.v1",
+          "output_or_refusal_digest": "20e560d1f72f51d165f930c40144b69c6d44240e5e73afc40ab9368090f88502",
+          "refusal_class_id": "packet_too_large",
+          "detail": "guest-artifact invocation refuses packets above 4096 bytes to keep the first guest lane bounded.",
+          "receipt_digest": "a330b2dc1e04dfb926d275b40ec650b135b503c59a36ed599b53d91c32ff160d"
+        }
+      },
+      "receipt_binding_preserved": true,
+      "typed_refusal_preserved": true,
+      "detail": "guest-artifact invocation refuses packets above 4096 bytes to keep the first guest lane bounded."
+    },
+    {
+      "case_id": "guest_artifact_runtime_unavailable",
+      "status": "typed_refusal",
+      "request_packet_digest": "0cabf8eb3bc773790a70725c508a206377f6bb6d98afd973bb6615763e21a43f",
+      "response_or_refusal_schema_id": "plugin.refusal.runtime_unavailable.v1",
+      "response_or_refusal_digest": "28230ceb76c1d75a3a4df849772167dbca2def3b13749d87bdaaa73fe4ee9843",
+      "replay_class_id": "guest_artifact_digest_replay_only.v1",
+      "refusal_code": "load_refusal",
+      "projected_result": {
+        "tool_name": "plugin_example_echo_guest",
+        "plugin_id": "plugin.example.echo_guest",
+        "plugin_version": "v1",
+        "status": "refusal",
+        "output_or_refusal_schema_id": "plugin.refusal.runtime_unavailable.v1",
+        "replay_class_id": "guest_artifact_digest_replay_only.v1",
+        "structured_payload": {
+          "detail": "guest-artifact invocation refused because load failed closed: guest-artifact loading fails closed when artifact bytes do not match the manifest-bound digest.",
+          "refusal_class_id": "guest_artifact_load_refusal",
+          "schema_id": "plugin.refusal.runtime_unavailable.v1"
+        },
+        "plugin_receipt": {
+          "receipt_id": "receipt.plugin.example.echo_guest.0cabf8eb3bc77379.v1",
+          "plugin_id": "plugin.example.echo_guest",
+          "plugin_version": "v1",
+          "tool_name": "plugin_example_echo_guest",
+          "packet_abi_version": "packet.v1",
+          "mount_envelope_id": "psion.plugin_guest_artifact.mount_envelope.reference.v1",
+          "capability_namespace_ids": [],
+          "replay_class_id": "guest_artifact_digest_replay_only.v1",
+          "status": "refusal",
+          "input_schema_id": "plugin.example.echo_guest.input.v1",
+          "input_packet_digest": "0cabf8eb3bc773790a70725c508a206377f6bb6d98afd973bb6615763e21a43f",
+          "output_or_refusal_schema_id": "plugin.refusal.runtime_unavailable.v1",
+          "output_or_refusal_digest": "28230ceb76c1d75a3a4df849772167dbca2def3b13749d87bdaaa73fe4ee9843",
+          "refusal_class_id": "guest_artifact_load_refusal",
+          "detail": "guest-artifact invocation refused because load failed closed: guest-artifact loading fails closed when artifact bytes do not match the manifest-bound digest.",
+          "receipt_digest": "04f4e103bd678fabf8f3d5f7f755650426da127ae3d14b1d92a4400b7ba371d0"
+        }
+      },
+      "receipt_binding_preserved": true,
+      "typed_refusal_preserved": true,
+      "detail": "guest-artifact invocation refused because load failed closed: guest-artifact loading fails closed when artifact bytes do not match the manifest-bound digest."
+    }
+  ],
+  "claim_boundary": "this bundle closes only the bounded receipt-equivalent guest-artifact invocation path. It proves one digest-bound Wasm guest can execute one packet echo call under host-owned bounds while emitting the same receipt class, replay class, typed refusal shape, and projected tool-result envelope as the host-native starter-plugin lane. It still does not claim guest-artifact catalog admission, controller breadth, publication, or arbitrary Wasm plugin support.",
+  "summary": "Guest-artifact invocation bundle covers refusal_cases=3, tool_name=`plugin_example_echo_guest`, and preserves receipt_binding_preserved=true across every case.",
+  "bundle_digest": "3745c64845b790a0d930e4e5535cede979a58b9a3a887315edc4d331db48cc51"
+}

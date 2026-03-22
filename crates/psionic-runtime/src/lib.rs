@@ -6,6 +6,7 @@ mod gpt_oss;
 mod local_multi_device;
 mod parity;
 mod proof;
+mod psion_plugin_guest_artifact_invocation;
 mod psion_plugin_guest_artifact_manifest;
 mod psion_plugin_guest_artifact_runtime_loading;
 mod structured_output;
@@ -107,6 +108,7 @@ pub use gpt_oss::*;
 pub use local_multi_device::*;
 pub use parity::*;
 pub use proof::*;
+pub use psion_plugin_guest_artifact_invocation::*;
 pub use psion_plugin_guest_artifact_manifest::*;
 pub use psion_plugin_guest_artifact_runtime_loading::*;
 use psionic_core::{

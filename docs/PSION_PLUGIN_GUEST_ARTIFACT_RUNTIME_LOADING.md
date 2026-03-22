@@ -18,7 +18,6 @@ The current loader only proves:
 
 It does **not** yet prove:
 
-- invocation
 - bridge exposure
 - catalog exposure
 - controller use
@@ -90,3 +89,5 @@ This runtime-loading proof does not claim:
 It only claims that one digest-bound guest artifact can be admitted into a
 bounded host-owned loader with explicit typed refusal paths.
 
+The next layer above this contract now lives in
+`docs/PSION_PLUGIN_GUEST_ARTIFACT_INVOCATION.md`.

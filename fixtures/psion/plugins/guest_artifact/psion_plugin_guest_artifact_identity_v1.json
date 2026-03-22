@@ -2,15 +2,15 @@
   "schema_version": "psionic.psion.plugin_guest_artifact_identity.v1",
   "identity_id": "psion_plugin_guest_artifact_identity.plugin.example.echo_guest.v1",
   "manifest_id": "psion_plugin_guest_artifact_manifest_reference",
-  "manifest_digest": "ce47b86bae51eba7598b5cc73f3ab69c7992732a4f710c12e7726b3622f34395",
+  "manifest_digest": "2b7f26c57a3af87c5ca7f0b5e1130a67b51c184afc8b8b832046985936b2f37d",
   "plugin_id": "plugin.example.echo_guest",
   "plugin_version": "v1",
   "artifact_id": "artifact.plugin.example.echo_guest.v1",
   "artifact_format": "wasm_module_packet_v1",
-  "artifact_digest": "93a44bbb96c751218e4c00d479e4c14358122a389acca16205b1e4d0dc5f9476",
+  "artifact_digest": "a51efa6038f402bab8a0d40e25740b0fafb6a730294cbb927304586caaf4d424",
   "packet_abi_version": "packet.v1",
   "guest_export_name": "handle_packet",
   "trust_tier": "operator_reviewed_digest_bound_internal_only",
   "publication_posture": "operator_internal_only_publication_blocked",
-  "identity_digest": "9b65b3c2ad8818e51814068ad6adfd132b6c244b8fc728134803622b3b5c239d"
+  "identity_digest": "b1929f64a0732e2f30581215d901942bffea6a538a69ee3569169456ec1369e9"
 }
