@@ -4,6 +4,7 @@ set -Eeuo pipefail
 
 LOG_FILE="/var/log/psion-google-startup.log"
 exec > >(tee -a "${LOG_FILE}") 2>&1
+export HOME="${HOME:-/root}"
 
 RUN_PHASE="bootstrap"
 FAILURE_CODE="bounded_success"
