@@ -1341,8 +1341,16 @@ and the audit note at
 `docs/audits/2026-03-21-tassadar-post-article-starter-plugin-catalog.md`.
 That tranche keeps the starter catalog closure-bundle-bound, operator-only,
 runtime-builtin-separate, and explicitly not a public plugin marketplace while
-publishing four bounded starter entries and two bounded composition flows. The
-next open bridge frontier is `TAS-217`.
+publishing four bounded starter entries and two bounded composition flows.
+`TAS-217` now adds the first real starter-plugin runtime implementation in
+`crates/psionic-runtime/src/tassadar_post_article_starter_plugin_runtime.rs`,
+with committed runtime evidence at
+`fixtures/tassadar/runs/tassadar_post_article_plugin_text_url_extract_v1/tassadar_post_article_plugin_text_url_extract_bundle.json`
+plus the checker
+`scripts/check-tassadar-post-article-plugin-text-url-extract.sh`.
+That closes one deterministic, capability-free `plugin.text.url_extract`
+surface without widening the machine boundary to URL truth or network truth,
+and moves the next open bridge frontier to `TAS-218`.
 
 ## Route Requirement
 

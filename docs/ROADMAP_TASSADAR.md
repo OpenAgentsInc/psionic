@@ -633,7 +633,20 @@ Current honest posture:
   four operator-curated starter plugins plus two bounded composition flows to
   the canonical machine closure bundle while keeping the entire tranche
   operator-only, runtime-builtin separate, and explicitly not a public plugin
-  marketplace; the next open bridge frontier is `TAS-217`
+  marketplace
+- the repo now also has one real runtime-owned `plugin.text.url_extract`
+  starter plugin, with reusable execution and bundle-writing code in
+  `crates/psionic-runtime/src/tassadar_post_article_starter_plugin_runtime.rs`,
+  a committed runtime bundle at
+  `fixtures/tassadar/runs/tassadar_post_article_plugin_text_url_extract_v1/tassadar_post_article_plugin_text_url_extract_bundle.json`,
+  a dedicated checker at
+  `scripts/check-tassadar-post-article-plugin-text-url-extract.sh`,
+  a starter-runtime doc at `docs/TASSADAR_STARTER_PLUGIN_RUNTIME.md`, and an
+  audit note at
+  `docs/audits/2026-03-22-tassadar-post-article-plugin-text-url-extract.md`;
+  this keeps the first starter runtime capability-free, deterministic, and
+  explicit about refusal classes and negative claims while moving the next open
+  bridge frontier to `TAS-218`
 - the repo now also has one machine-readable article-equivalence blocker
   matrix, with a committed eval report at
   `fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json`,
@@ -841,7 +854,9 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-216` is now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-217` through `TAS-226` remain open in GitHub and are tracked via the
+- `TAS-217` is now implemented and tracked in
+  `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
+- `TAS-218` through `TAS-226` remain open in GitHub and are tracked via the
   issue bodies plus `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 
 ## Repo-Local Companion Docs

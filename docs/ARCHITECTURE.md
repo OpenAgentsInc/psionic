@@ -1731,8 +1731,19 @@ The current scope is:
   plugin platform with four named starter plugins, per-plugin descriptor or
   fixture or sample-mount sidecars, and two bounded composition flows while
   keeping the catalog closure-bundle-bound, operator-only, runtime-builtin
-  separate, and explicitly not a public plugin marketplace. The next open
-  bridge frontier is `TAS-217`.
+  separate, and explicitly not a public plugin marketplace.
+- the current dedicated starter-plugin runtime artifacts also include
+  `crates/psionic-runtime/src/tassadar_post_article_starter_plugin_runtime.rs`,
+  the runtime bundle
+  `fixtures/tassadar/runs/tassadar_post_article_plugin_text_url_extract_v1/tassadar_post_article_plugin_text_url_extract_bundle.json`,
+  the checker
+  `scripts/check-tassadar-post-article-plugin-text-url-extract.sh`, the
+  runtime note `docs/TASSADAR_STARTER_PLUGIN_RUNTIME.md`, and the audit note
+  `docs/audits/2026-03-22-tassadar-post-article-plugin-text-url-extract.md`,
+  which close one real capability-free `plugin.text.url_extract` starter plugin
+  with explicit packet schema, deterministic replay posture, stable tool
+  projection, typed refusal classes, and explicit negative claims while moving
+  the next open bridge frontier to `TAS-218`.
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

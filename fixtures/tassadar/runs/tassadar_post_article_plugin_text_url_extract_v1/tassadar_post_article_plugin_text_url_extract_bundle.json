@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.post_article.plugin_text_url_extract.runtime_bundle.v1",
+  "plugin_id": "plugin.text.url_extract",
+  "plugin_version": "v1",
+  "manifest_id": "manifest.plugin.text.url_extract.v1",
+  "artifact_id": "artifact.plugin.text.url_extract.v1",
+  "packet_abi_version": "packet.v1",
+  "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+  "tool_projection": {
+    "plugin_id": "plugin.text.url_extract",
+    "tool_name": "plugin_text_url_extract",
+    "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
+    "arguments_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "packet-local input text scanned with the bounded https?://[^\\\\s]+ rule.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    },
+    "result_schema_id": "plugin.text.url_extract.output.v1",
+    "refusal_schema_ids": [
+      "plugin.refusal.schema_invalid.v1",
+      "plugin.refusal.packet_too_large.v1",
+      "plugin.refusal.unsupported_codec.v1",
+      "plugin.refusal.runtime_resource_limit.v1"
+    ],
+    "replay_class_id": "deterministic_replayable"
+  },
+  "negative_claim_ids": [
+    "url_validation_truth_not_claimed",
+    "dns_resolution_not_claimed",
+    "redirect_truth_not_claimed",
+    "network_reachability_not_claimed"
+  ],
+  "case_rows": [
+    {
+      "case_id": "extract_urls_success",
+      "status": "exact_success",
+      "codec_id": "json",
+      "request_packet_digest": "f8b785ab9312397f9a94aea615f9b879b6b27299280dcb88463c85272c4f3047",
+      "response_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+      "response_or_refusal_digest": "f8504da16ac52038db69623ffe10dc3ed04bddec8379b350d93373e03b5ad286",
+      "receipt": {
+        "receipt_id": "receipt.plugin.text.url_extract.f8b785ab9312397f.v1",
+        "plugin_id": "plugin.text.url_extract",
+        "plugin_version": "v1",
+        "tool_name": "plugin_text_url_extract",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+        "capability_namespace_ids": [],
+        "replay_class_id": "deterministic_replayable",
+        "status": "success",
+        "input_schema_id": "plugin.text.url_extract.input.v1",
+        "input_packet_digest": "f8b785ab9312397f9a94aea615f9b879b6b27299280dcb88463c85272c4f3047",
+        "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+        "output_or_refusal_digest": "f8504da16ac52038db69623ffe10dc3ed04bddec8379b350d93373e03b5ad286",
+        "detail": "url extract keeps the legacy left-to-right https?://[^\\s]+ rule with duplicate preservation and no network semantics.",
+        "receipt_digest": "ebc510343dcec0631b777d0bdf28d8ec8f5569601467254e2c5e7bea13a845d0"
+      },
+      "detail": "the runtime preserves left-to-right output order and duplicate posture for literal http(s) strings."
+    },
+    {
+      "case_id": "schema_invalid_missing_text",
+      "status": "typed_malformed_packet",
+      "codec_id": "json",
+      "request_packet_digest": "b84c1acf091222bfaf0dab067568bcf23c14d5970c02553c7a6d839384dfa37b",
+      "response_or_refusal_schema_id": "plugin.refusal.schema_invalid.v1",
+      "response_or_refusal_digest": "c9ca8d0174d046ac6b47ed8a8a837bc4c0719c3306ae9ad52af58799945e9c5a",
+      "receipt": {
+        "receipt_id": "receipt.plugin.text.url_extract.b84c1acf091222bf.v1",
+        "plugin_id": "plugin.text.url_extract",
+        "plugin_version": "v1",
+        "tool_name": "plugin_text_url_extract",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+        "capability_namespace_ids": [],
+        "replay_class_id": "deterministic_replayable",
+        "status": "refusal",
+        "input_schema_id": "plugin.text.url_extract.input.v1",
+        "input_packet_digest": "b84c1acf091222bfaf0dab067568bcf23c14d5970c02553c7a6d839384dfa37b",
+        "output_or_refusal_schema_id": "plugin.refusal.schema_invalid.v1",
+        "output_or_refusal_digest": "c9ca8d0174d046ac6b47ed8a8a837bc4c0719c3306ae9ad52af58799945e9c5a",
+        "refusal_class_id": "schema_invalid",
+        "detail": "url extract refuses malformed packets without host-side schema repair.",
+        "receipt_digest": "a470c3b6431cc58953c7288536402db3163a61623bc60195f8c6e6650ba5e5e1"
+      },
+      "detail": "missing `text` fails closed into a typed schema-invalid refusal."
+    },
+    {
+      "case_id": "packet_too_large_refusal",
+      "status": "typed_refusal",
+      "codec_id": "json",
+      "request_packet_digest": "53262be069a301ae84dc3108bf5515851205a3548f37971fcfadefeddd88ff35",
+      "response_or_refusal_schema_id": "plugin.refusal.packet_too_large.v1",
+      "response_or_refusal_digest": "fb9b782ebba383d59acc407b627c4caa865fb67e71dffbf5501b2f3faad22b8d",
+      "receipt": {
+        "receipt_id": "receipt.plugin.text.url_extract.53262be069a301ae.v1",
+        "plugin_id": "plugin.text.url_extract",
+        "plugin_version": "v1",
+        "tool_name": "plugin_text_url_extract",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+        "capability_namespace_ids": [],
+        "replay_class_id": "deterministic_replayable",
+        "status": "refusal",
+        "input_schema_id": "plugin.text.url_extract.input.v1",
+        "input_packet_digest": "53262be069a301ae84dc3108bf5515851205a3548f37971fcfadefeddd88ff35",
+        "output_or_refusal_schema_id": "plugin.refusal.packet_too_large.v1",
+        "output_or_refusal_digest": "fb9b782ebba383d59acc407b627c4caa865fb67e71dffbf5501b2f3faad22b8d",
+        "refusal_class_id": "packet_too_large",
+        "detail": "url extract keeps packet size ceilings explicit instead of relying on ambient parser allocation behavior.",
+        "receipt_digest": "f84f2f94a7870d6e7a6c2ada12bac8baefff775a745a16c32f21ac04b43c41d7"
+      },
+      "detail": "packet ceilings stay explicit rather than relying on ambient parser behavior."
+    },
+    {
+      "case_id": "unsupported_codec_refusal",
+      "status": "typed_refusal",
+      "codec_id": "bytes",
+      "request_packet_digest": "f8b785ab9312397f9a94aea615f9b879b6b27299280dcb88463c85272c4f3047",
+      "response_or_refusal_schema_id": "plugin.refusal.unsupported_codec.v1",
+      "response_or_refusal_digest": "f6eaec5bf65bb0c95d6cb2b799355f006b949f53131d8d6c17f8927750ec54d5",
+      "receipt": {
+        "receipt_id": "receipt.plugin.text.url_extract.f8b785ab9312397f.v1",
+        "plugin_id": "plugin.text.url_extract",
+        "plugin_version": "v1",
+        "tool_name": "plugin_text_url_extract",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+        "capability_namespace_ids": [],
+        "replay_class_id": "deterministic_replayable",
+        "status": "refusal",
+        "input_schema_id": "plugin.text.url_extract.input.v1",
+        "input_packet_digest": "f8b785ab9312397f9a94aea615f9b879b6b27299280dcb88463c85272c4f3047",
+        "output_or_refusal_schema_id": "plugin.refusal.unsupported_codec.v1",
+        "output_or_refusal_digest": "f6eaec5bf65bb0c95d6cb2b799355f006b949f53131d8d6c17f8927750ec54d5",
+        "refusal_class_id": "unsupported_codec",
+        "detail": "url extract accepts only json packet input under packet.v1.",
+        "receipt_digest": "386bce579b69def670fb38264c26aa84816ae9631b390e53912344e2a58548fe"
+      },
+      "detail": "unsupported codecs remain typed refusal truth instead of host-side best effort decode."
+    },
+    {
+      "case_id": "runtime_resource_limit_refusal",
+      "status": "typed_refusal",
+      "codec_id": "json",
+      "request_packet_digest": "5ec7c050293c04075fc1961ace8073038d3de0a1617ab20d773bc877d26e0839",
+      "response_or_refusal_schema_id": "plugin.refusal.runtime_resource_limit.v1",
+      "response_or_refusal_digest": "e82a8e95e51436d1bff6ec3aeac2af0c4341a195e9e32b5d81616c5f4f01a3a9",
+      "receipt": {
+        "receipt_id": "receipt.plugin.text.url_extract.5ec7c050293c0407.v1",
+        "plugin_id": "plugin.text.url_extract",
+        "plugin_version": "v1",
+        "tool_name": "plugin_text_url_extract",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+        "capability_namespace_ids": [],
+        "replay_class_id": "deterministic_replayable",
+        "status": "refusal",
+        "input_schema_id": "plugin.text.url_extract.input.v1",
+        "input_packet_digest": "5ec7c050293c04075fc1961ace8073038d3de0a1617ab20d773bc877d26e0839",
+        "output_or_refusal_schema_id": "plugin.refusal.runtime_resource_limit.v1",
+        "output_or_refusal_digest": "e82a8e95e51436d1bff6ec3aeac2af0c4341a195e9e32b5d81616c5f4f01a3a9",
+        "refusal_class_id": "runtime_resource_limit",
+        "detail": "url extract exceeded the configured output ceiling before completing the left-to-right scan.",
+        "receipt_digest": "7aca7b34f8234189ad8fbe07f577ca2180f061a4c97ea58cead9cf71ca82149d"
+      },
+      "detail": "bounded output ceilings fail closed into one typed runtime-resource-limit refusal."
+    }
+  ],
+  "claim_boundary": "this runtime bundle closes one capability-free starter plugin that extracts literal http:// and https:// substrings from packet-local text under one deterministic regex rule. It does not claim URL validation, DNS truth, redirect truth, or any network semantics.",
+  "summary": "url extract runtime bundle covers 5 cases across success=1, malformed=1, refusals=3.",
+  "bundle_digest": "de0e8814936b5684f3c64d344c9808289f809f3409c2bc0a01f60db183d6dc87"
+}

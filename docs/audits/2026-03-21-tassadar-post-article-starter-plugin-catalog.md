@@ -57,5 +57,12 @@ legibility.
 
 ## Next Frontier
 
-The next open starter-plugin frontier is `TAS-217`, which begins the dedicated
-plugin-by-plugin canonicalization wave on top of this catalog shell.
+`TAS-217` is now closed by the dedicated
+`plugin.text.url_extract` runtime implementation in
+`crates/psionic-runtime/src/tassadar_post_article_starter_plugin_runtime.rs`
+and its committed bundle at
+`fixtures/tassadar/runs/tassadar_post_article_plugin_text_url_extract_v1/tassadar_post_article_plugin_text_url_extract_bundle.json`.
+
+The next open starter-plugin frontier is `TAS-218`, which continues the
+plugin-by-plugin runtime wave on top of this catalog shell with
+`plugin.http.fetch_text`.
