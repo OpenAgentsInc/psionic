@@ -1,0 +1,2810 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.multi_plugin_trace_corpus.bundle.v1",
+  "source_bundle_rows": [
+    {
+      "lane_id": "deterministic_workflow",
+      "bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
+      "bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
+      "bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
+      "case_count": 2,
+      "claim_boundary": "this bundle freezes one host-owned deterministic starter-plugin workflow controller above the shared bridge. It keeps URL extraction, fetch, content-type branching, readable-html extraction, feed parsing, refusal capture, and stop conditions explicit without claiming open-ended planning or weighted controller closure."
+    },
+    {
+      "lane_id": "router_responses",
+      "bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_router_plugin_tool_loop_pilot_v1/tassadar_post_article_router_plugin_tool_loop_pilot_bundle.json",
+      "bundle_id": "tassadar.post_article.router_plugin_tool_loop_pilot.bundle.v1",
+      "bundle_digest": "c5b29de4b470c88c8b17fd04b93a13b73b81b36fa6071a2a330de0201f890d8f",
+      "case_count": 2,
+      "claim_boundary": "this pilot freezes one bounded router-owned plugin tool loop on `/v1/responses` with shared starter-plugin runtime execution, structured tool envelopes, typed refusals, response-state continuation, and explicit route truth. It does not claim weighted plugin closure, arbitrary model planning, or canonical Tassadar controller completion."
+    },
+    {
+      "lane_id": "apple_fm_session",
+      "bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_apple_fm_plugin_session_pilot_v1/tassadar_post_article_apple_fm_plugin_session_pilot_bundle.json",
+      "bundle_id": "tassadar.post_article.apple_fm_plugin_session_pilot.bundle.v1",
+      "bundle_digest": "9818a877307685deb471bceb59722272c78ef259b28683ee0461b2eb063e66f5",
+      "case_count": 2,
+      "claim_boundary": "this bundle freezes one local Apple FM plugin orchestration lane over the shared starter-plugin runtime and transcript envelope. It does not claim served-model closure, cross-platform serving completion, or canonical weighted-plugin control."
+    }
+  ],
+  "projected_tool_schema_rows": [
+    {
+      "tool_name": "plugin_feed_rss_atom_parse",
+      "plugin_id": "plugin.feed.rss_atom_parse",
+      "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
+      "arguments_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "content_type": {
+            "type": "string"
+          },
+          "feed_text": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_url",
+          "content_type",
+          "feed_text"
+        ],
+        "type": "object"
+      },
+      "arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
+      "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.input_too_large.v1",
+        "plugin.refusal.unsupported_feed_format.v1"
+      ],
+      "replay_class_id": "deterministic_replayable"
+    },
+    {
+      "tool_name": "plugin_html_extract_readable",
+      "plugin_id": "plugin.html.extract_readable",
+      "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+      "arguments_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "body_text": {
+            "type": "string"
+          },
+          "content_type": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_url",
+          "content_type",
+          "body_text"
+        ],
+        "type": "object"
+      },
+      "arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
+      "result_schema_id": "plugin.html.extract_readable.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.unsupported_codec.v1",
+        "plugin.refusal.input_too_large.v1",
+        "plugin.refusal.content_type_unsupported.v1"
+      ],
+      "replay_class_id": "deterministic_replayable"
+    },
+    {
+      "tool_name": "plugin_http_fetch_text",
+      "plugin_id": "plugin.http.fetch_text",
+      "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
+      "arguments_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "description": "allowlisted absolute URL fetched with one bounded GET-only runtime path.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "arguments_schema_digest": "ac666cca44c1c1cd89dca49d313e5776581c71ca1f5175011183721e2956c1dc",
+      "result_schema_id": "plugin.http.fetch_text.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.unsupported_codec.v1",
+        "plugin.refusal.network_denied.v1",
+        "plugin.refusal.url_not_permitted.v1",
+        "plugin.refusal.timeout.v1",
+        "plugin.refusal.response_too_large.v1",
+        "plugin.refusal.content_type_unsupported.v1",
+        "plugin.refusal.decode_failed.v1",
+        "plugin.refusal.upstream_failure.v1"
+      ],
+      "replay_class_id": "replayable_with_snapshots"
+    },
+    {
+      "tool_name": "plugin_text_url_extract",
+      "plugin_id": "plugin.text.url_extract",
+      "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
+      "arguments_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "description": "packet-local input text scanned with the bounded https?://[^\\\\s]+ rule.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "type": "object"
+      },
+      "arguments_schema_digest": "dc77cf65726337d506f1ef2070df9d9fd26dde8836cd04c7b092b037e5a46b5c",
+      "result_schema_id": "plugin.text.url_extract.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.packet_too_large.v1",
+        "plugin.refusal.unsupported_codec.v1",
+        "plugin.refusal.runtime_resource_limit.v1"
+      ],
+      "replay_class_id": "deterministic_replayable"
+    }
+  ],
+  "trace_records": [
+    {
+      "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
+      "record_id": "trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
+      "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+      "source_case_id": "apple_fm_plugin_session_fetch_refusal",
+      "lane_id": "apple_fm_session",
+      "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_apple_fm_plugin_session_pilot_v1/tassadar_post_article_apple_fm_plugin_session_pilot_bundle.json",
+      "source_bundle_id": "tassadar.post_article.apple_fm_plugin_session_pilot.bundle.v1",
+      "source_bundle_digest": "9818a877307685deb471bceb59722272c78ef259b28683ee0461b2eb063e66f5",
+      "directive_text": "Read https://snapshot.example/binary.",
+      "admissible_tool_names": [
+        "plugin_feed_rss_atom_parse",
+        "plugin_html_extract_readable",
+        "plugin_http_fetch_text",
+        "plugin_text_url_extract"
+      ],
+      "projected_tool_schema_rows": [
+        {
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "plugin_id": "plugin.feed.rss_atom_parse",
+          "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "content_type": {
+                "type": "string"
+              },
+              "feed_text": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "feed_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
+          "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.unsupported_feed_format.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_html_extract_readable",
+          "plugin_id": "plugin.html.extract_readable",
+          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "body_text": {
+                "type": "string"
+              },
+              "content_type": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "body_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
+          "result_schema_id": "plugin.html.extract_readable.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "url": {
+                "description": "allowlisted absolute URL fetched with one bounded GET-only runtime path.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "ac666cca44c1c1cd89dca49d313e5776581c71ca1f5175011183721e2956c1dc",
+          "result_schema_id": "plugin.http.fetch_text.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.network_denied.v1",
+            "plugin.refusal.url_not_permitted.v1",
+            "plugin.refusal.timeout.v1",
+            "plugin.refusal.response_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1",
+            "plugin.refusal.decode_failed.v1",
+            "plugin.refusal.upstream_failure.v1"
+          ],
+          "replay_class_id": "replayable_with_snapshots"
+        },
+        {
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "description": "packet-local input text scanned with the bounded https?://[^\\\\s]+ rule.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "dc77cf65726337d506f1ef2070df9d9fd26dde8836cd04c7b092b037e5a46b5c",
+          "result_schema_id": "plugin.text.url_extract.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.packet_too_large.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.runtime_resource_limit.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        }
+      ],
+      "controller_decision_rows": [
+        {
+          "decision_index": 0,
+          "decision_source": "apple_fm_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "apple_fm_plugin_session_fetch_refusal-assistant-1",
+          "tool_name": "plugin_text_url_extract",
+          "detail": "Calling the starter URL extractor from the Apple FM local lane."
+        },
+        {
+          "decision_index": 1,
+          "decision_source": "apple_fm_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "apple_fm_plugin_session_fetch_refusal-assistant-2",
+          "tool_name": "plugin_http_fetch_text",
+          "detail": "Fetching the extracted binary URL."
+        },
+        {
+          "decision_index": 2,
+          "decision_source": "apple_fm_assistant",
+          "decision_kind": "final_message",
+          "decision_ref": "apple_fm.final_message.apple_fm_plugin_session_fetch_refusal",
+          "detail": "The local Apple FM pilot stopped after a typed fetch refusal."
+        }
+      ],
+      "step_rows": [
+        {
+          "step_index": 0,
+          "decision_ref": "apple_fm_plugin_session_fetch_refusal-assistant-1",
+          "result_ref": "apple_fm_plugin_session_fetch_refusal-tool-1",
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "arguments": {
+            "text": "Read https://snapshot.example/binary."
+          },
+          "projected_result": {
+            "tool_name": "plugin_text_url_extract",
+            "plugin_id": "plugin.text.url_extract",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "urls": [
+                "https://snapshot.example/binary."
+              ]
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.text.url_extract.4a6f86849a652648.v1",
+              "plugin_id": "plugin.text.url_extract",
+              "plugin_version": "v1",
+              "tool_name": "plugin_text_url_extract",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.text.url_extract.input.v1",
+              "input_packet_digest": "4a6f86849a6526480a438ff012a729b18611d63bbcf1a14c1810f61af9416346",
+              "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+              "output_or_refusal_digest": "784e5a2425219ec59dc14d5fc26b3d39ed9f88a0f7077033806b98eb40b5893b",
+              "detail": "url extract keeps the legacy left-to-right https?://[^\\s]+ rule with duplicate preservation and no network semantics.",
+              "receipt_digest": "40c66550e26f0f13729b7f6037f249098d7dce373eee75d0ee71d0ab86c3512f"
+            }
+          },
+          "detail": "Calling the starter URL extractor from the Apple FM local lane."
+        },
+        {
+          "step_index": 1,
+          "decision_ref": "apple_fm_plugin_session_fetch_refusal-assistant-2",
+          "result_ref": "apple_fm_plugin_session_fetch_refusal-tool-2",
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "arguments": {
+            "url": "https://snapshot.example/binary"
+          },
+          "projected_result": {
+            "tool_name": "plugin_http_fetch_text",
+            "plugin_id": "plugin.http.fetch_text",
+            "plugin_version": "v1",
+            "status": "refusal",
+            "output_or_refusal_schema_id": "plugin.refusal.content_type_unsupported.v1",
+            "replay_class_id": "replayable_with_snapshots",
+            "structured_payload": {
+              "detail": "content type `image/png` is outside the bounded text-fetch window.",
+              "refusal_class_id": "content_type_unsupported",
+              "schema_id": "plugin.refusal.content_type_unsupported.v1"
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1",
+              "plugin_id": "plugin.http.fetch_text",
+              "plugin_version": "v1",
+              "tool_name": "plugin_http_fetch_text",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+              "capability_namespace_ids": [
+                "capability.http.read_only.v1"
+              ],
+              "replay_class_id": "replayable_with_snapshots",
+              "status": "refusal",
+              "input_schema_id": "plugin.http.fetch_text.input.v1",
+              "input_packet_digest": "c81ec5cc115ff56182920b966d9d4deac1e13d71d25ea6d189efec3f20d978a1",
+              "output_or_refusal_schema_id": "plugin.refusal.content_type_unsupported.v1",
+              "output_or_refusal_digest": "c51de5cd8f480d9c690d97908afc39d25e648385a3290da426e603393b611bde",
+              "refusal_class_id": "content_type_unsupported",
+              "detail": "content type `image/png` is outside the bounded text-fetch window.",
+              "receipt_digest": "44f2eaa29817d76374d585ffc39daa2fb1c2c8fc5ed4b741f27ffec56275884d"
+            }
+          },
+          "detail": "Fetching the extracted binary URL."
+        }
+      ],
+      "normalized_stop_condition_id": "workflow_stop.typed_refusal",
+      "source_stop_condition_id": "apple_fm.session.typed_refusal_completed",
+      "final_message_text": "The local Apple FM pilot stopped after a typed fetch refusal.",
+      "typed_refusal_preserved": true,
+      "detail": "the local Apple FM pilot keeps one session-local callback registry, one transcript envelope, and one shared starter-plugin runtime surface explicit instead of inventing Apple-only plugin semantics.",
+      "record_digest": "3b4335fdc43777bfc03897622f1305c54776f0fcba7f6e31299e8e45a66a8872"
+    },
+    {
+      "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
+      "record_id": "trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
+      "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+      "source_case_id": "web_content_intake_fetch_refusal",
+      "lane_id": "deterministic_workflow",
+      "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
+      "source_bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
+      "source_bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
+      "directive_text": "Review https://snapshot.example/binary",
+      "admissible_tool_names": [
+        "plugin_feed_rss_atom_parse",
+        "plugin_html_extract_readable",
+        "plugin_http_fetch_text",
+        "plugin_text_url_extract"
+      ],
+      "projected_tool_schema_rows": [
+        {
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "plugin_id": "plugin.feed.rss_atom_parse",
+          "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "content_type": {
+                "type": "string"
+              },
+              "feed_text": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "feed_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
+          "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.unsupported_feed_format.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_html_extract_readable",
+          "plugin_id": "plugin.html.extract_readable",
+          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "body_text": {
+                "type": "string"
+              },
+              "content_type": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "body_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
+          "result_schema_id": "plugin.html.extract_readable.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "url": {
+                "description": "allowlisted absolute URL fetched with one bounded GET-only runtime path.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "ac666cca44c1c1cd89dca49d313e5776581c71ca1f5175011183721e2956c1dc",
+          "result_schema_id": "plugin.http.fetch_text.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.network_denied.v1",
+            "plugin.refusal.url_not_permitted.v1",
+            "plugin.refusal.timeout.v1",
+            "plugin.refusal.response_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1",
+            "plugin.refusal.decode_failed.v1",
+            "plugin.refusal.upstream_failure.v1"
+          ],
+          "replay_class_id": "replayable_with_snapshots"
+        },
+        {
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "description": "packet-local input text scanned with the bounded https?://[^\\\\s]+ rule.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "dc77cf65726337d506f1ef2070df9d9fd26dde8836cd04c7b092b037e5a46b5c",
+          "result_schema_id": "plugin.text.url_extract.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.packet_too_large.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.runtime_resource_limit.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        }
+      ],
+      "controller_decision_rows": [
+        {
+          "decision_index": 0,
+          "decision_source": "host_owned",
+          "decision_kind": "tool_call",
+          "decision_ref": "deterministic.tool_call.0",
+          "tool_name": "plugin_text_url_extract",
+          "detail": "extract candidate URLs from the directive text with the shared bridge."
+        },
+        {
+          "decision_index": 1,
+          "decision_source": "host_owned",
+          "decision_kind": "tool_call",
+          "decision_ref": "deterministic.tool_call.1",
+          "tool_name": "plugin_http_fetch_text",
+          "detail": "fetch the URL through the shared bridge before any content-type branch decision."
+        },
+        {
+          "decision_index": 2,
+          "decision_source": "host_owned",
+          "decision_kind": "stop_condition",
+          "decision_ref": "deterministic.decision.0",
+          "detail": "the host-owned controller stops immediately when fetch returns a typed refusal."
+        }
+      ],
+      "step_rows": [
+        {
+          "step_index": 0,
+          "decision_ref": "deterministic.tool_call.0",
+          "result_ref": "deterministic.tool_result.0",
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "arguments": {
+            "text": "Review https://snapshot.example/binary"
+          },
+          "projected_result": {
+            "tool_name": "plugin_text_url_extract",
+            "plugin_id": "plugin.text.url_extract",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "urls": [
+                "https://snapshot.example/binary"
+              ]
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.text.url_extract.ffb40b7ac81128df.v1",
+              "plugin_id": "plugin.text.url_extract",
+              "plugin_version": "v1",
+              "tool_name": "plugin_text_url_extract",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.text.url_extract.input.v1",
+              "input_packet_digest": "ffb40b7ac81128dfbe3218b82f69a090a63a6a1229bc3fe682d0535ce71f96c6",
+              "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+              "output_or_refusal_digest": "5fdf45d65948fa246da4beeeeaf26c58a49e0cd8419d149c608ecf9ec4f334a4",
+              "detail": "url extract keeps the legacy left-to-right https?://[^\\s]+ rule with duplicate preservation and no network semantics.",
+              "receipt_digest": "7743fa7abaf881fa50a70b6ff4ff5adb128517ea791e759d11cf7b56f5e588e9"
+            }
+          },
+          "detail": "extract candidate URLs from the directive text with the shared bridge."
+        },
+        {
+          "step_index": 1,
+          "decision_ref": "deterministic.tool_call.1",
+          "result_ref": "deterministic.tool_result.1",
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "arguments": {
+            "url": "https://snapshot.example/binary"
+          },
+          "projected_result": {
+            "tool_name": "plugin_http_fetch_text",
+            "plugin_id": "plugin.http.fetch_text",
+            "plugin_version": "v1",
+            "status": "refusal",
+            "output_or_refusal_schema_id": "plugin.refusal.content_type_unsupported.v1",
+            "replay_class_id": "replayable_with_snapshots",
+            "structured_payload": {
+              "detail": "content type `image/png` is outside the bounded text-fetch window.",
+              "refusal_class_id": "content_type_unsupported",
+              "schema_id": "plugin.refusal.content_type_unsupported.v1"
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1",
+              "plugin_id": "plugin.http.fetch_text",
+              "plugin_version": "v1",
+              "tool_name": "plugin_http_fetch_text",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+              "capability_namespace_ids": [
+                "capability.http.read_only.v1"
+              ],
+              "replay_class_id": "replayable_with_snapshots",
+              "status": "refusal",
+              "input_schema_id": "plugin.http.fetch_text.input.v1",
+              "input_packet_digest": "c81ec5cc115ff56182920b966d9d4deac1e13d71d25ea6d189efec3f20d978a1",
+              "output_or_refusal_schema_id": "plugin.refusal.content_type_unsupported.v1",
+              "output_or_refusal_digest": "c51de5cd8f480d9c690d97908afc39d25e648385a3290da426e603393b611bde",
+              "refusal_class_id": "content_type_unsupported",
+              "detail": "content type `image/png` is outside the bounded text-fetch window.",
+              "receipt_digest": "44f2eaa29817d76374d585ffc39daa2fb1c2c8fc5ed4b741f27ffec56275884d"
+            }
+          },
+          "detail": "fetch the URL through the shared bridge before any content-type branch decision."
+        }
+      ],
+      "normalized_stop_condition_id": "workflow_stop.typed_refusal",
+      "source_stop_condition_id": "controller_stop.typed_refusal",
+      "final_message_text": "The deterministic controller stopped after a typed plugin refusal.",
+      "typed_refusal_preserved": true,
+      "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops immediately when fetch returns a typed refusal.",
+      "record_digest": "c7db2fb8bcfbf4731cf886420e79574d73b118c01b55aed811d56dab761d8321"
+    },
+    {
+      "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
+      "record_id": "trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
+      "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+      "source_case_id": "router_plugin_tool_loop_fetch_refusal",
+      "lane_id": "router_responses",
+      "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_router_plugin_tool_loop_pilot_v1/tassadar_post_article_router_plugin_tool_loop_pilot_bundle.json",
+      "source_bundle_id": "tassadar.post_article.router_plugin_tool_loop_pilot.bundle.v1",
+      "source_bundle_digest": "c5b29de4b470c88c8b17fd04b93a13b73b81b36fa6071a2a330de0201f890d8f",
+      "directive_text": "Read https://snapshot.example/binary.",
+      "admissible_tool_names": [
+        "plugin_feed_rss_atom_parse",
+        "plugin_html_extract_readable",
+        "plugin_http_fetch_text",
+        "plugin_text_url_extract"
+      ],
+      "projected_tool_schema_rows": [
+        {
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "plugin_id": "plugin.feed.rss_atom_parse",
+          "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "content_type": {
+                "type": "string"
+              },
+              "feed_text": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "feed_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
+          "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.unsupported_feed_format.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_html_extract_readable",
+          "plugin_id": "plugin.html.extract_readable",
+          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "body_text": {
+                "type": "string"
+              },
+              "content_type": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "body_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
+          "result_schema_id": "plugin.html.extract_readable.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "url": {
+                "description": "allowlisted absolute URL fetched with one bounded GET-only runtime path.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "ac666cca44c1c1cd89dca49d313e5776581c71ca1f5175011183721e2956c1dc",
+          "result_schema_id": "plugin.http.fetch_text.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.network_denied.v1",
+            "plugin.refusal.url_not_permitted.v1",
+            "plugin.refusal.timeout.v1",
+            "plugin.refusal.response_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1",
+            "plugin.refusal.decode_failed.v1",
+            "plugin.refusal.upstream_failure.v1"
+          ],
+          "replay_class_id": "replayable_with_snapshots"
+        },
+        {
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "description": "packet-local input text scanned with the bounded https?://[^\\\\s]+ rule.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "dc77cf65726337d506f1ef2070df9d9fd26dde8836cd04c7b092b037e5a46b5c",
+          "result_schema_id": "plugin.text.url_extract.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.packet_too_large.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.runtime_resource_limit.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        }
+      ],
+      "controller_decision_rows": [
+        {
+          "decision_index": 0,
+          "decision_source": "router_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "psionic-resp-1-tool-0",
+          "tool_name": "plugin_text_url_extract",
+          "detail": "the served seed response issued the first router-owned tool call."
+        },
+        {
+          "decision_index": 1,
+          "decision_source": "router_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "tool-1",
+          "tool_name": "plugin_http_fetch_text",
+          "detail": "Fetching the extracted binary URL."
+        },
+        {
+          "decision_index": 2,
+          "decision_source": "router_assistant",
+          "decision_kind": "final_message",
+          "decision_ref": "router.final_message.router_plugin_tool_loop_fetch_refusal",
+          "detail": "The router-owned plugin tool loop stopped after a typed fetch refusal."
+        }
+      ],
+      "step_rows": [
+        {
+          "step_index": 0,
+          "decision_ref": "psionic-resp-1-tool-0",
+          "result_ref": "psionic-resp-1-tool-0",
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "arguments": {
+            "text": "Read https://snapshot.example/binary."
+          },
+          "projected_result": {
+            "tool_name": "plugin_text_url_extract",
+            "plugin_id": "plugin.text.url_extract",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "urls": [
+                "https://snapshot.example/binary."
+              ]
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.text.url_extract.4a6f86849a652648.v1",
+              "plugin_id": "plugin.text.url_extract",
+              "plugin_version": "v1",
+              "tool_name": "plugin_text_url_extract",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.text.url_extract.input.v1",
+              "input_packet_digest": "4a6f86849a6526480a438ff012a729b18611d63bbcf1a14c1810f61af9416346",
+              "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+              "output_or_refusal_digest": "784e5a2425219ec59dc14d5fc26b3d39ed9f88a0f7077033806b98eb40b5893b",
+              "detail": "url extract keeps the legacy left-to-right https?://[^\\s]+ rule with duplicate preservation and no network semantics.",
+              "receipt_digest": "40c66550e26f0f13729b7f6037f249098d7dce373eee75d0ee71d0ab86c3512f"
+            }
+          },
+          "detail": "the served seed response issued the first router-owned tool call."
+        },
+        {
+          "step_index": 1,
+          "decision_ref": "tool-1",
+          "result_ref": "tool-1",
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "arguments": {
+            "url": "https://snapshot.example/binary"
+          },
+          "projected_result": {
+            "tool_name": "plugin_http_fetch_text",
+            "plugin_id": "plugin.http.fetch_text",
+            "plugin_version": "v1",
+            "status": "refusal",
+            "output_or_refusal_schema_id": "plugin.refusal.content_type_unsupported.v1",
+            "replay_class_id": "replayable_with_snapshots",
+            "structured_payload": {
+              "detail": "content type `image/png` is outside the bounded text-fetch window.",
+              "refusal_class_id": "content_type_unsupported",
+              "schema_id": "plugin.refusal.content_type_unsupported.v1"
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1",
+              "plugin_id": "plugin.http.fetch_text",
+              "plugin_version": "v1",
+              "tool_name": "plugin_http_fetch_text",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+              "capability_namespace_ids": [
+                "capability.http.read_only.v1"
+              ],
+              "replay_class_id": "replayable_with_snapshots",
+              "status": "refusal",
+              "input_schema_id": "plugin.http.fetch_text.input.v1",
+              "input_packet_digest": "c81ec5cc115ff56182920b966d9d4deac1e13d71d25ea6d189efec3f20d978a1",
+              "output_or_refusal_schema_id": "plugin.refusal.content_type_unsupported.v1",
+              "output_or_refusal_digest": "c51de5cd8f480d9c690d97908afc39d25e648385a3290da426e603393b611bde",
+              "refusal_class_id": "content_type_unsupported",
+              "detail": "content type `image/png` is outside the bounded text-fetch window.",
+              "receipt_digest": "44f2eaa29817d76374d585ffc39daa2fb1c2c8fc5ed4b741f27ffec56275884d"
+            }
+          },
+          "detail": "Fetching the extracted binary URL."
+        }
+      ],
+      "normalized_stop_condition_id": "workflow_stop.typed_refusal",
+      "source_stop_condition_id": "router.termination.completed",
+      "final_message_text": "The router-owned plugin tool loop stopped after a typed fetch refusal.",
+      "typed_refusal_preserved": true,
+      "detail": "the refusal case proves typed fetch refusals remain structured and receipt-bound after crossing the router-owned tool loop.",
+      "record_digest": "b15af5f92dab4dfa4236a9d52cd50e6c0eee7cd6f53496fc0e33d553c1a6c55c"
+    },
+    {
+      "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
+      "record_id": "trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+      "workflow_case_id": "starter_plugin.web_content_success.v1",
+      "source_case_id": "apple_fm_plugin_session_success",
+      "lane_id": "apple_fm_session",
+      "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_apple_fm_plugin_session_pilot_v1/tassadar_post_article_apple_fm_plugin_session_pilot_bundle.json",
+      "source_bundle_id": "tassadar.post_article.apple_fm_plugin_session_pilot.bundle.v1",
+      "source_bundle_digest": "9818a877307685deb471bceb59722272c78ef259b28683ee0461b2eb063e66f5",
+      "directive_text": "Read https://snapshot.example/article and https://snapshot.example/feed.rss.",
+      "admissible_tool_names": [
+        "plugin_feed_rss_atom_parse",
+        "plugin_html_extract_readable",
+        "plugin_http_fetch_text",
+        "plugin_text_url_extract"
+      ],
+      "projected_tool_schema_rows": [
+        {
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "plugin_id": "plugin.feed.rss_atom_parse",
+          "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "content_type": {
+                "type": "string"
+              },
+              "feed_text": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "feed_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
+          "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.unsupported_feed_format.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_html_extract_readable",
+          "plugin_id": "plugin.html.extract_readable",
+          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "body_text": {
+                "type": "string"
+              },
+              "content_type": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "body_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
+          "result_schema_id": "plugin.html.extract_readable.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "url": {
+                "description": "allowlisted absolute URL fetched with one bounded GET-only runtime path.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "ac666cca44c1c1cd89dca49d313e5776581c71ca1f5175011183721e2956c1dc",
+          "result_schema_id": "plugin.http.fetch_text.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.network_denied.v1",
+            "plugin.refusal.url_not_permitted.v1",
+            "plugin.refusal.timeout.v1",
+            "plugin.refusal.response_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1",
+            "plugin.refusal.decode_failed.v1",
+            "plugin.refusal.upstream_failure.v1"
+          ],
+          "replay_class_id": "replayable_with_snapshots"
+        },
+        {
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "description": "packet-local input text scanned with the bounded https?://[^\\\\s]+ rule.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "dc77cf65726337d506f1ef2070df9d9fd26dde8836cd04c7b092b037e5a46b5c",
+          "result_schema_id": "plugin.text.url_extract.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.packet_too_large.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.runtime_resource_limit.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        }
+      ],
+      "controller_decision_rows": [
+        {
+          "decision_index": 0,
+          "decision_source": "apple_fm_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "apple_fm_plugin_session_success-assistant-1",
+          "tool_name": "plugin_text_url_extract",
+          "detail": "Calling the starter URL extractor from the Apple FM local lane."
+        },
+        {
+          "decision_index": 1,
+          "decision_source": "apple_fm_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "apple_fm_plugin_session_success-assistant-2",
+          "tool_name": "plugin_http_fetch_text",
+          "detail": "Fetching the article HTML through the same plugin runtime."
+        },
+        {
+          "decision_index": 2,
+          "decision_source": "apple_fm_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "apple_fm_plugin_session_success-assistant-3",
+          "tool_name": "plugin_html_extract_readable",
+          "detail": "Extracting readable article content."
+        },
+        {
+          "decision_index": 3,
+          "decision_source": "apple_fm_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "apple_fm_plugin_session_success-assistant-4",
+          "tool_name": "plugin_http_fetch_text",
+          "detail": "Fetching the feed document."
+        },
+        {
+          "decision_index": 4,
+          "decision_source": "apple_fm_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "apple_fm_plugin_session_success-assistant-5",
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "detail": "Parsing the feed through the shared starter-plugin bridge."
+        },
+        {
+          "decision_index": 5,
+          "decision_source": "apple_fm_assistant",
+          "decision_kind": "final_message",
+          "decision_ref": "apple_fm.final_message.apple_fm_plugin_session_success",
+          "detail": "The local Apple FM pilot extracted one article and one feed through the shared starter-plugin runtime."
+        }
+      ],
+      "step_rows": [
+        {
+          "step_index": 0,
+          "decision_ref": "apple_fm_plugin_session_success-assistant-1",
+          "result_ref": "apple_fm_plugin_session_success-tool-1",
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "arguments": {
+            "text": "Read https://snapshot.example/article and https://snapshot.example/feed.rss."
+          },
+          "projected_result": {
+            "tool_name": "plugin_text_url_extract",
+            "plugin_id": "plugin.text.url_extract",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "urls": [
+                "https://snapshot.example/article",
+                "https://snapshot.example/feed.rss."
+              ]
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.text.url_extract.62157e9942c049fa.v1",
+              "plugin_id": "plugin.text.url_extract",
+              "plugin_version": "v1",
+              "tool_name": "plugin_text_url_extract",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.text.url_extract.input.v1",
+              "input_packet_digest": "62157e9942c049fa8e6ab7c6a1f74b1f41a2f5016445acc61527f8a8c8ce7f1b",
+              "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+              "output_or_refusal_digest": "214fd263858f807ded0fa9178cb5361396d4d52d4235af2cb29cc1fca930b7fe",
+              "detail": "url extract keeps the legacy left-to-right https?://[^\\s]+ rule with duplicate preservation and no network semantics.",
+              "receipt_digest": "fd52592bfe7ec1f52cbaae881db7a57041825dd51e07900e0e8d82da323aa341"
+            }
+          },
+          "detail": "Calling the starter URL extractor from the Apple FM local lane."
+        },
+        {
+          "step_index": 1,
+          "decision_ref": "apple_fm_plugin_session_success-assistant-2",
+          "result_ref": "apple_fm_plugin_session_success-tool-2",
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "arguments": {
+            "url": "https://snapshot.example/article"
+          },
+          "projected_result": {
+            "tool_name": "plugin_http_fetch_text",
+            "plugin_id": "plugin.http.fetch_text",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+            "replay_class_id": "replayable_with_snapshots",
+            "structured_payload": {
+              "body_text": "<html lang=\"en\"><head><title>Snapshot Article</title></head><body><main><p>Bounded starter plugin content.</p></main></body></html>",
+              "charset": "utf-8",
+              "content_type": "text/html",
+              "final_url": "https://snapshot.example/article",
+              "status_code": 200,
+              "truncated": false
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+              "plugin_id": "plugin.http.fetch_text",
+              "plugin_version": "v1",
+              "tool_name": "plugin_http_fetch_text",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+              "capability_namespace_ids": [
+                "capability.http.read_only.v1"
+              ],
+              "replay_class_id": "replayable_with_snapshots",
+              "status": "success",
+              "input_schema_id": "plugin.http.fetch_text.input.v1",
+              "input_packet_digest": "aa5ae2b22543ed81711389887a52bd710d475bb12785618b07edcaad83b51cea",
+              "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+              "output_or_refusal_digest": "da2fc12b9e181424b8b781b24df5e7508965a4e7a55ae901b917681ad5a5ab4a",
+              "detail": "fetch-text keeps GET-only host-mediated access explicit and returns structured text-fetch truth without browser semantics.",
+              "receipt_digest": "b46d6d7f789b833ceadeb938f07f5debe355e7ab53add5a002507ef3a3459a97"
+            }
+          },
+          "detail": "Fetching the article HTML through the same plugin runtime."
+        },
+        {
+          "step_index": 2,
+          "decision_ref": "apple_fm_plugin_session_success-assistant-3",
+          "result_ref": "apple_fm_plugin_session_success-tool-3",
+          "tool_name": "plugin_html_extract_readable",
+          "plugin_id": "plugin.html.extract_readable",
+          "arguments": {
+            "body_text": "<html lang=\"en\"><head><title>Snapshot Article</title></head><body><main><p>Bounded starter plugin content.</p></main></body></html>",
+            "content_type": "text/html",
+            "source_url": "https://snapshot.example/article"
+          },
+          "projected_result": {
+            "tool_name": "plugin_html_extract_readable",
+            "plugin_id": "plugin.html.extract_readable",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.html.extract_readable.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "content_language": "en",
+              "excerpt": "Bounded starter plugin content.",
+              "harvested_links": [],
+              "readable_text": "Bounded starter plugin content.",
+              "site_name": "snapshot.example",
+              "title": "Snapshot Article"
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.html.extract_readable.2e53ee21f594f758.v1",
+              "plugin_id": "plugin.html.extract_readable",
+              "plugin_version": "v1",
+              "tool_name": "plugin_html_extract_readable",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.html.extract_readable.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.html.extract_readable.input.v1",
+              "input_packet_digest": "2e53ee21f594f758611e9225b8d332b08686858abea5ca143b561ce2eb183f95",
+              "output_or_refusal_schema_id": "plugin.html.extract_readable.output.v1",
+              "output_or_refusal_digest": "773984ba9e24e9b31d9303c18afc842913c2c80127967d3b6b3e9c6d061e6c4f",
+              "detail": "extract-readable keeps bounded readability rules explicit and local instead of hiding them in host glue or browser state.",
+              "receipt_digest": "aa0ac963f5b9b0220ff32f3043ae00756b2ad1ff6f868db4f32e6d220fe8c150"
+            }
+          },
+          "detail": "Extracting readable article content."
+        },
+        {
+          "step_index": 3,
+          "decision_ref": "apple_fm_plugin_session_success-assistant-4",
+          "result_ref": "apple_fm_plugin_session_success-tool-4",
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "arguments": {
+            "url": "https://snapshot.example/feed.rss"
+          },
+          "projected_result": {
+            "tool_name": "plugin_http_fetch_text",
+            "plugin_id": "plugin.http.fetch_text",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+            "replay_class_id": "replayable_with_snapshots",
+            "structured_payload": {
+              "body_text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Snapshot Feed</title><link>https://snapshot.example/</link><description>Snapshot feed updates.</description><item><title>Feed Entry</title><link>/posts/feed-entry</link><description>Snapshot entry summary.</description></item></channel></rss>",
+              "charset": "utf-8",
+              "content_type": "application/rss+xml",
+              "final_url": "https://snapshot.example/feed.rss",
+              "status_code": 200,
+              "truncated": false
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+              "plugin_id": "plugin.http.fetch_text",
+              "plugin_version": "v1",
+              "tool_name": "plugin_http_fetch_text",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+              "capability_namespace_ids": [
+                "capability.http.read_only.v1"
+              ],
+              "replay_class_id": "replayable_with_snapshots",
+              "status": "success",
+              "input_schema_id": "plugin.http.fetch_text.input.v1",
+              "input_packet_digest": "818e6c686ecfff7348f85891ad436c71169b3bdc1507c7d6c10adae43e63e705",
+              "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+              "output_or_refusal_digest": "de6264c00b05bdb4e384fbee68f7817d16b716c6590e4aa25b704f2a57365b08",
+              "detail": "fetch-text keeps GET-only host-mediated access explicit and returns structured text-fetch truth without browser semantics.",
+              "receipt_digest": "beb2b5da6ad6c23aaa111962cc4663cec3a82335864b4fe36b2370d27e3593f9"
+            }
+          },
+          "detail": "Fetching the feed document."
+        },
+        {
+          "step_index": 4,
+          "decision_ref": "apple_fm_plugin_session_success-assistant-5",
+          "result_ref": "apple_fm_plugin_session_success-tool-5",
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "plugin_id": "plugin.feed.rss_atom_parse",
+          "arguments": {
+            "content_type": "application/rss+xml",
+            "feed_text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Snapshot Feed</title><link>https://snapshot.example/</link><description>Snapshot feed updates.</description><item><title>Feed Entry</title><link>/posts/feed-entry</link><description>Snapshot entry summary.</description></item></channel></rss>",
+            "source_url": "https://snapshot.example/feed.rss"
+          },
+          "projected_result": {
+            "tool_name": "plugin_feed_rss_atom_parse",
+            "plugin_id": "plugin.feed.rss_atom_parse",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "entries": [
+                {
+                  "content_excerpt": "Snapshot entry summary.",
+                  "link": "https://snapshot.example/posts/feed-entry",
+                  "summary": "Snapshot entry summary.",
+                  "title": "Feed Entry"
+                }
+              ],
+              "feed_description": "Snapshot feed updates.",
+              "feed_homepage_url": "https://snapshot.example/",
+              "feed_title": "Snapshot Feed"
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
+              "plugin_id": "plugin.feed.rss_atom_parse",
+              "plugin_version": "v1",
+              "tool_name": "plugin_feed_rss_atom_parse",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.feed.rss_atom_parse.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.feed.rss_atom_parse.input.v1",
+              "input_packet_digest": "122c9fad2c22555ff86e6c9952654ebf5ce7be02ed9bcce51142d3f339e8065e",
+              "output_or_refusal_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+              "output_or_refusal_digest": "6ef6eb5da2be9a7b431d3dd470adb4251b5260c359f8881146b0f85da2658ddd",
+              "detail": "feed-parse keeps RSS 2.0 and Atom 1.0 normalization explicit and local instead of hiding broader XML interpretation in host glue.",
+              "receipt_digest": "12772184129686d1b1f01a52cb84f21d6fe7d1a72f891cdb4d81feb26b490624"
+            }
+          },
+          "detail": "Parsing the feed through the shared starter-plugin bridge."
+        }
+      ],
+      "normalized_stop_condition_id": "workflow_stop.completed_success",
+      "source_stop_condition_id": "apple_fm.session.completed",
+      "final_message_text": "The local Apple FM pilot extracted one article and one feed through the shared starter-plugin runtime.",
+      "typed_refusal_preserved": false,
+      "detail": "the local Apple FM pilot keeps one session-local callback registry, one transcript envelope, and one shared starter-plugin runtime surface explicit instead of inventing Apple-only plugin semantics.",
+      "record_digest": "dc44e9417aec57b194f7654c92915aebefe4a2e94c5a4625f3bbcc13fcacbf82"
+    },
+    {
+      "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
+      "record_id": "trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+      "workflow_case_id": "starter_plugin.web_content_success.v1",
+      "source_case_id": "web_content_intake_success",
+      "lane_id": "deterministic_workflow",
+      "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
+      "source_bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
+      "source_bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
+      "directive_text": "Review https://snapshot.example/article and https://snapshot.example/feed.rss",
+      "admissible_tool_names": [
+        "plugin_feed_rss_atom_parse",
+        "plugin_html_extract_readable",
+        "plugin_http_fetch_text",
+        "plugin_text_url_extract"
+      ],
+      "projected_tool_schema_rows": [
+        {
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "plugin_id": "plugin.feed.rss_atom_parse",
+          "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "content_type": {
+                "type": "string"
+              },
+              "feed_text": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "feed_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
+          "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.unsupported_feed_format.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_html_extract_readable",
+          "plugin_id": "plugin.html.extract_readable",
+          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "body_text": {
+                "type": "string"
+              },
+              "content_type": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "body_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
+          "result_schema_id": "plugin.html.extract_readable.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "url": {
+                "description": "allowlisted absolute URL fetched with one bounded GET-only runtime path.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "ac666cca44c1c1cd89dca49d313e5776581c71ca1f5175011183721e2956c1dc",
+          "result_schema_id": "plugin.http.fetch_text.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.network_denied.v1",
+            "plugin.refusal.url_not_permitted.v1",
+            "plugin.refusal.timeout.v1",
+            "plugin.refusal.response_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1",
+            "plugin.refusal.decode_failed.v1",
+            "plugin.refusal.upstream_failure.v1"
+          ],
+          "replay_class_id": "replayable_with_snapshots"
+        },
+        {
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "description": "packet-local input text scanned with the bounded https?://[^\\\\s]+ rule.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "dc77cf65726337d506f1ef2070df9d9fd26dde8836cd04c7b092b037e5a46b5c",
+          "result_schema_id": "plugin.text.url_extract.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.packet_too_large.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.runtime_resource_limit.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        }
+      ],
+      "controller_decision_rows": [
+        {
+          "decision_index": 0,
+          "decision_source": "host_owned",
+          "decision_kind": "tool_call",
+          "decision_ref": "deterministic.tool_call.0",
+          "tool_name": "plugin_text_url_extract",
+          "detail": "extract candidate URLs from the directive text with the shared bridge."
+        },
+        {
+          "decision_index": 1,
+          "decision_source": "host_owned",
+          "decision_kind": "tool_call",
+          "decision_ref": "deterministic.tool_call.1",
+          "tool_name": "plugin_http_fetch_text",
+          "detail": "fetch the URL through the shared bridge before any content-type branch decision."
+        },
+        {
+          "decision_index": 2,
+          "decision_source": "host_owned",
+          "decision_kind": "tool_call",
+          "decision_ref": "deterministic.tool_call.2",
+          "tool_name": "plugin_html_extract_readable",
+          "detail": "run bounded readability extraction on fetched html through the shared bridge."
+        },
+        {
+          "decision_index": 3,
+          "decision_source": "host_owned",
+          "decision_kind": "tool_call",
+          "decision_ref": "deterministic.tool_call.3",
+          "tool_name": "plugin_http_fetch_text",
+          "detail": "fetch the URL through the shared bridge before any content-type branch decision."
+        },
+        {
+          "decision_index": 4,
+          "decision_source": "host_owned",
+          "decision_kind": "tool_call",
+          "decision_ref": "deterministic.tool_call.4",
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "detail": "run bounded feed parsing on fetched rss-or-atom content through the shared bridge."
+        },
+        {
+          "decision_index": 5,
+          "decision_source": "host_owned",
+          "decision_kind": "content_type_branch",
+          "decision_ref": "deterministic.decision.0",
+          "detail": "the host-owned controller routes html content into the readability plugin."
+        },
+        {
+          "decision_index": 6,
+          "decision_source": "host_owned",
+          "decision_kind": "content_type_branch",
+          "decision_ref": "deterministic.decision.1",
+          "detail": "the host-owned controller routes rss-or-atom content into the feed parser."
+        },
+        {
+          "decision_index": 7,
+          "decision_source": "host_owned",
+          "decision_kind": "stop_condition",
+          "decision_ref": "deterministic.decision.2",
+          "detail": "the host-owned controller stops after the extracted URL set is exhausted."
+        }
+      ],
+      "step_rows": [
+        {
+          "step_index": 0,
+          "decision_ref": "deterministic.tool_call.0",
+          "result_ref": "deterministic.tool_result.0",
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "arguments": {
+            "text": "Review https://snapshot.example/article and https://snapshot.example/feed.rss"
+          },
+          "projected_result": {
+            "tool_name": "plugin_text_url_extract",
+            "plugin_id": "plugin.text.url_extract",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "urls": [
+                "https://snapshot.example/article",
+                "https://snapshot.example/feed.rss"
+              ]
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.text.url_extract.4b99d49a956f5fb3.v1",
+              "plugin_id": "plugin.text.url_extract",
+              "plugin_version": "v1",
+              "tool_name": "plugin_text_url_extract",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.text.url_extract.input.v1",
+              "input_packet_digest": "4b99d49a956f5fb32f3834f47845011f3d7f51443503e6f95c7cb43128f45f25",
+              "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+              "output_or_refusal_digest": "df193012a6f1f6aa4daa6ccd257369d8a4b9f6f8e50c2d69601dd42af5400100",
+              "detail": "url extract keeps the legacy left-to-right https?://[^\\s]+ rule with duplicate preservation and no network semantics.",
+              "receipt_digest": "e7b0eece986cb376ca55adb956641258e9942083646985112283bc56eb4b7237"
+            }
+          },
+          "detail": "extract candidate URLs from the directive text with the shared bridge."
+        },
+        {
+          "step_index": 1,
+          "decision_ref": "deterministic.tool_call.1",
+          "result_ref": "deterministic.tool_result.1",
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "arguments": {
+            "url": "https://snapshot.example/article"
+          },
+          "projected_result": {
+            "tool_name": "plugin_http_fetch_text",
+            "plugin_id": "plugin.http.fetch_text",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+            "replay_class_id": "replayable_with_snapshots",
+            "structured_payload": {
+              "body_text": "<html lang=\"en\"><head><title>Snapshot Article</title></head><body><main><h1>Snapshot Article</h1><p>Bounded starter plugin content.</p></main></body></html>",
+              "charset": "utf-8",
+              "content_type": "text/html",
+              "final_url": "https://snapshot.example/article",
+              "status_code": 200,
+              "truncated": false
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+              "plugin_id": "plugin.http.fetch_text",
+              "plugin_version": "v1",
+              "tool_name": "plugin_http_fetch_text",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+              "capability_namespace_ids": [
+                "capability.http.read_only.v1"
+              ],
+              "replay_class_id": "replayable_with_snapshots",
+              "status": "success",
+              "input_schema_id": "plugin.http.fetch_text.input.v1",
+              "input_packet_digest": "aa5ae2b22543ed81711389887a52bd710d475bb12785618b07edcaad83b51cea",
+              "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+              "output_or_refusal_digest": "d521e503d4cf8aa3eb779798a103caab227c52671fbc04d6ff7932bb75ccf595",
+              "detail": "fetch-text keeps GET-only host-mediated access explicit and returns structured text-fetch truth without browser semantics.",
+              "receipt_digest": "307ae22c6cfb309e378531f71099d78d6b812ac42d6c783e8487342818464e39"
+            }
+          },
+          "detail": "fetch the URL through the shared bridge before any content-type branch decision."
+        },
+        {
+          "step_index": 2,
+          "decision_ref": "deterministic.tool_call.2",
+          "result_ref": "deterministic.tool_result.2",
+          "tool_name": "plugin_html_extract_readable",
+          "plugin_id": "plugin.html.extract_readable",
+          "arguments": {
+            "body_text": "<html lang=\"en\"><head><title>Snapshot Article</title></head><body><main><h1>Snapshot Article</h1><p>Bounded starter plugin content.</p></main></body></html>",
+            "content_type": "text/html",
+            "source_url": "https://snapshot.example/article"
+          },
+          "projected_result": {
+            "tool_name": "plugin_html_extract_readable",
+            "plugin_id": "plugin.html.extract_readable",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.html.extract_readable.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "content_language": "en",
+              "excerpt": "Snapshot Article Bounded starter plugin content.",
+              "harvested_links": [],
+              "readable_text": "Snapshot Article Bounded starter plugin content.",
+              "site_name": "snapshot.example",
+              "title": "Snapshot Article"
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.html.extract_readable.e1417d028da0461a.v1",
+              "plugin_id": "plugin.html.extract_readable",
+              "plugin_version": "v1",
+              "tool_name": "plugin_html_extract_readable",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.html.extract_readable.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.html.extract_readable.input.v1",
+              "input_packet_digest": "e1417d028da0461a5b19a19722b80afdceaad4e7936597211bcd0c34bd88c97d",
+              "output_or_refusal_schema_id": "plugin.html.extract_readable.output.v1",
+              "output_or_refusal_digest": "ff3c7f3bb4bf9f5d3aca30d5556c18dbbad9c0334cceacc4ea2268ccb24a96ef",
+              "detail": "extract-readable keeps bounded readability rules explicit and local instead of hiding them in host glue or browser state.",
+              "receipt_digest": "ac7379bd090fe692c60e30fbcc2384023cd340ffbffee039424cf415eef8bbb5"
+            }
+          },
+          "detail": "run bounded readability extraction on fetched html through the shared bridge."
+        },
+        {
+          "step_index": 3,
+          "decision_ref": "deterministic.tool_call.3",
+          "result_ref": "deterministic.tool_result.3",
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "arguments": {
+            "url": "https://snapshot.example/feed.rss"
+          },
+          "projected_result": {
+            "tool_name": "plugin_http_fetch_text",
+            "plugin_id": "plugin.http.fetch_text",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+            "replay_class_id": "replayable_with_snapshots",
+            "structured_payload": {
+              "body_text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Snapshot Feed</title><link>https://snapshot.example/</link><description>Snapshot feed updates.</description><item><title>Feed Entry</title><link>/posts/feed-entry</link><description>Snapshot entry summary.</description></item></channel></rss>",
+              "charset": "utf-8",
+              "content_type": "application/rss+xml",
+              "final_url": "https://snapshot.example/feed.rss",
+              "status_code": 200,
+              "truncated": false
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+              "plugin_id": "plugin.http.fetch_text",
+              "plugin_version": "v1",
+              "tool_name": "plugin_http_fetch_text",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+              "capability_namespace_ids": [
+                "capability.http.read_only.v1"
+              ],
+              "replay_class_id": "replayable_with_snapshots",
+              "status": "success",
+              "input_schema_id": "plugin.http.fetch_text.input.v1",
+              "input_packet_digest": "818e6c686ecfff7348f85891ad436c71169b3bdc1507c7d6c10adae43e63e705",
+              "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+              "output_or_refusal_digest": "de6264c00b05bdb4e384fbee68f7817d16b716c6590e4aa25b704f2a57365b08",
+              "detail": "fetch-text keeps GET-only host-mediated access explicit and returns structured text-fetch truth without browser semantics.",
+              "receipt_digest": "beb2b5da6ad6c23aaa111962cc4663cec3a82335864b4fe36b2370d27e3593f9"
+            }
+          },
+          "detail": "fetch the URL through the shared bridge before any content-type branch decision."
+        },
+        {
+          "step_index": 4,
+          "decision_ref": "deterministic.tool_call.4",
+          "result_ref": "deterministic.tool_result.4",
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "plugin_id": "plugin.feed.rss_atom_parse",
+          "arguments": {
+            "content_type": "application/rss+xml",
+            "feed_text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Snapshot Feed</title><link>https://snapshot.example/</link><description>Snapshot feed updates.</description><item><title>Feed Entry</title><link>/posts/feed-entry</link><description>Snapshot entry summary.</description></item></channel></rss>",
+            "source_url": "https://snapshot.example/feed.rss"
+          },
+          "projected_result": {
+            "tool_name": "plugin_feed_rss_atom_parse",
+            "plugin_id": "plugin.feed.rss_atom_parse",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "entries": [
+                {
+                  "content_excerpt": "Snapshot entry summary.",
+                  "link": "https://snapshot.example/posts/feed-entry",
+                  "summary": "Snapshot entry summary.",
+                  "title": "Feed Entry"
+                }
+              ],
+              "feed_description": "Snapshot feed updates.",
+              "feed_homepage_url": "https://snapshot.example/",
+              "feed_title": "Snapshot Feed"
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
+              "plugin_id": "plugin.feed.rss_atom_parse",
+              "plugin_version": "v1",
+              "tool_name": "plugin_feed_rss_atom_parse",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.feed.rss_atom_parse.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.feed.rss_atom_parse.input.v1",
+              "input_packet_digest": "122c9fad2c22555ff86e6c9952654ebf5ce7be02ed9bcce51142d3f339e8065e",
+              "output_or_refusal_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+              "output_or_refusal_digest": "6ef6eb5da2be9a7b431d3dd470adb4251b5260c359f8881146b0f85da2658ddd",
+              "detail": "feed-parse keeps RSS 2.0 and Atom 1.0 normalization explicit and local instead of hiding broader XML interpretation in host glue.",
+              "receipt_digest": "12772184129686d1b1f01a52cb84f21d6fe7d1a72f891cdb4d81feb26b490624"
+            }
+          },
+          "detail": "run bounded feed parsing on fetched rss-or-atom content through the shared bridge."
+        }
+      ],
+      "normalized_stop_condition_id": "workflow_stop.completed_success",
+      "source_stop_condition_id": "controller_stop.all_urls_processed",
+      "final_message_text": "The deterministic controller completed after exhausting the extracted URL set.",
+      "typed_refusal_preserved": false,
+      "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops after the extracted URL set is exhausted.",
+      "record_digest": "af82d98ab50b98bceabebfa67966b84ef5d0c85d9f6f4db5025f93da5b9f1ca2"
+    },
+    {
+      "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
+      "record_id": "trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
+      "workflow_case_id": "starter_plugin.web_content_success.v1",
+      "source_case_id": "router_plugin_tool_loop_success",
+      "lane_id": "router_responses",
+      "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_router_plugin_tool_loop_pilot_v1/tassadar_post_article_router_plugin_tool_loop_pilot_bundle.json",
+      "source_bundle_id": "tassadar.post_article.router_plugin_tool_loop_pilot.bundle.v1",
+      "source_bundle_digest": "c5b29de4b470c88c8b17fd04b93a13b73b81b36fa6071a2a330de0201f890d8f",
+      "directive_text": "Read https://snapshot.example/article and https://snapshot.example/feed.rss.",
+      "admissible_tool_names": [
+        "plugin_feed_rss_atom_parse",
+        "plugin_html_extract_readable",
+        "plugin_http_fetch_text",
+        "plugin_text_url_extract"
+      ],
+      "projected_tool_schema_rows": [
+        {
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "plugin_id": "plugin.feed.rss_atom_parse",
+          "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "content_type": {
+                "type": "string"
+              },
+              "feed_text": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "feed_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
+          "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.unsupported_feed_format.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_html_extract_readable",
+          "plugin_id": "plugin.html.extract_readable",
+          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "body_text": {
+                "type": "string"
+              },
+              "content_type": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source_url",
+              "content_type",
+              "body_text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
+          "result_schema_id": "plugin.html.extract_readable.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.input_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "url": {
+                "description": "allowlisted absolute URL fetched with one bounded GET-only runtime path.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "ac666cca44c1c1cd89dca49d313e5776581c71ca1f5175011183721e2956c1dc",
+          "result_schema_id": "plugin.http.fetch_text.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.network_denied.v1",
+            "plugin.refusal.url_not_permitted.v1",
+            "plugin.refusal.timeout.v1",
+            "plugin.refusal.response_too_large.v1",
+            "plugin.refusal.content_type_unsupported.v1",
+            "plugin.refusal.decode_failed.v1",
+            "plugin.refusal.upstream_failure.v1"
+          ],
+          "replay_class_id": "replayable_with_snapshots"
+        },
+        {
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "description": "packet-local input text scanned with the bounded https?://[^\\\\s]+ rule.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "dc77cf65726337d506f1ef2070df9d9fd26dde8836cd04c7b092b037e5a46b5c",
+          "result_schema_id": "plugin.text.url_extract.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.packet_too_large.v1",
+            "plugin.refusal.unsupported_codec.v1",
+            "plugin.refusal.runtime_resource_limit.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        }
+      ],
+      "controller_decision_rows": [
+        {
+          "decision_index": 0,
+          "decision_source": "router_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "psionic-resp-1-tool-0",
+          "tool_name": "plugin_text_url_extract",
+          "detail": "the served seed response issued the first router-owned tool call."
+        },
+        {
+          "decision_index": 1,
+          "decision_source": "router_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "tool-1",
+          "tool_name": "plugin_http_fetch_text",
+          "detail": "Fetching article HTML through the router-owned plugin gateway."
+        },
+        {
+          "decision_index": 2,
+          "decision_source": "router_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "tool-2",
+          "tool_name": "plugin_html_extract_readable",
+          "detail": "Extracting readable article content."
+        },
+        {
+          "decision_index": 3,
+          "decision_source": "router_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "tool-3",
+          "tool_name": "plugin_http_fetch_text",
+          "detail": "Fetching feed XML through the same gateway."
+        },
+        {
+          "decision_index": 4,
+          "decision_source": "router_assistant",
+          "decision_kind": "tool_call",
+          "decision_ref": "tool-4",
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "detail": "Parsing the feed as RSS or Atom."
+        },
+        {
+          "decision_index": 5,
+          "decision_source": "router_assistant",
+          "decision_kind": "final_message",
+          "decision_ref": "router.final_message.router_plugin_tool_loop_success",
+          "detail": "I extracted one article and one feed through the router-owned plugin tool loop."
+        }
+      ],
+      "step_rows": [
+        {
+          "step_index": 0,
+          "decision_ref": "psionic-resp-1-tool-0",
+          "result_ref": "psionic-resp-1-tool-0",
+          "tool_name": "plugin_text_url_extract",
+          "plugin_id": "plugin.text.url_extract",
+          "arguments": {
+            "text": "Read https://snapshot.example/article and https://snapshot.example/feed.rss."
+          },
+          "projected_result": {
+            "tool_name": "plugin_text_url_extract",
+            "plugin_id": "plugin.text.url_extract",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "urls": [
+                "https://snapshot.example/article",
+                "https://snapshot.example/feed.rss."
+              ]
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.text.url_extract.62157e9942c049fa.v1",
+              "plugin_id": "plugin.text.url_extract",
+              "plugin_version": "v1",
+              "tool_name": "plugin_text_url_extract",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.text.url_extract.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.text.url_extract.input.v1",
+              "input_packet_digest": "62157e9942c049fa8e6ab7c6a1f74b1f41a2f5016445acc61527f8a8c8ce7f1b",
+              "output_or_refusal_schema_id": "plugin.text.url_extract.output.v1",
+              "output_or_refusal_digest": "214fd263858f807ded0fa9178cb5361396d4d52d4235af2cb29cc1fca930b7fe",
+              "detail": "url extract keeps the legacy left-to-right https?://[^\\s]+ rule with duplicate preservation and no network semantics.",
+              "receipt_digest": "fd52592bfe7ec1f52cbaae881db7a57041825dd51e07900e0e8d82da323aa341"
+            }
+          },
+          "detail": "the served seed response issued the first router-owned tool call."
+        },
+        {
+          "step_index": 1,
+          "decision_ref": "tool-1",
+          "result_ref": "tool-1",
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "arguments": {
+            "url": "https://snapshot.example/article"
+          },
+          "projected_result": {
+            "tool_name": "plugin_http_fetch_text",
+            "plugin_id": "plugin.http.fetch_text",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+            "replay_class_id": "replayable_with_snapshots",
+            "structured_payload": {
+              "body_text": "<html lang=\"en\"><head><title>Snapshot Article</title></head><body><main><p>Bounded starter plugin content.</p></main></body></html>",
+              "charset": "utf-8",
+              "content_type": "text/html",
+              "final_url": "https://snapshot.example/article",
+              "status_code": 200,
+              "truncated": false
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+              "plugin_id": "plugin.http.fetch_text",
+              "plugin_version": "v1",
+              "tool_name": "plugin_http_fetch_text",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+              "capability_namespace_ids": [
+                "capability.http.read_only.v1"
+              ],
+              "replay_class_id": "replayable_with_snapshots",
+              "status": "success",
+              "input_schema_id": "plugin.http.fetch_text.input.v1",
+              "input_packet_digest": "aa5ae2b22543ed81711389887a52bd710d475bb12785618b07edcaad83b51cea",
+              "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+              "output_or_refusal_digest": "da2fc12b9e181424b8b781b24df5e7508965a4e7a55ae901b917681ad5a5ab4a",
+              "detail": "fetch-text keeps GET-only host-mediated access explicit and returns structured text-fetch truth without browser semantics.",
+              "receipt_digest": "b46d6d7f789b833ceadeb938f07f5debe355e7ab53add5a002507ef3a3459a97"
+            }
+          },
+          "detail": "Fetching article HTML through the router-owned plugin gateway."
+        },
+        {
+          "step_index": 2,
+          "decision_ref": "tool-2",
+          "result_ref": "tool-2",
+          "tool_name": "plugin_html_extract_readable",
+          "plugin_id": "plugin.html.extract_readable",
+          "arguments": {
+            "body_text": "<html lang=\"en\"><head><title>Snapshot Article</title></head><body><main><p>Bounded starter plugin content.</p></main></body></html>",
+            "content_type": "text/html",
+            "source_url": "https://snapshot.example/article"
+          },
+          "projected_result": {
+            "tool_name": "plugin_html_extract_readable",
+            "plugin_id": "plugin.html.extract_readable",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.html.extract_readable.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "content_language": "en",
+              "excerpt": "Bounded starter plugin content.",
+              "harvested_links": [],
+              "readable_text": "Bounded starter plugin content.",
+              "site_name": "snapshot.example",
+              "title": "Snapshot Article"
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.html.extract_readable.1646205d55c61941.v1",
+              "plugin_id": "plugin.html.extract_readable",
+              "plugin_version": "v1",
+              "tool_name": "plugin_html_extract_readable",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.html.extract_readable.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.html.extract_readable.input.v1",
+              "input_packet_digest": "1646205d55c61941305892d12c0129468bda966e187cecd67a00cff21b86adee",
+              "output_or_refusal_schema_id": "plugin.html.extract_readable.output.v1",
+              "output_or_refusal_digest": "773984ba9e24e9b31d9303c18afc842913c2c80127967d3b6b3e9c6d061e6c4f",
+              "detail": "extract-readable keeps bounded readability rules explicit and local instead of hiding them in host glue or browser state.",
+              "receipt_digest": "05a7fff53655232b5e8a01232576276d8d017c0f5de6a5606ad243fec71ddaa7"
+            }
+          },
+          "detail": "Extracting readable article content."
+        },
+        {
+          "step_index": 3,
+          "decision_ref": "tool-3",
+          "result_ref": "tool-3",
+          "tool_name": "plugin_http_fetch_text",
+          "plugin_id": "plugin.http.fetch_text",
+          "arguments": {
+            "url": "https://snapshot.example/feed.rss"
+          },
+          "projected_result": {
+            "tool_name": "plugin_http_fetch_text",
+            "plugin_id": "plugin.http.fetch_text",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+            "replay_class_id": "replayable_with_snapshots",
+            "structured_payload": {
+              "body_text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Snapshot Feed</title><link>https://snapshot.example/</link><description>Snapshot feed updates.</description><item><title>Feed Entry</title><link>/posts/feed-entry</link><description>Snapshot entry summary.</description></item></channel></rss>",
+              "charset": "utf-8",
+              "content_type": "application/rss+xml",
+              "final_url": "https://snapshot.example/feed.rss",
+              "status_code": 200,
+              "truncated": false
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+              "plugin_id": "plugin.http.fetch_text",
+              "plugin_version": "v1",
+              "tool_name": "plugin_http_fetch_text",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+              "capability_namespace_ids": [
+                "capability.http.read_only.v1"
+              ],
+              "replay_class_id": "replayable_with_snapshots",
+              "status": "success",
+              "input_schema_id": "plugin.http.fetch_text.input.v1",
+              "input_packet_digest": "818e6c686ecfff7348f85891ad436c71169b3bdc1507c7d6c10adae43e63e705",
+              "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+              "output_or_refusal_digest": "de6264c00b05bdb4e384fbee68f7817d16b716c6590e4aa25b704f2a57365b08",
+              "detail": "fetch-text keeps GET-only host-mediated access explicit and returns structured text-fetch truth without browser semantics.",
+              "receipt_digest": "beb2b5da6ad6c23aaa111962cc4663cec3a82335864b4fe36b2370d27e3593f9"
+            }
+          },
+          "detail": "Fetching feed XML through the same gateway."
+        },
+        {
+          "step_index": 4,
+          "decision_ref": "tool-4",
+          "result_ref": "tool-4",
+          "tool_name": "plugin_feed_rss_atom_parse",
+          "plugin_id": "plugin.feed.rss_atom_parse",
+          "arguments": {
+            "content_type": "application/rss+xml",
+            "feed_text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Snapshot Feed</title><link>https://snapshot.example/</link><description>Snapshot feed updates.</description><item><title>Feed Entry</title><link>/posts/feed-entry</link><description>Snapshot entry summary.</description></item></channel></rss>",
+            "source_url": "https://snapshot.example/feed.rss"
+          },
+          "projected_result": {
+            "tool_name": "plugin_feed_rss_atom_parse",
+            "plugin_id": "plugin.feed.rss_atom_parse",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "entries": [
+                {
+                  "content_excerpt": "Snapshot entry summary.",
+                  "link": "https://snapshot.example/posts/feed-entry",
+                  "summary": "Snapshot entry summary.",
+                  "title": "Feed Entry"
+                }
+              ],
+              "feed_description": "Snapshot feed updates.",
+              "feed_homepage_url": "https://snapshot.example/",
+              "feed_title": "Snapshot Feed"
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.feed.rss_atom_parse.3430f94093b76c67.v1",
+              "plugin_id": "plugin.feed.rss_atom_parse",
+              "plugin_version": "v1",
+              "tool_name": "plugin_feed_rss_atom_parse",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.feed.rss_atom_parse.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.feed.rss_atom_parse.input.v1",
+              "input_packet_digest": "3430f94093b76c67eacaadd3470ec7676574bfa9d63a3531c9771a48a8e2bcca",
+              "output_or_refusal_schema_id": "plugin.feed.rss_atom_parse.output.v1",
+              "output_or_refusal_digest": "6ef6eb5da2be9a7b431d3dd470adb4251b5260c359f8881146b0f85da2658ddd",
+              "detail": "feed-parse keeps RSS 2.0 and Atom 1.0 normalization explicit and local instead of hiding broader XML interpretation in host glue.",
+              "receipt_digest": "34286eb8a47ff91e59249319886c205fc0a8a9111a807700f8b9186f8f0e67b2"
+            }
+          },
+          "detail": "Parsing the feed as RSS or Atom."
+        }
+      ],
+      "normalized_stop_condition_id": "workflow_stop.completed_success",
+      "source_stop_condition_id": "router.termination.completed",
+      "final_message_text": "I extracted one article and one feed through the router-owned plugin tool loop.",
+      "typed_refusal_preserved": false,
+      "detail": "the first step comes from a real `/v1/responses` tool-call response, while the bounded follow-on turns stay router-owned and execute real starter plugins through the shared bridge.",
+      "record_digest": "d1a9f3f82d819291d3fec769f212633d03b76d1f8e3ce7f86191029c0174062d"
+    }
+  ],
+  "parity_matrix": {
+    "schema_id": "psionic.tassadar.multi_plugin_parity_matrix.v1",
+    "tool_schema_parity_rows": [
+      {
+        "tool_name": "plugin_feed_rss_atom_parse",
+        "plugin_id": "plugin.feed.rss_atom_parse",
+        "canonical_arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
+        "router_bundle_arguments_schema_digest": "bc5dfad4e24836efc8044a5976b8df06189e49b46cfa2e3caabf0b90efed5827",
+        "apple_fm_bundle_arguments_schema_digest": "4aff775bee46c1d9f6eae6d3aa2556a2c42431eb612a1551948e0d34dfc16c4e",
+        "stable_across_lanes": false,
+        "detail": "the committed controller bundles drift on tool-schema digest and must not be collapsed into synthetic agreement."
+      },
+      {
+        "tool_name": "plugin_html_extract_readable",
+        "plugin_id": "plugin.html.extract_readable",
+        "canonical_arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
+        "router_bundle_arguments_schema_digest": "09962aef6d6014880fe425b15f07938cd9bf6c11a5cd0a75484095372915a164",
+        "apple_fm_bundle_arguments_schema_digest": "318af4a378156a7a0cd115b0ffa1e799dd52de8e2795b481003abfd797317b9f",
+        "stable_across_lanes": false,
+        "detail": "the committed controller bundles drift on tool-schema digest and must not be collapsed into synthetic agreement."
+      },
+      {
+        "tool_name": "plugin_http_fetch_text",
+        "plugin_id": "plugin.http.fetch_text",
+        "canonical_arguments_schema_digest": "ac666cca44c1c1cd89dca49d313e5776581c71ca1f5175011183721e2956c1dc",
+        "router_bundle_arguments_schema_digest": "8794f224f0110343791a1b2b255e2df7ac4a5ec949a3783c68f3ca4112e8f074",
+        "apple_fm_bundle_arguments_schema_digest": "3eb46e203ce8b83cee14d7bc7c22bf0192c2d1f83359630fdcf09e87de7f4f5d",
+        "stable_across_lanes": false,
+        "detail": "the committed controller bundles drift on tool-schema digest and must not be collapsed into synthetic agreement."
+      },
+      {
+        "tool_name": "plugin_text_url_extract",
+        "plugin_id": "plugin.text.url_extract",
+        "canonical_arguments_schema_digest": "dc77cf65726337d506f1ef2070df9d9fd26dde8836cd04c7b092b037e5a46b5c",
+        "router_bundle_arguments_schema_digest": "faa376d8850bd26a2cca4286043e6185e73661cf76c654ca25fef6c3ba136106",
+        "apple_fm_bundle_arguments_schema_digest": "04ad1bce4e09a5b260d7cef5c29822234a66cf17281c1f838e3c02673d3f17f0",
+        "stable_across_lanes": false,
+        "detail": "the committed controller bundles drift on tool-schema digest and must not be collapsed into synthetic agreement."
+      }
+    ],
+    "workflow_parity_rows": [
+      {
+        "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+        "lane_record_ids": {
+          "apple_fm_session": "trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
+          "deterministic_workflow": "trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
+          "router_responses": "trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1"
+        },
+        "directive_digest_by_lane": {
+          "apple_fm_session": "02a60512176eaabf4ce123fefedbe39df1b09159edf867ce44f3dade151f5775",
+          "deterministic_workflow": "25b2b646b6eb8f24ec446864fa57a51517ebbc5387d5221c32b531d97446bff2",
+          "router_responses": "02a60512176eaabf4ce123fefedbe39df1b09159edf867ce44f3dade151f5775"
+        },
+        "normalized_stop_condition_id": "workflow_stop.typed_refusal",
+        "source_stop_condition_id_by_lane": {
+          "apple_fm_session": "apple_fm.session.typed_refusal_completed",
+          "deterministic_workflow": "controller_stop.typed_refusal",
+          "router_responses": "router.termination.completed"
+        },
+        "step_parity_rows": [
+          {
+            "step_index": 0,
+            "lanes_present": [
+              "apple_fm_session",
+              "deterministic_workflow",
+              "router_responses"
+            ],
+            "tool_name_by_lane": {
+              "apple_fm_session": "plugin_text_url_extract",
+              "deterministic_workflow": "plugin_text_url_extract",
+              "router_responses": "plugin_text_url_extract"
+            },
+            "status_by_lane": {
+              "apple_fm_session": "success",
+              "deterministic_workflow": "success",
+              "router_responses": "success"
+            },
+            "arguments_digest_by_lane": {
+              "apple_fm_session": "03da06676d8114751d80b2eaecf9e961491c8b224d1841c34182c3d11920ef25",
+              "deterministic_workflow": "670806601ee6146fd63ef7eb0a29d6706601e0a3cf8c09dd9e55201a81a44834",
+              "router_responses": "03da06676d8114751d80b2eaecf9e961491c8b224d1841c34182c3d11920ef25"
+            },
+            "payload_digest_by_lane": {
+              "apple_fm_session": "7accafe4b77e286f5001db00c1ff80b4dbfd7706a928e792f8ea347e0bff952d",
+              "deterministic_workflow": "ad68f9ecaab49092bea3a52b72619644c8e67c665f3bc49bded0ed75721a9e95",
+              "router_responses": "7accafe4b77e286f5001db00c1ff80b4dbfd7706a928e792f8ea347e0bff952d"
+            },
+            "receipt_id_by_lane": {
+              "apple_fm_session": "receipt.plugin.text.url_extract.4a6f86849a652648.v1",
+              "deterministic_workflow": "receipt.plugin.text.url_extract.ffb40b7ac81128df.v1",
+              "router_responses": "receipt.plugin.text.url_extract.4a6f86849a652648.v1"
+            },
+            "agreement_class": "digest_drift",
+            "disagreement_reasons": [
+              "arguments_drift",
+              "payload_drift",
+              "receipt_identity_drift"
+            ]
+          },
+          {
+            "step_index": 1,
+            "lanes_present": [
+              "apple_fm_session",
+              "deterministic_workflow",
+              "router_responses"
+            ],
+            "tool_name_by_lane": {
+              "apple_fm_session": "plugin_http_fetch_text",
+              "deterministic_workflow": "plugin_http_fetch_text",
+              "router_responses": "plugin_http_fetch_text"
+            },
+            "status_by_lane": {
+              "apple_fm_session": "refusal",
+              "deterministic_workflow": "refusal",
+              "router_responses": "refusal"
+            },
+            "arguments_digest_by_lane": {
+              "apple_fm_session": "5a96bf1ab3283b8930e0e01f6e983ec4913613741f7f724e1bc6dea9a9f74281",
+              "deterministic_workflow": "5a96bf1ab3283b8930e0e01f6e983ec4913613741f7f724e1bc6dea9a9f74281",
+              "router_responses": "5a96bf1ab3283b8930e0e01f6e983ec4913613741f7f724e1bc6dea9a9f74281"
+            },
+            "payload_digest_by_lane": {
+              "apple_fm_session": "8a25c3b34c04f6fd63cf5011b4f85abe291d21ea97776a044bde36b6e31082cf",
+              "deterministic_workflow": "8a25c3b34c04f6fd63cf5011b4f85abe291d21ea97776a044bde36b6e31082cf",
+              "router_responses": "8a25c3b34c04f6fd63cf5011b4f85abe291d21ea97776a044bde36b6e31082cf"
+            },
+            "receipt_id_by_lane": {
+              "apple_fm_session": "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1",
+              "deterministic_workflow": "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1",
+              "router_responses": "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1"
+            },
+            "agreement_class": "exact_match",
+            "disagreement_reasons": []
+          }
+        ],
+        "disagreement_rows": [
+          {
+            "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+            "scope_kind": "directive",
+            "disagreement_kind": "directive_text_drift",
+            "detail": "directive text differs across controller lanes and is retained explicitly.",
+            "lane_values": {
+              "apple_fm_session": "02a60512176eaabf4ce123fefedbe39df1b09159edf867ce44f3dade151f5775",
+              "deterministic_workflow": "25b2b646b6eb8f24ec446864fa57a51517ebbc5387d5221c32b531d97446bff2",
+              "router_responses": "02a60512176eaabf4ce123fefedbe39df1b09159edf867ce44f3dade151f5775"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+            "scope_kind": "stop_condition",
+            "disagreement_kind": "source_stop_condition_drift",
+            "detail": "source stop-condition identifiers differ across controller lanes and are retained explicitly.",
+            "lane_values": {
+              "apple_fm_session": "apple_fm.session.typed_refusal_completed",
+              "deterministic_workflow": "controller_stop.typed_refusal",
+              "router_responses": "router.termination.completed"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+            "scope_kind": "step",
+            "step_index": 0,
+            "disagreement_kind": "arguments_drift",
+            "detail": "step 0 keeps `arguments_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "03da06676d8114751d80b2eaecf9e961491c8b224d1841c34182c3d11920ef25",
+              "deterministic_workflow": "670806601ee6146fd63ef7eb0a29d6706601e0a3cf8c09dd9e55201a81a44834",
+              "router_responses": "03da06676d8114751d80b2eaecf9e961491c8b224d1841c34182c3d11920ef25"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+            "scope_kind": "step",
+            "step_index": 0,
+            "disagreement_kind": "payload_drift",
+            "detail": "step 0 keeps `payload_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "7accafe4b77e286f5001db00c1ff80b4dbfd7706a928e792f8ea347e0bff952d",
+              "deterministic_workflow": "ad68f9ecaab49092bea3a52b72619644c8e67c665f3bc49bded0ed75721a9e95",
+              "router_responses": "7accafe4b77e286f5001db00c1ff80b4dbfd7706a928e792f8ea347e0bff952d"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+            "scope_kind": "step",
+            "step_index": 0,
+            "disagreement_kind": "receipt_identity_drift",
+            "detail": "step 0 keeps `receipt_identity_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "receipt.plugin.text.url_extract.4a6f86849a652648.v1",
+              "deterministic_workflow": "receipt.plugin.text.url_extract.ffb40b7ac81128df.v1",
+              "router_responses": "receipt.plugin.text.url_extract.4a6f86849a652648.v1"
+            }
+          }
+        ]
+      },
+      {
+        "workflow_case_id": "starter_plugin.web_content_success.v1",
+        "lane_record_ids": {
+          "apple_fm_session": "trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+          "deterministic_workflow": "trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+          "router_responses": "trace_record.starter_plugin.web_content_success.v1.router_responses.v1"
+        },
+        "directive_digest_by_lane": {
+          "apple_fm_session": "c9beb57da8259c317574ece0407f5eabbafff78b1c8dcfd6613a07939522737a",
+          "deterministic_workflow": "9c993b9968f35ed6fd427ba94b64fdec9b605e17d0b89bde7b01930165977459",
+          "router_responses": "c9beb57da8259c317574ece0407f5eabbafff78b1c8dcfd6613a07939522737a"
+        },
+        "normalized_stop_condition_id": "workflow_stop.completed_success",
+        "source_stop_condition_id_by_lane": {
+          "apple_fm_session": "apple_fm.session.completed",
+          "deterministic_workflow": "controller_stop.all_urls_processed",
+          "router_responses": "router.termination.completed"
+        },
+        "step_parity_rows": [
+          {
+            "step_index": 0,
+            "lanes_present": [
+              "apple_fm_session",
+              "deterministic_workflow",
+              "router_responses"
+            ],
+            "tool_name_by_lane": {
+              "apple_fm_session": "plugin_text_url_extract",
+              "deterministic_workflow": "plugin_text_url_extract",
+              "router_responses": "plugin_text_url_extract"
+            },
+            "status_by_lane": {
+              "apple_fm_session": "success",
+              "deterministic_workflow": "success",
+              "router_responses": "success"
+            },
+            "arguments_digest_by_lane": {
+              "apple_fm_session": "5ef95acc90c47b9240081025530f6af260a1b88b03872d565e75717a6313da03",
+              "deterministic_workflow": "9e384017f8279af05a8f1843ba3d379a2a69096506602c709ebe59860b954731",
+              "router_responses": "5ef95acc90c47b9240081025530f6af260a1b88b03872d565e75717a6313da03"
+            },
+            "payload_digest_by_lane": {
+              "apple_fm_session": "c5a7d90739237d4c869c84819b5e0ea58b79d76e9d897e9b5b560ed2307ccb71",
+              "deterministic_workflow": "df3406978cb6d6e386ca61ca8e737dd8e970d5d703527c6434abf980684c5b57",
+              "router_responses": "c5a7d90739237d4c869c84819b5e0ea58b79d76e9d897e9b5b560ed2307ccb71"
+            },
+            "receipt_id_by_lane": {
+              "apple_fm_session": "receipt.plugin.text.url_extract.62157e9942c049fa.v1",
+              "deterministic_workflow": "receipt.plugin.text.url_extract.4b99d49a956f5fb3.v1",
+              "router_responses": "receipt.plugin.text.url_extract.62157e9942c049fa.v1"
+            },
+            "agreement_class": "digest_drift",
+            "disagreement_reasons": [
+              "arguments_drift",
+              "payload_drift",
+              "receipt_identity_drift"
+            ]
+          },
+          {
+            "step_index": 1,
+            "lanes_present": [
+              "apple_fm_session",
+              "deterministic_workflow",
+              "router_responses"
+            ],
+            "tool_name_by_lane": {
+              "apple_fm_session": "plugin_http_fetch_text",
+              "deterministic_workflow": "plugin_http_fetch_text",
+              "router_responses": "plugin_http_fetch_text"
+            },
+            "status_by_lane": {
+              "apple_fm_session": "success",
+              "deterministic_workflow": "success",
+              "router_responses": "success"
+            },
+            "arguments_digest_by_lane": {
+              "apple_fm_session": "0705ea67391d995070cad5a6b145403768ca443848edc62801ed762a816a3c44",
+              "deterministic_workflow": "0705ea67391d995070cad5a6b145403768ca443848edc62801ed762a816a3c44",
+              "router_responses": "0705ea67391d995070cad5a6b145403768ca443848edc62801ed762a816a3c44"
+            },
+            "payload_digest_by_lane": {
+              "apple_fm_session": "5f6caeea45d69c894751b456b226f69039644d7302fb869030d3bbfb44ffb0fb",
+              "deterministic_workflow": "aaa46aac4d11c24184c6ce61a60438746b0e3c32fde305b353f11465bcf32be8",
+              "router_responses": "5f6caeea45d69c894751b456b226f69039644d7302fb869030d3bbfb44ffb0fb"
+            },
+            "receipt_id_by_lane": {
+              "apple_fm_session": "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+              "deterministic_workflow": "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+              "router_responses": "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1"
+            },
+            "agreement_class": "digest_drift",
+            "disagreement_reasons": [
+              "payload_drift"
+            ]
+          },
+          {
+            "step_index": 2,
+            "lanes_present": [
+              "apple_fm_session",
+              "deterministic_workflow",
+              "router_responses"
+            ],
+            "tool_name_by_lane": {
+              "apple_fm_session": "plugin_html_extract_readable",
+              "deterministic_workflow": "plugin_html_extract_readable",
+              "router_responses": "plugin_html_extract_readable"
+            },
+            "status_by_lane": {
+              "apple_fm_session": "success",
+              "deterministic_workflow": "success",
+              "router_responses": "success"
+            },
+            "arguments_digest_by_lane": {
+              "apple_fm_session": "aefb42dbbad556b7c584bafc89cf0b8567a5d7a8d8a806fa42c72fe3a580bd7a",
+              "deterministic_workflow": "078c797104bbdf834e08f4cf7cb3cb1fef939844d50a7f5e8c59ba560f99e5c6",
+              "router_responses": "aefb42dbbad556b7c584bafc89cf0b8567a5d7a8d8a806fa42c72fe3a580bd7a"
+            },
+            "payload_digest_by_lane": {
+              "apple_fm_session": "cd8585aaabcef873a011caec8841206cb3262a96f972540bb09e241011014164",
+              "deterministic_workflow": "d5afc6065123f414fa47cc85b2bb66869adba51f3342df8391eb79977d2b5fdb",
+              "router_responses": "cd8585aaabcef873a011caec8841206cb3262a96f972540bb09e241011014164"
+            },
+            "receipt_id_by_lane": {
+              "apple_fm_session": "receipt.plugin.html.extract_readable.2e53ee21f594f758.v1",
+              "deterministic_workflow": "receipt.plugin.html.extract_readable.e1417d028da0461a.v1",
+              "router_responses": "receipt.plugin.html.extract_readable.1646205d55c61941.v1"
+            },
+            "agreement_class": "digest_drift",
+            "disagreement_reasons": [
+              "arguments_drift",
+              "payload_drift",
+              "receipt_identity_drift"
+            ]
+          },
+          {
+            "step_index": 3,
+            "lanes_present": [
+              "apple_fm_session",
+              "deterministic_workflow",
+              "router_responses"
+            ],
+            "tool_name_by_lane": {
+              "apple_fm_session": "plugin_http_fetch_text",
+              "deterministic_workflow": "plugin_http_fetch_text",
+              "router_responses": "plugin_http_fetch_text"
+            },
+            "status_by_lane": {
+              "apple_fm_session": "success",
+              "deterministic_workflow": "success",
+              "router_responses": "success"
+            },
+            "arguments_digest_by_lane": {
+              "apple_fm_session": "b83c505202850cccc683a91d4a1beb544f5fccac15a96e13fe21179459c3494d",
+              "deterministic_workflow": "b83c505202850cccc683a91d4a1beb544f5fccac15a96e13fe21179459c3494d",
+              "router_responses": "b83c505202850cccc683a91d4a1beb544f5fccac15a96e13fe21179459c3494d"
+            },
+            "payload_digest_by_lane": {
+              "apple_fm_session": "1f6103b441344c171dfa57728470dccb80415d1d854a4dd565419846deebf692",
+              "deterministic_workflow": "1f6103b441344c171dfa57728470dccb80415d1d854a4dd565419846deebf692",
+              "router_responses": "1f6103b441344c171dfa57728470dccb80415d1d854a4dd565419846deebf692"
+            },
+            "receipt_id_by_lane": {
+              "apple_fm_session": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+              "deterministic_workflow": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+              "router_responses": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1"
+            },
+            "agreement_class": "exact_match",
+            "disagreement_reasons": []
+          },
+          {
+            "step_index": 4,
+            "lanes_present": [
+              "apple_fm_session",
+              "deterministic_workflow",
+              "router_responses"
+            ],
+            "tool_name_by_lane": {
+              "apple_fm_session": "plugin_feed_rss_atom_parse",
+              "deterministic_workflow": "plugin_feed_rss_atom_parse",
+              "router_responses": "plugin_feed_rss_atom_parse"
+            },
+            "status_by_lane": {
+              "apple_fm_session": "success",
+              "deterministic_workflow": "success",
+              "router_responses": "success"
+            },
+            "arguments_digest_by_lane": {
+              "apple_fm_session": "a011e6f8d9ae7ce783953364407733390b05d65bb6edb82c1c30cd46191992aa",
+              "deterministic_workflow": "a011e6f8d9ae7ce783953364407733390b05d65bb6edb82c1c30cd46191992aa",
+              "router_responses": "a011e6f8d9ae7ce783953364407733390b05d65bb6edb82c1c30cd46191992aa"
+            },
+            "payload_digest_by_lane": {
+              "apple_fm_session": "4b04d9b8c4d01a72db94896649d548bf2734b78e24c62b51ebf238a61eb2303c",
+              "deterministic_workflow": "4b04d9b8c4d01a72db94896649d548bf2734b78e24c62b51ebf238a61eb2303c",
+              "router_responses": "4b04d9b8c4d01a72db94896649d548bf2734b78e24c62b51ebf238a61eb2303c"
+            },
+            "receipt_id_by_lane": {
+              "apple_fm_session": "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
+              "deterministic_workflow": "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
+              "router_responses": "receipt.plugin.feed.rss_atom_parse.3430f94093b76c67.v1"
+            },
+            "agreement_class": "digest_drift",
+            "disagreement_reasons": [
+              "receipt_identity_drift"
+            ]
+          }
+        ],
+        "disagreement_rows": [
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "directive",
+            "disagreement_kind": "directive_text_drift",
+            "detail": "directive text differs across controller lanes and is retained explicitly.",
+            "lane_values": {
+              "apple_fm_session": "c9beb57da8259c317574ece0407f5eabbafff78b1c8dcfd6613a07939522737a",
+              "deterministic_workflow": "9c993b9968f35ed6fd427ba94b64fdec9b605e17d0b89bde7b01930165977459",
+              "router_responses": "c9beb57da8259c317574ece0407f5eabbafff78b1c8dcfd6613a07939522737a"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "stop_condition",
+            "disagreement_kind": "source_stop_condition_drift",
+            "detail": "source stop-condition identifiers differ across controller lanes and are retained explicitly.",
+            "lane_values": {
+              "apple_fm_session": "apple_fm.session.completed",
+              "deterministic_workflow": "controller_stop.all_urls_processed",
+              "router_responses": "router.termination.completed"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 0,
+            "disagreement_kind": "arguments_drift",
+            "detail": "step 0 keeps `arguments_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "5ef95acc90c47b9240081025530f6af260a1b88b03872d565e75717a6313da03",
+              "deterministic_workflow": "9e384017f8279af05a8f1843ba3d379a2a69096506602c709ebe59860b954731",
+              "router_responses": "5ef95acc90c47b9240081025530f6af260a1b88b03872d565e75717a6313da03"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 0,
+            "disagreement_kind": "payload_drift",
+            "detail": "step 0 keeps `payload_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "c5a7d90739237d4c869c84819b5e0ea58b79d76e9d897e9b5b560ed2307ccb71",
+              "deterministic_workflow": "df3406978cb6d6e386ca61ca8e737dd8e970d5d703527c6434abf980684c5b57",
+              "router_responses": "c5a7d90739237d4c869c84819b5e0ea58b79d76e9d897e9b5b560ed2307ccb71"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 0,
+            "disagreement_kind": "receipt_identity_drift",
+            "detail": "step 0 keeps `receipt_identity_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "receipt.plugin.text.url_extract.62157e9942c049fa.v1",
+              "deterministic_workflow": "receipt.plugin.text.url_extract.4b99d49a956f5fb3.v1",
+              "router_responses": "receipt.plugin.text.url_extract.62157e9942c049fa.v1"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 1,
+            "disagreement_kind": "payload_drift",
+            "detail": "step 1 keeps `payload_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "5f6caeea45d69c894751b456b226f69039644d7302fb869030d3bbfb44ffb0fb",
+              "deterministic_workflow": "aaa46aac4d11c24184c6ce61a60438746b0e3c32fde305b353f11465bcf32be8",
+              "router_responses": "5f6caeea45d69c894751b456b226f69039644d7302fb869030d3bbfb44ffb0fb"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 2,
+            "disagreement_kind": "arguments_drift",
+            "detail": "step 2 keeps `arguments_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "aefb42dbbad556b7c584bafc89cf0b8567a5d7a8d8a806fa42c72fe3a580bd7a",
+              "deterministic_workflow": "078c797104bbdf834e08f4cf7cb3cb1fef939844d50a7f5e8c59ba560f99e5c6",
+              "router_responses": "aefb42dbbad556b7c584bafc89cf0b8567a5d7a8d8a806fa42c72fe3a580bd7a"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 2,
+            "disagreement_kind": "payload_drift",
+            "detail": "step 2 keeps `payload_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "cd8585aaabcef873a011caec8841206cb3262a96f972540bb09e241011014164",
+              "deterministic_workflow": "d5afc6065123f414fa47cc85b2bb66869adba51f3342df8391eb79977d2b5fdb",
+              "router_responses": "cd8585aaabcef873a011caec8841206cb3262a96f972540bb09e241011014164"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 2,
+            "disagreement_kind": "receipt_identity_drift",
+            "detail": "step 2 keeps `receipt_identity_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "receipt.plugin.html.extract_readable.2e53ee21f594f758.v1",
+              "deterministic_workflow": "receipt.plugin.html.extract_readable.e1417d028da0461a.v1",
+              "router_responses": "receipt.plugin.html.extract_readable.1646205d55c61941.v1"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 4,
+            "disagreement_kind": "receipt_identity_drift",
+            "detail": "step 4 keeps `receipt_identity_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
+              "deterministic_workflow": "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
+              "router_responses": "receipt.plugin.feed.rss_atom_parse.3430f94093b76c67.v1"
+            }
+          }
+        ]
+      }
+    ],
+    "explicit_disagreement_count": 15
+  },
+  "bootstrap_contract": {
+    "contract_id": "psionic.tassadar.multi_plugin_training_bootstrap.v1",
+    "target_deferred_issue_id": "TAS-204",
+    "trace_record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
+    "admitted_controller_lanes": [
+      "apple_fm_session",
+      "deterministic_workflow",
+      "router_responses"
+    ],
+    "admitted_workflow_case_ids": [
+      "starter_plugin.fetch_refusal.v1",
+      "starter_plugin.web_content_success.v1"
+    ],
+    "requires_receipt_identity": true,
+    "preserves_disagreement_rows": true,
+    "bootstrap_ready": true,
+    "bootstrap_boundary": "later weighted-controller work may bootstrap from these lane-neutral records only if it preserves plugin receipt identity, keeps disagreement rows explicit, and does not collapse deterministic, router-owned, and Apple FM traces into a false proof of controller closure."
+  },
+  "claim_boundary": "this bundle freezes a repo-owned, lane-neutral multi-plugin trace corpus plus an explicit parity matrix across deterministic, router-owned, and local Apple FM controller lanes. It is bootstrap input to later TAS-204 weighted-controller work and does not claim weighted-controller closure, served-model equivalence, or canonical Tassadar proof closure.",
+  "summary": "multi-plugin trace corpus freezes source_bundles=3, trace_records=6, workflow_parity_rows=2, and explicit_disagreements=15.",
+  "bundle_digest": "d26765f7d2f0bdedc4113dc754cb627a566076b5c994228025500b64eeaa69bb"
+}

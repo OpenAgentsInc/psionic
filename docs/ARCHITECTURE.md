@@ -1809,6 +1809,16 @@ The current scope is:
   which publish one session-aware local Apple FM controller lane above the same
   shared bridge, keep transcript truth and plugin receipt truth explicit, and
   move the next open orchestration frontier to `TAS-226`
+- the current multi-plugin trace-corpus artifacts are
+  `fixtures/tassadar/datasets/tassadar_multi_plugin_trace_corpus_v1/tassadar_multi_plugin_trace_corpus_bundle.json`,
+  the checker
+  `scripts/check-tassadar-multi-plugin-trace-corpus.sh`, the corpus doc
+  `docs/TASSADAR_MULTI_PLUGIN_TRACE_CORPUS.md`, and the audit note
+  `docs/audits/2026-03-22-tassadar-multi-plugin-trace-corpus.md`, which
+  publish one lane-neutral trace-record shape, one explicit parity matrix, and
+  one training-bootstrap boundary above the deterministic, router-owned, and
+  Apple FM controller lanes while moving the next open orchestration frontier
+  to `TAS-221`
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

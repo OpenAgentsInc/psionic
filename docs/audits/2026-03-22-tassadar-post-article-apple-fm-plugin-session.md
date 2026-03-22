@@ -34,11 +34,10 @@ controller lane above the shared starter-plugin bridge.
 - served-model closure
 - cross-platform serving claims
 - weighted controller closure
-- cross-lane parity or training-bootstrap claims before the later corpus issue
-  lands
+- cross-lane publication or controller-closure claims before the umbrella
+  closeout lands
 
 ## Next Frontier
 
 The next open orchestration frontier above the three current controller lanes
-is `TAS-226`: multi-plugin trace corpus, parity matrix, and training-bootstrap
-contract.
+is `TAS-221`: publish the first real-run multi-plugin orchestration wave.

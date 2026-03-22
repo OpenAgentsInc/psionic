@@ -63,5 +63,5 @@ The router-owned served controller lane above the same bridge lives in
 
 ## Planned
 
-- trace-corpus and parity-matrix freezing across deterministic, router-owned,
-  and Apple FM controller lanes
+- cross-lane trace corpus and parity matrix now land separately in
+  `docs/TASSADAR_MULTI_PLUGIN_TRACE_CORPUS.md`

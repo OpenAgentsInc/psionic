@@ -53,5 +53,5 @@ The committed bundle freezes:
 
 - Apple FM local plugin-session integration now lands separately in
   `docs/TASSADAR_APPLE_FM_PLUGIN_SESSION.md`
-- cross-lane parity and training-bootstrap artifacts over deterministic,
-  router-owned, and Apple FM controller traces
+- cross-lane trace corpus and parity matrix now land separately in
+  `docs/TASSADAR_MULTI_PLUGIN_TRACE_CORPUS.md`

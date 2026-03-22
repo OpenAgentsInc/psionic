@@ -41,5 +41,4 @@ the fetch-text lane.
 `docs/TASSADAR_ROUTER_PLUGIN_TOOL_LOOP.md`.
 
 The next open orchestration frontier above the deterministic starter controller
-is `TAS-226`: multi-plugin trace corpus, parity matrix, and training-bootstrap
-contract.
+is `TAS-221`: publish the first real-run multi-plugin orchestration wave.

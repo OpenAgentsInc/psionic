@@ -1414,6 +1414,16 @@ and the checker
 That closes the first session-aware local Apple FM plugin lane above the shared
 bridge without widening the boundary to served-model closure or weighted
 controller closure, and moves the next open bridge frontier to `TAS-226`.
+`TAS-226` now adds the multi-plugin trace corpus in
+`crates/psionic-data/src/tassadar_multi_plugin_trace_corpus.rs`
+plus the committed bundle at
+`fixtures/tassadar/datasets/tassadar_multi_plugin_trace_corpus_v1/tassadar_multi_plugin_trace_corpus_bundle.json`
+and the checker
+`scripts/check-tassadar-multi-plugin-trace-corpus.sh`.
+That closes the first lane-neutral trace-record and parity-matrix bootstrap
+surface above the deterministic, router-owned, and Apple FM controller lanes
+without widening the boundary to weighted controller closure, and moves the
+next open bridge frontier to `TAS-221`.
 
 ## Route Requirement
 

@@ -59,5 +59,5 @@ Each case carries:
   `docs/TASSADAR_ROUTER_PLUGIN_TOOL_LOOP.md`
 - Apple FM local plugin-session integration now lands separately in
   `docs/TASSADAR_APPLE_FM_PLUGIN_SESSION.md`
-- parity and training-bootstrap artifacts above the deterministic, router, and
-  Apple FM controller lanes
+- cross-lane trace corpus and parity matrix now land separately in
+  `docs/TASSADAR_MULTI_PLUGIN_TRACE_CORPUS.md`

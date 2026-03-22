@@ -733,6 +733,18 @@ Current honest posture:
   this keeps the first local Apple FM plugin lane session-aware, receipt-bound,
   transcript-explicit, and refusal-explicit while moving the next open bridge
   frontier to `TAS-226`
+- the repo now also has one multi-plugin trace corpus and parity matrix, with
+  reusable corpus-building code in
+  `crates/psionic-data/src/tassadar_multi_plugin_trace_corpus.rs`, a committed
+  bundle at
+  `fixtures/tassadar/datasets/tassadar_multi_plugin_trace_corpus_v1/tassadar_multi_plugin_trace_corpus_bundle.json`,
+  a dedicated checker at
+  `scripts/check-tassadar-multi-plugin-trace-corpus.sh`, a corpus doc at
+  `docs/TASSADAR_MULTI_PLUGIN_TRACE_CORPUS.md`, and an audit note at
+  `docs/audits/2026-03-22-tassadar-multi-plugin-trace-corpus.md`; this keeps
+  the first training-ready multi-lane trace record shape repo-owned,
+  disagreement-explicit, and receipt-bound while moving the next open bridge
+  frontier to `TAS-221`
 - the repo now also has one machine-readable article-equivalence blocker
   matrix, with a committed eval report at
   `fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json`,
@@ -956,10 +968,10 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-225` is now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
+- `TAS-226` is now implemented and tracked in
+  `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-221` remains open in GitHub as the umbrella issue and is tracked via
   the issue body plus `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-226` remains open in GitHub and is tracked via the issue body plus
-  `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 
 ## Repo-Local Companion Docs
 

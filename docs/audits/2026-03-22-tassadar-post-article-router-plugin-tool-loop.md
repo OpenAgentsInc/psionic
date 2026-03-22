@@ -35,11 +35,10 @@
 - weighted controller closure
 - open-ended model planning claims
 - Apple FM session completion before the Apple FM lane lands
-- cross-lane parity or training-bootstrap claims before the later corpus issue
-  lands
+- cross-lane publication or controller-closure claims before the umbrella
+  closeout lands
 
 ## Next Frontier
 
 The next open orchestration frontier above the router-owned served lane is
-`TAS-226`: multi-plugin trace corpus, parity matrix, and training-bootstrap
-contract.
+`TAS-221`: publish the first real-run multi-plugin orchestration wave.

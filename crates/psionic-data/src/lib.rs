@@ -24,6 +24,7 @@ mod tassadar_error_regime_catalog;
 mod tassadar_kernel_module_scaling;
 mod tassadar_learned_call_stack_heap_suite;
 mod tassadar_mixed_trajectory;
+mod tassadar_multi_plugin_trace_corpus;
 mod tassadar_program_family_frontier;
 mod tassadar_search_native_executor;
 mod tassadar_shared_primitive_transfer;
@@ -63,6 +64,7 @@ pub use tassadar_error_regime_catalog::*;
 pub use tassadar_kernel_module_scaling::*;
 pub use tassadar_learned_call_stack_heap_suite::*;
 pub use tassadar_mixed_trajectory::*;
+pub use tassadar_multi_plugin_trace_corpus::*;
 pub use tassadar_program_family_frontier::*;
 pub use tassadar_search_native_executor::*;
 pub use tassadar_shared_primitive_transfer::*;
@@ -2391,9 +2393,7 @@ pub enum DistributedDataFeedContractError {
     Determinism(#[from] DeterminismContractError),
     #[error("distributed data feed expected split `{split_name}` to exist in the manifest")]
     UnknownSplit { split_name: String },
-    #[error(
-        "distributed replay ordering requires a seeded or strict runtime determinism contract"
-    )]
+    #[error("distributed replay ordering requires a seeded or strict runtime determinism contract")]
     BestEffortReplayUnsupported,
     #[error("worker coordination requires a non-empty replica group")]
     MissingReplicaGroup,
@@ -3082,16 +3082,18 @@ mod tests {
             DatasetRecordEncoding::TokenIdsLeU32,
             sample_tokenizer(),
         )
-        .with_splits(vec![DatasetSplitDeclaration::new(
-            &dataset,
-            "train",
-            DatasetSplitKind::Train,
-            vec![
-                sample_shard(&dataset, "train", "shard-0", 3, 24),
-                sample_shard(&dataset, "train", "shard-1", 2, 18),
-            ],
-        )
-        .expect("split should validate")]);
+        .with_splits(vec![
+            DatasetSplitDeclaration::new(
+                &dataset,
+                "train",
+                DatasetSplitKind::Train,
+                vec![
+                    sample_shard(&dataset, "train", "shard-0", 3, 24),
+                    sample_shard(&dataset, "train", "shard-1", 2, 18),
+                ],
+            )
+            .expect("split should validate"),
+        ]);
 
         let contract = DatasetIterationContract::new(dataset, "train")
             .with_mode(DatasetIterationMode::Repeat)
@@ -3163,10 +3165,12 @@ mod tests {
         let report = builtin_data_ingress_semantics_report();
         assert_eq!(report.schema_version, 1);
         assert_eq!(report.current_scope_window, "psionic_data_ingress_v1");
-        assert!(report
-            .stable_signature_lines()
-            .iter()
-            .any(|line| line.starts_with("report_digest=")));
+        assert!(
+            report
+                .stable_signature_lines()
+                .iter()
+                .any(|line| line.starts_with("report_digest="))
+        );
 
         let direct_host = report
             .cases
@@ -3299,10 +3303,12 @@ mod tests {
             report.current_scope_window,
             "psionic_distributed_data_feed_v1"
         );
-        assert!(report
-            .stable_signature_lines()
-            .iter()
-            .any(|line| line.starts_with("report_digest=")));
+        assert!(
+            report
+                .stable_signature_lines()
+                .iter()
+                .any(|line| line.starts_with("report_digest="))
+        );
 
         let contiguous = report
             .cases
@@ -3351,10 +3357,12 @@ mod tests {
             .expect("missing elastic-membership refusal");
         assert_eq!(refused.status, DistributedDataFeedCapabilityStatus::Refused);
         assert!(refused.refusal.is_some());
-        assert!(refused
-            .refusal
-            .as_ref()
-            .expect("refusal should exist")
-            .contains("elastic_membership"));
+        assert!(
+            refused
+                .refusal
+                .as_ref()
+                .expect("refusal should exist")
+                .contains("elastic_membership")
+        );
     }
 }

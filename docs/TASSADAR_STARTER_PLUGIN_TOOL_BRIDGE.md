@@ -85,5 +85,5 @@ without claiming served-model closure or weighted controller closure.
 
 ## Planned
 
-- trace-corpus and parity-matrix freezing above the deterministic, router, and
-  Apple FM controller lanes
+- cross-lane trace corpus and parity matrix now land separately in
+  `docs/TASSADAR_MULTI_PLUGIN_TRACE_CORPUS.md`

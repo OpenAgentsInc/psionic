@@ -186,6 +186,11 @@ and now also has:
   freezes the explicit restart, rollback, corruption-detection, and
   invalidation bundle that later rented-cluster and trusted-cluster work must
   preserve.
+- `docs/TASSADAR_MULTI_PLUGIN_TRACE_CORPUS.md` is the canonical first
+  multi-plugin controller trace corpus and training-bootstrap doc for the
+  Tassadar plugin-control lane and freezes the lane-neutral trace-record,
+  parity-matrix, disagreement-retention, and receipt-identity contract that
+  later weighted-controller work must follow.
 - `docs/PSION_RENTED_CLUSTER_RUNBOOK.md` is the canonical first rented-cluster
   runbook and failure-policy doc for the `Psion` learned-model lane and
   freezes the storage persistence, preemption downgrade, cost stop-condition,
