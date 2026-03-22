@@ -415,10 +415,8 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "deferred_issue_ids": [
-    "TAS-206"
-  ],
+  "deferred_issue_ids": [],
   "claim_boundary": "this catalog report freezes plugin authority, promotion, publication posture, and trust tiers above the canonical weighted controller without widening the claim surface. It keeps operator/internal posture, profile-specific named-but-suppressed routes, validator and accepted-outcome hook requirements, promotion challengeability, quarantine, revocation, and broader public refusal explicit instead of implying a served/public plugin platform or arbitrary public software execution.",
-  "summary": "post-article plugin authority gate binds machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, contract_status=Green, trust_tier_rows=4, promotion_rows=5, publication_posture_rows=5, observer_rows=4, validation_rows=8, weighted_plugin_control_allowed=true, and deferred_issue_ids=1.",
-  "report_digest": "73ea3bc84c8ca2371048ec532d9f4691ec6ad62290372dd67cc20cfb8cb8c7e6"
+  "summary": "post-article plugin authority gate binds machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, contract_status=Green, trust_tier_rows=4, promotion_rows=5, publication_posture_rows=5, observer_rows=4, validation_rows=8, weighted_plugin_control_allowed=true, and deferred_issue_ids=0.",
+  "report_digest": "d813236bb30fa342550de38460ac35aab291ad0f1684d7f1ddc3ddfa67e55eeb"
 }

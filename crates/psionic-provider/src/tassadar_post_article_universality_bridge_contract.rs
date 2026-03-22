@@ -81,6 +81,9 @@ mod tests {
         assert!(receipt
             .reserved_capability_issue_ids
             .contains(&String::from("TAS-195")));
+        assert!(receipt
+            .reserved_capability_issue_ids
+            .contains(&String::from("TAS-207")));
         assert!(receipt.bridge_contract_green);
         assert!(!receipt.rebase_claim_allowed);
         assert!(!receipt.plugin_capability_claim_allowed);

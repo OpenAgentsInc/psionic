@@ -11256,15 +11256,15 @@
     },
     {
       "hook_id": "schema_version_negotiation_hook",
-      "purpose": "keep schema-version negotiation explicit above the bridge while result binding stays contract-owned and weighted controller ownership remains later",
+      "purpose": "keep schema-version negotiation and canonical-machine inheritance explicit above the bridge while the anti-drift tranche remains later",
       "reserved_issue_ids": [
-        "TAS-206"
+        "TAS-207"
       ],
-      "current_posture": "reserved_after_weighted_controller_contract",
+      "current_posture": "reserved_after_bounded_plugin_platform_closeout",
       "source_refs": [
         "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
       ],
-      "detail": "the bridge now delegates schema-stability, weighted-controller ownership, and bounded plugin authority gating to TAS-203A through TAS-205 while keeping the later plugin-platform closeout boundary explicit instead of widening the bridge itself into a publication or trust-tier contract"
+      "detail": "the bridge now delegates schema stability, weighted-controller ownership, bounded plugin-platform closeout, and the later canonical-machine lock to TAS-203A through TAS-207 instead of widening the bridge itself into the terminal machine or publication surface"
     }
   ],
   "validation_rows": [
@@ -11332,5 +11332,5 @@
   "served_public_universality_allowed": false,
   "claim_boundary": "this bridge contract freezes only the post-`TAS-186` rebasing boundary between the historical `TCM.v1` universality closeout and the canonical owned article-equivalence route. It binds the old closeout to one explicit post-article machine identity tuple, one coarse direct-vs-resumable carrier topology, one bridge-scoped computational model statement, and one explicit three-plane contract. It does not by itself prove continuation semantic preservation, control-plane provenance, final canonical carrier binding, served/public universality, weighted plugin control, or arbitrary software capability.",
   "summary": "Post-article universality bridge contract keeps dependencies=7/7, historical_bindings=4, carrier_topology=ExplicitSplitAcrossDirectAndResumableLanes, validation_rows=6/6, bridge_status=Green, rebase_claim_allowed=false, and reserved_capability_hooks=4.",
-  "report_digest": "4b4c0a2d467af56b3f085bdad2d331aa82ac09b15e9b896401ecbd635b2b55b7"
+  "report_digest": "76e98ce4d130ef18f61dc52715f2cd211594d94ed3336f0b3005daad23f587a4"
 }

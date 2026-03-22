@@ -1064,7 +1064,7 @@ and the dedicated checker now lives at
 `scripts/check-tassadar-post-article-weighted-plugin-controller-trace-and-refusal-aware-model-loop.sh`.
 This tranche turns weighted plugin control green on the canonical route,
 clears the `TAS-203A` defer pointer to empty, clears the controller defer
-pointer to empty, moves the reserved bridge capability frontier to `TAS-206`,
+pointer to empty, moves the reserved bridge capability frontier to `TAS-207`,
 and still does not admit bounded plugin-platform closeout, plugin
 publication, served/public universality, or arbitrary software capability.
 
@@ -1087,9 +1087,29 @@ the provider receipt now lives at
 and the dedicated checker now lives at
 `scripts/check-tassadar-post-article-plugin-authority-promotion-publication-and-trust-tier-gate.sh`.
 This tranche turns the bounded plugin authority and posture gate green while
-still deferring the first bounded plugin-platform closeout claim to `TAS-206`
-and still does not admit served/public universality or arbitrary software
-capability.
+now serving as one prerequisite beneath the separate `TAS-206` bounded
+plugin-platform closeout audit. It still does not admit served/public
+universality or arbitrary software capability on its own.
+
+`TAS-206` now closes the first bounded weighted plugin-platform closeout at
+`fixtures/tassadar/reports/tassadar_post_article_bounded_weighted_plugin_platform_closeout_audit_report.json`.
+That eval-owned audit binds the post-article Turing-completeness closeout,
+plugin charter, manifest identity, packet ABI, runtime API, invocation
+receipts, admissibility compiler, conformance harness, result-binding
+contract, weighted controller trace, and authority or promotion or
+publication gate into one operator/internal-only platform statement on the
+same canonical post-`TAS-186` machine identity. The operator-readable summary
+now lives at
+`fixtures/tassadar/reports/tassadar_post_article_bounded_weighted_plugin_platform_closeout_summary.json`,
+the provider receipt now lives at
+`crates/psionic-provider/src/tassadar_post_article_bounded_weighted_plugin_platform_closeout.rs`,
+and the dedicated checker now lives at
+`scripts/check-tassadar-post-article-bounded-weighted-plugin-platform-closeout-audit.sh`.
+This tranche turns `plugin_capability_claim_allowed=true` for the bounded
+operator/internal plugin platform, clears the TAS-205 defer pointer to empty,
+keeps plugin publication suppressed, keeps served/public universality false,
+keeps arbitrary software capability false, and still keeps the final
+claim-bearing canonical machine closure bundle separate for `TAS-215`.
 
 ## Route Requirement
 

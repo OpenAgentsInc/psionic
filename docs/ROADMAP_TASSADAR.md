@@ -420,7 +420,7 @@ Current honest posture:
   conditions, explicit determinism and external-signal boundaries, and
   explicit host-negative planner attacks; this tranche turns weighted plugin
   control green on the canonical route, clears the controller defer pointer to
-  empty, moves the later bridge reservation frontier to `TAS-206`, and still
+  empty, moves the later bridge reservation frontier to `TAS-207`, and still
   keeps bounded plugin-platform closeout, plugin publication, served/public
   universality, and arbitrary software capability blocked
 - the repo now also has one post-article plugin authority, promotion,
@@ -435,9 +435,26 @@ Current honest posture:
   posture, explicit profile-specific deterministic-import and runtime-support
   route hooks, and explicit broader public suppression or refusal above the
   already-closed weighted controller; this tranche turns the bounded plugin
-  authority and posture gate green while still keeping bounded plugin-platform
-  closeout, plugin publication, served/public universality, and arbitrary
-  software capability blocked until `TAS-206` and later anti-drift work land
+  authority and posture gate green while now serving as one prerequisite
+  beneath the separate bounded plugin-platform closeout audit and still does
+  not by itself turn plugin publication, served/public universality, or
+  arbitrary software capability green
+- the repo now also has one post-article bounded weighted plugin-platform
+  closeout audit, with a committed eval report at
+  `fixtures/tassadar/reports/tassadar_post_article_bounded_weighted_plugin_platform_closeout_audit_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_post_article_bounded_weighted_plugin_platform_closeout_summary.json`,
+  a provider-facing receipt, a dedicated checker script, and an audit note
+  that bind the post-article Turing closeout, plugin charter, manifest
+  identity, packet ABI, runtime API, invocation receipts, admissibility
+  compiler, conformance harness, result-binding contract, weighted controller
+  trace, and authority or promotion or publication gate into one bounded
+  operator/internal plugin-platform statement on the canonical rebased
+  machine instead of letting adjacent green artifacts imply that platform by
+  recomposition; this tranche turns `plugin_capability_claim_allowed=true`,
+  keeps plugin publication suppressed, keeps served/public universality false,
+  keeps arbitrary software capability false, and still keeps the final
+  canonical machine closure bundle separate for `TAS-215`
 - the repo now also has one post-article Turing-completeness closeout audit,
   with a committed eval report at
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
@@ -652,7 +669,7 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-157` through `TAS-205` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-206` through `TAS-226` remain open in GitHub and are tracked via the
+- `TAS-207` through `TAS-226` remain open in GitHub and are tracked via the
   issue bodies plus `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 
 ## Repo-Local Companion Docs

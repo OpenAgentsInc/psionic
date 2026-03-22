@@ -20,7 +20,7 @@
     "TAS-199",
     "TAS-200",
     "TAS-201",
-    "TAS-206"
+    "TAS-207"
   ],
   "bridge_status": "green",
   "bridge_contract_green": true,
@@ -28,5 +28,5 @@
   "plugin_capability_claim_allowed": false,
   "served_public_universality_allowed": false,
   "detail": "post-article universality bridge summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, carrier_topology=ExplicitSplitAcrossDirectAndResumableLanes, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, reserved_capability_issue_ids=4, bridge_status=Green, rebase_claim_allowed=false, plugin_capability_claim_allowed=false, and served_public_universality_allowed=false.",
-  "summary_digest": "196ba078011119513a26eb790dca7d3b1a8544030854d4dec6c6628987cadc5f"
+  "summary_digest": "e53ea3ea1d15f13a1fb557dc1714387428f8fcc61e0881b19740d43605e2689e"
 }

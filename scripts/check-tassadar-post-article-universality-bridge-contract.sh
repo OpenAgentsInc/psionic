@@ -33,5 +33,6 @@ jq -e '
   and .plugin_capability_claim_allowed == false
   and .served_public_universality_allowed == false
   and (.reserved_capability_issue_ids | index("TAS-195")) != null
-  and (.reserved_capability_issue_ids | index("TAS-206")) != null
+  and (.reserved_capability_issue_ids | index("TAS-207")) != null
+  and (.reserved_capability_issue_ids | index("TAS-206")) == null
 ' fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_summary.json >/dev/null

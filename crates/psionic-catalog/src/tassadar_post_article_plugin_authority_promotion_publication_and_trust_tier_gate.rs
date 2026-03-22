@@ -853,7 +853,7 @@ pub fn build_tassadar_post_article_plugin_authority_promotion_publication_and_tr
             plugin_publication_allowed,
             served_public_universality_allowed,
             arbitrary_software_capability_allowed,
-            deferred_issue_ids: vec![String::from("TAS-206")],
+            deferred_issue_ids: Vec::new(),
             claim_boundary: String::from(
                 "this catalog report freezes plugin authority, promotion, publication posture, and trust tiers above the canonical weighted controller without widening the claim surface. It keeps operator/internal posture, profile-specific named-but-suppressed routes, validator and accepted-outcome hook requirements, promotion challengeability, quarantine, revocation, and broader public refusal explicit instead of implying a served/public plugin platform or arbitrary public software execution.",
             ),
@@ -1339,7 +1339,7 @@ mod tests {
         assert_eq!(report.publication_posture_rows.len(), 5);
         assert_eq!(report.observer_rows.len(), 4);
         assert_eq!(report.validation_rows.len(), 8);
-        assert_eq!(report.deferred_issue_ids, vec![String::from("TAS-206")]);
+        assert!(report.deferred_issue_ids.is_empty());
     }
 
     #[test]

@@ -247,7 +247,7 @@ mod tests {
         assert_eq!(summary.publication_posture_row_count, 5);
         assert_eq!(summary.observer_row_count, 4);
         assert_eq!(summary.validation_row_count, 8);
-        assert_eq!(summary.deferred_issue_ids, vec![String::from("TAS-206")]);
+        assert!(summary.deferred_issue_ids.is_empty());
         assert!(summary.trust_tier_gate_green);
         assert!(summary.promotion_receipts_explicit);
         assert!(summary.publication_posture_explicit);

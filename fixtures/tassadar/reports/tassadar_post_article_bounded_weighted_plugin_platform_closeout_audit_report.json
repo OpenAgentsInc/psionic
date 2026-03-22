@@ -1,0 +1,362 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_bounded_weighted_plugin_platform_closeout_audit.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-post-article-bounded-weighted-plugin-platform-closeout-audit.sh",
+  "turing_closeout_audit_report_ref": "fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json",
+  "plugin_charter_authority_boundary_report_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
+  "plugin_manifest_identity_contract_report_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json",
+  "plugin_packet_abi_and_rust_pdk_report_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_packet_abi_and_rust_pdk_report.json",
+  "plugin_runtime_api_and_engine_abstraction_report_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_runtime_api_and_engine_abstraction_report.json",
+  "plugin_invocation_receipts_and_replay_classes_report_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_report.json",
+  "plugin_world_mount_envelope_compiler_and_admissibility_report_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_world_mount_envelope_compiler_and_admissibility_report.json",
+  "plugin_conformance_sandbox_and_benchmark_harness_eval_report_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_conformance_sandbox_and_benchmark_harness_eval_report.json",
+  "plugin_result_binding_schema_stability_and_composition_report_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_result_binding_schema_stability_and_composition_report.json",
+  "weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json",
+  "plugin_authority_promotion_publication_and_trust_tier_gate_report_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_authority_promotion_publication_and_trust_tier_gate_report.json",
+  "post_article_turing_audit_ref": "docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md",
+  "plugin_system_turing_audit_ref": "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md",
+  "local_plugin_system_spec_ref": "~/code/alpha/tassadar/plugin-system.md",
+  "supporting_material_rows": [
+    {
+      "material_id": "post_article_turing_closeout",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json",
+      "source_artifact_id": "tassadar.post_article_turing_completeness_closeout_audit.report.v1",
+      "source_artifact_digest": "ca6bc24fec901870cfd46fc1405b7499852baaa3617d2094f98804d4aae3ed45",
+      "detail": "the bounded plugin-platform closeout inherits the post-article bounded Turing-completeness closeout as its lower-plane proof-bearing compute and control carrier instead of recomputing that claim locally."
+    },
+    {
+      "material_id": "plugin_charter_authority_boundary",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
+      "source_artifact_id": "tassadar.post_article_plugin_charter_authority_boundary.report.v1",
+      "source_artifact_digest": "e95e6163bb3521805674473814449fcf0a2e9e32ab4ddf01f83a28399cc483c0",
+      "detail": "the plugin charter binds the capability lane to the canonical rebased machine identity, computational-model statement, and inherited control-plane proof before any later platform closeout may turn green."
+    },
+    {
+      "material_id": "plugin_manifest_identity_contract",
+      "material_class": "contract",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json",
+      "source_artifact_id": "tassadar.post_article_plugin_manifest_identity_contract.report.v1",
+      "source_artifact_digest": "28bf89089addd674b19f5298dd4adc409429a08f3679ab9e2e7edbde6b168107",
+      "detail": "manifest identity keeps plugin artifact identity, export declarations, and hot-swap boundaries machine-legible so the platform closeout does not float above unnamed plugin objects."
+    },
+    {
+      "material_id": "plugin_packet_abi_and_rust_pdk",
+      "material_class": "contract",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_packet_abi_and_rust_pdk_report.json",
+      "source_artifact_id": "tassadar.post_article_plugin_packet_abi_and_rust_pdk.report.v1",
+      "source_artifact_digest": "7b442f95f77893fcd0a1205e2932b88e3f0fd9234937ae3f8b19f2ff472299ed",
+      "detail": "the packet ABI and Rust-first PDK freeze the invocation contract and typed-refusal channel instead of letting the platform closeout imply a broader or tool-shaped guest surface."
+    },
+    {
+      "material_id": "plugin_runtime_api_and_engine_abstraction",
+      "material_class": "contract",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_runtime_api_and_engine_abstraction_report.json",
+      "source_artifact_id": "tassadar.post_article_plugin_runtime_api_and_engine_abstraction.report.v1",
+      "source_artifact_digest": "d904b76e18bf24b52d72cf7dd7e02133b34017a7e2b54e2fe6a3592d34818fec",
+      "detail": "the runtime API keeps host execution and engine abstraction explicit so the platform closeout remains above a declared host-owned execution layer rather than silently absorbing it."
+    },
+    {
+      "material_id": "plugin_invocation_receipts_and_replay_classes",
+      "material_class": "contract",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_report.json",
+      "source_artifact_id": "tassadar.post_article_plugin_invocation_receipts_and_replay_classes.report.v1",
+      "source_artifact_digest": "30b5ea1337daa25afc5de192fa03e042bd16780e91928657a3856e298dcee955",
+      "detail": "invocation receipts keep install/export/packet/replay identity machine-readable so later publication or benchmarking claims cannot erase what actually executed."
+    },
+    {
+      "material_id": "plugin_world_mount_envelope_and_admissibility",
+      "material_class": "contract",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_world_mount_envelope_compiler_and_admissibility_report.json",
+      "source_artifact_id": "tassadar.post_article_plugin_world_mount_envelope_compiler_and_admissibility.report.v1",
+      "source_artifact_digest": "dd28644b1fd07eded8837a5f9b792225d6a575b5958e0d68ebb4deefc8486bda",
+      "detail": "admissibility keeps candidate sets, equivalent-choice classes, route binding, trust posture, and publication posture explicit so later controller behavior does not smuggle hidden choice or mount power."
+    },
+    {
+      "material_id": "plugin_conformance_sandbox_and_benchmark_harness",
+      "material_class": "contract",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_conformance_sandbox_and_benchmark_harness_eval_report.json",
+      "source_artifact_id": "tassadar.post_article_plugin_conformance_sandbox_and_benchmark_harness.eval_report.v1",
+      "source_artifact_digest": "38a301b3df169ba72d7a1cb6a13e1df4e9c308cd0e4399eec33398567c7e517b",
+      "detail": "the conformance harness keeps the sandbox evidence and benchmark posture machine-readable so the closeout does not lean on unbounded or hidden operator experience."
+    },
+    {
+      "material_id": "plugin_result_binding_schema_stability_and_composition",
+      "material_class": "contract",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_result_binding_schema_stability_and_composition_report.json",
+      "source_artifact_id": "tassadar.post_article_plugin_result_binding_schema_stability_and_composition.report.v1",
+      "source_artifact_digest": "c82c71b5545e1d9e47853123cbe4dae1d80beac4c4b51fae902ff84c9e41ea92",
+      "detail": "result binding keeps schema stability, typed refusal normalization, and proof-versus-observational result boundaries explicit before weighted controller ownership turns into platform closure."
+    },
+    {
+      "material_id": "weighted_plugin_controller_trace",
+      "material_class": "proof_carrying",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json",
+      "source_artifact_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.eval_report.v1",
+      "source_artifact_digest": "a95d9aa0abf8d530cf8947caf1b04c7ea1fd49e372dce7807de43f59e87b6275",
+      "detail": "the weighted controller trace is the plugin-specific proof-bearing extension above the inherited control-plane proof; the platform closeout must cite that extension explicitly."
+    },
+    {
+      "material_id": "plugin_authority_promotion_publication_and_trust_tier_gate",
+      "material_class": "contract",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_authority_promotion_publication_and_trust_tier_gate_report.json",
+      "source_artifact_id": "tassadar.post_article_plugin_authority_promotion_publication_and_trust_tier_gate.report.v1",
+      "source_artifact_digest": "d813236bb30fa342550de38460ac35aab291ad0f1684d7f1ddc3ddfa67e55eeb",
+      "detail": "the authority gate freezes trust tiers, publication posture, validator hooks, and challengeability so the closeout can say exactly what platform capability does and does not imply."
+    },
+    {
+      "material_id": "post_article_turing_audit_context",
+      "material_class": "observational_context",
+      "satisfied": true,
+      "source_ref": "docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md",
+      "detail": "the March 20 post-article audit remains observational context that explains why the platform closeout stays separated from the lower-plane Turing closeout and the later machine closure bundle."
+    },
+    {
+      "material_id": "plugin_system_turing_audit_context",
+      "material_class": "observational_context",
+      "satisfied": true,
+      "source_ref": "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md",
+      "detail": "the March 20 plugin-system audit remains observational context that names the bounded plugin-platform closeout without collapsing it into public publication or arbitrary software claims."
+    },
+    {
+      "material_id": "local_plugin_system_spec",
+      "material_class": "observational_context",
+      "satisfied": true,
+      "source_ref": "~/code/alpha/tassadar/plugin-system.md",
+      "detail": "the local plugin-system notes remain design input only; they do not substitute for the proof-carrying contracts or the machine-readable closeout itself."
+    }
+  ],
+  "machine_identity_binding": {
+    "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+    "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "canonical_weight_bundle_digest": "99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+    "canonical_weight_primary_artifact_sha256": "e24923e6fe39f0656b3f331fb935e0827a3de43b706014610e513ca5a54e9f84",
+    "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+    "canonical_route_descriptor_digest": "00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032",
+    "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+    "continuation_contract_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
+    "computational_model_statement_id": "tassadar.post_article_universality_bridge.computational_model_statement.v1",
+    "control_plane_proof_report_id": "tassadar.post_article_control_plane_decision_provenance_proof.report.v1",
+    "control_plane_proof_report_digest": "6e2ee7d74812a896d76f878dbad372fe2f3acaf44436adbe4d8c7091f5960ba1",
+    "control_trace_contract_id": "tassadar.weighted_plugin.controller_trace_contract.v1",
+    "controller_eval_report_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.eval_report.v1",
+    "controller_eval_report_digest": "a95d9aa0abf8d530cf8947caf1b04c7ea1fd49e372dce7807de43f59e87b6275",
+    "authority_gate_report_id": "tassadar.post_article_plugin_authority_promotion_publication_and_trust_tier_gate.report.v1",
+    "authority_gate_report_digest": "d813236bb30fa342550de38460ac35aab291ad0f1684d7f1ddc3ddfa67e55eeb",
+    "turing_closeout_report_id": "tassadar.post_article_turing_completeness_closeout_audit.report.v1",
+    "turing_closeout_report_digest": "ca6bc24fec901870cfd46fc1405b7499852baaa3617d2094f98804d4aae3ed45",
+    "canonical_architecture_anchor_crate": "psionic-transformer",
+    "canonical_architecture_boundary_ref": "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
+    "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_model_id=`tassadar-article-transformer-trace-bound-trained-v0` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` computational_model_statement_id=`tassadar.post_article_universality_bridge.computational_model_statement.v1` control_plane_proof_report_id=`tassadar.post_article_control_plane_decision_provenance_proof.report.v1` control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1` authority_gate_report_id=`tassadar.post_article_plugin_authority_promotion_publication_and_trust_tier_gate.report.v1` and turing_closeout_report_id=`tassadar.post_article_turing_completeness_closeout_audit.report.v1` stay bound to `psionic-transformer`."
+  },
+  "dependency_rows": [
+    {
+      "dependency_id": "bounded_turing_closeout_foundation",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json"
+      ],
+      "detail": "the plugin-platform closeout sits above the rebased Turing-completeness closeout and inherits its canonical-route plus control-plane truth carrier without treating this report as the final machine bundle."
+    },
+    {
+      "dependency_id": "plugin_charter_boundary",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json"
+      ],
+      "detail": "the charter must already freeze the plugin lane, state classes, host-executes-but-may-not-decide posture, and proof-versus-audit distinction before a platform closeout can turn green."
+    },
+    {
+      "dependency_id": "plugin_manifest_identity_contract",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_manifest_identity_contract_report.json"
+      ],
+      "detail": "manifest identity must already be green so the platform closeout binds named plugin artifacts rather than a floating software notion."
+    },
+    {
+      "dependency_id": "plugin_packet_abi_and_rust_pdk",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_packet_abi_and_rust_pdk_report.json"
+      ],
+      "detail": "the platform closeout requires the narrow packet ABI, the Rust-first guest lane, the typed-refusal channel, and explicit receipt binding to already be frozen."
+    },
+    {
+      "dependency_id": "plugin_runtime_api_and_engine_abstraction",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_runtime_api_and_engine_abstraction_report.json"
+      ],
+      "detail": "the host-owned runtime API and engine abstraction must already be explicit so the closeout does not collapse host execution into model-owned control."
+    },
+    {
+      "dependency_id": "plugin_invocation_receipts_and_replay",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_invocation_receipts_and_replay_classes_report.json"
+      ],
+      "detail": "the platform closeout requires receipt identity and the typed failure lattice to already be frozen above the runtime API."
+    },
+    {
+      "dependency_id": "plugin_world_mount_envelope_and_admissibility",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_world_mount_envelope_compiler_and_admissibility_report.json"
+      ],
+      "detail": "the platform closeout requires admissibility, equivalent-choice classes, mount envelopes, and receipt-visible posture filtering to already be explicit and fail-closed."
+    },
+    {
+      "dependency_id": "plugin_conformance_sandbox_and_benchmark_harness",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_conformance_sandbox_and_benchmark_harness_eval_report.json"
+      ],
+      "detail": "the platform closeout requires conformance, benchmark posture, cancellation, timeout, and envelope integrity evidence to already be machine-readable."
+    },
+    {
+      "dependency_id": "plugin_result_binding_schema_stability_and_composition",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_result_binding_schema_stability_and_composition_report.json"
+      ],
+      "detail": "the platform closeout requires result binding, schema stability, semantic composition, and proof-versus-observational result boundaries to already be frozen."
+    },
+    {
+      "dependency_id": "weighted_plugin_controller_trace",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json"
+      ],
+      "detail": "the bounded platform closeout depends on the inherited control-plane proof plus the plugin-specific weighted-controller extension instead of implying controller ownership from lower-plane proofs alone."
+    },
+    {
+      "dependency_id": "plugin_authority_promotion_publication_and_trust_tier_gate",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_authority_promotion_publication_and_trust_tier_gate_report.json"
+      ],
+      "detail": "the platform closeout requires the authority, promotion, trust-tier, and publication posture gate to already be green so bounded capability does not imply broader publication or public platform rights."
+    }
+  ],
+  "validation_rows": [
+    {
+      "validation_id": "canonical_machine_tuple_locked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_authority_promotion_publication_and_trust_tier_gate_report.json"
+      ],
+      "detail": "all proof-bearing and capability-bearing artifacts stay bound to one canonical machine tuple over model id, weight digest, route digest, continuation contract, and computational-model statement instead of silently recomposing different effective machines."
+    },
+    {
+      "validation_id": "inherited_control_plane_plus_plugin_extension_explicit",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json"
+      ],
+      "detail": "weighted plugin control remains explicitly inherited from the lower-plane control proof plus the plugin-specific controller extension instead of floating as an adjacent benchmark or runtime observation."
+    },
+    {
+      "validation_id": "hidden_host_orchestration_quarantined",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json"
+      ],
+      "detail": "the host remains execution-only, the controller report keeps the host out of the planner role, and adversarial host-negative rows stay green instead of letting hidden orchestration backfill the platform claim."
+    },
+    {
+      "validation_id": "schema_drift_and_adapter_substitution_refused",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_result_binding_schema_stability_and_composition_report.json"
+      ],
+      "detail": "schema drift, version skew, ambiguous composition, and adapter-defined return paths stay fail-closed so platform closure cannot hide workflow logic in result adaptation."
+    },
+    {
+      "validation_id": "envelope_leakage_and_receipt_filtering_refused",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_world_mount_envelope_compiler_and_admissibility_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_conformance_sandbox_and_benchmark_harness_eval_report.json"
+      ],
+      "detail": "mount envelopes, receipt-visible filtering, trust posture, publication posture, and sandboxed envelope compatibility stay explicit so the platform closeout does not leak hidden capability or routing power."
+    },
+    {
+      "validation_id": "side_channel_and_benchmark_posture_explicit",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_conformance_sandbox_and_benchmark_harness_eval_report.json"
+      ],
+      "detail": "determinism, queue saturation, cancellation latency, timeout enforcement, and evidence overhead all stay explicit so timing and soft-failure behavior do not become hidden control channels."
+    },
+    {
+      "validation_id": "proof_vs_audit_classification_preserved",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_result_binding_schema_stability_and_composition_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json"
+      ],
+      "detail": "proof-carrying surfaces and observational audits remain explicitly classified so the platform closeout does not widen the claim by conflating sampled audits with proof-bearing contracts."
+    },
+    {
+      "validation_id": "operator_and_served_posture_explicit",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_authority_promotion_publication_and_trust_tier_gate_report.json"
+      ],
+      "detail": "the closeout stays operator/internal only, keeps served or public plugin publication suppressed, and does not imply that broader served posture already shares operator conformance."
+    },
+    {
+      "validation_id": "arbitrary_public_wasm_and_tool_use_refused",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_packet_abi_and_rust_pdk_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_runtime_api_and_engine_abstraction_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_plugin_authority_promotion_publication_and_trust_tier_gate_report.json"
+      ],
+      "detail": "bounded weighted plugin capability does not imply arbitrary public Wasm, arbitrary public tools, or arbitrary software capability; those claims remain explicitly false."
+    },
+    {
+      "validation_id": "closure_bundle_stays_separate",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json"
+      ],
+      "detail": "the final claim-bearing canonical machine closure bundle stays separate from this platform closeout and remains explicitly deferred to `TAS-215`."
+    }
+  ],
+  "closeout_status": "operator_green_served_suppressed",
+  "closeout_green": true,
+  "operator_internal_only_posture": true,
+  "served_plugin_envelope_published": false,
+  "closure_bundle_embedded_here": false,
+  "closure_bundle_issue_id": "TAS-215",
+  "rebase_claim_allowed": true,
+  "plugin_capability_claim_allowed": true,
+  "weighted_plugin_control_allowed": true,
+  "plugin_publication_allowed": false,
+  "served_public_universality_allowed": false,
+  "arbitrary_software_capability_allowed": false,
+  "claim_boundary": "this closeout audit states the first honest bounded weighted plugin-platform claim above the canonical post-`TAS-186` machine. It binds the lower-plane Turing closeout, plugin charter, manifest, ABI, runtime API, invocation receipts, admissibility envelope compiler, conformance harness, result-binding contract, weighted controller trace, and authority or promotion or publication gate into one operator/internal-only platform statement. It still keeps the final claim-bearing canonical machine closure bundle separate, keeps served or public plugin publication suppressed, refuses any implication of arbitrary public Wasm or arbitrary public tool use, and does not imply served/public universality or arbitrary software capability.",
+  "summary": "Post-article bounded weighted plugin-platform closeout audit keeps supporting_materials=14/14, dependency_rows=11/11, validation_rows=10/10, closeout_status=OperatorGreenServedSuppressed, closure_bundle_issue_id=`TAS-215`, and plugin_capability_claim_allowed=true.",
+  "report_digest": "98c759210f01fcc26c8cf0d871d44a441448eb8503bbba3df680e2d040bdcdf1"
+}

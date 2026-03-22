@@ -106,7 +106,7 @@ mod tests {
         assert_eq!(receipt.publication_posture_row_count, 5);
         assert_eq!(receipt.observer_row_count, 4);
         assert_eq!(receipt.validation_row_count, 8);
-        assert_eq!(receipt.deferred_issue_ids, vec![String::from("TAS-206")]);
+        assert!(receipt.deferred_issue_ids.is_empty());
         assert!(receipt.trust_tier_gate_green);
         assert!(receipt.promotion_receipts_explicit);
         assert!(receipt.publication_posture_explicit);

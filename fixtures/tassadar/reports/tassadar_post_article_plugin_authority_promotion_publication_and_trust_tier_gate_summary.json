@@ -13,9 +13,7 @@
   "publication_posture_row_count": 5,
   "observer_row_count": 4,
   "validation_row_count": 8,
-  "deferred_issue_ids": [
-    "TAS-206"
-  ],
+  "deferred_issue_ids": [],
   "trust_tier_gate_green": true,
   "promotion_receipts_explicit": true,
   "publication_posture_explicit": true,
@@ -31,6 +29,6 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "detail": "post-article plugin authority summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1`, contract_status=Green, trust_tier_rows=4, publication_posture_rows=5, validation_rows=8, weighted_plugin_control_allowed=true, and deferred_issue_ids=1.",
-  "summary_digest": "6aaca23858bf343ecdcbc6cc1726887cbe4f25ab1817fd3d64a6e32166dfa0a0"
+  "detail": "post-article plugin authority summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1`, contract_status=Green, trust_tier_rows=4, publication_posture_rows=5, validation_rows=8, weighted_plugin_control_allowed=true, and deferred_issue_ids=0.",
+  "summary_digest": "7ba9ab991ed12c9e6dfee2624202cd1a01f4ab64a9c6e9743254dd80f0a00c3d"
 }

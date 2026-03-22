@@ -23,5 +23,5 @@ profile-specific publication posture, observer rights, and validator plus
 accepted-outcome hook requirements. The current posture remains
 operator/internal only, keeps profile-specific deterministic-import and
 runtime-support lanes explicitly suppressed behind named policy hooks, refuses
-broader public publication, and defers the first bounded plugin-platform
-closeout claim to `TAS-206`.
+broader public publication, and now serves as one prerequisite beneath the
+separate `TAS-206` bounded plugin-platform closeout audit.

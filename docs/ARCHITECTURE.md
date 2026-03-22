@@ -1470,7 +1470,7 @@ The current scope is:
   hidden top-k filtering, helper substitution, and runtime policy drift.
   This turns weighted plugin control green on the canonical route, clears the
   controller defer pointer to empty, moves the reserved bridge frontier to
-  `TAS-206`, and still leaves bounded plugin-platform closeout, publication,
+  `TAS-207`, and still leaves bounded plugin-platform closeout, publication,
   served/public universality, and arbitrary software capability blocked.
 - the current post-article plugin authority, promotion, publication, and
   trust-tier artifacts are
@@ -1488,9 +1488,28 @@ The current scope is:
   operator/internal-only posture, explicit profile-specific deterministic
   import and runtime-support route hooks, and explicit broader public
   suppression or refusal. This freezes bounded plugin authority and posture
-  change mechanics without yet turning bounded plugin-platform closeout,
-  publication, served/public universality, or arbitrary software capability
-  green.
+  change mechanics beneath the separate bounded plugin-platform closeout audit
+  and still does not by itself turn publication, served/public universality,
+  or arbitrary software capability green.
+- the current post-article bounded weighted plugin-platform closeout artifacts
+  are
+  `fixtures/tassadar/reports/tassadar_post_article_bounded_weighted_plugin_platform_closeout_audit_report.json`,
+  `fixtures/tassadar/reports/tassadar_post_article_bounded_weighted_plugin_platform_closeout_summary.json`,
+  the provider receipt in
+  `crates/psionic-provider/src/tassadar_post_article_bounded_weighted_plugin_platform_closeout.rs`,
+  the checker script
+  `scripts/check-tassadar-post-article-bounded-weighted-plugin-platform-closeout-audit.sh`,
+  and the audit note
+  `docs/audits/2026-03-21-tassadar-post-article-bounded-weighted-plugin-platform-closeout-audit.md`,
+  which bind the post-article Turing closeout, plugin charter, manifest,
+  packet ABI, runtime API, invocation receipts, admissibility compiler,
+  conformance harness, result binding, weighted controller trace, and
+  authority or promotion or publication gate into one operator/internal-only
+  bounded plugin-platform statement on the canonical rebased machine. This
+  turns `plugin_capability_claim_allowed=true`, keeps plugin publication
+  suppressed, keeps served/public universality false, keeps arbitrary
+  software capability false, and still keeps the final canonical machine
+  closure bundle separate for `TAS-215`.
 - the current post-article Turing-completeness closeout artifacts are
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_summary.json`,
