@@ -120,6 +120,11 @@ and now also has:
   benchmark contract for the convergence tranche and freezes the common
   item-schema, contamination-attachment, receipt-posture, task-contract, and
   grader-interface surface that later plugin benchmark families must reuse.
+- `docs/PSION_PLUGIN_DISCOVERY_SELECTION_BENCHMARK.md` is the canonical first
+  package-specific plugin benchmark doc for the convergence tranche and
+  freezes the benchmark-authored discovery-versus-delegation package,
+  wrong-tool-versus-unsupported-tool distinction, and shared receipt surface
+  for the first host-native plugin-selection family.
 - `docs/audits/2026-03-22-tassadar-full-plugin-system-state-audit.md` is the
   canonical current-state proof record for the bounded Tassadar plugin system
   and freezes the present authoring-class, publication, and guest-artifact

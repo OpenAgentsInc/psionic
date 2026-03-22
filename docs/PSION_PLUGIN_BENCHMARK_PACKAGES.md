@@ -8,10 +8,14 @@
 This document freezes the shared benchmark contract for plugin-conditioned
 evaluation.
 
-It is not yet the package content for discovery, arguments, sequencing,
-refusal, or interpretation.
+It is not the package-specific content for arguments, sequencing, refusal, or
+interpretation.
 
 It is the common contract that those package families must now share.
+
+The first package-specific discovery-and-selection contract now lives in
+`docs/PSION_PLUGIN_DISCOVERY_SELECTION_BENCHMARK.md` and reuses this shared
+surface instead of inventing a new one.
 
 ## Canonical Artifacts
 
@@ -20,6 +24,8 @@ It is the common contract that those package families must now share.
 - `crates/psionic-train/src/psion_plugin_benchmark_packages.rs` owns the
   shared package shape, item schema, contamination attachment, receipt posture,
   task contracts, and grader interfaces.
+- `docs/PSION_PLUGIN_DISCOVERY_SELECTION_BENCHMARK.md` is the first package-
+  specific child contract built on top of this shared surface.
 
 The stable schema version is
 `psionic.psion.plugin_benchmark_package.v1`.
@@ -79,4 +85,5 @@ It does not yet claim:
 - broad controller-specific grading forks
 - package-specific benchmark thresholds or green results
 
-Those later issues must all reuse this shared contract rather than replacing it.
+Those later issues must all reuse this shared contract rather than replacing
+it.

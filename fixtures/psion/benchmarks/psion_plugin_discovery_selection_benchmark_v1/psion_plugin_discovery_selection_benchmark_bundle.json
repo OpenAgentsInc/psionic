@@ -1,0 +1,325 @@
+{
+  "schema_version": "psionic.psion.plugin_discovery_selection_benchmark_bundle.v1",
+  "package": {
+    "schema_version": "psionic.psion.plugin_benchmark_package.v1",
+    "package_id": "psion.plugin.discovery_selection.v1",
+    "package_family": "discovery_selection",
+    "benchmark_package": {
+      "abi_version": "psionic.benchmark.v1",
+      "key": {
+        "benchmark_ref": "benchmark://openagents/psion/plugin_discovery_selection",
+        "version": "v1"
+      },
+      "display_name": "Psion Plugin Discovery And Selection",
+      "environment": {
+        "environment_ref": "env.psion.plugin.benchmark",
+        "version": "2026.03.22"
+      },
+      "repeat_count": 3,
+      "aggregation": "median_score",
+      "verification_policy": {
+        "require_timer_integrity": false,
+        "require_token_accounting": false,
+        "require_final_state_capture": false,
+        "require_execution_strategy": false
+      },
+      "cases": [
+        {
+          "case_id": "plugin_discovery_direct_answer_v1"
+        },
+        {
+          "case_id": "plugin_discovery_single_fetch_v1"
+        },
+        {
+          "case_id": "plugin_discovery_multi_sequence_v1"
+        },
+        {
+          "case_id": "plugin_discovery_wrong_tool_negative_v1"
+        },
+        {
+          "case_id": "plugin_discovery_unsupported_tool_negative_v1"
+        }
+      ]
+    },
+    "prompt_formats": [
+      {
+        "format_id": "plugin_selection_decision_v1",
+        "system_instruction_ref": "prompt://psion/plugin_benchmark/system/plugin-selection",
+        "user_template_ref": "prompt://psion/plugin_benchmark/user/plugin-selection",
+        "envelope": "structured_plugin_selection_json",
+        "expected_response_format": "plugin_selection_decision_json",
+        "preserve_receipt_boundaries": true,
+        "detail": "Selection prompts force the model to emit one explicit route decision and one explicit plugin-selection payload."
+      }
+    ],
+    "grader_interfaces": [
+      {
+        "grader_kind": "selection_decision",
+        "grader_id": "selection_direct_answer_v1",
+        "expected_route": "answer_in_language",
+        "expected_plugin_ids": [],
+        "order_matters": false,
+        "detail": "Direct-answer route should stay in language without plugin delegation."
+      },
+      {
+        "grader_kind": "selection_decision",
+        "grader_id": "selection_single_http_fetch_v1",
+        "expected_route": "delegate_to_admitted_plugin",
+        "expected_plugin_ids": [
+          "plugin.http.fetch_text"
+        ],
+        "order_matters": true,
+        "detail": "Single-plugin selection should choose the bounded HTTP fetch plugin."
+      },
+      {
+        "grader_kind": "selection_decision",
+        "grader_id": "selection_multi_plugin_feed_then_fetch_v1",
+        "expected_route": "delegate_to_admitted_plugin",
+        "expected_plugin_ids": [
+          "plugin.feed.rss_atom_parse",
+          "plugin.http.fetch_text"
+        ],
+        "order_matters": true,
+        "detail": "Multi-plugin selection should choose the feed parser before the fetch plugin."
+      },
+      {
+        "grader_kind": "selection_decision",
+        "grader_id": "selection_wrong_tool_rejection_v1",
+        "expected_route": "delegate_to_admitted_plugin",
+        "expected_plugin_ids": [
+          "plugin.feed.rss_atom_parse"
+        ],
+        "order_matters": true,
+        "detail": "Wrong-tool negatives are scored separately from unsupported-capability refusal."
+      },
+      {
+        "grader_kind": "exact_route",
+        "grader_id": "selection_unsupported_tool_refusal_v1",
+        "expected_route": "refuse_unsupported_plugin_or_capability",
+        "detail": "Unsupported-tool discovery cases must refuse unsupported capability instead of choosing a wrong admitted tool."
+      }
+    ],
+    "items": [
+      {
+        "item_id": "plugin_discovery_direct_answer_v1",
+        "family": "discovery_selection",
+        "prompt_format_id": "plugin_selection_decision_v1",
+        "grader_id": "selection_direct_answer_v1",
+        "prompt_digest": "f13f0c482320c558564fd84096f165741f73e8bb11221f2cc2c085518ad728da",
+        "contamination_attachment": {
+          "contamination_bundle_ref": "fixtures/psion/plugins/datasets/psion_plugin_contamination_controls_v1/psion_plugin_contamination_bundle.json",
+          "contamination_bundle_digest": "d6c6245e888e933079f2cb4d42999b9c30968f3393395ffbb337d05676b3eae6",
+          "authored_prompt_ref": "benchmark://openagents/psion/plugin_discovery/direct_answer_v1",
+          "parent_lineage_ids": [],
+          "source_case_ids": [],
+          "receipt_refs": [],
+          "detail": "Discovery benchmark item is benchmark-authored and explicitly marked as such instead of pretending it came from held-out runtime lineage."
+        },
+        "receipt_posture": {
+          "execution_evidence_required": false,
+          "required_receipt_refs": [],
+          "forbid_unseen_execution_claims": true,
+          "detail": "Discovery benchmark scores route and selection choice without claiming execution happened."
+        },
+        "task": {
+          "task_kind": "discovery_selection",
+          "admitted_plugin_ids": [
+            "plugin.feed.rss_atom_parse",
+            "plugin.html.extract_readable",
+            "plugin.http.fetch_text",
+            "plugin.text.url_extract"
+          ],
+          "direct_answer_allowed": true,
+          "expected_route": "answer_in_language",
+          "expected_plugin_ids": []
+        },
+        "detail": "Direct-answer case should stay in language even when multiple plugins are admitted."
+      },
+      {
+        "item_id": "plugin_discovery_single_fetch_v1",
+        "family": "discovery_selection",
+        "prompt_format_id": "plugin_selection_decision_v1",
+        "grader_id": "selection_single_http_fetch_v1",
+        "prompt_digest": "8882e92cb10184f12e454750fd8c6f699d8ee7f72b65d8d471d999ddc2d7c569",
+        "contamination_attachment": {
+          "contamination_bundle_ref": "fixtures/psion/plugins/datasets/psion_plugin_contamination_controls_v1/psion_plugin_contamination_bundle.json",
+          "contamination_bundle_digest": "d6c6245e888e933079f2cb4d42999b9c30968f3393395ffbb337d05676b3eae6",
+          "authored_prompt_ref": "benchmark://openagents/psion/plugin_discovery/single_fetch_v1",
+          "parent_lineage_ids": [],
+          "source_case_ids": [],
+          "receipt_refs": [],
+          "detail": "Discovery benchmark item is benchmark-authored and explicitly marked as such instead of pretending it came from held-out runtime lineage."
+        },
+        "receipt_posture": {
+          "execution_evidence_required": false,
+          "required_receipt_refs": [],
+          "forbid_unseen_execution_claims": true,
+          "detail": "Discovery benchmark scores route and selection choice without claiming execution happened."
+        },
+        "task": {
+          "task_kind": "discovery_selection",
+          "admitted_plugin_ids": [
+            "plugin.feed.rss_atom_parse",
+            "plugin.html.extract_readable",
+            "plugin.http.fetch_text",
+            "plugin.text.url_extract"
+          ],
+          "direct_answer_allowed": false,
+          "expected_route": "delegate_to_admitted_plugin",
+          "expected_plugin_ids": [
+            "plugin.http.fetch_text"
+          ]
+        },
+        "detail": "Single-plugin case should choose the bounded HTTP fetch plugin from the admitted set."
+      },
+      {
+        "item_id": "plugin_discovery_multi_sequence_v1",
+        "family": "discovery_selection",
+        "prompt_format_id": "plugin_selection_decision_v1",
+        "grader_id": "selection_multi_plugin_feed_then_fetch_v1",
+        "prompt_digest": "3db682019e1d2673e93823dfa35b2422ee3b5b1d0a6801f9120650e661869e37",
+        "contamination_attachment": {
+          "contamination_bundle_ref": "fixtures/psion/plugins/datasets/psion_plugin_contamination_controls_v1/psion_plugin_contamination_bundle.json",
+          "contamination_bundle_digest": "d6c6245e888e933079f2cb4d42999b9c30968f3393395ffbb337d05676b3eae6",
+          "authored_prompt_ref": "benchmark://openagents/psion/plugin_discovery/multi_sequence_v1",
+          "parent_lineage_ids": [],
+          "source_case_ids": [],
+          "receipt_refs": [],
+          "detail": "Discovery benchmark item is benchmark-authored and explicitly marked as such instead of pretending it came from held-out runtime lineage."
+        },
+        "receipt_posture": {
+          "execution_evidence_required": false,
+          "required_receipt_refs": [],
+          "forbid_unseen_execution_claims": true,
+          "detail": "Discovery benchmark scores route and selection choice without claiming execution happened."
+        },
+        "task": {
+          "task_kind": "discovery_selection",
+          "admitted_plugin_ids": [
+            "plugin.feed.rss_atom_parse",
+            "plugin.html.extract_readable",
+            "plugin.http.fetch_text",
+            "plugin.text.url_extract"
+          ],
+          "direct_answer_allowed": false,
+          "expected_route": "delegate_to_admitted_plugin",
+          "expected_plugin_ids": [
+            "plugin.feed.rss_atom_parse",
+            "plugin.http.fetch_text"
+          ]
+        },
+        "detail": "Multi-plugin case should select a bounded two-plugin sequence under one admitted set."
+      },
+      {
+        "item_id": "plugin_discovery_wrong_tool_negative_v1",
+        "family": "discovery_selection",
+        "prompt_format_id": "plugin_selection_decision_v1",
+        "grader_id": "selection_wrong_tool_rejection_v1",
+        "prompt_digest": "5a5e39fcd86c004cd79c41207777c2cf5ee1d2415cafd0f220bd8aa5a994cc8d",
+        "contamination_attachment": {
+          "contamination_bundle_ref": "fixtures/psion/plugins/datasets/psion_plugin_contamination_controls_v1/psion_plugin_contamination_bundle.json",
+          "contamination_bundle_digest": "d6c6245e888e933079f2cb4d42999b9c30968f3393395ffbb337d05676b3eae6",
+          "authored_prompt_ref": "benchmark://openagents/psion/plugin_discovery/wrong_tool_negative_v1",
+          "parent_lineage_ids": [],
+          "source_case_ids": [],
+          "receipt_refs": [],
+          "detail": "Discovery benchmark item is benchmark-authored and explicitly marked as such instead of pretending it came from held-out runtime lineage."
+        },
+        "receipt_posture": {
+          "execution_evidence_required": false,
+          "required_receipt_refs": [],
+          "forbid_unseen_execution_claims": true,
+          "detail": "Discovery benchmark scores route and selection choice without claiming execution happened."
+        },
+        "task": {
+          "task_kind": "discovery_selection",
+          "admitted_plugin_ids": [
+            "plugin.feed.rss_atom_parse",
+            "plugin.html.extract_readable",
+            "plugin.http.fetch_text",
+            "plugin.text.url_extract"
+          ],
+          "direct_answer_allowed": false,
+          "expected_route": "delegate_to_admitted_plugin",
+          "expected_plugin_ids": [
+            "plugin.feed.rss_atom_parse"
+          ],
+          "negative_case_kind": "wrong_tool_choice"
+        },
+        "detail": "Wrong-tool negative remains separate from unsupported-tool refusal."
+      },
+      {
+        "item_id": "plugin_discovery_unsupported_tool_negative_v1",
+        "family": "discovery_selection",
+        "prompt_format_id": "plugin_selection_decision_v1",
+        "grader_id": "selection_unsupported_tool_refusal_v1",
+        "prompt_digest": "272bd4c7135a1ceff5912d0b51a4beb05fb0ec4b5cff1b15d906eceaed50e79b",
+        "contamination_attachment": {
+          "contamination_bundle_ref": "fixtures/psion/plugins/datasets/psion_plugin_contamination_controls_v1/psion_plugin_contamination_bundle.json",
+          "contamination_bundle_digest": "d6c6245e888e933079f2cb4d42999b9c30968f3393395ffbb337d05676b3eae6",
+          "authored_prompt_ref": "benchmark://openagents/psion/plugin_discovery/unsupported_tool_negative_v1",
+          "parent_lineage_ids": [],
+          "source_case_ids": [],
+          "receipt_refs": [],
+          "detail": "Discovery benchmark item is benchmark-authored and explicitly marked as such instead of pretending it came from held-out runtime lineage."
+        },
+        "receipt_posture": {
+          "execution_evidence_required": false,
+          "required_receipt_refs": [],
+          "forbid_unseen_execution_claims": true,
+          "detail": "Discovery benchmark scores route and selection choice without claiming execution happened."
+        },
+        "task": {
+          "task_kind": "discovery_selection",
+          "admitted_plugin_ids": [
+            "plugin.feed.rss_atom_parse",
+            "plugin.html.extract_readable",
+            "plugin.text.url_extract"
+          ],
+          "direct_answer_allowed": false,
+          "expected_route": "refuse_unsupported_plugin_or_capability",
+          "expected_plugin_ids": [],
+          "negative_case_kind": "unsupported_tool_choice"
+        },
+        "detail": "Unsupported-tool negative should refuse unsupported capability instead of selecting a wrong admitted tool."
+      }
+    ],
+    "summary": "Discovery package covers direct-answer, single-plugin, multi-plugin, wrong-tool, and unsupported-tool selection under the bounded host-native plugin set.",
+    "package_digest": "8d73fd11115d3d2b14be8fe73cfe0d296866519020fc8cb20a6d3103ff88df6b"
+  },
+  "receipt": {
+    "schema_version": "psionic.psion.plugin_benchmark_receipt.v1",
+    "receipt_id": "receipt.psion.plugin.discovery_selection.reference.v1",
+    "package_id": "psion.plugin.discovery_selection.v1",
+    "package_digest": "8d73fd11115d3d2b14be8fe73cfe0d296866519020fc8cb20a6d3103ff88df6b",
+    "package_family": "discovery_selection",
+    "contamination_bundle_digest": "d6c6245e888e933079f2cb4d42999b9c30968f3393395ffbb337d05676b3eae6",
+    "item_count": 5,
+    "observed_metrics": [
+      {
+        "kind": "route_accuracy_bps",
+        "value_bps": 10000,
+        "detail": "Reference route labels are fully aligned for the bounded package."
+      },
+      {
+        "kind": "selection_accuracy_bps",
+        "value_bps": 10000,
+        "detail": "Reference plugin-selection labels are fully aligned for the bounded package."
+      },
+      {
+        "kind": "wrong_tool_rejection_accuracy_bps",
+        "value_bps": 10000,
+        "detail": "Wrong-tool negatives remain distinct from unsupported-capability refusal."
+      },
+      {
+        "kind": "unsupported_tool_refusal_accuracy_bps",
+        "value_bps": 10000,
+        "detail": "Unsupported-tool cases route to explicit refusal instead of wrong-tool delegation."
+      }
+    ],
+    "summary": "Reference receipt for the first plugin discovery-and-selection benchmark package.",
+    "receipt_digest": "b7899863d58f91ca656505c54a8fcc211cf82ff8ecd549ba99808ea25b7a53ab"
+  },
+  "summary": "Discovery benchmark bundle freezes one authored package plus one shared receipt for direct-answer, plugin-delegate, wrong-tool, and unsupported-tool selection decisions.",
+  "bundle_digest": "7927ae708ea8464a2768e40ea7e8e65e0f2d9fa006ce0983a24ea146d19fbb4f"
+}

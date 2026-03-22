@@ -3,9 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use psionic_data::{
     PsionPluginContaminationBundle, PsionPluginContaminationItemKind, PsionPluginRouteLabel,
 };
-use psionic_eval::{
-    BenchmarkPackage,
-};
+use psionic_eval::BenchmarkPackage;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -13,6 +11,9 @@ use thiserror::Error;
 /// Stable schema version for the shared Psion plugin benchmark-package contract.
 pub const PSION_PLUGIN_BENCHMARK_PACKAGE_SCHEMA_VERSION: &str =
     "psionic.psion.plugin_benchmark_package.v1";
+/// Stable schema version for the shared Psion plugin benchmark receipt.
+pub const PSION_PLUGIN_BENCHMARK_PACKAGE_RECEIPT_SCHEMA_VERSION: &str =
+    "psionic.psion.plugin_benchmark_receipt.v1";
 
 /// Benchmark families admitted under the shared plugin-conditioned contract.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -128,14 +129,8 @@ impl PsionPluginBenchmarkRubricDimension {
             self.dimension_id.as_str(),
             "psion_plugin_rubric_dimension.dimension_id",
         )?;
-        validate_bps(
-            self.weight_bps,
-            "psion_plugin_rubric_dimension.weight_bps",
-        )?;
-        ensure_nonempty(
-            self.detail.as_str(),
-            "psion_plugin_rubric_dimension.detail",
-        )?;
+        validate_bps(self.weight_bps, "psion_plugin_rubric_dimension.weight_bps")?;
+        ensure_nonempty(self.detail.as_str(), "psion_plugin_rubric_dimension.detail")?;
         Ok(())
     }
 }
@@ -257,8 +252,14 @@ impl PsionPluginBenchmarkGraderInterface {
                 ensure_nonempty(grader.detail.as_str(), "exact_route_grader.detail")?;
             }
             Self::ArgumentSchema(grader) => {
-                ensure_nonempty(grader.grader_id.as_str(), "argument_schema_grader.grader_id")?;
-                ensure_nonempty(grader.tool_name.as_str(), "argument_schema_grader.tool_name")?;
+                ensure_nonempty(
+                    grader.grader_id.as_str(),
+                    "argument_schema_grader.grader_id",
+                )?;
+                ensure_nonempty(
+                    grader.tool_name.as_str(),
+                    "argument_schema_grader.tool_name",
+                )?;
                 ensure_nonempty(grader.detail.as_str(), "argument_schema_grader.detail")?;
                 if grader.required_argument_paths.is_empty()
                     && !grader.request_for_structure_allowed
@@ -292,8 +293,7 @@ impl PsionPluginBenchmarkGraderInterface {
             Self::ExactRefusal(grader) => {
                 ensure_nonempty(grader.grader_id.as_str(), "exact_refusal_grader.grader_id")?;
                 ensure_nonempty(grader.detail.as_str(), "exact_refusal_grader.detail")?;
-                if grader.accepted_reason_codes.is_empty()
-                    && !grader.request_for_structure_allowed
+                if grader.accepted_reason_codes.is_empty() && !grader.request_for_structure_allowed
                 {
                     return Err(PsionPluginBenchmarkPackageError::MissingField {
                         field: String::from("exact_refusal_grader.accepted_reason_codes"),
@@ -333,9 +333,7 @@ impl PsionPluginBenchmarkGraderInterface {
                 }
                 if total_weight_bps != 10_000 {
                     return Err(PsionPluginBenchmarkPackageError::FieldMismatch {
-                        field: String::from(
-                            "interpretation_rubric_grader.dimensions.weight_bps",
-                        ),
+                        field: String::from("interpretation_rubric_grader.dimensions.weight_bps"),
                         expected: String::from("10000"),
                         actual: total_weight_bps.to_string(),
                     });
@@ -448,12 +446,8 @@ impl PsionPluginBenchmarkTaskContract {
             Self::DiscoverySelection(_) => PsionPluginBenchmarkFamily::DiscoverySelection,
             Self::ArgumentConstruction(_) => PsionPluginBenchmarkFamily::ArgumentConstruction,
             Self::SequencingMultiCall(_) => PsionPluginBenchmarkFamily::SequencingMultiCall,
-            Self::RefusalRequestStructure(_) => {
-                PsionPluginBenchmarkFamily::RefusalRequestStructure
-            }
-            Self::ResultInterpretation(_) => {
-                PsionPluginBenchmarkFamily::ResultInterpretation
-            }
+            Self::RefusalRequestStructure(_) => PsionPluginBenchmarkFamily::RefusalRequestStructure,
+            Self::ResultInterpretation(_) => PsionPluginBenchmarkFamily::ResultInterpretation,
         }
     }
 
@@ -552,6 +546,10 @@ pub struct PsionPluginBenchmarkContaminationAttachment {
     pub contamination_bundle_ref: String,
     /// Stable contamination bundle digest.
     pub contamination_bundle_digest: String,
+    /// Optional authored prompt ref when the item is benchmark-authored rather than
+    /// derived from held-out lineage rows directly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authored_prompt_ref: Option<String>,
     /// Parent lineage ids used to build or grade the item.
     pub parent_lineage_ids: Vec<String>,
     /// Source case ids used to build or label the item.
@@ -584,11 +582,6 @@ impl PsionPluginBenchmarkContaminationAttachment {
             self.detail.as_str(),
             "benchmark_contamination_attachment.detail",
         )?;
-        if self.parent_lineage_ids.is_empty() {
-            return Err(PsionPluginBenchmarkPackageError::MissingField {
-                field: String::from("benchmark_contamination_attachment.parent_lineage_ids"),
-            });
-        }
         reject_duplicate_strings(
             self.parent_lineage_ids.as_slice(),
             "benchmark_contamination_attachment.parent_lineage_ids",
@@ -601,6 +594,33 @@ impl PsionPluginBenchmarkContaminationAttachment {
             self.receipt_refs.as_slice(),
             "benchmark_contamination_attachment.receipt_refs",
         )?;
+        if let Some(authored_prompt_ref) = &self.authored_prompt_ref {
+            ensure_nonempty(
+                authored_prompt_ref.as_str(),
+                "benchmark_contamination_attachment.authored_prompt_ref",
+            )?;
+        }
+        if self.parent_lineage_ids.is_empty() {
+            if self.authored_prompt_ref.is_none() {
+                return Err(PsionPluginBenchmarkPackageError::MissingField {
+                    field: String::from(
+                        "benchmark_contamination_attachment.parent_lineage_ids_or_authored_prompt_ref",
+                    ),
+                });
+            }
+            if !self.source_case_ids.is_empty() || !self.receipt_refs.is_empty() {
+                return Err(PsionPluginBenchmarkPackageError::FieldMismatch {
+                    field: String::from(
+                        "benchmark_contamination_attachment.source_case_ids_or_receipt_refs",
+                    ),
+                    expected: String::from(
+                        "empty when the item uses authored prompt provenance only",
+                    ),
+                    actual: String::from("non-empty"),
+                });
+            }
+            return Ok(());
+        }
 
         let mut expected_source_case_ids = BTreeSet::new();
         let mut expected_receipt_refs = BTreeSet::new();
@@ -609,9 +629,11 @@ impl PsionPluginBenchmarkContaminationAttachment {
                 .parent_lineage_rows
                 .iter()
                 .find(|row| row.lineage_id == *lineage_id)
-                .ok_or_else(|| PsionPluginBenchmarkPackageError::UnknownContaminationLineage {
-                    lineage_id: lineage_id.clone(),
-                })?;
+                .ok_or_else(
+                    || PsionPluginBenchmarkPackageError::UnknownContaminationLineage {
+                        lineage_id: lineage_id.clone(),
+                    },
+                )?;
             if row.item_kind != PsionPluginContaminationItemKind::HeldOutEvalRecord {
                 return Err(PsionPluginBenchmarkPackageError::FieldMismatch {
                     field: String::from("benchmark_contamination_attachment.parent_lineage_ids"),
@@ -642,6 +664,37 @@ impl PsionPluginBenchmarkContaminationAttachment {
     }
 }
 
+/// Metric kinds preserved on one plugin benchmark receipt.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsionPluginBenchmarkMetricKind {
+    RouteAccuracyBps,
+    SelectionAccuracyBps,
+    WrongToolRejectionAccuracyBps,
+    UnsupportedToolRefusalAccuracyBps,
+    RequestForStructureAccuracyBps,
+    InterpretationScoreBps,
+}
+
+/// One observed metric preserved on one plugin benchmark receipt.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionPluginObservedMetric {
+    /// Metric kind.
+    pub kind: PsionPluginBenchmarkMetricKind,
+    /// Metric value in basis points.
+    pub value_bps: u32,
+    /// Short explanation of the observed metric.
+    pub detail: String,
+}
+
+impl PsionPluginObservedMetric {
+    fn validate(&self) -> Result<(), PsionPluginBenchmarkPackageError> {
+        validate_bps(self.value_bps, "psion_plugin_observed_metric.value_bps")?;
+        ensure_nonempty(self.detail.as_str(), "psion_plugin_observed_metric.detail")?;
+        Ok(())
+    }
+}
+
 /// Declares whether execution evidence is required by one benchmark item.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionPluginBenchmarkReceiptPosture {
@@ -660,10 +713,7 @@ impl PsionPluginBenchmarkReceiptPosture {
         &self,
         attachment: &PsionPluginBenchmarkContaminationAttachment,
     ) -> Result<(), PsionPluginBenchmarkPackageError> {
-        ensure_nonempty(
-            self.detail.as_str(),
-            "benchmark_receipt_posture.detail",
-        )?;
+        ensure_nonempty(self.detail.as_str(), "benchmark_receipt_posture.detail")?;
         reject_duplicate_strings(
             self.required_receipt_refs.as_slice(),
             "benchmark_receipt_posture.required_receipt_refs",
@@ -812,7 +862,10 @@ impl PsionPluginBenchmarkPackageContract {
             item.validate()?;
             if item.family != self.package_family {
                 return Err(PsionPluginBenchmarkPackageError::FieldMismatch {
-                    field: format!("psion_plugin_benchmark_package.items[{}].family", item.item_id),
+                    field: format!(
+                        "psion_plugin_benchmark_package.items[{}].family",
+                        item.item_id
+                    ),
                     expected: format!("{:?}", self.package_family),
                     actual: format!("{:?}", item.family),
                 });
@@ -884,6 +937,137 @@ impl PsionPluginBenchmarkPackageContract {
         }
         Ok(())
     }
+}
+
+/// One benchmark receipt under the shared plugin-conditioned contract.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionPluginBenchmarkPackageReceipt {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable receipt id.
+    pub receipt_id: String,
+    /// Stable package id.
+    pub package_id: String,
+    /// Stable package digest.
+    pub package_digest: String,
+    /// Package family covered by the receipt.
+    pub package_family: PsionPluginBenchmarkFamily,
+    /// Contamination bundle digest the package cited.
+    pub contamination_bundle_digest: String,
+    /// Number of benchmark items covered by the receipt.
+    pub item_count: u32,
+    /// Observed metrics.
+    pub observed_metrics: Vec<PsionPluginObservedMetric>,
+    /// Short explanation of the receipt.
+    pub summary: String,
+    /// Stable digest over the receipt.
+    pub receipt_digest: String,
+}
+
+impl PsionPluginBenchmarkPackageReceipt {
+    /// Validates the receipt against the shared package contract.
+    pub fn validate_against_package(
+        &self,
+        package: &PsionPluginBenchmarkPackageContract,
+        contamination: &PsionPluginContaminationBundle,
+    ) -> Result<(), PsionPluginBenchmarkPackageError> {
+        if self.schema_version != PSION_PLUGIN_BENCHMARK_PACKAGE_RECEIPT_SCHEMA_VERSION {
+            return Err(PsionPluginBenchmarkPackageError::SchemaVersionMismatch {
+                expected: String::from(PSION_PLUGIN_BENCHMARK_PACKAGE_RECEIPT_SCHEMA_VERSION),
+                actual: self.schema_version.clone(),
+            });
+        }
+        ensure_nonempty(
+            self.receipt_id.as_str(),
+            "psion_plugin_benchmark_receipt.receipt_id",
+        )?;
+        if self.package_id != package.package_id {
+            return Err(PsionPluginBenchmarkPackageError::FieldMismatch {
+                field: String::from("psion_plugin_benchmark_receipt.package_id"),
+                expected: package.package_id.clone(),
+                actual: self.package_id.clone(),
+            });
+        }
+        if self.package_digest != package.package_digest {
+            return Err(PsionPluginBenchmarkPackageError::FieldMismatch {
+                field: String::from("psion_plugin_benchmark_receipt.package_digest"),
+                expected: package.package_digest.clone(),
+                actual: self.package_digest.clone(),
+            });
+        }
+        if self.package_family != package.package_family {
+            return Err(PsionPluginBenchmarkPackageError::FieldMismatch {
+                field: String::from("psion_plugin_benchmark_receipt.package_family"),
+                expected: format!("{:?}", package.package_family),
+                actual: format!("{:?}", self.package_family),
+            });
+        }
+        if self.contamination_bundle_digest != contamination.bundle_digest {
+            return Err(PsionPluginBenchmarkPackageError::FieldMismatch {
+                field: String::from("psion_plugin_benchmark_receipt.contamination_bundle_digest"),
+                expected: contamination.bundle_digest.clone(),
+                actual: self.contamination_bundle_digest.clone(),
+            });
+        }
+        if self.item_count != package.items.len() as u32 {
+            return Err(PsionPluginBenchmarkPackageError::FieldMismatch {
+                field: String::from("psion_plugin_benchmark_receipt.item_count"),
+                expected: package.items.len().to_string(),
+                actual: self.item_count.to_string(),
+            });
+        }
+        if self.observed_metrics.is_empty() {
+            return Err(PsionPluginBenchmarkPackageError::MissingField {
+                field: String::from("psion_plugin_benchmark_receipt.observed_metrics"),
+            });
+        }
+        let mut metric_kinds = BTreeSet::new();
+        for metric in &self.observed_metrics {
+            metric.validate()?;
+            if !metric_kinds.insert(metric.kind) {
+                return Err(PsionPluginBenchmarkPackageError::FieldMismatch {
+                    field: String::from("psion_plugin_benchmark_receipt.observed_metrics.kind"),
+                    expected: String::from("unique metric kinds"),
+                    actual: String::from("duplicate metric kind"),
+                });
+            }
+        }
+        ensure_nonempty(
+            self.summary.as_str(),
+            "psion_plugin_benchmark_receipt.summary",
+        )?;
+        if self.receipt_digest != stable_receipt_digest(self) {
+            return Err(PsionPluginBenchmarkPackageError::DigestMismatch {
+                kind: String::from("psion_plugin_benchmark_receipt"),
+            });
+        }
+        Ok(())
+    }
+}
+
+/// Records one shared benchmark receipt above a plugin package contract.
+pub fn record_psion_plugin_benchmark_package_receipt(
+    receipt_id: impl Into<String>,
+    package: &PsionPluginBenchmarkPackageContract,
+    contamination: &PsionPluginContaminationBundle,
+    observed_metrics: Vec<PsionPluginObservedMetric>,
+    summary: impl Into<String>,
+) -> Result<PsionPluginBenchmarkPackageReceipt, PsionPluginBenchmarkPackageError> {
+    let mut receipt = PsionPluginBenchmarkPackageReceipt {
+        schema_version: String::from(PSION_PLUGIN_BENCHMARK_PACKAGE_RECEIPT_SCHEMA_VERSION),
+        receipt_id: receipt_id.into(),
+        package_id: package.package_id.clone(),
+        package_digest: package.package_digest.clone(),
+        package_family: package.package_family,
+        contamination_bundle_digest: contamination.bundle_digest.clone(),
+        item_count: package.items.len() as u32,
+        observed_metrics,
+        summary: summary.into(),
+        receipt_digest: String::new(),
+    };
+    receipt.receipt_digest = stable_receipt_digest(&receipt);
+    receipt.validate_against_package(package, contamination)?;
+    Ok(receipt)
 }
 
 #[derive(Debug, Error)]
@@ -976,12 +1160,12 @@ fn validate_item_grader_compatibility(
         (
             PsionPluginBenchmarkTaskContract::DiscoverySelection(_),
             PsionPluginBenchmarkGraderInterface::SelectionDecision(_)
-                | PsionPluginBenchmarkGraderInterface::ExactRoute(_),
+            | PsionPluginBenchmarkGraderInterface::ExactRoute(_),
         ) => true,
         (
             PsionPluginBenchmarkTaskContract::ArgumentConstruction(_),
             PsionPluginBenchmarkGraderInterface::ArgumentSchema(_)
-                | PsionPluginBenchmarkGraderInterface::ExactRefusal(_),
+            | PsionPluginBenchmarkGraderInterface::ExactRefusal(_),
         ) => true,
         (
             PsionPluginBenchmarkTaskContract::SequencingMultiCall(_),
@@ -990,7 +1174,7 @@ fn validate_item_grader_compatibility(
         (
             PsionPluginBenchmarkTaskContract::RefusalRequestStructure(_),
             PsionPluginBenchmarkGraderInterface::ExactRefusal(_)
-                | PsionPluginBenchmarkGraderInterface::ExactRoute(_),
+            | PsionPluginBenchmarkGraderInterface::ExactRoute(_),
         ) => true,
         (
             PsionPluginBenchmarkTaskContract::ResultInterpretation(_),
@@ -1007,10 +1191,7 @@ fn validate_item_grader_compatibility(
     Ok(())
 }
 
-fn ensure_nonempty(
-    value: &str,
-    field: &str,
-) -> Result<(), PsionPluginBenchmarkPackageError> {
+fn ensure_nonempty(value: &str, field: &str) -> Result<(), PsionPluginBenchmarkPackageError> {
     if value.trim().is_empty() {
         return Err(PsionPluginBenchmarkPackageError::MissingField {
             field: String::from(field),
@@ -1034,10 +1215,7 @@ fn reject_duplicate_strings(
     Ok(())
 }
 
-fn validate_bps(
-    value: u32,
-    field: &str,
-) -> Result<(), PsionPluginBenchmarkPackageError> {
+fn validate_bps(value: u32, field: &str) -> Result<(), PsionPluginBenchmarkPackageError> {
     if value > 10_000 {
         return Err(PsionPluginBenchmarkPackageError::FieldMismatch {
             field: String::from(field),
@@ -1058,6 +1236,16 @@ fn stable_package_digest(package: &PsionPluginBenchmarkPackageContract) -> Strin
     hex::encode(hasher.finalize())
 }
 
+fn stable_receipt_digest(receipt: &PsionPluginBenchmarkPackageReceipt) -> String {
+    let mut canonical = receipt.clone();
+    canonical.receipt_digest.clear();
+    let encoded = serde_json::to_vec(&canonical).expect("receipt should serialize");
+    let mut hasher = Sha256::new();
+    hasher.update(b"psionic_psion_plugin_benchmark_receipt|");
+    hasher.update(encoded);
+    hex::encode(hasher.finalize())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -1067,8 +1255,8 @@ mod tests {
         PsionPluginBenchmarkPackageContract, PsionPluginBenchmarkPackageError,
         PsionPluginBenchmarkPromptEnvelope, PsionPluginBenchmarkPromptFormat,
         PsionPluginBenchmarkReceiptPosture, PsionPluginBenchmarkTaskContract,
-        PsionPluginExactRouteGrader, PsionPluginSelectionDecisionGrader,
-        PsionPluginDiscoverySelectionTask, stable_package_digest,
+        PsionPluginDiscoverySelectionTask, PsionPluginExactRouteGrader,
+        PsionPluginSelectionDecisionGrader, stable_package_digest,
     };
     use psionic_data::{
         PsionPluginContaminationBundle, PsionPluginRouteLabel,
@@ -1089,8 +1277,8 @@ mod tests {
     }
 
     #[test]
-    fn shared_plugin_benchmark_contract_rejects_unknown_contamination_lineage(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn shared_plugin_benchmark_contract_rejects_unknown_contamination_lineage()
+    -> Result<(), Box<dyn std::error::Error>> {
         let contamination = build_psion_plugin_contamination_bundle()?;
         let mut package = synthetic_discovery_selection_package(&contamination);
         package.items[0].contamination_attachment.parent_lineage_ids =
@@ -1112,7 +1300,9 @@ mod tests {
         let held_out_row = contamination
             .parent_lineage_rows
             .iter()
-            .find(|row| row.item_kind == psionic_data::PsionPluginContaminationItemKind::HeldOutEvalRecord)
+            .find(|row| {
+                row.item_kind == psionic_data::PsionPluginContaminationItemKind::HeldOutEvalRecord
+            })
             .expect("held-out lineage row should exist");
         let prompt_format = PsionPluginBenchmarkPromptFormat {
             format_id: String::from("plugin_selection_v1"),
@@ -1150,6 +1340,7 @@ mod tests {
                     psionic_data::PSION_PLUGIN_CONTAMINATION_BUNDLE_REF,
                 ),
                 contamination_bundle_digest: contamination.bundle_digest.clone(),
+                authored_prompt_ref: None,
                 parent_lineage_ids: vec![held_out_row.lineage_id.clone()],
                 source_case_ids: vec![held_out_row.source_trace.source_case_id.clone()],
                 receipt_refs: held_out_row.receipt_refs.clone(),
@@ -1205,17 +1396,15 @@ mod tests {
     }
 
     #[test]
-    fn exact_route_grader_is_compatible_with_discovery_selection_items(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn exact_route_grader_is_compatible_with_discovery_selection_items()
+    -> Result<(), Box<dyn std::error::Error>> {
         let contamination = build_psion_plugin_contamination_bundle()?;
         let mut package = synthetic_discovery_selection_package(&contamination);
         package.grader_interfaces = vec![PsionPluginBenchmarkGraderInterface::ExactRoute(
             PsionPluginExactRouteGrader {
                 grader_id: String::from("exact_route_v1"),
                 expected_route: PsionPluginRouteLabel::AnswerInLanguage,
-                detail: String::from(
-                    "Route-only grading remains valid for some discovery cases.",
-                ),
+                detail: String::from("Route-only grading remains valid for some discovery cases."),
             },
         )];
         package.items[0].grader_id = String::from("exact_route_v1");

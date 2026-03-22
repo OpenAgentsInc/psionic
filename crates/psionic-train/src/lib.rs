@@ -62,10 +62,12 @@ mod psion_benchmark_packages;
 mod psion_checkpoint_recovery;
 mod psion_decentralized_contribution;
 mod psion_pilot_pretraining_run;
+mod psion_plugin_benchmark_packages;
+mod psion_plugin_discovery_selection_benchmark;
 mod psion_pretrain_stage;
+mod psion_reasoning_sft;
 mod psion_reference_pilot;
 mod psion_refusal_calibration;
-mod psion_reasoning_sft;
 mod psion_rented_cluster_runbook;
 mod psion_route_class_evaluation;
 mod psion_run_observability;
@@ -122,7 +124,6 @@ mod tassadar_shared_primitive_transfer;
 mod tassadar_subroutine_supervision;
 mod tassadar_supervision_density;
 mod tassadar_trace_family_comparison;
-mod psion_plugin_benchmark_packages;
 mod tassadar_verifier_guided_search_trace_family;
 mod tassadar_weak_supervision_executor;
 mod worker_protocol;
@@ -169,10 +170,12 @@ pub use psion_benchmark_packages::*;
 pub use psion_checkpoint_recovery::*;
 pub use psion_decentralized_contribution::*;
 pub use psion_pilot_pretraining_run::*;
+pub use psion_plugin_benchmark_packages::*;
+pub use psion_plugin_discovery_selection_benchmark::*;
 pub use psion_pretrain_stage::*;
+pub use psion_reasoning_sft::*;
 pub use psion_reference_pilot::*;
 pub use psion_refusal_calibration::*;
-pub use psion_reasoning_sft::*;
 pub use psion_rented_cluster_runbook::*;
 pub use psion_route_class_evaluation::*;
 pub use psion_run_observability::*;
@@ -229,7 +232,6 @@ pub use tassadar_shared_primitive_transfer::*;
 pub use tassadar_subroutine_supervision::*;
 pub use tassadar_supervision_density::*;
 pub use tassadar_trace_family_comparison::*;
-pub use psion_plugin_benchmark_packages::*;
 pub use tassadar_verifier_guided_search_trace_family::*;
 pub use tassadar_weak_supervision_executor::*;
 pub use worker_protocol::*;
@@ -1110,8 +1112,8 @@ mod tests {
     }
 
     #[test]
-    fn observe_membership_advances_epoch_only_when_truth_changes(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn observe_membership_advances_epoch_only_when_truth_changes()
+    -> Result<(), Box<dyn std::error::Error>> {
         let stable = cluster_state(&[
             ("worker-a", ClusterMembershipStatus::Ready),
             ("worker-b", ClusterMembershipStatus::Ready),
@@ -1141,8 +1143,8 @@ mod tests {
     }
 
     #[test]
-    fn live_recovery_plan_exposes_recovery_and_late_join_semantics(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn live_recovery_plan_exposes_recovery_and_late_join_semantics()
+    -> Result<(), Box<dyn std::error::Error>> {
         let state = cluster_state(&[
             ("worker-a", ClusterMembershipStatus::Ready),
             ("worker-b", ClusterMembershipStatus::Ready),
@@ -1185,15 +1187,18 @@ mod tests {
             plan.recovery_context.late_joiner_node_ids,
             vec![String::from("worker-c")]
         );
-        assert!(plan
-            .actions
-            .contains(&TrainingRecoveryAction::ResumeFromDurableCheckpoint));
-        assert!(plan
-            .actions
-            .contains(&TrainingRecoveryAction::StageCheckpointForLateJoiners));
-        assert!(plan
-            .actions
-            .contains(&TrainingRecoveryAction::RebalanceWorldSize));
+        assert!(
+            plan.actions
+                .contains(&TrainingRecoveryAction::ResumeFromDurableCheckpoint)
+        );
+        assert!(
+            plan.actions
+                .contains(&TrainingRecoveryAction::StageCheckpointForLateJoiners)
+        );
+        assert!(
+            plan.actions
+                .contains(&TrainingRecoveryAction::RebalanceWorldSize)
+        );
         assert_eq!(plan.checkpoint_streams.len(), 1);
         assert!(!plan.plan_digest.is_empty());
         Ok(())
