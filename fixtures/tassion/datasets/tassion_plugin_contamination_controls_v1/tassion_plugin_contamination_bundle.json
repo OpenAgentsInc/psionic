@@ -1,0 +1,279 @@
+{
+  "schema_version": "psionic.tassion.plugin_contamination_bundle.v1",
+  "source_derivation_bundle_ref": "fixtures/tassion/datasets/tassion_plugin_training_derivation_v1/tassion_plugin_training_derivation_bundle.json",
+  "source_derivation_bundle_digest": "1509d92744576ec46e4242844b0b35ccd9ab3e05130dd50297ae721a86d78f75",
+  "dataset_bundle_ref": "fixtures/tassion/datasets/tassion_plugin_conditioned_dataset_v1/tassion_plugin_conditioned_dataset_bundle.json",
+  "dataset_bundle_digest": "897f0e57715fa903a5c6c3e1f9b026ab0c77164f40321c85d569539f156bed37",
+  "dataset_identity": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1",
+  "parent_lineage_rows": [
+    {
+      "lineage_id": "held_out.tassion_training.trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
+      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#held_out:tassion_training.trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
+      "item_kind": "held_out_eval_record",
+      "split_kind": "held_out",
+      "training_record_id": "tassion_training.trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
+      "training_record_digest": "fcc5fdfae602cc2eb65fc4bff43c591b5d9984edb5eebb70fa3bf8148b3c4405",
+      "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+      "controller_surface": "apple_fm_session",
+      "source_trace": {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_apple_fm_plugin_session_pilot_v1/tassadar_post_article_apple_fm_plugin_session_pilot_bundle.json",
+        "source_bundle_id": "tassadar.post_article.apple_fm_plugin_session_pilot.bundle.v1",
+        "source_bundle_digest": "9818a877307685deb471bceb59722272c78ef259b28683ee0461b2eb063e66f5",
+        "source_case_id": "apple_fm_plugin_session_fetch_refusal"
+      },
+      "receipt_refs": [
+        "receipt.plugin.text.url_extract.4a6f86849a652648.v1",
+        "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1"
+      ],
+      "receipt_digests": [
+        "40c66550e26f0f13729b7f6037f249098d7dce373eee75d0ee71d0ab86c3512f",
+        "44f2eaa29817d76374d585ffc39daa2fb1c2c8fc5ed4b741f27ffec56275884d"
+      ]
+    },
+    {
+      "lineage_id": "held_out.tassion_training.trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
+      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#held_out:tassion_training.trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
+      "item_kind": "held_out_eval_record",
+      "split_kind": "held_out",
+      "training_record_id": "tassion_training.trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
+      "training_record_digest": "dbd3e27b7719072664530d3fdd32f1ccdb86748d25638cf9c2e54acf67abddc5",
+      "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+      "controller_surface": "deterministic_workflow",
+      "source_trace": {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
+        "source_bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
+        "source_bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
+        "source_case_id": "web_content_intake_fetch_refusal"
+      },
+      "receipt_refs": [
+        "receipt.plugin.text.url_extract.ffb40b7ac81128df.v1",
+        "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1"
+      ],
+      "receipt_digests": [
+        "7743fa7abaf881fa50a70b6ff4ff5adb128517ea791e759d11cf7b56f5e588e9",
+        "44f2eaa29817d76374d585ffc39daa2fb1c2c8fc5ed4b741f27ffec56275884d"
+      ]
+    },
+    {
+      "lineage_id": "held_out.tassion_training.trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
+      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#held_out:tassion_training.trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
+      "item_kind": "held_out_eval_record",
+      "split_kind": "held_out",
+      "training_record_id": "tassion_training.trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
+      "training_record_digest": "0efb7fda0a8cc8b14b93afc69f4cf12fbadd97149907f700299f8c84b596f942",
+      "workflow_case_id": "starter_plugin.fetch_refusal.v1",
+      "controller_surface": "router_responses",
+      "source_trace": {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_router_plugin_tool_loop_pilot_v1/tassadar_post_article_router_plugin_tool_loop_pilot_bundle.json",
+        "source_bundle_id": "tassadar.post_article.router_plugin_tool_loop_pilot.bundle.v1",
+        "source_bundle_digest": "c5b29de4b470c88c8b17fd04b93a13b73b81b36fa6071a2a330de0201f890d8f",
+        "source_case_id": "router_plugin_tool_loop_fetch_refusal"
+      },
+      "receipt_refs": [
+        "receipt.plugin.text.url_extract.4a6f86849a652648.v1",
+        "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1"
+      ],
+      "receipt_digests": [
+        "40c66550e26f0f13729b7f6037f249098d7dce373eee75d0ee71d0ab86c3512f",
+        "44f2eaa29817d76374d585ffc39daa2fb1c2c8fc5ed4b741f27ffec56275884d"
+      ]
+    },
+    {
+      "lineage_id": "train.tassion_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#train:tassion_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+      "item_kind": "sft_train_record",
+      "split_kind": "train",
+      "training_record_id": "tassion_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+      "training_record_digest": "88912f61508d71b1654ba071e9c931d1badec7bc40400932a273b5df54e4157f",
+      "workflow_case_id": "starter_plugin.web_content_success.v1",
+      "controller_surface": "apple_fm_session",
+      "source_trace": {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_apple_fm_plugin_session_pilot_v1/tassadar_post_article_apple_fm_plugin_session_pilot_bundle.json",
+        "source_bundle_id": "tassadar.post_article.apple_fm_plugin_session_pilot.bundle.v1",
+        "source_bundle_digest": "9818a877307685deb471bceb59722272c78ef259b28683ee0461b2eb063e66f5",
+        "source_case_id": "apple_fm_plugin_session_success"
+      },
+      "receipt_refs": [
+        "receipt.plugin.text.url_extract.62157e9942c049fa.v1",
+        "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+        "receipt.plugin.html.extract_readable.2e53ee21f594f758.v1",
+        "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+        "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1"
+      ],
+      "receipt_digests": [
+        "fd52592bfe7ec1f52cbaae881db7a57041825dd51e07900e0e8d82da323aa341",
+        "b46d6d7f789b833ceadeb938f07f5debe355e7ab53add5a002507ef3a3459a97",
+        "aa0ac963f5b9b0220ff32f3043ae00756b2ad1ff6f868db4f32e6d220fe8c150",
+        "beb2b5da6ad6c23aaa111962cc4663cec3a82335864b4fe36b2370d27e3593f9",
+        "12772184129686d1b1f01a52cb84f21d6fe7d1a72f891cdb4d81feb26b490624"
+      ]
+    },
+    {
+      "lineage_id": "train.tassion_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#train:tassion_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+      "item_kind": "sft_train_record",
+      "split_kind": "train",
+      "training_record_id": "tassion_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+      "training_record_digest": "a2629fa60af9c6c2a4a2eb5ae80c599134e98ccee0ff981d947b83f9df6178e5",
+      "workflow_case_id": "starter_plugin.web_content_success.v1",
+      "controller_surface": "deterministic_workflow",
+      "source_trace": {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
+        "source_bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
+        "source_bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
+        "source_case_id": "web_content_intake_success"
+      },
+      "receipt_refs": [
+        "receipt.plugin.text.url_extract.4b99d49a956f5fb3.v1",
+        "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+        "receipt.plugin.html.extract_readable.e1417d028da0461a.v1",
+        "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+        "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1"
+      ],
+      "receipt_digests": [
+        "e7b0eece986cb376ca55adb956641258e9942083646985112283bc56eb4b7237",
+        "307ae22c6cfb309e378531f71099d78d6b812ac42d6c783e8487342818464e39",
+        "ac7379bd090fe692c60e30fbcc2384023cd340ffbffee039424cf415eef8bbb5",
+        "beb2b5da6ad6c23aaa111962cc4663cec3a82335864b4fe36b2370d27e3593f9",
+        "12772184129686d1b1f01a52cb84f21d6fe7d1a72f891cdb4d81feb26b490624"
+      ]
+    },
+    {
+      "lineage_id": "train.tassion_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
+      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#train:tassion_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
+      "item_kind": "sft_train_record",
+      "split_kind": "train",
+      "training_record_id": "tassion_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
+      "training_record_digest": "fa61a180b2c6bfb21071952d0d9655022e233adf30f3f66e929997d924c917ef",
+      "workflow_case_id": "starter_plugin.web_content_success.v1",
+      "controller_surface": "router_responses",
+      "source_trace": {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_router_plugin_tool_loop_pilot_v1/tassadar_post_article_router_plugin_tool_loop_pilot_bundle.json",
+        "source_bundle_id": "tassadar.post_article.router_plugin_tool_loop_pilot.bundle.v1",
+        "source_bundle_digest": "c5b29de4b470c88c8b17fd04b93a13b73b81b36fa6071a2a330de0201f890d8f",
+        "source_case_id": "router_plugin_tool_loop_success"
+      },
+      "receipt_refs": [
+        "receipt.plugin.text.url_extract.62157e9942c049fa.v1",
+        "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+        "receipt.plugin.html.extract_readable.1646205d55c61941.v1",
+        "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+        "receipt.plugin.feed.rss_atom_parse.3430f94093b76c67.v1"
+      ],
+      "receipt_digests": [
+        "fd52592bfe7ec1f52cbaae881db7a57041825dd51e07900e0e8d82da323aa341",
+        "b46d6d7f789b833ceadeb938f07f5debe355e7ab53add5a002507ef3a3459a97",
+        "05a7fff53655232b5e8a01232576276d8d017c0f5de6a5606ad243fec71ddaa7",
+        "beb2b5da6ad6c23aaa111962cc4663cec3a82335864b4fe36b2370d27e3593f9",
+        "34286eb8a47ff91e59249319886c205fc0a8a9111a807700f8b9186f8f0e67b2"
+      ]
+    }
+  ],
+  "trace_disjoint_groups": [
+    {
+      "split_kind": "held_out",
+      "workflow_case_ids": [
+        "starter_plugin.fetch_refusal.v1"
+      ],
+      "source_case_ids": [
+        "apple_fm_plugin_session_fetch_refusal",
+        "router_plugin_tool_loop_fetch_refusal",
+        "web_content_intake_fetch_refusal"
+      ],
+      "receipt_refs": [
+        "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1",
+        "receipt.plugin.text.url_extract.4a6f86849a652648.v1",
+        "receipt.plugin.text.url_extract.ffb40b7ac81128df.v1"
+      ],
+      "detail": "held_out plugin-conditioned rows stay disjoint from the opposite split by workflow case id, source case id, and plugin receipt ref."
+    },
+    {
+      "split_kind": "train",
+      "workflow_case_ids": [
+        "starter_plugin.web_content_success.v1"
+      ],
+      "source_case_ids": [
+        "apple_fm_plugin_session_success",
+        "router_plugin_tool_loop_success",
+        "web_content_intake_success"
+      ],
+      "receipt_refs": [
+        "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
+        "receipt.plugin.feed.rss_atom_parse.3430f94093b76c67.v1",
+        "receipt.plugin.html.extract_readable.1646205d55c61941.v1",
+        "receipt.plugin.html.extract_readable.2e53ee21f594f758.v1",
+        "receipt.plugin.html.extract_readable.e1417d028da0461a.v1",
+        "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+        "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+        "receipt.plugin.text.url_extract.4b99d49a956f5fb3.v1",
+        "receipt.plugin.text.url_extract.62157e9942c049fa.v1"
+      ],
+      "detail": "train plugin-conditioned rows stay disjoint from the opposite split by workflow case id, source case id, and plugin receipt ref."
+    }
+  ],
+  "exclusion_manifest": {
+    "schema_version": "psionic.tassion.plugin_contamination_bundle.v1",
+    "source_derivation_bundle_ref": "fixtures/tassion/datasets/tassion_plugin_training_derivation_v1/tassion_plugin_training_derivation_bundle.json",
+    "source_derivation_bundle_digest": "1509d92744576ec46e4242844b0b35ccd9ab3e05130dd50297ae721a86d78f75",
+    "dataset_identity": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1",
+    "training_excluded_trace_sources": [
+      {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_apple_fm_plugin_session_pilot_v1/tassadar_post_article_apple_fm_plugin_session_pilot_bundle.json",
+        "source_bundle_id": "tassadar.post_article.apple_fm_plugin_session_pilot.bundle.v1",
+        "source_bundle_digest": "9818a877307685deb471bceb59722272c78ef259b28683ee0461b2eb063e66f5",
+        "source_case_id": "apple_fm_plugin_session_fetch_refusal"
+      },
+      {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_router_plugin_tool_loop_pilot_v1/tassadar_post_article_router_plugin_tool_loop_pilot_bundle.json",
+        "source_bundle_id": "tassadar.post_article.router_plugin_tool_loop_pilot.bundle.v1",
+        "source_bundle_digest": "c5b29de4b470c88c8b17fd04b93a13b73b81b36fa6071a2a330de0201f890d8f",
+        "source_case_id": "router_plugin_tool_loop_fetch_refusal"
+      },
+      {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
+        "source_bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
+        "source_bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
+        "source_case_id": "web_content_intake_fetch_refusal"
+      }
+    ],
+    "benchmark_excluded_trace_sources": [
+      {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_apple_fm_plugin_session_pilot_v1/tassadar_post_article_apple_fm_plugin_session_pilot_bundle.json",
+        "source_bundle_id": "tassadar.post_article.apple_fm_plugin_session_pilot.bundle.v1",
+        "source_bundle_digest": "9818a877307685deb471bceb59722272c78ef259b28683ee0461b2eb063e66f5",
+        "source_case_id": "apple_fm_plugin_session_success"
+      },
+      {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_router_plugin_tool_loop_pilot_v1/tassadar_post_article_router_plugin_tool_loop_pilot_bundle.json",
+        "source_bundle_id": "tassadar.post_article.router_plugin_tool_loop_pilot.bundle.v1",
+        "source_bundle_digest": "c5b29de4b470c88c8b17fd04b93a13b73b81b36fa6071a2a330de0201f890d8f",
+        "source_case_id": "router_plugin_tool_loop_success"
+      },
+      {
+        "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
+        "source_bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
+        "source_bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
+        "source_case_id": "web_content_intake_success"
+      }
+    ],
+    "training_excluded_receipt_refs": [
+      "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1",
+      "receipt.plugin.text.url_extract.4a6f86849a652648.v1",
+      "receipt.plugin.text.url_extract.ffb40b7ac81128df.v1"
+    ],
+    "benchmark_excluded_receipt_refs": [
+      "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
+      "receipt.plugin.feed.rss_atom_parse.3430f94093b76c67.v1",
+      "receipt.plugin.html.extract_readable.1646205d55c61941.v1",
+      "receipt.plugin.html.extract_readable.2e53ee21f594f758.v1",
+      "receipt.plugin.html.extract_readable.e1417d028da0461a.v1",
+      "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+      "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+      "receipt.plugin.text.url_extract.4b99d49a956f5fb3.v1",
+      "receipt.plugin.text.url_extract.62157e9942c049fa.v1"
+    ]
+  },
+  "claim_boundary": "this bundle projects the committed plugin-conditioned derivation and dataset artifacts into one smaller contamination-review surface. It preserves parent training-record lineage, plugin-trace source identity, and plugin runtime receipt ancestry for the bounded train and held-out splits. It does not claim broader benchmark-family closure, mixed guest-artifact coverage, or universal plugin contamination rules by itself.",
+  "summary": "plugin contamination bundle keeps parent_lineage_rows=6 with train_rows=3 held_out_rows=3 and trace_disjoint_groups=2.",
+  "bundle_digest": "af16df43b72d55856d840fe0c84d4de7c445ffedb83ffb7b54f352dfc1f06279"
+}

@@ -111,6 +111,11 @@ and now also has:
   freezes the stable dataset identity, workflow-case-disjoint split rule, and
   preserved controller-surface plus plugin-class label contract for the first
   host-native dataset build.
+- `docs/TASSION_PLUGIN_CONTAMINATION_CONTROLS.md` is the canonical first
+  plugin-aware contamination-control contract for the convergence tranche and
+  freezes the parent-lineage rows, plugin-trace plus plugin-receipt exclusion
+  manifest, and trace-disjoint train-vs-held-out review posture for the first
+  host-native dataset build.
 - `docs/audits/2026-03-22-tassadar-full-plugin-system-state-audit.md` is the
   canonical current-state proof record for the bounded Tassadar plugin system
   and freezes the present authoring-class, publication, and guest-artifact
