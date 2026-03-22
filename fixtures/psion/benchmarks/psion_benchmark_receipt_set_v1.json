@@ -1,7 +1,7 @@
 {
   "schema_version": "psion.benchmark_receipt_set.v1",
   "receipt_set_id": "psion-benchmark-receipt-set-v1",
-  "catalog_digest": "0b3ee8dba4848fabaf306c531adb09e809479c5e53ddb11471c25df41685ba3c",
+  "catalog_digest": "7772ae338d51ea3034494763535859e3cff24d08cd8031411e464c02cc5b7a44",
   "receipts": [
     {
       "schema_version": "psion.benchmark_package_receipt.v1",
@@ -131,13 +131,13 @@
       "receipt_id": "psion-memorization-benchmark-receipt-v1",
       "phase": "pilot",
       "package_id": "psion_memorization_reasoning_benchmark_v1",
-      "package_digest": "b2d2a8d4da88d166838e6ed866b2df5772453709bef00e094f682bb25204f47e",
+      "package_digest": "599e61d8c6bb7f599042672aaef51b53f4401856437be2a1e688276134cb24a3",
       "package_family": "memorization_versus_reasoning",
-      "acceptance_family": "held_out_technical_reasoning",
-      "contamination_input_digest": "57caf81f4cd0d54fea05946aadb7078111414de617e3d277225e1a159d7b20b4",
-      "item_count": 1,
+      "acceptance_family": "memorization_versus_reasoning",
+      "contamination_input_digest": "52821f8da4180d39b2a81a45d5be7638a0968b40605a674d834d034fa8c90146",
+      "item_count": 5,
       "grader_summary": {
-        "exact_label_item_count": 1,
+        "exact_label_item_count": 5,
         "rubric_item_count": 0,
         "exact_route_item_count": 0,
         "exact_refusal_item_count": 0
@@ -147,35 +147,25 @@
           "metric_kind": "pass_rate_bps",
           "observed_bps": 8040,
           "regression_from_baseline_bps": 0
-        },
-        {
-          "metric_kind": "improvement_over_seed_baseline_bps",
-          "observed_bps": 1260,
-          "regression_from_baseline_bps": 0
         }
       ],
       "evidence_receipt": {
         "receipt_id": "psion-memorization-benchmark-receipt-v1-evidence",
         "phase": "pilot",
-        "family": "held_out_technical_reasoning",
+        "family": "memorization_versus_reasoning",
         "benchmark_artifact_id": "psion_memorization_reasoning_benchmark_v1",
-        "benchmark_artifact_digest": "b2d2a8d4da88d166838e6ed866b2df5772453709bef00e094f682bb25204f47e",
+        "benchmark_artifact_digest": "599e61d8c6bb7f599042672aaef51b53f4401856437be2a1e688276134cb24a3",
         "metrics": [
           {
             "metric_kind": "pass_rate_bps",
             "observed_bps": 8040,
-            "regression_from_baseline_bps": 0
-          },
-          {
-            "metric_kind": "improvement_over_seed_baseline_bps",
-            "observed_bps": 1260,
             "regression_from_baseline_bps": 0
           }
         ],
         "summary": "Memorization-versus-reasoning benchmark receipt on the shared contract."
       },
       "summary": "Memorization-versus-reasoning benchmark receipt on the shared contract.",
-      "receipt_digest": "4c949710c274b4e7c97e957c9bbfef6c088732e6dffa17b37a9a547ab6e5d386"
+      "receipt_digest": "b460b10dcce8be917976b3e88feb7c3d202d5bedd700911a565117696ec62e42"
     },
     {
       "schema_version": "psion.benchmark_package_receipt.v1",
@@ -271,5 +261,5 @@
     }
   ],
   "summary": "Canonical receipt set proving the shared Psion benchmark contract emits acceptance-ready package receipts across the main benchmark families.",
-  "receipt_set_digest": "f749c8e790880d05b1f4648055b88cd7cf69aec834b2373d40461a4869d330be"
+  "receipt_set_digest": "355ad96692c2a0bb88018dd84b15b9503c244b2dea0af1fc9f1413eb7435ca95"
 }

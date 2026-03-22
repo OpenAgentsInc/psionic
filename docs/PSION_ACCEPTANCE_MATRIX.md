@@ -69,6 +69,12 @@ pretraining, SFT promotion, internal serving, and trusted-cluster scale-up.
 That keeps implementation implications and portability reasoning explicit
 without pretending the pilot already proves the full engineering lane.
 
+`PSION-24` adds a dedicated memorization-versus-reasoning gate:
+`psion_memorization_reasoning_benchmark_v1` now binds directly into
+`sft_promotion` and later phase gates, so recombination failures on altered
+constraints, paraphrases, historical transfer, and spec-adjacent edge cases no
+longer hide inside the generic held-out technical reasoning family.
+
 ## Promotion Contract
 
 `Psion` phase promotion is recorded through the training-owned

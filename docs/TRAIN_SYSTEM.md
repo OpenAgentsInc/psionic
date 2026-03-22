@@ -154,6 +154,11 @@ and now also has:
   lane and freezes the typed implementation-implication, ambiguity, unspecified
   region, and portability-risk coverage plus the direct acceptance-matrix
   binding for the engineering spec package.
+- `docs/PSION_MEMORIZATION_VS_REASONING_PROBES.md` is the canonical first
+  memorization-versus-reasoning probe doc for the `Psion` learned-model lane
+  and freezes the altered-constraint, unfamiliar-synthesis, historical
+  transfer, paraphrase, and spec-adjacent-edge probe coverage plus the direct
+  acceptance-matrix binding for the recombination package.
 - `docs/PSION_CHECKPOINT_RECOVERY.md` is the canonical first dense-versus-
   sharded checkpoint-recovery doc for the `Psion` learned-model lane and
   freezes the explicit restart, rollback, corruption-detection, and

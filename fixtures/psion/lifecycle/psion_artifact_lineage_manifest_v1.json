@@ -85,9 +85,10 @@
     },
     {
       "benchmark_id": "psion_memorization_reasoning_benchmark_v1",
-      "benchmark_digest": "b2d2a8d4da88d166838e6ed866b2df5772453709bef00e094f682bb25204f47e",
+      "benchmark_digest": "599e61d8c6bb7f599042672aaef51b53f4401856437be2a1e688276134cb24a3",
       "source_ids": [
-        "spec_quiz_eval_pack_v1"
+        "spec_quiz_eval_pack_v1",
+        "wasm_core_spec_release_2"
       ]
     },
     {

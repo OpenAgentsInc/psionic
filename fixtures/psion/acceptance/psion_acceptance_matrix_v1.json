@@ -268,6 +268,20 @@
           "rationale": "The SFT lane keeps implementation inference explicit instead of blending it back into normative reading."
         },
         {
+          "family": "memorization_versus_reasoning",
+          "benchmark_artifact_id": "psion_memorization_reasoning_benchmark_v1",
+          "benchmark_artifact_digest": "599e61d8c6bb7f599042672aaef51b53f4401856437be2a1e688276134cb24a3",
+          "threshold_bands": [
+            {
+              "metric_kind": "pass_rate_bps",
+              "minimum_bps": 7800,
+              "allowed_regression_bps": 250,
+              "rationale": "SFT promotion must stay above a frozen recombination floor instead of rewarding fluent recall on familiar passages."
+            }
+          ],
+          "rationale": "The pretraining-to-SFT gate now includes explicit memorization-versus-reasoning probes rather than relying only on generic held-out scores."
+        },
+        {
           "family": "route_selection",
           "threshold_bands": [
             {
@@ -365,6 +379,20 @@
             }
           ],
           "rationale": "Serving guidance is only bounded when ambiguity, unspecified regions, and portability risk remain explicit."
+        },
+        {
+          "family": "memorization_versus_reasoning",
+          "benchmark_artifact_id": "psion_memorization_reasoning_benchmark_v1",
+          "benchmark_artifact_digest": "599e61d8c6bb7f599042672aaef51b53f4401856437be2a1e688276134cb24a3",
+          "threshold_bands": [
+            {
+              "metric_kind": "pass_rate_bps",
+              "minimum_bps": 7900,
+              "allowed_regression_bps": 200,
+              "rationale": "Internal serving requires stronger evidence that the model still recombines under changed wording and constraints."
+            }
+          ],
+          "rationale": "Serving promotion stays blocked if the lane only sounds competent on familiar benchmark surface forms."
         },
         {
           "family": "route_selection",
@@ -498,6 +526,20 @@
             }
           ],
           "rationale": "Cluster scale-up keeps implementation implications and portability risk as a distinct benchmark family."
+        },
+        {
+          "family": "memorization_versus_reasoning",
+          "benchmark_artifact_id": "psion_memorization_reasoning_benchmark_v1",
+          "benchmark_artifact_digest": "599e61d8c6bb7f599042672aaef51b53f4401856437be2a1e688276134cb24a3",
+          "threshold_bands": [
+            {
+              "metric_kind": "pass_rate_bps",
+              "minimum_bps": 8000,
+              "allowed_regression_bps": 150,
+              "rationale": "Trusted-cluster scale-up must preserve recombination strength on altered constraints, paraphrases, and edge cases."
+            }
+          ],
+          "rationale": "Cluster scale-up keeps anti-memorization probes explicit instead of hiding them inside a generic held-out lane."
         },
         {
           "family": "route_selection",

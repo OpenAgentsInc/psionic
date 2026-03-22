@@ -69,8 +69,11 @@ families:
 - architecture reasoning stays rubric-backed with explicit rubric versioning
 - normative spec reading stays exact with equivalent exact truth bindings
 - engineering spec interpretation now proves the hybrid posture with one
-  rubric-backed item and one CPU-reference exact-label item
+  exact-label boundary item plus rubric-backed implication, ambiguity, and
+  portability items
 - memorization-versus-reasoning stays exact with deterministic label truth
+  across altered constraints, paraphrases, historical transfer, and
+  spec-adjacent edge cases
 - route evaluation stays exact with route-policy truth
 - refusal evaluation stays exact with refusal-policy truth
 

@@ -513,7 +513,7 @@
       "schema_version": "psion.benchmark_package_contract.v1",
       "package_id": "psion_memorization_reasoning_benchmark_v1",
       "package_family": "memorization_versus_reasoning",
-      "acceptance_family": "held_out_technical_reasoning",
+      "acceptance_family": "memorization_versus_reasoning",
       "benchmark_package": {
         "abi_version": "psionic.benchmark.v1",
         "key": {
@@ -535,7 +535,19 @@
         },
         "cases": [
           {
-            "case_id": "mem-case-1"
+            "case_id": "mem-case-altered-constraints"
+          },
+          {
+            "case_id": "mem-case-unfamiliar-synthesis"
+          },
+          {
+            "case_id": "mem-case-historical-transfer"
+          },
+          {
+            "case_id": "mem-case-paraphrase"
+          },
+          {
+            "case_id": "mem-case-spec-edge"
           }
         ]
       },
@@ -564,7 +576,8 @@
       ],
       "contamination_inputs": {
         "benchmark_source_ids": [
-          "spec_quiz_eval_pack_v1"
+          "spec_quiz_eval_pack_v1",
+          "wasm_core_spec_release_2"
         ],
         "held_out_source_ids": [
           "spec_quiz_eval_pack_v1"
@@ -574,29 +587,119 @@
         ],
         "near_duplicate_review_ref": "review://psion/benchmark/near-duplicate-v1",
         "detail": "Benchmark package preserves the held-out source ids, training-excluded ids, and near-duplicate review reference required by the isolation contract.",
-        "contamination_input_digest": "57caf81f4cd0d54fea05946aadb7078111414de617e3d277225e1a159d7b20b4"
+        "contamination_input_digest": "52821f8da4180d39b2a81a45d5be7638a0968b40605a674d834d034fa8c90146"
       },
       "items": [
         {
-          "item_id": "mem-case-1",
+          "item_id": "mem-case-altered-constraints",
           "family": "memorization_versus_reasoning",
           "prompt_format_id": "bounded_explanation_v1",
           "grader_id": "exact_label_v1",
-          "prompt_digest": "mem-prompt-digest-1",
+          "prompt_digest": "mem-prompt-digest-altered",
           "source_ids": [
             "spec_quiz_eval_pack_v1"
           ],
           "task": {
             "task_kind": "memorization_versus_reasoning",
-            "seed_fact_ref": "seed://psion/memorization/1",
-            "perturbation_ref": "perturbation://psion/memorization/1",
-            "reasoning_required": true
+            "seed_fact_ref": "seed://psion/memorization/cache-hierarchy-baseline",
+            "perturbation_ref": "perturbation://psion/memorization/cache-latency-budget-tightened",
+            "probe_kind": "altered_constraint_recombination",
+            "expected_transfer": "adapt the pipeline recommendation under a tightened latency budget instead of replaying the baseline answer",
+            "recombination_required": true,
+            "surface_form_shift_required": true,
+            "verbatim_recall_forbidden": true
           },
-          "detail": "Memorization-versus-reasoning item checks that the package can separate recall from transfer."
+          "detail": "Altered-constraint probe checks whether the answer recombines the learned architecture ontology after one key resource bound is changed."
+        },
+        {
+          "item_id": "mem-case-unfamiliar-synthesis",
+          "family": "memorization_versus_reasoning",
+          "prompt_format_id": "bounded_explanation_v1",
+          "grader_id": "exact_label_v1",
+          "prompt_digest": "mem-prompt-digest-synthesis",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1"
+          ],
+          "task": {
+            "task_kind": "memorization_versus_reasoning",
+            "seed_fact_ref": "seed://psion/memorization/queueing-and-backpressure",
+            "perturbation_ref": "perturbation://psion/memorization/queueing-plus-capability-routing",
+            "probe_kind": "unfamiliar_design_synthesis",
+            "expected_transfer": "combine queueing and capability-routing ideas for an unfamiliar system composition",
+            "recombination_required": true,
+            "surface_form_shift_required": true,
+            "verbatim_recall_forbidden": true
+          },
+          "detail": "Unfamiliar-synthesis probe checks whether the answer composes known mechanisms in a new configuration rather than reciting one familiar design."
+        },
+        {
+          "item_id": "mem-case-historical-transfer",
+          "family": "memorization_versus_reasoning",
+          "prompt_format_id": "bounded_explanation_v1",
+          "grader_id": "exact_label_v1",
+          "prompt_digest": "mem-prompt-digest-historical",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1"
+          ],
+          "task": {
+            "task_kind": "memorization_versus_reasoning",
+            "seed_fact_ref": "seed://psion/memorization/vector-era-scheduling",
+            "perturbation_ref": "perturbation://psion/memorization/gpu-batch-scheduler-analogy",
+            "probe_kind": "historical_analogy_transfer",
+            "expected_transfer": "transfer a bounded historical scheduling analogy without claiming the old and new systems are identical",
+            "recombination_required": true,
+            "surface_form_shift_required": true,
+            "verbatim_recall_forbidden": true
+          },
+          "detail": "Historical-transfer probe checks whether the answer uses historical systems knowledge as an analogy instead of as a canned template."
+        },
+        {
+          "item_id": "mem-case-paraphrase",
+          "family": "memorization_versus_reasoning",
+          "prompt_format_id": "bounded_explanation_v1",
+          "grader_id": "exact_label_v1",
+          "prompt_digest": "mem-prompt-digest-paraphrase",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1",
+            "wasm_core_spec_release_2"
+          ],
+          "task": {
+            "task_kind": "memorization_versus_reasoning",
+            "seed_fact_ref": "seed://psion/memorization/wasm-validation-definition",
+            "perturbation_ref": "perturbation://psion/memorization/wasm-validation-paraphrase-variant",
+            "probe_kind": "paraphrase_variation",
+            "expected_transfer": "answer the paraphrased specification prompt without depending on the memorized stock wording",
+            "recombination_required": true,
+            "surface_form_shift_required": true,
+            "verbatim_recall_forbidden": true
+          },
+          "detail": "Paraphrase-variation probe checks whether the answer survives surface-form changes around one familiar technical fact."
+        },
+        {
+          "item_id": "mem-case-spec-edge",
+          "family": "memorization_versus_reasoning",
+          "prompt_format_id": "bounded_explanation_v1",
+          "grader_id": "exact_label_v1",
+          "prompt_digest": "mem-prompt-digest-edge",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1",
+            "wasm_core_spec_release_2"
+          ],
+          "task": {
+            "task_kind": "memorization_versus_reasoning",
+            "seed_fact_ref": "seed://psion/memorization/module-linking-baseline",
+            "perturbation_ref": "perturbation://psion/memorization/spec-adjacent-edge-case",
+            "probe_kind": "spec_adjacent_edge_case",
+            "expected_transfer": "apply the learned specification ontology to a nearby edge case that is not quoted verbatim in the seed material",
+            "recombination_required": true,
+            "surface_form_shift_required": true,
+            "verbatim_recall_forbidden": true
+          },
+          "detail": "Spec-adjacent edge-case probe checks whether the answer can reason next to the source text instead of only replaying the exact benchmark passage."
         }
       ],
-      "summary": "Memorization-versus-reasoning package uses the shared exact-label contract.",
-      "package_digest": "b2d2a8d4da88d166838e6ed866b2df5772453709bef00e094f682bb25204f47e"
+      "summary": "Memorization-versus-reasoning package uses typed exact-label probes that force altered constraints, unfamiliar synthesis, historical transfer, paraphrase variation, and spec-adjacent edge cases.",
+      "package_digest": "599e61d8c6bb7f599042672aaef51b53f4401856437be2a1e688276134cb24a3"
     },
     {
       "schema_version": "psion.benchmark_package_contract.v1",
@@ -770,5 +873,5 @@
     }
   ],
   "summary": "Canonical catalog proving the main Psion benchmark families can all build on one shared prompt, item, grader, contamination-input, and receipt contract.",
-  "catalog_digest": "0b3ee8dba4848fabaf306c531adb09e809479c5e53ddb11471c25df41685ba3c"
+  "catalog_digest": "7772ae338d51ea3034494763535859e3cff24d08cd8031411e464c02cc5b7a44"
 }

@@ -78,6 +78,17 @@ pub enum PsionEngineeringSpecInterpretationProbeKind {
     PortabilityConsequence,
 }
 
+/// Probe kind for memorization-versus-reasoning benchmark items.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsionMemorizationVersusReasoningProbeKind {
+    AlteredConstraintRecombination,
+    UnfamiliarDesignSynthesis,
+    HistoricalAnalogyTransfer,
+    ParaphraseVariation,
+    SpecAdjacentEdgeCase,
+}
+
 /// Prompt envelope shared by the bounded Psion benchmark families.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -339,7 +350,11 @@ pub enum PsionBenchmarkTaskContract {
     MemorizationVersusReasoning {
         seed_fact_ref: String,
         perturbation_ref: String,
-        reasoning_required: bool,
+        probe_kind: PsionMemorizationVersusReasoningProbeKind,
+        expected_transfer: String,
+        recombination_required: bool,
+        surface_form_shift_required: bool,
+        verbatim_recall_forbidden: bool,
     },
     RouteEvaluation {
         expected_route: PsionRouteKind,
@@ -491,7 +506,11 @@ impl PsionBenchmarkTaskContract {
                 Self::MemorizationVersusReasoning {
                     seed_fact_ref,
                     perturbation_ref,
-                    reasoning_required,
+                    expected_transfer,
+                    recombination_required,
+                    surface_form_shift_required,
+                    verbatim_recall_forbidden,
+                    ..
                 },
             ) => {
                 ensure_nonempty(
@@ -502,9 +521,29 @@ impl PsionBenchmarkTaskContract {
                     perturbation_ref.as_str(),
                     "memorization_vs_reasoning.perturbation_ref",
                 )?;
-                if !reasoning_required {
+                ensure_nonempty(
+                    expected_transfer.as_str(),
+                    "memorization_vs_reasoning.expected_transfer",
+                )?;
+                if !recombination_required {
                     return Err(PsionBenchmarkPackageError::FieldMismatch {
-                        field: String::from("memorization_vs_reasoning.reasoning_required"),
+                        field: String::from("memorization_vs_reasoning.recombination_required"),
+                        expected: String::from("true"),
+                        actual: String::from("false"),
+                    });
+                }
+                if !surface_form_shift_required {
+                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                        field: String::from(
+                            "memorization_vs_reasoning.surface_form_shift_required",
+                        ),
+                        expected: String::from("true"),
+                        actual: String::from("false"),
+                    });
+                }
+                if !verbatim_recall_forbidden {
+                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                        field: String::from("memorization_vs_reasoning.verbatim_recall_forbidden"),
                         expected: String::from("true"),
                         actual: String::from("false"),
                     });
@@ -1437,7 +1476,7 @@ fn expected_acceptance_family(
             PsionBenchmarkFamily::EngineeringSpecInterpretation
         }
         PsionBenchmarkPackageFamily::MemorizationVersusReasoning => {
-            PsionBenchmarkFamily::HeldOutTechnicalReasoning
+            PsionBenchmarkFamily::MemorizationVersusReasoning
         }
         PsionBenchmarkPackageFamily::RouteEvaluation => PsionBenchmarkFamily::RouteSelection,
         PsionBenchmarkPackageFamily::RefusalEvaluation => {
@@ -1455,10 +1494,7 @@ fn required_metric_kinds(
         | PsionBenchmarkPackageFamily::EngineeringSpecInterpretation => {
             &[PsionMetricKind::PassRateBps]
         }
-        PsionBenchmarkPackageFamily::MemorizationVersusReasoning => &[
-            PsionMetricKind::PassRateBps,
-            PsionMetricKind::ImprovementOverSeedBaselineBps,
-        ],
+        PsionBenchmarkPackageFamily::MemorizationVersusReasoning => &[PsionMetricKind::PassRateBps],
         PsionBenchmarkPackageFamily::RouteEvaluation => {
             &[PsionMetricKind::RouteSelectionAccuracyBps]
         }
@@ -2055,7 +2091,8 @@ mod tests {
         PsionBenchmarkPackageContract, PsionBenchmarkPackageError, PsionBenchmarkPackageFamily,
         PsionBenchmarkPromptEnvelope, PsionBenchmarkPromptFormat, PsionBenchmarkRubricDimension,
         PsionBenchmarkRubricGrader, PsionBenchmarkTaskContract,
-        PsionEngineeringSpecInterpretationProbeKind, PsionNormativeSpecReadingProbeKind,
+        PsionEngineeringSpecInterpretationProbeKind, PsionMemorizationVersusReasoningProbeKind,
+        PsionNormativeSpecReadingProbeKind,
     };
     use crate::{
         PsionBenchmarkFamily, PsionMetricKind, PsionObservedMetric, PsionPhaseGate, PsionRouteKind,
@@ -2513,27 +2550,163 @@ mod tests {
             record_psion_benchmark_package(
                 "psion_memorization_reasoning_benchmark_v1",
                 PsionBenchmarkPackageFamily::MemorizationVersusReasoning,
-                benchmark_package("psion_memorization_reasoning_benchmark_v1", &["mem-case-1"]),
+                benchmark_package(
+                    "psion_memorization_reasoning_benchmark_v1",
+                    &[
+                        "mem-case-altered-constraints",
+                        "mem-case-unfamiliar-synthesis",
+                        "mem-case-historical-transfer",
+                        "mem-case-paraphrase",
+                        "mem-case-spec-edge",
+                    ],
+                ),
                 vec![explanation_prompt_format()],
                 vec![exact_label_grader()],
-                contamination_inputs(&["spec_quiz_eval_pack_v1"]),
-                vec![PsionBenchmarkItem {
-                    item_id: String::from("mem-case-1"),
-                    family: PsionBenchmarkPackageFamily::MemorizationVersusReasoning,
-                    prompt_format_id: String::from("bounded_explanation_v1"),
-                    grader_id: String::from("exact_label_v1"),
-                    prompt_digest: String::from("mem-prompt-digest-1"),
-                    source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
-                    task: PsionBenchmarkTaskContract::MemorizationVersusReasoning {
-                        seed_fact_ref: String::from("seed://psion/memorization/1"),
-                        perturbation_ref: String::from("perturbation://psion/memorization/1"),
-                        reasoning_required: true,
+                contamination_inputs(&["spec_quiz_eval_pack_v1", "wasm_core_spec_release_2"]),
+                vec![
+                    PsionBenchmarkItem {
+                        item_id: String::from("mem-case-altered-constraints"),
+                        family: PsionBenchmarkPackageFamily::MemorizationVersusReasoning,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("exact_label_v1"),
+                        prompt_digest: String::from("mem-prompt-digest-altered"),
+                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                        task: PsionBenchmarkTaskContract::MemorizationVersusReasoning {
+                            seed_fact_ref: String::from(
+                                "seed://psion/memorization/cache-hierarchy-baseline",
+                            ),
+                            perturbation_ref: String::from(
+                                "perturbation://psion/memorization/cache-latency-budget-tightened",
+                            ),
+                            probe_kind:
+                                PsionMemorizationVersusReasoningProbeKind::AlteredConstraintRecombination,
+                            expected_transfer: String::from(
+                                "adapt the pipeline recommendation under a tightened latency budget instead of replaying the baseline answer",
+                            ),
+                            recombination_required: true,
+                            surface_form_shift_required: true,
+                            verbatim_recall_forbidden: true,
+                        },
+                        detail: String::from(
+                            "Altered-constraint probe checks whether the answer recombines the learned architecture ontology after one key resource bound is changed.",
+                        ),
                     },
-                    detail: String::from(
-                        "Memorization-versus-reasoning item checks that the package can separate recall from transfer.",
-                    ),
-                }],
-                "Memorization-versus-reasoning package uses the shared exact-label contract.",
+                    PsionBenchmarkItem {
+                        item_id: String::from("mem-case-unfamiliar-synthesis"),
+                        family: PsionBenchmarkPackageFamily::MemorizationVersusReasoning,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("exact_label_v1"),
+                        prompt_digest: String::from("mem-prompt-digest-synthesis"),
+                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                        task: PsionBenchmarkTaskContract::MemorizationVersusReasoning {
+                            seed_fact_ref: String::from(
+                                "seed://psion/memorization/queueing-and-backpressure",
+                            ),
+                            perturbation_ref: String::from(
+                                "perturbation://psion/memorization/queueing-plus-capability-routing",
+                            ),
+                            probe_kind:
+                                PsionMemorizationVersusReasoningProbeKind::UnfamiliarDesignSynthesis,
+                            expected_transfer: String::from(
+                                "combine queueing and capability-routing ideas for an unfamiliar system composition",
+                            ),
+                            recombination_required: true,
+                            surface_form_shift_required: true,
+                            verbatim_recall_forbidden: true,
+                        },
+                        detail: String::from(
+                            "Unfamiliar-synthesis probe checks whether the answer composes known mechanisms in a new configuration rather than reciting one familiar design.",
+                        ),
+                    },
+                    PsionBenchmarkItem {
+                        item_id: String::from("mem-case-historical-transfer"),
+                        family: PsionBenchmarkPackageFamily::MemorizationVersusReasoning,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("exact_label_v1"),
+                        prompt_digest: String::from("mem-prompt-digest-historical"),
+                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                        task: PsionBenchmarkTaskContract::MemorizationVersusReasoning {
+                            seed_fact_ref: String::from(
+                                "seed://psion/memorization/vector-era-scheduling",
+                            ),
+                            perturbation_ref: String::from(
+                                "perturbation://psion/memorization/gpu-batch-scheduler-analogy",
+                            ),
+                            probe_kind:
+                                PsionMemorizationVersusReasoningProbeKind::HistoricalAnalogyTransfer,
+                            expected_transfer: String::from(
+                                "transfer a bounded historical scheduling analogy without claiming the old and new systems are identical",
+                            ),
+                            recombination_required: true,
+                            surface_form_shift_required: true,
+                            verbatim_recall_forbidden: true,
+                        },
+                        detail: String::from(
+                            "Historical-transfer probe checks whether the answer uses historical systems knowledge as an analogy instead of as a canned template.",
+                        ),
+                    },
+                    PsionBenchmarkItem {
+                        item_id: String::from("mem-case-paraphrase"),
+                        family: PsionBenchmarkPackageFamily::MemorizationVersusReasoning,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("exact_label_v1"),
+                        prompt_digest: String::from("mem-prompt-digest-paraphrase"),
+                        source_ids: vec![
+                            String::from("spec_quiz_eval_pack_v1"),
+                            String::from("wasm_core_spec_release_2"),
+                        ],
+                        task: PsionBenchmarkTaskContract::MemorizationVersusReasoning {
+                            seed_fact_ref: String::from(
+                                "seed://psion/memorization/wasm-validation-definition",
+                            ),
+                            perturbation_ref: String::from(
+                                "perturbation://psion/memorization/wasm-validation-paraphrase-variant",
+                            ),
+                            probe_kind:
+                                PsionMemorizationVersusReasoningProbeKind::ParaphraseVariation,
+                            expected_transfer: String::from(
+                                "answer the paraphrased specification prompt without depending on the memorized stock wording",
+                            ),
+                            recombination_required: true,
+                            surface_form_shift_required: true,
+                            verbatim_recall_forbidden: true,
+                        },
+                        detail: String::from(
+                            "Paraphrase-variation probe checks whether the answer survives surface-form changes around one familiar technical fact.",
+                        ),
+                    },
+                    PsionBenchmarkItem {
+                        item_id: String::from("mem-case-spec-edge"),
+                        family: PsionBenchmarkPackageFamily::MemorizationVersusReasoning,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("exact_label_v1"),
+                        prompt_digest: String::from("mem-prompt-digest-edge"),
+                        source_ids: vec![
+                            String::from("spec_quiz_eval_pack_v1"),
+                            String::from("wasm_core_spec_release_2"),
+                        ],
+                        task: PsionBenchmarkTaskContract::MemorizationVersusReasoning {
+                            seed_fact_ref: String::from(
+                                "seed://psion/memorization/module-linking-baseline",
+                            ),
+                            perturbation_ref: String::from(
+                                "perturbation://psion/memorization/spec-adjacent-edge-case",
+                            ),
+                            probe_kind:
+                                PsionMemorizationVersusReasoningProbeKind::SpecAdjacentEdgeCase,
+                            expected_transfer: String::from(
+                                "apply the learned specification ontology to a nearby edge case that is not quoted verbatim in the seed material",
+                            ),
+                            recombination_required: true,
+                            surface_form_shift_required: true,
+                            verbatim_recall_forbidden: true,
+                        },
+                        detail: String::from(
+                            "Spec-adjacent edge-case probe checks whether the answer can reason next to the source text instead of only replaying the exact benchmark passage.",
+                        ),
+                    },
+                ],
+                "Memorization-versus-reasoning package uses typed exact-label probes that force altered constraints, unfamiliar synthesis, historical transfer, paraphrase variation, and spec-adjacent edge cases.",
             )?,
             record_psion_benchmark_package(
                 "psion_route_benchmark_v1",
@@ -2604,6 +2777,16 @@ mod tests {
             Some(PsionBenchmarkFamily::EngineeringSpecInterpretation),
             "engineering package should map into the dedicated acceptance family"
         );
+        let memorization = catalog
+            .packages
+            .iter()
+            .find(|package| package.package_id == "psion_memorization_reasoning_benchmark_v1")
+            .expect("memorization package should exist");
+        assert_eq!(
+            memorization.acceptance_family,
+            Some(PsionBenchmarkFamily::MemorizationVersusReasoning),
+            "memorization package should map into the dedicated acceptance family"
+        );
         let receipts = vec![
             record_psion_benchmark_package_receipt(
                 "psion-architecture-benchmark-receipt-v1",
@@ -2642,18 +2825,11 @@ mod tests {
                 "psion-memorization-benchmark-receipt-v1",
                 PsionPhaseGate::Pilot,
                 &packages[3],
-                vec![
-                    PsionObservedMetric {
-                        metric_kind: PsionMetricKind::PassRateBps,
-                        observed_bps: 8040,
-                        regression_from_baseline_bps: 0,
-                    },
-                    PsionObservedMetric {
-                        metric_kind: PsionMetricKind::ImprovementOverSeedBaselineBps,
-                        observed_bps: 1260,
-                        regression_from_baseline_bps: 0,
-                    },
-                ],
+                vec![PsionObservedMetric {
+                    metric_kind: PsionMetricKind::PassRateBps,
+                    observed_bps: 8040,
+                    regression_from_baseline_bps: 0,
+                }],
                 "Memorization-versus-reasoning benchmark receipt on the shared contract.",
             )?,
             record_psion_benchmark_package_receipt(

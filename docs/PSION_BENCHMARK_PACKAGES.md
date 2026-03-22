@@ -31,6 +31,11 @@ that keeps normative source text separate from later engineering inference.
 keeps implementation implications, ambiguity, unspecified regions, and
 portability risks separate from normative source reading.
 
+`docs/PSION_MEMORIZATION_VS_REASONING_PROBES.md` now does the same for
+`psion_memorization_reasoning_benchmark_v1`, including the typed probe
+coverage that keeps recombination under altered constraints, paraphrases,
+historical transfer, and spec-adjacent edge cases separate from stock recall.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_benchmark_packages.rs` owns the shared

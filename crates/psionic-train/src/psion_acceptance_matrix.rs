@@ -52,6 +52,8 @@ pub enum PsionBenchmarkFamily {
     NormativeSpecReading,
     /// Engineering interpretation that stays explicit about where text ends and inference begins.
     EngineeringSpecInterpretation,
+    /// Recombination probes that distinguish memorized stock passages from transferable reasoning.
+    MemorizationVersusReasoning,
     /// Specifications and manuals kept separate from the training lane.
     SpecificationAndManualComprehension,
     /// Route-selection calibration across direct, handoff, and refusal lanes.
@@ -468,6 +470,7 @@ impl PsionAcceptanceMatrix {
                     PsionBenchmarkFamily::ArchitectureReasoning
                         | PsionBenchmarkFamily::NormativeSpecReading
                         | PsionBenchmarkFamily::EngineeringSpecInterpretation
+                        | PsionBenchmarkFamily::MemorizationVersusReasoning
                 ) {
                     return Err(PsionAcceptanceMatrixError::MissingField {
                         field: format!(
@@ -1789,6 +1792,11 @@ mod tests {
             .phase_gate(PsionPhaseGate::SftPromotion)
             .expect("sft promotion gate")
             .benchmark_requirement(PsionBenchmarkFamily::EngineeringSpecInterpretation)
+            .is_some());
+        assert!(matrix
+            .phase_gate(PsionPhaseGate::SftPromotion)
+            .expect("sft promotion gate")
+            .benchmark_requirement(PsionBenchmarkFamily::MemorizationVersusReasoning)
             .is_some());
     }
 
