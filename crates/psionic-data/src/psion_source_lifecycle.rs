@@ -1222,7 +1222,15 @@ mod tests {
             .validate_against_lifecycle(&lifecycle)
             .expect("artifact-lineage manifest should validate");
         assert_eq!(lineage.checkpoints.len(), 1);
-        assert_eq!(lineage.benchmark_artifacts.len(), 1);
+        assert_eq!(lineage.benchmark_artifacts.len(), 7);
+        assert!(lineage
+            .benchmark_artifacts
+            .iter()
+            .any(|artifact| artifact.benchmark_id == "psion_spec_reading_benchmark_v1"));
+        assert!(lineage
+            .benchmark_artifacts
+            .iter()
+            .any(|artifact| artifact.benchmark_id == "psion_route_benchmark_v1"));
     }
 
     #[test]
@@ -1246,12 +1254,24 @@ mod tests {
             receipt.affected_checkpoint_ids,
             vec![String::from("psion_pilot_checkpoint_v1")]
         );
+        assert_eq!(
+            receipt.affected_benchmark_artifact_ids,
+            vec![
+                String::from("psion_spec_reading_benchmark_v1"),
+                String::from("psion_normative_spec_benchmark_v1"),
+                String::from("psion_engineering_spec_benchmark_v1"),
+                String::from("psion_memorization_reasoning_benchmark_v1"),
+            ]
+        );
         assert!(receipt
             .required_actions
             .contains(&PsionLifecycleImpactAction::RetokenizeAffectedArtifacts));
         assert!(receipt
             .required_actions
             .contains(&PsionLifecycleImpactAction::RetrainingReview));
+        assert!(receipt
+            .required_actions
+            .contains(&PsionLifecycleImpactAction::BenchmarkInvalidationReview));
         assert!(receipt
             .required_actions
             .contains(&PsionLifecycleImpactAction::CapabilityMatrixReview));
