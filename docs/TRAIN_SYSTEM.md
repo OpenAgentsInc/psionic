@@ -92,6 +92,11 @@ and now also has:
   dependency-ordered training, benchmark, guest-artifact, and operator-proof
   split that later learned-plugin-use work must follow without widening
   publication or executor claims.
+- `docs/audits/2026-03-22-tassadar-full-plugin-system-state-audit.md` is the
+  canonical current-state proof record for the bounded Tassadar plugin system
+  and freezes the present authoring-class, publication, and guest-artifact
+  boundaries that the `TASSION` convergence tranche must inherit rather than
+  silently widen.
 - `docs/PSION_CORPUS_ADMISSION.md` is the canonical first governance doc for
   the `Psion` learned-model lane and freezes the versioned source-admission
   contract that later ingestion, tokenizer, and training work must follow.

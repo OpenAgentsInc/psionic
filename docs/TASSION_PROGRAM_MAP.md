@@ -36,6 +36,12 @@ The current repo truth is:
    - the shared starter-plugin bridge, deterministic workflow controller,
      router-owned tool loop, Apple FM tool lane, and lane-neutral multi-plugin
      trace corpus are all implemented
+   - the only fully proved user-authoring path today is still host-native,
+     capability-free, and local deterministic
+   - the `networked_read_only` class is documented but still intentionally
+     narrower and more manual than the capability-free authoring path
+   - secret-backed and stateful starter-plugin authoring remain later bounded
+     substrate work, not already-closed platform facts
    - weighted-controller and publication posture remain bounded and internal
    - the old guest-artifact / user-provided Wasm path is still not a live
      runtime lane
@@ -86,8 +92,12 @@ The convergence tranche should consume the existing repo truth directly:
 - `docs/PSION_PROGRAM_MAP.md`
 - `docs/TRAIN_SYSTEM.md`
 - `docs/TASSADAR_MULTI_PLUGIN_ORCHESTRATION_WAVE.md`
+- `docs/TASSADAR_STARTER_PLUGIN_AUTHORING.md`
+- `docs/TASSADAR_STARTER_PLUGIN_CATALOG.md`
 - `docs/TASSADAR_STARTER_PLUGIN_RUNTIME.md`
 - `docs/TASSADAR_STARTER_PLUGIN_TOOL_BRIDGE.md`
+- `docs/TASSADAR_STARTER_PLUGIN_WORKFLOW_CONTROLLER.md`
+- `docs/TASSADAR_STARTER_PLUGIN_USER_AUTHORING_WAVE.md`
 - `docs/TASSADAR_ROUTER_PLUGIN_TOOL_LOOP.md`
 - `docs/TASSADAR_APPLE_FM_PLUGIN_SESSION.md`
 - `docs/TASSADAR_MULTI_PLUGIN_TRACE_CORPUS.md`
@@ -98,6 +108,25 @@ The convergence tranche should consume the existing repo truth directly:
 
 No TASSION issue should invent a second plugin API, a second trace format, or a
 second tool-call notation just for training.
+
+## Live Substrate Preconditions
+
+The current plugin-system audit already narrowed a few things that later
+`TASSION-*` work must not accidentally overstate:
+
+- the live first-class authoring lane is still the capability-free local
+  deterministic host-native path
+- the `networked_read_only` lane should be treated as an immediate substrate
+  proof target, not as something already closed by the current repo state
+- secret-backed and stateful plugin classes stay separate bounded follow-on
+  substrate work until their host-mediated secret and durable-state contracts
+  are explicit
+- guest-artifact restoration is still a deliberate later decision wave, not an
+  implied property of the current starter-plugin platform
+
+That means `TASSION` is allowed to build learned plugin-use training on top of
+today's bounded substrate, but it must preserve the current operator-internal,
+publication-blocked, non-universal claim boundary while doing so.
 
 ## Dependency Order
 
