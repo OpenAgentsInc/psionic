@@ -11,9 +11,10 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    FetchTextConfig, FetchTextResponse, FetchTextSnapshotResponse, FetchTextSnapshotResult,
-    StarterPluginInvocationStatus, StarterPluginProjectedToolResultEnvelope,
-    StarterPluginToolBridgeConfig, StarterPluginToolBridgeError, execute_starter_plugin_tool_call,
+    execute_starter_plugin_tool_call, ExtractReadableResponse, FetchTextConfig, FetchTextResponse,
+    FetchTextSnapshotResponse, FetchTextSnapshotResult, StarterPluginInvocationStatus,
+    StarterPluginProjectedToolResultEnvelope, StarterPluginToolBridgeConfig,
+    StarterPluginToolBridgeError, TextStatsResponse,
 };
 
 pub const TASSADAR_POST_ARTICLE_STARTER_PLUGIN_WORKFLOW_CONTROLLER_BUNDLE_REF: &str = "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json";
@@ -49,10 +50,20 @@ pub struct StarterPluginWorkflowRefusalRow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StarterPluginWorkflowTextStatsRow {
+    pub subject_id: String,
+    pub byte_count: usize,
+    pub word_count: usize,
+    pub non_empty_line_count: usize,
+    pub receipt_id: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StarterPluginWorkflowFinalArtifact {
     pub extracted_urls: Vec<String>,
     pub article_titles: Vec<String>,
     pub feed_titles: Vec<String>,
+    pub text_stats_rows: Vec<StarterPluginWorkflowTextStatsRow>,
     pub step_receipt_ids: Vec<String>,
 }
 
@@ -124,7 +135,7 @@ pub fn build_starter_plugin_workflow_controller_bundle() -> StarterPluginWorkflo
         workflow_graph_id: String::from(workflow_graph_id),
         case_rows,
         claim_boundary: String::from(
-            "this bundle freezes one host-owned deterministic starter-plugin workflow controller above the shared bridge. It keeps URL extraction, fetch, content-type branching, readable-html extraction, feed parsing, refusal capture, and stop conditions explicit without claiming open-ended planning or weighted controller closure.",
+            "this bundle freezes one host-owned deterministic starter-plugin workflow controller above the shared bridge. It keeps URL extraction, fetch, content-type branching, readable-html extraction, readable-text measurement, feed parsing, refusal capture, and stop conditions explicit without claiming open-ended planning or weighted controller closure.",
         ),
         summary: String::new(),
         bundle_digest: String::new(),
@@ -208,6 +219,7 @@ fn run_workflow_case(
     let mut refusal_rows = Vec::new();
     let mut article_titles = Vec::new();
     let mut feed_titles = Vec::new();
+    let mut text_stats_rows = Vec::new();
     let mut step_receipt_ids = Vec::new();
     let mut step_index = 0_u16;
     let mut decision_index = 0_u16;
@@ -286,13 +298,57 @@ fn run_workflow_case(
                 extract.clone(),
                 "run bounded readability extraction on fetched html through the shared bridge.",
             ));
-            let extract_response = decode_extract_title(
-                extract.structured_payload.clone(),
-                extract.tool_name.as_str(),
-            )?;
-            if let Some(title) = extract_response {
+            let extract_response = decode_extract_response(extract.structured_payload.clone())?;
+            if let Some(title) = extract_response.title.clone() {
                 article_titles.push(title);
             }
+            decision_rows.push(decision_row(
+                decision_index,
+                "post_extract_enrichment",
+                url.as_str(),
+                "branch.text_stats",
+                "the host-owned controller routes bounded readable text into the user-added text-stats plugin for explicit packet-local measurement.",
+            ));
+            decision_index = decision_index.saturating_add(1);
+            step_index = step_index.saturating_add(1);
+            let text_stats = execute_starter_plugin_tool_call(
+                "plugin_text_stats",
+                serde_json::json!({
+                    "text": extract_response.readable_text
+                }),
+                &config,
+            )?;
+            step_receipt_ids.push(text_stats.plugin_receipt.receipt_id.clone());
+            step_rows.push(workflow_step_row(
+                step_index,
+                url.as_str(),
+                text_stats.clone(),
+                "measure extracted readable text with the user-added capability-free text-stats plugin through the shared bridge.",
+            ));
+            if matches!(text_stats.status, StarterPluginInvocationStatus::Refusal) {
+                refusal_rows.push(refusal_row(
+                    step_index,
+                    &text_stats,
+                    "the controller stops if the user-added text-stats plugin returns a typed refusal.",
+                ));
+                decision_rows.push(decision_row(
+                    decision_index,
+                    "stop_condition",
+                    url.as_str(),
+                    "controller_stop.typed_refusal",
+                    "the host-owned controller stops immediately when text-stats returns a typed refusal.",
+                ));
+                stop_condition_id = String::from("controller_stop.typed_refusal");
+                break;
+            }
+            let text_stats_response = decode_text_stats_response(text_stats.structured_payload)?;
+            text_stats_rows.push(StarterPluginWorkflowTextStatsRow {
+                subject_id: String::from(url),
+                byte_count: text_stats_response.byte_count,
+                word_count: text_stats_response.word_count,
+                non_empty_line_count: text_stats_response.non_empty_line_count,
+                receipt_id: text_stats.plugin_receipt.receipt_id,
+            });
             continue;
         }
 
@@ -362,12 +418,13 @@ fn run_workflow_case(
             extracted_urls: urls,
             article_titles,
             feed_titles,
+            text_stats_rows,
             step_receipt_ids,
         },
         stop_condition_id,
         green: case_id == "web_content_intake_success",
         detail: String::from(
-            "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge.",
+            "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge.",
         ),
     })
 }
@@ -450,22 +507,15 @@ fn decode_fetch_text_response(
     })
 }
 
-fn decode_extract_title(
+fn decode_extract_response(
     payload: serde_json::Value,
-    tool_name: &str,
-) -> Result<Option<String>, StarterPluginWorkflowControllerError> {
-    #[derive(Deserialize)]
-    struct ExtractReadablePayload {
-        title: Option<String>,
-    }
-    serde_json::from_value::<ExtractReadablePayload>(payload)
-        .map(|payload| payload.title)
-        .map_err(
-            |error| StarterPluginWorkflowControllerError::DecodePayload {
-                tool_name: String::from(tool_name),
-                error,
-            },
-        )
+) -> Result<ExtractReadableResponse, StarterPluginWorkflowControllerError> {
+    serde_json::from_value::<ExtractReadableResponse>(payload).map_err(|error| {
+        StarterPluginWorkflowControllerError::DecodePayload {
+            tool_name: String::from("plugin_html_extract_readable"),
+            error,
+        }
+    })
 }
 
 fn decode_feed_title(
@@ -484,6 +534,17 @@ fn decode_feed_title(
                 error,
             },
         )
+}
+
+fn decode_text_stats_response(
+    payload: serde_json::Value,
+) -> Result<TextStatsResponse, StarterPluginWorkflowControllerError> {
+    serde_json::from_value::<TextStatsResponse>(payload).map_err(|error| {
+        StarterPluginWorkflowControllerError::DecodePayload {
+            tool_name: String::from("plugin_text_stats"),
+            error,
+        }
+    })
 }
 
 fn content_type_is_html(content_type: &str) -> bool {
@@ -609,7 +670,7 @@ mod tests {
             .expect("success workflow case");
 
         assert!(case.green);
-        assert_eq!(case.step_rows.len(), 5);
+        assert_eq!(case.step_rows.len(), 6);
         assert_eq!(
             case.final_artifact.article_titles,
             vec![String::from("Snapshot Article")]
@@ -618,6 +679,12 @@ mod tests {
             case.final_artifact.feed_titles,
             vec![String::from("Snapshot Feed")]
         );
+        assert_eq!(case.final_artifact.text_stats_rows.len(), 1);
+        assert_eq!(case.final_artifact.text_stats_rows[0].word_count, 6);
+        assert!(case
+            .step_rows
+            .iter()
+            .any(|row| row.tool_name == "plugin_text_stats"));
         assert_eq!(case.stop_condition_id, "controller_stop.all_urls_processed");
     }
 

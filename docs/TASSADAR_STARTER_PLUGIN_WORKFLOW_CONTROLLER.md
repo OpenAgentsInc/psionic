@@ -29,6 +29,7 @@ for one bounded web-content intake graph:
 - fetch each extracted URL with `plugin_http_fetch_text`
 - branch on fetched content type into `plugin_html_extract_readable` or
   `plugin_feed_rss_atom_parse`
+- route extracted readable text into `plugin_text_stats` on the html branch
 - stop explicitly on typed refusal or when the extracted URL set is exhausted
 
 The committed bundle freezes two pilot cases:
@@ -41,15 +42,18 @@ Each case carries:
 - host-owned decision rows
 - per-step projected tool results
 - per-step plugin receipts
+- final text-stats artifacts when the html branch executes
 - explicit refusal rows
 - explicit stop condition
 
 ## What Is Green
 
-- one reproducible multi-plugin success pilot with five sequential plugin steps
+- one reproducible multi-plugin success pilot with six sequential plugin steps,
+  including one user-added `plugin_text_stats` enrichment step
 - one refusal pilot that stops on typed fetch refusal instead of hiding retry
   logic
 - explicit html-versus-feed branch decisions
+- one explicit html-to-text-stats enrichment branch above the shared bridge
 - explicit final stop conditions for success and refusal
 - direct reuse of the shared starter-plugin bridge for every tool call
 

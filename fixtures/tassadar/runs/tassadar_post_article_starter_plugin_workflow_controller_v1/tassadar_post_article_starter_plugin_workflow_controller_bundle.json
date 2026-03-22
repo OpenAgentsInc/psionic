@@ -17,13 +17,20 @@
         },
         {
           "decision_index": 1,
+          "decision_kind": "post_extract_enrichment",
+          "subject_id": "https://snapshot.example/article",
+          "chosen_path_id": "branch.text_stats",
+          "detail": "the host-owned controller routes bounded readable text into the user-added text-stats plugin for explicit packet-local measurement."
+        },
+        {
+          "decision_index": 2,
           "decision_kind": "content_type_branch",
           "subject_id": "https://snapshot.example/feed.rss",
           "chosen_path_id": "branch.feed_parse",
           "detail": "the host-owned controller routes rss-or-atom content into the feed parser."
         },
         {
-          "decision_index": 2,
+          "decision_index": 3,
           "decision_kind": "stop_condition",
           "subject_id": "web_content_intake_success",
           "chosen_path_id": "controller_stop.all_urls_processed",
@@ -153,6 +160,45 @@
         },
         {
           "step_index": 3,
+          "subject_id": "https://snapshot.example/article",
+          "tool_name": "plugin_text_stats",
+          "plugin_id": "plugin.text.stats",
+          "projected_result": {
+            "tool_name": "plugin_text_stats",
+            "plugin_id": "plugin.text.stats",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.text.stats.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "byte_count": 48,
+              "line_count": 1,
+              "non_empty_line_count": 1,
+              "unicode_scalar_count": 48,
+              "word_count": 6
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.text.stats.0307e79769277046.v1",
+              "plugin_id": "plugin.text.stats",
+              "plugin_version": "v1",
+              "tool_name": "plugin_text_stats",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.text.stats.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.text.stats.input.v1",
+              "input_packet_digest": "0307e797692770463de0fc3badbf158bad0c799dd2d53eead3ffa4a411c328cd",
+              "output_or_refusal_schema_id": "plugin.text.stats.output.v1",
+              "output_or_refusal_digest": "87381ec3013d2cf47a751b23d526fdd7e04dd07db6d8c6595f3901447f365b82",
+              "detail": "text-stats keeps byte, scalar, line, and whitespace-delimited word counts explicit and packet-local instead of borrowing tokenizer or semantic structure claims.",
+              "receipt_digest": "fff59e9755264d47d668e98ad8e1a300cad3c7d09638640da5d057a9bcb30217"
+            }
+          },
+          "detail": "measure extracted readable text with the user-added capability-free text-stats plugin through the shared bridge."
+        },
+        {
+          "step_index": 4,
           "subject_id": "https://snapshot.example/feed.rss",
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
@@ -194,7 +240,7 @@
           "detail": "fetch the URL through the shared bridge before any content-type branch decision."
         },
         {
-          "step_index": 4,
+          "step_index": 5,
           "subject_id": "https://snapshot.example/feed.rss",
           "tool_name": "plugin_feed_rss_atom_parse",
           "plugin_id": "plugin.feed.rss_atom_parse",
@@ -251,17 +297,27 @@
         "feed_titles": [
           "Snapshot Feed"
         ],
+        "text_stats_rows": [
+          {
+            "subject_id": "https://snapshot.example/article",
+            "byte_count": 48,
+            "word_count": 6,
+            "non_empty_line_count": 1,
+            "receipt_id": "receipt.plugin.text.stats.0307e79769277046.v1"
+          }
+        ],
         "step_receipt_ids": [
           "receipt.plugin.text.url_extract.4b99d49a956f5fb3.v1",
           "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
           "receipt.plugin.html.extract_readable.e1417d028da0461a.v1",
+          "receipt.plugin.text.stats.0307e79769277046.v1",
           "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
           "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1"
         ]
       },
       "stop_condition_id": "controller_stop.all_urls_processed",
       "green": true,
-      "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge."
+      "detail": "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge."
     },
     {
       "case_id": "web_content_intake_fetch_refusal",
@@ -370,6 +426,7 @@
         ],
         "article_titles": [],
         "feed_titles": [],
+        "text_stats_rows": [],
         "step_receipt_ids": [
           "receipt.plugin.text.url_extract.ffb40b7ac81128df.v1",
           "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1"
@@ -377,10 +434,10 @@
       },
       "stop_condition_id": "controller_stop.typed_refusal",
       "green": false,
-      "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge."
+      "detail": "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge."
     }
   ],
-  "claim_boundary": "this bundle freezes one host-owned deterministic starter-plugin workflow controller above the shared bridge. It keeps URL extraction, fetch, content-type branching, readable-html extraction, feed parsing, refusal capture, and stop conditions explicit without claiming open-ended planning or weighted controller closure.",
+  "claim_boundary": "this bundle freezes one host-owned deterministic starter-plugin workflow controller above the shared bridge. It keeps URL extraction, fetch, content-type branching, readable-html extraction, readable-text measurement, feed parsing, refusal capture, and stop conditions explicit without claiming open-ended planning or weighted controller closure.",
   "summary": "starter workflow controller bundle covers case_rows=2 over one host-owned web-content intake graph.",
-  "bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a"
+  "bundle_digest": "fc4fa612040c74c3cb3560850347c5eb2df0a75faad1a2364ca832e18a70c91e"
 }
