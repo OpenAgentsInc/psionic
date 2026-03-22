@@ -9,6 +9,12 @@
   "public_access_prevention": "enforced",
   "uniform_bucket_level_access": true,
   "versioning": true,
+  "labels": {
+    "environment": "development",
+    "lane": "psion",
+    "profile": "single-node",
+    "purpose": "train"
+  },
   "retention_period": "7d",
   "soft_delete_duration": "14d",
   "lifecycle_policy_ref": "fixtures/psion/google/psion_google_training_bucket_lifecycle_v1.json",

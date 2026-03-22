@@ -1,0 +1,33 @@
+{
+  "schema_version": "psion.google_training_identity_profile.v1",
+  "profile_id": "openagentsgemini-psion-train-single-node-v1",
+  "project_id": "openagentsgemini",
+  "service_account_email": "psion-train-single-node@openagentsgemini.iam.gserviceaccount.com",
+  "service_account_display_name": "Psion single-node training runtime",
+  "service_account_description": "Bounded Psion single-node Google training pilot runtime.",
+  "project_label_updates": {
+    "environment": "development",
+    "psion_lane": "google_single_node"
+  },
+  "bucket_label_updates": {
+    "environment": "development",
+    "lane": "psion",
+    "profile": "single-node",
+    "purpose": "train"
+  },
+  "recommended_instance_labels": {
+    "environment": "development",
+    "lane": "psion",
+    "profile": "single-node",
+    "workload": "train"
+  },
+  "required_project_roles": [
+    "roles/logging.logWriter",
+    "roles/monitoring.metricWriter"
+  ],
+  "required_bucket_roles": [
+    "roles/storage.objectAdmin",
+    "roles/storage.legacyBucketReader"
+  ],
+  "bucket_url": "gs://openagentsgemini-psion-train-us-central1"
+}
