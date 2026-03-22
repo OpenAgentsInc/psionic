@@ -111,7 +111,7 @@ impl PsionRouteClass {
     }
 }
 
-/// Probe kind for unsupported-envelope refusal benchmark items.
+/// Probe kind for refusal and unsupported-envelope benchmark items.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PsionRefusalProbeKind {
