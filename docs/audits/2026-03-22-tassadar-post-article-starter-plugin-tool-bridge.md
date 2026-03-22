@@ -48,5 +48,5 @@ and its committed bundle at
 `docs/TASSADAR_ROUTER_PLUGIN_TOOL_LOOP.md` and its committed bundle at
 `fixtures/tassadar/runs/tassadar_post_article_router_plugin_tool_loop_pilot_v1/tassadar_post_article_router_plugin_tool_loop_pilot_bundle.json`.
 
-The next open orchestration frontier above the shared bridge is now `TAS-221`:
-publish the first real-run multi-plugin orchestration wave.
+The next later orchestration frontier above the shared bridge is the separate
+`TAS-204` weighted-controller lane above the published orchestration wave.

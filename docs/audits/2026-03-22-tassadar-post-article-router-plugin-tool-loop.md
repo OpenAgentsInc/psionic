@@ -41,4 +41,5 @@
 ## Next Frontier
 
 The next open orchestration frontier above the router-owned served lane is
-`TAS-221`: publish the first real-run multi-plugin orchestration wave.
+the later `TAS-204` weighted-controller lane above the published
+orchestration wave.

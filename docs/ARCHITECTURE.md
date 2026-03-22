@@ -1819,6 +1819,13 @@ The current scope is:
   one training-bootstrap boundary above the deterministic, router-owned, and
   Apple FM controller lanes while moving the next open orchestration frontier
   to `TAS-221`
+- the current orchestration-wave publication artifacts are the umbrella doc
+  `docs/TASSADAR_MULTI_PLUGIN_ORCHESTRATION_WAVE.md` and the audit note
+  `docs/audits/2026-03-22-tassadar-real-run-multi-plugin-orchestration-wave.md`,
+  which publish the dependency-ordered closeout across the shared bridge,
+  deterministic controller, router-owned controller, Apple FM controller, and
+  trace-corpus lanes while leaving the later `TAS-204` weighted-controller
+  lane separate
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

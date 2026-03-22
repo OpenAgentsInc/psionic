@@ -745,6 +745,12 @@ Current honest posture:
   the first training-ready multi-lane trace record shape repo-owned,
   disagreement-explicit, and receipt-bound while moving the next open bridge
   frontier to `TAS-221`
+- the repo now also has one published orchestration-wave closeout at
+  `docs/TASSADAR_MULTI_PLUGIN_ORCHESTRATION_WAVE.md` plus the audit note
+  `docs/audits/2026-03-22-tassadar-real-run-multi-plugin-orchestration-wave.md`;
+  this ties `TAS-222` through `TAS-226` into one bounded operator-internal
+  controller tranche above the shared starter-plugin runtime while leaving
+  later `TAS-204` weighted-controller work separate
 - the repo now also has one machine-readable article-equivalence blocker
   matrix, with a committed eval report at
   `fixtures/tassadar/reports/tassadar_article_equivalence_blocker_matrix_report.json`,
@@ -970,8 +976,10 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-226` is now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-221` remains open in GitHub as the umbrella issue and is tracked via
-  the issue body plus `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
+- `TAS-221` is now implemented and tracked in
+  `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
+- later `TAS-204` weighted-controller work remains separate from the published
+  real-run orchestration wave
 
 ## Repo-Local Companion Docs
 

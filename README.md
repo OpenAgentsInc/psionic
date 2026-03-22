@@ -24,6 +24,9 @@ clustered execution, and machine-legible execution truth.
 - `docs/TOKIO_RUNTIME_TELEMETRY.md` is the canonical Tokio runtime telemetry
   and operator runbook for serving and transport surfaces.
 - `docs/TRAIN_SYSTEM.md` is the canonical training subsystem spec.
+- `docs/TASSADAR_MULTI_PLUGIN_ORCHESTRATION_WAVE.md` is the canonical umbrella
+  closeout doc for the first real-run multi-plugin controller tranche above
+  the shared starter-plugin runtime.
 - `docs/PSION_PROGRAM_MAP.md` is the canonical umbrella map for the `Psion`
   learned-model lane.
 - `docs/PSION_CORPUS_ADMISSION.md` is the canonical first admission-policy doc

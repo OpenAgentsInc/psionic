@@ -39,4 +39,5 @@ above the shared starter-plugin bridge.
 `fixtures/tassadar/runs/tassadar_post_article_router_plugin_tool_loop_pilot_v1/tassadar_post_article_router_plugin_tool_loop_pilot_bundle.json`.
 
 The next open orchestration frontier above the deterministic controller is now
-`TAS-221`: publish the first real-run multi-plugin orchestration wave.
+the later `TAS-204` weighted-controller lane above the published
+orchestration wave.

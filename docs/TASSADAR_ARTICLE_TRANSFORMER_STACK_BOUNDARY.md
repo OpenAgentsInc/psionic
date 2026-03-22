@@ -1422,8 +1422,16 @@ and the checker
 `scripts/check-tassadar-multi-plugin-trace-corpus.sh`.
 That closes the first lane-neutral trace-record and parity-matrix bootstrap
 surface above the deterministic, router-owned, and Apple FM controller lanes
-without widening the boundary to weighted controller closure, and moves the
-next open bridge frontier to `TAS-221`.
+without widening the boundary to weighted controller closure, and provides the
+final child surface consumed by the later `TAS-221` orchestration-wave
+closeout.
+`TAS-221` now publishes the first real-run multi-plugin orchestration wave in
+`docs/TASSADAR_MULTI_PLUGIN_ORCHESTRATION_WAVE.md`
+plus the audit note
+`docs/audits/2026-03-22-tassadar-real-run-multi-plugin-orchestration-wave.md`.
+That closes the first dependency-ordered controller tranche above the shared
+starter-plugin runtime without widening the boundary to weighted controller
+closure, and leaves the later `TAS-204` weighted-controller lane separate.
 
 ## Route Requirement
 

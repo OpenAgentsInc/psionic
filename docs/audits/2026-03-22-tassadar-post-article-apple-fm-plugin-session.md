@@ -40,4 +40,5 @@ controller lane above the shared starter-plugin bridge.
 ## Next Frontier
 
 The next open orchestration frontier above the three current controller lanes
-is `TAS-221`: publish the first real-run multi-plugin orchestration wave.
+is the later `TAS-204` weighted-controller lane above the published
+orchestration wave.

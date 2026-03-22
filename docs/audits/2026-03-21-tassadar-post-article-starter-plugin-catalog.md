@@ -92,5 +92,5 @@ and its committed bundle at
 `docs/TASSADAR_ROUTER_PLUGIN_TOOL_LOOP.md`.
 
 The next open orchestration frontier above this starter catalog is now
-`TAS-221`, which publishes the first real-run multi-plugin orchestration wave
-across the deterministic, router-owned, Apple FM, and trace-corpus lanes.
+the later `TAS-204` weighted-controller lane above the now-published
+orchestration wave.

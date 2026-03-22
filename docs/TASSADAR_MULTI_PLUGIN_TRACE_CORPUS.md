@@ -67,5 +67,5 @@ The local Apple FM source lane lives in
 
 ## Planned
 
-- orchestration-wave publication and closeout above the three source controller
-  lanes
+- later `TAS-204` weighted-controller work remains separate and must preserve
+  receipt identity plus explicit disagreement rows

@@ -35,6 +35,5 @@ and local Apple FM controller lanes.
 
 ## Next Frontier
 
-The next open orchestration frontier above the now-landed controller and
-corpus lanes is `TAS-221`: publish the first real-run multi-plugin
-orchestration wave.
+The next later frontier above the now-published controller and corpus lanes is
+the separate `TAS-204` weighted-controller lane.
