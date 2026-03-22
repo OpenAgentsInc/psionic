@@ -1,0 +1,133 @@
+{
+  "schema_version": "psion.rented_cluster_failure_rehearsal_bundle.v1",
+  "bundle_id": "psion-rented-cluster-failure-rehearsal-bundle-v1",
+  "runbook_id": "psion-rented-cluster-runbook-v1",
+  "checkpoint_recovery_bundle_digest": "7ae450003b6ecd756fa296e33ce65c40aa463727a2c483c5b90647db2e3a9116",
+  "recovery_event_receipt_ids": [
+    "psion-forced-interruption-restart-v1",
+    "psion-corruption-rollback-v1"
+  ],
+  "checkpoint_recovery_artifact_id": "psion-dense-checkpoint-artifact-v1",
+  "checkpoint_storage_artifact_id": "checkpoint:stream-psion-pretrain-final-v1:manifest-psion-pretrain-final-v1",
+  "preemption_admission_receipt": {
+    "workload_id": "validator-workload:rented_health:eval://psion/rented/health",
+    "outcome": "admitted_after_preemption",
+    "dispatch_plan": {
+      "policy": {
+        "max_workers": 2,
+        "target_batch_work_units": 2,
+        "max_batch_bytes": 262144,
+        "park_after_idle_batches": 1
+      },
+      "batches": [
+        {
+          "item_count": 1,
+          "total_work_units": 1,
+          "total_bytes": 6240,
+          "worker_count": 1
+        }
+      ],
+      "total_wake_events": 1,
+      "parked_workers": 1
+    },
+    "estimated_cost_units": 60,
+    "budget_usage": {
+      "active_work_units": 1,
+      "active_bytes": 6240,
+      "active_cost_units": 60
+    },
+    "preemptions": [
+      {
+        "workload_id": "sandbox-workload:rented-sbx-1",
+        "role": "sandbox",
+        "queue_class": "background",
+        "estimated_cost_units": 263200,
+        "reason": "higher_priority_budget_pressure"
+      }
+    ],
+    "queue_depth": 1,
+    "receipt_digest": "1f848dfd11573fefc8cca350e35720a26e9d4c700b13964c0885cb6a2fa4e06c"
+  },
+  "trainer_completion_receipt": {
+    "workload_id": "trainer-workload:psion-rented-batch",
+    "estimated_cost_units": 91,
+    "actual_cost_units": 364,
+    "receipt_digest": "6dd55be9c26df318fab95b89b058dadca0291ae8349c0dc4653b5beab02ca903"
+  },
+  "checkpoint_storage_sweep_receipts": [
+    {
+      "sweep_id": "artifact-sweep-6000",
+      "observed_at_ms": 6000,
+      "transitions": [
+        {
+          "artifact_id": "checkpoint:stream-psion-pretrain-final-v1:manifest-psion-pretrain-final-v1",
+          "from_tier": "hot",
+          "to_tier": "warm",
+          "from_state": "active",
+          "to_state": "active",
+          "reason": "hot_retention_expired"
+        }
+      ],
+      "receipt_digest": "c0655c3303c7b55d6674fe1f0fe72477f92b2f95d6259de48d1bb629616549db"
+    },
+    {
+      "sweep_id": "artifact-sweep-40000",
+      "observed_at_ms": 40000,
+      "transitions": [
+        {
+          "artifact_id": "checkpoint:stream-psion-pretrain-final-v1:manifest-psion-pretrain-final-v1",
+          "from_tier": "warm",
+          "to_tier": "cold_archive",
+          "from_state": "active",
+          "to_state": "active",
+          "reason": "warm_retention_expired"
+        }
+      ],
+      "receipt_digest": "165d1c2b354be9c2857db197a3454c4e89a01436b15af4ba60af6360ddb3e2e3"
+    }
+  ],
+  "checkpoint_cold_restore_receipts": [
+    {
+      "artifact_id": "checkpoint:stream-psion-pretrain-final-v1:manifest-psion-pretrain-final-v1",
+      "action": "requested",
+      "archive_locator": "archive://checkpoint/object-psion-pretrain-final-v1",
+      "observed_at_ms": 42000,
+      "target_ready_at_ms": 87000,
+      "receipt_digest": "74b9de1b1c6ac19bbf4bc460fbf137a8a0c1272fbda9cac5e95a7f21d26de2bd"
+    },
+    {
+      "artifact_id": "checkpoint:stream-psion-pretrain-final-v1:manifest-psion-pretrain-final-v1",
+      "action": "completed",
+      "archive_locator": "archive://checkpoint/object-psion-pretrain-final-v1",
+      "observed_at_ms": 60000,
+      "target_ready_at_ms": 105000,
+      "receipt_digest": "676e74e90697c0d4c3ef17fa03fe889e65f4bd158f4b1758198688416723af51"
+    }
+  ],
+  "stop_conditions": [
+    {
+      "schema_version": "psion.rented_cluster_stop_condition_receipt.v1",
+      "receipt_id": "psion-rented-cluster-preemption-stop-v1",
+      "condition_kind": "preemption_budget_exceeded",
+      "source_ref": "validator-workload:rented_health:eval://psion/rented/health",
+      "observed_value": 1,
+      "threshold_value": 1,
+      "action": "downgrade_to_resume_only",
+      "detail": "Repeated preemption on rented spot capacity downgrades the run to resume-only posture.",
+      "receipt_digest": "cd76d9f6994cb01783a9bf5558a15c1a75fb9209d12868886d199bb9d7972952"
+    },
+    {
+      "schema_version": "psion.rented_cluster_stop_condition_receipt.v1",
+      "receipt_id": "psion-rented-cluster-cost-stop-v1",
+      "condition_kind": "cost_guardrail_exceeded",
+      "source_ref": "trainer-workload:psion-rented-batch",
+      "observed_value": 30000,
+      "threshold_value": 2500,
+      "action": "stop_run",
+      "detail": "Rented-cluster cost overrun breached the stop threshold and terminated the run instead of hiding the spend drift.",
+      "receipt_digest": "1a59f2d74c5b4097118faf223c48fc7b0704ffb4756ace8072894ce52ac2080a"
+    }
+  ],
+  "summary": "Rented-cluster rehearsal bundle binds preemption downgrade, cost stop, checkpoint archive, cold restore, and cited recovery receipts into one bounded failure policy artifact.",
+  "bundle_digest": "6f55b494e9ecc57454cc98bf6c35bc8ef5418702be09fc9bbb5f89042a35774e"
+}

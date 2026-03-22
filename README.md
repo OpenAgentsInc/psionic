@@ -48,6 +48,8 @@ clustered execution, and machine-legible execution truth.
 - `docs/PSION_CHECKPOINT_RECOVERY.md` is the canonical dense-versus-sharded
   checkpoint restart, rollback, and invalidation doc for the `Psion`
   learned-model lane.
+- `docs/PSION_RENTED_CLUSTER_RUNBOOK.md` is the canonical rented-cluster
+  runbook and failure-policy doc for the `Psion` learned-model lane.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical phase-gate and
   promotion-decision doc for the `Psion` learned-model lane.
 - `docs/PSION_CAPABILITY_MATRIX.md` is the canonical served capability and

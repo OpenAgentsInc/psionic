@@ -132,6 +132,11 @@ and now also has:
   freezes the explicit restart, rollback, corruption-detection, and
   invalidation bundle that later rented-cluster and trusted-cluster work must
   preserve.
+- `docs/PSION_RENTED_CLUSTER_RUNBOOK.md` is the canonical first rented-cluster
+  runbook and failure-policy doc for the `Psion` learned-model lane and
+  freezes the storage persistence, preemption downgrade, cost stop-condition,
+  and infra-mode refusal contract that later trusted-cluster work must not
+  silently widen.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical first phase-gate and
   promotion-decision doc for the `Psion` learned-model lane and freezes the
   acceptance-matrix plus evidence-bound promotion contract that later pilot,

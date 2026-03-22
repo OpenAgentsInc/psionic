@@ -1,0 +1,137 @@
+{
+  "schema_version": "psion.rented_cluster_runbook.v1",
+  "runbook_id": "psion-rented-cluster-runbook-v1",
+  "checkpoint_recovery_bundle_digest": "7ae450003b6ecd756fa296e33ce65c40aa463727a2c483c5b90647db2e3a9116",
+  "storage_profiles": {
+    "checkpoint": {
+      "hot_retention_ms": 5000,
+      "warm_retention_ms": 30000,
+      "archive_class": "restorable",
+      "delete_after_ms": 172800000,
+      "deduplicate_by_digest": false,
+      "cold_restore_sla_ms": 45000
+    },
+    "eval_artifact": {
+      "hot_retention_ms": 10000,
+      "warm_retention_ms": 60000,
+      "archive_class": "restorable",
+      "deduplicate_by_digest": false,
+      "cold_restore_sla_ms": 60000
+    },
+    "log_bundle": {
+      "hot_retention_ms": 5000,
+      "warm_retention_ms": 15000,
+      "archive_class": "ephemeral",
+      "delete_after_ms": 3600000,
+      "deduplicate_by_digest": false,
+      "cold_restore_sla_ms": 10000
+    }
+  },
+  "scheduling_policy": {
+    "global_budget": {
+      "max_active_work_units": 8,
+      "max_active_bytes": 268437456,
+      "max_active_cost_units": 400000
+    },
+    "queue_policies": {
+      "realtime": {
+        "priority_bps": 9500,
+        "preemption_mode": "lower_priority_only",
+        "dispatch_policy": {
+          "max_workers": 2,
+          "target_batch_work_units": 2,
+          "max_batch_bytes": 262144,
+          "park_after_idle_batches": 1
+        }
+      },
+      "standard": {
+        "priority_bps": 6000,
+        "preemption_mode": "lower_priority_only",
+        "dispatch_policy": {
+          "max_workers": 4,
+          "target_batch_work_units": 4,
+          "max_batch_bytes": 4194304,
+          "park_after_idle_batches": 4
+        }
+      },
+      "bulk": {
+        "priority_bps": 3500,
+        "preemption_mode": "lower_priority_only",
+        "dispatch_policy": {
+          "max_workers": 4,
+          "target_batch_work_units": 8,
+          "max_batch_bytes": 8388608,
+          "park_after_idle_batches": 8
+        }
+      },
+      "background": {
+        "priority_bps": 1000,
+        "preemption_mode": "never",
+        "dispatch_policy": {
+          "max_workers": 1,
+          "target_batch_work_units": 1,
+          "max_batch_bytes": 67108864,
+          "park_after_idle_batches": 8
+        }
+      }
+    },
+    "role_cost_rates": {
+      "trainer": {
+        "base_cost_units": 24,
+        "cost_units_per_dispatch_unit": 3,
+        "cost_units_per_kibibyte": 1
+      },
+      "rollout": {
+        "base_cost_units": 16,
+        "cost_units_per_dispatch_unit": 2,
+        "cost_units_per_kibibyte": 1
+      },
+      "eval": {
+        "base_cost_units": 18,
+        "cost_units_per_dispatch_unit": 3,
+        "cost_units_per_kibibyte": 1
+      },
+      "sandbox": {
+        "base_cost_units": 12,
+        "cost_units_per_dispatch_unit": 2,
+        "cost_units_per_kibibyte": 1
+      },
+      "validator": {
+        "base_cost_units": 20,
+        "cost_units_per_dispatch_unit": 3,
+        "cost_units_per_kibibyte": 1
+      }
+    }
+  },
+  "max_preemption_events_before_downgrade": 1,
+  "max_cost_overrun_bps_before_stop": 2500,
+  "mode_evaluations": [
+    {
+      "infra_mode": "single_region_on_demand",
+      "topology_label": "single_region_homogeneous",
+      "disposition": "supported",
+      "detail": "Single-region on-demand rented clusters stay within the bounded runbook when checkpoint persistence and cold restore are green."
+    },
+    {
+      "infra_mode": "single_region_spot",
+      "topology_label": "single_region_spot_preemptible",
+      "disposition": "downgraded_resume_only",
+      "required_recovery_mode": "resume_from_last_stable_checkpoint",
+      "detail": "Single-region spot capacity is allowed only on explicit resume-from-last-stable-checkpoint posture."
+    },
+    {
+      "infra_mode": "cross_region_ephemeral",
+      "topology_label": "cross_region_mixed_latency",
+      "disposition": "refused",
+      "detail": "Cross-region ephemeral clusters are refused because mixed-latency recovery and storage-loss risk are outside the bounded runbook."
+    },
+    {
+      "infra_mode": "untrusted_shared_cluster",
+      "topology_label": "shared_untrusted_fabric",
+      "disposition": "refused",
+      "detail": "Untrusted shared clusters are refused rather than backfilling trusted-cluster claims onto rented infrastructure."
+    }
+  ],
+  "summary": "Rented-cluster runbook freezes storage persistence, preemption downgrade, cost stop conditions, and explicit refusal on unsupported infra modes before broader cluster work.",
+  "runbook_digest": "974fb48ad05d5e5407bd6dfecc739c2c1c82c9c6b32d89532f12429fcd29be15"
+}
