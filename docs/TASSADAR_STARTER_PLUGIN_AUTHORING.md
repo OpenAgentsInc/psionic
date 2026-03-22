@@ -133,6 +133,27 @@ For a new capability-free plugin, the normal sequence is:
 8. only then decide whether to admit it to bridge, catalog, or controller
    surfaces
 
+## Scaffold Helper
+
+The repo now also ships one narrow scaffold helper for this class:
+
+```bash
+python3 scripts/scaffold-tassadar-capability-free-starter-plugin.py \
+  --plugin-id plugin.example.words \
+  --output-dir /tmp/plugin-example-words
+```
+
+The scaffold writes a bounded stub tree:
+
+- runtime snippet
+- bundle-writer stub
+- test stub
+- checker stub
+- one manifest describing the generated ids and defaults
+
+It does not patch live runtime files for you. The generated output is a
+starting point that still requires explicit review and TODO completion.
+
 ## Example Path
 
 `plugin.text.stats` is the canonical example for this authoring class:

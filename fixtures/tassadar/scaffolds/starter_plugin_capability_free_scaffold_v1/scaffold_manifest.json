@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "plugin_id": "plugin.example.words",
+  "tool_name": "plugin_example_words",
+  "authoring_class": "capability_free_local_deterministic",
+  "bridge_exposed_default": false,
+  "catalog_exposed_default": false,
+  "generated_files": [
+    "README.md",
+    "scaffold_manifest.json",
+    "plugin_example_words_runtime_snippet.rs",
+    "tassadar_post_article_example_words_bundle.rs",
+    "plugin_example_words_tests.rs",
+    "check-example_words.sh"
+  ]
+}
