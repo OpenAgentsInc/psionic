@@ -2,7 +2,9 @@
 
 > Status: canonical `PSION-44` / `#410` runbook, written 2026-03-22 after the
 > Google launch bundle, immutable input package, checkpoint archive, host
-> observability finalizer, and validation folders landed on `main`.
+> observability finalizer, and validation folders landed on `main`, then proved
+> by the bounded-success `PSION-45` / `#411` follow-up audit later the same
+> day.
 
 This runbook is the operator entrypoint for the first truthful Google-hosted
 `Psion` pilot.
@@ -45,6 +47,8 @@ checkpoints.
   `scripts/psion-google-delete-single-node.sh`
 - readiness audit:
   `docs/audits/2026-03-22-openagentsgemini-gpu-training-pilot-audit.md`
+- first real run audit:
+  `docs/audits/2026-03-22-openagentsgemini-first-google-single-gpu-pilot-run-audit.md`
 
 ## Local Requirements
 

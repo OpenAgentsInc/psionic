@@ -202,6 +202,11 @@ and now also has:
   archive, cold-restore, and teardown procedure for the bounded Google pilot
   without widening the claim boundary to trusted-cluster or broader-pretrain
   posture.
+- `docs/audits/2026-03-22-openagentsgemini-first-google-single-gpu-pilot-run-audit.md`
+  is the canonical proof record for the first bounded Google single-node
+  `Psion` pilot and freezes the typed live-attempt history, retained evidence,
+  and current no-go boundary against claiming effective GPU-backed broader
+  pretraining from that run alone.
 - `docs/PSION_TRUSTED_CLUSTER_RUN.md` is the canonical first trusted-cluster
   multi-host run doc for the `Psion` learned-model lane and freezes the
   bounded topology contract, distributed-group receipt, replay receipt, and

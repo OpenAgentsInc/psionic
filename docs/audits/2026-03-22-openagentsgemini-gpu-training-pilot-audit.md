@@ -4,6 +4,13 @@ This audit checks whether the current Google Cloud project can honestly launch
 one bounded Psion GPU training pilot and retain enough infra, artifact, and
 cost evidence to make the run useful.
 
+Follow-up status:
+
+- the first real bounded Google-hosted run was executed later on
+  `2026-03-22`
+- follow-up audit:
+  `docs/audits/2026-03-22-openagentsgemini-first-google-single-gpu-pilot-run-audit.md`
+
 I did not allocate a GPU VM in this audit. This is a control-plane and quota
 readiness pass over the current `gcloud`-visible project state.
 
@@ -222,7 +229,8 @@ Current governance hygiene:
 
 ## Status Call
 
-The GCP project is close, but not fully pilot-ready.
+At the time of this readiness pass, the GCP project was close, but not fully
+pilot-ready. The follow-up run later closed the bounded single-node proof.
 
 What is green:
 
@@ -255,20 +263,24 @@ What is green:
 - the repo now has one committed Google single-node operator runbook plus one
   local operator preflight command that rejects stale tooling, auth drift, and
   quota-unready launch posture before any paid launch begins
+- the first real bounded Google-hosted pilot now exists and is recorded in
+  `docs/audits/2026-03-22-openagentsgemini-first-google-single-gpu-pilot-run-audit.md`
 
 What is still only `partial`:
 
 - exact Cloud Billing export to BigQuery is still console-managed; the current
   repo-owned machine-queryable cost sink is the live price-catalog table plus
   budget notifications rather than invoice-grade billing-export rows
+- the current `psion_reference_pilot_bundle` lane is still CPU-bound even on an
+  L4 host, so Google launch truth is now proved but GPU-backed pretraining
+  throughput truth is not
 
 Blunt conclusion:
 
-- yes, this project appears capable of launching a bounded single-GPU Psion
-  pilot, subject to live zonal stock and a short setup pass
-- it is now prepared to preserve run evidence honestly and has one repo-owned
-  operator runbook, but it still does not claim the first real Google-hosted
-  pilot until that run exists
+- yes, this project has now proved one bounded Google-hosted single-GPU Psion
+  pilot with retained evidence, checkpoint archive, and cold-restore proof
+- no, this still does not prove effective GPU-utilized pretraining because the
+  current reference pilot command remained CPU-bound on the L4 host
 
 ## Recommended First GPU Pilot
 
@@ -336,14 +348,14 @@ This audit does not yet close the following launch-critical risks:
   images or first-boot NVIDIA driver installation behavior
 - local boot-disk pressure could invalidate the run if dataset staging,
   checkpoints, or logs exceed the undeclared working-disk budget
-- artifact durability is still partial until object digests, checkpoint
-  manifests, and cold-restore proof exist
+- artifact durability is now proved for the bounded reference lane, but broader
+  checkpoint promotion and later train variants remain unproved
 - cost truth remains partial until billing export or an equivalent
   machine-queryable surface is wired into the run bundle
 - operator-local tooling drift can still break launch or evidence collection if
   `gcloud`, `bq`, or auth posture remain implicit
-- the audit still does not prove Google-host execution readiness until one real
-  run completes with preserved evidence
+- the current bounded-success run still does not prove accelerator utilization
+  truth because the reference pilot lane remained CPU-bound on the GPU host
 
 ## Required Issue Program
 
@@ -354,8 +366,11 @@ ready for the first real Psion pretraining run.
 
 Progress note:
 
-- Issues 1 through 7 are now implemented in the repo and project
-- Issues 8 through 10 remain the live pretraining-readiness gap
+- Issues 1 through 10 are now closed for the bounded Google single-node
+  reference lane
+- broader Google pretraining readiness still remains narrower than full
+  accelerator-backed training readiness because the current reference pilot
+  command is still CPU-bound
 
 The intended claim boundary stays narrow:
 
@@ -695,54 +710,31 @@ Issues 1 through 8
 
 ### Issue 10: Execute The First Real Google Single-GPU Psion Pretraining Run
 
-Description:
-After the setup issues are closed, the repo still needs one actual bounded run
-on Google infra. Until that exists, the project only has inferred launch
-readiness, not proved execution readiness.
+Status:
 
-Result classes for the follow-up audit:
+- closed on `2026-03-22` as `bounded_success`
+- follow-up audit:
+  `docs/audits/2026-03-22-openagentsgemini-first-google-single-gpu-pilot-run-audit.md`
 
-- `launch_capacity_failure`
-- `bootstrap_failure`
-- `input_materialization_failure`
-- `training_runtime_failure`
-- `checkpoint_archive_failure`
-- `checkpoint_restore_failure`
-- `cost_guardrail_abort`
-- `bounded_success`
+Outcome summary:
 
-Required details:
-
-- use the preferred first-run shape:
-  one L4-backed `g2` instance unless memory pressure forces `a2-highgpu-1g`
-- follow the declared zone fallback order and stop retrying after the bounded
-  launch-attempt policy is exhausted
-- define when the run should:
-  abort immediately, checkpoint then abort, retry in another zone, or downgrade
-  from an A100 request to an L4 request
-- keep the run bounded by explicit cost, time, step, or token ceilings
-- abort if the run fails to upload a durable checkpoint by the declared
-  checkpoint deadline
-- abort if the evidence-upload path is broken and the run can no longer produce
-  a truthful retained bundle
-- archive the full evidence bundle into the dedicated training bucket
-- validate the emitted stage receipt, observability receipt, replay facts,
-  checkpoint lineage, and pilot bundle from the real run
-- write a follow-up audit that states whether the run stayed green or exposed
-  blockers for the next attempt, and record a typed result classification for
-  the final outcome
-
-Acceptance details:
-
-- one actual Google-hosted run completes or fails with explicit preserved cause
-- the final evidence bundle is enough to support a truthful go or no-go call on
-  the next pretraining step
-- the repo has a committed audit of the result, not just a console anecdote
-- the final result can be classified cleanly as success, bounded refusal, or
-  typed failure
-
-Dependencies:
-Issues 1 through 9
+- successful run id:
+  `psion-g2-l4-google-pilot-20260322t184426z`
+- final topology:
+  `g2-standard-8` plus `nvidia-l4` in `us-central1-a`
+- the run completed bootstrap, training, checkpoint archive, cold restore, and
+  evidence finalization on real Google infra
+- the final manifest retained `34` objects with per-object digests
+- the run preserved a full typed attempt history before the bounded-success
+  pass:
+  `bootstrap_failure`, two `artifact_upload_failure` cases, and one
+  `checkpoint_restore_failure`
+- the fixes that unblocked the successful pass were committed as:
+  `cb5be11`, `fe1eb3d`, `57b4b56`, and `11decde`
+- the current claim boundary remains narrow:
+  this proved Google-host launch and evidence truth, but not effective
+  accelerator utilization, because the current reference pilot lane stayed
+  CPU-bound on the L4 host
 
 ## Evidence Bundle The Pilot Should Save
 
