@@ -765,7 +765,7 @@ const STARTER_PLUGIN_REGISTRATIONS: &[StarterPluginRegistration] = &[
         runtime_bundle_ref: TASSADAR_POST_ARTICLE_PLUGIN_TEXT_STATS_RUNTIME_BUNDLE_REF,
         runtime_run_root_ref: TASSADAR_POST_ARTICLE_PLUGIN_TEXT_STATS_RUN_ROOT_REF,
         tool_description: "count bytes, Unicode scalar values, lines, non-empty lines, and whitespace-delimited words from packet-local text without tokenizer, language, or semantic-structure claims.",
-        bridge_exposed: false,
+        bridge_exposed: true,
         catalog_exposed: false,
         catalog: None,
     },
@@ -3398,15 +3398,15 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn starter_plugin_registry_keeps_hidden_user_plugin_out_of_bridge_and_catalog() {
+    fn starter_plugin_registry_keeps_user_plugin_bridge_visible_but_catalog_hidden() {
         let registration = starter_plugin_registration_by_plugin_id("plugin.text.stats")
             .expect("text-stats registration");
 
         assert_eq!(starter_plugin_registrations().len(), 5);
-        assert_eq!(bridge_exposed_starter_plugin_registrations().len(), 4);
+        assert_eq!(bridge_exposed_starter_plugin_registrations().len(), 5);
         assert_eq!(catalog_exposed_starter_plugin_registrations().len(), 4);
         assert_eq!(registration.tool_name, "plugin_text_stats");
-        assert!(!registration.bridge_exposed);
+        assert!(registration.bridge_exposed);
         assert!(!registration.catalog_exposed);
     }
 

@@ -86,6 +86,82 @@
       "detail": "the shared bridge derives deterministic, router-owned, and Apple FM tool definitions from one starter-plugin projection without inventing a second schema vocabulary."
     },
     {
+      "plugin_id": "plugin.text.stats",
+      "tool_name": "plugin_text_stats",
+      "result_schema_id": "plugin.text.stats.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.packet_too_large.v1",
+        "plugin.refusal.unsupported_codec.v1"
+      ],
+      "replay_class_id": "deterministic_replayable",
+      "deterministic_projection": {
+        "plugin_id": "plugin.text.stats",
+        "tool_name": "plugin_text_stats",
+        "description": "count bytes, Unicode scalar values, lines, non-empty lines, and whitespace-delimited words from packet-local text without tokenizer, language, or semantic-structure claims.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "description": "packet-local text counted with Rust byte length, chars(), lines(), and split_whitespace() semantics.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        },
+        "result_schema_id": "plugin.text.stats.output.v1",
+        "refusal_schema_ids": [
+          "plugin.refusal.schema_invalid.v1",
+          "plugin.refusal.packet_too_large.v1",
+          "plugin.refusal.unsupported_codec.v1"
+        ],
+        "replay_class_id": "deterministic_replayable"
+      },
+      "router_projection": {
+        "kind": "function",
+        "name": "plugin_text_stats",
+        "description": "count bytes, Unicode scalar values, lines, non-empty lines, and whitespace-delimited words from packet-local text without tokenizer, language, or semantic-structure claims.",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "description": "packet-local text counted with Rust byte length, chars(), lines(), and split_whitespace() semantics.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        }
+      },
+      "apple_fm_projection": {
+        "name": "plugin_text_stats",
+        "description": "count bytes, Unicode scalar values, lines, non-empty lines, and whitespace-delimited words from packet-local text without tokenizer, language, or semantic-structure claims.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "description": "packet-local text counted with Rust byte length, chars(), lines(), and split_whitespace() semantics.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        }
+      },
+      "arguments_schema_digest": "08bc2f97a094970d8c33a86c97db1adc5f99c5138d8ba19b5dd4eefd7e4f604d",
+      "router_parameters_digest": "08bc2f97a094970d8c33a86c97db1adc5f99c5138d8ba19b5dd4eefd7e4f604d",
+      "apple_fm_schema_digest": "08bc2f97a094970d8c33a86c97db1adc5f99c5138d8ba19b5dd4eefd7e4f604d",
+      "stable_across_surfaces": true,
+      "detail": "the shared bridge derives deterministic, router-owned, and Apple FM tool definitions from one starter-plugin projection without inventing a second schema vocabulary."
+    },
+    {
       "plugin_id": "plugin.http.fetch_text",
       "tool_name": "plugin_http_fetch_text",
       "result_schema_id": "plugin.http.fetch_text.output.v1",
@@ -384,6 +460,20 @@
       "detail": "success results stay receipt-bound and structured at the shared bridge boundary."
     },
     {
+      "case_id": "text_stats_success_bridge",
+      "tool_name": "plugin_text_stats",
+      "plugin_id": "plugin.text.stats",
+      "status": "success",
+      "output_or_refusal_schema_id": "plugin.text.stats.output.v1",
+      "structured_payload_digest": "0fd25b27c4c45d80f12faaf9c6fabd7dcee2ef6d0abb2894e8cef0a663da8e1c",
+      "rendered_output_digest": "124eda030d60e2c66ffec43276a56dda00d7f98de5f2edcaec17252f4684b469",
+      "plugin_receipt_id": "receipt.plugin.text.stats.72ccc4ddaca2729d.v1",
+      "plugin_receipt_digest": "94985e020227e97bc4074a3d32b743b11a4a834bd6480e011185b1c498063dfd",
+      "receipt_binding_preserved": true,
+      "typed_refusal_preserved": false,
+      "detail": "user-added capability-free plugins project through the shared bridge with the same receipt-bound structured envelope as the original starter set."
+    },
+    {
       "case_id": "fetch_text_success_bridge",
       "tool_name": "plugin_http_fetch_text",
       "plugin_id": "plugin.http.fetch_text",
@@ -426,8 +516,8 @@
       "detail": "typed plugin refusals stay typed and receipt-bound instead of degrading into free-form tool text."
     }
   ],
-  "plugin_count": 4,
+  "plugin_count": 5,
   "claim_boundary": "this bundle freezes one shared starter-plugin projection and receipt bridge above the plugin runtime and below deterministic, router-owned, and Apple FM controller lanes. It keeps tool-schema derivation, structured outputs, typed refusals, and plugin receipt identity explicit without claiming weighted controller closure.",
-  "summary": "starter plugin tool bridge covers projection_rows=4 and execution_cases=4 across deterministic, router-owned, and Apple FM controller surfaces.",
-  "bundle_digest": "8dee989312c02999d7327f3ba9ac5c71536c86fc090f9ceb2edb4e460b909cde"
+  "summary": "starter plugin tool bridge covers projection_rows=5 and execution_cases=5 across deterministic, router-owned, and Apple FM controller surfaces.",
+  "bundle_digest": "021d606709a244ce78e9877a03633a0bd10ba27996019c5f58539a8ba0ebb3d9"
 }

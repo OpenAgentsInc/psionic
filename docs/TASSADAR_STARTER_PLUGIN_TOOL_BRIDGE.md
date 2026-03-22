@@ -34,9 +34,10 @@ with three main surfaces:
 - OpenAI-compatible router-facing function-tool projection
 - Apple FM-facing tool-definition projection over the same argument schemas
 
-The current bridge freezes four starter-plugin definitions:
+The current bridge freezes five starter-plugin definitions:
 
 - `plugin_text_url_extract`
+- `plugin_text_stats`
 - `plugin_http_fetch_text`
 - `plugin_html_extract_readable`
 - `plugin_feed_rss_atom_parse`

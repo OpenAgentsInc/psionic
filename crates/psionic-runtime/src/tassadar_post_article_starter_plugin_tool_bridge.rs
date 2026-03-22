@@ -12,11 +12,12 @@ use thiserror::Error;
 
 use crate::{
     bridge_exposed_starter_plugin_registrations, invoke_extract_readable_json_packet,
-    invoke_feed_parse_json_packet, invoke_fetch_text_json_packet, invoke_url_extract_json_packet,
-    starter_plugin_registration_by_tool_name, starter_plugin_tool_projection_for_plugin_id,
-    ExtractReadableConfig, FeedParseConfig, FetchTextConfig, FetchTextSnapshotResponse,
-    FetchTextSnapshotResult, StarterPluginInvocationReceipt, StarterPluginInvocationStatus,
-    StarterPluginRefusal, StarterPluginToolProjection, UrlExtractConfig,
+    invoke_feed_parse_json_packet, invoke_fetch_text_json_packet, invoke_text_stats_json_packet,
+    invoke_url_extract_json_packet, starter_plugin_registration_by_tool_name,
+    starter_plugin_tool_projection_for_plugin_id, ExtractReadableConfig, FeedParseConfig,
+    FetchTextConfig, FetchTextSnapshotResponse, FetchTextSnapshotResult,
+    StarterPluginInvocationReceipt, StarterPluginInvocationStatus, StarterPluginRefusal,
+    StarterPluginToolProjection, TextStatsConfig, UrlExtractConfig,
 };
 
 pub const TASSADAR_POST_ARTICLE_STARTER_PLUGIN_TOOL_BRIDGE_BUNDLE_REF: &str = "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_tool_bridge_v1/tassadar_post_article_starter_plugin_tool_bridge_bundle.json";
@@ -114,6 +115,7 @@ pub struct StarterPluginToolBridgeBundle {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StarterPluginToolBridgeConfig {
     pub url_extract: UrlExtractConfig,
+    pub text_stats: TextStatsConfig,
     pub fetch_text: FetchTextConfig,
     pub extract_readable: ExtractReadableConfig,
     pub feed_parse: FeedParseConfig,
@@ -123,6 +125,7 @@ impl Default for StarterPluginToolBridgeConfig {
     fn default() -> Self {
         Self {
             url_extract: UrlExtractConfig::default(),
+            text_stats: TextStatsConfig::default(),
             fetch_text: FetchTextConfig::snapshot(bridge_snapshot_entries()),
             extract_readable: ExtractReadableConfig::default(),
             feed_parse: FeedParseConfig::default(),
@@ -220,6 +223,15 @@ pub fn execute_starter_plugin_tool_call(
     let envelope = match registration.plugin_id {
         "plugin.text.url_extract" => {
             let outcome = invoke_url_extract_json_packet("json", &packet, &config.url_extract);
+            projected_tool_result_from_outcome(
+                tool_name,
+                outcome.receipt,
+                outcome.response,
+                outcome.refusal,
+            )
+        }
+        "plugin.text.stats" => {
+            let outcome = invoke_text_stats_json_packet("json", &packet, &config.text_stats);
             projected_tool_result_from_outcome(
                 tool_name,
                 outcome.receipt,
@@ -326,6 +338,18 @@ pub fn build_starter_plugin_tool_bridge_bundle() -> StarterPluginToolBridgeBundl
             "success results stay receipt-bound and structured at the shared bridge boundary.",
         ),
         bridge_execution_case(
+            "text_stats_success_bridge",
+            execute_starter_plugin_tool_call(
+                "plugin_text_stats",
+                serde_json::json!({
+                    "text": "alpha beta\n\ngamma delta"
+                }),
+                &config,
+            )
+            .expect("text-stats bridge result"),
+            "user-added capability-free plugins project through the shared bridge with the same receipt-bound structured envelope as the original starter set.",
+        ),
+        bridge_execution_case(
             "fetch_text_success_bridge",
             execute_starter_plugin_tool_call(
                 "plugin_http_fetch_text",
@@ -377,7 +401,7 @@ pub fn build_starter_plugin_tool_bridge_bundle() -> StarterPluginToolBridgeBundl
         ],
         projection_rows,
         execution_cases,
-        plugin_count: 4,
+        plugin_count: 0,
         claim_boundary: String::from(
             "this bundle freezes one shared starter-plugin projection and receipt bridge above the plugin runtime and below deterministic, router-owned, and Apple FM controller lanes. It keeps tool-schema derivation, structured outputs, typed refusals, and plugin receipt identity explicit without claiming weighted controller closure.",
         ),
@@ -389,6 +413,7 @@ pub fn build_starter_plugin_tool_bridge_bundle() -> StarterPluginToolBridgeBundl
         bundle.projection_rows.len(),
         bundle.execution_cases.len(),
     );
+    bundle.plugin_count = bundle.projection_rows.len() as u32;
     bundle.bundle_digest = stable_json_digest(b"starter_plugin_tool_bridge_bundle|", &bundle);
     bundle
 }
@@ -574,7 +599,7 @@ mod tests {
     fn starter_plugin_tool_bridge_keeps_projection_rows_stable() {
         let bundle = build_starter_plugin_tool_bridge_bundle();
 
-        assert_eq!(bundle.projection_rows.len(), 4);
+        assert_eq!(bundle.projection_rows.len(), 5);
         assert_eq!(
             bundle.surface_ids,
             vec![
@@ -587,6 +612,10 @@ mod tests {
             .projection_rows
             .iter()
             .all(|row| row.stable_across_surfaces));
+        assert!(bundle
+            .projection_rows
+            .iter()
+            .any(|row| row.tool_name == "plugin_text_stats"));
     }
 
     #[test]
@@ -637,12 +666,16 @@ mod tests {
     fn starter_plugin_tool_bridge_bundle_covers_projection_and_execution_rows() {
         let bundle = build_starter_plugin_tool_bridge_bundle();
 
-        assert_eq!(starter_plugin_tool_bridge_projections().len(), 4);
-        assert_eq!(bundle.execution_cases.len(), 4);
+        assert_eq!(starter_plugin_tool_bridge_projections().len(), 5);
+        assert_eq!(bundle.execution_cases.len(), 5);
         assert!(bundle
             .execution_cases
             .iter()
             .any(|row| row.status == StarterPluginInvocationStatus::Refusal));
+        assert!(bundle
+            .execution_cases
+            .iter()
+            .any(|row| row.plugin_id == "plugin.text.stats"));
         assert!(bundle
             .execution_cases
             .iter()
