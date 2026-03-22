@@ -1742,8 +1742,17 @@ The current scope is:
   `docs/audits/2026-03-22-tassadar-post-article-plugin-text-url-extract.md`,
   which close one real capability-free `plugin.text.url_extract` starter plugin
   with explicit packet schema, deterministic replay posture, stable tool
-  projection, typed refusal classes, and explicit negative claims while moving
-  the next open bridge frontier to `TAS-218`.
+  projection, typed refusal classes, and explicit negative claims.
+- the same starter-runtime surface now also closes one real read-only network
+  `plugin.http.fetch_text` plugin with the runtime bundle
+  `fixtures/tassadar/runs/tassadar_post_article_plugin_http_fetch_text_v1/tassadar_post_article_plugin_http_fetch_text_bundle.json`,
+  the checker
+  `scripts/check-tassadar-post-article-plugin-http-fetch-text.sh`, and the
+  audit note
+  `docs/audits/2026-03-22-tassadar-post-article-plugin-http-fetch-text.md`,
+  which freeze one allowlist-bound host-mediated HTTP fetch path with explicit
+  mount-envelope policy, replay-class posture, typed refusal classes, and
+  negative claims while moving the next open bridge frontier to `TAS-219`.
 - the current semantic-window revision artifacts are
   `fixtures/tassadar/reports/tassadar_semantic_window_revision_receipt.json`
   and

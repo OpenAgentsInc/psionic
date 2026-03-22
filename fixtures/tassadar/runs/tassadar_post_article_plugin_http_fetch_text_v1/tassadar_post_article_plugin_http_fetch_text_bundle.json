@@ -1,0 +1,353 @@
+{
+  "schema_version": 1,
+  "bundle_id": "tassadar.post_article.plugin_http_fetch_text.runtime_bundle.v1",
+  "plugin_id": "plugin.http.fetch_text",
+  "plugin_version": "v1",
+  "manifest_id": "manifest.plugin.http.fetch_text.v1",
+  "artifact_id": "artifact.plugin.http.fetch_text.v1",
+  "packet_abi_version": "packet.v1",
+  "sample_mount_envelope": {
+    "envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+    "allowlisted_url_prefixes": [
+      "https://snapshot.example/"
+    ],
+    "timeout_millis": 500,
+    "response_size_limit_bytes": 16384,
+    "redirect_limit": 3,
+    "allowed_content_type_ids": [
+      "text/",
+      "application/xhtml+xml",
+      "application/xml",
+      "text/xml",
+      "application/rss+xml",
+      "application/atom+xml"
+    ],
+    "replay_class_id": "replayable_with_snapshots",
+    "detail": "the sample fetch-text mount envelope binds allowlist, timeout, redirect, response-size, and content-type policy to one host-mediated read-only HTTP capability."
+  },
+  "tool_projection": {
+    "plugin_id": "plugin.http.fetch_text",
+    "tool_name": "plugin_http_fetch_text",
+    "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
+    "arguments_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "description": "allowlisted absolute URL fetched with one bounded GET-only runtime path.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    },
+    "result_schema_id": "plugin.http.fetch_text.output.v1",
+    "refusal_schema_ids": [
+      "plugin.refusal.schema_invalid.v1",
+      "plugin.refusal.unsupported_codec.v1",
+      "plugin.refusal.network_denied.v1",
+      "plugin.refusal.url_not_permitted.v1",
+      "plugin.refusal.timeout.v1",
+      "plugin.refusal.response_too_large.v1",
+      "plugin.refusal.content_type_unsupported.v1",
+      "plugin.refusal.decode_failed.v1",
+      "plugin.refusal.upstream_failure.v1"
+    ],
+    "replay_class_id": "replayable_with_snapshots"
+  },
+  "supported_replay_class_ids": [
+    "replayable_with_snapshots",
+    "operator_replay_only"
+  ],
+  "negative_claim_ids": [
+    "browser_execution_not_claimed",
+    "javascript_execution_not_claimed",
+    "cookie_or_auth_session_not_claimed",
+    "arbitrary_headers_not_claimed",
+    "general_unrestricted_web_access_not_claimed"
+  ],
+  "case_rows": [
+    {
+      "case_id": "fetch_text_article_success",
+      "status": "exact_success",
+      "codec_id": "json",
+      "request_packet_digest": "aa5ae2b22543ed81711389887a52bd710d475bb12785618b07edcaad83b51cea",
+      "response_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+      "response_or_refusal_digest": "fb32def4756e71af10ffc532898d91533e4dd1694d9c5967d9745e9266fe4016",
+      "backend_id": "snapshot_http_mount",
+      "logical_cpu_millis": 2,
+      "receipt": {
+        "receipt_id": "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+        "plugin_id": "plugin.http.fetch_text",
+        "plugin_version": "v1",
+        "tool_name": "plugin_http_fetch_text",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+        "capability_namespace_ids": [
+          "capability.http.read_only.v1"
+        ],
+        "replay_class_id": "replayable_with_snapshots",
+        "status": "success",
+        "input_schema_id": "plugin.http.fetch_text.input.v1",
+        "input_packet_digest": "aa5ae2b22543ed81711389887a52bd710d475bb12785618b07edcaad83b51cea",
+        "output_or_refusal_schema_id": "plugin.http.fetch_text.output.v1",
+        "output_or_refusal_digest": "fb32def4756e71af10ffc532898d91533e4dd1694d9c5967d9745e9266fe4016",
+        "detail": "fetch-text keeps GET-only host-mediated access explicit and returns structured text-fetch truth without browser semantics.",
+        "receipt_digest": "cde8cf48b8ff7685a1e12cfd1204b8b47ed11d81e5578d63fec1bce394ecee98"
+      },
+      "detail": "snapshot-backed fetch-text returns structured host-mediated text-fetch truth."
+    },
+    {
+      "case_id": "schema_invalid_missing_url",
+      "status": "typed_malformed_packet",
+      "codec_id": "json",
+      "request_packet_digest": "fe84bbb5eef4c6dc30da9032756b8ae6f5c11834cc728d9ed9683712f8e665f4",
+      "response_or_refusal_schema_id": "plugin.refusal.schema_invalid.v1",
+      "response_or_refusal_digest": "6a69ee59f00a377394eca760bfbf7a2f4ce8e4d10d79f7f9ec46de38171542b3",
+      "backend_id": "snapshot_http_mount",
+      "logical_cpu_millis": 1,
+      "receipt": {
+        "receipt_id": "receipt.plugin.http.fetch_text.fe84bbb5eef4c6dc.v1",
+        "plugin_id": "plugin.http.fetch_text",
+        "plugin_version": "v1",
+        "tool_name": "plugin_http_fetch_text",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+        "capability_namespace_ids": [
+          "capability.http.read_only.v1"
+        ],
+        "replay_class_id": "replayable_with_snapshots",
+        "status": "refusal",
+        "input_schema_id": "plugin.http.fetch_text.input.v1",
+        "input_packet_digest": "fe84bbb5eef4c6dc30da9032756b8ae6f5c11834cc728d9ed9683712f8e665f4",
+        "output_or_refusal_schema_id": "plugin.refusal.schema_invalid.v1",
+        "output_or_refusal_digest": "6a69ee59f00a377394eca760bfbf7a2f4ce8e4d10d79f7f9ec46de38171542b3",
+        "refusal_class_id": "schema_invalid",
+        "detail": "fetch-text refuses malformed packets without host-side schema repair.",
+        "receipt_digest": "233b7931a2a62bc3961dbb6d32c06f04bef20c06f132f24f9a903b063d312250"
+      },
+      "detail": "missing `url` fails closed into a typed schema-invalid refusal."
+    },
+    {
+      "case_id": "url_not_permitted_refusal",
+      "status": "typed_refusal",
+      "codec_id": "json",
+      "request_packet_digest": "57a5af80f024498d00935ebd2f80793b7fe22e286548975ecffe63536d7f8cd3",
+      "response_or_refusal_schema_id": "plugin.refusal.url_not_permitted.v1",
+      "response_or_refusal_digest": "2f7635d7834d2e1696c0f159c1716605bc8bd9115c76c148b9553dcb1d9b5790",
+      "backend_id": "snapshot_http_mount",
+      "logical_cpu_millis": 1,
+      "receipt": {
+        "receipt_id": "receipt.plugin.http.fetch_text.57a5af80f024498d.v1",
+        "plugin_id": "plugin.http.fetch_text",
+        "plugin_version": "v1",
+        "tool_name": "plugin_http_fetch_text",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+        "capability_namespace_ids": [
+          "capability.http.read_only.v1"
+        ],
+        "replay_class_id": "replayable_with_snapshots",
+        "status": "refusal",
+        "input_schema_id": "plugin.http.fetch_text.input.v1",
+        "input_packet_digest": "57a5af80f024498d00935ebd2f80793b7fe22e286548975ecffe63536d7f8cd3",
+        "output_or_refusal_schema_id": "plugin.refusal.url_not_permitted.v1",
+        "output_or_refusal_digest": "2f7635d7834d2e1696c0f159c1716605bc8bd9115c76c148b9553dcb1d9b5790",
+        "refusal_class_id": "url_not_permitted",
+        "detail": "fetch-text keeps URL allowlists in the host-owned mount envelope instead of guest packets.",
+        "receipt_digest": "2ad8c9595bdb597d98c28c520cac6b1378d719c6fccb4119ae289b976d1da46d"
+      },
+      "detail": "URL allowlists stay bound to the mount envelope instead of guest packets."
+    },
+    {
+      "case_id": "timeout_refusal",
+      "status": "typed_refusal",
+      "codec_id": "json",
+      "request_packet_digest": "f6a0c8aeaa11720c211ac5a4cf921571028ab92428359601cd9a5bfd7d614ef0",
+      "response_or_refusal_schema_id": "plugin.refusal.timeout.v1",
+      "response_or_refusal_digest": "65186405e43c096f05dafdf83962e001975ef19630ecc504c6bf7be1d7c7c5bf",
+      "backend_id": "snapshot_http_mount",
+      "logical_cpu_millis": 1,
+      "receipt": {
+        "receipt_id": "receipt.plugin.http.fetch_text.f6a0c8aeaa11720c.v1",
+        "plugin_id": "plugin.http.fetch_text",
+        "plugin_version": "v1",
+        "tool_name": "plugin_http_fetch_text",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+        "capability_namespace_ids": [
+          "capability.http.read_only.v1"
+        ],
+        "replay_class_id": "replayable_with_snapshots",
+        "status": "refusal",
+        "input_schema_id": "plugin.http.fetch_text.input.v1",
+        "input_packet_digest": "f6a0c8aeaa11720c211ac5a4cf921571028ab92428359601cd9a5bfd7d614ef0",
+        "output_or_refusal_schema_id": "plugin.refusal.timeout.v1",
+        "output_or_refusal_digest": "65186405e43c096f05dafdf83962e001975ef19630ecc504c6bf7be1d7c7c5bf",
+        "refusal_class_id": "timeout",
+        "detail": "the mounted snapshot records this fetch as a timeout.",
+        "receipt_digest": "2f075a997be3730e4553a130028a6e6557a2863f46e349d089d626f321972dee"
+      },
+      "detail": "timeouts stay machine-readable and do not degrade into generic tool text."
+    },
+    {
+      "case_id": "network_denied_refusal",
+      "status": "typed_refusal",
+      "codec_id": "json",
+      "request_packet_digest": "615425d88524ded107dd309baf1c5135f4675df18188d838615f069eb21852bf",
+      "response_or_refusal_schema_id": "plugin.refusal.network_denied.v1",
+      "response_or_refusal_digest": "5eebe2d8e220d98e25bfa2caf8972c282fb8ef75e503983fb1f4701b5a17adfc",
+      "backend_id": "snapshot_http_mount",
+      "logical_cpu_millis": 1,
+      "receipt": {
+        "receipt_id": "receipt.plugin.http.fetch_text.615425d88524ded1.v1",
+        "plugin_id": "plugin.http.fetch_text",
+        "plugin_version": "v1",
+        "tool_name": "plugin_http_fetch_text",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+        "capability_namespace_ids": [
+          "capability.http.read_only.v1"
+        ],
+        "replay_class_id": "replayable_with_snapshots",
+        "status": "refusal",
+        "input_schema_id": "plugin.http.fetch_text.input.v1",
+        "input_packet_digest": "615425d88524ded107dd309baf1c5135f4675df18188d838615f069eb21852bf",
+        "output_or_refusal_schema_id": "plugin.refusal.network_denied.v1",
+        "output_or_refusal_digest": "5eebe2d8e220d98e25bfa2caf8972c282fb8ef75e503983fb1f4701b5a17adfc",
+        "refusal_class_id": "network_denied",
+        "detail": "the mounted snapshot did not admit this allowlisted URL.",
+        "receipt_digest": "3ea54653839ac2a7b0e188b4c7a98c73fe1bbac6f063b99c8fc42c2f7545785b"
+      },
+      "detail": "missing mounted snapshot entries remain explicit network-denied truth."
+    },
+    {
+      "case_id": "response_too_large_refusal",
+      "status": "typed_refusal",
+      "codec_id": "json",
+      "request_packet_digest": "de9505c282db40dac30b1b3fffc5648df946e275bf6b03b1f9734e796994f397",
+      "response_or_refusal_schema_id": "plugin.refusal.response_too_large.v1",
+      "response_or_refusal_digest": "a6d579889c39bed8f03da2e323f46589f236d85bacb5bbe7b639a979edd40677",
+      "backend_id": "snapshot_http_mount",
+      "logical_cpu_millis": 1,
+      "receipt": {
+        "receipt_id": "receipt.plugin.http.fetch_text.de9505c282db40da.v1",
+        "plugin_id": "plugin.http.fetch_text",
+        "plugin_version": "v1",
+        "tool_name": "plugin_http_fetch_text",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+        "capability_namespace_ids": [
+          "capability.http.read_only.v1"
+        ],
+        "replay_class_id": "replayable_with_snapshots",
+        "status": "refusal",
+        "input_schema_id": "plugin.http.fetch_text.input.v1",
+        "input_packet_digest": "de9505c282db40dac30b1b3fffc5648df946e275bf6b03b1f9734e796994f397",
+        "output_or_refusal_schema_id": "plugin.refusal.response_too_large.v1",
+        "output_or_refusal_digest": "a6d579889c39bed8f03da2e323f46589f236d85bacb5bbe7b639a979edd40677",
+        "refusal_class_id": "response_too_large",
+        "detail": "the response exceeded the mounted response-size ceiling.",
+        "receipt_digest": "51e7e4fcc1ae7be0438175dc320ecc274a127066dc13c6a1a64a61960a8db732"
+      },
+      "detail": "response-size ceilings remain explicit and fail closed."
+    },
+    {
+      "case_id": "content_type_unsupported_refusal",
+      "status": "typed_refusal",
+      "codec_id": "json",
+      "request_packet_digest": "c81ec5cc115ff56182920b966d9d4deac1e13d71d25ea6d189efec3f20d978a1",
+      "response_or_refusal_schema_id": "plugin.refusal.content_type_unsupported.v1",
+      "response_or_refusal_digest": "c51de5cd8f480d9c690d97908afc39d25e648385a3290da426e603393b611bde",
+      "backend_id": "snapshot_http_mount",
+      "logical_cpu_millis": 1,
+      "receipt": {
+        "receipt_id": "receipt.plugin.http.fetch_text.c81ec5cc115ff561.v1",
+        "plugin_id": "plugin.http.fetch_text",
+        "plugin_version": "v1",
+        "tool_name": "plugin_http_fetch_text",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+        "capability_namespace_ids": [
+          "capability.http.read_only.v1"
+        ],
+        "replay_class_id": "replayable_with_snapshots",
+        "status": "refusal",
+        "input_schema_id": "plugin.http.fetch_text.input.v1",
+        "input_packet_digest": "c81ec5cc115ff56182920b966d9d4deac1e13d71d25ea6d189efec3f20d978a1",
+        "output_or_refusal_schema_id": "plugin.refusal.content_type_unsupported.v1",
+        "output_or_refusal_digest": "c51de5cd8f480d9c690d97908afc39d25e648385a3290da426e603393b611bde",
+        "refusal_class_id": "content_type_unsupported",
+        "detail": "content type `image/png` is outside the bounded text-fetch window.",
+        "receipt_digest": "44f2eaa29817d76374d585ffc39daa2fb1c2c8fc5ed4b741f27ffec56275884d"
+      },
+      "detail": "binary content types remain outside the bounded text-fetch window."
+    },
+    {
+      "case_id": "decode_failed_refusal",
+      "status": "typed_refusal",
+      "codec_id": "json",
+      "request_packet_digest": "c98dd2220083c08b0fe289e2fb34a98a3fd03abe954370d0d85975ebc23a35f5",
+      "response_or_refusal_schema_id": "plugin.refusal.decode_failed.v1",
+      "response_or_refusal_digest": "7bdfba90614210c12dc458ab0ea4adeec6e8ea993a3ce0200bd0f6ea2d1e4e64",
+      "backend_id": "snapshot_http_mount",
+      "logical_cpu_millis": 1,
+      "receipt": {
+        "receipt_id": "receipt.plugin.http.fetch_text.c98dd2220083c08b.v1",
+        "plugin_id": "plugin.http.fetch_text",
+        "plugin_version": "v1",
+        "tool_name": "plugin_http_fetch_text",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+        "capability_namespace_ids": [
+          "capability.http.read_only.v1"
+        ],
+        "replay_class_id": "replayable_with_snapshots",
+        "status": "refusal",
+        "input_schema_id": "plugin.http.fetch_text.input.v1",
+        "input_packet_digest": "c98dd2220083c08b0fe289e2fb34a98a3fd03abe954370d0d85975ebc23a35f5",
+        "output_or_refusal_schema_id": "plugin.refusal.decode_failed.v1",
+        "output_or_refusal_digest": "7bdfba90614210c12dc458ab0ea4adeec6e8ea993a3ce0200bd0f6ea2d1e4e64",
+        "refusal_class_id": "decode_failed",
+        "detail": "the response body failed utf-8 decoding under the declared charset.",
+        "receipt_digest": "e9b7a2f6080f82caf23270a199cd4701f7fef548932af7d56167a4d58db65673"
+      },
+      "detail": "decode failures remain explicit instead of silently replacing bytes."
+    },
+    {
+      "case_id": "upstream_failure_refusal",
+      "status": "typed_refusal",
+      "codec_id": "json",
+      "request_packet_digest": "3400085873b337f57f78f70fb69b3383071927ebfa1be0972cf9327ab00ff3b1",
+      "response_or_refusal_schema_id": "plugin.refusal.upstream_failure.v1",
+      "response_or_refusal_digest": "27acc6362f2a0c766f3ba670e55af2f7756b635d0dd65372c2232873ceff5ab8",
+      "backend_id": "snapshot_http_mount",
+      "logical_cpu_millis": 1,
+      "receipt": {
+        "receipt_id": "receipt.plugin.http.fetch_text.3400085873b337f5.v1",
+        "plugin_id": "plugin.http.fetch_text",
+        "plugin_version": "v1",
+        "tool_name": "plugin_http_fetch_text",
+        "packet_abi_version": "packet.v1",
+        "mount_envelope_id": "mount.plugin.http.fetch_text.read_only_http_allowlist.v1",
+        "capability_namespace_ids": [
+          "capability.http.read_only.v1"
+        ],
+        "replay_class_id": "replayable_with_snapshots",
+        "status": "refusal",
+        "input_schema_id": "plugin.http.fetch_text.input.v1",
+        "input_packet_digest": "3400085873b337f57f78f70fb69b3383071927ebfa1be0972cf9327ab00ff3b1",
+        "output_or_refusal_schema_id": "plugin.refusal.upstream_failure.v1",
+        "output_or_refusal_digest": "27acc6362f2a0c766f3ba670e55af2f7756b635d0dd65372c2232873ceff5ab8",
+        "refusal_class_id": "upstream_failure",
+        "detail": "the mounted snapshot marks this URL as an upstream transport failure.",
+        "receipt_digest": "c600157e91512232a09c719e1e6f35182f9cfeeba3eb94c48156f97149600c85"
+      },
+      "detail": "snapshot-declared upstream failures stay typed and machine-readable."
+    }
+  ],
+  "claim_boundary": "this runtime bundle closes one read-only network starter plugin that fetches allowlisted text content through a host-mediated HTTP mount. It does not claim browser execution, JavaScript, cookies, auth sessions, arbitrary headers, or unrestricted network access.",
+  "summary": "fetch-text runtime bundle covers 9 cases across success=1, malformed=1, refusals=7 with snapshot-backed replay truth explicit.",
+  "bundle_digest": "30688140bfa1fc5383dea7b038d41486319d15fed27d502edbb825d8927a8606"
+}

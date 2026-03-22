@@ -1350,7 +1350,15 @@ plus the checker
 `scripts/check-tassadar-post-article-plugin-text-url-extract.sh`.
 That closes one deterministic, capability-free `plugin.text.url_extract`
 surface without widening the machine boundary to URL truth or network truth,
-and moves the next open bridge frontier to `TAS-218`.
+and `TAS-218` now adds one host-mediated read-only network
+`plugin.http.fetch_text` runtime in the same starter-runtime module, with
+committed evidence at
+`fixtures/tassadar/runs/tassadar_post_article_plugin_http_fetch_text_v1/tassadar_post_article_plugin_http_fetch_text_bundle.json`
+plus the checker
+`scripts/check-tassadar-post-article-plugin-http-fetch-text.sh`.
+That closes one allowlist-bound text-fetch path without widening the boundary
+to browser execution, JavaScript, cookies, auth sessions, or unrestricted web
+access, and moves the next open bridge frontier to `TAS-219`.
 
 ## Route Requirement
 

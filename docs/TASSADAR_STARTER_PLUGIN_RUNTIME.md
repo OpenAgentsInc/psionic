@@ -52,9 +52,62 @@ Negative claims stay explicit:
 - no redirect truth
 - no network reachability truth
 
+### `plugin.http.fetch_text`
+
+- runtime bundle:
+  `fixtures/tassadar/runs/tassadar_post_article_plugin_http_fetch_text_v1/tassadar_post_article_plugin_http_fetch_text_bundle.json`
+- example writer:
+  `cargo run -p psionic-runtime --example tassadar_post_article_plugin_http_fetch_text_bundle`
+- checker:
+  `scripts/check-tassadar-post-article-plugin-http-fetch-text.sh`
+
+`plugin.http.fetch_text` is now a real read-only network starter plugin. It
+accepts one JSON packet shaped like `{ "url": string }`, enforces URL policy
+from the mounted envelope instead of the guest packet, and returns structured
+fetch truth:
+
+- `final_url`
+- `status_code`
+- `content_type`
+- `charset`
+- `body_text`
+- `truncated`
+
+The current committed evidence is snapshot-backed so replay posture is honest
+and deterministic. The runtime also carries a live host-HTTP path that is
+explicitly classified as `operator_replay_only`.
+
+Typed refusal surface:
+
+- `plugin.refusal.schema_invalid.v1`
+- `plugin.refusal.unsupported_codec.v1`
+- `plugin.refusal.network_denied.v1`
+- `plugin.refusal.url_not_permitted.v1`
+- `plugin.refusal.timeout.v1`
+- `plugin.refusal.response_too_large.v1`
+- `plugin.refusal.content_type_unsupported.v1`
+- `plugin.refusal.decode_failed.v1`
+- `plugin.refusal.upstream_failure.v1`
+
+Tool projection is explicit and stable:
+
+- tool name: `plugin_http_fetch_text`
+- argument schema remains JSON-schema-shaped and packet-derived
+- sample mount envelope remains
+  `mount.plugin.http.fetch_text.read_only_http_allowlist.v1`
+- replay classes remain explicit:
+  `replayable_with_snapshots` and `operator_replay_only`
+
+Negative claims stay explicit:
+
+- no browser execution
+- no JavaScript execution
+- no cookie or auth-session support
+- no arbitrary header surface
+- no unrestricted web access
+
 ## Planned
 
-- `plugin.http.fetch_text`
 - `plugin.html.extract_readable`
 - `plugin.feed.rss_atom_parse`
 - shared plugin-to-tool projection across deterministic, router-owned, and Apple

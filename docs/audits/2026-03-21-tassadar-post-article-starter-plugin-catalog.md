@@ -63,6 +63,10 @@ legibility.
 and its committed bundle at
 `fixtures/tassadar/runs/tassadar_post_article_plugin_text_url_extract_v1/tassadar_post_article_plugin_text_url_extract_bundle.json`.
 
-The next open starter-plugin frontier is `TAS-218`, which continues the
+`TAS-218` is now also closed by the dedicated `plugin.http.fetch_text` runtime
+implementation in the same starter-runtime module and its committed bundle at
+`fixtures/tassadar/runs/tassadar_post_article_plugin_http_fetch_text_v1/tassadar_post_article_plugin_http_fetch_text_bundle.json`.
+
+The next open starter-plugin frontier is `TAS-219`, which continues the
 plugin-by-plugin runtime wave on top of this catalog shell with
-`plugin.http.fetch_text`.
+`plugin.html.extract_readable`.
