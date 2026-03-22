@@ -1,12 +1,12 @@
 {
-  "schema_version": "psionic.tassion.plugin_conditioned_dataset_bundle.v1",
+  "schema_version": "psionic.psion.plugin_conditioned_dataset_bundle.v1",
   "dataset_key": {
-    "dataset_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference",
+    "dataset_ref": "dataset://openagents/psion/plugin_conditioned_host_native_reference",
     "version": "2026.03.22.v1"
   },
-  "stable_dataset_identity": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1",
-  "source_derivation_bundle_ref": "fixtures/tassion/datasets/tassion_plugin_training_derivation_v1/tassion_plugin_training_derivation_bundle.json",
-  "source_derivation_bundle_digest": "1509d92744576ec46e4242844b0b35ccd9ab3e05130dd50297ae721a86d78f75",
+  "stable_dataset_identity": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1",
+  "source_derivation_bundle_ref": "fixtures/psion/plugins/datasets/psion_plugin_training_derivation_v1/psion_plugin_training_derivation_bundle.json",
+  "source_derivation_bundle_digest": "ee0ddb7b6e959e99b5559e69ceac96d9748181ffa37c29ea8f45862163566fda",
   "held_out_isolation": {
     "policy_id": "workflow_case_disjoint.v1",
     "workflow_case_disjoint": true,
@@ -23,8 +23,8 @@
       "split_kind": "train",
       "records": [
         {
-          "schema_version": "psionic.tassion.plugin_training_record.v1",
-          "record_id": "tassion_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+          "schema_version": "psionic.psion.plugin_training_record.v1",
+          "record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
           "directive_text": "Read https://snapshot.example/article and https://snapshot.example/feed.rss.",
           "admitted_plugins": [
             {
@@ -222,11 +222,11 @@
           "outcome_label": "completed_success",
           "final_response_text": "The local Apple FM pilot extracted one article and one feed through the shared starter-plugin runtime.",
           "detail": "the local Apple FM pilot keeps one session-local callback registry, one transcript envelope, and one shared starter-plugin runtime surface explicit instead of inventing Apple-only plugin semantics.",
-          "record_digest": "88912f61508d71b1654ba071e9c931d1badec7bc40400932a273b5df54e4157f"
+          "record_digest": "b98831464f6da0aff5c0412e61f62f954cd27cbfb5a7e4b05c84ff7369ad82bc"
         },
         {
-          "schema_version": "psionic.tassion.plugin_training_record.v1",
-          "record_id": "tassion_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+          "schema_version": "psionic.psion.plugin_training_record.v1",
+          "record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
           "directive_text": "Review https://snapshot.example/article and https://snapshot.example/feed.rss",
           "admitted_plugins": [
             {
@@ -424,11 +424,11 @@
           "outcome_label": "completed_success",
           "final_response_text": "The deterministic controller completed after exhausting the extracted URL set.",
           "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops after the extracted URL set is exhausted.",
-          "record_digest": "a2629fa60af9c6c2a4a2eb5ae80c599134e98ccee0ff981d947b83f9df6178e5"
+          "record_digest": "0e2c0ad683f9b596efbd22e5c1d25e29b8660cecf0da2b597681fe01a8542190"
         },
         {
-          "schema_version": "psionic.tassion.plugin_training_record.v1",
-          "record_id": "tassion_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
+          "schema_version": "psionic.psion.plugin_training_record.v1",
+          "record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
           "directive_text": "Read https://snapshot.example/article and https://snapshot.example/feed.rss.",
           "admitted_plugins": [
             {
@@ -626,7 +626,7 @@
           "outcome_label": "completed_success",
           "final_response_text": "I extracted one article and one feed through the router-owned plugin tool loop.",
           "detail": "the first step comes from a real `/v1/responses` tool-call response, while the bounded follow-on turns stay router-owned and execute real starter plugins through the shared bridge.",
-          "record_digest": "fa61a180b2c6bfb21071952d0d9655022e233adf30f3f66e929997d924c917ef"
+          "record_digest": "2131d1edb42de12c814b0ae9413875be0799cbf7e0fbf578260cc2e398c6df52"
         }
       ],
       "stats": {
@@ -656,8 +656,8 @@
       "split_kind": "held_out",
       "records": [
         {
-          "schema_version": "psionic.tassion.plugin_training_record.v1",
-          "record_id": "tassion_training.trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
+          "schema_version": "psionic.psion.plugin_training_record.v1",
+          "record_id": "psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
           "directive_text": "Read https://snapshot.example/binary.",
           "admitted_plugins": [
             {
@@ -775,11 +775,11 @@
           "outcome_label": "typed_runtime_refusal",
           "final_response_text": "The local Apple FM pilot stopped after a typed fetch refusal.",
           "detail": "the local Apple FM pilot keeps one session-local callback registry, one transcript envelope, and one shared starter-plugin runtime surface explicit instead of inventing Apple-only plugin semantics.",
-          "record_digest": "fcc5fdfae602cc2eb65fc4bff43c591b5d9984edb5eebb70fa3bf8148b3c4405"
+          "record_digest": "52d3615bc179e16e151ace468065aa9772864079ec3312f85eed0a591ccee071"
         },
         {
-          "schema_version": "psionic.tassion.plugin_training_record.v1",
-          "record_id": "tassion_training.trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
+          "schema_version": "psionic.psion.plugin_training_record.v1",
+          "record_id": "psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
           "directive_text": "Review https://snapshot.example/binary",
           "admitted_plugins": [
             {
@@ -897,11 +897,11 @@
           "outcome_label": "typed_runtime_refusal",
           "final_response_text": "The deterministic controller stopped after a typed plugin refusal.",
           "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops immediately when fetch returns a typed refusal.",
-          "record_digest": "dbd3e27b7719072664530d3fdd32f1ccdb86748d25638cf9c2e54acf67abddc5"
+          "record_digest": "656761325f7cf5a9d8363611759cfdf563c207b43cdb97412892f4d5f0f9a6e7"
         },
         {
-          "schema_version": "psionic.tassion.plugin_training_record.v1",
-          "record_id": "tassion_training.trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
+          "schema_version": "psionic.psion.plugin_training_record.v1",
+          "record_id": "psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
           "directive_text": "Read https://snapshot.example/binary.",
           "admitted_plugins": [
             {
@@ -1019,7 +1019,7 @@
           "outcome_label": "typed_runtime_refusal",
           "final_response_text": "The router-owned plugin tool loop stopped after a typed fetch refusal.",
           "detail": "the refusal case proves typed fetch refusals remain structured and receipt-bound after crossing the router-owned tool loop.",
-          "record_digest": "0efb7fda0a8cc8b14b93afc69f4cf12fbadd97149907f700299f8c84b596f942"
+          "record_digest": "bfc90e2a70ce0217fe558de291c16666fb390b73f2585fed8bd866c947838f6d"
         }
       ],
       "stats": {
@@ -1048,5 +1048,5 @@
   ],
   "claim_boundary": "this bundle freezes one small host-native plugin-conditioned dataset built from the committed derivation bundle with workflow-case-disjoint train and held-out splits. It preserves controller-surface, plugin-class, route-label, and outcome-label counts instead of collapsing the records into anonymous prompt/response rows. It does not claim scale, generalization, or mixed guest-artifact coverage by itself.",
   "summary": "plugin-conditioned dataset bundle keeps train_records=3 and held_out_records=3 under workflow_case_disjoint=true.",
-  "bundle_digest": "897f0e57715fa903a5c6c3e1f9b026ab0c77164f40321c85d569539f156bed37"
+  "bundle_digest": "9e4bc8b26ed7bb71a19e6f48f37904986e321d51e9af5f6282fa50e61fc821b6"
 }

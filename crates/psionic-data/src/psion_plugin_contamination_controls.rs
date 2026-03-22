@@ -9,22 +9,22 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    DatasetSplitKind, TassionControllerSurface, TassionPluginConditionedDatasetBundle,
-    TassionPluginConditionedDatasetError, TassionPluginTrainingDerivationBundle,
-    TassionPluginTrainingDerivationError, build_tassion_plugin_conditioned_dataset_bundle_from_derivation,
-    build_tassion_plugin_training_derivation_bundle,
+    DatasetSplitKind, PsionPluginControllerSurface, PsionPluginConditionedDatasetBundle,
+    PsionPluginConditionedDatasetError, PsionPluginTrainingDerivationBundle,
+    PsionPluginTrainingDerivationError, build_psion_plugin_conditioned_dataset_bundle_from_derivation,
+    build_psion_plugin_training_derivation_bundle,
 };
 
 /// Stable schema version for the first plugin-aware contamination bundle.
-pub const TASSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION: &str =
-    "psionic.tassion.plugin_contamination_bundle.v1";
+pub const PSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION: &str =
+    "psionic.psion.plugin_contamination_bundle.v1";
 /// Stable committed output ref for the first contamination bundle.
-pub const TASSION_PLUGIN_CONTAMINATION_BUNDLE_REF: &str =
-    "fixtures/tassion/datasets/tassion_plugin_contamination_controls_v1/tassion_plugin_contamination_bundle.json";
+pub const PSION_PLUGIN_CONTAMINATION_BUNDLE_REF: &str =
+    "fixtures/psion/plugins/datasets/psion_plugin_contamination_controls_v1/psion_plugin_contamination_bundle.json";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TassionPluginContaminationItemKind {
+pub enum PsionPluginContaminationItemKind {
     /// Train split record used for SFT.
     SftTrainRecord,
     /// Held-out split record reserved for eval and benchmark construction.
@@ -32,7 +32,7 @@ pub enum TassionPluginContaminationItemKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct TassionPluginTraceSourceRef {
+pub struct PsionPluginTraceSourceRef {
     /// Stable source bundle ref.
     pub source_bundle_ref: String,
     /// Stable source bundle id.
@@ -44,13 +44,13 @@ pub struct TassionPluginTraceSourceRef {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassionPluginParentLineageRow {
+pub struct PsionPluginParentLineageRow {
     /// Stable lineage row identifier.
     pub lineage_id: String,
     /// Stable item ref inside the downstream split surface.
     pub item_ref: String,
     /// Item kind represented by the row.
-    pub item_kind: TassionPluginContaminationItemKind,
+    pub item_kind: PsionPluginContaminationItemKind,
     /// Dataset split represented by the row.
     pub split_kind: DatasetSplitKind,
     /// Stable parent training record id.
@@ -60,9 +60,9 @@ pub struct TassionPluginParentLineageRow {
     /// Stable workflow case id for contamination review.
     pub workflow_case_id: String,
     /// Controller surface that produced or anchored the row.
-    pub controller_surface: TassionControllerSurface,
+    pub controller_surface: PsionPluginControllerSurface,
     /// Source trace identity preserved from the parent record.
-    pub source_trace: TassionPluginTraceSourceRef,
+    pub source_trace: PsionPluginTraceSourceRef,
     /// Receipt refs preserved from the parent record.
     pub receipt_refs: Vec<String>,
     /// Receipt digests preserved from the parent record.
@@ -70,7 +70,7 @@ pub struct TassionPluginParentLineageRow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassionPluginTraceDisjointGroup {
+pub struct PsionPluginTraceDisjointGroup {
     /// Stable split kind for the group.
     pub split_kind: DatasetSplitKind,
     /// Stable workflow case ids represented in the group.
@@ -84,7 +84,7 @@ pub struct TassionPluginTraceDisjointGroup {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassionPluginExclusionManifest {
+pub struct PsionPluginExclusionManifest {
     /// Stable schema version.
     pub schema_version: String,
     /// Source derivation bundle ref.
@@ -94,9 +94,9 @@ pub struct TassionPluginExclusionManifest {
     /// Stable dataset identity that this manifest protects.
     pub dataset_identity: String,
     /// Held-out trace sources excluded from training.
-    pub training_excluded_trace_sources: Vec<TassionPluginTraceSourceRef>,
+    pub training_excluded_trace_sources: Vec<PsionPluginTraceSourceRef>,
     /// Train trace sources excluded from benchmark and held-out packaging.
-    pub benchmark_excluded_trace_sources: Vec<TassionPluginTraceSourceRef>,
+    pub benchmark_excluded_trace_sources: Vec<PsionPluginTraceSourceRef>,
     /// Held-out receipt refs excluded from training.
     pub training_excluded_receipt_refs: Vec<String>,
     /// Train receipt refs excluded from held-out benchmark packaging.
@@ -104,7 +104,7 @@ pub struct TassionPluginExclusionManifest {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassionPluginContaminationBundle {
+pub struct PsionPluginContaminationBundle {
     /// Stable schema version.
     pub schema_version: String,
     /// Source derivation bundle ref.
@@ -118,11 +118,11 @@ pub struct TassionPluginContaminationBundle {
     /// Stable dataset identity protected by the bundle.
     pub dataset_identity: String,
     /// Parent-lineage rows across SFT and held-out eval items.
-    pub parent_lineage_rows: Vec<TassionPluginParentLineageRow>,
+    pub parent_lineage_rows: Vec<PsionPluginParentLineageRow>,
     /// Split-scoped trace-disjoint groups.
-    pub trace_disjoint_groups: Vec<TassionPluginTraceDisjointGroup>,
+    pub trace_disjoint_groups: Vec<PsionPluginTraceDisjointGroup>,
     /// Explicit plugin-aware exclusion manifest.
-    pub exclusion_manifest: TassionPluginExclusionManifest,
+    pub exclusion_manifest: PsionPluginExclusionManifest,
     /// Plain-language claim boundary for the bundle.
     pub claim_boundary: String,
     /// Short machine-readable summary.
@@ -131,16 +131,16 @@ pub struct TassionPluginContaminationBundle {
     pub bundle_digest: String,
 }
 
-impl TassionPluginContaminationBundle {
+impl PsionPluginContaminationBundle {
     /// Writes the contamination bundle to one JSON file.
     pub fn write_to_path(
         &self,
         output_path: impl AsRef<Path>,
-    ) -> Result<(), TassionPluginContaminationError> {
+    ) -> Result<(), PsionPluginContaminationError> {
         let output_path = output_path.as_ref();
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent).map_err(|error| {
-                TassionPluginContaminationError::CreateDir {
+                PsionPluginContaminationError::CreateDir {
                     path: parent.display().to_string(),
                     error,
                 }
@@ -148,7 +148,7 @@ impl TassionPluginContaminationBundle {
         }
         let json = serde_json::to_string_pretty(self)?;
         fs::write(output_path, format!("{json}\n")).map_err(|error| {
-            TassionPluginContaminationError::Write {
+            PsionPluginContaminationError::Write {
                 path: output_path.display().to_string(),
                 error,
             }
@@ -156,10 +156,10 @@ impl TassionPluginContaminationBundle {
     }
 
     /// Validates the contamination bundle.
-    pub fn validate(&self) -> Result<(), TassionPluginContaminationError> {
-        if self.schema_version != TASSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION {
-            return Err(TassionPluginContaminationError::SchemaVersionMismatch {
-                expected: String::from(TASSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION),
+    pub fn validate(&self) -> Result<(), PsionPluginContaminationError> {
+        if self.schema_version != PSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION {
+            return Err(PsionPluginContaminationError::SchemaVersionMismatch {
+                expected: String::from(PSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION),
                 actual: self.schema_version.clone(),
             });
         }
@@ -193,12 +193,12 @@ impl TassionPluginContaminationBundle {
             "contamination_bundle.bundle_digest",
         )?;
         if self.parent_lineage_rows.is_empty() {
-            return Err(TassionPluginContaminationError::MissingField {
+            return Err(PsionPluginContaminationError::MissingField {
                 field: String::from("contamination_bundle.parent_lineage_rows"),
             });
         }
         if self.trace_disjoint_groups.is_empty() {
-            return Err(TassionPluginContaminationError::MissingField {
+            return Err(PsionPluginContaminationError::MissingField {
                 field: String::from("contamination_bundle.trace_disjoint_groups"),
             });
         }
@@ -208,12 +208,12 @@ impl TassionPluginContaminationBundle {
         for row in &self.parent_lineage_rows {
             validate_lineage_row(row)?;
             if !seen_lineage_ids.insert(row.lineage_id.as_str()) {
-                return Err(TassionPluginContaminationError::DuplicateLineageId {
+                return Err(PsionPluginContaminationError::DuplicateLineageId {
                     lineage_id: row.lineage_id.clone(),
                 });
             }
             if !seen_item_refs.insert(row.item_ref.as_str()) {
-                return Err(TassionPluginContaminationError::DuplicateItemRef {
+                return Err(PsionPluginContaminationError::DuplicateItemRef {
                     item_ref: row.item_ref.clone(),
                 });
             }
@@ -225,7 +225,7 @@ impl TassionPluginContaminationBundle {
             .filter(|row| row.split_kind == DatasetSplitKind::Train)
             .collect::<Vec<_>>();
         if train_rows.is_empty() {
-            return Err(TassionPluginContaminationError::MissingField {
+            return Err(PsionPluginContaminationError::MissingField {
                 field: String::from("contamination_bundle.train_rows"),
             });
         }
@@ -235,22 +235,22 @@ impl TassionPluginContaminationBundle {
             .filter(|row| row.split_kind == DatasetSplitKind::HeldOut)
             .collect::<Vec<_>>();
         if held_out_rows.is_empty() {
-            return Err(TassionPluginContaminationError::MissingField {
+            return Err(PsionPluginContaminationError::MissingField {
                 field: String::from("contamination_bundle.held_out_rows"),
             });
         }
         if train_rows.iter().any(|row| {
-            row.item_kind != TassionPluginContaminationItemKind::SftTrainRecord
+            row.item_kind != PsionPluginContaminationItemKind::SftTrainRecord
         }) {
-            return Err(TassionPluginContaminationError::SplitKindItemKindMismatch {
+            return Err(PsionPluginContaminationError::SplitKindItemKindMismatch {
                 split_kind: String::from("train"),
                 expected_item_kind: String::from("sft_train_record"),
             });
         }
         if held_out_rows.iter().any(|row| {
-            row.item_kind != TassionPluginContaminationItemKind::HeldOutEvalRecord
+            row.item_kind != PsionPluginContaminationItemKind::HeldOutEvalRecord
         }) {
-            return Err(TassionPluginContaminationError::SplitKindItemKindMismatch {
+            return Err(PsionPluginContaminationError::SplitKindItemKindMismatch {
                 split_kind: String::from("held_out"),
                 expected_item_kind: String::from("held_out_eval_record"),
             });
@@ -259,7 +259,7 @@ impl TassionPluginContaminationBundle {
         let expected_groups =
             expected_trace_disjoint_groups(&self.parent_lineage_rows.iter().collect::<Vec<_>>());
         if self.trace_disjoint_groups != expected_groups {
-            return Err(TassionPluginContaminationError::TraceDisjointGroupDrift);
+            return Err(PsionPluginContaminationError::TraceDisjointGroupDrift);
         }
         ensure_trace_disjoint(&train_rows, &held_out_rows)?;
         self.exclusion_manifest
@@ -268,35 +268,35 @@ impl TassionPluginContaminationBundle {
     }
 }
 
-impl TassionPluginExclusionManifest {
+impl PsionPluginExclusionManifest {
     fn validate_against_rows(
         &self,
-        train_rows: &[&TassionPluginParentLineageRow],
-        held_out_rows: &[&TassionPluginParentLineageRow],
-        bundle: &TassionPluginContaminationBundle,
-    ) -> Result<(), TassionPluginContaminationError> {
-        if self.schema_version != TASSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION {
-            return Err(TassionPluginContaminationError::SchemaVersionMismatch {
-                expected: String::from(TASSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION),
+        train_rows: &[&PsionPluginParentLineageRow],
+        held_out_rows: &[&PsionPluginParentLineageRow],
+        bundle: &PsionPluginContaminationBundle,
+    ) -> Result<(), PsionPluginContaminationError> {
+        if self.schema_version != PSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION {
+            return Err(PsionPluginContaminationError::SchemaVersionMismatch {
+                expected: String::from(PSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION),
                 actual: self.schema_version.clone(),
             });
         }
         if self.source_derivation_bundle_ref != bundle.source_derivation_bundle_ref {
-            return Err(TassionPluginContaminationError::FieldMismatch {
+            return Err(PsionPluginContaminationError::FieldMismatch {
                 field: String::from("exclusion_manifest.source_derivation_bundle_ref"),
                 expected: bundle.source_derivation_bundle_ref.clone(),
                 actual: self.source_derivation_bundle_ref.clone(),
             });
         }
         if self.source_derivation_bundle_digest != bundle.source_derivation_bundle_digest {
-            return Err(TassionPluginContaminationError::FieldMismatch {
+            return Err(PsionPluginContaminationError::FieldMismatch {
                 field: String::from("exclusion_manifest.source_derivation_bundle_digest"),
                 expected: bundle.source_derivation_bundle_digest.clone(),
                 actual: self.source_derivation_bundle_digest.clone(),
             });
         }
         if self.dataset_identity != bundle.dataset_identity {
-            return Err(TassionPluginContaminationError::FieldMismatch {
+            return Err(PsionPluginContaminationError::FieldMismatch {
                 field: String::from("exclusion_manifest.dataset_identity"),
                 expected: bundle.dataset_identity.clone(),
                 actual: self.dataset_identity.clone(),
@@ -306,14 +306,14 @@ impl TassionPluginExclusionManifest {
         let expected_training_sources = unique_trace_sources(held_out_rows);
         let expected_benchmark_sources = unique_trace_sources(train_rows);
         if self.training_excluded_trace_sources != expected_training_sources {
-            return Err(TassionPluginContaminationError::FieldMismatch {
+            return Err(PsionPluginContaminationError::FieldMismatch {
                 field: String::from("exclusion_manifest.training_excluded_trace_sources"),
                 expected: String::from("held-out trace source set"),
                 actual: String::from("drifted from held-out trace source set"),
             });
         }
         if self.benchmark_excluded_trace_sources != expected_benchmark_sources {
-            return Err(TassionPluginContaminationError::FieldMismatch {
+            return Err(PsionPluginContaminationError::FieldMismatch {
                 field: String::from("exclusion_manifest.benchmark_excluded_trace_sources"),
                 expected: String::from("train trace source set"),
                 actual: String::from("drifted from train trace source set"),
@@ -323,14 +323,14 @@ impl TassionPluginExclusionManifest {
         let expected_training_receipts = unique_receipt_refs(held_out_rows);
         let expected_benchmark_receipts = unique_receipt_refs(train_rows);
         if self.training_excluded_receipt_refs != expected_training_receipts {
-            return Err(TassionPluginContaminationError::FieldMismatch {
+            return Err(PsionPluginContaminationError::FieldMismatch {
                 field: String::from("exclusion_manifest.training_excluded_receipt_refs"),
                 expected: String::from("held-out receipt ref set"),
                 actual: String::from("drifted from held-out receipt ref set"),
             });
         }
         if self.benchmark_excluded_receipt_refs != expected_benchmark_receipts {
-            return Err(TassionPluginContaminationError::FieldMismatch {
+            return Err(PsionPluginContaminationError::FieldMismatch {
                 field: String::from("exclusion_manifest.benchmark_excluded_receipt_refs"),
                 expected: String::from("train receipt ref set"),
                 actual: String::from("drifted from train receipt ref set"),
@@ -341,7 +341,7 @@ impl TassionPluginExclusionManifest {
 }
 
 #[derive(Debug, Error)]
-pub enum TassionPluginContaminationError {
+pub enum PsionPluginContaminationError {
     #[error("failed to create `{path}`: {error}")]
     CreateDir { path: String, error: std::io::Error },
     #[error("failed to write `{path}`: {error}")]
@@ -370,37 +370,37 @@ pub enum TassionPluginContaminationError {
     #[error("trace disjointness is broken: {detail}")]
     TraceDisjointnessBroken { detail: String },
     #[error(transparent)]
-    TrainingDerivation(#[from] TassionPluginTrainingDerivationError),
+    TrainingDerivation(#[from] PsionPluginTrainingDerivationError),
     #[error(transparent)]
-    ConditionedDataset(#[from] TassionPluginConditionedDatasetError),
+    ConditionedDataset(#[from] PsionPluginConditionedDatasetError),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
 }
 
 #[must_use]
-pub fn tassion_plugin_contamination_bundle_path() -> PathBuf {
-    repo_root().join(TASSION_PLUGIN_CONTAMINATION_BUNDLE_REF)
+pub fn psion_plugin_contamination_bundle_path() -> PathBuf {
+    repo_root().join(PSION_PLUGIN_CONTAMINATION_BUNDLE_REF)
 }
 
-pub fn build_tassion_plugin_contamination_bundle(
-) -> Result<TassionPluginContaminationBundle, TassionPluginContaminationError> {
-    let derivation = build_tassion_plugin_training_derivation_bundle()?;
-    let dataset = build_tassion_plugin_conditioned_dataset_bundle_from_derivation(&derivation)?;
-    build_tassion_plugin_contamination_bundle_from_inputs(&derivation, &dataset)
+pub fn build_psion_plugin_contamination_bundle(
+) -> Result<PsionPluginContaminationBundle, PsionPluginContaminationError> {
+    let derivation = build_psion_plugin_training_derivation_bundle()?;
+    let dataset = build_psion_plugin_conditioned_dataset_bundle_from_derivation(&derivation)?;
+    build_psion_plugin_contamination_bundle_from_inputs(&derivation, &dataset)
 }
 
-pub fn write_tassion_plugin_contamination_bundle(
+pub fn write_psion_plugin_contamination_bundle(
     output_path: impl AsRef<Path>,
-) -> Result<TassionPluginContaminationBundle, TassionPluginContaminationError> {
-    let bundle = build_tassion_plugin_contamination_bundle()?;
+) -> Result<PsionPluginContaminationBundle, PsionPluginContaminationError> {
+    let bundle = build_psion_plugin_contamination_bundle()?;
     bundle.write_to_path(output_path)?;
     Ok(bundle)
 }
 
-pub fn build_tassion_plugin_contamination_bundle_from_inputs(
-    derivation: &TassionPluginTrainingDerivationBundle,
-    dataset: &TassionPluginConditionedDatasetBundle,
-) -> Result<TassionPluginContaminationBundle, TassionPluginContaminationError> {
+pub fn build_psion_plugin_contamination_bundle_from_inputs(
+    derivation: &PsionPluginTrainingDerivationBundle,
+    dataset: &PsionPluginConditionedDatasetBundle,
+) -> Result<PsionPluginContaminationBundle, PsionPluginContaminationError> {
     let record_map = derivation
         .records
         .iter()
@@ -410,14 +410,14 @@ pub fn build_tassion_plugin_contamination_bundle_from_inputs(
     for split in &dataset.split_rows {
         for record in &split.records {
             let Some(parent_record) = record_map.get(record.record_id.as_str()) else {
-                return Err(TassionPluginContaminationError::FieldMismatch {
+                return Err(PsionPluginContaminationError::FieldMismatch {
                     field: format!("dataset.split_rows.{:?}.records[].record_id", split.split_kind),
                     expected: String::from("record present in derivation bundle"),
                     actual: format!("missing `{}`", record.record_id),
                 });
             };
             if parent_record.record_digest != record.record_digest {
-                return Err(TassionPluginContaminationError::FieldMismatch {
+                return Err(PsionPluginContaminationError::FieldMismatch {
                     field: format!(
                         "dataset.split_rows.{:?}.records[].record_digest",
                         split.split_kind
@@ -427,17 +427,17 @@ pub fn build_tassion_plugin_contamination_bundle_from_inputs(
                 });
             }
             let workflow_case_id = record.controller_context.workflow_case_id.clone().ok_or_else(
-                || TassionPluginContaminationError::MissingField {
+                || PsionPluginContaminationError::MissingField {
                     field: format!("lineage_row.workflow_case_id.{}", record.record_id),
                 },
             )?;
             let item_kind = match split.split_kind {
-                DatasetSplitKind::Train => TassionPluginContaminationItemKind::SftTrainRecord,
+                DatasetSplitKind::Train => PsionPluginContaminationItemKind::SftTrainRecord,
                 DatasetSplitKind::HeldOut => {
-                    TassionPluginContaminationItemKind::HeldOutEvalRecord
+                    PsionPluginContaminationItemKind::HeldOutEvalRecord
                 }
                 _ => {
-                    return Err(TassionPluginContaminationError::TraceDisjointnessBroken {
+                    return Err(PsionPluginContaminationError::TraceDisjointnessBroken {
                         detail: format!(
                             "unexpected split kind `{}` in plugin-conditioned dataset",
                             split_kind_key(split.split_kind)
@@ -445,7 +445,7 @@ pub fn build_tassion_plugin_contamination_bundle_from_inputs(
                     });
                 }
             };
-            parent_lineage_rows.push(TassionPluginParentLineageRow {
+            parent_lineage_rows.push(PsionPluginParentLineageRow {
                 lineage_id: format!(
                     "{}.{}",
                     split_kind_key(split.split_kind),
@@ -463,7 +463,7 @@ pub fn build_tassion_plugin_contamination_bundle_from_inputs(
                 training_record_digest: record.record_digest.clone(),
                 workflow_case_id,
                 controller_surface: record.controller_context.controller_surface,
-                source_trace: TassionPluginTraceSourceRef {
+                source_trace: PsionPluginTraceSourceRef {
                     source_bundle_ref: record.controller_context.source_bundle_ref.clone(),
                     source_bundle_id: record.controller_context.source_bundle_id.clone(),
                     source_bundle_digest: record.controller_context.source_bundle_digest.clone(),
@@ -494,10 +494,10 @@ pub fn build_tassion_plugin_contamination_bundle_from_inputs(
         .collect::<Vec<_>>();
     let trace_disjoint_groups =
         expected_trace_disjoint_groups(&parent_lineage_rows.iter().collect::<Vec<_>>());
-    let exclusion_manifest = TassionPluginExclusionManifest {
-        schema_version: String::from(TASSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION),
+    let exclusion_manifest = PsionPluginExclusionManifest {
+        schema_version: String::from(PSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION),
         source_derivation_bundle_ref: String::from(
-            crate::TASSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_REF,
+            crate::PSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_REF,
         ),
         source_derivation_bundle_digest: derivation.bundle_digest.clone(),
         dataset_identity: dataset.stable_dataset_identity.clone(),
@@ -509,13 +509,13 @@ pub fn build_tassion_plugin_contamination_bundle_from_inputs(
 
     let train_count = train_rows.len();
     let held_out_count = held_out_rows.len();
-    let mut bundle = TassionPluginContaminationBundle {
-        schema_version: String::from(TASSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION),
+    let mut bundle = PsionPluginContaminationBundle {
+        schema_version: String::from(PSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION),
         source_derivation_bundle_ref: String::from(
-            crate::TASSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_REF,
+            crate::PSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_REF,
         ),
         source_derivation_bundle_digest: derivation.bundle_digest.clone(),
-        dataset_bundle_ref: String::from(crate::TASSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_REF),
+        dataset_bundle_ref: String::from(crate::PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_REF),
         dataset_bundle_digest: dataset.bundle_digest.clone(),
         dataset_identity: dataset.stable_dataset_identity.clone(),
         parent_lineage_rows,
@@ -534,14 +534,14 @@ pub fn build_tassion_plugin_contamination_bundle_from_inputs(
         held_out_count,
         bundle.trace_disjoint_groups.len(),
     );
-    bundle.bundle_digest = stable_digest(b"psionic_tassion_plugin_contamination_bundle|", &bundle);
+    bundle.bundle_digest = stable_digest(b"psionic_psion_plugin_contamination_bundle|", &bundle);
     bundle.validate()?;
     Ok(bundle)
 }
 
 fn validate_lineage_row(
-    row: &TassionPluginParentLineageRow,
-) -> Result<(), TassionPluginContaminationError> {
+    row: &PsionPluginParentLineageRow,
+) -> Result<(), PsionPluginContaminationError> {
     ensure_nonempty(row.lineage_id.as_str(), "lineage_row.lineage_id")?;
     ensure_nonempty(row.item_ref.as_str(), "lineage_row.item_ref")?;
     ensure_nonempty(
@@ -574,7 +574,7 @@ fn validate_lineage_row(
     )?;
     let mut seen_receipts = BTreeSet::new();
     if row.receipt_refs.len() != row.receipt_digests.len() {
-        return Err(TassionPluginContaminationError::TraceDisjointnessBroken {
+        return Err(PsionPluginContaminationError::TraceDisjointnessBroken {
             detail: format!("receipt ref and digest counts drift for `{}`", row.lineage_id),
         });
     }
@@ -582,7 +582,7 @@ fn validate_lineage_row(
         ensure_nonempty(receipt_ref.as_str(), "lineage_row.receipt_refs[]")?;
         ensure_nonempty(receipt_digest.as_str(), "lineage_row.receipt_digests[]")?;
         if !seen_receipts.insert(receipt_ref.as_str()) {
-            return Err(TassionPluginContaminationError::TraceDisjointnessBroken {
+            return Err(PsionPluginContaminationError::TraceDisjointnessBroken {
                 detail: format!("duplicate receipt ref `{receipt_ref}` on `{}`", row.lineage_id),
             });
         }
@@ -591,9 +591,9 @@ fn validate_lineage_row(
 }
 
 fn ensure_trace_disjoint(
-    train_rows: &[&TassionPluginParentLineageRow],
-    held_out_rows: &[&TassionPluginParentLineageRow],
-) -> Result<(), TassionPluginContaminationError> {
+    train_rows: &[&PsionPluginParentLineageRow],
+    held_out_rows: &[&PsionPluginParentLineageRow],
+) -> Result<(), PsionPluginContaminationError> {
     let train_workflows = train_rows
         .iter()
         .map(|row| row.workflow_case_id.as_str())
@@ -603,7 +603,7 @@ fn ensure_trace_disjoint(
         .map(|row| row.workflow_case_id.as_str())
         .collect::<BTreeSet<_>>();
     if !train_workflows.is_disjoint(&held_out_workflows) {
-        return Err(TassionPluginContaminationError::TraceDisjointnessBroken {
+        return Err(PsionPluginContaminationError::TraceDisjointnessBroken {
             detail: String::from("train and held-out workflow case ids overlap"),
         });
     }
@@ -617,7 +617,7 @@ fn ensure_trace_disjoint(
         .map(|row| row.source_trace.source_case_id.as_str())
         .collect::<BTreeSet<_>>();
     if !train_sources.is_disjoint(&held_out_sources) {
-        return Err(TassionPluginContaminationError::TraceDisjointnessBroken {
+        return Err(PsionPluginContaminationError::TraceDisjointnessBroken {
             detail: String::from("train and held-out source case ids overlap"),
         });
     }
@@ -631,7 +631,7 @@ fn ensure_trace_disjoint(
         .flat_map(|row| row.receipt_refs.iter().map(String::as_str))
         .collect::<BTreeSet<_>>();
     if !train_receipts.is_disjoint(&held_out_receipts) {
-        return Err(TassionPluginContaminationError::TraceDisjointnessBroken {
+        return Err(PsionPluginContaminationError::TraceDisjointnessBroken {
             detail: String::from("train and held-out receipt refs overlap"),
         });
     }
@@ -639,8 +639,8 @@ fn ensure_trace_disjoint(
 }
 
 fn expected_trace_disjoint_groups(
-    rows: &[&TassionPluginParentLineageRow],
-) -> Vec<TassionPluginTraceDisjointGroup> {
+    rows: &[&PsionPluginParentLineageRow],
+) -> Vec<PsionPluginTraceDisjointGroup> {
     let mut groups = [DatasetSplitKind::HeldOut, DatasetSplitKind::Train]
         .into_iter()
         .filter_map(|split_kind| {
@@ -652,7 +652,7 @@ fn expected_trace_disjoint_groups(
             if split_rows.is_empty() {
                 return None;
             }
-            Some(TassionPluginTraceDisjointGroup {
+            Some(PsionPluginTraceDisjointGroup {
                 split_kind,
                 workflow_case_ids: split_rows
                     .iter()
@@ -686,8 +686,8 @@ fn expected_trace_disjoint_groups(
 }
 
 fn unique_trace_sources(
-    rows: &[&TassionPluginParentLineageRow],
-) -> Vec<TassionPluginTraceSourceRef> {
+    rows: &[&PsionPluginParentLineageRow],
+) -> Vec<PsionPluginTraceSourceRef> {
     rows.iter()
         .map(|row| row.source_trace.clone())
         .collect::<BTreeSet<_>>()
@@ -695,7 +695,7 @@ fn unique_trace_sources(
         .collect()
 }
 
-fn unique_receipt_refs(rows: &[&TassionPluginParentLineageRow]) -> Vec<String> {
+fn unique_receipt_refs(rows: &[&PsionPluginParentLineageRow]) -> Vec<String> {
     rows.iter()
         .flat_map(|row| row.receipt_refs.clone())
         .collect::<BTreeSet<_>>()
@@ -706,9 +706,9 @@ fn unique_receipt_refs(rows: &[&TassionPluginParentLineageRow]) -> Vec<String> {
 fn ensure_nonempty(
     value: &str,
     field: &str,
-) -> Result<(), TassionPluginContaminationError> {
+) -> Result<(), PsionPluginContaminationError> {
     if value.trim().is_empty() {
-        return Err(TassionPluginContaminationError::MissingField {
+        return Err(PsionPluginContaminationError::MissingField {
             field: String::from(field),
         });
     }
@@ -748,17 +748,17 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::{
-        TASSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION, TassionPluginContaminationError,
-        build_tassion_plugin_contamination_bundle,
+        PSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION, PsionPluginContaminationError,
+        build_psion_plugin_contamination_bundle,
     };
     use crate::DatasetSplitKind;
 
     #[test]
     fn contamination_bundle_builds() -> Result<(), Box<dyn std::error::Error>> {
-        let bundle = build_tassion_plugin_contamination_bundle()?;
+        let bundle = build_psion_plugin_contamination_bundle()?;
         assert_eq!(
             bundle.schema_version,
-            TASSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION
+            PSION_PLUGIN_CONTAMINATION_BUNDLE_SCHEMA_VERSION
         );
         assert_eq!(bundle.trace_disjoint_groups.len(), 2);
         assert!(!bundle.parent_lineage_rows.is_empty());
@@ -769,7 +769,7 @@ mod tests {
     #[test]
     fn contamination_bundle_rejects_overlapping_source_case_sets(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut bundle = build_tassion_plugin_contamination_bundle()?;
+        let mut bundle = build_psion_plugin_contamination_bundle()?;
         let train_source_case_id = bundle
             .parent_lineage_rows
             .iter()
@@ -799,7 +799,7 @@ mod tests {
             .expect_err("overlapping trace source ids should fail");
         assert!(matches!(
             error,
-            TassionPluginContaminationError::TraceDisjointnessBroken { .. }
+            PsionPluginContaminationError::TraceDisjointnessBroken { .. }
         ));
         Ok(())
     }

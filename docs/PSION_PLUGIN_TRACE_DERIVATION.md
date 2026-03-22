@@ -1,31 +1,31 @@
-# TASSION Plugin-Trace Normalization And Derivation
+# PSION Plugin-Trace Normalization And Derivation
 
-> Status: canonical `TASSION-4` derivation contract for normalizing the
+> Status: canonical `PSION_PLUGIN-4` derivation contract for normalizing the
 > committed multi-plugin trace corpus into canonical plugin-training records,
 > written 2026-03-22 after landing the first repo-owned derivation bundle in
 > `psionic-data`.
 
 This document freezes the first derivation path from real plugin-runtime traces
-to the canonical `TASSION` plugin-training record schema.
+to the canonical Psion plugin-training record schema.
 
 It does not define a second trace format.
 
 It consumes the existing lane-neutral multi-plugin trace corpus and emits the
-canonical training-record schema from `docs/TASSION_PLUGIN_TRAINING_RECORD_SCHEMA.md`.
+canonical training-record schema from `docs/PSION_PLUGIN_TRAINING_RECORD_SCHEMA.md`.
 
 ## Canonical Artifacts
 
-- `docs/TASSION_PLUGIN_TRACE_DERIVATION.md` is the canonical human-readable
+- `docs/PSION_PLUGIN_TRACE_DERIVATION.md` is the canonical human-readable
   derivation contract.
-- `crates/psionic-data/src/tassion_plugin_training_derivation.rs` owns the
+- `crates/psionic-data/src/psion_plugin_training_derivation.rs` owns the
   typed derivation bundle, runtime-drift checks, and write helpers.
-- `crates/psionic-data/examples/tassion_plugin_training_derivation.rs` writes
+- `crates/psionic-data/examples/psion_plugin_training_derivation.rs` writes
   the canonical derived bundle.
 - `docs/TASSADAR_MULTI_PLUGIN_TRACE_CORPUS.md` remains the canonical source
   corpus contract.
 
 The stable derivation bundle schema version is
-`psionic.tassion.plugin_training_derivation_bundle.v1`.
+`psionic.psion.plugin_training_derivation_bundle.v1`.
 
 ## Current Sources
 
@@ -39,7 +39,7 @@ corpus built from:
 The derivation path does not special-case those lanes into separate training
 schemas.
 
-It normalizes them into one shared `TassionPluginTrainingRecord` surface while
+It normalizes them into one shared `PsionPluginTrainingRecord` surface while
 preserving:
 
 - controller surface id
@@ -61,7 +61,7 @@ That means derivation fails closed when the source trace corpus drifts from:
 - refusal schema ids
 - replay class id
 
-This is the main guarantee of `TASSION-4`:
+This is the main guarantee of `PSION_PLUGIN-4`:
 
 the repo reuses runtime truth instead of exporting one stale controller-only
 snapshot.

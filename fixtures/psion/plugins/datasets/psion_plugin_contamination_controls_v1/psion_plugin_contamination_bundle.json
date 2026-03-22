@@ -1,18 +1,18 @@
 {
-  "schema_version": "psionic.tassion.plugin_contamination_bundle.v1",
-  "source_derivation_bundle_ref": "fixtures/tassion/datasets/tassion_plugin_training_derivation_v1/tassion_plugin_training_derivation_bundle.json",
-  "source_derivation_bundle_digest": "1509d92744576ec46e4242844b0b35ccd9ab3e05130dd50297ae721a86d78f75",
-  "dataset_bundle_ref": "fixtures/tassion/datasets/tassion_plugin_conditioned_dataset_v1/tassion_plugin_conditioned_dataset_bundle.json",
-  "dataset_bundle_digest": "897f0e57715fa903a5c6c3e1f9b026ab0c77164f40321c85d569539f156bed37",
-  "dataset_identity": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1",
+  "schema_version": "psionic.psion.plugin_contamination_bundle.v1",
+  "source_derivation_bundle_ref": "fixtures/psion/plugins/datasets/psion_plugin_training_derivation_v1/psion_plugin_training_derivation_bundle.json",
+  "source_derivation_bundle_digest": "ee0ddb7b6e959e99b5559e69ceac96d9748181ffa37c29ea8f45862163566fda",
+  "dataset_bundle_ref": "fixtures/psion/plugins/datasets/psion_plugin_conditioned_dataset_v1/psion_plugin_conditioned_dataset_bundle.json",
+  "dataset_bundle_digest": "9e4bc8b26ed7bb71a19e6f48f37904986e321d51e9af5f6282fa50e61fc821b6",
+  "dataset_identity": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1",
   "parent_lineage_rows": [
     {
-      "lineage_id": "held_out.tassion_training.trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
-      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#held_out:tassion_training.trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
+      "lineage_id": "held_out.psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
+      "item_ref": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1#held_out:psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
       "item_kind": "held_out_eval_record",
       "split_kind": "held_out",
-      "training_record_id": "tassion_training.trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
-      "training_record_digest": "fcc5fdfae602cc2eb65fc4bff43c591b5d9984edb5eebb70fa3bf8148b3c4405",
+      "training_record_id": "psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
+      "training_record_digest": "52d3615bc179e16e151ace468065aa9772864079ec3312f85eed0a591ccee071",
       "workflow_case_id": "starter_plugin.fetch_refusal.v1",
       "controller_surface": "apple_fm_session",
       "source_trace": {
@@ -31,12 +31,12 @@
       ]
     },
     {
-      "lineage_id": "held_out.tassion_training.trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
-      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#held_out:tassion_training.trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
+      "lineage_id": "held_out.psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
+      "item_ref": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1#held_out:psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
       "item_kind": "held_out_eval_record",
       "split_kind": "held_out",
-      "training_record_id": "tassion_training.trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
-      "training_record_digest": "dbd3e27b7719072664530d3fdd32f1ccdb86748d25638cf9c2e54acf67abddc5",
+      "training_record_id": "psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
+      "training_record_digest": "656761325f7cf5a9d8363611759cfdf563c207b43cdb97412892f4d5f0f9a6e7",
       "workflow_case_id": "starter_plugin.fetch_refusal.v1",
       "controller_surface": "deterministic_workflow",
       "source_trace": {
@@ -55,12 +55,12 @@
       ]
     },
     {
-      "lineage_id": "held_out.tassion_training.trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
-      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#held_out:tassion_training.trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
+      "lineage_id": "held_out.psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
+      "item_ref": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1#held_out:psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
       "item_kind": "held_out_eval_record",
       "split_kind": "held_out",
-      "training_record_id": "tassion_training.trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
-      "training_record_digest": "0efb7fda0a8cc8b14b93afc69f4cf12fbadd97149907f700299f8c84b596f942",
+      "training_record_id": "psion_plugin_training.trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
+      "training_record_digest": "bfc90e2a70ce0217fe558de291c16666fb390b73f2585fed8bd866c947838f6d",
       "workflow_case_id": "starter_plugin.fetch_refusal.v1",
       "controller_surface": "router_responses",
       "source_trace": {
@@ -79,12 +79,12 @@
       ]
     },
     {
-      "lineage_id": "train.tassion_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
-      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#train:tassion_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+      "lineage_id": "train.psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+      "item_ref": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1#train:psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
       "item_kind": "sft_train_record",
       "split_kind": "train",
-      "training_record_id": "tassion_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
-      "training_record_digest": "88912f61508d71b1654ba071e9c931d1badec7bc40400932a273b5df54e4157f",
+      "training_record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+      "training_record_digest": "b98831464f6da0aff5c0412e61f62f954cd27cbfb5a7e4b05c84ff7369ad82bc",
       "workflow_case_id": "starter_plugin.web_content_success.v1",
       "controller_surface": "apple_fm_session",
       "source_trace": {
@@ -109,12 +109,12 @@
       ]
     },
     {
-      "lineage_id": "train.tassion_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
-      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#train:tassion_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+      "lineage_id": "train.psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+      "item_ref": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1#train:psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
       "item_kind": "sft_train_record",
       "split_kind": "train",
-      "training_record_id": "tassion_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
-      "training_record_digest": "a2629fa60af9c6c2a4a2eb5ae80c599134e98ccee0ff981d947b83f9df6178e5",
+      "training_record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+      "training_record_digest": "0e2c0ad683f9b596efbd22e5c1d25e29b8660cecf0da2b597681fe01a8542190",
       "workflow_case_id": "starter_plugin.web_content_success.v1",
       "controller_surface": "deterministic_workflow",
       "source_trace": {
@@ -139,12 +139,12 @@
       ]
     },
     {
-      "lineage_id": "train.tassion_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
-      "item_ref": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1#train:tassion_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
+      "lineage_id": "train.psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
+      "item_ref": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1#train:psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
       "item_kind": "sft_train_record",
       "split_kind": "train",
-      "training_record_id": "tassion_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
-      "training_record_digest": "fa61a180b2c6bfb21071952d0d9655022e233adf30f3f66e929997d924c917ef",
+      "training_record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
+      "training_record_digest": "2131d1edb42de12c814b0ae9413875be0799cbf7e0fbf578260cc2e398c6df52",
       "workflow_case_id": "starter_plugin.web_content_success.v1",
       "controller_surface": "router_responses",
       "source_trace": {
@@ -212,10 +212,10 @@
     }
   ],
   "exclusion_manifest": {
-    "schema_version": "psionic.tassion.plugin_contamination_bundle.v1",
-    "source_derivation_bundle_ref": "fixtures/tassion/datasets/tassion_plugin_training_derivation_v1/tassion_plugin_training_derivation_bundle.json",
-    "source_derivation_bundle_digest": "1509d92744576ec46e4242844b0b35ccd9ab3e05130dd50297ae721a86d78f75",
-    "dataset_identity": "dataset://openagents/tassion/plugin_conditioned_host_native_reference@2026.03.22.v1",
+    "schema_version": "psionic.psion.plugin_contamination_bundle.v1",
+    "source_derivation_bundle_ref": "fixtures/psion/plugins/datasets/psion_plugin_training_derivation_v1/psion_plugin_training_derivation_bundle.json",
+    "source_derivation_bundle_digest": "ee0ddb7b6e959e99b5559e69ceac96d9748181ffa37c29ea8f45862163566fda",
+    "dataset_identity": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1",
     "training_excluded_trace_sources": [
       {
         "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_apple_fm_plugin_session_pilot_v1/tassadar_post_article_apple_fm_plugin_session_pilot_bundle.json",
@@ -275,5 +275,5 @@
   },
   "claim_boundary": "this bundle projects the committed plugin-conditioned derivation and dataset artifacts into one smaller contamination-review surface. It preserves parent training-record lineage, plugin-trace source identity, and plugin runtime receipt ancestry for the bounded train and held-out splits. It does not claim broader benchmark-family closure, mixed guest-artifact coverage, or universal plugin contamination rules by itself.",
   "summary": "plugin contamination bundle keeps parent_lineage_rows=6 with train_rows=3 held_out_rows=3 and trace_disjoint_groups=2.",
-  "bundle_digest": "af16df43b72d55856d840fe0c84d4de7c445ffedb83ffb7b54f352dfc1f06279"
+  "bundle_digest": "d6c6245e888e933079f2cb4d42999b9c30968f3393395ffbb337d05676b3eae6"
 }

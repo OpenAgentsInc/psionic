@@ -6,13 +6,13 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 /// Stable schema version for canonical plugin-conditioned training records.
-pub const TASSION_PLUGIN_TRAINING_RECORD_SCHEMA_VERSION: &str =
-    "psionic.tassion.plugin_training_record.v1";
+pub const PSION_PLUGIN_TRAINING_RECORD_SCHEMA_VERSION: &str =
+    "psionic.psion.plugin_training_record.v1";
 
 /// Plugin class carried through the plugin-conditioned training substrate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TassionPluginClass {
+pub enum PsionPluginClass {
     /// Host-native capability-free local deterministic plugin.
     HostNativeCapabilityFreeLocalDeterministic,
     /// Host-native networked read-only plugin.
@@ -26,7 +26,7 @@ pub enum TassionPluginClass {
 /// Controller surface that produced or anchored one training record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TassionControllerSurface {
+pub enum PsionPluginControllerSurface {
     /// Deterministic workflow controller above the starter-plugin bridge.
     DeterministicWorkflow,
     /// Router-owned `/v1/responses` plugin loop.
@@ -42,7 +42,7 @@ pub enum TassionControllerSurface {
 /// Route label carried by one plugin-conditioned training record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TassionPluginRouteLabel {
+pub enum PsionPluginRouteLabel {
     /// The learned lane should answer in language.
     AnswerInLanguage,
     /// The learned lane should delegate to an admitted plugin.
@@ -56,7 +56,7 @@ pub enum TassionPluginRouteLabel {
 /// Outcome label carried by one plugin-conditioned training record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TassionPluginOutcomeLabel {
+pub enum PsionPluginOutcomeLabel {
     /// The record completed successfully.
     CompletedSuccess,
     /// Runtime returned a typed refusal.
@@ -72,7 +72,7 @@ pub enum TassionPluginOutcomeLabel {
 /// Invocation result state attached to one plugin invocation row.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TassionPluginInvocationStatus {
+pub enum PsionPluginInvocationStatus {
     /// Invocation completed successfully.
     Success,
     /// Invocation completed with a typed runtime refusal.
@@ -83,13 +83,13 @@ pub enum TassionPluginInvocationStatus {
 
 /// One admitted plugin row carried on a canonical training record.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassionAdmittedPluginRecord {
+pub struct PsionPluginAdmittedPluginRecord {
     /// Stable plugin identifier.
     pub plugin_id: String,
     /// Stable tool name projected through the shared bridge.
     pub tool_name: String,
     /// Plugin class carried by the current convergence posture.
-    pub plugin_class: TassionPluginClass,
+    pub plugin_class: PsionPluginClass,
     /// Runtime capability class.
     pub capability_class: String,
     /// Runtime origin class.
@@ -106,9 +106,9 @@ pub struct TassionAdmittedPluginRecord {
 
 /// One controller provenance block attached to a training record.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassionControllerContext {
+pub struct PsionPluginControllerContext {
     /// Controller surface that produced or anchored the record.
-    pub controller_surface: TassionControllerSurface,
+    pub controller_surface: PsionPluginControllerSurface,
     /// Stable source bundle ref.
     pub source_bundle_ref: String,
     /// Stable source bundle identifier.
@@ -126,7 +126,7 @@ pub struct TassionControllerContext {
 
 /// One receipt-backed plugin invocation row attached to a training record.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct TassionPluginInvocationRecord {
+pub struct PsionPluginInvocationRecord {
     /// Stable invocation identifier.
     pub invocation_id: String,
     /// Stable controller decision reference.
@@ -142,7 +142,7 @@ pub struct TassionPluginInvocationRecord {
     /// Stable runtime receipt digest.
     pub receipt_digest: String,
     /// Receipt-backed invocation status.
-    pub status: TassionPluginInvocationStatus,
+    pub status: PsionPluginInvocationStatus,
     /// Result payload returned on successful invocation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result_payload: Option<Value>,
@@ -155,7 +155,7 @@ pub struct TassionPluginInvocationRecord {
 
 /// Canonical plugin-conditioned training record.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct TassionPluginTrainingRecord {
+pub struct PsionPluginTrainingRecord {
     /// Stable schema version.
     pub schema_version: String,
     /// Stable record identifier.
@@ -163,15 +163,15 @@ pub struct TassionPluginTrainingRecord {
     /// Task prompt or directive text.
     pub directive_text: String,
     /// Explicit admitted plugin set for the task.
-    pub admitted_plugins: Vec<TassionAdmittedPluginRecord>,
+    pub admitted_plugins: Vec<PsionPluginAdmittedPluginRecord>,
     /// Controller provenance and source bundle identity.
-    pub controller_context: TassionControllerContext,
+    pub controller_context: PsionPluginControllerContext,
     /// Receipt-backed plugin invocation rows.
-    pub plugin_invocations: Vec<TassionPluginInvocationRecord>,
+    pub plugin_invocations: Vec<PsionPluginInvocationRecord>,
     /// Route label for the task.
-    pub route_label: TassionPluginRouteLabel,
+    pub route_label: PsionPluginRouteLabel,
     /// Outcome label for the task.
-    pub outcome_label: TassionPluginOutcomeLabel,
+    pub outcome_label: PsionPluginOutcomeLabel,
     /// Optional final response text preserved for success cases.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub final_response_text: Option<String>,
@@ -181,21 +181,21 @@ pub struct TassionPluginTrainingRecord {
     pub record_digest: String,
 }
 
-impl TassionPluginTrainingRecord {
+impl PsionPluginTrainingRecord {
     /// Creates and validates one canonical plugin-conditioned training record.
     pub fn new(
         record_id: impl Into<String>,
         directive_text: impl Into<String>,
-        admitted_plugins: Vec<TassionAdmittedPluginRecord>,
-        controller_context: TassionControllerContext,
-        plugin_invocations: Vec<TassionPluginInvocationRecord>,
-        route_label: TassionPluginRouteLabel,
-        outcome_label: TassionPluginOutcomeLabel,
+        admitted_plugins: Vec<PsionPluginAdmittedPluginRecord>,
+        controller_context: PsionPluginControllerContext,
+        plugin_invocations: Vec<PsionPluginInvocationRecord>,
+        route_label: PsionPluginRouteLabel,
+        outcome_label: PsionPluginOutcomeLabel,
         final_response_text: Option<String>,
         detail: impl Into<String>,
-    ) -> Result<Self, TassionPluginTrainingRecordError> {
+    ) -> Result<Self, PsionPluginTrainingRecordError> {
         let mut record = Self {
-            schema_version: String::from(TASSION_PLUGIN_TRAINING_RECORD_SCHEMA_VERSION),
+            schema_version: String::from(PSION_PLUGIN_TRAINING_RECORD_SCHEMA_VERSION),
             record_id: record_id.into(),
             directive_text: directive_text.into(),
             admitted_plugins,
@@ -213,14 +213,14 @@ impl TassionPluginTrainingRecord {
     }
 
     /// Validates the canonical training record.
-    pub fn validate(&self) -> Result<(), TassionPluginTrainingRecordError> {
+    pub fn validate(&self) -> Result<(), PsionPluginTrainingRecordError> {
         ensure_nonempty(
             self.schema_version.as_str(),
             "training_record.schema_version",
         )?;
-        if self.schema_version != TASSION_PLUGIN_TRAINING_RECORD_SCHEMA_VERSION {
-            return Err(TassionPluginTrainingRecordError::SchemaVersionMismatch {
-                expected: String::from(TASSION_PLUGIN_TRAINING_RECORD_SCHEMA_VERSION),
+        if self.schema_version != PSION_PLUGIN_TRAINING_RECORD_SCHEMA_VERSION {
+            return Err(PsionPluginTrainingRecordError::SchemaVersionMismatch {
+                expected: String::from(PSION_PLUGIN_TRAINING_RECORD_SCHEMA_VERSION),
                 actual: self.schema_version.clone(),
             });
         }
@@ -233,7 +233,7 @@ impl TassionPluginTrainingRecord {
         validate_controller_context(&self.controller_context)?;
 
         if self.admitted_plugins.is_empty() {
-            return Err(TassionPluginTrainingRecordError::MissingField {
+            return Err(PsionPluginTrainingRecordError::MissingField {
                 field: String::from("training_record.admitted_plugins"),
             });
         }
@@ -243,14 +243,14 @@ impl TassionPluginTrainingRecord {
             validate_admitted_plugin(plugin)?;
             if !seen_plugin_ids.insert(plugin.plugin_id.as_str()) {
                 return Err(
-                    TassionPluginTrainingRecordError::DuplicateAdmittedPluginId {
+                    PsionPluginTrainingRecordError::DuplicateAdmittedPluginId {
                         plugin_id: plugin.plugin_id.clone(),
                     },
                 );
             }
             if !seen_tool_names.insert(plugin.tool_name.as_str()) {
                 return Err(
-                    TassionPluginTrainingRecordError::DuplicateAdmittedToolName {
+                    PsionPluginTrainingRecordError::DuplicateAdmittedToolName {
                         tool_name: plugin.tool_name.clone(),
                     },
                 );
@@ -259,11 +259,11 @@ impl TassionPluginTrainingRecord {
 
         if matches!(
             self.route_label,
-            TassionPluginRouteLabel::DelegateToAdmittedPlugin
+            PsionPluginRouteLabel::DelegateToAdmittedPlugin
         ) && self.plugin_invocations.is_empty()
         {
             return Err(
-                TassionPluginTrainingRecordError::MissingInvocationRowsForDelegation {
+                PsionPluginTrainingRecordError::MissingInvocationRowsForDelegation {
                     record_id: self.record_id.clone(),
                 },
             );
@@ -273,7 +273,7 @@ impl TassionPluginTrainingRecord {
         for invocation in &self.plugin_invocations {
             validate_invocation_row(invocation)?;
             if !seen_invocations.insert(invocation.invocation_id.as_str()) {
-                return Err(TassionPluginTrainingRecordError::DuplicateInvocationId {
+                return Err(PsionPluginTrainingRecordError::DuplicateInvocationId {
                     invocation_id: invocation.invocation_id.clone(),
                 });
             }
@@ -282,13 +282,13 @@ impl TassionPluginTrainingRecord {
                 .iter()
                 .find(|plugin| plugin.plugin_id == invocation.plugin_id)
                 .ok_or_else(|| {
-                    TassionPluginTrainingRecordError::InvocationTargetsUnknownPlugin {
+                    PsionPluginTrainingRecordError::InvocationTargetsUnknownPlugin {
                         invocation_id: invocation.invocation_id.clone(),
                         plugin_id: invocation.plugin_id.clone(),
                     }
                 })?;
             if admitted_plugin.tool_name != invocation.tool_name {
-                return Err(TassionPluginTrainingRecordError::FieldMismatch {
+                return Err(PsionPluginTrainingRecordError::FieldMismatch {
                     field: format!(
                         "training_record.plugin_invocations[{}].tool_name",
                         invocation.invocation_id
@@ -304,7 +304,7 @@ impl TassionPluginTrainingRecord {
                     .any(|schema_id| schema_id == refusal_schema_id)
                 {
                     return Err(
-                        TassionPluginTrainingRecordError::UnknownInvocationRefusalSchema {
+                        PsionPluginTrainingRecordError::UnknownInvocationRefusalSchema {
                             invocation_id: invocation.invocation_id.clone(),
                             refusal_schema_id: refusal_schema_id.clone(),
                         },
@@ -314,9 +314,9 @@ impl TassionPluginTrainingRecord {
         }
 
         match self.outcome_label {
-            TassionPluginOutcomeLabel::CompletedSuccess => {
+            PsionPluginOutcomeLabel::CompletedSuccess => {
                 let final_text = self.final_response_text.as_deref().ok_or_else(|| {
-                    TassionPluginTrainingRecordError::MissingField {
+                    PsionPluginTrainingRecordError::MissingField {
                         field: String::from("training_record.final_response_text"),
                     }
                 })?;
@@ -337,13 +337,13 @@ impl TassionPluginTrainingRecord {
     pub fn stable_digest(&self) -> String {
         let mut digest_record = self.clone();
         digest_record.record_digest.clear();
-        stable_digest(b"psionic_tassion_plugin_training_record|", &digest_record)
+        stable_digest(b"psionic_psion_plugin_training_record|", &digest_record)
     }
 }
 
 /// Validation failure for one canonical plugin-conditioned training record.
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
-pub enum TassionPluginTrainingRecordError {
+pub enum PsionPluginTrainingRecordError {
     #[error("field `{field}` is missing")]
     MissingField { field: String },
     #[error("expected schema version `{expected}`, found `{actual}`")]
@@ -377,8 +377,8 @@ pub enum TassionPluginTrainingRecordError {
 }
 
 fn validate_admitted_plugin(
-    plugin: &TassionAdmittedPluginRecord,
-) -> Result<(), TassionPluginTrainingRecordError> {
+    plugin: &PsionPluginAdmittedPluginRecord,
+) -> Result<(), PsionPluginTrainingRecordError> {
     ensure_nonempty(
         plugin.plugin_id.as_str(),
         "training_record.admitted_plugins[].plugin_id",
@@ -408,7 +408,7 @@ fn validate_admitted_plugin(
         "training_record.admitted_plugins[].replay_class_id",
     )?;
     if plugin.refusal_schema_ids.is_empty() {
-        return Err(TassionPluginTrainingRecordError::MissingField {
+        return Err(PsionPluginTrainingRecordError::MissingField {
             field: String::from("training_record.admitted_plugins[].refusal_schema_ids"),
         });
     }
@@ -419,7 +419,7 @@ fn validate_admitted_plugin(
             "training_record.admitted_plugins[].refusal_schema_ids[]",
         )?;
         if !seen_refusal_schema_ids.insert(refusal_schema_id.as_str()) {
-            return Err(TassionPluginTrainingRecordError::FieldMismatch {
+            return Err(PsionPluginTrainingRecordError::FieldMismatch {
                 field: String::from("training_record.admitted_plugins[].refusal_schema_ids"),
                 expected: String::from("unique refusal schema ids"),
                 actual: refusal_schema_id.clone(),
@@ -430,8 +430,8 @@ fn validate_admitted_plugin(
 }
 
 fn validate_controller_context(
-    context: &TassionControllerContext,
-) -> Result<(), TassionPluginTrainingRecordError> {
+    context: &PsionPluginControllerContext,
+) -> Result<(), PsionPluginTrainingRecordError> {
     ensure_nonempty(
         context.source_bundle_ref.as_str(),
         "training_record.controller_context.source_bundle_ref",
@@ -462,8 +462,8 @@ fn validate_controller_context(
 }
 
 fn validate_invocation_row(
-    invocation: &TassionPluginInvocationRecord,
-) -> Result<(), TassionPluginTrainingRecordError> {
+    invocation: &PsionPluginInvocationRecord,
+) -> Result<(), PsionPluginTrainingRecordError> {
     ensure_nonempty(
         invocation.invocation_id.as_str(),
         "training_record.plugin_invocations[].invocation_id",
@@ -501,9 +501,9 @@ fn validate_invocation_row(
     Ok(())
 }
 
-fn ensure_nonempty(value: &str, field: &str) -> Result<(), TassionPluginTrainingRecordError> {
+fn ensure_nonempty(value: &str, field: &str) -> Result<(), PsionPluginTrainingRecordError> {
     if value.trim().is_empty() {
-        return Err(TassionPluginTrainingRecordError::MissingField {
+        return Err(PsionPluginTrainingRecordError::MissingField {
             field: String::from(field),
         });
     }
@@ -522,11 +522,11 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 mod tests {
     use super::*;
 
-    fn admitted_plugin(plugin_id: &str, tool_name: &str) -> TassionAdmittedPluginRecord {
-        TassionAdmittedPluginRecord {
+    fn admitted_plugin(plugin_id: &str, tool_name: &str) -> PsionPluginAdmittedPluginRecord {
+        PsionPluginAdmittedPluginRecord {
             plugin_id: String::from(plugin_id),
             tool_name: String::from(tool_name),
-            plugin_class: TassionPluginClass::HostNativeCapabilityFreeLocalDeterministic,
+            plugin_class: PsionPluginClass::HostNativeCapabilityFreeLocalDeterministic,
             capability_class: String::from("local_deterministic_text"),
             origin_class: String::from("host_native"),
             input_schema_id: format!("{plugin_id}.input.v1"),
@@ -536,9 +536,9 @@ mod tests {
         }
     }
 
-    fn controller_context() -> TassionControllerContext {
-        TassionControllerContext {
-            controller_surface: TassionControllerSurface::DeterministicWorkflow,
+    fn controller_context() -> PsionPluginControllerContext {
+        PsionPluginControllerContext {
+            controller_surface: PsionPluginControllerSurface::DeterministicWorkflow,
             source_bundle_ref: String::from("fixtures/tassadar/example_bundle.json"),
             source_bundle_id: String::from("bundle.example.v1"),
             source_bundle_digest: String::from("bundle_digest"),
@@ -548,8 +548,8 @@ mod tests {
         }
     }
 
-    fn invocation(plugin_id: &str, tool_name: &str) -> TassionPluginInvocationRecord {
-        TassionPluginInvocationRecord {
+    fn invocation(plugin_id: &str, tool_name: &str) -> PsionPluginInvocationRecord {
+        PsionPluginInvocationRecord {
             invocation_id: String::from("invoke_a"),
             decision_ref: String::from("decision_a"),
             plugin_id: String::from(plugin_id),
@@ -557,7 +557,7 @@ mod tests {
             arguments: serde_json::json!({"text": "hello"}),
             receipt_ref: String::from("receipt_a"),
             receipt_digest: String::from("receipt_digest"),
-            status: TassionPluginInvocationStatus::Success,
+            status: PsionPluginInvocationStatus::Success,
             result_payload: Some(serde_json::json!({"words": 1})),
             refusal_schema_id: None,
             detail: String::from("successful invocation"),
@@ -566,14 +566,14 @@ mod tests {
 
     #[test]
     fn training_record_validates() {
-        let record = TassionPluginTrainingRecord::new(
+        let record = PsionPluginTrainingRecord::new(
             "record_a",
             "Count the words in this text.",
             vec![admitted_plugin("plugin.text.stats", "plugin_text_stats")],
             controller_context(),
             vec![invocation("plugin.text.stats", "plugin_text_stats")],
-            TassionPluginRouteLabel::DelegateToAdmittedPlugin,
-            TassionPluginOutcomeLabel::CompletedSuccess,
+            PsionPluginRouteLabel::DelegateToAdmittedPlugin,
+            PsionPluginOutcomeLabel::CompletedSuccess,
             Some(String::from("The text contains one word.")),
             "delegation over admitted plugin",
         )
@@ -583,21 +583,21 @@ mod tests {
 
     #[test]
     fn delegation_requires_invocation_rows() {
-        let error = TassionPluginTrainingRecord::new(
+        let error = PsionPluginTrainingRecord::new(
             "record_a",
             "Count the words in this text.",
             vec![admitted_plugin("plugin.text.stats", "plugin_text_stats")],
             controller_context(),
             Vec::new(),
-            TassionPluginRouteLabel::DelegateToAdmittedPlugin,
-            TassionPluginOutcomeLabel::CompletedSuccess,
+            PsionPluginRouteLabel::DelegateToAdmittedPlugin,
+            PsionPluginOutcomeLabel::CompletedSuccess,
             Some(String::from("The text contains one word.")),
             "delegation over admitted plugin",
         )
         .expect_err("delegation should require invocation rows");
         assert_eq!(
             error,
-            TassionPluginTrainingRecordError::MissingInvocationRowsForDelegation {
+            PsionPluginTrainingRecordError::MissingInvocationRowsForDelegation {
                 record_id: String::from("record_a")
             }
         );
@@ -605,7 +605,7 @@ mod tests {
 
     #[test]
     fn invocation_must_target_admitted_plugin() {
-        let error = TassionPluginTrainingRecord::new(
+        let error = PsionPluginTrainingRecord::new(
             "record_a",
             "Count the words in this text.",
             vec![admitted_plugin("plugin.text.stats", "plugin_text_stats")],
@@ -614,15 +614,15 @@ mod tests {
                 "plugin.http.fetch_text",
                 "plugin_http_fetch_text",
             )],
-            TassionPluginRouteLabel::DelegateToAdmittedPlugin,
-            TassionPluginOutcomeLabel::CompletedSuccess,
+            PsionPluginRouteLabel::DelegateToAdmittedPlugin,
+            PsionPluginOutcomeLabel::CompletedSuccess,
             Some(String::from("The text contains one word.")),
             "delegation over admitted plugin",
         )
         .expect_err("invocation should target admitted plugin");
         assert_eq!(
             error,
-            TassionPluginTrainingRecordError::InvocationTargetsUnknownPlugin {
+            PsionPluginTrainingRecordError::InvocationTargetsUnknownPlugin {
                 invocation_id: String::from("invoke_a"),
                 plugin_id: String::from("plugin.http.fetch_text")
             }

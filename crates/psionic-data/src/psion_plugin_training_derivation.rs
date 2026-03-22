@@ -13,30 +13,30 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    TassionAdmittedPluginRecord, TassionControllerContext, TassionControllerSurface,
-    TassionPluginClass, TassionPluginInvocationRecord, TassionPluginInvocationStatus,
-    TassionPluginOutcomeLabel, TassionPluginRouteLabel, TassionPluginTrainingRecord,
+    PsionPluginAdmittedPluginRecord, PsionPluginControllerContext, PsionPluginControllerSurface,
+    PsionPluginClass, PsionPluginInvocationRecord, PsionPluginInvocationStatus,
+    PsionPluginOutcomeLabel, PsionPluginRouteLabel, PsionPluginTrainingRecord,
     TassadarMultiPluginTraceCorpusBundle, TassadarMultiPluginTraceCorpusError,
     TassadarMultiPluginTraceRecord, tassadar_multi_plugin_trace_corpus_bundle_path,
 };
 
 /// Stable schema version for the canonical plugin-trace derivation bundle.
-pub const TASSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_SCHEMA_VERSION: &str =
-    "psionic.tassion.plugin_training_derivation_bundle.v1";
+pub const PSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_SCHEMA_VERSION: &str =
+    "psionic.psion.plugin_training_derivation_bundle.v1";
 /// Canonical committed output ref for the derivation bundle.
-pub const TASSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_REF: &str =
-    "fixtures/tassion/datasets/tassion_plugin_training_derivation_v1/tassion_plugin_training_derivation_bundle.json";
+pub const PSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_REF: &str =
+    "fixtures/psion/plugins/datasets/psion_plugin_training_derivation_v1/psion_plugin_training_derivation_bundle.json";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassionControllerSurfaceCountRow {
+pub struct PsionPluginControllerSurfaceCountRow {
     /// Controller surface represented in the derived records.
-    pub controller_surface: TassionControllerSurface,
+    pub controller_surface: PsionPluginControllerSurface,
     /// Number of source trace records normalized for the surface.
     pub source_record_count: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct TassionPluginTrainingDerivationBundle {
+pub struct PsionPluginTrainingDerivationBundle {
     /// Stable schema version.
     pub schema_version: String,
     /// Stable derivation bundle identifier.
@@ -46,9 +46,9 @@ pub struct TassionPluginTrainingDerivationBundle {
     /// Stable source corpus digest.
     pub source_corpus_digest: String,
     /// Per-surface source-record counts.
-    pub controller_surface_counts: Vec<TassionControllerSurfaceCountRow>,
+    pub controller_surface_counts: Vec<PsionPluginControllerSurfaceCountRow>,
     /// Derived canonical plugin-training records.
-    pub records: Vec<TassionPluginTrainingRecord>,
+    pub records: Vec<PsionPluginTrainingRecord>,
     /// Plain-language claim boundary for the derivation bundle.
     pub claim_boundary: String,
     /// Short machine-readable summary.
@@ -57,16 +57,16 @@ pub struct TassionPluginTrainingDerivationBundle {
     pub bundle_digest: String,
 }
 
-impl TassionPluginTrainingDerivationBundle {
+impl PsionPluginTrainingDerivationBundle {
     /// Writes the derivation bundle to one JSON file.
     pub fn write_to_path(
         &self,
         output_path: impl AsRef<Path>,
-    ) -> Result<(), TassionPluginTrainingDerivationError> {
+    ) -> Result<(), PsionPluginTrainingDerivationError> {
         let output_path = output_path.as_ref();
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent).map_err(|error| {
-                TassionPluginTrainingDerivationError::CreateDir {
+                PsionPluginTrainingDerivationError::CreateDir {
                     path: parent.display().to_string(),
                     error,
                 }
@@ -74,7 +74,7 @@ impl TassionPluginTrainingDerivationBundle {
         }
         let json = serde_json::to_string_pretty(self)?;
         fs::write(output_path, format!("{json}\n")).map_err(|error| {
-            TassionPluginTrainingDerivationError::Write {
+            PsionPluginTrainingDerivationError::Write {
                 path: output_path.display().to_string(),
                 error,
             }
@@ -83,7 +83,7 @@ impl TassionPluginTrainingDerivationBundle {
 }
 
 #[derive(Debug, Error)]
-pub enum TassionPluginTrainingDerivationError {
+pub enum PsionPluginTrainingDerivationError {
     #[error("failed to create `{path}`: {error}")]
     CreateDir { path: String, error: std::io::Error },
     #[error("failed to read `{path}`: {error}")]
@@ -106,33 +106,33 @@ pub enum TassionPluginTrainingDerivationError {
     #[error(transparent)]
     TraceCorpus(#[from] TassadarMultiPluginTraceCorpusError),
     #[error(transparent)]
-    TrainingRecord(#[from] crate::TassionPluginTrainingRecordError),
+    TrainingRecord(#[from] crate::PsionPluginTrainingRecordError),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
 }
 
 #[must_use]
-pub fn tassion_plugin_training_derivation_bundle_path() -> PathBuf {
-    repo_root().join(TASSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_REF)
+pub fn psion_plugin_training_derivation_bundle_path() -> PathBuf {
+    repo_root().join(PSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_REF)
 }
 
-pub fn build_tassion_plugin_training_derivation_bundle(
-) -> Result<TassionPluginTrainingDerivationBundle, TassionPluginTrainingDerivationError> {
+pub fn build_psion_plugin_training_derivation_bundle(
+) -> Result<PsionPluginTrainingDerivationBundle, PsionPluginTrainingDerivationError> {
     let corpus = load_committed_tassadar_multi_plugin_trace_corpus_bundle()?;
-    build_tassion_plugin_training_derivation_bundle_from_corpus(&corpus)
+    build_psion_plugin_training_derivation_bundle_from_corpus(&corpus)
 }
 
-pub fn write_tassion_plugin_training_derivation_bundle(
+pub fn write_psion_plugin_training_derivation_bundle(
     output_path: impl AsRef<Path>,
-) -> Result<TassionPluginTrainingDerivationBundle, TassionPluginTrainingDerivationError> {
-    let bundle = build_tassion_plugin_training_derivation_bundle()?;
+) -> Result<PsionPluginTrainingDerivationBundle, PsionPluginTrainingDerivationError> {
+    let bundle = build_psion_plugin_training_derivation_bundle()?;
     bundle.write_to_path(output_path)?;
     Ok(bundle)
 }
 
-pub fn build_tassion_plugin_training_derivation_bundle_from_corpus(
+pub fn build_psion_plugin_training_derivation_bundle_from_corpus(
     corpus: &TassadarMultiPluginTraceCorpusBundle,
-) -> Result<TassionPluginTrainingDerivationBundle, TassionPluginTrainingDerivationError> {
+) -> Result<PsionPluginTrainingDerivationBundle, PsionPluginTrainingDerivationError> {
     let mut records = corpus
         .trace_records
         .iter()
@@ -148,15 +148,15 @@ pub fn build_tassion_plugin_training_derivation_bundle_from_corpus(
     }
     let controller_surface_counts = count_by_surface
         .into_iter()
-        .map(|(controller_surface, source_record_count)| TassionControllerSurfaceCountRow {
+        .map(|(controller_surface, source_record_count)| PsionPluginControllerSurfaceCountRow {
             controller_surface,
             source_record_count,
         })
         .collect::<Vec<_>>();
 
-    let mut bundle = TassionPluginTrainingDerivationBundle {
-        schema_version: String::from(TASSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_SCHEMA_VERSION),
-        bundle_id: String::from("tassion.plugin_training_derivation.bundle.v1"),
+    let mut bundle = PsionPluginTrainingDerivationBundle {
+        schema_version: String::from(PSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_SCHEMA_VERSION),
+        bundle_id: String::from("psion.plugin_training_derivation.bundle.v1"),
         source_corpus_ref: String::from(crate::TASSADAR_MULTI_PLUGIN_TRACE_CORPUS_BUNDLE_REF),
         source_corpus_digest: corpus.bundle_digest.clone(),
         controller_surface_counts,
@@ -174,7 +174,7 @@ pub fn build_tassion_plugin_training_derivation_bundle_from_corpus(
         bundle.controller_surface_counts.len(),
     );
     bundle.bundle_digest = stable_digest(
-        b"psionic_tassion_plugin_training_derivation_bundle|",
+        b"psionic_psion_plugin_training_derivation_bundle|",
         &bundle,
     );
     Ok(bundle)
@@ -182,7 +182,7 @@ pub fn build_tassion_plugin_training_derivation_bundle_from_corpus(
 
 fn derive_training_record(
     trace_record: &TassadarMultiPluginTraceRecord,
-) -> Result<TassionPluginTrainingRecord, TassionPluginTrainingDerivationError> {
+) -> Result<PsionPluginTrainingRecord, PsionPluginTrainingDerivationError> {
     let controller_surface = map_controller_surface(
         trace_record.lane_id.as_str(),
         trace_record.record_id.as_str(),
@@ -192,7 +192,7 @@ fn derive_training_record(
         .iter()
         .map(|row| {
             let registration = starter_plugin_registration_by_tool_name(row.tool_name.as_str())
-                .ok_or_else(|| TassionPluginTrainingDerivationError::UnknownToolRegistration {
+                .ok_or_else(|| PsionPluginTrainingDerivationError::UnknownToolRegistration {
                     tool_name: row.tool_name.clone(),
                 })?;
             check_match(
@@ -219,14 +219,14 @@ fn derive_training_record(
                 .map(|schema_id| String::from(*schema_id))
                 .collect::<Vec<_>>();
             if row.refusal_schema_ids != expected_refusal_schema_ids {
-                return Err(TassionPluginTrainingDerivationError::TraceSchemaDrift {
+                return Err(PsionPluginTrainingDerivationError::TraceSchemaDrift {
                     tool_name: row.tool_name.clone(),
                     field: String::from("refusal_schema_ids"),
                     expected: format!("{expected_refusal_schema_ids:?}"),
                     actual: format!("{:?}", row.refusal_schema_ids),
                 });
             }
-            Ok(TassionAdmittedPluginRecord {
+            Ok(PsionPluginAdmittedPluginRecord {
                 plugin_id: row.plugin_id.clone(),
                 tool_name: row.tool_name.clone(),
                 plugin_class: map_plugin_class(registration.authoring_class),
@@ -246,17 +246,17 @@ fn derive_training_record(
         .map(|step| {
             let (status, result_payload, refusal_schema_id) = match step.projected_result.status {
                 StarterPluginInvocationStatus::Success => (
-                    TassionPluginInvocationStatus::Success,
+                    PsionPluginInvocationStatus::Success,
                     Some(step.projected_result.structured_payload.clone()),
                     None,
                 ),
                 StarterPluginInvocationStatus::Refusal => (
-                    TassionPluginInvocationStatus::TypedRefusal,
+                    PsionPluginInvocationStatus::TypedRefusal,
                     None,
                     Some(step.projected_result.output_or_refusal_schema_id.clone()),
                 ),
             };
-            Ok(TassionPluginInvocationRecord {
+            Ok(PsionPluginInvocationRecord {
                 invocation_id: format!("{}.invoke.{}", trace_record.record_id, step.step_index),
                 decision_ref: step.decision_ref.clone(),
                 plugin_id: step.plugin_id.clone(),
@@ -270,34 +270,34 @@ fn derive_training_record(
                 detail: step.detail.clone(),
             })
         })
-        .collect::<Result<Vec<_>, TassionPluginTrainingDerivationError>>()?;
+        .collect::<Result<Vec<_>, PsionPluginTrainingDerivationError>>()?;
 
     let route_label = if !plugin_invocations.is_empty() {
-        TassionPluginRouteLabel::DelegateToAdmittedPlugin
+        PsionPluginRouteLabel::DelegateToAdmittedPlugin
     } else if trace_record.typed_refusal_preserved {
-        TassionPluginRouteLabel::RefuseUnsupportedPluginOrCapability
+        PsionPluginRouteLabel::RefuseUnsupportedPluginOrCapability
     } else {
-        TassionPluginRouteLabel::AnswerInLanguage
+        PsionPluginRouteLabel::AnswerInLanguage
     };
     let outcome_label = if plugin_invocations
         .iter()
-        .any(|invocation| invocation.status == TassionPluginInvocationStatus::TypedRefusal)
+        .any(|invocation| invocation.status == PsionPluginInvocationStatus::TypedRefusal)
         || trace_record.typed_refusal_preserved
     {
-        TassionPluginOutcomeLabel::TypedRuntimeRefusal
+        PsionPluginOutcomeLabel::TypedRuntimeRefusal
     } else {
-        TassionPluginOutcomeLabel::CompletedSuccess
+        PsionPluginOutcomeLabel::CompletedSuccess
     };
     let final_response_text = if trace_record.final_message_text.trim().is_empty() {
         None
     } else {
         Some(trace_record.final_message_text.clone())
     };
-    TassionPluginTrainingRecord::new(
-        format!("tassion_training.{}", trace_record.record_id),
+    PsionPluginTrainingRecord::new(
+        format!("psion_plugin_training.{}", trace_record.record_id),
         trace_record.directive_text.clone(),
         admitted_plugins,
-        TassionControllerContext {
+        PsionPluginControllerContext {
             controller_surface,
             source_bundle_ref: trace_record.source_bundle_ref.clone(),
             source_bundle_id: trace_record.source_bundle_id.clone(),
@@ -312,31 +312,31 @@ fn derive_training_record(
         final_response_text,
         trace_record.detail.clone(),
     )
-    .map_err(TassionPluginTrainingDerivationError::from)
+    .map_err(PsionPluginTrainingDerivationError::from)
 }
 
 fn map_controller_surface(
     lane_id: &str,
     record_id: &str,
-) -> Result<TassionControllerSurface, TassionPluginTrainingDerivationError> {
+) -> Result<PsionPluginControllerSurface, PsionPluginTrainingDerivationError> {
     match lane_id {
-        "deterministic_workflow" => Ok(TassionControllerSurface::DeterministicWorkflow),
-        "router_responses" => Ok(TassionControllerSurface::RouterResponses),
-        "apple_fm_session" => Ok(TassionControllerSurface::AppleFmSession),
-        _ => Err(TassionPluginTrainingDerivationError::UnknownControllerLane {
+        "deterministic_workflow" => Ok(PsionPluginControllerSurface::DeterministicWorkflow),
+        "router_responses" => Ok(PsionPluginControllerSurface::RouterResponses),
+        "apple_fm_session" => Ok(PsionPluginControllerSurface::AppleFmSession),
+        _ => Err(PsionPluginTrainingDerivationError::UnknownControllerLane {
             lane_id: String::from(lane_id),
             record_id: String::from(record_id),
         }),
     }
 }
 
-fn map_plugin_class(authoring_class: StarterPluginAuthoringClass) -> TassionPluginClass {
+fn map_plugin_class(authoring_class: StarterPluginAuthoringClass) -> PsionPluginClass {
     match authoring_class {
         StarterPluginAuthoringClass::CapabilityFreeLocalDeterministic => {
-            TassionPluginClass::HostNativeCapabilityFreeLocalDeterministic
+            PsionPluginClass::HostNativeCapabilityFreeLocalDeterministic
         }
         StarterPluginAuthoringClass::NetworkedReadOnly => {
-            TassionPluginClass::HostNativeNetworkedReadOnly
+            PsionPluginClass::HostNativeNetworkedReadOnly
         }
     }
 }
@@ -360,9 +360,9 @@ fn check_match(
     field: &str,
     expected: &str,
     actual: &str,
-) -> Result<(), TassionPluginTrainingDerivationError> {
+) -> Result<(), PsionPluginTrainingDerivationError> {
     if expected != actual {
-        return Err(TassionPluginTrainingDerivationError::TraceSchemaDrift {
+        return Err(PsionPluginTrainingDerivationError::TraceSchemaDrift {
             tool_name: String::from(tool_name),
             field: String::from(field),
             expected: String::from(expected),
@@ -381,13 +381,13 @@ fn repo_root() -> PathBuf {
 }
 
 fn load_committed_tassadar_multi_plugin_trace_corpus_bundle(
-) -> Result<TassadarMultiPluginTraceCorpusBundle, TassionPluginTrainingDerivationError> {
+) -> Result<TassadarMultiPluginTraceCorpusBundle, PsionPluginTrainingDerivationError> {
     let path = tassadar_multi_plugin_trace_corpus_bundle_path();
-    let bytes = fs::read(&path).map_err(|error| TassionPluginTrainingDerivationError::Read {
+    let bytes = fs::read(&path).map_err(|error| PsionPluginTrainingDerivationError::Read {
         path: path.display().to_string(),
         error,
     })?;
-    serde_json::from_slice(&bytes).map_err(TassionPluginTrainingDerivationError::from)
+    serde_json::from_slice(&bytes).map_err(PsionPluginTrainingDerivationError::from)
 }
 
 fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
@@ -401,18 +401,18 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        TASSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_SCHEMA_VERSION,
-        build_tassion_plugin_training_derivation_bundle,
-        build_tassion_plugin_training_derivation_bundle_from_corpus,
+        PSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_SCHEMA_VERSION,
+        build_psion_plugin_training_derivation_bundle,
+        build_psion_plugin_training_derivation_bundle_from_corpus,
         load_committed_tassadar_multi_plugin_trace_corpus_bundle,
     };
 
     #[test]
     fn derivation_bundle_builds_from_committed_corpus() -> Result<(), Box<dyn std::error::Error>> {
-        let bundle = build_tassion_plugin_training_derivation_bundle()?;
+        let bundle = build_psion_plugin_training_derivation_bundle()?;
         assert_eq!(
             bundle.schema_version,
-            TASSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_SCHEMA_VERSION
+            PSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_SCHEMA_VERSION
         );
         assert_eq!(bundle.records.len(), 6);
         assert_eq!(bundle.controller_surface_counts.len(), 3);
@@ -430,7 +430,7 @@ mod tests {
         let mut corpus = load_committed_tassadar_multi_plugin_trace_corpus_bundle()?;
         corpus.trace_records[0].projected_tool_schema_rows[0].result_schema_id =
             String::from("drifted.result.schema.v1");
-        let error = build_tassion_plugin_training_derivation_bundle_from_corpus(&corpus)
+        let error = build_psion_plugin_training_derivation_bundle_from_corpus(&corpus)
             .expect_err("schema drift should fail closed");
         assert!(error.to_string().contains("trace corpus drift for tool"));
         Ok(())

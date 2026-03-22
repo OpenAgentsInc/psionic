@@ -1,12 +1,12 @@
-# TASSION Plugin Contamination Controls
+# PSION Plugin Contamination Controls
 
-> Status: canonical `TASSION-6` contamination-control contract for the first
+> Status: canonical `PSION_PLUGIN-6` contamination-control contract for the first
 > plugin-conditioned convergence tranche, written 2026-03-22 after landing the
 > first repo-owned parent-lineage and exclusion bundle above the committed
 > dataset and derivation artifacts.
 
 This document freezes the first plugin-aware contamination-control surface for
-the `TASSION` lane.
+the Psion plugin lane.
 
 The contract is deliberately narrow.
 
@@ -17,17 +17,17 @@ one smaller artifact that later SFT and benchmark stages can cite directly.
 
 ## Canonical Artifacts
 
-- `docs/TASSION_PLUGIN_CONTAMINATION_CONTROLS.md` is the canonical
+- `docs/PSION_PLUGIN_CONTAMINATION_CONTROLS.md` is the canonical
   human-readable contract.
-- `crates/psionic-data/src/tassion_plugin_contamination_controls.rs` owns the
+- `crates/psionic-data/src/psion_plugin_contamination_controls.rs` owns the
   typed bundle, parent-lineage rows, and exclusion manifest validation.
-- `crates/psionic-data/examples/tassion_plugin_contamination_controls.rs`
+- `crates/psionic-data/examples/psion_plugin_contamination_controls.rs`
   writes the canonical contamination bundle.
-- `fixtures/tassion/datasets/tassion_plugin_contamination_controls_v1/` carries
+- `fixtures/psion/plugins/datasets/psion_plugin_contamination_controls_v1/` carries
   the first committed machine-readable artifact.
 
 The stable bundle schema version is
-`psionic.tassion.plugin_contamination_bundle.v1`.
+`psionic.psion.plugin_contamination_bundle.v1`.
 
 ## Why This Exists
 

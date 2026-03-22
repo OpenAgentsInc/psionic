@@ -1,21 +1,21 @@
-# TASSION Claim Boundary And Capability Posture
+# PSION Plugin Claim Boundary And Capability Posture
 
-> Status: canonical `TASSION-2` claim-boundary and capability-posture
+> Status: canonical `PSION_PLUGIN-2` claim-boundary and capability-posture
 > contract for the `Psion x Tassadar` plugin-conditioned convergence tranche,
-> written 2026-03-22 from `docs/TASSION_PROGRAM_MAP.md`,
+> written 2026-03-22 from `docs/PSION_PLUGIN_PROGRAM_MAP.md`,
 > `docs/TRAIN_SYSTEM.md`, and
 > `docs/audits/2026-03-22-tassadar-full-plugin-system-state-audit.md`.
 
 This document freezes the combined claim boundary for the plugin-conditioned
 learned lane and the first capability-posture language that later
-`TASSION-*` issues must inherit.
+`PSION_PLUGIN-*` issues must inherit.
 
 It is not the later served capability matrix for a trained model.
 
 That later publication is owned by:
 
-- `TASSION-16` for the first host-native plugin-conditioned model
-- `TASSION-28` for the mixed host-native plus guest-artifact model
+- `PSION_PLUGIN-16` for the first host-native plugin-conditioned model
+- `PSION_PLUGIN-28` for the mixed host-native plus guest-artifact model
 
 This document exists earlier because the convergence tranche already needs one
 explicit answer to a simpler question:
@@ -25,9 +25,9 @@ explicit answer to a simpler question:
 
 ## Canonical Artifacts
 
-- `docs/TASSION_CLAIM_BOUNDARY_AND_CAPABILITY_POSTURE.md` is the canonical
+- `docs/PSION_PLUGIN_CLAIM_BOUNDARY_AND_CAPABILITY_POSTURE.md` is the canonical
   human-readable contract.
-- `docs/TASSION_PROGRAM_MAP.md` is the canonical dependency map and track split
+- `docs/PSION_PLUGIN_PROGRAM_MAP.md` is the canonical dependency map and track split
   that this document sharpens into publication and route/refusal posture.
 - `docs/TRAIN_SYSTEM.md` is the canonical training-system authority doc that
   inherits this bounded posture for the convergence tranche.
@@ -84,7 +84,7 @@ The current posture for each class is:
 | Plugin class | Current posture | Meaning |
 | --- | --- | --- |
 | `host_native_capability_free_local_deterministic` | `proved_supported_substrate` | real runtime, bridge, catalog, controller, weighted-controller, and user-authoring proof already exist |
-| `host_native_networked_read_only` | `not_yet_proved_substrate` | class is documented, but the full end-to-end user-authored proof is still a named `TASSION` task |
+| `host_native_networked_read_only` | `not_yet_proved_substrate` | class is documented, but the full end-to-end user-authored proof is still a named plugin-program task |
 | `host_native_secret_backed_or_stateful` | `out_of_scope_for_this_tranche` | class remains later bounded substrate work and must not be implied by the current convergence lane |
 | `guest_artifact_digest_bound` | `later_separate_bounded_lane` | class does not describe present-tense starter-plugin truth and remains separate from the current host-native substrate |
 
@@ -121,12 +121,12 @@ The refusal side must keep at least these typed boundaries explicit:
 - `secret_backed_or_stateful_class_not_enabled`
 
 That keeps plugin-conditioned route and refusal evidence compatible with the
-later package work in `TASSION-7` through `TASSION-12` without inventing a
+later package work in `PSION_PLUGIN-7` through `PSION_PLUGIN-12` without inventing a
 second route/refusal vocabulary.
 
 ## Served Posture For This Tranche
 
-Until `TASSION-16`, any served description of the convergence tranche must stay
+Until `PSION_PLUGIN-16`, any served description of the convergence tranche must stay
 strictly inside the following posture:
 
 - the lane is operator-internal

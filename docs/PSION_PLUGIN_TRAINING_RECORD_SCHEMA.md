@@ -1,11 +1,12 @@
-# TASSION Plugin-Training Record Schema
+# PSION Plugin-Training Record Schema
 
-> Status: canonical `TASSION-3` plugin-training record schema for the
+> Status: canonical `PSION_PLUGIN-3` plugin-training record schema for the
 > `Psion x Tassadar` convergence tranche, written 2026-03-22 after landing the
 > first typed `psionic-data` contract for plugin-conditioned training records.
 
 This document freezes the first machine-checkable record format that later
-`TASSION` derivation, dataset, benchmark, and training stages must reuse.
+The Psion plugin derivation, dataset, benchmark, and training stages must reuse
+this schema.
 
 The purpose of the schema is simple:
 
@@ -20,15 +21,15 @@ It is also not a controller-specific export.
 
 ## Canonical Artifacts
 
-- `docs/TASSION_PLUGIN_TRAINING_RECORD_SCHEMA.md` is the canonical
+- `docs/PSION_PLUGIN_TRAINING_RECORD_SCHEMA.md` is the canonical
   human-readable contract.
-- `crates/psionic-data/src/tassion_plugin_training_record.rs` owns the typed
+- `crates/psionic-data/src/psion_plugin_training_record.rs` owns the typed
   schema, validator, and stable digest logic.
 - `crates/psionic-data` re-exports the typed schema for later derivation and
   dataset builders.
 
 The stable schema version is
-`psionic.tassion.plugin_training_record.v1`.
+`psionic.psion.plugin_training_record.v1`.
 
 ## Record Shape
 

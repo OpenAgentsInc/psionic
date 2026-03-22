@@ -87,39 +87,43 @@ and now also has:
 - `docs/PSION_PROGRAM_MAP.md` is the canonical umbrella map for the `Psion`
   learned-model lane and freezes the dependency-ordered track split plus the
   learned-versus-executor claim boundary that all later `Psion` docs inherit.
-- `docs/TASSION_PROGRAM_MAP.md` is the canonical convergence map for the next
+- `docs/PSION_PLUGIN_PROGRAM_MAP.md` is the canonical convergence map for the next
   `Psion x Tassadar` plugin-conditioned training tranche and freezes the
   dependency-ordered training, benchmark, `networked_read_only` substrate-
   proof, guest-artifact, and operator-proof split that later learned-plugin-
   use work must follow without widening publication or executor claims.
-- `docs/TASSION_CLAIM_BOUNDARY_AND_CAPABILITY_POSTURE.md` is the canonical
+- `docs/PSION_PLUGIN_CLAIM_BOUNDARY_AND_CAPABILITY_POSTURE.md` is the canonical
   claim-boundary and capability-posture contract for the convergence tranche
   and freezes which plugin classes are currently proved, not yet proved, later
   separate, or out of scope before any trained model capability matrix is
   honest.
-- `docs/TASSION_PLUGIN_TRAINING_RECORD_SCHEMA.md` is the canonical first
+- `docs/PSION_PLUGIN_TRAINING_RECORD_SCHEMA.md` is the canonical first
   plugin-conditioned training-record contract for the convergence tranche and
   freezes the admitted-plugin-set, controller-context, invocation-receipt,
   route-label, and outcome-label shape that later derivation, dataset, and
   benchmark work must reuse.
-- `docs/TASSION_PLUGIN_TRACE_DERIVATION.md` is the canonical first
+- `docs/PSION_PLUGIN_TRACE_DERIVATION.md` is the canonical first
   plugin-conditioned trace-normalization contract for the convergence tranche
   and freezes the runtime-drift-checked derivation path from the committed
   multi-plugin trace corpus into canonical training records.
-- `docs/TASSION_PLUGIN_CONDITIONED_DATASET.md` is the canonical first
+- `docs/PSION_PLUGIN_CONDITIONED_DATASET.md` is the canonical first
   plugin-conditioned dataset-bundle contract for the convergence tranche and
   freezes the stable dataset identity, workflow-case-disjoint split rule, and
   preserved controller-surface plus plugin-class label contract for the first
   host-native dataset build.
-- `docs/TASSION_PLUGIN_CONTAMINATION_CONTROLS.md` is the canonical first
+- `docs/PSION_PLUGIN_CONTAMINATION_CONTROLS.md` is the canonical first
   plugin-aware contamination-control contract for the convergence tranche and
   freezes the parent-lineage rows, plugin-trace plus plugin-receipt exclusion
   manifest, and trace-disjoint train-vs-held-out review posture for the first
   host-native dataset build.
+- `docs/PSION_PLUGIN_BENCHMARK_PACKAGES.md` is the canonical shared plugin
+  benchmark contract for the convergence tranche and freezes the common
+  item-schema, contamination-attachment, receipt-posture, task-contract, and
+  grader-interface surface that later plugin benchmark families must reuse.
 - `docs/audits/2026-03-22-tassadar-full-plugin-system-state-audit.md` is the
   canonical current-state proof record for the bounded Tassadar plugin system
   and freezes the present authoring-class, publication, and guest-artifact
-  boundaries that the `TASSION` convergence tranche must inherit rather than
+  boundaries that the Psion plugin convergence tranche must inherit rather than
   silently widen.
 - `docs/PSION_CORPUS_ADMISSION.md` is the canonical first governance doc for
   the `Psion` learned-model lane and freezes the versioned source-admission

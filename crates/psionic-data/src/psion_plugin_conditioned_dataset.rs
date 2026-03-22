@@ -9,26 +9,26 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    DatasetKey, DatasetSplitKind, TassionControllerSurface, TassionPluginClass,
-    TassionPluginOutcomeLabel, TassionPluginRouteLabel, TassionPluginTrainingDerivationBundle,
-    TassionPluginTrainingDerivationError, TassionPluginTrainingRecord,
-    build_tassion_plugin_training_derivation_bundle,
+    DatasetKey, DatasetSplitKind, PsionPluginControllerSurface, PsionPluginClass,
+    PsionPluginOutcomeLabel, PsionPluginRouteLabel, PsionPluginTrainingDerivationBundle,
+    PsionPluginTrainingDerivationError, PsionPluginTrainingRecord,
+    build_psion_plugin_training_derivation_bundle,
 };
 
 /// Stable schema version for the first plugin-conditioned dataset bundle.
-pub const TASSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION: &str =
-    "psionic.tassion.plugin_conditioned_dataset_bundle.v1";
+pub const PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION: &str =
+    "psionic.psion.plugin_conditioned_dataset_bundle.v1";
 /// Stable dataset ref for the first host-native plugin-conditioned dataset bundle.
-pub const TASSION_PLUGIN_CONDITIONED_DATASET_REF: &str =
-    "dataset://openagents/tassion/plugin_conditioned_host_native_reference";
+pub const PSION_PLUGIN_CONDITIONED_DATASET_REF: &str =
+    "dataset://openagents/psion/plugin_conditioned_host_native_reference";
 /// Stable committed output ref for the first dataset bundle.
-pub const TASSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_REF: &str =
-    "fixtures/tassion/datasets/tassion_plugin_conditioned_dataset_v1/tassion_plugin_conditioned_dataset_bundle.json";
+pub const PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_REF: &str =
+    "fixtures/psion/plugins/datasets/psion_plugin_conditioned_dataset_v1/psion_plugin_conditioned_dataset_bundle.json";
 const TRAIN_WORKFLOW_CASE_ID: &str = "starter_plugin.web_content_success.v1";
 const HELD_OUT_WORKFLOW_CASE_ID: &str = "starter_plugin.fetch_refusal.v1";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassionPluginConditionedSplitStats {
+pub struct PsionPluginConditionedSplitStats {
     /// Split kind represented by the stats.
     pub split_kind: DatasetSplitKind,
     /// Number of records in the split.
@@ -36,27 +36,27 @@ pub struct TassionPluginConditionedSplitStats {
     /// Workflow cases represented in the split.
     pub workflow_case_ids: Vec<String>,
     /// Controller-surface counts preserved in the split.
-    pub controller_surface_counts: BTreeMap<TassionControllerSurface, u32>,
+    pub controller_surface_counts: BTreeMap<PsionPluginControllerSurface, u32>,
     /// Plugin-class counts preserved in the split.
-    pub plugin_class_counts: BTreeMap<TassionPluginClass, u32>,
+    pub plugin_class_counts: BTreeMap<PsionPluginClass, u32>,
     /// Route-label counts preserved in the split.
-    pub route_label_counts: BTreeMap<TassionPluginRouteLabel, u32>,
+    pub route_label_counts: BTreeMap<PsionPluginRouteLabel, u32>,
     /// Outcome-label counts preserved in the split.
-    pub outcome_label_counts: BTreeMap<TassionPluginOutcomeLabel, u32>,
+    pub outcome_label_counts: BTreeMap<PsionPluginOutcomeLabel, u32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct TassionPluginConditionedSplit {
+pub struct PsionPluginConditionedSplit {
     /// Split kind for the record group.
     pub split_kind: DatasetSplitKind,
     /// Stable records assigned to the split.
-    pub records: Vec<TassionPluginTrainingRecord>,
+    pub records: Vec<PsionPluginTrainingRecord>,
     /// Summary stats preserved for the split.
-    pub stats: TassionPluginConditionedSplitStats,
+    pub stats: PsionPluginConditionedSplitStats,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TassionHeldOutIsolationContract {
+pub struct PsionPluginHeldOutIsolationContract {
     /// Stable policy identifier.
     pub policy_id: String,
     /// Whether train and held-out splits are disjoint by workflow case id.
@@ -70,7 +70,7 @@ pub struct TassionHeldOutIsolationContract {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct TassionPluginConditionedDatasetBundle {
+pub struct PsionPluginConditionedDatasetBundle {
     /// Stable schema version.
     pub schema_version: String,
     /// Stable dataset key.
@@ -82,9 +82,9 @@ pub struct TassionPluginConditionedDatasetBundle {
     /// Source derivation bundle digest.
     pub source_derivation_bundle_digest: String,
     /// Held-out isolation contract.
-    pub held_out_isolation: TassionHeldOutIsolationContract,
+    pub held_out_isolation: PsionPluginHeldOutIsolationContract,
     /// Split rows for the dataset.
-    pub split_rows: Vec<TassionPluginConditionedSplit>,
+    pub split_rows: Vec<PsionPluginConditionedSplit>,
     /// Plain-language claim boundary for the bundle.
     pub claim_boundary: String,
     /// Short machine-readable summary.
@@ -93,16 +93,16 @@ pub struct TassionPluginConditionedDatasetBundle {
     pub bundle_digest: String,
 }
 
-impl TassionPluginConditionedDatasetBundle {
+impl PsionPluginConditionedDatasetBundle {
     /// Writes the dataset bundle to one JSON file.
     pub fn write_to_path(
         &self,
         output_path: impl AsRef<Path>,
-    ) -> Result<(), TassionPluginConditionedDatasetError> {
+    ) -> Result<(), PsionPluginConditionedDatasetError> {
         let output_path = output_path.as_ref();
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent).map_err(|error| {
-                TassionPluginConditionedDatasetError::CreateDir {
+                PsionPluginConditionedDatasetError::CreateDir {
                     path: parent.display().to_string(),
                     error,
                 }
@@ -110,7 +110,7 @@ impl TassionPluginConditionedDatasetBundle {
         }
         let json = serde_json::to_string_pretty(self)?;
         fs::write(output_path, format!("{json}\n")).map_err(|error| {
-            TassionPluginConditionedDatasetError::Write {
+            PsionPluginConditionedDatasetError::Write {
                 path: output_path.display().to_string(),
                 error,
             }
@@ -118,15 +118,15 @@ impl TassionPluginConditionedDatasetBundle {
     }
 
     /// Validates the dataset bundle.
-    pub fn validate(&self) -> Result<(), TassionPluginConditionedDatasetError> {
-        if self.schema_version != TASSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION {
-            return Err(TassionPluginConditionedDatasetError::SchemaVersionMismatch {
-                expected: String::from(TASSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION),
+    pub fn validate(&self) -> Result<(), PsionPluginConditionedDatasetError> {
+        if self.schema_version != PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION {
+            return Err(PsionPluginConditionedDatasetError::SchemaVersionMismatch {
+                expected: String::from(PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION),
                 actual: self.schema_version.clone(),
             });
         }
         if self.split_rows.is_empty() {
-            return Err(TassionPluginConditionedDatasetError::MissingField {
+            return Err(PsionPluginConditionedDatasetError::MissingField {
                 field: String::from("dataset_bundle.split_rows"),
             });
         }
@@ -136,26 +136,26 @@ impl TassionPluginConditionedDatasetBundle {
         let mut held_out_workflow_case_ids = None;
         for split in &self.split_rows {
             if !seen_split_kinds.insert(split_kind_key(split.split_kind)) {
-                return Err(TassionPluginConditionedDatasetError::DuplicateSplitKind {
+                return Err(PsionPluginConditionedDatasetError::DuplicateSplitKind {
                     split_kind: format!("{:?}", split.split_kind),
                 });
             }
             if split.records.is_empty() {
-                return Err(TassionPluginConditionedDatasetError::MissingField {
+                return Err(PsionPluginConditionedDatasetError::MissingField {
                     field: format!("dataset_bundle.split_rows[{:#?}].records", split.split_kind),
                 });
             }
             for record in &split.records {
                 record.validate()?;
                 if !seen_record_ids.insert(record.record_id.as_str()) {
-                    return Err(TassionPluginConditionedDatasetError::DuplicateRecordId {
+                    return Err(PsionPluginConditionedDatasetError::DuplicateRecordId {
                         record_id: record.record_id.clone(),
                     });
                 }
             }
             let actual_stats = build_split_stats(split.split_kind, split.records.clone())?;
             if split.stats != actual_stats {
-                return Err(TassionPluginConditionedDatasetError::SplitStatsMismatch {
+                return Err(PsionPluginConditionedDatasetError::SplitStatsMismatch {
                     split_kind: format!("{:?}", split.split_kind),
                 });
             }
@@ -170,12 +170,12 @@ impl TassionPluginConditionedDatasetBundle {
             }
         }
         let train_workflow_case_ids = train_workflow_case_ids.ok_or_else(|| {
-            TassionPluginConditionedDatasetError::MissingField {
+            PsionPluginConditionedDatasetError::MissingField {
                 field: String::from("dataset_bundle.train_split"),
             }
         })?;
         let held_out_workflow_case_ids = held_out_workflow_case_ids.ok_or_else(|| {
-            TassionPluginConditionedDatasetError::MissingField {
+            PsionPluginConditionedDatasetError::MissingField {
                 field: String::from("dataset_bundle.held_out_split"),
             }
         })?;
@@ -185,22 +185,22 @@ impl TassionPluginConditionedDatasetBundle {
             .cloned()
             .collect::<BTreeSet<_>>();
         if !train_set.is_disjoint(&held_out_set) {
-            return Err(TassionPluginConditionedDatasetError::HeldOutIsolationBroken {
+            return Err(PsionPluginConditionedDatasetError::HeldOutIsolationBroken {
                 detail: String::from("train and held-out workflow case ids overlap"),
             });
         }
         if !self.held_out_isolation.workflow_case_disjoint {
-            return Err(TassionPluginConditionedDatasetError::HeldOutIsolationBroken {
+            return Err(PsionPluginConditionedDatasetError::HeldOutIsolationBroken {
                 detail: String::from("workflow_case_disjoint must stay true"),
             });
         }
         if self.held_out_isolation.train_workflow_case_ids != train_workflow_case_ids {
-            return Err(TassionPluginConditionedDatasetError::HeldOutIsolationBroken {
+            return Err(PsionPluginConditionedDatasetError::HeldOutIsolationBroken {
                 detail: String::from("train workflow case ids drift from split stats"),
             });
         }
         if self.held_out_isolation.held_out_workflow_case_ids != held_out_workflow_case_ids {
-            return Err(TassionPluginConditionedDatasetError::HeldOutIsolationBroken {
+            return Err(PsionPluginConditionedDatasetError::HeldOutIsolationBroken {
                 detail: String::from("held-out workflow case ids drift from split stats"),
             });
         }
@@ -209,7 +209,7 @@ impl TassionPluginConditionedDatasetBundle {
 }
 
 #[derive(Debug, Error)]
-pub enum TassionPluginConditionedDatasetError {
+pub enum PsionPluginConditionedDatasetError {
     #[error("failed to create `{path}`: {error}")]
     CreateDir { path: String, error: std::io::Error },
     #[error("failed to write `{path}`: {error}")]
@@ -227,35 +227,35 @@ pub enum TassionPluginConditionedDatasetError {
     #[error("held-out isolation is broken: {detail}")]
     HeldOutIsolationBroken { detail: String },
     #[error(transparent)]
-    Derivation(#[from] TassionPluginTrainingDerivationError),
+    Derivation(#[from] PsionPluginTrainingDerivationError),
     #[error(transparent)]
-    TrainingRecord(#[from] crate::TassionPluginTrainingRecordError),
+    TrainingRecord(#[from] crate::PsionPluginTrainingRecordError),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
 }
 
 #[must_use]
-pub fn tassion_plugin_conditioned_dataset_bundle_path() -> PathBuf {
-    repo_root().join(TASSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_REF)
+pub fn psion_plugin_conditioned_dataset_bundle_path() -> PathBuf {
+    repo_root().join(PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_REF)
 }
 
-pub fn build_tassion_plugin_conditioned_dataset_bundle(
-) -> Result<TassionPluginConditionedDatasetBundle, TassionPluginConditionedDatasetError> {
-    let derivation = build_tassion_plugin_training_derivation_bundle()?;
-    build_tassion_plugin_conditioned_dataset_bundle_from_derivation(&derivation)
+pub fn build_psion_plugin_conditioned_dataset_bundle(
+) -> Result<PsionPluginConditionedDatasetBundle, PsionPluginConditionedDatasetError> {
+    let derivation = build_psion_plugin_training_derivation_bundle()?;
+    build_psion_plugin_conditioned_dataset_bundle_from_derivation(&derivation)
 }
 
-pub fn write_tassion_plugin_conditioned_dataset_bundle(
+pub fn write_psion_plugin_conditioned_dataset_bundle(
     output_path: impl AsRef<Path>,
-) -> Result<TassionPluginConditionedDatasetBundle, TassionPluginConditionedDatasetError> {
-    let bundle = build_tassion_plugin_conditioned_dataset_bundle()?;
+) -> Result<PsionPluginConditionedDatasetBundle, PsionPluginConditionedDatasetError> {
+    let bundle = build_psion_plugin_conditioned_dataset_bundle()?;
     bundle.write_to_path(output_path)?;
     Ok(bundle)
 }
 
-pub fn build_tassion_plugin_conditioned_dataset_bundle_from_derivation(
-    derivation: &TassionPluginTrainingDerivationBundle,
-) -> Result<TassionPluginConditionedDatasetBundle, TassionPluginConditionedDatasetError> {
+pub fn build_psion_plugin_conditioned_dataset_bundle_from_derivation(
+    derivation: &PsionPluginTrainingDerivationBundle,
+) -> Result<PsionPluginConditionedDatasetBundle, PsionPluginConditionedDatasetError> {
     let mut train_records = Vec::new();
     let mut held_out_records = Vec::new();
     for record in &derivation.records {
@@ -264,7 +264,7 @@ pub fn build_tassion_plugin_conditioned_dataset_bundle_from_derivation(
                 .controller_context
                 .workflow_case_id
                 .as_deref()
-                .ok_or_else(|| TassionPluginConditionedDatasetError::MissingField {
+                .ok_or_else(|| PsionPluginConditionedDatasetError::MissingField {
                     field: format!(
                         "dataset_bundle.record_workflow_case_id.{}",
                         record.record_id
@@ -274,31 +274,31 @@ pub fn build_tassion_plugin_conditioned_dataset_bundle_from_derivation(
             TRAIN_WORKFLOW_CASE_ID => train_records.push(record.clone()),
             HELD_OUT_WORKFLOW_CASE_ID => held_out_records.push(record.clone()),
             _ => {
-                return Err(TassionPluginConditionedDatasetError::HeldOutIsolationBroken {
+                return Err(PsionPluginConditionedDatasetError::HeldOutIsolationBroken {
                     detail: format!("unexpected workflow case id `{workflow_case_id}`"),
                 });
             }
         }
     }
-    let train_split = TassionPluginConditionedSplit {
+    let train_split = PsionPluginConditionedSplit {
         split_kind: DatasetSplitKind::Train,
         stats: build_split_stats(DatasetSplitKind::Train, train_records.clone())?,
         records: train_records,
     };
-    let held_out_split = TassionPluginConditionedSplit {
+    let held_out_split = PsionPluginConditionedSplit {
         split_kind: DatasetSplitKind::HeldOut,
         stats: build_split_stats(DatasetSplitKind::HeldOut, held_out_records.clone())?,
         records: held_out_records,
     };
     let stable_dataset_identity =
-        DatasetKey::new(TASSION_PLUGIN_CONDITIONED_DATASET_REF, "2026.03.22.v1").storage_key();
-    let mut bundle = TassionPluginConditionedDatasetBundle {
-        schema_version: String::from(TASSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION),
-        dataset_key: DatasetKey::new(TASSION_PLUGIN_CONDITIONED_DATASET_REF, "2026.03.22.v1"),
+        DatasetKey::new(PSION_PLUGIN_CONDITIONED_DATASET_REF, "2026.03.22.v1").storage_key();
+    let mut bundle = PsionPluginConditionedDatasetBundle {
+        schema_version: String::from(PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION),
+        dataset_key: DatasetKey::new(PSION_PLUGIN_CONDITIONED_DATASET_REF, "2026.03.22.v1"),
         stable_dataset_identity,
-        source_derivation_bundle_ref: String::from(crate::TASSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_REF),
+        source_derivation_bundle_ref: String::from(crate::PSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_REF),
         source_derivation_bundle_digest: derivation.bundle_digest.clone(),
-        held_out_isolation: TassionHeldOutIsolationContract {
+        held_out_isolation: PsionPluginHeldOutIsolationContract {
             policy_id: String::from("workflow_case_disjoint.v1"),
             workflow_case_disjoint: true,
             train_workflow_case_ids: train_split.stats.workflow_case_ids.clone(),
@@ -329,15 +329,15 @@ pub fn build_tassion_plugin_conditioned_dataset_bundle_from_derivation(
             .map(|split| split.records.len())
             .unwrap_or(0),
     );
-    bundle.bundle_digest = stable_digest(b"psionic_tassion_plugin_conditioned_dataset_bundle|", &bundle);
+    bundle.bundle_digest = stable_digest(b"psionic_psion_plugin_conditioned_dataset_bundle|", &bundle);
     bundle.validate()?;
     Ok(bundle)
 }
 
 fn build_split_stats(
     split_kind: DatasetSplitKind,
-    records: Vec<TassionPluginTrainingRecord>,
-) -> Result<TassionPluginConditionedSplitStats, TassionPluginConditionedDatasetError> {
+    records: Vec<PsionPluginTrainingRecord>,
+) -> Result<PsionPluginConditionedSplitStats, PsionPluginConditionedDatasetError> {
     let mut workflow_case_ids = BTreeSet::new();
     let mut controller_surface_counts = BTreeMap::new();
     let mut plugin_class_counts = BTreeMap::new();
@@ -345,7 +345,7 @@ fn build_split_stats(
     let mut outcome_label_counts = BTreeMap::new();
     for record in &records {
         let workflow_case_id = record.controller_context.workflow_case_id.as_deref().ok_or_else(
-            || TassionPluginConditionedDatasetError::MissingField {
+            || PsionPluginConditionedDatasetError::MissingField {
                 field: format!("split_stats.workflow_case_id.{}", record.record_id),
             },
         )?;
@@ -361,7 +361,7 @@ fn build_split_stats(
             *plugin_class_counts.entry(plugin.plugin_class).or_insert(0_u32) += 1;
         }
     }
-    Ok(TassionPluginConditionedSplitStats {
+    Ok(PsionPluginConditionedSplitStats {
         split_kind,
         record_count: records.len() as u32,
         workflow_case_ids: workflow_case_ids.into_iter().collect(),
@@ -403,16 +403,16 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        TASSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION,
-        TassionPluginConditionedDatasetError, build_tassion_plugin_conditioned_dataset_bundle,
+        PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION,
+        PsionPluginConditionedDatasetError, build_psion_plugin_conditioned_dataset_bundle,
     };
 
     #[test]
     fn dataset_bundle_builds() -> Result<(), Box<dyn std::error::Error>> {
-        let bundle = build_tassion_plugin_conditioned_dataset_bundle()?;
+        let bundle = build_psion_plugin_conditioned_dataset_bundle()?;
         assert_eq!(
             bundle.schema_version,
-            TASSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION
+            PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION
         );
         assert_eq!(bundle.split_rows.len(), 2);
         assert!(bundle.held_out_isolation.workflow_case_disjoint);
@@ -423,7 +423,7 @@ mod tests {
     #[test]
     fn dataset_bundle_rejects_overlapping_workflow_cases(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut bundle = build_tassion_plugin_conditioned_dataset_bundle()?;
+        let mut bundle = build_psion_plugin_conditioned_dataset_bundle()?;
         let held_out_split = bundle
             .split_rows
             .iter_mut()
@@ -443,7 +443,7 @@ mod tests {
             .expect_err("overlapping workflow cases should fail");
         assert!(matches!(
             error,
-            TassionPluginConditionedDatasetError::HeldOutIsolationBroken { .. }
+            PsionPluginConditionedDatasetError::HeldOutIsolationBroken { .. }
         ));
         Ok(())
     }

@@ -1,8 +1,9 @@
-# TASSION Program Map
+# PSION Plugin Program Map
 
 > Status: canonical proposed convergence map for the next `Psion x Tassadar`
-> plugin-conditioned training tranche, written 2026-03-22 from
-> `~/code/alpha/tassadar/TASSION.md` and adjusted to current repo truth.
+> plugin-conditioned training tranche, written 2026-03-22 from the historical
+> alpha planning note in `~/code/alpha/tassadar/` and adjusted to current repo
+> truth.
 
 ## Why This Doc Exists
 
@@ -91,11 +92,12 @@ The convergence tranche should consume the existing repo truth directly:
 
 - `docs/PSION_PROGRAM_MAP.md`
 - `docs/TRAIN_SYSTEM.md`
-- `docs/TASSION_CLAIM_BOUNDARY_AND_CAPABILITY_POSTURE.md`
-- `docs/TASSION_PLUGIN_TRAINING_RECORD_SCHEMA.md`
-- `docs/TASSION_PLUGIN_TRACE_DERIVATION.md`
-- `docs/TASSION_PLUGIN_CONDITIONED_DATASET.md`
-- `docs/TASSION_PLUGIN_CONTAMINATION_CONTROLS.md`
+- `docs/PSION_PLUGIN_CLAIM_BOUNDARY_AND_CAPABILITY_POSTURE.md`
+- `docs/PSION_PLUGIN_TRAINING_RECORD_SCHEMA.md`
+- `docs/PSION_PLUGIN_TRACE_DERIVATION.md`
+- `docs/PSION_PLUGIN_CONDITIONED_DATASET.md`
+- `docs/PSION_PLUGIN_CONTAMINATION_CONTROLS.md`
+- `docs/PSION_PLUGIN_BENCHMARK_PACKAGES.md`
 - `docs/TASSADAR_MULTI_PLUGIN_ORCHESTRATION_WAVE.md`
 - `docs/TASSADAR_STARTER_PLUGIN_AUTHORING.md`
 - `docs/TASSADAR_STARTER_PLUGIN_CATALOG.md`
@@ -111,13 +113,14 @@ The convergence tranche should consume the existing repo truth directly:
 - the bounded guest packet-ABI / Rust-first guest surface already frozen in:
   `docs/ARCHITECTURE.md` and the `TAS-199` / `TAS-200` era plugin docs
 
-No TASSION issue should invent a second plugin API, a second trace format, or a
+No plugin-program issue should invent a second plugin API, a second trace
+format, or a
 second tool-call notation just for training.
 
 ## Live Substrate Preconditions
 
 The current plugin-system audit already narrowed a few things that later
-`TASSION-*` work must not accidentally overstate:
+`PSION_PLUGIN-*` work must not accidentally overstate:
 
 - the live first-class authoring lane is still the capability-free local
   deterministic host-native path
@@ -129,109 +132,110 @@ The current plugin-system audit already narrowed a few things that later
 - guest-artifact restoration is still a deliberate later decision wave, not an
   implied property of the current starter-plugin platform
 
-That means `TASSION` is allowed to build learned plugin-use training on top of
+That means the Psion plugin convergence tranche is allowed to build learned
+plugin-use training on top of
 today's bounded substrate, but it must preserve the current operator-internal,
 publication-blocked, non-universal claim boundary while doing so.
 
 ## Dependency Order
 
-The `TASSION` convergence program is dependency-ordered in nine tracks:
+The Psion plugin convergence program is dependency-ordered in nine tracks:
 
-1. program and claim discipline: `TASSION-1`, `TASSION-2`
+1. program and claim discipline: `PSION_PLUGIN-1`, `PSION_PLUGIN-2`
 2. plugin-training data substrate:
-   `TASSION-3`, `TASSION-4`, `TASSION-5`, `TASSION-6`
+   `PSION_PLUGIN-3`, `PSION_PLUGIN-4`, `PSION_PLUGIN-5`, `PSION_PLUGIN-6`
 3. plugin-aware benchmark and eval surfaces:
-   `TASSION-7`, `TASSION-8`, `TASSION-9`, `TASSION-10`, `TASSION-11`,
-   `TASSION-12`
+   `PSION_PLUGIN-7`, `PSION_PLUGIN-8`, `PSION_PLUGIN-9`, `PSION_PLUGIN-10`, `PSION_PLUGIN-11`,
+   `PSION_PLUGIN-12`
 4. learned plugin-use reference lane:
-   `TASSION-13`, `TASSION-14`, `TASSION-15`, `TASSION-16`
-5. `networked_read_only` substrate proof: `TASSION-17`
+   `PSION_PLUGIN-13`, `PSION_PLUGIN-14`, `PSION_PLUGIN-15`, `PSION_PLUGIN-16`
+5. `networked_read_only` substrate proof: `PSION_PLUGIN-17`
 6. narrow guest-artifact Wasm restoration:
-   `TASSION-18`, `TASSION-19`, `TASSION-20`, `TASSION-21`, `TASSION-22`,
-   `TASSION-23`
+   `PSION_PLUGIN-18`, `PSION_PLUGIN-19`, `PSION_PLUGIN-20`, `PSION_PLUGIN-21`, `PSION_PLUGIN-22`,
+   `PSION_PLUGIN-23`
 7. combined plugin-conditioned lane with guest-artifact coverage:
-   `TASSION-24`, `TASSION-25`, `TASSION-26`, `TASSION-27`, `TASSION-28`
-8. real operator proof: `TASSION-29`, `TASSION-30`
+   `PSION_PLUGIN-24`, `PSION_PLUGIN-25`, `PSION_PLUGIN-26`, `PSION_PLUGIN-27`, `PSION_PLUGIN-28`
+8. real operator proof: `PSION_PLUGIN-29`, `PSION_PLUGIN-30`
 9. follow-on scale and hardening:
-   `TASSION-31`, `TASSION-32`, `TASSION-33`
+   `PSION_PLUGIN-31`, `PSION_PLUGIN-32`, `PSION_PLUGIN-33`
 
 ## Canonical Track Map
 
 ### Track 1: Program and claim discipline
 
-- `TASSION-1`: publish the convergence umbrella issue
-- `TASSION-2`: freeze the combined claim boundary and capability-matrix posture
+- `PSION_PLUGIN-1`: publish the convergence umbrella issue
+- `PSION_PLUGIN-2`: freeze the combined claim boundary and capability-matrix posture
 
 ### Track 2: Plugin-training data substrate
 
-- `TASSION-3`: canonical plugin-training record schema
-- `TASSION-4`: plugin-trace normalization and derivation pipeline
-- `TASSION-5`: plugin-conditioned dataset builder
-- `TASSION-6`: plugin-aware contamination and derivation controls
+- `PSION_PLUGIN-3`: canonical plugin-training record schema
+- `PSION_PLUGIN-4`: plugin-trace normalization and derivation pipeline
+- `PSION_PLUGIN-5`: plugin-conditioned dataset builder
+- `PSION_PLUGIN-6`: plugin-aware contamination and derivation controls
 
 ### Track 3: Plugin-aware benchmark and eval surfaces
 
-- `TASSION-7`: shared plugin-use benchmark schema and grader interfaces
-- `TASSION-8`: plugin discovery and selection benchmark package
-- `TASSION-9`: plugin argument construction benchmark package
-- `TASSION-10`: plugin sequencing and multi-call benchmark package
-- `TASSION-11`: plugin refusal and request-for-structure benchmark package
-- `TASSION-12`: plugin result interpretation benchmark package
+- `PSION_PLUGIN-7`: shared plugin-use benchmark schema and grader interfaces
+- `PSION_PLUGIN-8`: plugin discovery and selection benchmark package
+- `PSION_PLUGIN-9`: plugin argument construction benchmark package
+- `PSION_PLUGIN-10`: plugin sequencing and multi-call benchmark package
+- `PSION_PLUGIN-11`: plugin refusal and request-for-structure benchmark package
+- `PSION_PLUGIN-12`: plugin result interpretation benchmark package
 
 ### Track 4: Learned plugin-use reference lane
 
-- `TASSION-13`: plugin-conditioned SFT stage in `psionic-train`
-- `TASSION-14`: plugin-conditioned compact-decoder reference model config
-- `TASSION-15`: first host-native starter-plugin-conditioned reference lane
+- `PSION_PLUGIN-13`: plugin-conditioned SFT stage in `psionic-train`
+- `PSION_PLUGIN-14`: plugin-conditioned compact-decoder reference model config
+- `PSION_PLUGIN-15`: first host-native starter-plugin-conditioned reference lane
   for the currently fully proved authoring class: host-native, capability-free,
   local deterministic starter plugins
-- `TASSION-16`: capability matrix and served posture v1 for the host-native
+- `PSION_PLUGIN-16`: capability matrix and served posture v1 for the host-native
   plugin-conditioned model, explicitly distinguishing supported host-native
   capability-free behavior from not-yet-proved `networked_read_only` behavior
   and unsupported secret-backed, stateful, and guest-artifact classes
 
 ### Track 5: `networked_read_only` substrate proof
 
-- `TASSION-17`: prove the first end-to-end `networked_read_only`
+- `PSION_PLUGIN-17`: prove the first end-to-end `networked_read_only`
   user-authored plugin lane across runtime, bridge, catalog, controller, and
   weighted-controller truth without widening publication or authoring claims
 
 ### Track 6: Narrow guest-artifact Wasm restoration
 
-- `TASSION-18`: make an explicit product decision that guest-artifact
+- `PSION_PLUGIN-18`: make an explicit product decision that guest-artifact
   restoration is a later separate bounded lane and not present-tense
   starter-plugin truth
-- `TASSION-19`: digest-bound guest-artifact manifest and identity contract
-- `TASSION-20`: bounded guest-artifact runtime loading path
-- `TASSION-21`: receipt-equivalent guest-artifact invocation path
-- `TASSION-22`: one user-provided Wasm starter plugin end to end
-- `TASSION-23`: guest-artifact trust-tier and authority-gate rows
+- `PSION_PLUGIN-19`: digest-bound guest-artifact manifest and identity contract
+- `PSION_PLUGIN-20`: bounded guest-artifact runtime loading path
+- `PSION_PLUGIN-21`: receipt-equivalent guest-artifact invocation path
+- `PSION_PLUGIN-22`: one user-provided Wasm starter plugin end to end
+- `PSION_PLUGIN-23`: guest-artifact trust-tier and authority-gate rows
 
 ### Track 7: Combined plugin-conditioned lane with guest-artifact coverage
 
-- `TASSION-24`: extend derivation pipeline for guest-artifact traces
-- `TASSION-25`: mixed host-native plus guest-artifact dataset v1
-- `TASSION-26`: mixed plugin-conditioned model v1
-- `TASSION-27`: guest-plugin benchmark package
-- `TASSION-28`: mixed capability matrix v2
+- `PSION_PLUGIN-24`: extend derivation pipeline for guest-artifact traces
+- `PSION_PLUGIN-25`: mixed host-native plus guest-artifact dataset v1
+- `PSION_PLUGIN-26`: mixed plugin-conditioned model v1
+- `PSION_PLUGIN-27`: guest-plugin benchmark package
+- `PSION_PLUGIN-28`: mixed capability matrix v2
 
 ### Track 8: Real operator proof
 
-- `TASSION-29`: first real plugin-conditioned Google single-node training
+- `PSION_PLUGIN-29`: first real plugin-conditioned Google single-node training
   audit
-- `TASSION-30`: first real mixed guest-artifact plugin-conditioned Google
+- `PSION_PLUGIN-30`: first real mixed guest-artifact plugin-conditioned Google
   audit
 
 ### Track 9: Follow-on scale and hardening
 
-- `TASSION-31`: plugin-conditioned route/refusal hardening tranche
-- `TASSION-32`: expand weighted-controller corpus only for new plugin classes
-- `TASSION-33`: decide whether cluster-scale plugin-conditioned training is
+- `PSION_PLUGIN-31`: plugin-conditioned route/refusal hardening tranche
+- `PSION_PLUGIN-32`: expand weighted-controller corpus only for new plugin classes
+- `PSION_PLUGIN-33`: decide whether cluster-scale plugin-conditioned training is
   warranted
 
 ## Operating Rules
 
-Every `TASSION-*` issue must preserve all of the following:
+Every `PSION_PLUGIN-*` issue must preserve all of the following:
 
 - training examples come from real plugin-runtime truth, not mock string tool
   calls

@@ -34,10 +34,10 @@ mod tassadar_supervision_density;
 mod tassadar_trace_state_ablation;
 mod tassadar_universality_witness_suite;
 mod tassadar_weak_supervision;
-mod tassion_plugin_contamination_controls;
-mod tassion_plugin_conditioned_dataset;
-mod tassion_plugin_training_derivation;
-mod tassion_plugin_training_record;
+mod psion_plugin_contamination_controls;
+mod psion_plugin_conditioned_dataset;
+mod psion_plugin_training_derivation;
+mod psion_plugin_training_record;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -79,10 +79,10 @@ pub use tassadar_supervision_density::*;
 pub use tassadar_trace_state_ablation::*;
 pub use tassadar_universality_witness_suite::*;
 pub use tassadar_weak_supervision::*;
-pub use tassion_plugin_contamination_controls::*;
-pub use tassion_plugin_conditioned_dataset::*;
-pub use tassion_plugin_training_derivation::*;
-pub use tassion_plugin_training_record::*;
+pub use psion_plugin_contamination_controls::*;
+pub use psion_plugin_conditioned_dataset::*;
+pub use psion_plugin_training_derivation::*;
+pub use psion_plugin_training_record::*;
 
 /// Human-readable crate ownership summary.
 pub const CRATE_ROLE: &str =
