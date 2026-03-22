@@ -28,6 +28,8 @@ clustered execution, and machine-legible execution truth.
   downstream-lineage doc for the `Psion` learned-model lane.
 - `docs/PSION_BENCHMARK_ISOLATION.md` is the canonical held-out and
   contamination-control doc for the `Psion` learned-model lane.
+- `docs/PSION_RAW_SOURCE_INGESTION.md` is the canonical raw-source import and
+  normalization doc for the `Psion` learned-model lane.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical phase-gate and
   promotion-decision doc for the `Psion` learned-model lane.
 - `docs/PSION_CAPABILITY_MATRIX.md` is the canonical served capability and

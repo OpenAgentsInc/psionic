@@ -95,6 +95,10 @@ and now also has:
   contamination-control doc for the `Psion` learned-model lane and freezes the
   exclusion-manifest, tokenizer-exposure, and benchmark-invalidation contract
   that later tokenizer and benchmark work must follow.
+- `docs/PSION_RAW_SOURCE_INGESTION.md` is the canonical first raw-source import
+  and normalization doc for the `Psion` learned-model lane and freezes the
+  manifest, preprocessing-version, and boundary-preservation contract that
+  later tokenizer and dataset stages must follow.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical first phase-gate and
   promotion-decision doc for the `Psion` learned-model lane and freezes the
   acceptance-matrix plus evidence-bound promotion contract that later pilot,
