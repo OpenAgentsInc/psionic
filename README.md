@@ -43,6 +43,8 @@ clustered execution, and machine-legible execution truth.
 - `docs/PSION_RUN_OBSERVABILITY.md` is the canonical cost, throughput,
   checkpoint-size, and topology-observability doc for the `Psion`
   learned-model lane.
+- `docs/PSION_PILOT_PRETRAINING_RUN.md` is the canonical first pilot-run and
+  promotion-evidence doc for the `Psion` learned-model lane.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical phase-gate and
   promotion-decision doc for the `Psion` learned-model lane.
 - `docs/PSION_CAPABILITY_MATRIX.md` is the canonical served capability and

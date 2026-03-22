@@ -123,6 +123,10 @@ and now also has:
   doc for the `Psion` learned-model lane and freezes the cost, throughput,
   checkpoint-size, topology, and instability-marker receipts that later pilot
   and broader-pretraining decisions must cite directly.
+- `docs/PSION_PILOT_PRETRAINING_RUN.md` is the canonical first pilot-run doc
+  for the `Psion` learned-model lane and freezes the bounded pilot bundle,
+  held-out-loss receipt, route/refusal probes, and acceptance-matrix promotion
+  decision that must exist before broader pretraining is honest.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical first phase-gate and
   promotion-decision doc for the `Psion` learned-model lane and freezes the
   acceptance-matrix plus evidence-bound promotion contract that later pilot,
