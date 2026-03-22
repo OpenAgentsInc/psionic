@@ -1561,6 +1561,7 @@ fn digest_bytes(bytes: &[u8]) -> String {
 
 fn training_stage_kind_label(kind: TrainingStageKind) -> &'static str {
     match kind {
+        TrainingStageKind::Pretrain => "pretrain",
         TrainingStageKind::GeneralSft => "general_sft",
         TrainingStageKind::AgenticSft => "agentic_sft",
         TrainingStageKind::Rl => "rl",

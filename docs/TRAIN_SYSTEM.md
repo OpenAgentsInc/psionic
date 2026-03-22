@@ -115,6 +115,10 @@ and now also has:
   doc for the `Psion` learned-model lane and freezes tokenizer binding,
   context-length configuration, checkpoint tensor naming, and export naming
   that later pretraining, evaluation, and serving work must follow.
+- `docs/PSION_PRETRAIN_STAGE.md` is the canonical first pretrain-stage doc for
+  the `Psion` learned-model lane and freezes the declared stage config,
+  objective contract, source-family-aware reporting, replay receipt, and
+  checkpoint-lineage receipt that later pilot and cluster runs must follow.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical first phase-gate and
   promotion-decision doc for the `Psion` learned-model lane and freezes the
   acceptance-matrix plus evidence-bound promotion contract that later pilot,

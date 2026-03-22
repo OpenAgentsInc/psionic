@@ -6,10 +6,14 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+use crate::PsionPretrainStageRunReceipt;
+
 /// One canonical training stage in the multi-stage train program.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TrainingStageKind {
+    /// Broad next-token pretraining over the curated corpus.
+    Pretrain,
     /// Broad supervised fine-tuning over ordinary completion or long-context traces.
     GeneralSft,
     /// Agentic SFT over tool-call and long-context traces.
@@ -23,6 +27,7 @@ impl TrainingStageKind {
     #[must_use]
     pub const fn next_kind(self) -> Option<Self> {
         match self {
+            Self::Pretrain => Some(Self::GeneralSft),
             Self::GeneralSft => Some(Self::AgenticSft),
             Self::AgenticSft => Some(Self::Rl),
             Self::Rl => None,
@@ -280,6 +285,8 @@ pub struct TrainingStageCompletionReceipt {
     pub kind: TrainingStageKind,
     /// Number of accepted traces in the stage.
     pub ingested_trace_count: u32,
+    /// Number of accepted pretrain run receipts in the stage.
+    pub pretrain_run_count: u32,
     /// Logical completion timestamp.
     pub completed_at_ms: u64,
     /// Stable digest over the completion record.
@@ -350,6 +357,9 @@ pub struct TrainingStageState {
     /// Accepted trace ingestion receipts.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ingested_traces: Vec<TrainingSftTraceIngestionReceipt>,
+    /// Accepted Psion pretrain run receipts.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pretrain_runs: Vec<PsionPretrainStageRunReceipt>,
 }
 
 /// Error returned by the multi-stage train program.
@@ -394,8 +404,8 @@ pub enum TrainingStageProgramError {
         from: TrainingStageKind,
         to: TrainingStageKind,
     },
-    /// The initial stage must be general SFT.
-    #[error("initial training stage must be `general_sft`, found `{kind:?}`")]
+    /// The initial stage must be pretrain or general SFT.
+    #[error("initial training stage must be `pretrain` or `general_sft`, found `{kind:?}`")]
     InvalidInitialStage { kind: TrainingStageKind },
     /// A checkpoint is required to enter the stage.
     #[error("training stage `{kind:?}` requires a promoted checkpoint")]
@@ -411,15 +421,35 @@ pub enum TrainingStageProgramError {
     /// The stage requires at least one trace before completion.
     #[error("training stage `{stage_id}` requires at least one ingested trace")]
     StageRequiresTrace { stage_id: String },
+    /// The pretrain stage requires at least one pretrain receipt before completion.
+    #[error("training stage `{stage_id}` requires at least one pretrain receipt")]
+    StageRequiresPretrainRun { stage_id: String },
     /// The trace kind is not allowed in the current stage.
     #[error("training stage `{stage_id}` does not admit trace kind `{trace_kind:?}`")]
     TraceKindNotAllowed {
         stage_id: String,
         trace_kind: TrainingSftTraceKind,
     },
+    /// A pretrain receipt was attached to a non-pretrain stage.
+    #[error("training stage `{stage_id}` does not admit pretrain receipts")]
+    PretrainReceiptNotAllowed { stage_id: String },
+    /// A pretrain receipt drifted from the active stage identity.
+    #[error("training stage expected pretrain receipt stage `{expected_stage_id}`, found `{actual_stage_id}`")]
+    PretrainReceiptStageMismatch {
+        expected_stage_id: String,
+        actual_stage_id: String,
+    },
+    /// A pretrain receipt drifted from the active run identity.
+    #[error(
+        "training stage expected pretrain receipt run `{expected_run_id}`, found `{actual_run_id}`"
+    )]
+    PretrainReceiptRunMismatch {
+        expected_run_id: String,
+        actual_run_id: String,
+    },
 }
 
-/// Persistent multi-stage train-program state over SFT, agentic SFT, and RL.
+/// Persistent multi-stage train-program state over pretrain, SFT, agentic SFT, and RL.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrainingStageProgramState {
     /// Stable run id.
@@ -471,6 +501,14 @@ impl TrainingStageProgramState {
         self.start_stage(TrainingStageKind::GeneralSft, environment, None)
     }
 
+    /// Starts the first `pretrain` stage.
+    pub fn start_initial_pretrain_stage(
+        &mut self,
+        environment: EnvironmentPackageKey,
+    ) -> Result<TrainingStageTransitionReceipt, TrainingStageProgramError> {
+        self.start_stage(TrainingStageKind::Pretrain, environment, None)
+    }
+
     /// Ingests one typed SFT trace into the active stage.
     pub fn ingest_trace(
         &mut self,
@@ -502,6 +540,54 @@ impl TrainingStageProgramState {
         Ok(receipt)
     }
 
+    /// Records one Psion pretrain run receipt on the active pretrain stage.
+    pub fn record_psion_pretrain_run(
+        &mut self,
+        receipt: &PsionPretrainStageRunReceipt,
+    ) -> Result<(), TrainingStageProgramError> {
+        let stage = self
+            .stages
+            .last_mut()
+            .ok_or(TrainingStageProgramError::NoActiveStage)?;
+        if stage.status != TrainingStageStatus::Active {
+            return Err(TrainingStageProgramError::NoActiveStage);
+        }
+        if stage.kind != TrainingStageKind::Pretrain {
+            return Err(TrainingStageProgramError::PretrainReceiptNotAllowed {
+                stage_id: stage.stage_id.clone(),
+            });
+        }
+        if receipt.stage_id != stage.stage_id {
+            return Err(TrainingStageProgramError::PretrainReceiptStageMismatch {
+                expected_stage_id: stage.stage_id.clone(),
+                actual_stage_id: receipt.stage_id.clone(),
+            });
+        }
+        if receipt.run_id != self.run_id {
+            return Err(TrainingStageProgramError::PretrainReceiptRunMismatch {
+                expected_run_id: self.run_id.clone(),
+                actual_run_id: receipt.run_id.clone(),
+            });
+        }
+        if receipt
+            .checkpoint_lineage
+            .promoted_checkpoint
+            .checkpoint_family
+            != self.checkpoint_family
+        {
+            return Err(TrainingStageProgramError::CheckpointFamilyMismatch {
+                expected: self.checkpoint_family.clone(),
+                actual: receipt
+                    .checkpoint_lineage
+                    .promoted_checkpoint
+                    .checkpoint_family
+                    .clone(),
+            });
+        }
+        stage.pretrain_runs.push(receipt.clone());
+        Ok(())
+    }
+
     /// Completes the active stage.
     pub fn complete_current_stage(
         &mut self,
@@ -513,14 +599,20 @@ impl TrainingStageProgramState {
         if stage.status != TrainingStageStatus::Active {
             return Err(TrainingStageProgramError::NoActiveStage);
         }
-        if matches!(
-            stage.kind,
+        match stage.kind {
+            TrainingStageKind::Pretrain if stage.pretrain_runs.is_empty() => {
+                return Err(TrainingStageProgramError::StageRequiresPretrainRun {
+                    stage_id: stage.stage_id.clone(),
+                });
+            }
             TrainingStageKind::GeneralSft | TrainingStageKind::AgenticSft
-        ) && stage.ingested_traces.is_empty()
-        {
-            return Err(TrainingStageProgramError::StageRequiresTrace {
-                stage_id: stage.stage_id.clone(),
-            });
+                if stage.ingested_traces.is_empty() =>
+            {
+                return Err(TrainingStageProgramError::StageRequiresTrace {
+                    stage_id: stage.stage_id.clone(),
+                });
+            }
+            _ => {}
         }
         stage.status = TrainingStageStatus::Completed;
         let completed_at_ms = now_epoch_ms();
@@ -529,12 +621,14 @@ impl TrainingStageProgramState {
             stage_id: stage.stage_id.clone(),
             kind: stage.kind,
             ingested_trace_count: stage.ingested_traces.len() as u32,
+            pretrain_run_count: stage.pretrain_runs.len() as u32,
             completed_at_ms,
             completion_digest: stable_stage_completion_digest(
                 self.run_id.as_str(),
                 stage.stage_id.as_str(),
                 stage.kind,
                 stage.ingested_traces.len() as u32,
+                stage.pretrain_runs.len() as u32,
                 completed_at_ms,
             ),
         };
@@ -614,7 +708,10 @@ impl TrainingStageProgramState {
         let previous_stage = self.stages.last().cloned();
         match previous_stage.as_ref() {
             None => {
-                if kind != TrainingStageKind::GeneralSft {
+                if !matches!(
+                    kind,
+                    TrainingStageKind::Pretrain | TrainingStageKind::GeneralSft
+                ) {
                     return Err(TrainingStageProgramError::InvalidInitialStage { kind });
                 }
             }
@@ -667,6 +764,7 @@ impl TrainingStageProgramState {
             status: TrainingStageStatus::Active,
             base_checkpoint,
             ingested_traces: Vec::new(),
+            pretrain_runs: Vec::new(),
         });
         self.transitions.push(transition.clone());
         Ok(transition)
@@ -675,6 +773,7 @@ impl TrainingStageProgramState {
 
 fn training_stage_kind_label(kind: TrainingStageKind) -> &'static str {
     match kind {
+        TrainingStageKind::Pretrain => "pretrain",
         TrainingStageKind::GeneralSft => "general_sft",
         TrainingStageKind::AgenticSft => "agentic_sft",
         TrainingStageKind::Rl => "rl",
@@ -686,6 +785,7 @@ fn stage_kind_allows_trace(
     trace_kind: TrainingSftTraceKind,
 ) -> bool {
     match stage_kind {
+        TrainingStageKind::Pretrain => false,
         TrainingStageKind::GeneralSft => matches!(
             trace_kind,
             TrainingSftTraceKind::PlainCompletion | TrainingSftTraceKind::LongContext
@@ -758,6 +858,7 @@ fn stable_stage_completion_digest(
     stage_id: &str,
     kind: TrainingStageKind,
     ingested_trace_count: u32,
+    pretrain_run_count: u32,
     completed_at_ms: u64,
 ) -> String {
     let mut hasher = Sha256::new();
@@ -769,6 +870,8 @@ fn stable_stage_completion_digest(
     hasher.update(training_stage_kind_label(kind).as_bytes());
     hasher.update(b"|");
     hasher.update(ingested_trace_count.to_string().as_bytes());
+    hasher.update(b"|");
+    hasher.update(pretrain_run_count.to_string().as_bytes());
     hasher.update(b"|");
     hasher.update(completed_at_ms.to_string().as_bytes());
     hex::encode(hasher.finalize())
@@ -839,12 +942,19 @@ fn now_epoch_ms() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        TrainingLongContextTraceLineage, TrainingSftTraceArtifact, TrainingSftTraceKind,
-        TrainingStageKind, TrainingStageProgramError, TrainingStageProgramState,
-        TrainingToolCallTraceLineage, TrainingToolCallTraceStep,
+        PsionPretrainStageRunReceipt, TrainingLongContextTraceLineage, TrainingSftTraceArtifact,
+        TrainingSftTraceKind, TrainingStageKind, TrainingStageProgramError,
+        TrainingStageProgramState, TrainingToolCallTraceLineage, TrainingToolCallTraceStep,
     };
     use psionic_environments::EnvironmentPackageKey;
     use psionic_runtime::TrainingCheckpointReference;
+
+    fn psion_pretrain_receipt() -> PsionPretrainStageRunReceipt {
+        serde_json::from_str(include_str!(
+            "../../../fixtures/psion/pretrain/psion_pretrain_stage_receipt_v1.json"
+        ))
+        .expect("pretrain stage receipt should parse")
+    }
 
     fn checkpoint(step: u64) -> TrainingCheckpointReference {
         TrainingCheckpointReference::new(
@@ -864,8 +974,64 @@ mod tests {
     }
 
     #[test]
-    fn stage_program_advances_from_general_sft_to_agentic_sft_to_rl()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn stage_program_advances_from_pretrain_to_general_sft(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let environment = EnvironmentPackageKey::new("env.psion", "2026.03.22");
+        let mut program = TrainingStageProgramState::new("run-psion-pilot", "train.psion.decoder")?;
+        let initial = program.start_initial_pretrain_stage(environment.clone())?;
+        assert_eq!(initial.next_stage_kind, TrainingStageKind::Pretrain);
+
+        let pretrain_receipt = psion_pretrain_receipt();
+        program.record_psion_pretrain_run(&pretrain_receipt)?;
+        let completed = program.complete_current_stage()?;
+        assert_eq!(completed.kind, TrainingStageKind::Pretrain);
+        assert_eq!(completed.pretrain_run_count, 1);
+        assert_eq!(completed.ingested_trace_count, 0);
+
+        let general_sft = program.advance_stage(
+            TrainingStageKind::GeneralSft,
+            environment,
+            pretrain_receipt
+                .checkpoint_lineage
+                .promoted_checkpoint
+                .clone(),
+        )?;
+        assert_eq!(
+            general_sft.transition.next_stage_kind,
+            TrainingStageKind::GeneralSft
+        );
+        assert_eq!(
+            program.current_stage().map(|stage| stage.kind),
+            Some(TrainingStageKind::GeneralSft)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stage_program_refuses_pretrain_receipt_from_another_run(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let environment = EnvironmentPackageKey::new("env.psion", "2026.03.22");
+        let mut program = TrainingStageProgramState::new("run-psion-pilot", "train.psion.decoder")?;
+        program.start_initial_pretrain_stage(environment)?;
+
+        let mut pretrain_receipt = psion_pretrain_receipt();
+        pretrain_receipt.run_id = String::from("run-psion-other");
+
+        assert_eq!(
+            program
+                .record_psion_pretrain_run(&pretrain_receipt)
+                .expect_err("mismatched run id should be rejected"),
+            TrainingStageProgramError::PretrainReceiptRunMismatch {
+                expected_run_id: String::from("run-psion-pilot"),
+                actual_run_id: String::from("run-psion-other"),
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stage_program_advances_from_general_sft_to_agentic_sft_to_rl(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let environment = EnvironmentPackageKey::new("env.weather", "2026.03.14");
         let mut program = TrainingStageProgramState::new("run-weather", "train.weather")?;
         let initial = program.start_initial_stage(environment.clone())?;
@@ -939,8 +1105,8 @@ mod tests {
     }
 
     #[test]
-    fn stage_program_refuses_agentic_trace_before_agentic_stage()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn stage_program_refuses_agentic_trace_before_agentic_stage(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let environment = EnvironmentPackageKey::new("env.weather", "2026.03.14");
         let mut program = TrainingStageProgramState::new("run-weather", "train.weather")?;
         program.start_initial_stage(environment.clone())?;
