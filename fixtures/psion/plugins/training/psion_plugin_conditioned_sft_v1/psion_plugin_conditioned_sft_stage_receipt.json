@@ -1,0 +1,53 @@
+{
+  "schema_version": "psionic.psion.plugin_conditioned_sft_stage_receipt.v1",
+  "receipt_id": "receipt.psion.plugin_conditioned_sft.reference.v1",
+  "run_id": "run-psion-plugin-conditioned-reference",
+  "stage_id": "run-psion-plugin-conditioned-reference-stage-2-agentic_sft",
+  "checkpoint_family": "train.psion.plugin_conditioned.reference",
+  "stage_manifest_digest": "836576c1df62ab8ff42bc08afa4a617eb47dd06eca20d9467506366d106c0987",
+  "dataset_bundle_digest": "9e4bc8b26ed7bb71a19e6f48f37904986e321d51e9af5f6282fa50e61fc821b6",
+  "agentic_sft_transition_digest": "355d533ded13912bd82dc18136c0b8f99069c2bfce926c56ba62c36aed4f9b72",
+  "general_sft_completion_digest": "2e3b0cae08ef1199ef83bac989dd07b3bae5adebc13627883405843c60407a25",
+  "agentic_sft_completion_digest": "28bd44f657f88de297d680ce3d9171ed942d03b137fea18b8c5c2cf6cc80301a",
+  "ingested_trace_count": 3,
+  "execution_evidence_trace_count": 3,
+  "eval_hook_count": 7,
+  "controller_coverage": [
+    {
+      "controller_surface": "deterministic_workflow",
+      "trace_count": 1,
+      "detail": "The stage preserves 1 accepted plugin-conditioned traces from DeterministicWorkflow."
+    },
+    {
+      "controller_surface": "router_responses",
+      "trace_count": 1,
+      "detail": "The stage preserves 1 accepted plugin-conditioned traces from RouterResponses."
+    },
+    {
+      "controller_surface": "apple_fm_session",
+      "trace_count": 1,
+      "detail": "The stage preserves 1 accepted plugin-conditioned traces from AppleFmSession."
+    }
+  ],
+  "route_coverage": [
+    {
+      "route_label": "delegate_to_admitted_plugin",
+      "trace_count": 3,
+      "detail": "The stage preserves 3 traces carrying DelegateToAdmittedPlugin."
+    }
+  ],
+  "replay_class_coverage": [
+    {
+      "replay_class_id": "deterministic_replayable",
+      "trace_count": 3,
+      "detail": "Replay class `deterministic_replayable` stays explicit on 3 accepted traces."
+    },
+    {
+      "replay_class_id": "replayable_with_snapshots",
+      "trace_count": 3,
+      "detail": "Replay class `replayable_with_snapshots` stays explicit on 3 accepted traces."
+    }
+  ],
+  "summary": "The first plugin-conditioned stage completed with one accepted trace per committed host-native train record and explicit replay plus held-out audit posture.",
+  "receipt_digest": "75e7aebd37a3e7d398b2f4a8b2740de99354cfeb8d363fe2a83320453a523b53"
+}

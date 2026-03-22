@@ -145,6 +145,11 @@ and now also has:
   freezes the receipt-backed result-interpretation package, execution-backed
   versus inferred statement boundary, and refusal-continuation scoring surface
   for the first host-native interpretation family.
+- `docs/PSION_PLUGIN_CONDITIONED_SFT.md` is the canonical first
+  plugin-conditioned `agentic_sft` stage doc for the convergence tranche and
+  freezes the stage manifest, canonical dataset binding, benchmark-hook
+  posture, replay-class coverage, stage receipt, and bounded output bundle for
+  the first learned plugin-use stage contract.
 - `docs/audits/2026-03-22-tassadar-full-plugin-system-state-audit.md` is the
   canonical current-state proof record for the bounded Tassadar plugin system
   and freezes the present authoring-class, publication, and guest-artifact
