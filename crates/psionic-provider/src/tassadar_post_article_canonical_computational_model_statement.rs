@@ -91,7 +91,7 @@ mod tests {
         assert!(receipt.plugin_layer_scoped_above_machine);
         assert!(receipt.proof_transport_complete);
         assert_eq!(receipt.proof_transport_audit_issue_id, "TAS-209");
-        assert_eq!(receipt.next_stability_issue_id, "TAS-210");
+        assert_eq!(receipt.next_stability_issue_id, "TAS-211");
         assert_eq!(receipt.closure_bundle_issue_id, "TAS-215");
         assert!(!receipt.weighted_plugin_control_part_of_model);
         assert!(!receipt.plugin_publication_allowed);

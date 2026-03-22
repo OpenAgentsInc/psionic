@@ -52,7 +52,7 @@ const PROOF_TRANSPORT_AUDIT_REPORT_REF: &str =
 const PROOF_TRANSPORT_AUDIT_REPORT_ID: &str =
     "tassadar.post_article_execution_semantics_proof_transport_audit.report.v1";
 const PROOF_TRANSPORT_AUDIT_ISSUE_ID: &str = "TAS-209";
-const NEXT_STABILITY_ISSUE_ID: &str = "TAS-210";
+const NEXT_STABILITY_ISSUE_ID: &str = "TAS-211";
 const CLOSURE_BUNDLE_ISSUE_ID: &str = "TAS-215";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -883,7 +883,7 @@ mod tests {
             "fixtures/tassadar/reports/tassadar_post_article_execution_semantics_proof_transport_audit_report.json"
         );
         assert_eq!(report.proof_transport_audit_issue_id, "TAS-209");
-        assert_eq!(report.next_stability_issue_id, "TAS-210");
+        assert_eq!(report.next_stability_issue_id, "TAS-211");
         assert!(!report.closure_bundle_embedded_here);
         assert_eq!(report.closure_bundle_issue_id, "TAS-215");
         assert!(!report.weighted_plugin_control_part_of_model);

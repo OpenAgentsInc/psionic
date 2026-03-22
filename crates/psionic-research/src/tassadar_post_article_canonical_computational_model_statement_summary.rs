@@ -257,7 +257,7 @@ mod tests {
         assert!(summary.plugin_layer_scoped_above_machine);
         assert!(summary.proof_transport_complete);
         assert_eq!(summary.proof_transport_audit_issue_id, "TAS-209");
-        assert_eq!(summary.next_stability_issue_id, "TAS-210");
+        assert_eq!(summary.next_stability_issue_id, "TAS-211");
         assert!(!summary.closure_bundle_embedded_here);
         assert_eq!(summary.closure_bundle_issue_id, "TAS-215");
         assert!(!summary.weighted_plugin_control_part_of_model);

@@ -1065,7 +1065,7 @@ and the dedicated checker now lives at
 This tranche turns weighted plugin control green on the canonical route,
 clears the `TAS-203A` defer pointer to empty, clears the controller defer
 pointer to empty, with the current reserved bridge capability frontier now at
-`TAS-210`, and still does not admit bounded plugin-platform closeout, plugin
+`TAS-211`, and still does not admit bounded plugin-platform closeout, plugin
 publication, served/public universality, or arbitrary software capability.
 
 `TAS-205` now closes the canonical plugin authority, promotion, publication,
@@ -1173,9 +1173,35 @@ the transformer-owned anchor contract now lives at
 and the dedicated checker now lives at
 `scripts/check-tassadar-post-article-execution-semantics-proof-transport-audit.sh`.
 This tranche closes proof transport, moves the next anti-drift stability
-frontier to `TAS-210`, keeps the final claim-bearing canonical machine closure
+frontier to `TAS-211`, keeps the final claim-bearing canonical machine closure
 bundle separate for `TAS-215`, and still does not turn plugin publication,
 served/public universality, or arbitrary software capability green.
+
+`TAS-210` now closes the continuation non-computationality contract at
+`fixtures/tassadar/reports/tassadar_post_article_continuation_non_computationality_contract_report.json`.
+That eval-owned artifact binds checkpoint, spill, tape, session, process-
+object, installed-process, and weighted-controller continuation surfaces to the
+same canonical machine tuple, the published computational-model statement, and
+the closed proof-transport boundary instead of letting continuation inherit
+identity from adjacent green artifacts. It also freezes explicit invalidations
+for hidden checkpoint workflow logic, spill/tape directive logic, process-
+object policy smuggling, installed-process recomposition, session-surface
+widening, resume-as-hidden-compute, and second-machine overclaim. The
+operator-readable summary now lives at
+`fixtures/tassadar/reports/tassadar_post_article_continuation_non_computationality_contract_summary.json`,
+the provider receipt now lives at
+`crates/psionic-provider/src/tassadar_post_article_continuation_non_computationality_contract.rs`,
+the transformer-owned anchor contract now lives at
+`crates/psionic-transformer/src/tassadar_post_article_continuation_non_computationality_contract.rs`,
+and the dedicated checker now lives at
+`scripts/check-tassadar-post-article-continuation-non-computationality-contract.sh`.
+This tranche closes continuation non-computationality, refreshes the dependent
+conformance, authority, bounded-platform-closeout, computational-model,
+proof-transport, and machine-lock artifacts onto the same canonical statement
+binding, moves the next anti-drift stability frontier to `TAS-211`, keeps the
+final claim-bearing canonical machine closure bundle separate for `TAS-215`,
+and still does not turn plugin publication, served/public universality, or
+arbitrary software capability green.
 
 ## Route Requirement
 

@@ -236,7 +236,7 @@ mod tests {
         assert_eq!(summary.proof_transport_issue_id, "TAS-209");
         assert!(summary.proof_transport_complete);
         assert!(summary.plugin_execution_transport_bound);
-        assert_eq!(summary.next_stability_issue_id, "TAS-210");
+        assert_eq!(summary.next_stability_issue_id, "TAS-211");
         assert_eq!(summary.closure_bundle_issue_id, "TAS-215");
     }
 

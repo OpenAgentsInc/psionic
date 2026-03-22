@@ -37,7 +37,7 @@ jq -e '
   and .plugin_layer_scoped_above_machine == true
   and .proof_transport_complete == true
   and .proof_transport_audit_issue_id == "TAS-209"
-  and .next_stability_issue_id == "TAS-210"
+  and .next_stability_issue_id == "TAS-211"
   and .closure_bundle_embedded_here == false
   and .closure_bundle_issue_id == "TAS-215"
   and .weighted_plugin_control_part_of_model == false
@@ -66,7 +66,7 @@ jq -e '
   and .plugin_layer_scoped_above_machine == true
   and .proof_transport_complete == true
   and .proof_transport_audit_issue_id == "TAS-209"
-  and .next_stability_issue_id == "TAS-210"
+  and .next_stability_issue_id == "TAS-211"
   and .closure_bundle_embedded_here == false
   and .closure_bundle_issue_id == "TAS-215"
   and .weighted_plugin_control_part_of_model == false
@@ -78,6 +78,6 @@ jq -e '
 jq -e '
   .bridge_machine_identity_id == "tassadar.post_article_universality_bridge.machine_identity.v1"
   and (.reserved_capability_issue_ids | index("TAS-195")) != null
-  and (.reserved_capability_issue_ids | index("TAS-210")) != null
+  and (.reserved_capability_issue_ids | index("TAS-211")) != null
   and (.reserved_capability_issue_ids | index("TAS-208")) == null
 ' fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_summary.json >/dev/null

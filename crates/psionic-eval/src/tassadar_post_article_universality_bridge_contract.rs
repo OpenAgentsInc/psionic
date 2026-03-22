@@ -763,13 +763,13 @@ pub fn build_tassadar_post_article_universality_bridge_contract_report() -> Resu
             purpose: String::from(
                 "keep schema-version negotiation and canonical-machine inheritance explicit above the bridge while the later stability frontier remains separate",
             ),
-            reserved_issue_ids: vec![String::from("TAS-210")],
+            reserved_issue_ids: vec![String::from("TAS-211")],
             current_posture: String::from("reserved_after_bounded_plugin_platform_closeout"),
             source_refs: vec![String::from(
                 "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md",
             )],
             detail: String::from(
-                "the bridge now delegates schema stability, weighted-controller ownership, bounded plugin-platform closeout, canonical-machine locking, the published computational-model statement, the execution-semantics proof-transport audit, and the later continuation non-computationality contract to TAS-203A through TAS-210 instead of widening the bridge itself into the terminal machine or publication surface",
+                "the bridge now delegates schema stability, weighted-controller ownership, bounded plugin-platform closeout, canonical-machine locking, the published computational-model statement, the execution-semantics proof-transport audit, the closed continuation non-computationality boundary, and the later fast-route legitimacy and carrier-binding contract to TAS-203A through TAS-211 instead of widening the bridge itself into the terminal machine or publication surface",
             ),
         },
     ];
@@ -980,7 +980,7 @@ pub fn build_tassadar_post_article_universality_bridge_contract_report() -> Resu
         plugin_capability_claim_allowed: false,
         served_public_universality_allowed: false,
         claim_boundary: String::from(
-            "this bridge contract freezes only the post-`TAS-186` rebasing boundary between the historical `TCM.v1` universality closeout and the canonical owned article-equivalence route. It binds the old closeout to one explicit post-article machine identity tuple, one coarse direct-vs-resumable carrier topology, one separately published canonical computational-model statement, one separately published execution-semantics proof-transport audit, and one explicit three-plane contract. It does not by itself prove continuation non-computationality, fast-route legitimacy, control-plane provenance, final canonical carrier binding, served/public universality, weighted plugin control, or arbitrary software capability.",
+            "this bridge contract freezes only the post-`TAS-186` rebasing boundary between the historical `TCM.v1` universality closeout and the canonical owned article-equivalence route. It binds the old closeout to one explicit post-article machine identity tuple, one coarse direct-vs-resumable carrier topology, one separately published canonical computational-model statement, one separately published execution-semantics proof-transport audit, and one explicit three-plane contract. It does not by itself prove fast-route legitimacy, control-plane provenance, final canonical carrier binding, served/public universality, weighted plugin control, or arbitrary software capability.",
         ),
         summary: String::new(),
         report_digest: String::new(),

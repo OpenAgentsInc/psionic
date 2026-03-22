@@ -76,7 +76,7 @@ mod tests {
         assert_eq!(receipt.proof_transport_issue_id, "TAS-209");
         assert!(receipt.proof_transport_complete);
         assert!(receipt.plugin_execution_transport_bound);
-        assert_eq!(receipt.next_stability_issue_id, "TAS-210");
+        assert_eq!(receipt.next_stability_issue_id, "TAS-211");
         assert_eq!(receipt.closure_bundle_issue_id, "TAS-215");
     }
 }

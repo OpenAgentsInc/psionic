@@ -420,7 +420,7 @@ Current honest posture:
   conditions, explicit determinism and external-signal boundaries, and
   explicit host-negative planner attacks; this tranche turns weighted plugin
   control green on the canonical route, clears the controller defer pointer to
-  empty, with the later bridge reservation frontier now at `TAS-210`, and still
+  empty, with the later bridge reservation frontier now at `TAS-211`, and still
   keeps bounded plugin-platform closeout, plugin publication, served/public
   universality, and arbitrary software capability blocked
 - the repo now also has one post-article plugin authority, promotion,
@@ -496,10 +496,27 @@ Current honest posture:
   computational-model statement, the historical green `TCM.v1` continuation
   contract, and the current plugin runtime, conformance, and weighted-controller
   surfaces to one explicit proof-bearing execution boundary; this tranche
-  closes proof transport, moves the next anti-drift frontier to `TAS-210`,
+  closes proof transport, moves the next anti-drift frontier to `TAS-211`,
   keeps the final claim-bearing canonical machine closure bundle separate for
   `TAS-215`, and still keeps plugin publication, served/public universality,
   and arbitrary software capability blocked
+- the repo now also has one post-article continuation non-computationality
+  contract, with a committed eval report at
+  `fixtures/tassadar/reports/tassadar_post_article_continuation_non_computationality_contract_report.json`,
+  a disclosure-safe research summary at
+  `fixtures/tassadar/reports/tassadar_post_article_continuation_non_computationality_contract_summary.json`,
+  a transformer-owned anchor contract, a provider-facing receipt, a dedicated
+  checker script, and an audit note that freeze checkpoint, spill, tape,
+  session, process-object, installed-process, and weighted-controller
+  continuation surfaces as transport-only extensions of the same canonical
+  machine instead of a second machine; this tranche closes continuation
+  non-computationality, refreshes the dependent conformance, authority,
+  bounded-platform-closeout, computational-model, proof-transport, and
+  machine-lock artifacts onto the same canonical statement binding, moves the
+  next anti-drift frontier to `TAS-211`, keeps the final claim-bearing
+  canonical machine closure bundle separate for `TAS-215`, and still keeps
+  plugin publication, served/public universality, and arbitrary software
+  capability blocked
 - the repo now also has one post-article Turing-completeness closeout audit,
   with a committed eval report at
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
@@ -714,9 +731,9 @@ Issue-state note:
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 - `TAS-157` through `TAS-205` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-206` through `TAS-209` are now implemented and tracked in
+- `TAS-206` through `TAS-210` are now implemented and tracked in
   `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
-- `TAS-210` through `TAS-226` remain open in GitHub and are tracked via the
+- `TAS-211` through `TAS-226` remain open in GitHub and are tracked via the
   issue bodies plus `docs/ROADMAP_TASSADAR_TAS_SYNC.md`
 
 ## Repo-Local Companion Docs

@@ -37,7 +37,7 @@ jq -e '
   and .proof_transport_issue_id == "TAS-209"
   and .proof_transport_complete == true
   and .plugin_execution_transport_bound == true
-  and .next_stability_issue_id == "TAS-210"
+  and .next_stability_issue_id == "TAS-211"
   and .closure_bundle_issue_id == "TAS-215"
   and .closure_bundle_embedded_here == false
   and .rebase_claim_allowed == false
@@ -66,7 +66,7 @@ jq -e '
   and .proof_transport_issue_id == "TAS-209"
   and .proof_transport_complete == true
   and .plugin_execution_transport_bound == true
-  and .next_stability_issue_id == "TAS-210"
+  and .next_stability_issue_id == "TAS-211"
   and .closure_bundle_issue_id == "TAS-215"
 ' fixtures/tassadar/reports/tassadar_post_article_execution_semantics_proof_transport_audit_summary.json >/dev/null
 
@@ -76,7 +76,7 @@ jq -e '
   and .proof_transport_complete == true
   and .proof_transport_audit_report_ref == "fixtures/tassadar/reports/tassadar_post_article_execution_semantics_proof_transport_audit_report.json"
   and .proof_transport_audit_issue_id == "TAS-209"
-  and .next_stability_issue_id == "TAS-210"
+  and .next_stability_issue_id == "TAS-211"
   and ((.supporting_material_rows | length) == 11)
   and ((.dependency_rows | length) == 7)
   and ((.invalidation_rows | length) == 5)
@@ -86,6 +86,6 @@ jq -e '
 jq -e '
   .bridge_machine_identity_id == "tassadar.post_article_universality_bridge.machine_identity.v1"
   and (.reserved_capability_issue_ids | index("TAS-195")) != null
-  and (.reserved_capability_issue_ids | index("TAS-210")) != null
+  and (.reserved_capability_issue_ids | index("TAS-211")) != null
   and (.reserved_capability_issue_ids | index("TAS-209")) == null
 ' fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_summary.json >/dev/null

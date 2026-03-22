@@ -310,7 +310,7 @@
   "plugin_layer_scoped_above_machine": true,
   "proof_transport_complete": true,
   "proof_transport_audit_issue_id": "TAS-209",
-  "next_stability_issue_id": "TAS-210",
+  "next_stability_issue_id": "TAS-211",
   "closure_bundle_embedded_here": false,
   "closure_bundle_issue_id": "TAS-215",
   "weighted_plugin_control_part_of_model": false,
@@ -318,6 +318,6 @@
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
   "claim_boundary": "this runtime-owned report publishes the canonical post-article computational model statement: one owned direct Transformer route supplies compute identity, TCM.v1 supplies continuation and effect boundaries, and any plugin layer stays above that machine instead of redefining it. Execution-semantics proof transport is now carried by the separate TAS-209 audit, while publication, served/public universality, arbitrary software capability, the later anti-drift stability frontier, and the final closure bundle remain separate.",
-  "summary": "Post-article canonical computational-model statement keeps status=Green, supporting_material_rows=11, dependency_rows=7, invalidation_rows=5, validation_rows=7, proof_transport_complete=true, proof_transport_audit_issue_id=`TAS-209`, next_stability_issue_id=`TAS-210`, and closure_bundle_issue_id=`TAS-215`.",
-  "report_digest": "c43671ba6d2954fd3668281c65a3a2703a0e6ee0c31352e099232686a8e932de"
+  "summary": "Post-article canonical computational-model statement keeps status=Green, supporting_material_rows=11, dependency_rows=7, invalidation_rows=5, validation_rows=7, proof_transport_complete=true, proof_transport_audit_issue_id=`TAS-209`, next_stability_issue_id=`TAS-211`, and closure_bundle_issue_id=`TAS-215`.",
+  "report_digest": "4a1570bc0d28016501fa568d4e455c0e9654197c7797509832dda636908dcc93"
 }

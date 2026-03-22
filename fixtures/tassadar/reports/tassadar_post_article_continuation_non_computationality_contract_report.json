@@ -1,0 +1,576 @@
+{
+  "schema_version": 1,
+  "report_id": "tassadar.post_article_continuation_non_computationality_contract.report.v1",
+  "checker_script_ref": "scripts/check-tassadar-post-article-continuation-non-computationality-contract.sh",
+  "transformer_anchor_contract_ref": "crates/psionic-transformer/src/tassadar_post_article_continuation_non_computationality_contract.rs",
+  "canonical_machine_identity_lock_report_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_machine_identity_lock_report.json",
+  "canonical_computational_model_statement_report_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_computational_model_statement_report.json",
+  "execution_semantics_proof_transport_audit_report_ref": "fixtures/tassadar/reports/tassadar_post_article_execution_semantics_proof_transport_audit_report.json",
+  "execution_checkpoint_report_ref": "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+  "process_object_report_ref": "fixtures/tassadar/reports/tassadar_process_object_report.json",
+  "session_process_profile_report_ref": "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+  "spill_tape_store_report_ref": "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+  "installed_process_lifecycle_report_ref": "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json",
+  "weighted_plugin_controller_trace_eval_report_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json",
+  "supporting_material_refs": [
+    "fixtures/tassadar/reports/tassadar_post_article_canonical_machine_identity_lock_report.json",
+    "fixtures/tassadar/reports/tassadar_post_article_canonical_computational_model_statement_report.json",
+    "fixtures/tassadar/reports/tassadar_post_article_execution_semantics_proof_transport_audit_report.json",
+    "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+    "fixtures/tassadar/reports/tassadar_process_object_report.json",
+    "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+    "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+    "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json",
+    "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json"
+  ],
+  "continuation_contract": {
+    "schema_version": 1,
+    "contract_id": "tassadar.post_article.continuation_non_computationality.contract.v1",
+    "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+    "tuple_id": "tassadar.post_article.canonical_machine_identity_lock.tuple.v1",
+    "carrier_class_id": "tassadar.post_article.canonical_machine.closure_bundle_bound_rebased_route_identity.v1",
+    "boundary_id": "tassadar.post_article.continuation_non_computationality.boundary.v1",
+    "admitted_continuation_surface_ids": [
+      "tassadar.post_article.continuation.checkpoint_surface.v1",
+      "tassadar.post_article.continuation.session_process_surface.v1",
+      "tassadar.post_article.continuation.spill_tape_surface.v1",
+      "tassadar.post_article.continuation.process_object_surface.v1",
+      "tassadar.post_article.continuation.installed_process_surface.v1",
+      "tassadar.post_article.continuation.weighted_controller_surface.v1"
+    ],
+    "admitted_state_class_ids": [
+      "weights_owned_state",
+      "ephemeral_execution_state",
+      "resumed_continuation_state",
+      "durable_receipt_backed_state"
+    ],
+    "blocked_hidden_compute_ids": [
+      "checkpoint_embeds_hidden_workflow_logic",
+      "spill_or_tape_segments_choose_next_action",
+      "process_objects_smuggle_planner_state",
+      "installed_process_lifecycle_becomes_second_machine",
+      "session_resume_widens_into_open_ended_external_control",
+      "plugin_controller_uses_resume_as_hidden_compute",
+      "continuation_recomposition_creates_second_machine"
+    ],
+    "contract_rule_rows": [
+      {
+        "rule_id": "continuation_artifacts_transport_declared_state_only",
+        "green": true,
+        "detail": "checkpoint, spill, tape, process-object, and installed-process surfaces may transport declared continuation state, but they may not encode hidden planner logic or a second workflow machine."
+      },
+      {
+        "rule_id": "checkpoint_and_spill_resume_must_be_exact_or_refusal_bounded",
+        "green": true,
+        "detail": "checkpoint and spill/tape continuation only inherit the canonical machine while exact parity or typed refusal posture stays explicit."
+      },
+      {
+        "rule_id": "session_process_resume_must_stay_finite_and_deterministic",
+        "green": true,
+        "detail": "session-process continuation may extend deterministic finite transcripts only; open-ended external-event control remains outside the contract."
+      },
+      {
+        "rule_id": "process_snapshot_and_lifecycle_receipts_are_transport_not_compute",
+        "green": true,
+        "detail": "durable process snapshots, tapes, work queues, migrations, and rollbacks preserve declared execution state and lineage, but they do not become the locus of fresh computation."
+      },
+      {
+        "rule_id": "plugin_controller_may_consume_continuation_only_while_host_stays_non_planner",
+        "green": true,
+        "detail": "plugin and controller layers may consume the declared continuation carrier only while selection, retry, stop, and refusal handling remain model-owned and the host stays execution-only."
+      }
+    ],
+    "invalidation_rule_rows": [
+      {
+        "rule_id": "checkpoint_workflow_logic_invalidates_contract",
+        "green": true,
+        "detail": "the contract fails if checkpoint objects start carrying hidden workflow instructions, planner branches, or undeclared policy state."
+      },
+      {
+        "rule_id": "spill_or_tape_directive_logic_invalidates_contract",
+        "green": true,
+        "detail": "the contract fails if spill or tape artifacts start choosing control flow instead of transporting bounded state."
+      },
+      {
+        "rule_id": "process_object_policy_smuggling_invalidates_contract",
+        "green": true,
+        "detail": "the contract fails if process snapshots, tapes, or work queues start carrying undeclared planner or heuristic authority."
+      },
+      {
+        "rule_id": "installed_process_recomposition_invalidates_contract",
+        "green": true,
+        "detail": "the contract fails if installed-process migration or rollback changes the canonical machine identity, continuation contract, or route binding."
+      },
+      {
+        "rule_id": "session_surface_widening_invalidates_contract",
+        "green": true,
+        "detail": "the contract fails if finite deterministic session continuation widens into open-ended external-event control."
+      },
+      {
+        "rule_id": "resume_hidden_compute_invalidates_contract",
+        "green": true,
+        "detail": "the contract fails if retry, resume, or stop semantics relocate real computation into host-managed continuation."
+      },
+      {
+        "rule_id": "second_machine_overclaim_invalidates_contract",
+        "green": true,
+        "detail": "the contract fails if continuation is presented as a second proof-bearing machine rather than an extension of the same canonical machine."
+      }
+    ],
+    "next_stability_issue_id": "TAS-211",
+    "claim_boundary": "this transformer-owned contract freezes the continuation non-computationality boundary only. It says declared continuation surfaces extend one canonical post-article machine without becoming a second machine, but it still leaves fast-route legitimacy, anti-drift closure, served/public universality, and the final closure bundle to later issues.",
+    "summary": "Transformer continuation non-computationality contract freezes 5 contract rules and 7 invalidation rules across checkpoint, session, spill, process, installed-process, and weighted-controller continuation surfaces."
+  },
+  "machine_identity_binding": {
+    "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+    "tuple_id": "tassadar.post_article.canonical_machine_identity_lock.tuple.v1",
+    "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "canonical_weight_artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-trace-bound-trained-v0/99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+    "canonical_weight_bundle_digest": "99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+    "canonical_weight_primary_artifact_sha256": "e24923e6fe39f0656b3f331fb935e0827a3de43b706014610e513ca5a54e9f84",
+    "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+    "canonical_route_descriptor_digest": "00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032",
+    "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
+    "continuation_contract_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
+    "computational_model_statement_id": "tassadar.post_article.canonical_computational_model.statement.v1",
+    "proof_transport_boundary_id": "tassadar.post_article_universal_machine_proof.proof_transport_boundary.v1",
+    "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` tuple_id=`tassadar.post_article.canonical_machine_identity_lock.tuple.v1` canonical_model_id=`tassadar-article-transformer-trace-bound-trained-v0` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` continuation_contract_id=`tassadar.tcm_v1.runtime_contract.report.v1` computational_model_statement_id=`tassadar.post_article.canonical_computational_model.statement.v1` and proof_transport_boundary_id=`tassadar.post_article_universal_machine_proof.proof_transport_boundary.v1` remain the bound continuation tuple."
+  },
+  "supporting_material_rows": [
+    {
+      "material_id": "transformer_anchor_contract",
+      "material_class": "anchor",
+      "satisfied": true,
+      "source_ref": "crates/psionic-transformer/src/tassadar_post_article_continuation_non_computationality_contract.rs",
+      "source_artifact_id": "tassadar.post_article.continuation_non_computationality.contract.v1",
+      "detail": "the transformer-owned contract names the continuation surfaces, blocked hidden-compute modes, and next stability frontier explicitly."
+    },
+    {
+      "material_id": "canonical_machine_identity_lock",
+      "material_class": "machine_binding",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_machine_identity_lock_report.json",
+      "source_artifact_id": "tassadar.post_article_canonical_machine_identity_lock.report.v1",
+      "source_artifact_digest": "60c2b8252611caa29837346a6dec669edc29096e2af94fbb73c57a7b80a4ee3e",
+      "detail": "the canonical machine lock binds continuation to one explicit post-article machine tuple."
+    },
+    {
+      "material_id": "canonical_computational_model_statement",
+      "material_class": "machine_binding",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_computational_model_statement_report.json",
+      "source_artifact_id": "tassadar.post_article_canonical_computational_model_statement.report.v1",
+      "source_artifact_digest": "4a1570bc0d28016501fa568d4e455c0e9654197c7797509832dda636908dcc93",
+      "detail": "the computational-model statement names continuation as a property of the same canonical machine instead of a second machine."
+    },
+    {
+      "material_id": "execution_semantics_proof_transport_audit",
+      "material_class": "machine_binding",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_execution_semantics_proof_transport_audit_report.json",
+      "source_artifact_id": "tassadar.post_article_execution_semantics_proof_transport_audit.report.v1",
+      "source_artifact_digest": "09cfd184ee180c7ccd1500d5123280a1c037e37c1bfc5baa822b5e3ec2834fde",
+      "detail": "the proof-transport audit binds the continuation carrier to the same proof-bearing machine without closing this issue implicitly."
+    },
+    {
+      "material_id": "execution_checkpoint_profile",
+      "material_class": "continuation_surface",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+      "source_artifact_id": "tassadar.execution_checkpoint.report.v1",
+      "source_artifact_digest": "111a77b1cbdc440d37e80fa181da4a06d4ac15a136fca6d93b73da2669284d73",
+      "detail": "execution checkpoints keep deterministic multi-slice continuation explicit through persisted checkpoint artifacts and typed resume refusals."
+    },
+    {
+      "material_id": "process_object_family",
+      "material_class": "continuation_surface",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_process_object_report.json",
+      "source_artifact_id": "tassadar.process_object.report.v1",
+      "source_artifact_digest": "82a32395ce8337a8414a30be9a6ba29fb1632ee4e833fce53013778a3134afa2",
+      "detail": "durable process objects keep snapshot, tape, and work-queue lineage explicit instead of becoming hidden workflow interpreters."
+    },
+    {
+      "material_id": "session_process_profile",
+      "material_class": "continuation_surface",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+      "source_artifact_id": "tassadar.session_process_profile.report.v1",
+      "source_artifact_digest": "7d267ea312cb4c5b6e881d4f690a9d63312d8c565ede4388fb1fe40dd3a4ea93",
+      "detail": "bounded session continuation remains finite and deterministic while open-ended external loops stay on typed refusal paths."
+    },
+    {
+      "material_id": "spill_tape_store_profile",
+      "material_class": "continuation_surface",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+      "source_artifact_id": "tassadar.spill_tape_store.report.v1",
+      "source_artifact_digest": "aff6caa9d10360eb67a5d0182d617c37546d0c78f4900201a55c522fbf441b4e",
+      "detail": "spill and tape-store continuation keep exact parity or typed refusal explicit under one bounded portability envelope."
+    },
+    {
+      "material_id": "installed_process_lifecycle_profile",
+      "material_class": "continuation_surface",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json",
+      "source_artifact_id": "tassadar.installed_process_lifecycle.report.v1",
+      "source_artifact_digest": "b5640dc76a8627e5cfce454d7a025154b346669bbed3d8938f7d98b9d915b603",
+      "detail": "installed-process lifecycle receipts keep migration and rollback as typed transport surfaces rather than a second machine."
+    },
+    {
+      "material_id": "weighted_plugin_controller_eval",
+      "material_class": "controller_boundary",
+      "satisfied": true,
+      "source_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json",
+      "source_artifact_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.eval_report.v1",
+      "source_artifact_digest": "f1a06b77a988f80767b24f035a8776d46d20ca46484b563d6c8c6a25511151bf",
+      "detail": "weighted plugin control remains model-owned and keeps the host execution-only while consuming the same continuation carrier."
+    }
+  ],
+  "dependency_rows": [
+    {
+      "dependency_id": "canonical_machine_binding_complete",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_machine_identity_lock_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_computational_model_statement_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_execution_semantics_proof_transport_audit_report.json"
+      ],
+      "detail": "the canonical machine lock, computational-model statement, and proof-transport audit agree on one machine tuple and one continuation contract."
+    },
+    {
+      "dependency_id": "checkpoint_and_process_structures_transport_state_only",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+        "fixtures/tassadar/reports/tassadar_process_object_report.json",
+        "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json"
+      ],
+      "detail": "checkpoint, process-object, and installed-process structures keep state and lineage explicit without smuggling hidden workflow logic."
+    },
+    {
+      "dependency_id": "session_resume_stays_bounded",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_session_process_profile_report.json"
+      ],
+      "detail": "session-process continuation stays finite and deterministic while open-ended external loops remain refused."
+    },
+    {
+      "dependency_id": "spill_and_tape_resume_stays_bounded",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json"
+      ],
+      "detail": "spill and tape continuation preserve exact parity on admitted cases and keep widening on typed refusal paths."
+    },
+    {
+      "dependency_id": "plugin_controller_resume_boundary_closed",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json"
+      ],
+      "detail": "plugin and controller layers may consume continuation only while resume, retry, and stop remain model-owned and the host stays non-planner."
+    },
+    {
+      "dependency_id": "continuation_extends_execution_without_second_machine",
+      "satisfied": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_machine_identity_lock_report.json",
+        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+        "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+        "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+        "fixtures/tassadar/reports/tassadar_process_object_report.json",
+        "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json"
+      ],
+      "detail": "declared continuation surfaces extend one already-bound machine rather than creating a second proof-bearing machine."
+    }
+  ],
+  "continuation_surface_rows": [
+    {
+      "surface_id": "tassadar.post_article.continuation.checkpoint_surface.v1",
+      "surface_kind": "checkpoint_execution",
+      "source_report_ref": "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+      "source_report_id": "tassadar.execution_checkpoint.report.v1",
+      "source_report_digest": "111a77b1cbdc440d37e80fa181da4a06d4ac15a136fca6d93b73da2669284d73",
+      "canonical_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+      "structural_carrier_ids": [
+        "tassadar.execution_checkpoint.v1"
+      ],
+      "suspicious_key_hits": [],
+      "state_transport_only": true,
+      "exact_parity_or_typed_refusal_green": true,
+      "expressivity_extension_blocked": true,
+      "host_compute_relocation_detected": false,
+      "surface_green": true,
+      "detail": "checkpoint artifacts carry deterministic continuation state, parity, and typed refusal posture without carrying hidden workflow authority."
+    },
+    {
+      "surface_id": "tassadar.post_article.continuation.session_process_surface.v1",
+      "surface_kind": "session_process",
+      "source_report_ref": "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+      "source_report_id": "tassadar.session_process_profile.report.v1",
+      "source_report_digest": "7d267ea312cb4c5b6e881d4f690a9d63312d8c565ede4388fb1fe40dd3a4ea93",
+      "canonical_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+      "structural_carrier_ids": [
+        "tassadar.internal_compute.session_process.v1",
+        "deterministic_echo_turn_loop",
+        "stateful_counter_turn_loop"
+      ],
+      "suspicious_key_hits": [],
+      "state_transport_only": true,
+      "exact_parity_or_typed_refusal_green": true,
+      "expressivity_extension_blocked": true,
+      "host_compute_relocation_detected": false,
+      "surface_green": true,
+      "detail": "session-process continuation stays finite and deterministic, and it refuses the open-ended external-event surface instead of becoming generic workflow control."
+    },
+    {
+      "surface_id": "tassadar.post_article.continuation.spill_tape_surface.v1",
+      "surface_kind": "spill_tape_store",
+      "source_report_ref": "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+      "source_report_id": "tassadar.spill_tape_store.report.v1",
+      "source_report_digest": "aff6caa9d10360eb67a5d0182d617c37546d0c78f4900201a55c522fbf441b4e",
+      "canonical_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+      "structural_carrier_ids": [
+        "tassadar.internal_compute.spill_tape_store.v1",
+        "tassadar.spill_segment.v1",
+        "tassadar.external_tape_store.v1"
+      ],
+      "suspicious_key_hits": [],
+      "state_transport_only": true,
+      "exact_parity_or_typed_refusal_green": true,
+      "expressivity_extension_blocked": true,
+      "host_compute_relocation_detected": false,
+      "surface_green": true,
+      "detail": "spill and tape-store continuation preserve declared state across exact parity cases and keep missing segments, oversize state, and portability widening on typed refusal paths."
+    },
+    {
+      "surface_id": "tassadar.post_article.continuation.process_object_surface.v1",
+      "surface_kind": "durable_process_object",
+      "source_report_ref": "fixtures/tassadar/reports/tassadar_process_object_report.json",
+      "source_report_id": "tassadar.process_object.report.v1",
+      "source_report_digest": "82a32395ce8337a8414a30be9a6ba29fb1632ee4e833fce53013778a3134afa2",
+      "canonical_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+      "structural_carrier_ids": [
+        "tassadar.internal_compute.process_objects.v1",
+        "tassadar.process_snapshot.v1",
+        "tassadar.process_tape.v1",
+        "tassadar.process_work_queue.v1"
+      ],
+      "suspicious_key_hits": [],
+      "state_transport_only": true,
+      "exact_parity_or_typed_refusal_green": true,
+      "expressivity_extension_blocked": true,
+      "host_compute_relocation_detected": false,
+      "surface_green": true,
+      "detail": "process snapshots, tapes, and work queues preserve durable execution state and typed refusals without carrying hidden planner logic."
+    },
+    {
+      "surface_id": "tassadar.post_article.continuation.installed_process_surface.v1",
+      "surface_kind": "installed_process_lifecycle",
+      "source_report_ref": "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json",
+      "source_report_id": "tassadar.installed_process_lifecycle.report.v1",
+      "source_report_digest": "b5640dc76a8627e5cfce454d7a025154b346669bbed3d8938f7d98b9d915b603",
+      "canonical_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+      "structural_carrier_ids": [
+        "tassadar.installed_process_snapshot.v1",
+        "tassadar.installed_process_migration_receipt.v1",
+        "tassadar.installed_process_rollback_receipt.v1"
+      ],
+      "suspicious_key_hits": [],
+      "state_transport_only": true,
+      "exact_parity_or_typed_refusal_green": true,
+      "expressivity_extension_blocked": true,
+      "host_compute_relocation_detected": false,
+      "surface_green": true,
+      "detail": "installed-process migration and rollback remain typed transport surfaces over the same machine instead of becoming a second machine."
+    },
+    {
+      "surface_id": "tassadar.post_article.continuation.weighted_controller_surface.v1",
+      "surface_kind": "weighted_plugin_controller",
+      "source_report_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json",
+      "source_report_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.eval_report.v1",
+      "source_report_digest": "f1a06b77a988f80767b24f035a8776d46d20ca46484b563d6c8c6a25511151bf",
+      "canonical_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
+      "structural_carrier_ids": [
+        "tassadar.weighted_plugin.controller_trace_contract.v1",
+        "tassadar.weighted_plugin.model_loop_return_profile.v1",
+        "tassadar.tcm_v1.runtime_contract.report.v1"
+      ],
+      "suspicious_key_hits": [],
+      "state_transport_only": true,
+      "exact_parity_or_typed_refusal_green": true,
+      "expressivity_extension_blocked": true,
+      "host_compute_relocation_detected": false,
+      "surface_green": true,
+      "detail": "weighted plugin control may consume continuation only while retry, refusal, and stop stay model-owned and the host stays execution-only."
+    }
+  ],
+  "invalidation_rows": [
+    {
+      "invalidation_id": "second_machine_binding_detected",
+      "present": false,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_machine_identity_lock_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_computational_model_statement_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_execution_semantics_proof_transport_audit_report.json"
+      ],
+      "detail": "any mismatch in machine identity, route, weight lineage, or continuation contract means continuation has drifted onto a different machine."
+    },
+    {
+      "invalidation_id": "checkpoint_workflow_logic_detected",
+      "present": false,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json"
+      ],
+      "detail": "checkpoint artifacts may not carry hidden workflow logic, planner state, or undeclared scheduling authority."
+    },
+    {
+      "invalidation_id": "spill_or_tape_directive_logic_detected",
+      "present": false,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json"
+      ],
+      "detail": "spill and tape segments may not choose control flow or encode directives beyond declared state transport."
+    },
+    {
+      "invalidation_id": "session_surface_widening_detected",
+      "present": false,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_session_process_profile_report.json"
+      ],
+      "detail": "session continuation invalidates the contract if it widens into open-ended external control."
+    },
+    {
+      "invalidation_id": "process_object_logic_smuggling_detected",
+      "present": false,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_process_object_report.json",
+        "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json"
+      ],
+      "detail": "process-object and installed-process lifecycle receipts may not smuggle planner or policy logic into continuation state."
+    },
+    {
+      "invalidation_id": "resume_hidden_compute_detected",
+      "present": false,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json"
+      ],
+      "detail": "resume, retry, and stop semantics invalidate the contract if they relocate real computation into host-managed continuation."
+    },
+    {
+      "invalidation_id": "continuation_overclaim_detected",
+      "present": false,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+        "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+        "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+        "fixtures/tassadar/reports/tassadar_process_object_report.json",
+        "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json"
+      ],
+      "detail": "continuation may not be overclaimed as green if any declared surface fails parity, typed refusal, or non-computationality checks."
+    }
+  ],
+  "validation_rows": [
+    {
+      "validation_id": "canonical_machine_binding_green",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_machine_identity_lock_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_canonical_computational_model_statement_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_execution_semantics_proof_transport_audit_report.json"
+      ],
+      "detail": "the canonical machine tuple, computational-model statement, and proof-transport audit agree on one continuation-bound machine."
+    },
+    {
+      "validation_id": "checkpoint_and_spill_surfaces_green",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+        "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json"
+      ],
+      "detail": "checkpoint and spill/tape continuation stay exact-or-refusal-bounded on declared workloads."
+    },
+    {
+      "validation_id": "session_surface_green",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_session_process_profile_report.json"
+      ],
+      "detail": "session-process continuation stays finite, deterministic, and refusal-bounded."
+    },
+    {
+      "validation_id": "process_surfaces_green",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_process_object_report.json",
+        "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json"
+      ],
+      "detail": "durable process objects plus installed-process lifecycle receipts preserve state and lineage without becoming compute."
+    },
+    {
+      "validation_id": "hidden_workflow_logic_refused",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+        "fixtures/tassadar/reports/tassadar_process_object_report.json",
+        "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+        "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json"
+      ],
+      "detail": "declared continuation structures carry state and lineage only; hidden workflow logic remains absent."
+    },
+    {
+      "validation_id": "continuation_expressivity_extension_blocked",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+        "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+        "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json"
+      ],
+      "detail": "continuation does not add expressivity beyond the base route because widening cases stay refused or blocked explicitly."
+    },
+    {
+      "validation_id": "plugin_resume_hidden_compute_refused",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json"
+      ],
+      "detail": "plugin and controller layers do not lean on resume semantics as hidden compute because the host remains non-planner and retry or stop stays model-owned."
+    },
+    {
+      "validation_id": "invalidation_rows_absent",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_execution_checkpoint_report.json",
+        "fixtures/tassadar/reports/tassadar_session_process_profile_report.json",
+        "fixtures/tassadar/reports/tassadar_spill_tape_store_report.json",
+        "fixtures/tassadar/reports/tassadar_process_object_report.json",
+        "fixtures/tassadar/reports/tassadar_installed_process_lifecycle_report.json",
+        "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json"
+      ],
+      "detail": "no hidden-workflow, second-machine, or host-relocated-compute invalidation is present."
+    },
+    {
+      "validation_id": "continuation_non_computationality_complete",
+      "green": true,
+      "source_refs": [
+        "fixtures/tassadar/reports/tassadar_post_article_continuation_non_computationality_contract_report.json"
+      ],
+      "detail": "the continuation non-computationality contract is complete on one canonical machine and hands the frontier to TAS-211."
+    }
+  ],
+  "contract_status": "green",
+  "contract_green": true,
+  "continuation_extends_execution_without_second_machine": true,
+  "hidden_workflow_logic_refused": true,
+  "continuation_expressivity_extension_blocked": true,
+  "plugin_resume_hidden_compute_refused": true,
+  "continuation_non_computationality_complete": true,
+  "next_stability_issue_id": "TAS-211",
+  "closure_bundle_issue_id": "TAS-215",
+  "claim_boundary": "this eval-owned contract report freezes one continuation non-computationality boundary on the canonical post-article machine. It proves that declared checkpoint, spill, session, process-object, and installed-process continuation surfaces transport state and lineage without becoming a second machine, and that weighted plugin control may consume the same continuation carrier only while the host stays non-planner. It still leaves fast-route legitimacy, broader anti-drift closeout, served/public universality, and the final closure bundle to later issues.",
+  "summary": "Post-article continuation non-computationality contract report keeps status=Green, supporting_material_rows=10, dependency_rows=6, continuation_surface_rows=6, invalidation_rows=7, validation_rows=9, continuation_non_computationality_complete=true, next_stability_issue_id=`TAS-211`, and closure_bundle_issue_id=`TAS-215`.",
+  "report_digest": "ce41e26ca2020d7507187bd7c61a2bcd8171031398e754679f93dc1423a03439"
+}

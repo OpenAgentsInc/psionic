@@ -27,9 +27,9 @@
     "canonical_weight_primary_artifact_sha256": "e24923e6fe39f0656b3f331fb935e0827a3de43b706014610e513ca5a54e9f84",
     "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
     "continuation_contract_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
-    "computational_model_statement_id": "tassadar.post_article_universality_bridge.computational_model_statement.v1",
+    "computational_model_statement_id": "tassadar.post_article.canonical_computational_model.statement.v1",
     "controller_eval_report_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.eval_report.v1",
-    "controller_eval_report_digest": "a95d9aa0abf8d530cf8947caf1b04c7ea1fd49e372dce7807de43f59e87b6275",
+    "controller_eval_report_digest": "f1a06b77a988f80767b24f035a8776d46d20ca46484b563d6c8c6a25511151bf",
     "control_trace_contract_id": "tassadar.weighted_plugin.controller_trace_contract.v1",
     "manifest_contract_report_id": "tassadar.post_article_plugin_manifest_identity_contract.report.v1",
     "manifest_contract_report_digest": "d5171cef01418006cd93b7d48ba165566a036a6c62cba74fddda744f3ea96cf5",
@@ -44,7 +44,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json",
       "bound_report_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.eval_report.v1",
-      "bound_report_digest": "a95d9aa0abf8d530cf8947caf1b04c7ea1fd49e372dce7807de43f59e87b6275",
+      "bound_report_digest": "f1a06b77a988f80767b24f035a8776d46d20ca46484b563d6c8c6a25511151bf",
       "detail": "the inherited controller proof must already be green, keep weighted plugin control explicit, and clear its TAS-204 frontier before the authority gate can rely on it."
     },
     {
@@ -418,5 +418,5 @@
   "deferred_issue_ids": [],
   "claim_boundary": "this catalog report freezes plugin authority, promotion, publication posture, and trust tiers above the canonical weighted controller without widening the claim surface. It keeps operator/internal posture, profile-specific named-but-suppressed routes, validator and accepted-outcome hook requirements, promotion challengeability, quarantine, revocation, and broader public refusal explicit instead of implying a served/public plugin platform or arbitrary public software execution.",
   "summary": "post-article plugin authority gate binds machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, contract_status=Green, trust_tier_rows=4, promotion_rows=5, publication_posture_rows=5, observer_rows=4, validation_rows=8, weighted_plugin_control_allowed=true, and deferred_issue_ids=0.",
-  "report_digest": "b84cadce8ce39aa0c70715003283eebbec83026ede05b998ba2355a2afd0d686"
+  "report_digest": "ee083cad516d06573d5af935199ac503e4c3fa3c615748cf62198e82de4f4599"
 }

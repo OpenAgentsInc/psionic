@@ -1470,7 +1470,7 @@ The current scope is:
   hidden top-k filtering, helper substitution, and runtime policy drift.
   This turns weighted plugin control green on the canonical route, clears the
   controller defer pointer to empty, moves the reserved bridge frontier to
-  `TAS-210`, and still leaves bounded plugin-platform closeout, publication,
+  `TAS-211`, and still leaves bounded plugin-platform closeout, publication,
   served/public universality, and arbitrary software capability blocked.
 - the current post-article plugin authority, promotion, publication, and
   trust-tier artifacts are
@@ -1566,9 +1566,29 @@ The current scope is:
   historical green `TCM.v1` continuation carrier, and the current plugin
   runtime, conformance, and weighted-controller surfaces to one explicit
   proof-bearing execution boundary. This closes proof transport, moves the
-  next anti-drift stability frontier to `TAS-210`, keeps the final closure
+  next anti-drift stability frontier to `TAS-211`, keeps the final closure
   bundle separate for `TAS-215`, and still leaves plugin publication,
   served/public universality, and arbitrary software capability blocked.
+- the current post-article continuation non-computationality artifacts are
+  `fixtures/tassadar/reports/tassadar_post_article_continuation_non_computationality_contract_report.json`,
+  `fixtures/tassadar/reports/tassadar_post_article_continuation_non_computationality_contract_summary.json`,
+  the transformer-owned anchor contract in
+  `crates/psionic-transformer/src/tassadar_post_article_continuation_non_computationality_contract.rs`,
+  the provider receipt in
+  `crates/psionic-provider/src/tassadar_post_article_continuation_non_computationality_contract.rs`,
+  the checker script
+  `scripts/check-tassadar-post-article-continuation-non-computationality-contract.sh`,
+  and the audit note
+  `docs/audits/2026-03-21-tassadar-post-article-continuation-non-computationality-contract.md`,
+  which bind checkpoint, spill, tape, session, process-object, installed-
+  process, and weighted-controller continuation surfaces to one explicit
+  transport-only boundary on the same canonical machine tuple, the same
+  computational-model statement, and the same proof-transport boundary instead
+  of letting continuation inherit identity by adjacency. This closes
+  continuation non-computationality, moves the next anti-drift stability
+  frontier to `TAS-211`, keeps the final closure bundle separate for
+  `TAS-215`, and still leaves plugin publication, served/public universality,
+  and arbitrary software capability blocked.
 - the current post-article Turing-completeness closeout artifacts are
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json`,
   `fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_summary.json`,

@@ -123,7 +123,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
       "source_artifact_id": "tassadar.post_article_universality_bridge.contract.report.v1",
-      "source_artifact_digest": "53b898e457b3e3174e9e1bd33d3a41df482bfcb92c22356ca871bbbf3c2f280b",
+      "source_artifact_digest": "138a26334ffc3c6d7fc9e3ed07ce3c1cc6fee36378066cbbbda4de7786b52029",
       "detail": "the universality bridge still names the machine identity, route identity, continuation contract, and computational-model statement that the lock is freezing."
     },
     {
@@ -141,7 +141,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_bounded_weighted_plugin_platform_closeout_audit_report.json",
       "source_artifact_id": "tassadar.post_article_bounded_weighted_plugin_platform_closeout_audit.report.v1",
-      "source_artifact_digest": "98c759210f01fcc26c8cf0d871d44a441448eb8503bbba3df680e2d040bdcdf1",
+      "source_artifact_digest": "11ceeec8d8886182deb64264fe1168ca2db3ac6ffc97e4b7f3ccb8840d46ecb6",
       "detail": "the bounded weighted plugin-platform closeout remains the highest current capability-bearing surface that must inherit the same canonical machine tuple."
     },
     {
@@ -229,7 +229,7 @@
     "computational_model_statement_id": "tassadar.post_article.canonical_computational_model.statement.v1",
     "canonical_machine_lock_contract_id": "tassadar.post_article.canonical_machine_identity_lock.contract.v1",
     "bridge_contract_report_id": "tassadar.post_article_universality_bridge.contract.report.v1",
-    "bridge_contract_report_digest": "53b898e457b3e3174e9e1bd33d3a41df482bfcb92c22356ca871bbbf3c2f280b",
+    "bridge_contract_report_digest": "138a26334ffc3c6d7fc9e3ed07ce3c1cc6fee36378066cbbbda4de7786b52029",
     "tcm_v1_model_id": "tcm.v1",
     "tcm_v1_model_digest": "259cab92c74b71b0135d4d2efee3212d4c8efe8ae6a62165f9560cbd509fe3c6",
     "detail": "tuple_id=`tassadar.post_article.canonical_machine_identity_lock.tuple.v1` carrier_class_id=`tassadar.post_article.canonical_machine.closure_bundle_bound_rebased_route_identity.v1` machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_model_id=`tassadar-article-transformer-trace-bound-trained-v0` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` continuation_contract_id=`tassadar.tcm_v1.runtime_contract.report.v1` binds the post-article machine lock above `tassadar.post_article_universality_bridge.contract.report.v1`."
@@ -241,7 +241,7 @@
       "carrier_projection_id": "canonical_bridge_anchor",
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
       "source_artifact_id": "tassadar.post_article_universality_bridge.contract.report.v1",
-      "source_artifact_digest": "53b898e457b3e3174e9e1bd33d3a41df482bfcb92c22356ca871bbbf3c2f280b",
+      "source_artifact_digest": "138a26334ffc3c6d7fc9e3ed07ce3c1cc6fee36378066cbbbda4de7786b52029",
       "declared_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
       "declared_canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
       "declared_canonical_weight_bundle_digest": "99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
@@ -609,7 +609,7 @@
       "carrier_projection_id": "weighted_controller_trace_projection",
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json",
       "source_artifact_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.eval_report.v1",
-      "source_artifact_digest": "a95d9aa0abf8d530cf8947caf1b04c7ea1fd49e372dce7807de43f59e87b6275",
+      "source_artifact_digest": "f1a06b77a988f80767b24f035a8776d46d20ca46484b563d6c8c6a25511151bf",
       "declared_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
       "declared_canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
       "declared_canonical_weight_bundle_digest": "99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
@@ -643,7 +643,7 @@
       "carrier_projection_id": "plugin_conformance_benchmark_projection",
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_conformance_sandbox_and_benchmark_harness_eval_report.json",
       "source_artifact_id": "tassadar.post_article_plugin_conformance_sandbox_and_benchmark_harness.eval_report.v1",
-      "source_artifact_digest": "38a301b3df169ba72d7a1cb6a13e1df4e9c308cd0e4399eec33398567c7e517b",
+      "source_artifact_digest": "3970864b77253dcce9ca28fce3d4057f3e71824f61e6941e9af4672ebbf5a3db",
       "declared_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
       "declared_canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
       "declared_canonical_weight_bundle_digest": "99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
@@ -677,7 +677,7 @@
       "carrier_projection_id": "plugin_authority_gate_projection",
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_authority_promotion_publication_and_trust_tier_gate_report.json",
       "source_artifact_id": "tassadar.post_article_plugin_authority_promotion_publication_and_trust_tier_gate.report.v1",
-      "source_artifact_digest": "d813236bb30fa342550de38460ac35aab291ad0f1684d7f1ddc3ddfa67e55eeb",
+      "source_artifact_digest": "ee083cad516d06573d5af935199ac503e4c3fa3c615748cf62198e82de4f4599",
       "declared_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
       "declared_canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
       "declared_canonical_weight_bundle_digest": "99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
@@ -711,7 +711,7 @@
       "carrier_projection_id": "bounded_plugin_platform_closeout_projection",
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_bounded_weighted_plugin_platform_closeout_audit_report.json",
       "source_artifact_id": "tassadar.post_article_bounded_weighted_plugin_platform_closeout_audit.report.v1",
-      "source_artifact_digest": "98c759210f01fcc26c8cf0d871d44a441448eb8503bbba3df680e2d040bdcdf1",
+      "source_artifact_digest": "11ceeec8d8886182deb64264fe1168ca2db3ac6ffc97e4b7f3ccb8840d46ecb6",
       "declared_machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
       "declared_canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
       "declared_canonical_weight_bundle_digest": "99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
@@ -987,5 +987,5 @@
   "arbitrary_software_capability_allowed": false,
   "claim_boundary": "this contract freezes one canonical machine identity lock across the post-article bridge, route audits, proof and witness surfaces, plugin receipts, controller traces, conformance harnesses, authority posture, and bounded platform closeout. It binds each cited artifact to one globally named tuple over model id, weight digest, route digest, continuation contract, and a transformer-owned carrier class, explicitly rebinds legacy partial-tuple artifacts through machine-readable lock rows instead of implied inheritance, refuses mixed-carrier recomposition, and still keeps plugin publication, served/public universality, arbitrary software capability, and the final claim-bearing closure bundle out of scope here.",
   "summary": "Post-article canonical machine identity lock keeps supporting_materials=8/8, dependency_rows=6/6, artifact_binding_rows=16/16, invalidation_rows=7 present=0, validation_rows=8/8, lock_status=Green, and closure_bundle_issue_id=`TAS-215`.",
-  "report_digest": "d0c45f1e82793cb8b1a24a27f119a289c0a95480a90d57f000d29911acfc98ca"
+  "report_digest": "60c2b8252611caa29837346a6dec669edc29096e2af94fbb73c57a7b80a4ee3e"
 }

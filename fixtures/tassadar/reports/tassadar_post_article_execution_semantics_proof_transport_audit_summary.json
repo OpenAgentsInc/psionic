@@ -16,8 +16,8 @@
   "proof_transport_issue_id": "TAS-209",
   "proof_transport_complete": true,
   "plugin_execution_transport_bound": true,
-  "next_stability_issue_id": "TAS-210",
+  "next_stability_issue_id": "TAS-211",
   "closure_bundle_issue_id": "TAS-215",
-  "detail": "post-article execution-semantics proof-transport summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, audit_status=Green, plugin_surface_rows=3, proof_transport_complete=true, next_stability_issue_id=`TAS-210`, and closure_bundle_issue_id=`TAS-215`.",
-  "summary_digest": "e2375cd75cd7543415f4806de512f88b37b1a2edb509ae6b0935db4eaa7b2f78"
+  "detail": "post-article execution-semantics proof-transport summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1`, audit_status=Green, plugin_surface_rows=3, proof_transport_complete=true, next_stability_issue_id=`TAS-211`, and closure_bundle_issue_id=`TAS-215`.",
+  "summary_digest": "5781f53582caa3c5123e437ad98c219c681a4c03b74dcef237914c8cf18caaa1"
 }

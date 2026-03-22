@@ -61,7 +61,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_computational_model_statement_report.json",
       "source_artifact_id": "tassadar.post_article_canonical_computational_model_statement.report.v1",
-      "source_artifact_digest": "c43671ba6d2954fd3668281c65a3a2703a0e6ee0c31352e099232686a8e932de",
+      "source_artifact_digest": "4a1570bc0d28016501fa568d4e455c0e9654197c7797509832dda636908dcc93",
       "detail": "the canonical computational-model statement names the direct route, continuation carrier, effect boundary, and plugin-overlay posture that proof transport must preserve."
     },
     {
@@ -406,7 +406,7 @@
         "docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md",
         "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md"
       ],
-      "detail": "closing proof transport here still leaves continuation non-computationality, later stability issues, and the final closure bundle explicit and separate."
+      "detail": "closing proof transport here still leaves later stability issues and the final closure bundle explicit and separate."
     }
   ],
   "audit_status": "green",
@@ -414,14 +414,14 @@
   "proof_transport_issue_id": "TAS-209",
   "proof_transport_complete": true,
   "plugin_execution_transport_bound": true,
-  "next_stability_issue_id": "TAS-210",
+  "next_stability_issue_id": "TAS-211",
   "closure_bundle_issue_id": "TAS-215",
   "closure_bundle_embedded_here": false,
   "rebase_claim_allowed": false,
   "plugin_capability_claim_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "claim_boundary": "this eval-owned audit freezes one canonical execution-semantics proof-transport boundary for the post-article machine. It binds the historical universal-machine proof, the post-article rebinding receipts, the canonical computational-model statement, the declared TCM.v1 continuation carrier, and the current plugin-facing runtime/conformance/controller surfaces to the same proof-bearing machine without overclaiming a stronger machine. It still leaves continuation non-computationality, fast-route legitimacy, equivalent-choice neutrality, downward non-influence, anti-drift closeout, and the final closure bundle as later issues.",
-  "summary": "Post-article execution-semantics proof-transport audit keeps status=Green, supporting_material_rows=11, dependency_rows=9, plugin_surface_rows=3, invalidation_rows=6, validation_rows=9, next_stability_issue_id=`TAS-210`, and closure_bundle_issue_id=`TAS-215`.",
-  "report_digest": "83b1d3398c2ac21a4bf205ead4d4c859c00e31800b6aea58dc29212850d18565"
+  "claim_boundary": "this eval-owned audit freezes one canonical execution-semantics proof-transport boundary for the post-article machine. It binds the historical universal-machine proof, the post-article rebinding receipts, the canonical computational-model statement, the declared TCM.v1 continuation carrier, and the current plugin-facing runtime/conformance/controller surfaces to the same proof-bearing machine without overclaiming a stronger machine. It still leaves fast-route legitimacy, equivalent-choice neutrality, downward non-influence, anti-drift closeout, and the final closure bundle as later issues.",
+  "summary": "Post-article execution-semantics proof-transport audit keeps status=Green, supporting_material_rows=11, dependency_rows=9, plugin_surface_rows=3, invalidation_rows=6, validation_rows=9, next_stability_issue_id=`TAS-211`, and closure_bundle_issue_id=`TAS-215`.",
+  "report_digest": "09cfd184ee180c7ccd1500d5123280a1c037e37c1bfc5baa822b5e3ec2834fde"
 }

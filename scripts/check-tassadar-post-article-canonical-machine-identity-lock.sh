@@ -72,6 +72,6 @@ jq -e '
 jq -e '
   .bridge_machine_identity_id == "tassadar.post_article_universality_bridge.machine_identity.v1"
   and (.reserved_capability_issue_ids | index("TAS-195")) != null
-  and (.reserved_capability_issue_ids | index("TAS-210")) != null
+  and (.reserved_capability_issue_ids | index("TAS-211")) != null
   and (.reserved_capability_issue_ids | index("TAS-207")) == null
 ' fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_summary.json >/dev/null

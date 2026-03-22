@@ -4,7 +4,7 @@
   "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
   "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
   "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
-  "computational_model_statement_id": "tassadar.post_article_universality_bridge.computational_model_statement.v1",
+  "computational_model_statement_id": "tassadar.post_article.canonical_computational_model.statement.v1",
   "control_trace_contract_id": "tassadar.weighted_plugin.controller_trace_contract.v1",
   "contract_status": "green",
   "dependency_row_count": 8,
@@ -30,5 +30,5 @@
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
   "detail": "post-article plugin authority summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1`, contract_status=Green, trust_tier_rows=4, publication_posture_rows=5, validation_rows=8, weighted_plugin_control_allowed=true, and deferred_issue_ids=0.",
-  "summary_digest": "7ba9ab991ed12c9e6dfee2624202cd1a01f4ab64a9c6e9743254dd80f0a00c3d"
+  "summary_digest": "3ee98f47f9fd09c72d1f8e91e3de89c4c14b2c359e44bc8f038e26aaf5042bbf"
 }

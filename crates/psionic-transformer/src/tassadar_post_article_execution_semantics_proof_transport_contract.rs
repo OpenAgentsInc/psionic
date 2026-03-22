@@ -88,7 +88,7 @@ pub fn build_tassadar_post_article_execution_semantics_proof_transport_contract(
         ),
         law_row(
             "proof_transport_audit_must_hand_off_to_later_stability_issues",
-            "closing proof transport here does not close continuation non-computationality, fast-route legitimacy, equivalent-choice neutrality, downward non-influence, anti-drift stability, or the final closure bundle.",
+            "closing proof transport here does not close fast-route legitimacy, equivalent-choice neutrality, downward non-influence, anti-drift stability, or the final closure bundle.",
         ),
     ];
     let invalidation_rule_rows = vec![
@@ -139,9 +139,9 @@ pub fn build_tassadar_post_article_execution_semantics_proof_transport_contract(
         plugin_projection_surface_ids,
         transport_rule_rows,
         invalidation_rule_rows,
-        next_stability_issue_id: String::from("TAS-210"),
+        next_stability_issue_id: String::from("TAS-211"),
         claim_boundary: String::from(
-            "this transformer-owned contract names the execution-semantics proof-transport boundary only. It does not itself prove continuation non-computationality, fast-route legitimacy, served/public conformance, anti-drift closeout, or the final closure bundle.",
+            "this transformer-owned contract names the execution-semantics proof-transport boundary only. It does not itself prove fast-route legitimacy, served/public conformance, anti-drift closeout, or the final closure bundle.",
         ),
         summary: String::from(
             "Transformer execution-semantics proof-transport contract freezes 5 transport rules and 7 invalidation rules for one canonical post-article machine boundary.",
@@ -219,7 +219,7 @@ mod tests {
         );
         assert_eq!(contract.transport_rule_rows.len(), 5);
         assert_eq!(contract.invalidation_rule_rows.len(), 7);
-        assert_eq!(contract.next_stability_issue_id, "TAS-210");
+        assert_eq!(contract.next_stability_issue_id, "TAS-211");
         assert!(contract
             .transport_rule_rows
             .iter()

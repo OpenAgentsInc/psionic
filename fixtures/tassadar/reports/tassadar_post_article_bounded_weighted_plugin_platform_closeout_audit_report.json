@@ -86,7 +86,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_conformance_sandbox_and_benchmark_harness_eval_report.json",
       "source_artifact_id": "tassadar.post_article_plugin_conformance_sandbox_and_benchmark_harness.eval_report.v1",
-      "source_artifact_digest": "38a301b3df169ba72d7a1cb6a13e1df4e9c308cd0e4399eec33398567c7e517b",
+      "source_artifact_digest": "3970864b77253dcce9ca28fce3d4057f3e71824f61e6941e9af4672ebbf5a3db",
       "detail": "the conformance harness keeps the sandbox evidence and benchmark posture machine-readable so the closeout does not lean on unbounded or hidden operator experience."
     },
     {
@@ -104,7 +104,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_eval_report.json",
       "source_artifact_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.eval_report.v1",
-      "source_artifact_digest": "a95d9aa0abf8d530cf8947caf1b04c7ea1fd49e372dce7807de43f59e87b6275",
+      "source_artifact_digest": "f1a06b77a988f80767b24f035a8776d46d20ca46484b563d6c8c6a25511151bf",
       "detail": "the weighted controller trace is the plugin-specific proof-bearing extension above the inherited control-plane proof; the platform closeout must cite that extension explicitly."
     },
     {
@@ -113,7 +113,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_authority_promotion_publication_and_trust_tier_gate_report.json",
       "source_artifact_id": "tassadar.post_article_plugin_authority_promotion_publication_and_trust_tier_gate.report.v1",
-      "source_artifact_digest": "b84cadce8ce39aa0c70715003283eebbec83026ede05b998ba2355a2afd0d686",
+      "source_artifact_digest": "ee083cad516d06573d5af935199ac503e4c3fa3c615748cf62198e82de4f4599",
       "detail": "the authority gate freezes trust tiers, publication posture, validator hooks, and challengeability so the closeout can say exactly what platform capability does and does not imply."
     },
     {
@@ -147,19 +147,19 @@
     "canonical_route_descriptor_digest": "00af062cccc3d1b2e42ee8e092b9ef8e1539dd3f2dfc379cff7d1cd4a008b032",
     "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
     "continuation_contract_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
-    "computational_model_statement_id": "tassadar.post_article_universality_bridge.computational_model_statement.v1",
+    "computational_model_statement_id": "tassadar.post_article.canonical_computational_model.statement.v1",
     "control_plane_proof_report_id": "tassadar.post_article_control_plane_decision_provenance_proof.report.v1",
     "control_plane_proof_report_digest": "6e2ee7d74812a896d76f878dbad372fe2f3acaf44436adbe4d8c7091f5960ba1",
     "control_trace_contract_id": "tassadar.weighted_plugin.controller_trace_contract.v1",
     "controller_eval_report_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.eval_report.v1",
-    "controller_eval_report_digest": "a95d9aa0abf8d530cf8947caf1b04c7ea1fd49e372dce7807de43f59e87b6275",
+    "controller_eval_report_digest": "f1a06b77a988f80767b24f035a8776d46d20ca46484b563d6c8c6a25511151bf",
     "authority_gate_report_id": "tassadar.post_article_plugin_authority_promotion_publication_and_trust_tier_gate.report.v1",
-    "authority_gate_report_digest": "b84cadce8ce39aa0c70715003283eebbec83026ede05b998ba2355a2afd0d686",
+    "authority_gate_report_digest": "ee083cad516d06573d5af935199ac503e4c3fa3c615748cf62198e82de4f4599",
     "turing_closeout_report_id": "tassadar.post_article_turing_completeness_closeout_audit.report.v1",
     "turing_closeout_report_digest": "ca6bc24fec901870cfd46fc1405b7499852baaa3617d2094f98804d4aae3ed45",
     "canonical_architecture_anchor_crate": "psionic-transformer",
     "canonical_architecture_boundary_ref": "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
-    "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_model_id=`tassadar-article-transformer-trace-bound-trained-v0` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` computational_model_statement_id=`tassadar.post_article_universality_bridge.computational_model_statement.v1` control_plane_proof_report_id=`tassadar.post_article_control_plane_decision_provenance_proof.report.v1` control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1` authority_gate_report_id=`tassadar.post_article_plugin_authority_promotion_publication_and_trust_tier_gate.report.v1` and turing_closeout_report_id=`tassadar.post_article_turing_completeness_closeout_audit.report.v1` stay bound to `psionic-transformer`."
+    "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_model_id=`tassadar-article-transformer-trace-bound-trained-v0` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` computational_model_statement_id=`tassadar.post_article.canonical_computational_model.statement.v1` control_plane_proof_report_id=`tassadar.post_article_control_plane_decision_provenance_proof.report.v1` control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1` authority_gate_report_id=`tassadar.post_article_plugin_authority_promotion_publication_and_trust_tier_gate.report.v1` and turing_closeout_report_id=`tassadar.post_article_turing_completeness_closeout_audit.report.v1` stay bound to `psionic-transformer`."
   },
   "dependency_rows": [
     {
@@ -254,7 +254,7 @@
   "validation_rows": [
     {
       "validation_id": "canonical_machine_tuple_locked",
-      "green": false,
+      "green": true,
       "source_refs": [
         "fixtures/tassadar/reports/tassadar_post_article_turing_completeness_closeout_audit_report.json",
         "fixtures/tassadar/reports/tassadar_post_article_plugin_charter_authority_boundary_report.json",
@@ -344,19 +344,19 @@
       "detail": "the final claim-bearing canonical machine closure bundle stays separate from this platform closeout and remains explicitly deferred to `TAS-215`."
     }
   ],
-  "closeout_status": "incomplete",
-  "closeout_green": false,
+  "closeout_status": "operator_green_served_suppressed",
+  "closeout_green": true,
   "operator_internal_only_posture": true,
   "served_plugin_envelope_published": false,
   "closure_bundle_embedded_here": false,
   "closure_bundle_issue_id": "TAS-215",
   "rebase_claim_allowed": true,
-  "plugin_capability_claim_allowed": false,
+  "plugin_capability_claim_allowed": true,
   "weighted_plugin_control_allowed": true,
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
   "claim_boundary": "this closeout audit states the first honest bounded weighted plugin-platform claim above the canonical post-`TAS-186` machine. It binds the lower-plane Turing closeout, plugin charter, manifest, ABI, runtime API, invocation receipts, admissibility envelope compiler, conformance harness, result-binding contract, weighted controller trace, and authority or promotion or publication gate into one operator/internal-only platform statement. It still keeps the final claim-bearing canonical machine closure bundle separate, keeps served or public plugin publication suppressed, refuses any implication of arbitrary public Wasm or arbitrary public tool use, and does not imply served/public universality or arbitrary software capability.",
-  "summary": "Post-article bounded weighted plugin-platform closeout audit keeps supporting_materials=14/14, dependency_rows=11/11, validation_rows=9/10, closeout_status=Incomplete, closure_bundle_issue_id=`TAS-215`, and plugin_capability_claim_allowed=false.",
-  "report_digest": "405838aed2b6f87cec6373390a1e5bc90fb36eecbead400c81723a232738176d"
+  "summary": "Post-article bounded weighted plugin-platform closeout audit keeps supporting_materials=14/14, dependency_rows=11/11, validation_rows=10/10, closeout_status=OperatorGreenServedSuppressed, closure_bundle_issue_id=`TAS-215`, and plugin_capability_claim_allowed=true.",
+  "report_digest": "11ceeec8d8886182deb64264fe1168ca2db3ac6ffc97e4b7f3ccb8840d46ecb6"
 }

@@ -58,7 +58,7 @@ const POST_ARTICLE_TURING_AUDIT_REF: &str =
     "docs/audits/2026-03-20-tassadar-post-article-turing-completeness-audit.md";
 const PLUGIN_SYSTEM_TURING_AUDIT_REF: &str =
     "docs/audits/2026-03-20-tassadar-plugin-system-and-turing-completeness-audit.md";
-const NEXT_STABILITY_ISSUE_ID: &str = "TAS-210";
+const NEXT_STABILITY_ISSUE_ID: &str = "TAS-211";
 const CLOSURE_BUNDLE_ISSUE_ID: &str = "TAS-215";
 const PROOF_TRANSPORT_ISSUE_ID: &str = "TAS-209";
 
@@ -916,7 +916,7 @@ fn build_report_from_inputs(
                 String::from(POST_ARTICLE_TURING_AUDIT_REF),
                 String::from(PLUGIN_SYSTEM_TURING_AUDIT_REF),
             ],
-            "closing proof transport here still leaves continuation non-computationality, later stability issues, and the final closure bundle explicit and separate.",
+            "closing proof transport here still leaves later stability issues and the final closure bundle explicit and separate.",
         ),
     ];
 
@@ -989,7 +989,7 @@ fn build_report_from_inputs(
         served_public_universality_allowed: false,
         arbitrary_software_capability_allowed: false,
         claim_boundary: String::from(
-            "this eval-owned audit freezes one canonical execution-semantics proof-transport boundary for the post-article machine. It binds the historical universal-machine proof, the post-article rebinding receipts, the canonical computational-model statement, the declared TCM.v1 continuation carrier, and the current plugin-facing runtime/conformance/controller surfaces to the same proof-bearing machine without overclaiming a stronger machine. It still leaves continuation non-computationality, fast-route legitimacy, equivalent-choice neutrality, downward non-influence, anti-drift closeout, and the final closure bundle as later issues.",
+            "this eval-owned audit freezes one canonical execution-semantics proof-transport boundary for the post-article machine. It binds the historical universal-machine proof, the post-article rebinding receipts, the canonical computational-model statement, the declared TCM.v1 continuation carrier, and the current plugin-facing runtime/conformance/controller surfaces to the same proof-bearing machine without overclaiming a stronger machine. It still leaves fast-route legitimacy, equivalent-choice neutrality, downward non-influence, anti-drift closeout, and the final closure bundle as later issues.",
         ),
         summary: String::new(),
         report_digest: String::new(),
@@ -1236,7 +1236,7 @@ mod tests {
         assert!(report.proof_transport_complete);
         assert!(report.plugin_execution_transport_bound);
         assert_eq!(report.proof_transport_issue_id, "TAS-209");
-        assert_eq!(report.next_stability_issue_id, "TAS-210");
+        assert_eq!(report.next_stability_issue_id, "TAS-211");
         assert_eq!(report.closure_bundle_issue_id, "TAS-215");
         assert!(!report.closure_bundle_embedded_here);
         assert!(!report.rebase_claim_allowed);
