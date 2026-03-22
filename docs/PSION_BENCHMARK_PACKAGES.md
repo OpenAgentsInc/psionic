@@ -12,6 +12,11 @@ benchmark family is already green. It defines the package shapes that later
 benchmark sets, aggregate receipts, and acceptance-matrix decisions must all
 share.
 
+Label-production provenance now lives in
+`docs/PSION_BENCHMARK_LABEL_GENERATION.md`. This document stays focused on
+package shape, not on how exact labels, rubric-backed labels, or derived-data
+lineage receipts are produced.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_benchmark_packages.rs` owns the shared

@@ -59,6 +59,50 @@
         "spec_quiz_eval_pack_v1",
         "wasm_core_spec_release_2"
       ]
+    },
+    {
+      "benchmark_id": "psion_architecture_reasoning_benchmark_v1",
+      "benchmark_digest": "0aa2a13d57576c0c0c0bfb2644140224ffad1e75901770ef17a23c6684e147ad",
+      "source_ids": [
+        "spec_quiz_eval_pack_v1"
+      ]
+    },
+    {
+      "benchmark_id": "psion_normative_spec_benchmark_v1",
+      "benchmark_digest": "8a8ccf2e556115f779b9092648acf6cb1e2a8f648ce9f8acb3890b53002b1d70",
+      "source_ids": [
+        "spec_quiz_eval_pack_v1",
+        "wasm_core_spec_release_2"
+      ]
+    },
+    {
+      "benchmark_id": "psion_engineering_spec_benchmark_v1",
+      "benchmark_digest": "d50e6b9ddc50fae6a4ee99451f3a0723db01b9955560950365be8b7ffec6834e",
+      "source_ids": [
+        "spec_quiz_eval_pack_v1",
+        "wasm_core_spec_release_2"
+      ]
+    },
+    {
+      "benchmark_id": "psion_memorization_reasoning_benchmark_v1",
+      "benchmark_digest": "b2d2a8d4da88d166838e6ed866b2df5772453709bef00e094f682bb25204f47e",
+      "source_ids": [
+        "spec_quiz_eval_pack_v1"
+      ]
+    },
+    {
+      "benchmark_id": "psion_route_benchmark_v1",
+      "benchmark_digest": "3ae4b43aa0c68a6b20c618b8fd55d13357676a8ea84257cb21b9f3fbf55f4374",
+      "source_ids": [
+        "spec_quiz_eval_pack_v1"
+      ]
+    },
+    {
+      "benchmark_id": "psion_refusal_benchmark_v1",
+      "benchmark_digest": "0634f40bc65e8938d0d599849106daa52b2efa94bfc44a0aa4b6080f527dc3cc",
+      "source_ids": [
+        "spec_quiz_eval_pack_v1"
+      ]
     }
   ]
 }

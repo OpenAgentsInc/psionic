@@ -1,0 +1,348 @@
+{
+  "schema_version": "psion.benchmark_label_generation_receipt_set.v1",
+  "receipt_set_id": "psion-benchmark-label-generation-receipt-set-v1",
+  "catalog_digest": "9c7d3e9530cd1ba4becb2cdbfa52b7c659f8c70314a47129559d7c221996a5e5",
+  "lineage_schema_version": "psion.artifact_lineage.v1",
+  "receipts": [
+    {
+      "schema_version": "psion.benchmark_label_generation_receipt.v1",
+      "receipt_id": "psion_architecture_reasoning_benchmark_v1-label-generation-receipt-v1",
+      "package_id": "psion_architecture_reasoning_benchmark_v1",
+      "package_digest": "0aa2a13d57576c0c0c0bfb2644140224ffad1e75901770ef17a23c6684e147ad",
+      "package_family": "architecture_reasoning",
+      "contamination_input_digest": "57caf81f4cd0d54fea05946aadb7078111414de617e3d277225e1a159d7b20b4",
+      "generation_mode": "rubric_backed",
+      "item_receipts": [
+        {
+          "item_id": "arch-case-1",
+          "grader_id": "rubric_reasoning_v1",
+          "generation_mode": "rubric_backed",
+          "label_logic": {
+            "logic_id": "arch-case-1-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/rubric-label-assembly-v1",
+            "detail": "Rubric-backed items pin the label-generation logic version used to assemble reasoning labels."
+          },
+          "rubric_binding": {
+            "rubric_ref": "rubric://psion/benchmark/reasoning",
+            "rubric_version": "2026.03.22",
+            "reviewer_guidance_ref": "guidance://psion/benchmark/rubric/reasoning-v1",
+            "detail": "Rubric-backed labels pin the rubric reference, rubric version, and reviewer guidance used to score the item."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-arch-case-1",
+            "generated_label_digest": "derived-label-arch-case-1",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/rubric-label-assembly-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent reviewed sources, parent artifact reference, and rubric generator reference for the item and its label."
+          },
+          "detail": "Rubric-backed item records rubric versioning and derived-data lineage."
+        }
+      ],
+      "summary": "Label-generation receipt for `psion_architecture_reasoning_benchmark_v1` proving benchmark labels stay bound to exact-truth or rubric-version contracts with explicit derived-data lineage.",
+      "receipt_digest": "63134d3383a10ed0ebdfce6c771160c4dbdb2733d75270bc933857044fc2cd07"
+    },
+    {
+      "schema_version": "psion.benchmark_label_generation_receipt.v1",
+      "receipt_id": "psion_normative_spec_benchmark_v1-label-generation-receipt-v1",
+      "package_id": "psion_normative_spec_benchmark_v1",
+      "package_digest": "8a8ccf2e556115f779b9092648acf6cb1e2a8f648ce9f8acb3890b53002b1d70",
+      "package_family": "normative_spec_reading",
+      "contamination_input_digest": "52821f8da4180d39b2a81a45d5be7638a0968b40605a674d834d034fa8c90146",
+      "generation_mode": "exact",
+      "item_receipts": [
+        {
+          "item_id": "spec-case-1",
+          "grader_id": "exact_label_v1",
+          "generation_mode": "exact",
+          "label_logic": {
+            "logic_id": "spec-case-1-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/exact-label-projection-v1",
+            "detail": "Exact-label items pin the deterministic projection logic used to materialize labels."
+          },
+          "exact_truth": {
+            "truth_kind": "equivalent_exact_label",
+            "truth_ref": "truth://psion/benchmark/spec-extract-v1",
+            "truth_artifact_digest": "sha256:truth_spec-case-1",
+            "label_namespace": "psion.spec.reading",
+            "accepted_labels": [
+              "pass",
+              "boundary_clear"
+            ],
+            "detail": "Equivalent exact truth keeps the deterministic label extraction source versioned when CPU-reference execution is not the right anchor."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-spec-case-1",
+            "generated_label_digest": "derived-label-spec-case-1",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1",
+              "wasm_core_spec_release_2"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/exact-label-projection-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent sources and deterministic generator for the exact label."
+          },
+          "detail": "Exact-label item records CPU-reference or equivalent exact truth plus derived-data lineage."
+        }
+      ],
+      "summary": "Label-generation receipt for `psion_normative_spec_benchmark_v1` proving benchmark labels stay bound to exact-truth or rubric-version contracts with explicit derived-data lineage.",
+      "receipt_digest": "a8f7ceff5503add8a07ff5827d7b8316e4d342634290be88381cec97e4b76136"
+    },
+    {
+      "schema_version": "psion.benchmark_label_generation_receipt.v1",
+      "receipt_id": "psion_engineering_spec_benchmark_v1-label-generation-receipt-v1",
+      "package_id": "psion_engineering_spec_benchmark_v1",
+      "package_digest": "d50e6b9ddc50fae6a4ee99451f3a0723db01b9955560950365be8b7ffec6834e",
+      "package_family": "engineering_spec_interpretation",
+      "contamination_input_digest": "52821f8da4180d39b2a81a45d5be7638a0968b40605a674d834d034fa8c90146",
+      "generation_mode": "hybrid",
+      "item_receipts": [
+        {
+          "item_id": "eng-case-1",
+          "grader_id": "rubric_reasoning_v1",
+          "generation_mode": "rubric_backed",
+          "label_logic": {
+            "logic_id": "eng-case-1-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/rubric-label-assembly-v1",
+            "detail": "Rubric-backed items pin the label-generation logic version used to assemble reasoning labels."
+          },
+          "rubric_binding": {
+            "rubric_ref": "rubric://psion/benchmark/reasoning",
+            "rubric_version": "2026.03.22",
+            "reviewer_guidance_ref": "guidance://psion/benchmark/rubric/reasoning-v1",
+            "detail": "Rubric-backed labels pin the rubric reference, rubric version, and reviewer guidance used to score the item."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-eng-case-1",
+            "generated_label_digest": "derived-label-eng-case-1",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/rubric-label-assembly-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent reviewed sources, parent artifact reference, and rubric generator reference for the item and its label."
+          },
+          "detail": "Rubric-backed item records rubric versioning and derived-data lineage."
+        },
+        {
+          "item_id": "eng-case-2",
+          "grader_id": "exact_label_v1",
+          "generation_mode": "exact",
+          "label_logic": {
+            "logic_id": "eng-case-2-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/exact-label-projection-v1",
+            "detail": "Exact-label items pin the deterministic projection logic used to materialize labels."
+          },
+          "exact_truth": {
+            "truth_kind": "cpu_reference_label",
+            "runtime_ref": "runtime://psion/cpu_reference_queue_model_v1",
+            "truth_artifact_ref": "artifact://psion/benchmark/queue_depth_limit_cpu_reference_v1",
+            "truth_artifact_digest": "sha256:psion_queue_depth_limit_cpu_reference_v1",
+            "label_namespace": "psion.spec.reading",
+            "accepted_labels": [
+              "pass",
+              "boundary_clear"
+            ],
+            "detail": "This exact-label item binds to a CPU-reference queue model so exact execution truth is explicit on the label-generation side."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-eng-case-2",
+            "generated_label_digest": "derived-label-eng-case-2",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1",
+              "wasm_core_spec_release_2"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/exact-label-projection-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent sources and deterministic generator for the exact label."
+          },
+          "detail": "Exact-label item records CPU-reference or equivalent exact truth plus derived-data lineage."
+        }
+      ],
+      "summary": "Label-generation receipt for `psion_engineering_spec_benchmark_v1` proving benchmark labels stay bound to exact-truth or rubric-version contracts with explicit derived-data lineage.",
+      "receipt_digest": "fc936489790a2b5c3d97e4d5c8807df280b39a8b04c9c5a17117fd6711c8afd7"
+    },
+    {
+      "schema_version": "psion.benchmark_label_generation_receipt.v1",
+      "receipt_id": "psion_memorization_reasoning_benchmark_v1-label-generation-receipt-v1",
+      "package_id": "psion_memorization_reasoning_benchmark_v1",
+      "package_digest": "b2d2a8d4da88d166838e6ed866b2df5772453709bef00e094f682bb25204f47e",
+      "package_family": "memorization_versus_reasoning",
+      "contamination_input_digest": "57caf81f4cd0d54fea05946aadb7078111414de617e3d277225e1a159d7b20b4",
+      "generation_mode": "exact",
+      "item_receipts": [
+        {
+          "item_id": "mem-case-1",
+          "grader_id": "exact_label_v1",
+          "generation_mode": "exact",
+          "label_logic": {
+            "logic_id": "mem-case-1-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/exact-label-projection-v1",
+            "detail": "Exact-label items pin the deterministic projection logic used to materialize labels."
+          },
+          "exact_truth": {
+            "truth_kind": "equivalent_exact_label",
+            "truth_ref": "truth://psion/benchmark/spec-extract-v1",
+            "truth_artifact_digest": "sha256:truth_mem-case-1",
+            "label_namespace": "psion.spec.reading",
+            "accepted_labels": [
+              "pass",
+              "boundary_clear"
+            ],
+            "detail": "Equivalent exact truth keeps the deterministic label extraction source versioned when CPU-reference execution is not the right anchor."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-mem-case-1",
+            "generated_label_digest": "derived-label-mem-case-1",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/exact-label-projection-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent sources and deterministic generator for the exact label."
+          },
+          "detail": "Exact-label item records CPU-reference or equivalent exact truth plus derived-data lineage."
+        }
+      ],
+      "summary": "Label-generation receipt for `psion_memorization_reasoning_benchmark_v1` proving benchmark labels stay bound to exact-truth or rubric-version contracts with explicit derived-data lineage.",
+      "receipt_digest": "578c21b5d925bd6e00bd8567e096a16ca79e7be900304c241cc98512f6273080"
+    },
+    {
+      "schema_version": "psion.benchmark_label_generation_receipt.v1",
+      "receipt_id": "psion_route_benchmark_v1-label-generation-receipt-v1",
+      "package_id": "psion_route_benchmark_v1",
+      "package_digest": "3ae4b43aa0c68a6b20c618b8fd55d13357676a8ea84257cb21b9f3fbf55f4374",
+      "package_family": "route_evaluation",
+      "contamination_input_digest": "57caf81f4cd0d54fea05946aadb7078111414de617e3d277225e1a159d7b20b4",
+      "generation_mode": "exact",
+      "item_receipts": [
+        {
+          "item_id": "route-case-1",
+          "grader_id": "exact_route_v1",
+          "generation_mode": "exact",
+          "label_logic": {
+            "logic_id": "route-case-1-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/route-policy-v1",
+            "detail": "Route items pin the exact policy procedure used to derive route labels."
+          },
+          "exact_truth": {
+            "truth_kind": "route_policy",
+            "truth_ref": "route://psion/exactness_boundary",
+            "truth_artifact_digest": "sha256:truth_route-case-1",
+            "expected_route": "exact_executor_handoff",
+            "detail": "Route-selection labels bind to an exact route boundary instead of a freeform annotation pass."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-route-case-1",
+            "generated_label_digest": "derived-label-route-case-1",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/route-policy-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent sources and exact route-policy generator used for the label."
+          },
+          "detail": "Exact route item records route-policy truth and derived-data lineage."
+        }
+      ],
+      "summary": "Label-generation receipt for `psion_route_benchmark_v1` proving benchmark labels stay bound to exact-truth or rubric-version contracts with explicit derived-data lineage.",
+      "receipt_digest": "2f7e3a404588d0925ebccb137bd9434937d05ff34cce4e85573843afb2ccf012"
+    },
+    {
+      "schema_version": "psion.benchmark_label_generation_receipt.v1",
+      "receipt_id": "psion_refusal_benchmark_v1-label-generation-receipt-v1",
+      "package_id": "psion_refusal_benchmark_v1",
+      "package_digest": "0634f40bc65e8938d0d599849106daa52b2efa94bfc44a0aa4b6080f527dc3cc",
+      "package_family": "refusal_evaluation",
+      "contamination_input_digest": "57caf81f4cd0d54fea05946aadb7078111414de617e3d277225e1a159d7b20b4",
+      "generation_mode": "exact",
+      "item_receipts": [
+        {
+          "item_id": "refusal-case-1",
+          "grader_id": "exact_refusal_v1",
+          "generation_mode": "exact",
+          "label_logic": {
+            "logic_id": "refusal-case-1-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/refusal-policy-v1",
+            "detail": "Refusal items pin the exact refusal-policy procedure used to derive labels."
+          },
+          "exact_truth": {
+            "truth_kind": "refusal_policy",
+            "truth_ref": "refusal://psion/benchmark/boundary-v1",
+            "truth_artifact_digest": "sha256:truth_refusal-case-1",
+            "accepted_reason_codes": [
+              "unsupported_exactness_request"
+            ],
+            "detail": "Refusal labels bind to an exact refusal boundary instead of a freeform review note."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-refusal-case-1",
+            "generated_label_digest": "derived-label-refusal-case-1",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/refusal-policy-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent sources and exact refusal generator used for the label."
+          },
+          "detail": "Exact refusal item records refusal-policy truth and derived-data lineage."
+        }
+      ],
+      "summary": "Label-generation receipt for `psion_refusal_benchmark_v1` proving benchmark labels stay bound to exact-truth or rubric-version contracts with explicit derived-data lineage.",
+      "receipt_digest": "a7103032da6226d9e93554362c58ebff6bee02c2a04e9f071345c1171800c6aa"
+    }
+  ],
+  "summary": "Canonical receipt set proving the main Psion benchmark families record exact-truth bindings, rubric versions, and derived-data lineage back to reviewed parent sources or generators instead of treating benchmark labels as opaque hand-maintained state.",
+  "receipt_set_digest": "68d47825d1aec237fe669b1fba32c7b9bdf23cd7f615f5d403787250f434554e"
+}

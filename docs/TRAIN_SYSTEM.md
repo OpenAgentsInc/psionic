@@ -135,6 +135,11 @@ and now also has:
   doc for the `Psion` learned-model lane and freezes the shared item schema,
   prompt-format, grader-interface, contamination-input, and receipt contract
   that later acceptance evidence must build on.
+- `docs/PSION_BENCHMARK_LABEL_GENERATION.md` is the canonical first
+  benchmark-label-generation doc for the `Psion` learned-model lane and
+  freezes the exact-truth, rubric-version, label-generation-logic, and
+  derived-data-lineage contract that later benchmark evidence and
+  contamination review must preserve.
 - `docs/PSION_CHECKPOINT_RECOVERY.md` is the canonical first dense-versus-
   sharded checkpoint-recovery doc for the `Psion` learned-model lane and
   freezes the explicit restart, rollback, corruption-detection, and

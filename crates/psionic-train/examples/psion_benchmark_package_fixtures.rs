@@ -191,26 +191,49 @@ fn package_contracts() -> Result<Vec<psionic_train::PsionBenchmarkPackageContrac
         record_psion_benchmark_package(
             "psion_engineering_spec_benchmark_v1",
             PsionBenchmarkPackageFamily::EngineeringSpecInterpretation,
-            benchmark_package("psion_engineering_spec_benchmark_v1", &["eng-case-1"]),
+            benchmark_package(
+                "psion_engineering_spec_benchmark_v1",
+                &["eng-case-1", "eng-case-2"],
+            ),
             vec![explanation_prompt_format()],
-            vec![rubric_grader()],
+            vec![rubric_grader(), exact_label_grader()],
             contamination_inputs(&["spec_quiz_eval_pack_v1", "wasm_core_spec_release_2"])?,
-            vec![PsionBenchmarkItem {
-                item_id: String::from("eng-case-1"),
-                family: PsionBenchmarkPackageFamily::EngineeringSpecInterpretation,
-                prompt_format_id: String::from("bounded_explanation_v1"),
-                grader_id: String::from("rubric_reasoning_v1"),
-                prompt_digest: String::from("eng-prompt-digest-1"),
-                source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
-                task: PsionBenchmarkTaskContract::EngineeringSpecInterpretation {
-                    artifact_ref: String::from("artifact://psion/spec/queueing_model"),
-                    expected_constraint: String::from("throughput ceiling"),
+            vec![
+                PsionBenchmarkItem {
+                    item_id: String::from("eng-case-1"),
+                    family: PsionBenchmarkPackageFamily::EngineeringSpecInterpretation,
+                    prompt_format_id: String::from("bounded_explanation_v1"),
+                    grader_id: String::from("rubric_reasoning_v1"),
+                    prompt_digest: String::from("eng-prompt-digest-1"),
+                    source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                    task: PsionBenchmarkTaskContract::EngineeringSpecInterpretation {
+                        artifact_ref: String::from("artifact://psion/spec/queueing_model"),
+                        expected_constraint: String::from("throughput ceiling"),
+                    },
+                    detail: String::from(
+                        "Engineering spec interpretation item checks bounded implementation inference.",
+                    ),
                 },
-                detail: String::from(
-                    "Engineering spec interpretation item checks bounded implementation inference.",
-                ),
-            }],
-            "Engineering spec package uses the shared contract with a rubric-backed grader.",
+                PsionBenchmarkItem {
+                    item_id: String::from("eng-case-2"),
+                    family: PsionBenchmarkPackageFamily::EngineeringSpecInterpretation,
+                    prompt_format_id: String::from("bounded_explanation_v1"),
+                    grader_id: String::from("exact_label_v1"),
+                    prompt_digest: String::from("eng-prompt-digest-2"),
+                    source_ids: vec![
+                        String::from("spec_quiz_eval_pack_v1"),
+                        String::from("wasm_core_spec_release_2"),
+                    ],
+                    task: PsionBenchmarkTaskContract::EngineeringSpecInterpretation {
+                        artifact_ref: String::from("artifact://psion/spec/queue_depth_limit"),
+                        expected_constraint: String::from("queue depth hard limit"),
+                    },
+                    detail: String::from(
+                        "Engineering spec interpretation exact-label item checks deterministic constraint extraction against a canonical engineering boundary.",
+                    ),
+                },
+            ],
+            "Engineering spec package uses the shared contract with both rubric-backed and exact-label graders.",
         )?,
         record_psion_benchmark_package(
             "psion_memorization_reasoning_benchmark_v1",

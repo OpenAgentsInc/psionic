@@ -218,6 +218,9 @@
         "cases": [
           {
             "case_id": "eng-case-1"
+          },
+          {
+            "case_id": "eng-case-2"
           }
         ]
       },
@@ -251,6 +254,16 @@
             }
           ],
           "detail": "Rubric grader supports bounded reasoning labels without collapsing them into one exact string."
+        },
+        {
+          "grader_kind": "exact_label",
+          "grader_id": "exact_label_v1",
+          "label_namespace": "psion.spec.reading",
+          "accepted_labels": [
+            "pass",
+            "boundary_clear"
+          ],
+          "detail": "Exact-label grader supports deterministic label-based grading."
         }
       ],
       "contamination_inputs": {
@@ -284,10 +297,27 @@
             "expected_constraint": "throughput ceiling"
           },
           "detail": "Engineering spec interpretation item checks bounded implementation inference."
+        },
+        {
+          "item_id": "eng-case-2",
+          "family": "engineering_spec_interpretation",
+          "prompt_format_id": "bounded_explanation_v1",
+          "grader_id": "exact_label_v1",
+          "prompt_digest": "eng-prompt-digest-2",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1",
+            "wasm_core_spec_release_2"
+          ],
+          "task": {
+            "task_kind": "engineering_spec_interpretation",
+            "artifact_ref": "artifact://psion/spec/queue_depth_limit",
+            "expected_constraint": "queue depth hard limit"
+          },
+          "detail": "Engineering spec interpretation exact-label item checks deterministic constraint extraction against a canonical engineering boundary."
         }
       ],
-      "summary": "Engineering spec package uses the shared contract with a rubric-backed grader.",
-      "package_digest": "6e3ecc743c1a719c6da94b071b58a21454d506869dbb6642f3abad5cd54fbab5"
+      "summary": "Engineering spec package uses the shared contract with both rubric-backed and exact-label graders.",
+      "package_digest": "d50e6b9ddc50fae6a4ee99451f3a0723db01b9955560950365be8b7ffec6834e"
     },
     {
       "schema_version": "psion.benchmark_package_contract.v1",
@@ -550,5 +580,5 @@
     }
   ],
   "summary": "Canonical catalog proving the main Psion benchmark families can all build on one shared prompt, item, grader, contamination-input, and receipt contract.",
-  "catalog_digest": "1a8731db2e3e5362b32ee823febcf9ab767401ed610fd0dc0858e6f017387c19"
+  "catalog_digest": "9c7d3e9530cd1ba4becb2cdbfa52b7c659f8c70314a47129559d7c221996a5e5"
 }

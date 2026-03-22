@@ -49,6 +49,9 @@ clustered execution, and machine-legible execution truth.
   style-control doc for the `Psion` learned-model lane.
 - `docs/PSION_BENCHMARK_PACKAGES.md` is the canonical shared benchmark item,
   grader, and receipt doc for the `Psion` learned-model lane.
+- `docs/PSION_BENCHMARK_LABEL_GENERATION.md` is the canonical benchmark-label,
+  rubric-version, exact-truth, and derived-data-lineage doc for the `Psion`
+  learned-model lane.
 - `docs/PSION_CHECKPOINT_RECOVERY.md` is the canonical dense-versus-sharded
   checkpoint restart, rollback, and invalidation doc for the `Psion`
   learned-model lane.
