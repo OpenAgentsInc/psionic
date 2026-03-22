@@ -27,6 +27,9 @@ clustered execution, and machine-legible execution truth.
 - `docs/TASSADAR_MULTI_PLUGIN_ORCHESTRATION_WAVE.md` is the canonical umbrella
   closeout doc for the first real-run multi-plugin controller tranche above
   the shared starter-plugin runtime.
+- `docs/TASSADAR_STARTER_PLUGIN_AUTHORING.md` is the canonical bounded
+  authoring template for adding a new capability-free starter plugin inside
+  this repository.
 - `docs/PSION_PROGRAM_MAP.md` is the canonical umbrella map for the `Psion`
   learned-model lane.
 - `docs/PSION_CORPUS_ADMISSION.md` is the canonical first admission-policy doc

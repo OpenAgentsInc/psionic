@@ -20,6 +20,9 @@ class, capability posture, mount envelope identity, runtime bundle identity,
 and per-surface publication flags derive from that one registry so the runtime,
 shared bridge, and starter catalog do not drift independently.
 
+The human-readable contributor contract for adding a new capability-free
+starter plugin now lives in `docs/TASSADAR_STARTER_PLUGIN_AUTHORING.md`.
+
 ## Implemented
 
 ### `plugin.text.url_extract`
