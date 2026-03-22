@@ -117,7 +117,10 @@ while IFS= read -r artifact_json; do
   verify_sha256 "${dest_path}" "${expected_sha256}"
 done < <(jq -c '.artifacts[]' "${archive_manifest_file}")
 
-cargo run -p psionic-train --example psion_reference_pilot_resume_probe -- "${download_dir}" "${resume_output_dir}" >/dev/null
+(
+  cd "${REPO_ROOT}"
+  cargo run -p psionic-train --example psion_reference_pilot_resume_probe -- "${download_dir}" "${resume_output_dir}" >/dev/null
+)
 
 resume_probe_file="${resume_output_dir}/psion_reference_pilot_resume_probe.json"
 resume_probe_sha256="$(compute_sha256 "${resume_probe_file}")"
