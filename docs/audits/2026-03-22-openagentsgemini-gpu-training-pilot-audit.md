@@ -155,7 +155,8 @@ What is still only `partial`:
 
 Blunt conclusion:
 
-- yes, this project can launch a bounded single-GPU Psion pilot
+- yes, this project appears capable of launching a bounded single-GPU Psion
+  pilot, subject to live zonal stock and a short setup pass
 - no, it is not yet cleanly prepared to do that and preserve all relevant run
   evidence without a short setup pass first
 
@@ -179,6 +180,15 @@ Recommended order:
 3. leave Spot or preemptible usage for later once checkpoint persistence is
    proven, even though spot-like quota exists
 
+Initial zone fallback order for the first launch:
+
+- L4 plus `g2`: `us-central1-b`, then `us-central1-c`, then `us-central1-a`
+- A100 plus `a2-highgpu-1g`: `us-central1-b`, then `us-central1-c`, then
+  `us-central1-a`, then `us-central1-f`
+
+These are only operator defaults. Actual launch truth still depends on live
+zonal stock at allocation time.
+
 ## Minimum Setup Before Launch
 
 - create a dedicated regional bucket for training artifacts, checkpoints, and
@@ -192,6 +202,25 @@ Recommended order:
   and cost drift are not invisible during the run
 - define one launch wrapper that snapshots quota, instance metadata, machine
   details, and training outputs into the bucket
+
+## Remaining Operational Risks
+
+This audit does not yet close the following launch-critical risks:
+
+- live zonal GPU stock may still block allocation even when quota and catalog
+  look green
+- bootstrap reproducibility may drift if the first run relies on floating base
+  images or first-boot NVIDIA driver installation behavior
+- local boot-disk pressure could invalidate the run if dataset staging,
+  checkpoints, or logs exceed the undeclared working-disk budget
+- artifact durability is still partial until object digests, checkpoint
+  manifests, and cold-restore proof exist
+- cost truth remains partial until billing export or an equivalent
+  machine-queryable surface is wired into the run bundle
+- operator-local tooling drift can still break launch or evidence collection if
+  `gcloud`, `bq`, or auth posture remain implicit
+- the audit still does not prove Google-host execution readiness until one real
+  run completes with preserved evidence
 
 ## Required Issue Program
 
@@ -313,6 +342,9 @@ Required details:
 - export billing data to BigQuery or another machine-queryable cost sink
 - define one quota-preflight command that checks region, zone, accelerator, CPU,
   and disk headroom before launch
+- define a bounded launch-attempt policy covering stock failure, zone fallback,
+  and the point where the operator must stop retrying and record a
+  `launch_capacity_failure`
 - define an estimated max-cost envelope for the first run and bind it to the
   launch manifest
 - align stop conditions with the rented-cluster runbook cost posture rather
@@ -344,8 +376,18 @@ Required details:
   operator remember the shape manually
 - carry at least these machine profiles explicitly:
   `g2-standard-*` plus `1x L4`, and `a2-highgpu-1g` plus `1x A100`
+- pin the base image family, source image project, and exact image identifier
+  recorded in the manifest instead of relying on a floating implicit image
+- prefer a prevalidated GPU-ready image after the first successful run instead
+  of treating first-boot driver installation as the permanent operator story
 - capture zone, machine type, accelerator type, disk type, disk size, bucket
   path, git revision, and training command in one launch manifest
+- define a minimum boot-disk size and local scratch policy covering dataset
+  cache, logs, and temporary checkpoint materialization
+- define low-disk watermark and fail-fast behavior before the run silently
+  collapses on local storage
+- carry the initial zone fallback order in the launch logic instead of leaving
+  zone choice to operator improvisation
 - use a startup script or equivalent reproducible bootstrap path that can:
   install or verify NVIDIA driver state, fetch the repo at the selected
   revision, materialize run directories, and start the bounded training command
@@ -355,6 +397,8 @@ Acceptance details:
 
 - one command launches the declared training VM shape
 - one manifest object records the exact infra and code inputs
+- the manifest records the exact image identity, boot-disk policy, and zone
+  chosen after any fallback
 - one command tears down the host after artifacts are safely retained
 
 Dependencies:
@@ -373,9 +417,18 @@ Required details:
 - include digests for:
   source or tokenized corpus inputs, tokenizer artifacts, stage config,
   benchmark fixtures, and the exact code revision
+- define how the first run obtains training data:
+  staged to local disk, streamed from GCS, or cached with an explicit bounded
+  local working-set policy
 - teach the launch path to fetch those exact artifacts, not floating local
   state
 - write one manifest that ties all input digests to the run id
+- require checksum validation for the input package, benchmark fixtures, and
+  any uploaded manifests before training begins
+- define the benchmark execution posture explicitly:
+  minimal held-out and pilot-critical probes on-host, with heavier benchmark
+  passes allowed post hoc from the archived checkpoint unless the pilot contract
+  requires them during the run
 - keep the Google operator lane aligned with the canonical Psion stage and pilot
   docs instead of inventing a second cloud-specific training schema
 
@@ -384,6 +437,7 @@ Acceptance details:
 - rerunning the same manifest on a fresh VM reproduces the same input digests
 - the stage receipt and final run bundle point back to the immutable input
   package
+- the run can prove whether inputs were staged, streamed, or cached locally
 - there is no hidden dependency on the operator’s unstated local workspace
 
 Dependencies:
@@ -403,6 +457,8 @@ Required details:
 - implement or script cold restore onto a new VM from the archived checkpoint
 - record restore success or failure with the same checkpoint-lineage discipline
   used by the existing Psion training artifacts
+- require object digests for archived checkpoint artifacts and the checkpoint
+  manifest itself before a restore is accepted as valid
 - explicitly test the required rented-cluster downgrade path:
   `resume_from_last_stable_checkpoint`
 
@@ -427,18 +483,29 @@ Required details:
 
 - capture instance metadata:
   project, zone, machine type, accelerator type, disk shape, and network mode
+- record the exact base image identity and the UTC launch, bootstrap, training
+  start, checkpoint, and teardown timestamps
 - capture runtime metadata:
   NVIDIA driver, CUDA runtime, `nvidia-smi`, CPU, memory, disk, and uptime
+- capture GPU utilization and memory-usage summaries so a "green" run cannot
+  hide obviously bad GPU occupancy or throughput
 - retain stdout, stderr, and structured training logs
 - emit or assemble the Psion stage receipt, observability receipt, replay
   receipt, checkpoint lineage, benchmark receipts, and pilot bundle from the
   actual remote run
+- require typed failure classification for non-green runs, with at least:
+  `launch_capacity_failure`, `bootstrap_failure`, `driver_runtime_failure`,
+  `artifact_upload_failure`, `training_divergence`,
+  `checkpoint_restore_failure`, `cost_guardrail_abort`, and `operator_abort`
+- require per-object checksums in the final uploaded manifest, including a
+  manifest-of-manifests checksum for the full evidence folder
 - upload one final manifest listing every retained object for the run
 
 Acceptance details:
 
 - every Google training run produces one bucket folder that is self-describing
 - the observability receipt can be regenerated from retained machine facts
+- a failed run still produces typed timestamps, failure code, and object digests
 - the final run folder is enough to audit cost, topology, checkpoint identity,
   and run outcome after the VM is gone
 
@@ -457,6 +524,14 @@ Required details:
 - add one dedicated runbook under `docs/`
 - document preflight, launch, monitoring, checkpoint archive, restore drill,
   evidence upload, and teardown
+- document required local operator tooling versions or minimum versions for
+  `gcloud` and `bq`, required auth posture, and required environment variables
+- add one local preflight that fails if the operator toolchain or auth posture
+  is incompatible with the Google pilot lane
+- document the secret posture explicitly:
+  prefer attached-service-account access, avoid runtime secret injection unless
+  strictly required, and record secret dependencies without recording secret
+  values
 - keep the claim boundary explicit:
   single-region, single-node, Google Compute Engine first
 - document refusal boundaries too:
@@ -470,6 +545,7 @@ Acceptance details:
 - one operator can run the full bounded procedure from the repo without hidden
   tribal knowledge
 - every command and artifact path in the runbook is still executable
+- local tooling or auth mismatch is rejected before any paid launch begins
 - the runbook states what remains refused after the first Google run
 
 Dependencies:
@@ -486,12 +562,22 @@ Required details:
 
 - use the preferred first-run shape:
   one L4-backed `g2` instance unless memory pressure forces `a2-highgpu-1g`
+- follow the declared zone fallback order and stop retrying after the bounded
+  launch-attempt policy is exhausted
+- define when the run should:
+  abort immediately, checkpoint then abort, retry in another zone, or downgrade
+  from an A100 request to an L4 request
 - keep the run bounded by explicit cost, time, step, or token ceilings
+- abort if the run fails to upload a durable checkpoint by the declared
+  checkpoint deadline
+- abort if the evidence-upload path is broken and the run can no longer produce
+  a truthful retained bundle
 - archive the full evidence bundle into the dedicated training bucket
 - validate the emitted stage receipt, observability receipt, replay facts,
   checkpoint lineage, and pilot bundle from the real run
 - write a follow-up audit that states whether the run stayed green or exposed
-  blockers for the next attempt
+  blockers for the next attempt, and record a typed result classification for
+  the final outcome
 
 Acceptance details:
 
@@ -499,6 +585,8 @@ Acceptance details:
 - the final evidence bundle is enough to support a truthful go or no-go call on
   the next pretraining step
 - the repo has a committed audit of the result, not just a console anecdote
+- the final result can be classified cleanly as success, bounded refusal, or
+  typed failure
 
 Dependencies:
 Issues 1 through 9
@@ -508,14 +596,23 @@ Issues 1 through 9
 At minimum, the first run should upload one bucket path containing:
 
 - the instance description JSON
+- the image self-link or equivalent exact image identity
 - the launch command or startup script
+- the launch manifest with cost ceiling, machine profile, zone choice, and
+  input-package digests
 - `nvidia-smi`, disk, memory, and CPU snapshots
+- GPU utilization summaries and step-throughput snapshots
 - the git revision and exact cargo or binary command used
 - the Psion stage config, observability receipt, replay receipt, and checkpoint
   lineage
 - stdout and stderr logs
 - checkpoint manifests and checkpoint artifacts
-- a final upload manifest listing every saved object
+- per-object SHA-256 digests for every retained object
+- UTC timestamps for launch, training start, checkpoint writes, final upload,
+  and teardown
+- a typed failure classification if the run does not finish green
+- a final upload manifest listing every saved object plus a manifest-of-
+  manifests checksum
 
 Without that bundle, the project may still run a GPU job, but it will not meet
 the standard of a truthful training pilot with preserved evidence.
