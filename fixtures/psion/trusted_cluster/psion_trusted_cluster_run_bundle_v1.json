@@ -1,0 +1,2606 @@
+{
+  "schema_version": "psion.trusted_cluster_run_bundle.v1",
+  "bundle_id": "psion-trusted-cluster-run-bundle-v1",
+  "pretrain_stage_receipt": {
+    "schema_version": "psion.pretrain_stage_receipt.v1",
+    "run_id": "run-psion-broad",
+    "stage_id": "run-psion-broad-stage-1-pretrain",
+    "stage_kind": "pretrain",
+    "model_id": "psion-compact-decoder-internal-v1",
+    "model_descriptor_digest": "c1eaf1c25afb760a686aa5df6a8a81d4c6be6557a18a4f8bf7b68372119f36ab",
+    "tokenizer_binding_digest": "92c451001e4cec3481a3480b29d80ecaa1696f9bffe553139d3a2f65da69e321",
+    "dataset_identity": "psion_corpus_tokenized@v1",
+    "sampling_policy_id": "psion_pretrain_mix",
+    "sampling_policy_version": "v1",
+    "objective_config": {
+      "objective_kind": "next_token_prediction",
+      "loss_normalization": "by_target_token",
+      "label_smoothing_bps": 20,
+      "tokenizer_binding_digest": "92c451001e4cec3481a3480b29d80ecaa1696f9bffe553139d3a2f65da69e321",
+      "dataset_identity": "psion_corpus_tokenized@v1",
+      "max_context_tokens": 8192
+    },
+    "source_family_reports": [
+      {
+        "split_name": "held_out",
+        "split_kind": "held_out",
+        "source_family_id": "evaluation_only_benchmark_material",
+        "source_ids": [
+          "spec_quiz_eval_pack_v1"
+        ],
+        "token_share_bps_within_split": 10000,
+        "sequence_share_bps_within_split": 10000,
+        "mean_next_token_loss_milli": 1210,
+        "detail": "Held-out benchmark material remains isolated for broader pretraining evaluation."
+      },
+      {
+        "split_name": "train",
+        "split_kind": "train",
+        "source_family_id": "computer_architecture_history",
+        "source_ids": [
+          "arch_textbook_foster_1985"
+        ],
+        "token_share_bps_within_split": 5550,
+        "sequence_share_bps_within_split": 5450,
+        "mean_next_token_loss_milli": 980,
+        "detail": "Broader run keeps prose slightly ahead while reducing train loss materially."
+      },
+      {
+        "split_name": "train",
+        "split_kind": "train",
+        "source_family_id": "normative_specs",
+        "source_ids": [
+          "wasm_core_spec_release_2"
+        ],
+        "token_share_bps_within_split": 4450,
+        "sequence_share_bps_within_split": 4550,
+        "mean_next_token_loss_milli": 1035,
+        "detail": "Broader run preserves heavy spec coverage alongside the prose anchor."
+      },
+      {
+        "split_name": "validation",
+        "split_kind": "validation",
+        "source_family_id": "computer_architecture_history",
+        "source_ids": [
+          "arch_textbook_foster_1985"
+        ],
+        "token_share_bps_within_split": 5200,
+        "sequence_share_bps_within_split": 5150,
+        "mean_next_token_loss_milli": 1015,
+        "detail": "Validation prose stays slightly dominant for broader-run reasoning checks."
+      },
+      {
+        "split_name": "validation",
+        "split_kind": "validation",
+        "source_family_id": "normative_specs",
+        "source_ids": [
+          "wasm_core_spec_release_2"
+        ],
+        "token_share_bps_within_split": 4800,
+        "sequence_share_bps_within_split": 4850,
+        "mean_next_token_loss_milli": 1080,
+        "detail": "Validation spec coverage remains high so interpretation drift is visible."
+      }
+    ],
+    "replay_receipt": {
+      "receipt_id": "psion-broad-pretrain-replay-v1",
+      "stable_dataset_identity": "psion_corpus_tokenized@v1",
+      "iteration_mode": "repeat",
+      "shard_ordering": "deterministic_shuffle",
+      "deterministic_shuffle_seed": 1337,
+      "successful_replays": 3,
+      "exact_replay_observed": true,
+      "replay_digest": "304740c7d1f0a53d2b3d4aba71c881bb09b1345b638f52b6db22a225ee289fe4",
+      "summary": "Broader run replay checks matched the tokenized-corpus contract across three recovery rehearsals."
+    },
+    "checkpoint_lineage": {
+      "receipt_id": "psion-broad-pretrain-checkpoint-lineage-v1",
+      "promoted_checkpoint": {
+        "checkpoint_family": "train.psion.decoder",
+        "stream_id": "stream-psion-broad-pretrain-final-v1",
+        "manifest_digest": "manifest-psion-broad-pretrain-final-v1",
+        "object_digest": "object-psion-broad-pretrain-final-v1",
+        "writer_node_id": "node-psion-b",
+        "membership_epoch": 7,
+        "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+        "topology_digest": "topology-digest-psion-broad-v1",
+        "started_at_ms": 1742620000000,
+        "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+        "step": 16384,
+        "durable_at_ms": 1742620900000
+      },
+      "promoted_checkpoint_label": "broader-pretrain-final",
+      "model_id": "psion-compact-decoder-internal-v1",
+      "model_descriptor_digest": "c1eaf1c25afb760a686aa5df6a8a81d4c6be6557a18a4f8bf7b68372119f36ab",
+      "checkpoint_lineage_digest": "cfe8386d015ec30fbc827894a9541921da0be51e02e1abe4c913f474ec057f96"
+    },
+    "summary": "Broader Psion pretrain stage scales the explicit next-token lane onto the internal compact decoder while preserving replay and checkpoint lineage.",
+    "receipt_digest": "633c4eca517b41798f7b183608195ad4c10156ff7f6b595bd3541871bb64d0ab"
+  },
+  "observability_receipt": {
+    "schema_version": "psion.pretrain_run_observability_receipt.v1",
+    "receipt_id": "psion-broader-pretrain-observability-v1",
+    "run_profile": "broader_pretraining",
+    "run_id": "run-psion-broad",
+    "stage_id": "run-psion-broad-stage-1-pretrain",
+    "stage_kind": "pretrain",
+    "model_id": "psion-compact-decoder-internal-v1",
+    "model_descriptor_digest": "c1eaf1c25afb760a686aa5df6a8a81d4c6be6557a18a4f8bf7b68372119f36ab",
+    "dataset_identity": "psion_corpus_tokenized@v1",
+    "sampling_policy_id": "psion_pretrain_mix",
+    "sampling_policy_version": "v1",
+    "pretrain_stage_receipt_digest": "633c4eca517b41798f7b183608195ad4c10156ff7f6b595bd3541871bb64d0ab",
+    "cost": {
+      "cost_basis": "metered_usd",
+      "currency_code": "USD",
+      "compute_cost_microusd": 487250000,
+      "storage_cost_microusd": 18600000,
+      "network_cost_microusd": 6400000,
+      "total_cost_microusd": 512250000,
+      "detail": "Broader run cost reflects metered trusted-cluster accelerator time plus checkpoint storage and east-west traffic."
+    },
+    "throughput": {
+      "train_tokens_processed": 1073741824,
+      "validation_tokens_processed": 33554432,
+      "held_out_tokens_scored": 8388608,
+      "optimizer_steps_completed": 16384,
+      "wall_clock_ms": 3780000,
+      "mean_tokens_per_second": 296214,
+      "peak_tokens_per_second": 331442,
+      "mean_sequences_per_second_milli": 72500,
+      "mean_step_latency_ms": 231,
+      "checkpoint_write_throughput_bytes_per_second": 1476395008
+    },
+    "checkpoint_artifact": {
+      "promoted_checkpoint_label": "broader-pretrain-final",
+      "checkpoint_family": "train.psion.decoder",
+      "checkpoint_object_digest": "object-psion-broad-pretrain-final-v1",
+      "checkpoint_size_bytes": 1546182656,
+      "optimizer_state_size_bytes": 773091328,
+      "ancillary_artifact_size_bytes": 14680064,
+      "total_artifact_size_bytes": 2333954048,
+      "shard_count": 8,
+      "detail": "Broader run artifact surface includes sharded weights, optimizer state, and receipt/descriptor sidecars."
+    },
+    "hardware_topology": {
+      "topology_digest": "db340e8890b303f59c2e4cc7140473fca894282ab6493a53a50d7d4efc2daccc",
+      "observed_worker_count": 4,
+      "delivered_execution": {
+        "runtime_backend": "cuda",
+        "execution_topology": {
+          "effective_backend": "cuda",
+          "kind": "tensor_sharded",
+          "assignments": [
+            {
+              "shard_id": 0,
+              "device": {
+                "stable_device_id": "cuda:h100-0",
+                "topology_key": "0000:81:00.0",
+                "placement_index": 0
+              },
+              "partition": {
+                "kind": "tensor_range",
+                "axis": 0,
+                "start": 0,
+                "end": 256
+              }
+            },
+            {
+              "shard_id": 1,
+              "device": {
+                "stable_device_id": "cuda:h100-1",
+                "topology_key": "0000:82:00.0",
+                "placement_index": 1
+              },
+              "partition": {
+                "kind": "tensor_range",
+                "axis": 0,
+                "start": 256,
+                "end": 512
+              }
+            },
+            {
+              "shard_id": 2,
+              "device": {
+                "stable_device_id": "cuda:h100-2",
+                "topology_key": "0000:83:00.0",
+                "placement_index": 2
+              },
+              "partition": {
+                "kind": "tensor_range",
+                "axis": 0,
+                "start": 512,
+                "end": 768
+              }
+            },
+            {
+              "shard_id": 3,
+              "device": {
+                "stable_device_id": "cuda:h100-3",
+                "topology_key": "0000:84:00.0",
+                "placement_index": 3
+              },
+              "partition": {
+                "kind": "tensor_range",
+                "axis": 0,
+                "start": 768,
+                "end": 1024
+              }
+            }
+          ]
+        },
+        "selected_devices": [
+          {
+            "stable_device_id": "cuda:h100-0",
+            "topology_key": "0000:81:00.0",
+            "performance_class": "discrete_accelerator",
+            "memory_class": "dedicated_device",
+            "total_memory_bytes": 85899345920,
+            "free_memory_bytes": 67645734912
+          },
+          {
+            "stable_device_id": "cuda:h100-1",
+            "topology_key": "0000:82:00.0",
+            "performance_class": "discrete_accelerator",
+            "memory_class": "dedicated_device",
+            "total_memory_bytes": 85899345920,
+            "free_memory_bytes": 65498251264
+          },
+          {
+            "stable_device_id": "cuda:h100-2",
+            "topology_key": "0000:83:00.0",
+            "performance_class": "discrete_accelerator",
+            "memory_class": "dedicated_device",
+            "total_memory_bytes": 85899345920,
+            "free_memory_bytes": 64424509440
+          },
+          {
+            "stable_device_id": "cuda:h100-3",
+            "topology_key": "0000:84:00.0",
+            "performance_class": "discrete_accelerator",
+            "memory_class": "dedicated_device",
+            "total_memory_bytes": 85899345920,
+            "free_memory_bytes": 63350767616
+          }
+        ],
+        "cluster_execution": {
+          "cluster_id": "cluster-psion-trusted-a",
+          "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+          "topology_digest": "topology-digest-psion-broad-v1",
+          "scheduler_node_id": "scheduler-psion-a",
+          "transport": "trusted_lan_stream",
+          "disposition": "sharded",
+          "execution_topology": {
+            "effective_backend": "cuda",
+            "kind": "tensor_sharded",
+            "assignments": [
+              {
+                "shard_id": 0,
+                "device": {
+                  "stable_device_id": "cuda:h100-0",
+                  "topology_key": "0000:81:00.0",
+                  "placement_index": 0
+                },
+                "partition": {
+                  "kind": "tensor_range",
+                  "axis": 0,
+                  "start": 0,
+                  "end": 256
+                }
+              },
+              {
+                "shard_id": 1,
+                "device": {
+                  "stable_device_id": "cuda:h100-1",
+                  "topology_key": "0000:82:00.0",
+                  "placement_index": 1
+                },
+                "partition": {
+                  "kind": "tensor_range",
+                  "axis": 0,
+                  "start": 256,
+                  "end": 512
+                }
+              },
+              {
+                "shard_id": 2,
+                "device": {
+                  "stable_device_id": "cuda:h100-2",
+                  "topology_key": "0000:83:00.0",
+                  "placement_index": 2
+                },
+                "partition": {
+                  "kind": "tensor_range",
+                  "axis": 0,
+                  "start": 512,
+                  "end": 768
+                }
+              },
+              {
+                "shard_id": 3,
+                "device": {
+                  "stable_device_id": "cuda:h100-3",
+                  "topology_key": "0000:84:00.0",
+                  "placement_index": 3
+                },
+                "partition": {
+                  "kind": "tensor_range",
+                  "axis": 0,
+                  "start": 768,
+                  "end": 1024
+                }
+              }
+            ]
+          },
+          "selected_nodes": [
+            {
+              "node_id": "worker-a",
+              "runtime_backend": "cuda",
+              "device_inventory": {
+                "stable_device_id": "cuda:h100-0",
+                "topology_key": "0000:81:00.0",
+                "performance_class": "discrete_accelerator",
+                "memory_class": "dedicated_device",
+                "total_memory_bytes": 85899345920,
+                "free_memory_bytes": 67645734912
+              }
+            },
+            {
+              "node_id": "worker-b",
+              "runtime_backend": "cuda",
+              "device_inventory": {
+                "stable_device_id": "cuda:h100-1",
+                "topology_key": "0000:82:00.0",
+                "performance_class": "discrete_accelerator",
+                "memory_class": "dedicated_device",
+                "total_memory_bytes": 85899345920,
+                "free_memory_bytes": 65498251264
+              }
+            },
+            {
+              "node_id": "worker-c",
+              "runtime_backend": "cuda",
+              "device_inventory": {
+                "stable_device_id": "cuda:h100-2",
+                "topology_key": "0000:83:00.0",
+                "performance_class": "discrete_accelerator",
+                "memory_class": "dedicated_device",
+                "total_memory_bytes": 85899345920,
+                "free_memory_bytes": 64424509440
+              }
+            },
+            {
+              "node_id": "worker-d",
+              "runtime_backend": "cuda",
+              "device_inventory": {
+                "stable_device_id": "cuda:h100-3",
+                "topology_key": "0000:84:00.0",
+                "performance_class": "discrete_accelerator",
+                "memory_class": "dedicated_device",
+                "total_memory_bytes": 85899345920,
+                "free_memory_bytes": 63350767616
+              }
+            }
+          ],
+          "training_recovery": {
+            "posture": "elastic_reconfiguration",
+            "checkpoint_availability": "durable",
+            "elastic_membership": {
+              "membership_epoch": 7,
+              "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+              "topology_digest": "topology-digest-psion-broad-v1",
+              "active_node_ids": [
+                "worker-a",
+                "worker-b",
+                "worker-c",
+                "worker-d"
+              ]
+            },
+            "latest_checkpoint": {
+              "checkpoint_family": "train.psion.decoder",
+              "stream_id": "stream-psion-broad-pretrain-final-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-v1",
+              "object_digest": "object-psion-broad-pretrain-final-v1",
+              "writer_node_id": "node-psion-b",
+              "membership_epoch": 7,
+              "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+              "topology_digest": "topology-digest-psion-broad-v1",
+              "started_at_ms": 1742620000000,
+              "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+              "step": 16384,
+              "durable_at_ms": 1742620900000
+            },
+            "recovering_node_ids": [
+              "worker-d"
+            ],
+            "requested_at_ms": 1742620500000,
+            "detail": "One worker rejoined after a short topology churn event during the broader run."
+          },
+          "training_collective": {
+            "device_mesh": {
+              "mesh_id": "psion-broad-mesh",
+              "mesh_revision": 7,
+              "effective_backend": "cuda",
+              "communication_class": "tensor_collective_mesh",
+              "elastic_membership": {
+                "membership_epoch": 7,
+                "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+                "topology_digest": "topology-digest-psion-broad-v1",
+                "active_node_ids": [
+                  "worker-a",
+                  "worker-b",
+                  "worker-c",
+                  "worker-d"
+                ]
+              },
+              "member_node_ids": [
+                "worker-a",
+                "worker-b",
+                "worker-c",
+                "worker-d"
+              ]
+            },
+            "kind": "all_reduce",
+            "quantization": "int8_symmetric",
+            "payload_bytes": 536870912,
+            "estimated_wire_bytes": 201326592,
+            "worker_count": 4,
+            "benchmark_digest": "psion-broad-collective-benchmark-v1",
+            "benchmark_speedup_bps": 1670,
+            "max_relative_error_bps": 12,
+            "detail": "Tensor-parallel gradient reductions stayed on the justified int8 collective lane."
+          }
+        }
+      },
+      "detail": "Broader pretraining run preserved explicit tensor-sharded cluster topology and recovery facts."
+    },
+    "instability_telemetry": {
+      "entropy_drift_bps": 180,
+      "stale_rollout_drop_rate_bps": 0,
+      "checkpoint_catchup_latency_ms": 2400,
+      "topology_churn_events": 2,
+      "environment_failure_rate_bps": 120,
+      "sandbox_failure_rate_bps": 45
+    },
+    "stability_verdict": {
+      "policy_digest": "3ebc721fa005d8237f6b5053f5c41bd8649e682384c00e88e132a46434453403",
+      "action": "quarantine",
+      "signal_receipts": [
+        {
+          "signal": "entropy_drift_bps",
+          "observed_value": 180.0,
+          "threshold_value": 100.0,
+          "action": "continue"
+        },
+        {
+          "signal": "checkpoint_catchup_latency_ms",
+          "observed_value": 2400.0,
+          "threshold_value": 1500.0,
+          "action": "quarantine"
+        },
+        {
+          "signal": "topology_churn_events",
+          "observed_value": 2.0,
+          "threshold_value": 0.0,
+          "action": "continue"
+        }
+      ],
+      "optimization_receipts": [],
+      "verdict_digest": "34b0eb3d517d25f946890f46cbcbdcfd0570a5cf5f137eedd2f6d6daec039148"
+    },
+    "summary": "Broader pretraining observability receipt records scale-up throughput, metered cost, checkpoint size, cluster topology, and structured instability markers.",
+    "observability_digest": "46d82db942801eddee02fb638bee11654478bc8f4b6be2f472bdb3d31751d142"
+  },
+  "rented_cluster_runbook": {
+    "schema_version": "psion.rented_cluster_runbook.v1",
+    "runbook_id": "psion-rented-cluster-runbook-v1",
+    "checkpoint_recovery_bundle_digest": "7ae450003b6ecd756fa296e33ce65c40aa463727a2c483c5b90647db2e3a9116",
+    "storage_profiles": {
+      "checkpoint": {
+        "hot_retention_ms": 5000,
+        "warm_retention_ms": 30000,
+        "archive_class": "restorable",
+        "delete_after_ms": 172800000,
+        "deduplicate_by_digest": false,
+        "cold_restore_sla_ms": 45000
+      },
+      "eval_artifact": {
+        "hot_retention_ms": 10000,
+        "warm_retention_ms": 60000,
+        "archive_class": "restorable",
+        "deduplicate_by_digest": false,
+        "cold_restore_sla_ms": 60000
+      },
+      "log_bundle": {
+        "hot_retention_ms": 5000,
+        "warm_retention_ms": 15000,
+        "archive_class": "ephemeral",
+        "delete_after_ms": 3600000,
+        "deduplicate_by_digest": false,
+        "cold_restore_sla_ms": 10000
+      }
+    },
+    "scheduling_policy": {
+      "global_budget": {
+        "max_active_work_units": 8,
+        "max_active_bytes": 268437456,
+        "max_active_cost_units": 400000
+      },
+      "queue_policies": {
+        "realtime": {
+          "priority_bps": 9500,
+          "preemption_mode": "lower_priority_only",
+          "dispatch_policy": {
+            "max_workers": 2,
+            "target_batch_work_units": 2,
+            "max_batch_bytes": 262144,
+            "park_after_idle_batches": 1
+          }
+        },
+        "standard": {
+          "priority_bps": 6000,
+          "preemption_mode": "lower_priority_only",
+          "dispatch_policy": {
+            "max_workers": 4,
+            "target_batch_work_units": 4,
+            "max_batch_bytes": 4194304,
+            "park_after_idle_batches": 4
+          }
+        },
+        "bulk": {
+          "priority_bps": 3500,
+          "preemption_mode": "lower_priority_only",
+          "dispatch_policy": {
+            "max_workers": 4,
+            "target_batch_work_units": 8,
+            "max_batch_bytes": 8388608,
+            "park_after_idle_batches": 8
+          }
+        },
+        "background": {
+          "priority_bps": 1000,
+          "preemption_mode": "never",
+          "dispatch_policy": {
+            "max_workers": 1,
+            "target_batch_work_units": 1,
+            "max_batch_bytes": 67108864,
+            "park_after_idle_batches": 8
+          }
+        }
+      },
+      "role_cost_rates": {
+        "trainer": {
+          "base_cost_units": 24,
+          "cost_units_per_dispatch_unit": 3,
+          "cost_units_per_kibibyte": 1
+        },
+        "rollout": {
+          "base_cost_units": 16,
+          "cost_units_per_dispatch_unit": 2,
+          "cost_units_per_kibibyte": 1
+        },
+        "eval": {
+          "base_cost_units": 18,
+          "cost_units_per_dispatch_unit": 3,
+          "cost_units_per_kibibyte": 1
+        },
+        "sandbox": {
+          "base_cost_units": 12,
+          "cost_units_per_dispatch_unit": 2,
+          "cost_units_per_kibibyte": 1
+        },
+        "validator": {
+          "base_cost_units": 20,
+          "cost_units_per_dispatch_unit": 3,
+          "cost_units_per_kibibyte": 1
+        }
+      }
+    },
+    "max_preemption_events_before_downgrade": 1,
+    "max_cost_overrun_bps_before_stop": 2500,
+    "mode_evaluations": [
+      {
+        "infra_mode": "single_region_on_demand",
+        "topology_label": "single_region_homogeneous",
+        "disposition": "supported",
+        "detail": "Single-region on-demand rented clusters stay within the bounded runbook when checkpoint persistence and cold restore are green."
+      },
+      {
+        "infra_mode": "single_region_spot",
+        "topology_label": "single_region_spot_preemptible",
+        "disposition": "downgraded_resume_only",
+        "required_recovery_mode": "resume_from_last_stable_checkpoint",
+        "detail": "Single-region spot capacity is allowed only on explicit resume-from-last-stable-checkpoint posture."
+      },
+      {
+        "infra_mode": "cross_region_ephemeral",
+        "topology_label": "cross_region_mixed_latency",
+        "disposition": "refused",
+        "detail": "Cross-region ephemeral clusters are refused because mixed-latency recovery and storage-loss risk are outside the bounded runbook."
+      },
+      {
+        "infra_mode": "untrusted_shared_cluster",
+        "topology_label": "shared_untrusted_fabric",
+        "disposition": "refused",
+        "detail": "Untrusted shared clusters are refused rather than backfilling trusted-cluster claims onto rented infrastructure."
+      }
+    ],
+    "summary": "Rented-cluster runbook freezes storage persistence, preemption downgrade, cost stop conditions, and explicit refusal on unsupported infra modes before broader cluster work.",
+    "runbook_digest": "974fb48ad05d5e5407bd6dfecc739c2c1c82c9c6b32d89532f12429fcd29be15"
+  },
+  "topology_contract": {
+    "schema_version": "psion.trusted_cluster_topology_contract.v1",
+    "contract_id": "psion-trusted-cluster-topology-contract-v1",
+    "pretrain_stage_receipt_digest": "633c4eca517b41798f7b183608195ad4c10156ff7f6b595bd3541871bb64d0ab",
+    "observability_receipt_digest": "46d82db942801eddee02fb638bee11654478bc8f4b6be2f472bdb3d31751d142",
+    "rented_cluster_runbook_digest": "974fb48ad05d5e5407bd6dfecc739c2c1c82c9c6b32d89532f12429fcd29be15",
+    "supported_topology_label": "homogeneous_four_node_h100_tensor_parallel",
+    "required_backend": "cuda",
+    "required_device_id_prefix": "cuda:h100-",
+    "required_worker_count": 4,
+    "one_rank_per_node_required": true,
+    "required_distributed_backend": "nccl",
+    "required_distributed_topology_profile": "trusted_lan_stream_mesh",
+    "required_transport": "trusted_lan_stream",
+    "required_cluster_disposition": "sharded",
+    "required_execution_topology_kind": "tensor_sharded",
+    "required_communication_class": "tensor_collective_mesh",
+    "required_optimizer_kind": "zero_stage3",
+    "required_collective_kind": "all_reduce",
+    "required_collective_quantization": "int8_symmetric",
+    "mode_evaluations": [
+      {
+        "topology_mode": "homogeneous_cuda_h100_one_rank_per_node",
+        "disposition": "supported",
+        "detail": "The first trusted-cluster lane is one homogeneous H100-class CUDA rank per node over trusted-LAN stream transport."
+      },
+      {
+        "topology_mode": "mixed_backend_or_accelerator",
+        "disposition": "refused",
+        "detail": "Mixed backend or accelerator meshes are refused instead of pretending collective and throughput behavior generalize automatically."
+      },
+      {
+        "topology_mode": "cross_region_or_mixed_latency_fabric",
+        "disposition": "refused",
+        "detail": "Cross-region or mixed-latency fabrics are refused because the first truthful lane is bounded to one trusted low-latency cluster."
+      },
+      {
+        "topology_mode": "elastic_world_size_change",
+        "disposition": "out_of_scope",
+        "detail": "Elastic world-size increase remains out of scope for the first trusted-cluster lane; recovery is same-world-size restart only."
+      },
+      {
+        "topology_mode": "shared_or_untrusted_fabric",
+        "disposition": "refused",
+        "detail": "Shared or untrusted fabrics are refused rather than widening this lane into public all-reduce claims."
+      }
+    ],
+    "summary": "Trusted-cluster Psion scale-up is bounded to one homogeneous four-node CUDA H100 tensor-parallel lane with one rank per node, trusted-LAN stream transport, explicit NCCL-class public group truth, and explicit refusal or out-of-scope posture for mixed, cross-region, shared, or elastic-world-size modes.",
+    "contract_digest": "684396a914c47ebc834faf7a3a57d688271cc83d67616732de192dcf9b342ed8"
+  },
+  "distributed_group": {
+    "group_id": "psion-trusted-cluster-group-v1",
+    "kind": "bootstrapped_mesh",
+    "requested_backend": "nccl",
+    "resolved_backend": "nccl",
+    "effective_backend": "cuda",
+    "communication_class": "tensor_collective_mesh",
+    "transport": "trusted_lan_stream",
+    "topology_profile": "trusted_lan_stream_mesh",
+    "mesh_id": "psion-broad-mesh",
+    "mesh_revision": 7,
+    "local_node_id": "worker-c",
+    "local_rank": 2,
+    "world_size": 4,
+    "member_node_ids": [
+      "worker-a",
+      "worker-b",
+      "worker-c",
+      "worker-d"
+    ],
+    "summary": "Train-owned distributed-group receipt freezes the bounded NCCL-class trusted-LAN stream mesh that the trusted-cluster lane requires from public distributed-group truth.",
+    "group_digest": "c1fa5be4f0d204d5fa421dc52acb50f2e0a6295f222ff61376fe8a2e289877ab"
+  },
+  "optimizer_contract": {
+    "optimizer_id": "optimizer://psion-trusted-cluster",
+    "optimizer_kind": "zero_stage3",
+    "precision_policy": {
+      "parameter_precision": "bf16",
+      "gradient_precision": "bf16",
+      "optimizer_state_precision": "fp32",
+      "master_weight_precision": "fp32",
+      "reduction_precision": "fp32",
+      "communication_quantization": "int8_symmetric",
+      "stochastic_rounding": true
+    },
+    "accumulation_policy": {
+      "microbatch_count": 2,
+      "reduction": "mean",
+      "flush_collective_kind": "all_reduce"
+    },
+    "activation_checkpointing": {
+      "mode": "every_nth_block",
+      "block_interval": 2,
+      "activation_peak_bytes_without_checkpointing": 14400000000,
+      "activation_peak_bytes_with_checkpointing": 6200000000,
+      "rematerialization_overhead_bps": 900
+    },
+    "memory_budget": {
+      "device_budget_bytes": 77309411328,
+      "host_budget_bytes": 17179869184,
+      "scratch_reserve_bytes": 2147483648
+    },
+    "collective_sync_plan": {
+      "cadence_receipt": {
+        "step_index": 16384,
+        "mesh_revision": 7,
+        "cadence_class": "global_only_fallback",
+        "global_interval_steps": 1,
+        "next_global_step": 16385,
+        "global_quantization": "int8_symmetric",
+        "local_quantization": "none",
+        "degraded_transport": false,
+        "transport_feedback": {
+          "observed_at_ms": 1742620090000,
+          "estimated_bandwidth_mbps": 6400,
+          "estimated_latency_ms": 1,
+          "active_streams": 1,
+          "feedback_digest": "9ab5a7d4e3b1712efb3af5d7cd7fe39269eec871ac98bd612a71ac0544cbb7da",
+          "detail": "trusted-cluster stream fabric stayed healthy during the bound sync"
+        },
+        "receipt_digest": "b869da6fa8fdf1e23c1b35a7b4ac56d5833a1e7afc5e1aa6f5616097a0841cb2"
+      },
+      "stages": [
+        {
+          "scope": "global_mesh",
+          "member_node_ids": [
+            "worker-a",
+            "worker-b",
+            "worker-c",
+            "worker-d"
+          ],
+          "plan": {
+            "collective": {
+              "device_mesh": {
+                "mesh_id": "psion-broad-mesh",
+                "mesh_revision": 7,
+                "effective_backend": "cuda",
+                "communication_class": "tensor_collective_mesh",
+                "elastic_membership": {
+                  "membership_epoch": 7,
+                  "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+                  "topology_digest": "topology-digest-psion-broad-v1",
+                  "active_node_ids": [
+                    "worker-a",
+                    "worker-b",
+                    "worker-c",
+                    "worker-d"
+                  ]
+                },
+                "member_node_ids": [
+                  "worker-a",
+                  "worker-b",
+                  "worker-c",
+                  "worker-d"
+                ],
+                "axes": [
+                  {
+                    "axis_id": "tp",
+                    "kind": "tensor_parallel",
+                    "extent": 4,
+                    "collective_group_size": 4,
+                    "detail": "one tensor-parallel shard per worker"
+                  }
+                ]
+              },
+              "kind": "all_reduce",
+              "quantization": "int8_symmetric",
+              "payload_bytes": 536870912,
+              "estimated_wire_bytes": 805306368,
+              "worker_count": 4,
+              "benchmark_digest": "5d468db7c6d8e9e97da54408348a408bdda42cdd56d4b35594ba40ec4497af38",
+              "benchmark_speedup_bps": 5000,
+              "max_relative_error_bps": 12,
+              "detail": "AllReduce collective planned over global mesh on mesh `psion-broad-mesh` revision 1"
+            },
+            "handoffs": [
+              {
+                "from_shard_id": 0,
+                "to_shard_id": 1,
+                "from_node_id": "worker-a",
+                "to_node_id": "worker-b",
+                "kind": "tensor_collective",
+                "transport": "trusted_lan_stream",
+                "layer_boundary": 0,
+                "estimated_bytes_per_token": 201326592,
+                "detail": "Int8Symmetric tensor-collective ring handoff from rank 0 to 1"
+              },
+              {
+                "from_shard_id": 1,
+                "to_shard_id": 2,
+                "from_node_id": "worker-b",
+                "to_node_id": "worker-c",
+                "kind": "tensor_collective",
+                "transport": "trusted_lan_stream",
+                "layer_boundary": 0,
+                "estimated_bytes_per_token": 201326592,
+                "detail": "Int8Symmetric tensor-collective ring handoff from rank 1 to 2"
+              },
+              {
+                "from_shard_id": 2,
+                "to_shard_id": 3,
+                "from_node_id": "worker-c",
+                "to_node_id": "worker-d",
+                "kind": "tensor_collective",
+                "transport": "trusted_lan_stream",
+                "layer_boundary": 0,
+                "estimated_bytes_per_token": 201326592,
+                "detail": "Int8Symmetric tensor-collective ring handoff from rank 2 to 3"
+              },
+              {
+                "from_shard_id": 3,
+                "to_shard_id": 0,
+                "from_node_id": "worker-d",
+                "to_node_id": "worker-a",
+                "kind": "tensor_collective",
+                "transport": "trusted_lan_stream",
+                "layer_boundary": 0,
+                "estimated_bytes_per_token": 201326592,
+                "detail": "Int8Symmetric tensor-collective ring handoff from rank 3 to 0"
+              }
+            ],
+            "work_item": {
+              "class": "collective_step",
+              "work_units": 4,
+              "bytes": 805306368,
+              "latency_sensitive": false
+            }
+          }
+        }
+      ]
+    },
+    "groups": [
+      {
+        "group_id": "decoder.weight",
+        "class": "matrix",
+        "parameter_layout": {
+          "kind": "full_shard",
+          "axis_id": "tp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "tp",
+              "node_id": "worker-a",
+              "device_label": "cuda:h100-0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 1
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "tp",
+              "node_id": "worker-b",
+              "device_label": "cuda:h100-1",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 1,
+                "element_count": 1
+              }
+            },
+            {
+              "shard_id": 2,
+              "axis_id": "tp",
+              "node_id": "worker-c",
+              "device_label": "cuda:h100-2",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 2,
+                "element_count": 1
+              }
+            },
+            {
+              "shard_id": 3,
+              "axis_id": "tp",
+              "node_id": "worker-d",
+              "device_label": "cuda:h100-3",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 3,
+                "element_count": 1
+              }
+            }
+          ]
+        },
+        "gradient_layout": {
+          "kind": "full_shard",
+          "axis_id": "tp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "tp",
+              "node_id": "worker-a",
+              "device_label": "cuda:h100-0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 1
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "tp",
+              "node_id": "worker-b",
+              "device_label": "cuda:h100-1",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 1,
+                "element_count": 1
+              }
+            },
+            {
+              "shard_id": 2,
+              "axis_id": "tp",
+              "node_id": "worker-c",
+              "device_label": "cuda:h100-2",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 2,
+                "element_count": 1
+              }
+            },
+            {
+              "shard_id": 3,
+              "axis_id": "tp",
+              "node_id": "worker-d",
+              "device_label": "cuda:h100-3",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 3,
+                "element_count": 1
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage3",
+          "residency": "host_offloaded",
+          "axis_id": "tp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "tp",
+              "node_id": "worker-a",
+              "device_label": "cuda:h100-0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 1
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "tp",
+              "node_id": "worker-b",
+              "device_label": "cuda:h100-1",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 1,
+                "element_count": 1
+              }
+            },
+            {
+              "shard_id": 2,
+              "axis_id": "tp",
+              "node_id": "worker-c",
+              "device_label": "cuda:h100-2",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 2,
+                "element_count": 1
+              }
+            },
+            {
+              "shard_id": 3,
+              "axis_id": "tp",
+              "node_id": "worker-d",
+              "device_label": "cuda:h100-3",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 3,
+                "element_count": 1
+              }
+            }
+          ]
+        },
+        "master_weight_residency": "host_resident"
+      },
+      {
+        "group_id": "decoder.bias",
+        "class": "bias",
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "tp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "tp",
+              "node_id": "worker-a",
+              "device_label": "cuda:h100-0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "tp",
+              "node_id": "worker-b",
+              "device_label": "cuda:h100-1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 2,
+              "axis_id": "tp",
+              "node_id": "worker-c",
+              "device_label": "cuda:h100-2",
+              "replica_ordinal": 2,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 3,
+              "axis_id": "tp",
+              "node_id": "worker-d",
+              "device_label": "cuda:h100-3",
+              "replica_ordinal": 3,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            }
+          ]
+        },
+        "gradient_layout": {
+          "kind": "replicated",
+          "axis_id": "tp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "tp",
+              "node_id": "worker-a",
+              "device_label": "cuda:h100-0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "tp",
+              "node_id": "worker-b",
+              "device_label": "cuda:h100-1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 2,
+              "axis_id": "tp",
+              "node_id": "worker-c",
+              "device_label": "cuda:h100-2",
+              "replica_ordinal": 2,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 3,
+              "axis_id": "tp",
+              "node_id": "worker-d",
+              "device_label": "cuda:h100-3",
+              "replica_ordinal": 3,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "replicated",
+          "residency": "device_resident",
+          "axis_id": "tp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "tp",
+              "node_id": "worker-a",
+              "device_label": "cuda:h100-0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "tp",
+              "node_id": "worker-b",
+              "device_label": "cuda:h100-1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 2,
+              "axis_id": "tp",
+              "node_id": "worker-c",
+              "device_label": "cuda:h100-2",
+              "replica_ordinal": 2,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 3,
+              "axis_id": "tp",
+              "node_id": "worker-d",
+              "device_label": "cuda:h100-3",
+              "replica_ordinal": 3,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            }
+          ]
+        },
+        "master_weight_residency": "device_resident"
+      }
+    ],
+    "contract_digest": "37a70a550e515b726fb349ef80b779d1c691e522d3e08654155b5542f06c84ba"
+  },
+  "distributed_step_receipt": {
+    "step_id": "psion-trusted-cluster-distributed-run-distributed-step-1",
+    "contract_digest": "37a70a550e515b726fb349ef80b779d1c691e522d3e08654155b5542f06c84ba",
+    "microbatches": [
+      {
+        "receipt_id": "psion-trusted-cluster-distributed-run-microbatch-1",
+        "batch_id": "microbatch-a",
+        "microbatch_index": 1,
+        "buffered_microbatches": 1,
+        "flush_ready": false,
+        "sample_count": 8,
+        "receipt_digest": "917b41bba35a707ff54232a23fd40b7a4897ebf3309b4fdc51d54605da4833c2"
+      },
+      {
+        "receipt_id": "psion-trusted-cluster-distributed-run-microbatch-2",
+        "batch_id": "microbatch-b",
+        "microbatch_index": 2,
+        "buffered_microbatches": 2,
+        "flush_ready": true,
+        "sample_count": 8,
+        "receipt_digest": "9282841c9613cb59012348ff8bb37737e46d9e8748dbd8131d9ba4717bfb4760"
+      }
+    ],
+    "precision_policy": {
+      "parameter_precision": "bf16",
+      "gradient_precision": "bf16",
+      "optimizer_state_precision": "fp32",
+      "master_weight_precision": "fp32",
+      "reduction_precision": "fp32",
+      "communication_quantization": "int8_symmetric",
+      "stochastic_rounding": true
+    },
+    "memory_plan": {
+      "contract_digest": "37a70a550e515b726fb349ef80b779d1c691e522d3e08654155b5542f06c84ba",
+      "parameter_logical_bytes": 16,
+      "gradient_logical_bytes": 16,
+      "optimizer_state_logical_bytes": 48,
+      "master_weight_logical_bytes": 32,
+      "activation_peak_bytes": 6200000000,
+      "activation_bytes_saved": 8200000000,
+      "peak_device_bytes_per_worker": 8347483688,
+      "peak_host_bytes_per_worker": 12,
+      "remote_offloaded_optimizer_bytes": 0,
+      "within_device_budget": true,
+      "within_host_budget": true,
+      "receipt_digest": "e4640823dca656cec5f7fe9d2d62b844e038deb2cf26e8f1259c1a23c7c06ed3"
+    },
+    "collective_sync_plan": {
+      "cadence_receipt": {
+        "step_index": 16384,
+        "mesh_revision": 7,
+        "cadence_class": "global_only_fallback",
+        "global_interval_steps": 1,
+        "next_global_step": 16385,
+        "global_quantization": "int8_symmetric",
+        "local_quantization": "none",
+        "degraded_transport": false,
+        "transport_feedback": {
+          "observed_at_ms": 1742620090000,
+          "estimated_bandwidth_mbps": 6400,
+          "estimated_latency_ms": 1,
+          "active_streams": 1,
+          "feedback_digest": "9ab5a7d4e3b1712efb3af5d7cd7fe39269eec871ac98bd612a71ac0544cbb7da",
+          "detail": "trusted-cluster stream fabric stayed healthy during the bound sync"
+        },
+        "receipt_digest": "b869da6fa8fdf1e23c1b35a7b4ac56d5833a1e7afc5e1aa6f5616097a0841cb2"
+      },
+      "stages": [
+        {
+          "scope": "global_mesh",
+          "member_node_ids": [
+            "worker-a",
+            "worker-b",
+            "worker-c",
+            "worker-d"
+          ],
+          "plan": {
+            "collective": {
+              "device_mesh": {
+                "mesh_id": "psion-broad-mesh",
+                "mesh_revision": 7,
+                "effective_backend": "cuda",
+                "communication_class": "tensor_collective_mesh",
+                "elastic_membership": {
+                  "membership_epoch": 7,
+                  "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+                  "topology_digest": "topology-digest-psion-broad-v1",
+                  "active_node_ids": [
+                    "worker-a",
+                    "worker-b",
+                    "worker-c",
+                    "worker-d"
+                  ]
+                },
+                "member_node_ids": [
+                  "worker-a",
+                  "worker-b",
+                  "worker-c",
+                  "worker-d"
+                ],
+                "axes": [
+                  {
+                    "axis_id": "tp",
+                    "kind": "tensor_parallel",
+                    "extent": 4,
+                    "collective_group_size": 4,
+                    "detail": "one tensor-parallel shard per worker"
+                  }
+                ]
+              },
+              "kind": "all_reduce",
+              "quantization": "int8_symmetric",
+              "payload_bytes": 536870912,
+              "estimated_wire_bytes": 805306368,
+              "worker_count": 4,
+              "benchmark_digest": "5d468db7c6d8e9e97da54408348a408bdda42cdd56d4b35594ba40ec4497af38",
+              "benchmark_speedup_bps": 5000,
+              "max_relative_error_bps": 12,
+              "detail": "AllReduce collective planned over global mesh on mesh `psion-broad-mesh` revision 1"
+            },
+            "handoffs": [
+              {
+                "from_shard_id": 0,
+                "to_shard_id": 1,
+                "from_node_id": "worker-a",
+                "to_node_id": "worker-b",
+                "kind": "tensor_collective",
+                "transport": "trusted_lan_stream",
+                "layer_boundary": 0,
+                "estimated_bytes_per_token": 201326592,
+                "detail": "Int8Symmetric tensor-collective ring handoff from rank 0 to 1"
+              },
+              {
+                "from_shard_id": 1,
+                "to_shard_id": 2,
+                "from_node_id": "worker-b",
+                "to_node_id": "worker-c",
+                "kind": "tensor_collective",
+                "transport": "trusted_lan_stream",
+                "layer_boundary": 0,
+                "estimated_bytes_per_token": 201326592,
+                "detail": "Int8Symmetric tensor-collective ring handoff from rank 1 to 2"
+              },
+              {
+                "from_shard_id": 2,
+                "to_shard_id": 3,
+                "from_node_id": "worker-c",
+                "to_node_id": "worker-d",
+                "kind": "tensor_collective",
+                "transport": "trusted_lan_stream",
+                "layer_boundary": 0,
+                "estimated_bytes_per_token": 201326592,
+                "detail": "Int8Symmetric tensor-collective ring handoff from rank 2 to 3"
+              },
+              {
+                "from_shard_id": 3,
+                "to_shard_id": 0,
+                "from_node_id": "worker-d",
+                "to_node_id": "worker-a",
+                "kind": "tensor_collective",
+                "transport": "trusted_lan_stream",
+                "layer_boundary": 0,
+                "estimated_bytes_per_token": 201326592,
+                "detail": "Int8Symmetric tensor-collective ring handoff from rank 3 to 0"
+              }
+            ],
+            "work_item": {
+              "class": "collective_step",
+              "work_units": 4,
+              "bytes": 805306368,
+              "latency_sensitive": false
+            }
+          }
+        }
+      ]
+    },
+    "groups": [
+      {
+        "group_id": "decoder.weight",
+        "parameter_shard_kind": "full_shard",
+        "optimizer_state_shard_kind": "zero_stage3",
+        "parameter_shard_count": 4,
+        "optimizer_state_shard_count": 4,
+        "gradient_shard_count": 4
+      },
+      {
+        "group_id": "decoder.bias",
+        "parameter_shard_kind": "replicated",
+        "optimizer_state_shard_kind": "replicated",
+        "parameter_shard_count": 4,
+        "optimizer_state_shard_count": 4,
+        "gradient_shard_count": 4
+      }
+    ],
+    "trainer_step": {
+      "receipt_id": "psion-trusted-cluster-distributed-run-step-1",
+      "run_id": "psion-trusted-cluster-distributed-run",
+      "checkpoint_family": "train.psion.decoder",
+      "execution_mode": "explicit_gradient_batch",
+      "schedule": {
+        "global_step": 1,
+        "window_index": 1,
+        "step_in_window": 1,
+        "cadence_index": 1,
+        "window_in_cadence": 1
+      },
+      "batch_id": "accumulated:microbatch-a+microbatch-b",
+      "loss": 0.42,
+      "sample_count": 16,
+      "group_telemetry": [
+        {
+          "group_id": "decoder.bias",
+          "class": "bias",
+          "optimizer": "sgd",
+          "effective_learning_rate": 0.01,
+          "effective_weight_decay": 0.0,
+          "gradient_norm_l2": 0.012206555,
+          "clipped_gradient_norm_l2": 0.012206555,
+          "update_norm_l2": 0.000122065554,
+          "parameter_norm_l2": 0.37405616,
+          "residency_before": "host_resident",
+          "residency_after": "host_resident"
+        },
+        {
+          "group_id": "decoder.weight",
+          "class": "matrix",
+          "optimizer": "adam_w",
+          "effective_learning_rate": 0.0003,
+          "effective_weight_decay": 0.0,
+          "gradient_norm_l2": 0.05937171,
+          "clipped_gradient_norm_l2": 0.05937171,
+          "update_norm_l2": 0.00059999974,
+          "parameter_norm_l2": 0.54717493,
+          "residency_before": "offloaded",
+          "residency_after": "offloaded"
+        }
+      ],
+      "residency_transitions": [
+        {
+          "group_id": "decoder.weight",
+          "global_step": 1,
+          "from": "offloaded",
+          "to": "device_resident",
+          "reason": "prefetch_for_step"
+        },
+        {
+          "group_id": "decoder.weight",
+          "global_step": 1,
+          "from": "device_resident",
+          "to": "offloaded",
+          "reason": "offload_after_step"
+        }
+      ],
+      "timing": {
+        "started_at_ms": 1742620100000,
+        "finished_at_ms": 1742620100240,
+        "duration_ms": 240
+      },
+      "receipt_digest": "947dbb65780d31b3e8db81c12cfe75c66e53146c623e870262f34715786a1c90"
+    },
+    "receipt_digest": "7894029c32552ac49a69a57b5d7e00fe7c1d73398c64053f5927b3fa61d1273f"
+  },
+  "checkpoint_recovery_bundle": {
+    "schema_version": "psion.checkpoint_recovery_bundle.v1",
+    "bundle_id": "psion-trusted-cluster-checkpoint-recovery-bundle-v1",
+    "run_id": "run-psion-broad",
+    "stage_id": "run-psion-broad-stage-1-pretrain",
+    "model_id": "psion-compact-decoder-internal-v1",
+    "pretrain_stage_receipt_digest": "633c4eca517b41798f7b183608195ad4c10156ff7f6b595bd3541871bb64d0ab",
+    "observability_receipt_digest": "46d82db942801eddee02fb638bee11654478bc8f4b6be2f472bdb3d31751d142",
+    "checkpoint_artifacts": [
+      {
+        "schema_version": "psion.checkpoint_artifact.v1",
+        "artifact_id": "psion-trusted-cluster-dense-checkpoint-artifact-v1",
+        "run_id": "run-psion-broad",
+        "stage_id": "run-psion-broad-stage-1-pretrain",
+        "model_id": "psion-compact-decoder-internal-v1",
+        "layout_kind": "dense",
+        "source_promoted_checkpoint_label": "broader-pretrain-final",
+        "source_checkpoint_object_digest": "object-psion-broad-pretrain-final-v1",
+        "checkpoint_manifest": {
+          "scope": {
+            "kind": "run",
+            "scope_id": "run-psion-broad"
+          },
+          "checkpoint_family": "train.psion.decoder",
+          "checkpoint": {
+            "checkpoint_family": "train.psion.decoder",
+            "stream_id": "stream-psion-broad-pretrain-final-v1",
+            "manifest_digest": "manifest-psion-broad-pretrain-final-v1",
+            "object_digest": "object-psion-broad-pretrain-final-v1",
+            "writer_node_id": "node-psion-b",
+            "membership_epoch": 7,
+            "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+            "topology_digest": "topology-digest-psion-broad-v1",
+            "started_at_ms": 1742620000000,
+            "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+            "step": 16384,
+            "durable_at_ms": 1742620900000
+          },
+          "shards": [
+            {
+              "shard_id": "trusted-dense-shard-0",
+              "manifest": {
+                "stream_id": "stream-psion-broad-pretrain-final-dense-v1",
+                "manifest_digest": "manifest-psion-broad-pretrain-final-dense-v1",
+                "subject": "checkpoint",
+                "object_digest": "object-psion-broad-pretrain-final-dense-v1",
+                "total_bytes": 386547056,
+                "chunk_count": 8,
+                "chunk_bytes": 4194304,
+                "encoding": "safetensors",
+                "checkpoint_binding": {
+                  "checkpoint_family": "train.psion.decoder",
+                  "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+                  "step": 16384
+                }
+              },
+              "writer_node_id": "node-psion-b"
+            }
+          ],
+          "durability": "durable",
+          "created_at_ms": 1742620900000,
+          "manifest_digest": "0208b58c5545f9a7e38ded8cef9f069f7ad81ec4365a3b852868ab7a83405175"
+        },
+        "checkpoint_pointer": {
+          "scope": {
+            "kind": "run",
+            "scope_id": "run-psion-broad"
+          },
+          "checkpoint_family": "train.psion.decoder",
+          "checkpoint": {
+            "checkpoint_family": "train.psion.decoder",
+            "stream_id": "stream-psion-broad-pretrain-final-v1",
+            "manifest_digest": "manifest-psion-broad-pretrain-final-v1",
+            "object_digest": "object-psion-broad-pretrain-final-v1",
+            "writer_node_id": "node-psion-b",
+            "membership_epoch": 7,
+            "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+            "topology_digest": "topology-digest-psion-broad-v1",
+            "started_at_ms": 1742620000000,
+            "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+            "step": 16384,
+            "durable_at_ms": 1742620900000
+          },
+          "manifest_digest": "0208b58c5545f9a7e38ded8cef9f069f7ad81ec4365a3b852868ab7a83405175",
+          "updated_at_ms": 1742620900600,
+          "pointer_digest": "d60915e76335c8aac31e94b04d5e48289087aa110c54241bb7bf0944d9cae310"
+        },
+        "checkpoint_context": {
+          "training_run_profile": "broader_pretraining",
+          "dataset_identity": "psion_corpus_tokenized@v1",
+          "sampling_policy_id": "psion_pretrain_mix",
+          "sampling_policy_version": "v1",
+          "source_checkpoint_topology_digest": "topology-digest-psion-broad-v1",
+          "training_hardware_topology_digest": "db340e8890b303f59c2e4cc7140473fca894282ab6493a53a50d7d4efc2daccc",
+          "observed_worker_count": 4,
+          "detail": "Trusted-cluster checkpoint artifacts preserve the source checkpoint topology and realized multi-host hardware topology separately."
+        },
+        "optimizer_state_restart": {
+          "optimizer_family": "adamw",
+          "optimizer_checkpoint_family": "train.psion.decoder.optimizer_state",
+          "optimizer_state_step": 16384,
+          "parameter_group_count": 16,
+          "optimizer_state_artifacts": [
+            {
+              "stream_id": "stream-psion-broad-pretrain-final-optimizer-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-optimizer-v1",
+              "subject": "checkpoint",
+              "object_digest": "object-psion-broad-pretrain-final-optimizer-v1",
+              "total_bytes": 773091328,
+              "chunk_count": 8,
+              "chunk_bytes": 4194304,
+              "encoding": "safetensors",
+              "checkpoint_binding": {
+                "checkpoint_family": "train.psion.decoder.optimizer_state",
+                "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/optimizer_state",
+                "step": 16384
+              }
+            }
+          ],
+          "strict_parameter_group_order_restore": true,
+          "resume_requires_matching_sampling_cursor": true,
+          "summary": "Dense optimizer-state restart preserves exact parameter-group order and sampling cursor binding for the broader run."
+        },
+        "summary": "Dense checkpoint artifact preserves one pointer-first last-stable fallback for the trusted-cluster lane.",
+        "artifact_digest": "1eb3999da53195b61dd153a7e8989d42ab58bd3d142fbd01adce7c4968685baf"
+      },
+      {
+        "schema_version": "psion.checkpoint_artifact.v1",
+        "artifact_id": "psion-trusted-cluster-sharded-checkpoint-artifact-v1",
+        "run_id": "run-psion-broad",
+        "stage_id": "run-psion-broad-stage-1-pretrain",
+        "model_id": "psion-compact-decoder-internal-v1",
+        "layout_kind": "sharded",
+        "source_promoted_checkpoint_label": "broader-pretrain-final",
+        "source_checkpoint_object_digest": "object-psion-broad-pretrain-final-v1",
+        "checkpoint_manifest": {
+          "scope": {
+            "kind": "run",
+            "scope_id": "run-psion-broad"
+          },
+          "checkpoint_family": "train.psion.decoder",
+          "checkpoint": {
+            "checkpoint_family": "train.psion.decoder",
+            "stream_id": "stream-psion-broad-pretrain-final-sharded-v1",
+            "manifest_digest": "manifest-psion-broad-pretrain-final-sharded-v1",
+            "object_digest": "object-psion-broad-pretrain-final-sharded-v1",
+            "writer_node_id": "node-psion-b",
+            "membership_epoch": 7,
+            "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+            "topology_digest": "topology-digest-psion-broad-v1",
+            "started_at_ms": 1742620000000,
+            "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+            "step": 16384,
+            "durable_at_ms": 1742620900000
+          },
+          "shards": [
+            {
+              "shard_id": "trusted-shard-0",
+              "manifest": {
+                "stream_id": "stream-psion-broad-pretrain-final-shard-0-v1",
+                "manifest_digest": "manifest-psion-broad-pretrain-final-shard-0-v1",
+                "subject": "checkpoint",
+                "object_digest": "object-psion-broad-pretrain-final-shard-0-v1",
+                "total_bytes": 386545664,
+                "chunk_count": 8,
+                "chunk_bytes": 4194304,
+                "encoding": "safetensors",
+                "checkpoint_binding": {
+                  "checkpoint_family": "train.psion.decoder",
+                  "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+                  "step": 16384
+                }
+              },
+              "writer_node_id": "node-psion-a"
+            },
+            {
+              "shard_id": "trusted-shard-1",
+              "manifest": {
+                "stream_id": "stream-psion-broad-pretrain-final-shard-1-v1",
+                "manifest_digest": "manifest-psion-broad-pretrain-final-shard-1-v1",
+                "subject": "checkpoint",
+                "object_digest": "object-psion-broad-pretrain-final-shard-1-v1",
+                "total_bytes": 386545664,
+                "chunk_count": 8,
+                "chunk_bytes": 4194304,
+                "encoding": "safetensors",
+                "checkpoint_binding": {
+                  "checkpoint_family": "train.psion.decoder",
+                  "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+                  "step": 16384
+                }
+              },
+              "writer_node_id": "node-psion-b"
+            },
+            {
+              "shard_id": "trusted-shard-2",
+              "manifest": {
+                "stream_id": "stream-psion-broad-pretrain-final-shard-2-v1",
+                "manifest_digest": "manifest-psion-broad-pretrain-final-shard-2-v1",
+                "subject": "checkpoint",
+                "object_digest": "object-psion-broad-pretrain-final-shard-2-v1",
+                "total_bytes": 386545664,
+                "chunk_count": 8,
+                "chunk_bytes": 4194304,
+                "encoding": "safetensors",
+                "checkpoint_binding": {
+                  "checkpoint_family": "train.psion.decoder",
+                  "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+                  "step": 16384
+                }
+              },
+              "writer_node_id": "node-psion-c"
+            },
+            {
+              "shard_id": "trusted-shard-3",
+              "manifest": {
+                "stream_id": "stream-psion-broad-pretrain-final-shard-3-v1",
+                "manifest_digest": "manifest-psion-broad-pretrain-final-shard-3-v1",
+                "subject": "checkpoint",
+                "object_digest": "object-psion-broad-pretrain-final-shard-3-v1",
+                "total_bytes": 386545664,
+                "chunk_count": 8,
+                "chunk_bytes": 4194304,
+                "encoding": "safetensors",
+                "checkpoint_binding": {
+                  "checkpoint_family": "train.psion.decoder",
+                  "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+                  "step": 16384
+                }
+              },
+              "writer_node_id": "node-psion-d"
+            }
+          ],
+          "durability": "durable",
+          "created_at_ms": 1742620920000,
+          "manifest_digest": "c1498cdf986c302efb49262fd1b3d5337228e0d89bb1c02c29796a3842cecf69"
+        },
+        "checkpoint_pointer": {
+          "scope": {
+            "kind": "run",
+            "scope_id": "run-psion-broad"
+          },
+          "checkpoint_family": "train.psion.decoder",
+          "checkpoint": {
+            "checkpoint_family": "train.psion.decoder",
+            "stream_id": "stream-psion-broad-pretrain-final-sharded-v1",
+            "manifest_digest": "manifest-psion-broad-pretrain-final-sharded-v1",
+            "object_digest": "object-psion-broad-pretrain-final-sharded-v1",
+            "writer_node_id": "node-psion-b",
+            "membership_epoch": 7,
+            "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+            "topology_digest": "topology-digest-psion-broad-v1",
+            "started_at_ms": 1742620000000,
+            "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+            "step": 16384,
+            "durable_at_ms": 1742620900000
+          },
+          "manifest_digest": "c1498cdf986c302efb49262fd1b3d5337228e0d89bb1c02c29796a3842cecf69",
+          "updated_at_ms": 1742620920600,
+          "pointer_digest": "a4dcd115554371f0430449785e461b9a15ebd1364c287f5b69b342bea6ff52d0"
+        },
+        "checkpoint_context": {
+          "training_run_profile": "broader_pretraining",
+          "dataset_identity": "psion_corpus_tokenized@v1",
+          "sampling_policy_id": "psion_pretrain_mix",
+          "sampling_policy_version": "v1",
+          "source_checkpoint_topology_digest": "topology-digest-psion-broad-v1",
+          "training_hardware_topology_digest": "db340e8890b303f59c2e4cc7140473fca894282ab6493a53a50d7d4efc2daccc",
+          "observed_worker_count": 4,
+          "detail": "Trusted-cluster checkpoint artifacts preserve the source checkpoint topology and realized multi-host hardware topology separately."
+        },
+        "optimizer_state_restart": {
+          "optimizer_family": "adamw",
+          "optimizer_checkpoint_family": "train.psion.decoder.optimizer_state",
+          "optimizer_state_step": 16384,
+          "parameter_group_count": 16,
+          "optimizer_state_artifacts": [
+            {
+              "stream_id": "stream-psion-broad-pretrain-final-optimizer-shard-0-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-optimizer-shard-0-v1",
+              "subject": "checkpoint",
+              "object_digest": "object-psion-broad-pretrain-final-optimizer-shard-0-v1",
+              "total_bytes": 193272832,
+              "chunk_count": 8,
+              "chunk_bytes": 4194304,
+              "encoding": "safetensors",
+              "checkpoint_binding": {
+                "checkpoint_family": "train.psion.decoder.optimizer_state",
+                "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/optimizer_state/sharded",
+                "step": 16384
+              }
+            },
+            {
+              "stream_id": "stream-psion-broad-pretrain-final-optimizer-shard-1-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-optimizer-shard-1-v1",
+              "subject": "checkpoint",
+              "object_digest": "object-psion-broad-pretrain-final-optimizer-shard-1-v1",
+              "total_bytes": 193272832,
+              "chunk_count": 8,
+              "chunk_bytes": 4194304,
+              "encoding": "safetensors",
+              "checkpoint_binding": {
+                "checkpoint_family": "train.psion.decoder.optimizer_state",
+                "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/optimizer_state/sharded",
+                "step": 16384
+              }
+            },
+            {
+              "stream_id": "stream-psion-broad-pretrain-final-optimizer-shard-2-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-optimizer-shard-2-v1",
+              "subject": "checkpoint",
+              "object_digest": "object-psion-broad-pretrain-final-optimizer-shard-2-v1",
+              "total_bytes": 193272832,
+              "chunk_count": 8,
+              "chunk_bytes": 4194304,
+              "encoding": "safetensors",
+              "checkpoint_binding": {
+                "checkpoint_family": "train.psion.decoder.optimizer_state",
+                "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/optimizer_state/sharded",
+                "step": 16384
+              }
+            },
+            {
+              "stream_id": "stream-psion-broad-pretrain-final-optimizer-shard-3-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-optimizer-shard-3-v1",
+              "subject": "checkpoint",
+              "object_digest": "object-psion-broad-pretrain-final-optimizer-shard-3-v1",
+              "total_bytes": 193272832,
+              "chunk_count": 8,
+              "chunk_bytes": 4194304,
+              "encoding": "safetensors",
+              "checkpoint_binding": {
+                "checkpoint_family": "train.psion.decoder.optimizer_state",
+                "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/optimizer_state/sharded",
+                "step": 16384
+              }
+            }
+          ],
+          "strict_parameter_group_order_restore": true,
+          "resume_requires_matching_sampling_cursor": true,
+          "summary": "Sharded optimizer-state restart preserves group order, step identity, and sampling cursor binding across four trusted-cluster shards."
+        },
+        "summary": "Sharded checkpoint artifact freezes the supported four-worker trusted-cluster restart path.",
+        "artifact_digest": "d1402a0eb627a3e425f34e3c343d09982978274aba30d9324cbc7237fed2a3e7"
+      }
+    ],
+    "recovery_events": [
+      {
+        "schema_version": "psion.checkpoint_recovery_event.v1",
+        "receipt_id": "psion-trusted-cluster-forced-restart-v1",
+        "event_kind": "forced_interruption_restart",
+        "source_artifact_id": "psion-trusted-cluster-dense-checkpoint-artifact-v1",
+        "recovery_mode": "resume_from_last_stable_checkpoint",
+        "restore_receipt": {
+          "recovery_mode": "resume_from_last_stable_checkpoint",
+          "source_kind": "pointer_lookup",
+          "selected_pointer": {
+            "scope": {
+              "kind": "run",
+              "scope_id": "run-psion-broad"
+            },
+            "checkpoint_family": "train.psion.decoder",
+            "checkpoint": {
+              "checkpoint_family": "train.psion.decoder",
+              "stream_id": "stream-psion-broad-pretrain-final-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-v1",
+              "object_digest": "object-psion-broad-pretrain-final-v1",
+              "writer_node_id": "node-psion-b",
+              "membership_epoch": 7,
+              "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+              "topology_digest": "topology-digest-psion-broad-v1",
+              "started_at_ms": 1742620000000,
+              "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+              "step": 16384,
+              "durable_at_ms": 1742620900000
+            },
+            "manifest_digest": "0208b58c5545f9a7e38ded8cef9f069f7ad81ec4365a3b852868ab7a83405175",
+            "updated_at_ms": 1742620900600,
+            "pointer_digest": "d60915e76335c8aac31e94b04d5e48289087aa110c54241bb7bf0944d9cae310"
+          },
+          "selected_manifest": {
+            "scope": {
+              "kind": "run",
+              "scope_id": "run-psion-broad"
+            },
+            "checkpoint_family": "train.psion.decoder",
+            "checkpoint": {
+              "checkpoint_family": "train.psion.decoder",
+              "stream_id": "stream-psion-broad-pretrain-final-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-v1",
+              "object_digest": "object-psion-broad-pretrain-final-v1",
+              "writer_node_id": "node-psion-b",
+              "membership_epoch": 7,
+              "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+              "topology_digest": "topology-digest-psion-broad-v1",
+              "started_at_ms": 1742620000000,
+              "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+              "step": 16384,
+              "durable_at_ms": 1742620900000
+            },
+            "shards": [
+              {
+                "shard_id": "trusted-dense-shard-0",
+                "manifest": {
+                  "stream_id": "stream-psion-broad-pretrain-final-dense-v1",
+                  "manifest_digest": "manifest-psion-broad-pretrain-final-dense-v1",
+                  "subject": "checkpoint",
+                  "object_digest": "object-psion-broad-pretrain-final-dense-v1",
+                  "total_bytes": 386547056,
+                  "chunk_count": 8,
+                  "chunk_bytes": 4194304,
+                  "encoding": "safetensors",
+                  "checkpoint_binding": {
+                    "checkpoint_family": "train.psion.decoder",
+                    "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+                    "step": 16384
+                  }
+                },
+                "writer_node_id": "node-psion-b"
+              }
+            ],
+            "durability": "durable",
+            "created_at_ms": 1742620900000,
+            "manifest_digest": "0208b58c5545f9a7e38ded8cef9f069f7ad81ec4365a3b852868ab7a83405175"
+          },
+          "attempts": [
+            {
+              "source_kind": "pointer_lookup",
+              "manifest_digest": "0208b58c5545f9a7e38ded8cef9f069f7ad81ec4365a3b852868ab7a83405175",
+              "accepted": true,
+              "detail": "pointer lookup selected a durable manifest for restore"
+            }
+          ],
+          "uploader_assignments": [
+            {
+              "shard_id": "trusted-dense-shard-0",
+              "uploader_node_id": "node-psion-b"
+            }
+          ],
+          "receipt_digest": "eaaadcc244765ad2104ad939c198ebe671b81ca2aa839a1b4e5a446968bb1b13"
+        },
+        "recovered_topology_digest": "psion-trusted-cluster-recovery-topology-single-device-v1",
+        "recovered_worker_count": 1,
+        "dataset_identity": "psion_corpus_tokenized@v1",
+        "sampling_policy_id": "psion_pretrain_mix",
+        "sampling_policy_version": "v1",
+        "optimizer_state_step_restored": 16384,
+        "instability_telemetry": {
+          "stale_rollout_drop_rate_bps": 0,
+          "checkpoint_catchup_latency_ms": 260,
+          "topology_churn_events": 0,
+          "environment_failure_rate_bps": 0,
+          "sandbox_failure_rate_bps": 0
+        },
+        "stability_verdict": {
+          "policy_digest": "c205bd4ef1223fbd52caa3beab784fffe9d1dcc44868fca1b63c8cb97280cf26",
+          "action": "continue",
+          "signal_receipts": [],
+          "optimization_receipts": [],
+          "verdict_digest": "30d90ae6a8a24919ad5e52dc25c56adf5f51f44edef08258477b5a486283feed"
+        },
+        "disposition": "resumed",
+        "summary": "Forced interruption restarted from the trusted-cluster dense fallback artifact.",
+        "receipt_digest": "3f55eb881471a916752d19ce48b78867b0bdaadc8a6628de8b36dceb090c7c3b"
+      },
+      {
+        "schema_version": "psion.checkpoint_recovery_event.v1",
+        "receipt_id": "psion-trusted-cluster-distributed-restart-v1",
+        "event_kind": "distributed_restart",
+        "source_artifact_id": "psion-trusted-cluster-sharded-checkpoint-artifact-v1",
+        "recovery_mode": "blocking_catch_up",
+        "restore_receipt": {
+          "recovery_mode": "blocking_catch_up",
+          "source_kind": "pointer_lookup",
+          "selected_pointer": {
+            "scope": {
+              "kind": "run",
+              "scope_id": "run-psion-broad"
+            },
+            "checkpoint_family": "train.psion.decoder",
+            "checkpoint": {
+              "checkpoint_family": "train.psion.decoder",
+              "stream_id": "stream-psion-broad-pretrain-final-sharded-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-sharded-v1",
+              "object_digest": "object-psion-broad-pretrain-final-sharded-v1",
+              "writer_node_id": "node-psion-b",
+              "membership_epoch": 7,
+              "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+              "topology_digest": "topology-digest-psion-broad-v1",
+              "started_at_ms": 1742620000000,
+              "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+              "step": 16384,
+              "durable_at_ms": 1742620900000
+            },
+            "manifest_digest": "c1498cdf986c302efb49262fd1b3d5337228e0d89bb1c02c29796a3842cecf69",
+            "updated_at_ms": 1742620920600,
+            "pointer_digest": "a4dcd115554371f0430449785e461b9a15ebd1364c287f5b69b342bea6ff52d0"
+          },
+          "selected_manifest": {
+            "scope": {
+              "kind": "run",
+              "scope_id": "run-psion-broad"
+            },
+            "checkpoint_family": "train.psion.decoder",
+            "checkpoint": {
+              "checkpoint_family": "train.psion.decoder",
+              "stream_id": "stream-psion-broad-pretrain-final-sharded-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-sharded-v1",
+              "object_digest": "object-psion-broad-pretrain-final-sharded-v1",
+              "writer_node_id": "node-psion-b",
+              "membership_epoch": 7,
+              "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+              "topology_digest": "topology-digest-psion-broad-v1",
+              "started_at_ms": 1742620000000,
+              "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+              "step": 16384,
+              "durable_at_ms": 1742620900000
+            },
+            "shards": [
+              {
+                "shard_id": "trusted-shard-0",
+                "manifest": {
+                  "stream_id": "stream-psion-broad-pretrain-final-shard-0-v1",
+                  "manifest_digest": "manifest-psion-broad-pretrain-final-shard-0-v1",
+                  "subject": "checkpoint",
+                  "object_digest": "object-psion-broad-pretrain-final-shard-0-v1",
+                  "total_bytes": 386545664,
+                  "chunk_count": 8,
+                  "chunk_bytes": 4194304,
+                  "encoding": "safetensors",
+                  "checkpoint_binding": {
+                    "checkpoint_family": "train.psion.decoder",
+                    "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+                    "step": 16384
+                  }
+                },
+                "writer_node_id": "node-psion-a"
+              },
+              {
+                "shard_id": "trusted-shard-1",
+                "manifest": {
+                  "stream_id": "stream-psion-broad-pretrain-final-shard-1-v1",
+                  "manifest_digest": "manifest-psion-broad-pretrain-final-shard-1-v1",
+                  "subject": "checkpoint",
+                  "object_digest": "object-psion-broad-pretrain-final-shard-1-v1",
+                  "total_bytes": 386545664,
+                  "chunk_count": 8,
+                  "chunk_bytes": 4194304,
+                  "encoding": "safetensors",
+                  "checkpoint_binding": {
+                    "checkpoint_family": "train.psion.decoder",
+                    "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+                    "step": 16384
+                  }
+                },
+                "writer_node_id": "node-psion-b"
+              },
+              {
+                "shard_id": "trusted-shard-2",
+                "manifest": {
+                  "stream_id": "stream-psion-broad-pretrain-final-shard-2-v1",
+                  "manifest_digest": "manifest-psion-broad-pretrain-final-shard-2-v1",
+                  "subject": "checkpoint",
+                  "object_digest": "object-psion-broad-pretrain-final-shard-2-v1",
+                  "total_bytes": 386545664,
+                  "chunk_count": 8,
+                  "chunk_bytes": 4194304,
+                  "encoding": "safetensors",
+                  "checkpoint_binding": {
+                    "checkpoint_family": "train.psion.decoder",
+                    "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+                    "step": 16384
+                  }
+                },
+                "writer_node_id": "node-psion-c"
+              },
+              {
+                "shard_id": "trusted-shard-3",
+                "manifest": {
+                  "stream_id": "stream-psion-broad-pretrain-final-shard-3-v1",
+                  "manifest_digest": "manifest-psion-broad-pretrain-final-shard-3-v1",
+                  "subject": "checkpoint",
+                  "object_digest": "object-psion-broad-pretrain-final-shard-3-v1",
+                  "total_bytes": 386545664,
+                  "chunk_count": 8,
+                  "chunk_bytes": 4194304,
+                  "encoding": "safetensors",
+                  "checkpoint_binding": {
+                    "checkpoint_family": "train.psion.decoder",
+                    "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+                    "step": 16384
+                  }
+                },
+                "writer_node_id": "node-psion-d"
+              }
+            ],
+            "durability": "durable",
+            "created_at_ms": 1742620920000,
+            "manifest_digest": "c1498cdf986c302efb49262fd1b3d5337228e0d89bb1c02c29796a3842cecf69"
+          },
+          "attempts": [
+            {
+              "source_kind": "pointer_lookup",
+              "manifest_digest": "c1498cdf986c302efb49262fd1b3d5337228e0d89bb1c02c29796a3842cecf69",
+              "accepted": true,
+              "detail": "pointer lookup selected a durable manifest for restore"
+            }
+          ],
+          "uploader_assignments": [
+            {
+              "shard_id": "trusted-shard-0",
+              "uploader_node_id": "node-psion-c"
+            },
+            {
+              "shard_id": "trusted-shard-1",
+              "uploader_node_id": "node-psion-a"
+            },
+            {
+              "shard_id": "trusted-shard-2",
+              "uploader_node_id": "node-psion-a"
+            },
+            {
+              "shard_id": "trusted-shard-3",
+              "uploader_node_id": "node-psion-b"
+            }
+          ],
+          "receipt_digest": "e9e95d3223963021f111972bb2549731b07c3a9a7e1db2a143f7dea4980c0e83"
+        },
+        "recovered_topology_digest": "topology-digest-psion-broad-v1",
+        "recovered_worker_count": 4,
+        "dataset_identity": "psion_corpus_tokenized@v1",
+        "sampling_policy_id": "psion_pretrain_mix",
+        "sampling_policy_version": "v1",
+        "optimizer_state_step_restored": 16384,
+        "instability_telemetry": {
+          "stale_rollout_drop_rate_bps": 0,
+          "checkpoint_catchup_latency_ms": 430,
+          "topology_churn_events": 1,
+          "environment_failure_rate_bps": 0,
+          "sandbox_failure_rate_bps": 0
+        },
+        "stability_verdict": {
+          "policy_digest": "c205bd4ef1223fbd52caa3beab784fffe9d1dcc44868fca1b63c8cb97280cf26",
+          "action": "continue",
+          "signal_receipts": [],
+          "optimization_receipts": [],
+          "verdict_digest": "30d90ae6a8a24919ad5e52dc25c56adf5f51f44edef08258477b5a486283feed"
+        },
+        "disposition": "resumed",
+        "summary": "Distributed restart resumed the trusted-cluster sharded checkpoint on the bounded four-worker topology.",
+        "receipt_digest": "7eaf1492514486d441410c8dd71d41288cb670c357cd7a88ee74a067fdc1fcc1"
+      },
+      {
+        "schema_version": "psion.checkpoint_recovery_event.v1",
+        "receipt_id": "psion-trusted-cluster-corruption-rollback-v1",
+        "event_kind": "corruption_detected_rollback",
+        "source_artifact_id": "psion-trusted-cluster-sharded-checkpoint-artifact-v1",
+        "recovery_mode": "resume_from_last_stable_checkpoint",
+        "restore_receipt": {
+          "recovery_mode": "resume_from_last_stable_checkpoint",
+          "source_kind": "manifest_listing_fallback",
+          "selected_pointer": {
+            "scope": {
+              "kind": "run",
+              "scope_id": "run-psion-broad"
+            },
+            "checkpoint_family": "train.psion.decoder",
+            "checkpoint": {
+              "checkpoint_family": "train.psion.decoder",
+              "stream_id": "stream-psion-broad-pretrain-final-sharded-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-sharded-v1",
+              "object_digest": "object-psion-broad-pretrain-final-sharded-v1",
+              "writer_node_id": "node-psion-b",
+              "membership_epoch": 7,
+              "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+              "topology_digest": "topology-digest-psion-broad-v1",
+              "started_at_ms": 1742620000000,
+              "checkpoint_ref": "checkpoint://psion/broad/pretrain/final/sharded",
+              "step": 16384,
+              "durable_at_ms": 1742620900000
+            },
+            "manifest_digest": "c1498cdf986c302efb49262fd1b3d5337228e0d89bb1c02c29796a3842cecf69",
+            "updated_at_ms": 1742620920600,
+            "pointer_digest": "a4dcd115554371f0430449785e461b9a15ebd1364c287f5b69b342bea6ff52d0"
+          },
+          "selected_manifest": {
+            "scope": {
+              "kind": "run",
+              "scope_id": "run-psion-broad"
+            },
+            "checkpoint_family": "train.psion.decoder",
+            "checkpoint": {
+              "checkpoint_family": "train.psion.decoder",
+              "stream_id": "stream-psion-broad-pretrain-final-v1",
+              "manifest_digest": "manifest-psion-broad-pretrain-final-v1",
+              "object_digest": "object-psion-broad-pretrain-final-v1",
+              "writer_node_id": "node-psion-b",
+              "membership_epoch": 7,
+              "cluster_state_digest": "cluster-state-digest-psion-broad-v1",
+              "topology_digest": "topology-digest-psion-broad-v1",
+              "started_at_ms": 1742620000000,
+              "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+              "step": 16384,
+              "durable_at_ms": 1742620900000
+            },
+            "shards": [
+              {
+                "shard_id": "trusted-dense-shard-0",
+                "manifest": {
+                  "stream_id": "stream-psion-broad-pretrain-final-dense-v1",
+                  "manifest_digest": "manifest-psion-broad-pretrain-final-dense-v1",
+                  "subject": "checkpoint",
+                  "object_digest": "object-psion-broad-pretrain-final-dense-v1",
+                  "total_bytes": 386547056,
+                  "chunk_count": 8,
+                  "chunk_bytes": 4194304,
+                  "encoding": "safetensors",
+                  "checkpoint_binding": {
+                    "checkpoint_family": "train.psion.decoder",
+                    "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+                    "step": 16384
+                  }
+                },
+                "writer_node_id": "node-psion-b"
+              }
+            ],
+            "durability": "durable",
+            "created_at_ms": 1742620900000,
+            "manifest_digest": "0208b58c5545f9a7e38ded8cef9f069f7ad81ec4365a3b852868ab7a83405175"
+          },
+          "attempts": [
+            {
+              "source_kind": "pointer_lookup",
+              "manifest_digest": "c1498cdf986c302efb49262fd1b3d5337228e0d89bb1c02c29796a3842cecf69",
+              "accepted": false,
+              "detail": "pointer lookup could not find the referenced manifest in store"
+            },
+            {
+              "source_kind": "manifest_listing_fallback",
+              "manifest_digest": "0208b58c5545f9a7e38ded8cef9f069f7ad81ec4365a3b852868ab7a83405175",
+              "accepted": true,
+              "detail": "manifest listing fallback selected the latest durable manifest"
+            }
+          ],
+          "uploader_assignments": [
+            {
+              "shard_id": "trusted-dense-shard-0",
+              "uploader_node_id": "node-psion-b"
+            }
+          ],
+          "receipt_digest": "cdb85641557f77a61c129c631b600bca80fcfe4cdbf42a08c60359c75f1417f4"
+        },
+        "recovered_topology_digest": "psion-trusted-cluster-recovery-topology-rollback-v1",
+        "recovered_worker_count": 1,
+        "dataset_identity": "psion_corpus_tokenized@v1",
+        "sampling_policy_id": "psion_pretrain_mix",
+        "sampling_policy_version": "v1",
+        "optimizer_state_step_restored": 16384,
+        "instability_telemetry": {
+          "stale_rollout_drop_rate_bps": 0,
+          "checkpoint_catchup_latency_ms": 810,
+          "topology_churn_events": 2,
+          "environment_failure_rate_bps": 0,
+          "sandbox_failure_rate_bps": 0
+        },
+        "stability_verdict": {
+          "policy_digest": "c205bd4ef1223fbd52caa3beab784fffe9d1dcc44868fca1b63c8cb97280cf26",
+          "action": "quarantine",
+          "signal_receipts": [
+            {
+              "signal": "checkpoint_catchup_latency_ms",
+              "observed_value": 810.0,
+              "threshold_value": 500.0,
+              "action": "quarantine"
+            }
+          ],
+          "optimization_receipts": [],
+          "verdict_digest": "7f3e6bb009d1a1f20b0f911fa5a01b6c194a85f8311c80e962c141e65ab19678"
+        },
+        "corruption_receipt": {
+          "schema_version": "psion.checkpoint_corruption_receipt.v1",
+          "receipt_id": "psion-trusted-cluster-sharded-corruption-v1",
+          "source_artifact_id": "psion-trusted-cluster-sharded-checkpoint-artifact-v1",
+          "corrupted_manifest_digest": "c1498cdf986c302efb49262fd1b3d5337228e0d89bb1c02c29796a3842cecf69",
+          "corruption_kind": "manifest_digest_mismatch",
+          "continuation_blocked": true,
+          "summary": "Sharded trusted-cluster checkpoint corruption blocked continuation and forced rollback to the dense last-stable artifact.",
+          "receipt_digest": "994fd3cc09e69b6507ff21d3c0620b2cf4e9e495844e388e09b4f33ca136c15d"
+        },
+        "disposition": "rolled_back_to_stable_checkpoint",
+        "rollback_target_artifact_id": "psion-trusted-cluster-dense-checkpoint-artifact-v1",
+        "summary": "Manifest corruption triggered rollback to the trusted-cluster dense last-stable artifact.",
+        "receipt_digest": "79beb840d309106cabe83bd031ec90280c02f2e7b195bf52690fe906f0d95669"
+      },
+      {
+        "schema_version": "psion.checkpoint_recovery_event.v1",
+        "receipt_id": "psion-trusted-cluster-corruption-invalidation-v1",
+        "event_kind": "corruption_detected_invalidation",
+        "source_artifact_id": "psion-trusted-cluster-dense-checkpoint-artifact-v1",
+        "recovery_mode": "resume_from_last_stable_checkpoint",
+        "recovered_topology_digest": "psion-trusted-cluster-recovery-topology-invalidation-v1",
+        "recovered_worker_count": 1,
+        "dataset_identity": "psion_corpus_tokenized@v1",
+        "sampling_policy_id": "psion_pretrain_mix",
+        "sampling_policy_version": "v1",
+        "optimizer_state_step_restored": 16384,
+        "instability_telemetry": {
+          "stale_rollout_drop_rate_bps": 0,
+          "checkpoint_catchup_latency_ms": 940,
+          "topology_churn_events": 0,
+          "environment_failure_rate_bps": 140,
+          "sandbox_failure_rate_bps": 0
+        },
+        "stability_verdict": {
+          "policy_digest": "c205bd4ef1223fbd52caa3beab784fffe9d1dcc44868fca1b63c8cb97280cf26",
+          "action": "halt",
+          "signal_receipts": [
+            {
+              "signal": "checkpoint_catchup_latency_ms",
+              "observed_value": 940.0,
+              "threshold_value": 500.0,
+              "action": "quarantine"
+            },
+            {
+              "signal": "environment_failure_rate_bps",
+              "observed_value": 140.0,
+              "threshold_value": 100.0,
+              "action": "halt"
+            }
+          ],
+          "optimization_receipts": [],
+          "verdict_digest": "aee82685eef4dc7302d3828e123dfc7ddc3d802cae40e860c3097575586755fc"
+        },
+        "corruption_receipt": {
+          "schema_version": "psion.checkpoint_corruption_receipt.v1",
+          "receipt_id": "psion-trusted-cluster-dense-optimizer-corruption-v1",
+          "source_artifact_id": "psion-trusted-cluster-dense-checkpoint-artifact-v1",
+          "corrupted_manifest_digest": "manifest-psion-broad-pretrain-final-optimizer-v1",
+          "corruption_kind": "optimizer_state_mismatch",
+          "continuation_blocked": true,
+          "summary": "Optimizer-state corruption invalidated the trusted-cluster run instead of resuming from a poisoned state.",
+          "receipt_digest": "5dca1b7264b94ba3bc836aafed4f01418b81cf8d63503a353af86ba8fc774091"
+        },
+        "disposition": "invalidated",
+        "summary": "Optimizer-state corruption invalidated the trusted-cluster run instead of continuing.",
+        "receipt_digest": "a67532a3f28c3dcca463e81112d6090d09bb0f06f9854cfbe0041fbb008cddcb"
+      }
+    ],
+    "last_stable_artifact_id": "psion-trusted-cluster-dense-checkpoint-artifact-v1",
+    "summary": "Trusted-cluster checkpoint recovery bundle freezes dense fallback, distributed restart, corruption rollback, and invalidation on the broader four-worker run.",
+    "bundle_digest": "4d7c11490f9aaf4cb0a769dbd0bf6682c98425ee5693f8156ae5d7a232bbc6ef"
+  },
+  "replay_receipt": {
+    "schema_version": "psion.trusted_cluster_replay_receipt.v1",
+    "receipt_id": "psion-trusted-cluster-replay-v1",
+    "topology_contract_digest": "684396a914c47ebc834faf7a3a57d688271cc83d67616732de192dcf9b342ed8",
+    "participating_node_ids": [
+      "worker-a",
+      "worker-b",
+      "worker-c",
+      "worker-d"
+    ],
+    "baseline_replay": {
+      "trainer_batch": {
+        "batch_id": "trainer-batch-psion-trusted-cluster-v1",
+        "policy_lineage": {
+          "target_revision": {
+            "policy_family": "psion.policy",
+            "revision_id": "rev-3",
+            "revision_number": 3,
+            "policy_digest": "psion-target-policy-digest",
+            "produced_at_ms": 3000
+          },
+          "source_revisions": [
+            {
+              "policy_family": "psion.policy",
+              "revision_id": "rev-2",
+              "revision_number": 2,
+              "policy_digest": "psion-source-policy-digest",
+              "produced_at_ms": 2000
+            }
+          ],
+          "lineage_digest": "835779e7f90572383af82643d0604edd45a7f3c7a58ac0c6358a8ac368eb4488"
+        },
+        "rollout_ids": [
+          "rollout-a",
+          "rollout-b",
+          "rollout-c",
+          "rollout-d"
+        ],
+        "rollout_digests": [
+          "baa0462ebfd04813a684480c6570dd37be85a42d82df33f2a83c46ec73d7bb92",
+          "fc171c53bd864f146f8204d074f77fe72080ef8f5bc755906b61a1d79b00227c",
+          "2c2a861135c149361a12e66a900bc9aabe7d6a8fc5c215c9d87fa628e13ad444",
+          "738a95bc6f532e12734d9aec267b57bb738f2e110473342c4a09c3d18fb20343"
+        ],
+        "proof_references": [
+          {
+            "kind": "execution_proof",
+            "digest": "proof-a",
+            "reference": "proof://a"
+          },
+          {
+            "kind": "execution_proof",
+            "digest": "proof-b",
+            "reference": "proof://b"
+          },
+          {
+            "kind": "execution_proof",
+            "digest": "proof-c",
+            "reference": "proof://c"
+          },
+          {
+            "kind": "execution_proof",
+            "digest": "proof-d",
+            "reference": "proof://d"
+          }
+        ],
+        "rollout_count": 4,
+        "token_count": 4,
+        "reward_sum": 3.08,
+        "advantage_sum": 2.32,
+        "assembled_at_ms": 4000,
+        "batch_digest": "8734cc8b2ab4c8c7adb95ac61fa3f633d4fd80e113d1eb2dbbd9f925139591e0"
+      },
+      "seed_discipline": {
+        "assignment_seed": 404,
+        "trainer_seed": 505,
+        "eval_seed": 606
+      },
+      "sample_selection_rules": [
+        {
+          "worker_id": "worker-a",
+          "attempt_index": 0,
+          "assignment_digest": "assignment-a",
+          "population_digest": "dfdd7775391ee74a47c7f772ad3a040747be4ea680d09f812b0fcc44f59318ef",
+          "selected_item_ids": [
+            "task-a"
+          ],
+          "sample_selection_seed": 12120018172099408983,
+          "selection_digest": "2b7561d3d5a988bc76a60b85e3466914aa1fa4ad7da2df963c93cdef49f2d963"
+        },
+        {
+          "worker_id": "worker-b",
+          "attempt_index": 0,
+          "assignment_digest": "assignment-b",
+          "population_digest": "673dba54320905cce92336d68c6408ae2200bbea472819acd0fa4136fed55ded",
+          "selected_item_ids": [
+            "task-c"
+          ],
+          "sample_selection_seed": 2489043725423512508,
+          "selection_digest": "7252ada8bb6a1919e8e8559baf8519ca4bb630f90b2defc715bc81a4ae80c886"
+        },
+        {
+          "worker_id": "worker-c",
+          "attempt_index": 0,
+          "assignment_digest": "assignment-c",
+          "population_digest": "b1af28da57b6e52b7052e2b6c176bf21ec738fb2ee97d10d40e1b296bd3b15b0",
+          "selected_item_ids": [
+            "task-e"
+          ],
+          "sample_selection_seed": 1012886128869977058,
+          "selection_digest": "461400d07e847420ad27a33bd237b8f654036a61ad5c5ff24bf8f6a8d41600f6"
+        },
+        {
+          "worker_id": "worker-d",
+          "attempt_index": 0,
+          "assignment_digest": "assignment-d",
+          "population_digest": "045c1e9eee69c43acdaaa7256fe6e5d825e2ae124fd588f6cae24f6727869895",
+          "selected_item_ids": [
+            "task-g"
+          ],
+          "sample_selection_seed": 1932301869039633622,
+          "selection_digest": "d76614abdcd488d02e661f854964ac01e276d4ece45b9ffe339fe028438b405b"
+        }
+      ],
+      "environment_pin": {
+        "package_key": {
+          "environment_ref": "psion.cluster.reasoner",
+          "version": "1.0.0"
+        },
+        "package_digest": "87dc6c202fcc8ab9bf77dd1d0552d5f7367f02379df988e748ce799ea71147af",
+        "runtime_family": "multi_turn_dialog",
+        "entrypoint_digest": "4756d0d3c45c62eb740b18c2e43c9652e3328cd0bc486427fb90318508ab6f7f",
+        "tool_pins": [
+          {
+            "tool_name": "inspect_topology",
+            "interface": "native_function",
+            "contract_digest": "12850a5eb03300d7e53cdd794fbd88c4308d710e4c105f36126f3b860e9811aa",
+            "version_label": "planner@1"
+          }
+        ]
+      },
+      "eval_posture": {
+        "eval_run_digest": "38afb8b3ebd3163fe4790f2b5223a4417b43370b0f79147f67771a3fcf0f60f6",
+        "environment": {
+          "environment_ref": "psion.cluster.reasoner",
+          "version": "1.0.0"
+        },
+        "mode": "offline_held_out",
+        "expected_sample_count": 4,
+        "scheduler_posture": "deterministic",
+        "strategy_digest": "fab6f929f24b3eb03a4a3136ceb1afbd47a42df5f3125501a141f0203dd3716c",
+        "eval_seed": 606,
+        "sample_ordering_digest": "5d9664e6b9782b35085860c1457efbb8c127b6698e1f32a34d595dab0c77dbd8"
+      },
+      "replay_digest": "055a9e4cf7bac41ccde90761aecb10afb33c232a7f0d1f2007f59393cfbd1da8"
+    },
+    "observed_replay": {
+      "trainer_batch": {
+        "batch_id": "trainer-batch-psion-trusted-cluster-v1",
+        "policy_lineage": {
+          "target_revision": {
+            "policy_family": "psion.policy",
+            "revision_id": "rev-3",
+            "revision_number": 3,
+            "policy_digest": "psion-target-policy-digest",
+            "produced_at_ms": 3000
+          },
+          "source_revisions": [
+            {
+              "policy_family": "psion.policy",
+              "revision_id": "rev-2",
+              "revision_number": 2,
+              "policy_digest": "psion-source-policy-digest",
+              "produced_at_ms": 2000
+            }
+          ],
+          "lineage_digest": "835779e7f90572383af82643d0604edd45a7f3c7a58ac0c6358a8ac368eb4488"
+        },
+        "rollout_ids": [
+          "rollout-a",
+          "rollout-b",
+          "rollout-c",
+          "rollout-d"
+        ],
+        "rollout_digests": [
+          "baa0462ebfd04813a684480c6570dd37be85a42d82df33f2a83c46ec73d7bb92",
+          "fc171c53bd864f146f8204d074f77fe72080ef8f5bc755906b61a1d79b00227c",
+          "2c2a861135c149361a12e66a900bc9aabe7d6a8fc5c215c9d87fa628e13ad444",
+          "738a95bc6f532e12734d9aec267b57bb738f2e110473342c4a09c3d18fb20343"
+        ],
+        "proof_references": [
+          {
+            "kind": "execution_proof",
+            "digest": "proof-a",
+            "reference": "proof://a"
+          },
+          {
+            "kind": "execution_proof",
+            "digest": "proof-b",
+            "reference": "proof://b"
+          },
+          {
+            "kind": "execution_proof",
+            "digest": "proof-c",
+            "reference": "proof://c"
+          },
+          {
+            "kind": "execution_proof",
+            "digest": "proof-d",
+            "reference": "proof://d"
+          }
+        ],
+        "rollout_count": 4,
+        "token_count": 4,
+        "reward_sum": 3.08,
+        "advantage_sum": 2.32,
+        "assembled_at_ms": 4000,
+        "batch_digest": "8734cc8b2ab4c8c7adb95ac61fa3f633d4fd80e113d1eb2dbbd9f925139591e0"
+      },
+      "seed_discipline": {
+        "assignment_seed": 404,
+        "trainer_seed": 505,
+        "eval_seed": 606
+      },
+      "sample_selection_rules": [
+        {
+          "worker_id": "worker-a",
+          "attempt_index": 0,
+          "assignment_digest": "assignment-a",
+          "population_digest": "dfdd7775391ee74a47c7f772ad3a040747be4ea680d09f812b0fcc44f59318ef",
+          "selected_item_ids": [
+            "task-a"
+          ],
+          "sample_selection_seed": 12120018172099408983,
+          "selection_digest": "2b7561d3d5a988bc76a60b85e3466914aa1fa4ad7da2df963c93cdef49f2d963"
+        },
+        {
+          "worker_id": "worker-b",
+          "attempt_index": 0,
+          "assignment_digest": "assignment-b",
+          "population_digest": "673dba54320905cce92336d68c6408ae2200bbea472819acd0fa4136fed55ded",
+          "selected_item_ids": [
+            "task-c"
+          ],
+          "sample_selection_seed": 2489043725423512508,
+          "selection_digest": "7252ada8bb6a1919e8e8559baf8519ca4bb630f90b2defc715bc81a4ae80c886"
+        },
+        {
+          "worker_id": "worker-c",
+          "attempt_index": 0,
+          "assignment_digest": "assignment-c",
+          "population_digest": "b1af28da57b6e52b7052e2b6c176bf21ec738fb2ee97d10d40e1b296bd3b15b0",
+          "selected_item_ids": [
+            "task-e"
+          ],
+          "sample_selection_seed": 1012886128869977058,
+          "selection_digest": "461400d07e847420ad27a33bd237b8f654036a61ad5c5ff24bf8f6a8d41600f6"
+        },
+        {
+          "worker_id": "worker-d",
+          "attempt_index": 0,
+          "assignment_digest": "assignment-d",
+          "population_digest": "045c1e9eee69c43acdaaa7256fe6e5d825e2ae124fd588f6cae24f6727869895",
+          "selected_item_ids": [
+            "task-g"
+          ],
+          "sample_selection_seed": 1932301869039633622,
+          "selection_digest": "d76614abdcd488d02e661f854964ac01e276d4ece45b9ffe339fe028438b405b"
+        }
+      ],
+      "environment_pin": {
+        "package_key": {
+          "environment_ref": "psion.cluster.reasoner",
+          "version": "1.0.0"
+        },
+        "package_digest": "87dc6c202fcc8ab9bf77dd1d0552d5f7367f02379df988e748ce799ea71147af",
+        "runtime_family": "multi_turn_dialog",
+        "entrypoint_digest": "4756d0d3c45c62eb740b18c2e43c9652e3328cd0bc486427fb90318508ab6f7f",
+        "tool_pins": [
+          {
+            "tool_name": "inspect_topology",
+            "interface": "native_function",
+            "contract_digest": "12850a5eb03300d7e53cdd794fbd88c4308d710e4c105f36126f3b860e9811aa",
+            "version_label": "planner@1"
+          }
+        ]
+      },
+      "eval_posture": {
+        "eval_run_digest": "38afb8b3ebd3163fe4790f2b5223a4417b43370b0f79147f67771a3fcf0f60f6",
+        "environment": {
+          "environment_ref": "psion.cluster.reasoner",
+          "version": "1.0.0"
+        },
+        "mode": "offline_held_out",
+        "expected_sample_count": 4,
+        "scheduler_posture": "deterministic",
+        "strategy_digest": "fab6f929f24b3eb03a4a3136ceb1afbd47a42df5f3125501a141f0203dd3716c",
+        "eval_seed": 606,
+        "sample_ordering_digest": "5d9664e6b9782b35085860c1457efbb8c127b6698e1f32a34d595dab0c77dbd8"
+      },
+      "replay_digest": "055a9e4cf7bac41ccde90761aecb10afb33c232a7f0d1f2007f59393cfbd1da8"
+    },
+    "verification": {
+      "disposition": "match",
+      "expected_replay_digest": "055a9e4cf7bac41ccde90761aecb10afb33c232a7f0d1f2007f59393cfbd1da8",
+      "observed_replay_digest": "055a9e4cf7bac41ccde90761aecb10afb33c232a7f0d1f2007f59393cfbd1da8"
+    },
+    "successful_replays": 5,
+    "exact_replay_observed": true,
+    "summary": "Trusted-cluster replay receipts cover all four worker identities and preserve exact replay across repeated multi-host checks.",
+    "receipt_digest": "a7c14afd3b7975abe2b004d29986754d2deb339a6c76a7678d9e3ded98177b52"
+  },
+  "summary": "The first bounded trusted-cluster Psion run bundle ties together the broader-stage receipt, broader-run throughput and topology receipts, bootstrapped public distributed group truth, optimizer-step evidence, multi-host replay verification, and checkpoint restart coverage on one explicit four-node trusted cluster lane.",
+  "bundle_digest": "b9b2af255fccfd0b18b065cfb65de7dd0eca8542eddc57a01bc42c66b1c2bbac"
+}

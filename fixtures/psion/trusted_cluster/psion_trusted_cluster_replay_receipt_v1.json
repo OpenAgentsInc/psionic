@@ -1,0 +1,312 @@
+{
+  "schema_version": "psion.trusted_cluster_replay_receipt.v1",
+  "receipt_id": "psion-trusted-cluster-replay-v1",
+  "topology_contract_digest": "684396a914c47ebc834faf7a3a57d688271cc83d67616732de192dcf9b342ed8",
+  "participating_node_ids": [
+    "worker-a",
+    "worker-b",
+    "worker-c",
+    "worker-d"
+  ],
+  "baseline_replay": {
+    "trainer_batch": {
+      "batch_id": "trainer-batch-psion-trusted-cluster-v1",
+      "policy_lineage": {
+        "target_revision": {
+          "policy_family": "psion.policy",
+          "revision_id": "rev-3",
+          "revision_number": 3,
+          "policy_digest": "psion-target-policy-digest",
+          "produced_at_ms": 3000
+        },
+        "source_revisions": [
+          {
+            "policy_family": "psion.policy",
+            "revision_id": "rev-2",
+            "revision_number": 2,
+            "policy_digest": "psion-source-policy-digest",
+            "produced_at_ms": 2000
+          }
+        ],
+        "lineage_digest": "835779e7f90572383af82643d0604edd45a7f3c7a58ac0c6358a8ac368eb4488"
+      },
+      "rollout_ids": [
+        "rollout-a",
+        "rollout-b",
+        "rollout-c",
+        "rollout-d"
+      ],
+      "rollout_digests": [
+        "baa0462ebfd04813a684480c6570dd37be85a42d82df33f2a83c46ec73d7bb92",
+        "fc171c53bd864f146f8204d074f77fe72080ef8f5bc755906b61a1d79b00227c",
+        "2c2a861135c149361a12e66a900bc9aabe7d6a8fc5c215c9d87fa628e13ad444",
+        "738a95bc6f532e12734d9aec267b57bb738f2e110473342c4a09c3d18fb20343"
+      ],
+      "proof_references": [
+        {
+          "kind": "execution_proof",
+          "digest": "proof-a",
+          "reference": "proof://a"
+        },
+        {
+          "kind": "execution_proof",
+          "digest": "proof-b",
+          "reference": "proof://b"
+        },
+        {
+          "kind": "execution_proof",
+          "digest": "proof-c",
+          "reference": "proof://c"
+        },
+        {
+          "kind": "execution_proof",
+          "digest": "proof-d",
+          "reference": "proof://d"
+        }
+      ],
+      "rollout_count": 4,
+      "token_count": 4,
+      "reward_sum": 3.08,
+      "advantage_sum": 2.32,
+      "assembled_at_ms": 4000,
+      "batch_digest": "8734cc8b2ab4c8c7adb95ac61fa3f633d4fd80e113d1eb2dbbd9f925139591e0"
+    },
+    "seed_discipline": {
+      "assignment_seed": 404,
+      "trainer_seed": 505,
+      "eval_seed": 606
+    },
+    "sample_selection_rules": [
+      {
+        "worker_id": "worker-a",
+        "attempt_index": 0,
+        "assignment_digest": "assignment-a",
+        "population_digest": "dfdd7775391ee74a47c7f772ad3a040747be4ea680d09f812b0fcc44f59318ef",
+        "selected_item_ids": [
+          "task-a"
+        ],
+        "sample_selection_seed": 12120018172099408983,
+        "selection_digest": "2b7561d3d5a988bc76a60b85e3466914aa1fa4ad7da2df963c93cdef49f2d963"
+      },
+      {
+        "worker_id": "worker-b",
+        "attempt_index": 0,
+        "assignment_digest": "assignment-b",
+        "population_digest": "673dba54320905cce92336d68c6408ae2200bbea472819acd0fa4136fed55ded",
+        "selected_item_ids": [
+          "task-c"
+        ],
+        "sample_selection_seed": 2489043725423512508,
+        "selection_digest": "7252ada8bb6a1919e8e8559baf8519ca4bb630f90b2defc715bc81a4ae80c886"
+      },
+      {
+        "worker_id": "worker-c",
+        "attempt_index": 0,
+        "assignment_digest": "assignment-c",
+        "population_digest": "b1af28da57b6e52b7052e2b6c176bf21ec738fb2ee97d10d40e1b296bd3b15b0",
+        "selected_item_ids": [
+          "task-e"
+        ],
+        "sample_selection_seed": 1012886128869977058,
+        "selection_digest": "461400d07e847420ad27a33bd237b8f654036a61ad5c5ff24bf8f6a8d41600f6"
+      },
+      {
+        "worker_id": "worker-d",
+        "attempt_index": 0,
+        "assignment_digest": "assignment-d",
+        "population_digest": "045c1e9eee69c43acdaaa7256fe6e5d825e2ae124fd588f6cae24f6727869895",
+        "selected_item_ids": [
+          "task-g"
+        ],
+        "sample_selection_seed": 1932301869039633622,
+        "selection_digest": "d76614abdcd488d02e661f854964ac01e276d4ece45b9ffe339fe028438b405b"
+      }
+    ],
+    "environment_pin": {
+      "package_key": {
+        "environment_ref": "psion.cluster.reasoner",
+        "version": "1.0.0"
+      },
+      "package_digest": "87dc6c202fcc8ab9bf77dd1d0552d5f7367f02379df988e748ce799ea71147af",
+      "runtime_family": "multi_turn_dialog",
+      "entrypoint_digest": "4756d0d3c45c62eb740b18c2e43c9652e3328cd0bc486427fb90318508ab6f7f",
+      "tool_pins": [
+        {
+          "tool_name": "inspect_topology",
+          "interface": "native_function",
+          "contract_digest": "12850a5eb03300d7e53cdd794fbd88c4308d710e4c105f36126f3b860e9811aa",
+          "version_label": "planner@1"
+        }
+      ]
+    },
+    "eval_posture": {
+      "eval_run_digest": "38afb8b3ebd3163fe4790f2b5223a4417b43370b0f79147f67771a3fcf0f60f6",
+      "environment": {
+        "environment_ref": "psion.cluster.reasoner",
+        "version": "1.0.0"
+      },
+      "mode": "offline_held_out",
+      "expected_sample_count": 4,
+      "scheduler_posture": "deterministic",
+      "strategy_digest": "fab6f929f24b3eb03a4a3136ceb1afbd47a42df5f3125501a141f0203dd3716c",
+      "eval_seed": 606,
+      "sample_ordering_digest": "5d9664e6b9782b35085860c1457efbb8c127b6698e1f32a34d595dab0c77dbd8"
+    },
+    "replay_digest": "055a9e4cf7bac41ccde90761aecb10afb33c232a7f0d1f2007f59393cfbd1da8"
+  },
+  "observed_replay": {
+    "trainer_batch": {
+      "batch_id": "trainer-batch-psion-trusted-cluster-v1",
+      "policy_lineage": {
+        "target_revision": {
+          "policy_family": "psion.policy",
+          "revision_id": "rev-3",
+          "revision_number": 3,
+          "policy_digest": "psion-target-policy-digest",
+          "produced_at_ms": 3000
+        },
+        "source_revisions": [
+          {
+            "policy_family": "psion.policy",
+            "revision_id": "rev-2",
+            "revision_number": 2,
+            "policy_digest": "psion-source-policy-digest",
+            "produced_at_ms": 2000
+          }
+        ],
+        "lineage_digest": "835779e7f90572383af82643d0604edd45a7f3c7a58ac0c6358a8ac368eb4488"
+      },
+      "rollout_ids": [
+        "rollout-a",
+        "rollout-b",
+        "rollout-c",
+        "rollout-d"
+      ],
+      "rollout_digests": [
+        "baa0462ebfd04813a684480c6570dd37be85a42d82df33f2a83c46ec73d7bb92",
+        "fc171c53bd864f146f8204d074f77fe72080ef8f5bc755906b61a1d79b00227c",
+        "2c2a861135c149361a12e66a900bc9aabe7d6a8fc5c215c9d87fa628e13ad444",
+        "738a95bc6f532e12734d9aec267b57bb738f2e110473342c4a09c3d18fb20343"
+      ],
+      "proof_references": [
+        {
+          "kind": "execution_proof",
+          "digest": "proof-a",
+          "reference": "proof://a"
+        },
+        {
+          "kind": "execution_proof",
+          "digest": "proof-b",
+          "reference": "proof://b"
+        },
+        {
+          "kind": "execution_proof",
+          "digest": "proof-c",
+          "reference": "proof://c"
+        },
+        {
+          "kind": "execution_proof",
+          "digest": "proof-d",
+          "reference": "proof://d"
+        }
+      ],
+      "rollout_count": 4,
+      "token_count": 4,
+      "reward_sum": 3.08,
+      "advantage_sum": 2.32,
+      "assembled_at_ms": 4000,
+      "batch_digest": "8734cc8b2ab4c8c7adb95ac61fa3f633d4fd80e113d1eb2dbbd9f925139591e0"
+    },
+    "seed_discipline": {
+      "assignment_seed": 404,
+      "trainer_seed": 505,
+      "eval_seed": 606
+    },
+    "sample_selection_rules": [
+      {
+        "worker_id": "worker-a",
+        "attempt_index": 0,
+        "assignment_digest": "assignment-a",
+        "population_digest": "dfdd7775391ee74a47c7f772ad3a040747be4ea680d09f812b0fcc44f59318ef",
+        "selected_item_ids": [
+          "task-a"
+        ],
+        "sample_selection_seed": 12120018172099408983,
+        "selection_digest": "2b7561d3d5a988bc76a60b85e3466914aa1fa4ad7da2df963c93cdef49f2d963"
+      },
+      {
+        "worker_id": "worker-b",
+        "attempt_index": 0,
+        "assignment_digest": "assignment-b",
+        "population_digest": "673dba54320905cce92336d68c6408ae2200bbea472819acd0fa4136fed55ded",
+        "selected_item_ids": [
+          "task-c"
+        ],
+        "sample_selection_seed": 2489043725423512508,
+        "selection_digest": "7252ada8bb6a1919e8e8559baf8519ca4bb630f90b2defc715bc81a4ae80c886"
+      },
+      {
+        "worker_id": "worker-c",
+        "attempt_index": 0,
+        "assignment_digest": "assignment-c",
+        "population_digest": "b1af28da57b6e52b7052e2b6c176bf21ec738fb2ee97d10d40e1b296bd3b15b0",
+        "selected_item_ids": [
+          "task-e"
+        ],
+        "sample_selection_seed": 1012886128869977058,
+        "selection_digest": "461400d07e847420ad27a33bd237b8f654036a61ad5c5ff24bf8f6a8d41600f6"
+      },
+      {
+        "worker_id": "worker-d",
+        "attempt_index": 0,
+        "assignment_digest": "assignment-d",
+        "population_digest": "045c1e9eee69c43acdaaa7256fe6e5d825e2ae124fd588f6cae24f6727869895",
+        "selected_item_ids": [
+          "task-g"
+        ],
+        "sample_selection_seed": 1932301869039633622,
+        "selection_digest": "d76614abdcd488d02e661f854964ac01e276d4ece45b9ffe339fe028438b405b"
+      }
+    ],
+    "environment_pin": {
+      "package_key": {
+        "environment_ref": "psion.cluster.reasoner",
+        "version": "1.0.0"
+      },
+      "package_digest": "87dc6c202fcc8ab9bf77dd1d0552d5f7367f02379df988e748ce799ea71147af",
+      "runtime_family": "multi_turn_dialog",
+      "entrypoint_digest": "4756d0d3c45c62eb740b18c2e43c9652e3328cd0bc486427fb90318508ab6f7f",
+      "tool_pins": [
+        {
+          "tool_name": "inspect_topology",
+          "interface": "native_function",
+          "contract_digest": "12850a5eb03300d7e53cdd794fbd88c4308d710e4c105f36126f3b860e9811aa",
+          "version_label": "planner@1"
+        }
+      ]
+    },
+    "eval_posture": {
+      "eval_run_digest": "38afb8b3ebd3163fe4790f2b5223a4417b43370b0f79147f67771a3fcf0f60f6",
+      "environment": {
+        "environment_ref": "psion.cluster.reasoner",
+        "version": "1.0.0"
+      },
+      "mode": "offline_held_out",
+      "expected_sample_count": 4,
+      "scheduler_posture": "deterministic",
+      "strategy_digest": "fab6f929f24b3eb03a4a3136ceb1afbd47a42df5f3125501a141f0203dd3716c",
+      "eval_seed": 606,
+      "sample_ordering_digest": "5d9664e6b9782b35085860c1457efbb8c127b6698e1f32a34d595dab0c77dbd8"
+    },
+    "replay_digest": "055a9e4cf7bac41ccde90761aecb10afb33c232a7f0d1f2007f59393cfbd1da8"
+  },
+  "verification": {
+    "disposition": "match",
+    "expected_replay_digest": "055a9e4cf7bac41ccde90761aecb10afb33c232a7f0d1f2007f59393cfbd1da8",
+    "observed_replay_digest": "055a9e4cf7bac41ccde90761aecb10afb33c232a7f0d1f2007f59393cfbd1da8"
+  },
+  "successful_replays": 5,
+  "exact_replay_observed": true,
+  "summary": "Trusted-cluster replay receipts cover all four worker identities and preserve exact replay across repeated multi-host checks.",
+  "receipt_digest": "a7c14afd3b7975abe2b004d29986754d2deb339a6c76a7678d9e3ded98177b52"
+}

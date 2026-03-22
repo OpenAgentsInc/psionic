@@ -50,6 +50,8 @@ clustered execution, and machine-legible execution truth.
   learned-model lane.
 - `docs/PSION_RENTED_CLUSTER_RUNBOOK.md` is the canonical rented-cluster
   runbook and failure-policy doc for the `Psion` learned-model lane.
+- `docs/PSION_TRUSTED_CLUSTER_RUN.md` is the canonical trusted-cluster
+  multi-host run doc for the `Psion` learned-model lane.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical phase-gate and
   promotion-decision doc for the `Psion` learned-model lane.
 - `docs/PSION_CAPABILITY_MATRIX.md` is the canonical served capability and

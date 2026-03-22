@@ -1,0 +1,50 @@
+{
+  "schema_version": "psion.trusted_cluster_topology_contract.v1",
+  "contract_id": "psion-trusted-cluster-topology-contract-v1",
+  "pretrain_stage_receipt_digest": "633c4eca517b41798f7b183608195ad4c10156ff7f6b595bd3541871bb64d0ab",
+  "observability_receipt_digest": "46d82db942801eddee02fb638bee11654478bc8f4b6be2f472bdb3d31751d142",
+  "rented_cluster_runbook_digest": "974fb48ad05d5e5407bd6dfecc739c2c1c82c9c6b32d89532f12429fcd29be15",
+  "supported_topology_label": "homogeneous_four_node_h100_tensor_parallel",
+  "required_backend": "cuda",
+  "required_device_id_prefix": "cuda:h100-",
+  "required_worker_count": 4,
+  "one_rank_per_node_required": true,
+  "required_distributed_backend": "nccl",
+  "required_distributed_topology_profile": "trusted_lan_stream_mesh",
+  "required_transport": "trusted_lan_stream",
+  "required_cluster_disposition": "sharded",
+  "required_execution_topology_kind": "tensor_sharded",
+  "required_communication_class": "tensor_collective_mesh",
+  "required_optimizer_kind": "zero_stage3",
+  "required_collective_kind": "all_reduce",
+  "required_collective_quantization": "int8_symmetric",
+  "mode_evaluations": [
+    {
+      "topology_mode": "homogeneous_cuda_h100_one_rank_per_node",
+      "disposition": "supported",
+      "detail": "The first trusted-cluster lane is one homogeneous H100-class CUDA rank per node over trusted-LAN stream transport."
+    },
+    {
+      "topology_mode": "mixed_backend_or_accelerator",
+      "disposition": "refused",
+      "detail": "Mixed backend or accelerator meshes are refused instead of pretending collective and throughput behavior generalize automatically."
+    },
+    {
+      "topology_mode": "cross_region_or_mixed_latency_fabric",
+      "disposition": "refused",
+      "detail": "Cross-region or mixed-latency fabrics are refused because the first truthful lane is bounded to one trusted low-latency cluster."
+    },
+    {
+      "topology_mode": "elastic_world_size_change",
+      "disposition": "out_of_scope",
+      "detail": "Elastic world-size increase remains out of scope for the first trusted-cluster lane; recovery is same-world-size restart only."
+    },
+    {
+      "topology_mode": "shared_or_untrusted_fabric",
+      "disposition": "refused",
+      "detail": "Shared or untrusted fabrics are refused rather than widening this lane into public all-reduce claims."
+    }
+  ],
+  "summary": "Trusted-cluster Psion scale-up is bounded to one homogeneous four-node CUDA H100 tensor-parallel lane with one rank per node, trusted-LAN stream transport, explicit NCCL-class public group truth, and explicit refusal or out-of-scope posture for mixed, cross-region, shared, or elastic-world-size modes.",
+  "contract_digest": "684396a914c47ebc834faf7a3a57d688271cc83d67616732de192dcf9b342ed8"
+}

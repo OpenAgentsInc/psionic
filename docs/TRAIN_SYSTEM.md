@@ -137,6 +137,11 @@ and now also has:
   freezes the storage persistence, preemption downgrade, cost stop-condition,
   and infra-mode refusal contract that later trusted-cluster work must not
   silently widen.
+- `docs/PSION_TRUSTED_CLUSTER_RUN.md` is the canonical first trusted-cluster
+  multi-host run doc for the `Psion` learned-model lane and freezes the
+  bounded topology contract, distributed-group receipt, replay receipt, and
+  checkpoint-restart coverage that later decentralized contribution work must
+  build on instead of bypassing.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical first phase-gate and
   promotion-decision doc for the `Psion` learned-model lane and freezes the
   acceptance-matrix plus evidence-bound promotion contract that later pilot,
