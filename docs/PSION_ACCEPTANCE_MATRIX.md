@@ -75,6 +75,12 @@ without pretending the pilot already proves the full engineering lane.
 constraints, paraphrases, historical transfer, and spec-adjacent edge cases no
 longer hide inside the generic held-out technical reasoning family.
 
+`PSION-25` tightens route selection the same way:
+`psion_route_benchmark_v1` now binds directly into the later route-selection
+gates, and the route lane now emits a dedicated route-class receipt that keeps
+answer-in-language, answer-with-uncertainty, request-for-structure, and
+exact-delegation outcomes separate from refusal work.
+
 ## Promotion Contract
 
 `Psion` phase promotion is recorded through the training-owned

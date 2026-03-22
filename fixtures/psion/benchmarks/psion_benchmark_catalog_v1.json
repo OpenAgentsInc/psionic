@@ -727,7 +727,16 @@
         },
         "cases": [
           {
-            "case_id": "route-case-1"
+            "case_id": "route-case-answer"
+          },
+          {
+            "case_id": "route-case-uncertainty"
+          },
+          {
+            "case_id": "route-case-structure"
+          },
+          {
+            "case_id": "route-case-delegate"
           }
         ]
       },
@@ -745,8 +754,26 @@
       "grader_interfaces": [
         {
           "grader_kind": "exact_route",
-          "grader_id": "exact_route_v1",
-          "expected_route": "exact_executor_handoff",
+          "grader_id": "route_answer_v1",
+          "expected_route": "answer_in_language",
+          "detail": "Route grader requires the declared route exactly."
+        },
+        {
+          "grader_kind": "exact_route",
+          "grader_id": "route_uncertainty_v1",
+          "expected_route": "answer_with_uncertainty",
+          "detail": "Route grader requires the declared route exactly."
+        },
+        {
+          "grader_kind": "exact_route",
+          "grader_id": "route_structure_v1",
+          "expected_route": "request_structured_inputs",
+          "detail": "Route grader requires the declared route exactly."
+        },
+        {
+          "grader_kind": "exact_route",
+          "grader_id": "route_delegate_v1",
+          "expected_route": "delegate_to_exact_executor",
           "detail": "Route grader requires the declared route exactly."
         }
       ],
@@ -766,24 +793,84 @@
       },
       "items": [
         {
-          "item_id": "route-case-1",
+          "item_id": "route-case-answer",
           "family": "route_evaluation",
           "prompt_format_id": "route_decision_v1",
-          "grader_id": "exact_route_v1",
-          "prompt_digest": "route-prompt-digest-1",
+          "grader_id": "route_answer_v1",
+          "prompt_digest": "route-prompt-digest-answer",
           "source_ids": [
             "spec_quiz_eval_pack_v1"
           ],
           "task": {
             "task_kind": "route_evaluation",
-            "expected_route": "exact_executor_handoff",
-            "route_boundary_ref": "route://psion/exactness_boundary"
+            "route_class": "answer_in_language",
+            "route_boundary_ref": "route://psion/language_judgment_boundary",
+            "required_signal": "answer directly in language",
+            "structured_input_schema_ref": null,
+            "uncertainty_required": false
           },
-          "detail": "Route item checks direct vs handoff vs refusal decisions."
+          "detail": "Route answer item checks the bounded direct-answer class without forcing delegation or a structured-input ask."
+        },
+        {
+          "item_id": "route-case-uncertainty",
+          "family": "route_evaluation",
+          "prompt_format_id": "route_decision_v1",
+          "grader_id": "route_uncertainty_v1",
+          "prompt_digest": "route-prompt-digest-uncertainty",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1"
+          ],
+          "task": {
+            "task_kind": "route_evaluation",
+            "route_class": "answer_with_uncertainty",
+            "route_boundary_ref": "route://psion/uncertainty_boundary",
+            "required_signal": "answer with explicit uncertainty",
+            "structured_input_schema_ref": null,
+            "uncertainty_required": true
+          },
+          "detail": "Route uncertainty item checks whether the learned lane can stay in-language while making uncertainty explicit."
+        },
+        {
+          "item_id": "route-case-structure",
+          "family": "route_evaluation",
+          "prompt_format_id": "route_decision_v1",
+          "grader_id": "route_structure_v1",
+          "prompt_digest": "route-prompt-digest-structure",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1"
+          ],
+          "task": {
+            "task_kind": "route_evaluation",
+            "route_class": "request_structured_inputs",
+            "route_boundary_ref": "route://psion/structured-input-boundary",
+            "required_signal": "request the missing structured inputs before answering",
+            "structured_input_schema_ref": "schema://psion/route/design_inputs_v1",
+            "uncertainty_required": false
+          },
+          "detail": "Route structure item checks whether the learned lane asks for the named structured fields instead of guessing them."
+        },
+        {
+          "item_id": "route-case-delegate",
+          "family": "route_evaluation",
+          "prompt_format_id": "route_decision_v1",
+          "grader_id": "route_delegate_v1",
+          "prompt_digest": "route-prompt-digest-delegate",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1"
+          ],
+          "task": {
+            "task_kind": "route_evaluation",
+            "route_class": "delegate_to_exact_executor",
+            "route_boundary_ref": "route://psion/exactness_boundary",
+            "required_signal": "delegate to the exact executor instead of improvising",
+            "structured_input_schema_ref": null,
+            "uncertainty_required": false
+          },
+          "detail": "Route delegate item checks the bounded exact-executor handoff class without over-reading delegation as learned execution."
         }
       ],
-      "summary": "Route package uses the shared structured route-prompt and exact-route grader contracts.",
-      "package_digest": "3ae4b43aa0c68a6b20c618b8fd55d13357676a8ea84257cb21b9f3fbf55f4374"
+      "summary": "Route package uses the shared structured route prompt and exact route-class graders across answer, uncertainty, structure-request, and exact-delegation paths.",
+      "package_digest": "76c517290e29616bf424831b637833006dc16b9a70bd8b0162ca6b5a90efa954"
     },
     {
       "schema_version": "psion.benchmark_package_contract.v1",
@@ -873,5 +960,5 @@
     }
   ],
   "summary": "Canonical catalog proving the main Psion benchmark families can all build on one shared prompt, item, grader, contamination-input, and receipt contract.",
-  "catalog_digest": "7772ae338d51ea3034494763535859e3cff24d08cd8031411e464c02cc5b7a44"
+  "catalog_digest": "9a76a8290dd84920667be084460c1ffe1461a70f0682f60d7325f5886c7da40b"
 }

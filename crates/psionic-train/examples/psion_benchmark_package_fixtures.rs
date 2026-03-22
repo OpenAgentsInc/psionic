@@ -16,7 +16,7 @@ use psionic_train::{
     PsionBenchmarkRubricGrader, PsionBenchmarkTaskContract,
     PsionEngineeringSpecInterpretationProbeKind, PsionMemorizationVersusReasoningProbeKind,
     PsionMetricKind, PsionNormativeSpecReadingProbeKind, PsionObservedMetric, PsionPhaseGate,
-    PsionRouteKind,
+    PsionRouteClass,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -606,24 +606,117 @@ fn package_contracts() -> Result<Vec<psionic_train::PsionBenchmarkPackageContrac
         record_psion_benchmark_package(
             "psion_route_benchmark_v1",
             PsionBenchmarkPackageFamily::RouteEvaluation,
-            benchmark_package("psion_route_benchmark_v1", &["route-case-1"]),
+            benchmark_package(
+                "psion_route_benchmark_v1",
+                &[
+                    "route-case-answer",
+                    "route-case-uncertainty",
+                    "route-case-structure",
+                    "route-case-delegate",
+                ],
+            ),
             vec![route_prompt_format()],
-            vec![exact_route_grader()],
+            vec![
+                exact_route_grader("route_answer_v1", PsionRouteClass::AnswerInLanguage),
+                exact_route_grader(
+                    "route_uncertainty_v1",
+                    PsionRouteClass::AnswerWithUncertainty,
+                ),
+                exact_route_grader(
+                    "route_structure_v1",
+                    PsionRouteClass::RequestStructuredInputs,
+                ),
+                exact_route_grader(
+                    "route_delegate_v1",
+                    PsionRouteClass::DelegateToExactExecutor,
+                ),
+            ],
             contamination_inputs(&["spec_quiz_eval_pack_v1"])?,
-            vec![PsionBenchmarkItem {
-                item_id: String::from("route-case-1"),
-                family: PsionBenchmarkPackageFamily::RouteEvaluation,
-                prompt_format_id: String::from("route_decision_v1"),
-                grader_id: String::from("exact_route_v1"),
-                prompt_digest: String::from("route-prompt-digest-1"),
-                source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
-                task: PsionBenchmarkTaskContract::RouteEvaluation {
-                    expected_route: PsionRouteKind::ExactExecutorHandoff,
-                    route_boundary_ref: String::from("route://psion/exactness_boundary"),
+            vec![
+                PsionBenchmarkItem {
+                    item_id: String::from("route-case-answer"),
+                    family: PsionBenchmarkPackageFamily::RouteEvaluation,
+                    prompt_format_id: String::from("route_decision_v1"),
+                    grader_id: String::from("route_answer_v1"),
+                    prompt_digest: String::from("route-prompt-digest-answer"),
+                    source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                    task: PsionBenchmarkTaskContract::RouteEvaluation {
+                        route_class: PsionRouteClass::AnswerInLanguage,
+                        route_boundary_ref: String::from(
+                            "route://psion/language_judgment_boundary",
+                        ),
+                        required_signal: String::from("answer directly in language"),
+                        structured_input_schema_ref: None,
+                        uncertainty_required: false,
+                    },
+                    detail: String::from(
+                        "Route answer item checks the bounded direct-answer class without forcing delegation or a structured-input ask.",
+                    ),
                 },
-                detail: String::from("Route item checks direct vs handoff vs refusal decisions."),
-            }],
-            "Route package uses the shared structured route-prompt and exact-route grader contracts.",
+                PsionBenchmarkItem {
+                    item_id: String::from("route-case-uncertainty"),
+                    family: PsionBenchmarkPackageFamily::RouteEvaluation,
+                    prompt_format_id: String::from("route_decision_v1"),
+                    grader_id: String::from("route_uncertainty_v1"),
+                    prompt_digest: String::from("route-prompt-digest-uncertainty"),
+                    source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                    task: PsionBenchmarkTaskContract::RouteEvaluation {
+                        route_class: PsionRouteClass::AnswerWithUncertainty,
+                        route_boundary_ref: String::from("route://psion/uncertainty_boundary"),
+                        required_signal: String::from("answer with explicit uncertainty"),
+                        structured_input_schema_ref: None,
+                        uncertainty_required: true,
+                    },
+                    detail: String::from(
+                        "Route uncertainty item checks whether the learned lane can stay in-language while making uncertainty explicit.",
+                    ),
+                },
+                PsionBenchmarkItem {
+                    item_id: String::from("route-case-structure"),
+                    family: PsionBenchmarkPackageFamily::RouteEvaluation,
+                    prompt_format_id: String::from("route_decision_v1"),
+                    grader_id: String::from("route_structure_v1"),
+                    prompt_digest: String::from("route-prompt-digest-structure"),
+                    source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                    task: PsionBenchmarkTaskContract::RouteEvaluation {
+                        route_class: PsionRouteClass::RequestStructuredInputs,
+                        route_boundary_ref: String::from(
+                            "route://psion/structured-input-boundary",
+                        ),
+                        required_signal: String::from(
+                            "request the missing structured inputs before answering",
+                        ),
+                        structured_input_schema_ref: Some(String::from(
+                            "schema://psion/route/design_inputs_v1",
+                        )),
+                        uncertainty_required: false,
+                    },
+                    detail: String::from(
+                        "Route structure item checks whether the learned lane asks for the named structured fields instead of guessing them.",
+                    ),
+                },
+                PsionBenchmarkItem {
+                    item_id: String::from("route-case-delegate"),
+                    family: PsionBenchmarkPackageFamily::RouteEvaluation,
+                    prompt_format_id: String::from("route_decision_v1"),
+                    grader_id: String::from("route_delegate_v1"),
+                    prompt_digest: String::from("route-prompt-digest-delegate"),
+                    source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                    task: PsionBenchmarkTaskContract::RouteEvaluation {
+                        route_class: PsionRouteClass::DelegateToExactExecutor,
+                        route_boundary_ref: String::from("route://psion/exactness_boundary"),
+                        required_signal: String::from(
+                            "delegate to the exact executor instead of improvising",
+                        ),
+                        structured_input_schema_ref: None,
+                        uncertainty_required: false,
+                    },
+                    detail: String::from(
+                        "Route delegate item checks the bounded exact-executor handoff class without over-reading delegation as learned execution.",
+                    ),
+                },
+            ],
+            "Route package uses the shared structured route prompt and exact route-class graders across answer, uncertainty, structure-request, and exact-delegation paths.",
         )?,
         record_psion_benchmark_package(
             "psion_refusal_benchmark_v1",
@@ -752,10 +845,13 @@ fn exact_label_grader() -> PsionBenchmarkGraderInterface {
     })
 }
 
-fn exact_route_grader() -> PsionBenchmarkGraderInterface {
+fn exact_route_grader(
+    grader_id: &str,
+    expected_route: PsionRouteClass,
+) -> PsionBenchmarkGraderInterface {
     PsionBenchmarkGraderInterface::ExactRoute(PsionBenchmarkExactRouteGrader {
-        grader_id: String::from("exact_route_v1"),
-        expected_route: PsionRouteKind::ExactExecutorHandoff,
+        grader_id: String::from(grader_id),
+        expected_route,
         detail: String::from("Route grader requires the declared route exactly."),
     })
 }

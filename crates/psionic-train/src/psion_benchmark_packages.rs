@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     PsionBenchmarkEvidenceReceipt, PsionBenchmarkFamily, PsionMetricKind, PsionObservedMetric,
-    PsionPhaseGate, PsionRouteKind,
+    PsionPhaseGate,
 };
 
 /// Stable schema version for the Psion benchmark package contract.
@@ -87,6 +87,28 @@ pub enum PsionMemorizationVersusReasoningProbeKind {
     HistoricalAnalogyTransfer,
     ParaphraseVariation,
     SpecAdjacentEdgeCase,
+}
+
+/// Explicit route classes evaluated inside the Psion learned lane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsionRouteClass {
+    AnswerInLanguage,
+    AnswerWithUncertainty,
+    RequestStructuredInputs,
+    DelegateToExactExecutor,
+}
+
+impl PsionRouteClass {
+    #[must_use]
+    pub const fn required_classes() -> [Self; 4] {
+        [
+            Self::AnswerInLanguage,
+            Self::AnswerWithUncertainty,
+            Self::RequestStructuredInputs,
+            Self::DelegateToExactExecutor,
+        ]
+    }
 }
 
 /// Prompt envelope shared by the bounded Psion benchmark families.
@@ -210,7 +232,7 @@ pub struct PsionBenchmarkExactRouteGrader {
     /// Stable grader id.
     pub grader_id: String,
     /// Expected route.
-    pub expected_route: PsionRouteKind,
+    pub expected_route: PsionRouteClass,
     /// Short explanation of the grader.
     pub detail: String,
 }
@@ -357,8 +379,11 @@ pub enum PsionBenchmarkTaskContract {
         verbatim_recall_forbidden: bool,
     },
     RouteEvaluation {
-        expected_route: PsionRouteKind,
+        route_class: PsionRouteClass,
         route_boundary_ref: String,
+        required_signal: String,
+        structured_input_schema_ref: Option<String>,
+        uncertainty_required: bool,
     },
     RefusalEvaluation {
         expected_reason_code: String,
@@ -552,13 +577,114 @@ impl PsionBenchmarkTaskContract {
             (
                 PsionBenchmarkPackageFamily::RouteEvaluation,
                 Self::RouteEvaluation {
-                    route_boundary_ref, ..
+                    route_class,
+                    route_boundary_ref,
+                    ..
                 },
             ) => {
                 ensure_nonempty(
                     route_boundary_ref.as_str(),
                     "route_evaluation.route_boundary_ref",
                 )?;
+                match self {
+                    Self::RouteEvaluation {
+                        required_signal,
+                        structured_input_schema_ref,
+                        uncertainty_required,
+                        ..
+                    } => {
+                        ensure_nonempty(
+                            required_signal.as_str(),
+                            "route_evaluation.required_signal",
+                        )?;
+                        match route_class {
+                            PsionRouteClass::AnswerInLanguage => {
+                                if structured_input_schema_ref.is_some() {
+                                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                                        field: String::from(
+                                            "route_evaluation.structured_input_schema_ref",
+                                        ),
+                                        expected: String::from("none"),
+                                        actual: String::from("some"),
+                                    });
+                                }
+                                if *uncertainty_required {
+                                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                                        field: String::from(
+                                            "route_evaluation.uncertainty_required",
+                                        ),
+                                        expected: String::from("false"),
+                                        actual: String::from("true"),
+                                    });
+                                }
+                            }
+                            PsionRouteClass::AnswerWithUncertainty => {
+                                if structured_input_schema_ref.is_some() {
+                                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                                        field: String::from(
+                                            "route_evaluation.structured_input_schema_ref",
+                                        ),
+                                        expected: String::from("none"),
+                                        actual: String::from("some"),
+                                    });
+                                }
+                                if !*uncertainty_required {
+                                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                                        field: String::from(
+                                            "route_evaluation.uncertainty_required",
+                                        ),
+                                        expected: String::from("true"),
+                                        actual: String::from("false"),
+                                    });
+                                }
+                            }
+                            PsionRouteClass::RequestStructuredInputs => {
+                                let Some(schema_ref) = structured_input_schema_ref.as_deref()
+                                else {
+                                    return Err(PsionBenchmarkPackageError::MissingField {
+                                        field: String::from(
+                                            "route_evaluation.structured_input_schema_ref",
+                                        ),
+                                    });
+                                };
+                                ensure_nonempty(
+                                    schema_ref,
+                                    "route_evaluation.structured_input_schema_ref",
+                                )?;
+                                if *uncertainty_required {
+                                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                                        field: String::from(
+                                            "route_evaluation.uncertainty_required",
+                                        ),
+                                        expected: String::from("false"),
+                                        actual: String::from("true"),
+                                    });
+                                }
+                            }
+                            PsionRouteClass::DelegateToExactExecutor => {
+                                if structured_input_schema_ref.is_some() {
+                                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                                        field: String::from(
+                                            "route_evaluation.structured_input_schema_ref",
+                                        ),
+                                        expected: String::from("none"),
+                                        actual: String::from("some"),
+                                    });
+                                }
+                                if *uncertainty_required {
+                                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                                        field: String::from(
+                                            "route_evaluation.uncertainty_required",
+                                        ),
+                                        expected: String::from("false"),
+                                        actual: String::from("true"),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    _ => unreachable!("route evaluation branch should only match route tasks"),
+                }
             }
             (
                 PsionBenchmarkPackageFamily::RefusalEvaluation,
@@ -907,6 +1033,7 @@ impl PsionBenchmarkPackageContract {
                 .map_err(PsionBenchmarkPackageError::BenchmarkIsolation)?;
             validate_item_prompt_compatibility(item, prompt_format)?;
             validate_item_grader_compatibility(item, grader)?;
+            validate_item_task_grader_alignment(item, grader)?;
         }
 
         if self.package_digest != stable_benchmark_package_digest(self) {
@@ -1628,6 +1755,50 @@ fn validate_item_grader_compatibility(
     Ok(())
 }
 
+fn validate_item_task_grader_alignment(
+    item: &PsionBenchmarkItem,
+    grader: &PsionBenchmarkGraderInterface,
+) -> Result<(), PsionBenchmarkPackageError> {
+    match (&item.task, grader) {
+        (
+            PsionBenchmarkTaskContract::RouteEvaluation { route_class, .. },
+            PsionBenchmarkGraderInterface::ExactRoute(grader),
+        ) => {
+            if *route_class != grader.expected_route {
+                return Err(PsionBenchmarkPackageError::FieldMismatch {
+                    field: format!("psion_benchmark_item[{}].task.route_class", item.item_id),
+                    expected: format!("{:?}", grader.expected_route),
+                    actual: format!("{:?}", route_class),
+                });
+            }
+        }
+        (
+            PsionBenchmarkTaskContract::RefusalEvaluation {
+                expected_reason_code,
+                ..
+            },
+            PsionBenchmarkGraderInterface::ExactRefusal(grader),
+        ) => {
+            if !grader
+                .accepted_reason_codes
+                .iter()
+                .any(|reason| reason == expected_reason_code)
+            {
+                return Err(PsionBenchmarkPackageError::FieldMismatch {
+                    field: format!(
+                        "psion_benchmark_item[{}].task.expected_reason_code",
+                        item.item_id
+                    ),
+                    expected: grader.accepted_reason_codes.join(","),
+                    actual: expected_reason_code.clone(),
+                });
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 fn task_kind_label(task: &PsionBenchmarkTaskContract) -> &'static str {
     match task {
         PsionBenchmarkTaskContract::ArchitectureReasoning { .. } => "architecture_reasoning",
@@ -2092,11 +2263,9 @@ mod tests {
         PsionBenchmarkPromptEnvelope, PsionBenchmarkPromptFormat, PsionBenchmarkRubricDimension,
         PsionBenchmarkRubricGrader, PsionBenchmarkTaskContract,
         PsionEngineeringSpecInterpretationProbeKind, PsionMemorizationVersusReasoningProbeKind,
-        PsionNormativeSpecReadingProbeKind,
+        PsionNormativeSpecReadingProbeKind, PsionRouteClass,
     };
-    use crate::{
-        PsionBenchmarkFamily, PsionMetricKind, PsionObservedMetric, PsionPhaseGate, PsionRouteKind,
-    };
+    use crate::{PsionBenchmarkFamily, PsionMetricKind, PsionObservedMetric, PsionPhaseGate};
     use psionic_data::{PsionExclusionManifest, PsionSourceLifecycleManifest};
     use psionic_environments::EnvironmentPackageKey;
     use psionic_eval::{BenchmarkAggregationKind, BenchmarkPackage, BenchmarkPackageKey};
@@ -2222,10 +2391,13 @@ mod tests {
         })
     }
 
-    fn exact_route_grader() -> PsionBenchmarkGraderInterface {
+    fn exact_route_grader(
+        grader_id: &str,
+        expected_route: PsionRouteClass,
+    ) -> PsionBenchmarkGraderInterface {
         PsionBenchmarkGraderInterface::ExactRoute(PsionBenchmarkExactRouteGrader {
-            grader_id: String::from("exact_route_v1"),
-            expected_route: PsionRouteKind::ExactExecutorHandoff,
+            grader_id: String::from(grader_id),
+            expected_route,
             detail: String::from("Route grader requires the declared route exactly."),
         })
     }
@@ -2711,24 +2883,117 @@ mod tests {
             record_psion_benchmark_package(
                 "psion_route_benchmark_v1",
                 PsionBenchmarkPackageFamily::RouteEvaluation,
-                benchmark_package("psion_route_benchmark_v1", &["route-case-1"]),
+                benchmark_package(
+                    "psion_route_benchmark_v1",
+                    &[
+                        "route-case-answer",
+                        "route-case-uncertainty",
+                        "route-case-structure",
+                        "route-case-delegate",
+                    ],
+                ),
                 vec![route_prompt_format()],
-                vec![exact_route_grader()],
+                vec![
+                    exact_route_grader("route_answer_v1", PsionRouteClass::AnswerInLanguage),
+                    exact_route_grader(
+                        "route_uncertainty_v1",
+                        PsionRouteClass::AnswerWithUncertainty,
+                    ),
+                    exact_route_grader(
+                        "route_structure_v1",
+                        PsionRouteClass::RequestStructuredInputs,
+                    ),
+                    exact_route_grader(
+                        "route_delegate_v1",
+                        PsionRouteClass::DelegateToExactExecutor,
+                    ),
+                ],
                 contamination_inputs(&["spec_quiz_eval_pack_v1"]),
-                vec![PsionBenchmarkItem {
-                    item_id: String::from("route-case-1"),
-                    family: PsionBenchmarkPackageFamily::RouteEvaluation,
-                    prompt_format_id: String::from("route_decision_v1"),
-                    grader_id: String::from("exact_route_v1"),
-                    prompt_digest: String::from("route-prompt-digest-1"),
-                    source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
-                    task: PsionBenchmarkTaskContract::RouteEvaluation {
-                        expected_route: PsionRouteKind::ExactExecutorHandoff,
-                        route_boundary_ref: String::from("route://psion/exactness_boundary"),
+                vec![
+                    PsionBenchmarkItem {
+                        item_id: String::from("route-case-answer"),
+                        family: PsionBenchmarkPackageFamily::RouteEvaluation,
+                        prompt_format_id: String::from("route_decision_v1"),
+                        grader_id: String::from("route_answer_v1"),
+                        prompt_digest: String::from("route-prompt-digest-answer"),
+                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                        task: PsionBenchmarkTaskContract::RouteEvaluation {
+                            route_class: PsionRouteClass::AnswerInLanguage,
+                            route_boundary_ref: String::from(
+                                "route://psion/language_judgment_boundary",
+                            ),
+                            required_signal: String::from("answer directly in language"),
+                            structured_input_schema_ref: None,
+                            uncertainty_required: false,
+                        },
+                        detail: String::from(
+                            "Route answer item checks the bounded direct-answer class without forcing delegation or a structured-input ask.",
+                        ),
                     },
-                    detail: String::from("Route item checks direct vs handoff vs refusal decisions."),
-                }],
-                "Route package uses the shared structured route-prompt and exact-route grader contracts.",
+                    PsionBenchmarkItem {
+                        item_id: String::from("route-case-uncertainty"),
+                        family: PsionBenchmarkPackageFamily::RouteEvaluation,
+                        prompt_format_id: String::from("route_decision_v1"),
+                        grader_id: String::from("route_uncertainty_v1"),
+                        prompt_digest: String::from("route-prompt-digest-uncertainty"),
+                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                        task: PsionBenchmarkTaskContract::RouteEvaluation {
+                            route_class: PsionRouteClass::AnswerWithUncertainty,
+                            route_boundary_ref: String::from("route://psion/uncertainty_boundary"),
+                            required_signal: String::from("answer with explicit uncertainty"),
+                            structured_input_schema_ref: None,
+                            uncertainty_required: true,
+                        },
+                        detail: String::from(
+                            "Route uncertainty item checks whether the learned lane can stay in-language while making uncertainty explicit.",
+                        ),
+                    },
+                    PsionBenchmarkItem {
+                        item_id: String::from("route-case-structure"),
+                        family: PsionBenchmarkPackageFamily::RouteEvaluation,
+                        prompt_format_id: String::from("route_decision_v1"),
+                        grader_id: String::from("route_structure_v1"),
+                        prompt_digest: String::from("route-prompt-digest-structure"),
+                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                        task: PsionBenchmarkTaskContract::RouteEvaluation {
+                            route_class: PsionRouteClass::RequestStructuredInputs,
+                            route_boundary_ref: String::from(
+                                "route://psion/structured-input-boundary",
+                            ),
+                            required_signal: String::from(
+                                "request the missing structured inputs before answering",
+                            ),
+                            structured_input_schema_ref: Some(String::from(
+                                "schema://psion/route/design_inputs_v1",
+                            )),
+                            uncertainty_required: false,
+                        },
+                        detail: String::from(
+                            "Route structure item checks whether the learned lane asks for the named structured fields instead of guessing them.",
+                        ),
+                    },
+                    PsionBenchmarkItem {
+                        item_id: String::from("route-case-delegate"),
+                        family: PsionBenchmarkPackageFamily::RouteEvaluation,
+                        prompt_format_id: String::from("route_decision_v1"),
+                        grader_id: String::from("route_delegate_v1"),
+                        prompt_digest: String::from("route-prompt-digest-delegate"),
+                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
+                        task: PsionBenchmarkTaskContract::RouteEvaluation {
+                            route_class: PsionRouteClass::DelegateToExactExecutor,
+                            route_boundary_ref: String::from("route://psion/exactness_boundary"),
+                            required_signal: String::from(
+                                "delegate to the exact executor instead of improvising",
+                            ),
+                            structured_input_schema_ref: None,
+                            uncertainty_required: false,
+                        },
+                        detail: String::from(
+                            "Route delegate item checks the bounded exact-executor handoff class without over-reading delegation as learned execution.",
+                        ),
+                    },
+                ],
+                "Route package uses the shared structured route prompt and exact route-class graders across answer, uncertainty, structure-request, and exact-delegation paths.",
             )?,
             record_psion_benchmark_package(
                 "psion_refusal_benchmark_v1",
@@ -2902,7 +3167,9 @@ mod tests {
         let exclusion = exclusion_manifest();
         let mut packages = package_contracts()?;
         packages[4].grader_interfaces = vec![exact_label_grader()];
-        packages[4].items[0].grader_id = String::from("exact_label_v1");
+        for item in &mut packages[4].items {
+            item.grader_id = String::from("exact_label_v1");
+        }
         packages[4].package_digest = super::stable_benchmark_package_digest(&packages[4]);
         let error = packages[4]
             .validate_against_context(&lifecycle, &exclusion)

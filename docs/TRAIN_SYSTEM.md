@@ -159,6 +159,10 @@ and now also has:
   and freezes the altered-constraint, unfamiliar-synthesis, historical
   transfer, paraphrase, and spec-adjacent-edge probe coverage plus the direct
   acceptance-matrix binding for the recombination package.
+- `docs/PSION_ROUTE_CLASS_EVALUATION.md` is the canonical first route-class
+  benchmark doc for the `Psion` learned-model lane and freezes the four route
+  classes, typed route receipt, delegation-error accounting, and direct
+  acceptance-matrix binding for the route benchmark package.
 - `docs/PSION_CHECKPOINT_RECOVERY.md` is the canonical first dense-versus-
   sharded checkpoint-recovery doc for the `Psion` learned-model lane and
   freezes the explicit restart, rollback, corruption-detection, and

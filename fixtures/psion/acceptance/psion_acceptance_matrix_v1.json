@@ -283,6 +283,8 @@
         },
         {
           "family": "route_selection",
+          "benchmark_artifact_id": "psion_route_benchmark_v1",
+          "benchmark_artifact_digest": "76c517290e29616bf424831b637833006dc16b9a70bd8b0162ca6b5a90efa954",
           "threshold_bands": [
             {
               "metric_kind": "route_selection_accuracy_bps",
@@ -396,6 +398,8 @@
         },
         {
           "family": "route_selection",
+          "benchmark_artifact_id": "psion_route_benchmark_v1",
+          "benchmark_artifact_digest": "76c517290e29616bf424831b637833006dc16b9a70bd8b0162ca6b5a90efa954",
           "threshold_bands": [
             {
               "metric_kind": "route_selection_accuracy_bps",
@@ -543,6 +547,8 @@
         },
         {
           "family": "route_selection",
+          "benchmark_artifact_id": "psion_route_benchmark_v1",
+          "benchmark_artifact_digest": "76c517290e29616bf424831b637833006dc16b9a70bd8b0162ca6b5a90efa954",
           "threshold_bands": [
             {
               "metric_kind": "route_selection_accuracy_bps",

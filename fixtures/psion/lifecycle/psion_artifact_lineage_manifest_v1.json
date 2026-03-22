@@ -93,7 +93,7 @@
     },
     {
       "benchmark_id": "psion_route_benchmark_v1",
-      "benchmark_digest": "3ae4b43aa0c68a6b20c618b8fd55d13357676a8ea84257cb21b9f3fbf55f4374",
+      "benchmark_digest": "76c517290e29616bf424831b637833006dc16b9a70bd8b0162ca6b5a90efa954",
       "source_ids": [
         "spec_quiz_eval_pack_v1"
       ]

@@ -471,6 +471,7 @@ impl PsionAcceptanceMatrix {
                         | PsionBenchmarkFamily::NormativeSpecReading
                         | PsionBenchmarkFamily::EngineeringSpecInterpretation
                         | PsionBenchmarkFamily::MemorizationVersusReasoning
+                        | PsionBenchmarkFamily::RouteSelection
                 ) {
                     return Err(PsionAcceptanceMatrixError::MissingField {
                         field: format!(

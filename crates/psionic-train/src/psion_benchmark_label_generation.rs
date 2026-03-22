@@ -12,7 +12,7 @@ use crate::{
     PsionBenchmarkExactLabelGrader, PsionBenchmarkExactRefusalGrader,
     PsionBenchmarkExactRouteGrader, PsionBenchmarkGraderInterface, PsionBenchmarkPackageContract,
     PsionBenchmarkPackageError, PsionBenchmarkPackageFamily, PsionBenchmarkRubricGrader,
-    PsionRouteKind,
+    PsionRouteClass,
 };
 
 /// Stable schema version for one Psion benchmark label-generation receipt.
@@ -105,7 +105,7 @@ pub enum PsionBenchmarkExactTruthBinding {
         /// Stable truth artifact digest.
         truth_artifact_digest: String,
         /// Expected route.
-        expected_route: PsionRouteKind,
+        expected_route: PsionRouteClass,
         /// Short explanation of the exact truth.
         detail: String,
     },
@@ -1650,7 +1650,7 @@ mod tests {
             .iter()
             .find(|package| package.package_id == "psion_route_benchmark_v1")
             .expect("route package should exist");
-        let mut item_receipt = base_item_receipt(package, "route-case-1");
+        let mut item_receipt = base_item_receipt(package, "route-case-answer");
         item_receipt.derived_data_lineage.parent_source_ids =
             vec![String::from("wasm_core_spec_release_2")];
         let error = record_psion_benchmark_label_generation_receipt(

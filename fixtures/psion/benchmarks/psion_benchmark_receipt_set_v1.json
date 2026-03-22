@@ -1,7 +1,7 @@
 {
   "schema_version": "psion.benchmark_receipt_set.v1",
   "receipt_set_id": "psion-benchmark-receipt-set-v1",
-  "catalog_digest": "7772ae338d51ea3034494763535859e3cff24d08cd8031411e464c02cc5b7a44",
+  "catalog_digest": "9a76a8290dd84920667be084460c1ffe1461a70f0682f60d7325f5886c7da40b",
   "receipts": [
     {
       "schema_version": "psion.benchmark_package_receipt.v1",
@@ -172,15 +172,15 @@
       "receipt_id": "psion-route-benchmark-receipt-v1",
       "phase": "pilot",
       "package_id": "psion_route_benchmark_v1",
-      "package_digest": "3ae4b43aa0c68a6b20c618b8fd55d13357676a8ea84257cb21b9f3fbf55f4374",
+      "package_digest": "76c517290e29616bf424831b637833006dc16b9a70bd8b0162ca6b5a90efa954",
       "package_family": "route_evaluation",
       "acceptance_family": "route_selection",
       "contamination_input_digest": "57caf81f4cd0d54fea05946aadb7078111414de617e3d277225e1a159d7b20b4",
-      "item_count": 1,
+      "item_count": 4,
       "grader_summary": {
         "exact_label_item_count": 0,
         "rubric_item_count": 0,
-        "exact_route_item_count": 1,
+        "exact_route_item_count": 4,
         "exact_refusal_item_count": 0
       },
       "observed_metrics": [
@@ -195,7 +195,7 @@
         "phase": "pilot",
         "family": "route_selection",
         "benchmark_artifact_id": "psion_route_benchmark_v1",
-        "benchmark_artifact_digest": "3ae4b43aa0c68a6b20c618b8fd55d13357676a8ea84257cb21b9f3fbf55f4374",
+        "benchmark_artifact_digest": "76c517290e29616bf424831b637833006dc16b9a70bd8b0162ca6b5a90efa954",
         "metrics": [
           {
             "metric_kind": "route_selection_accuracy_bps",
@@ -206,7 +206,7 @@
         "summary": "Route benchmark receipt on the shared contract."
       },
       "summary": "Route benchmark receipt on the shared contract.",
-      "receipt_digest": "dc81125b050b2f9629216ca13fcc7e3202dc24ed25faedb2635f0e90fdc9f1a6"
+      "receipt_digest": "f9ae80027e9d2a2ea5f95bc658577aad6a1afbc00c31774d4fae407ce0f0b44c"
     },
     {
       "schema_version": "psion.benchmark_package_receipt.v1",
@@ -261,5 +261,5 @@
     }
   ],
   "summary": "Canonical receipt set proving the shared Psion benchmark contract emits acceptance-ready package receipts across the main benchmark families.",
-  "receipt_set_digest": "355ad96692c2a0bb88018dd84b15b9503c244b2dea0af1fc9f1413eb7435ca95"
+  "receipt_set_digest": "6e1eac678aae49450649b041a44e123906ada281b020c37434d5371e98c43bcd"
 }

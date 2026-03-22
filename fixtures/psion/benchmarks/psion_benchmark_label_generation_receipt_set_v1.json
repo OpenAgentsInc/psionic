@@ -1,7 +1,7 @@
 {
   "schema_version": "psion.benchmark_label_generation_receipt_set.v1",
   "receipt_set_id": "psion-benchmark-label-generation-receipt-set-v1",
-  "catalog_digest": "7772ae338d51ea3034494763535859e3cff24d08cd8031411e464c02cc5b7a44",
+  "catalog_digest": "9a76a8290dd84920667be084460c1ffe1461a70f0682f60d7325f5886c7da40b",
   "lineage_schema_version": "psion.artifact_lineage.v1",
   "receipts": [
     {
@@ -658,17 +658,17 @@
       "schema_version": "psion.benchmark_label_generation_receipt.v1",
       "receipt_id": "psion_route_benchmark_v1-label-generation-receipt-v1",
       "package_id": "psion_route_benchmark_v1",
-      "package_digest": "3ae4b43aa0c68a6b20c618b8fd55d13357676a8ea84257cb21b9f3fbf55f4374",
+      "package_digest": "76c517290e29616bf424831b637833006dc16b9a70bd8b0162ca6b5a90efa954",
       "package_family": "route_evaluation",
       "contamination_input_digest": "57caf81f4cd0d54fea05946aadb7078111414de617e3d277225e1a159d7b20b4",
       "generation_mode": "exact",
       "item_receipts": [
         {
-          "item_id": "route-case-1",
-          "grader_id": "exact_route_v1",
+          "item_id": "route-case-answer",
+          "grader_id": "route_answer_v1",
           "generation_mode": "exact",
           "label_logic": {
-            "logic_id": "route-case-1-labelgen",
+            "logic_id": "route-case-answer-labelgen",
             "logic_version": "v1",
             "generator_ref": "generator://psion/benchmark/route-policy-v1",
             "detail": "Route items pin the exact policy procedure used to derive route labels."
@@ -676,13 +676,118 @@
           "exact_truth": {
             "truth_kind": "route_policy",
             "truth_ref": "route://psion/exactness_boundary",
-            "truth_artifact_digest": "sha256:truth_route-case-1",
-            "expected_route": "exact_executor_handoff",
+            "truth_artifact_digest": "sha256:truth_route-case-answer",
+            "expected_route": "answer_in_language",
             "detail": "Route-selection labels bind to an exact route boundary instead of a freeform annotation pass."
           },
           "derived_data_lineage": {
-            "generated_item_digest": "derived-item-route-case-1",
-            "generated_label_digest": "derived-label-route-case-1",
+            "generated_item_digest": "derived-item-route-case-answer",
+            "generated_label_digest": "derived-label-route-case-answer",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/route-policy-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent sources and exact route-policy generator used for the label."
+          },
+          "detail": "Exact route item records route-policy truth and derived-data lineage."
+        },
+        {
+          "item_id": "route-case-uncertainty",
+          "grader_id": "route_uncertainty_v1",
+          "generation_mode": "exact",
+          "label_logic": {
+            "logic_id": "route-case-uncertainty-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/route-policy-v1",
+            "detail": "Route items pin the exact policy procedure used to derive route labels."
+          },
+          "exact_truth": {
+            "truth_kind": "route_policy",
+            "truth_ref": "route://psion/exactness_boundary",
+            "truth_artifact_digest": "sha256:truth_route-case-uncertainty",
+            "expected_route": "answer_with_uncertainty",
+            "detail": "Route-selection labels bind to an exact route boundary instead of a freeform annotation pass."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-route-case-uncertainty",
+            "generated_label_digest": "derived-label-route-case-uncertainty",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/route-policy-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent sources and exact route-policy generator used for the label."
+          },
+          "detail": "Exact route item records route-policy truth and derived-data lineage."
+        },
+        {
+          "item_id": "route-case-structure",
+          "grader_id": "route_structure_v1",
+          "generation_mode": "exact",
+          "label_logic": {
+            "logic_id": "route-case-structure-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/route-policy-v1",
+            "detail": "Route items pin the exact policy procedure used to derive route labels."
+          },
+          "exact_truth": {
+            "truth_kind": "route_policy",
+            "truth_ref": "route://psion/exactness_boundary",
+            "truth_artifact_digest": "sha256:truth_route-case-structure",
+            "expected_route": "request_structured_inputs",
+            "detail": "Route-selection labels bind to an exact route boundary instead of a freeform annotation pass."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-route-case-structure",
+            "generated_label_digest": "derived-label-route-case-structure",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/route-policy-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent sources and exact route-policy generator used for the label."
+          },
+          "detail": "Exact route item records route-policy truth and derived-data lineage."
+        },
+        {
+          "item_id": "route-case-delegate",
+          "grader_id": "route_delegate_v1",
+          "generation_mode": "exact",
+          "label_logic": {
+            "logic_id": "route-case-delegate-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/route-policy-v1",
+            "detail": "Route items pin the exact policy procedure used to derive route labels."
+          },
+          "exact_truth": {
+            "truth_kind": "route_policy",
+            "truth_ref": "route://psion/exactness_boundary",
+            "truth_artifact_digest": "sha256:truth_route-case-delegate",
+            "expected_route": "delegate_to_exact_executor",
+            "detail": "Route-selection labels bind to an exact route boundary instead of a freeform annotation pass."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-route-case-delegate",
+            "generated_label_digest": "derived-label-route-case-delegate",
             "parent_source_ids": [
               "spec_quiz_eval_pack_v1"
             ],
@@ -700,7 +805,7 @@
         }
       ],
       "summary": "Label-generation receipt for `psion_route_benchmark_v1` proving benchmark labels stay bound to exact-truth or rubric-version contracts with explicit derived-data lineage.",
-      "receipt_digest": "2f7e3a404588d0925ebccb137bd9434937d05ff34cce4e85573843afb2ccf012"
+      "receipt_digest": "0be295cc8a7f27d25c4e4cb0d1db7f062f166fa31f92827fa4c1349461f5950a"
     },
     {
       "schema_version": "psion.benchmark_label_generation_receipt.v1",
@@ -754,5 +859,5 @@
     }
   ],
   "summary": "Canonical receipt set proving the main Psion benchmark families record exact-truth bindings, rubric versions, and derived-data lineage back to reviewed parent sources or generators instead of treating benchmark labels as opaque hand-maintained state.",
-  "receipt_set_digest": "a524ee6592ae14c83ad974b61fb70e807402a011ce61377cc279169e40d77eca"
+  "receipt_set_digest": "9e2e8e95be620f307a5eab6f7d1971a0b9b4e47477656a3cc4fc720a2c042c38"
 }

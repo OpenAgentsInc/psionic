@@ -36,6 +36,11 @@ portability risks separate from normative source reading.
 coverage that keeps recombination under altered constraints, paraphrases,
 historical transfer, and spec-adjacent edge cases separate from stock recall.
 
+`docs/PSION_ROUTE_CLASS_EVALUATION.md` now does the same for
+`psion_route_benchmark_v1`, including the four explicit route classes and the
+route receipt that keeps delegation, uncertainty, and structured-input requests
+separate.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_benchmark_packages.rs` owns the shared
