@@ -320,7 +320,7 @@
       "schema_version": "psion.benchmark_package_contract.v1",
       "package_id": "psion_engineering_spec_benchmark_v1",
       "package_family": "engineering_spec_interpretation",
-      "acceptance_family": null,
+      "acceptance_family": "engineering_spec_interpretation",
       "benchmark_package": {
         "abi_version": "psionic.benchmark.v1",
         "key": {
@@ -342,10 +342,16 @@
         },
         "cases": [
           {
-            "case_id": "eng-case-1"
+            "case_id": "eng-case-implication"
           },
           {
-            "case_id": "eng-case-2"
+            "case_id": "eng-case-ambiguity"
+          },
+          {
+            "case_id": "eng-case-unspecified"
+          },
+          {
+            "case_id": "eng-case-portability"
           }
         ]
       },
@@ -408,41 +414,100 @@
       },
       "items": [
         {
-          "item_id": "eng-case-1",
+          "item_id": "eng-case-implication",
           "family": "engineering_spec_interpretation",
           "prompt_format_id": "bounded_explanation_v1",
           "grader_id": "rubric_reasoning_v1",
-          "prompt_digest": "eng-prompt-digest-1",
-          "source_ids": [
-            "spec_quiz_eval_pack_v1"
-          ],
-          "task": {
-            "task_kind": "engineering_spec_interpretation",
-            "artifact_ref": "artifact://psion/spec/queueing_model",
-            "expected_constraint": "throughput ceiling"
-          },
-          "detail": "Engineering spec interpretation item checks bounded implementation inference."
-        },
-        {
-          "item_id": "eng-case-2",
-          "family": "engineering_spec_interpretation",
-          "prompt_format_id": "bounded_explanation_v1",
-          "grader_id": "exact_label_v1",
-          "prompt_digest": "eng-prompt-digest-2",
+          "prompt_digest": "eng-prompt-digest-implication",
           "source_ids": [
             "spec_quiz_eval_pack_v1",
             "wasm_core_spec_release_2"
           ],
           "task": {
             "task_kind": "engineering_spec_interpretation",
-            "artifact_ref": "artifact://psion/spec/queue_depth_limit",
-            "expected_constraint": "queue depth hard limit"
+            "normative_source_ref": "wasm://core/execution",
+            "required_section_anchor": "4.4.9",
+            "probe_kind": "implementation_implication",
+            "implementation_target": "single-threaded runtime scheduler",
+            "expected_consequence": "trap propagation ordering must remain visible to the runtime",
+            "normative_boundary_required": true,
+            "explicit_uncertainty_required": true,
+            "unsupported_certainty_forbidden": true
           },
-          "detail": "Engineering spec interpretation exact-label item checks deterministic constraint extraction against a canonical engineering boundary."
+          "detail": "Engineering implication item checks whether the answer separates what the execution text guarantees from the scheduling implication an embedding should preserve."
+        },
+        {
+          "item_id": "eng-case-ambiguity",
+          "family": "engineering_spec_interpretation",
+          "prompt_format_id": "bounded_explanation_v1",
+          "grader_id": "rubric_reasoning_v1",
+          "prompt_digest": "eng-prompt-digest-ambiguity",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1",
+            "wasm_core_spec_release_2"
+          ],
+          "task": {
+            "task_kind": "engineering_spec_interpretation",
+            "normative_source_ref": "wasm://core/validation",
+            "required_section_anchor": "2.5.7",
+            "probe_kind": "ambiguity_risk",
+            "implementation_target": "module loader import matcher",
+            "expected_consequence": "ambiguous import matching must be surfaced as a compatibility risk",
+            "normative_boundary_required": true,
+            "explicit_uncertainty_required": true,
+            "unsupported_certainty_forbidden": true
+          },
+          "detail": "Engineering ambiguity item checks whether the answer admits where the normative text leaves matching behavior open instead of projecting one implementation as universal."
+        },
+        {
+          "item_id": "eng-case-unspecified",
+          "family": "engineering_spec_interpretation",
+          "prompt_format_id": "bounded_explanation_v1",
+          "grader_id": "exact_label_v1",
+          "prompt_digest": "eng-prompt-digest-unspecified",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1",
+            "wasm_core_spec_release_2"
+          ],
+          "task": {
+            "task_kind": "engineering_spec_interpretation",
+            "normative_source_ref": "wasm://core/memory",
+            "required_section_anchor": "4.3.6",
+            "probe_kind": "unspecified_region",
+            "implementation_target": "embedding memory-growth policy",
+            "expected_consequence": "the answer must name the policy choice as implementation-defined rather than spec-mandated",
+            "normative_boundary_required": true,
+            "explicit_uncertainty_required": true,
+            "unsupported_certainty_forbidden": true
+          },
+          "detail": "Engineering unspecified-region item checks deterministic recognition that the embedding policy remains outside the normative text."
+        },
+        {
+          "item_id": "eng-case-portability",
+          "family": "engineering_spec_interpretation",
+          "prompt_format_id": "bounded_explanation_v1",
+          "grader_id": "rubric_reasoning_v1",
+          "prompt_digest": "eng-prompt-digest-portability",
+          "source_ids": [
+            "spec_quiz_eval_pack_v1",
+            "wasm_core_spec_release_2"
+          ],
+          "task": {
+            "task_kind": "engineering_spec_interpretation",
+            "normative_source_ref": "wasm://core/modules",
+            "required_section_anchor": "2.5.11",
+            "probe_kind": "portability_consequence",
+            "implementation_target": "cross-engine module artifact cache",
+            "expected_consequence": "the answer must identify portability risk when engine-specific assumptions outrun the spec",
+            "normative_boundary_required": true,
+            "explicit_uncertainty_required": true,
+            "unsupported_certainty_forbidden": true
+          },
+          "detail": "Engineering portability item checks whether the answer names cross-engine compatibility risk without claiming the spec guarantees more than it states."
         }
       ],
-      "summary": "Engineering spec package uses the shared contract with both rubric-backed and exact-label graders.",
-      "package_digest": "5151ff5b2e5cc83338e9e4fcdff5338146cd4e9110a24743d5f2b9ddb7a315c7"
+      "summary": "Engineering spec package uses typed items that keep normative anchors explicit while testing implementation implications, ambiguity risks, unspecified regions, and portability consequences.",
+      "package_digest": "2223c33a7301921ee440a29936d734428ebd6c4a507a12fe4e60c76afad5445a"
     },
     {
       "schema_version": "psion.benchmark_package_contract.v1",
@@ -705,5 +770,5 @@
     }
   ],
   "summary": "Canonical catalog proving the main Psion benchmark families can all build on one shared prompt, item, grader, contamination-input, and receipt contract.",
-  "catalog_digest": "2f18e6e84592ebb560b50e111ad622d102ff32cb70b66a0763c8db267e819f98"
+  "catalog_digest": "0b3ee8dba4848fabaf306c531adb09e809479c5e53ddb11471c25df41685ba3c"
 }

@@ -63,6 +63,12 @@ gate with an arbitrary receipt from another package.
 and direct package binding, so normative reading no longer rides on the older
 combined spec/manual benchmark family or on engineering interpretation receipts.
 
+`PSION-23` adds the parallel engineering interpretation gate:
+`psion_engineering_spec_benchmark_v1` is now bound directly into broader
+pretraining, SFT promotion, internal serving, and trusted-cluster scale-up.
+That keeps implementation implications and portability reasoning explicit
+without pretending the pilot already proves the full engineering lane.
+
 ## Promotion Contract
 
 `Psion` phase promotion is recorded through the training-owned

@@ -68,6 +68,16 @@ pub enum PsionNormativeSpecReadingProbeKind {
     NamedGuarantee,
 }
 
+/// Probe kind for engineering spec-interpretation benchmark items.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsionEngineeringSpecInterpretationProbeKind {
+    ImplementationImplication,
+    AmbiguityRisk,
+    UnspecifiedRegion,
+    PortabilityConsequence,
+}
+
 /// Prompt envelope shared by the bounded Psion benchmark families.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -317,8 +327,14 @@ pub enum PsionBenchmarkTaskContract {
         engineering_inference_forbidden: bool,
     },
     EngineeringSpecInterpretation {
-        artifact_ref: String,
-        expected_constraint: String,
+        normative_source_ref: String,
+        required_section_anchor: String,
+        probe_kind: PsionEngineeringSpecInterpretationProbeKind,
+        implementation_target: String,
+        expected_consequence: String,
+        normative_boundary_required: bool,
+        explicit_uncertainty_required: bool,
+        unsupported_certainty_forbidden: bool,
     },
     MemorizationVersusReasoning {
         seed_fact_ref: String,
@@ -416,18 +432,59 @@ impl PsionBenchmarkTaskContract {
             (
                 PsionBenchmarkPackageFamily::EngineeringSpecInterpretation,
                 Self::EngineeringSpecInterpretation {
-                    artifact_ref,
-                    expected_constraint,
+                    normative_source_ref,
+                    required_section_anchor,
+                    implementation_target,
+                    expected_consequence,
+                    normative_boundary_required,
+                    explicit_uncertainty_required,
+                    unsupported_certainty_forbidden,
+                    ..
                 },
             ) => {
                 ensure_nonempty(
-                    artifact_ref.as_str(),
-                    "engineering_spec_interpretation.artifact_ref",
+                    normative_source_ref.as_str(),
+                    "engineering_spec_interpretation.normative_source_ref",
                 )?;
                 ensure_nonempty(
-                    expected_constraint.as_str(),
-                    "engineering_spec_interpretation.expected_constraint",
+                    required_section_anchor.as_str(),
+                    "engineering_spec_interpretation.required_section_anchor",
                 )?;
+                ensure_nonempty(
+                    implementation_target.as_str(),
+                    "engineering_spec_interpretation.implementation_target",
+                )?;
+                ensure_nonempty(
+                    expected_consequence.as_str(),
+                    "engineering_spec_interpretation.expected_consequence",
+                )?;
+                if !normative_boundary_required {
+                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                        field: String::from(
+                            "engineering_spec_interpretation.normative_boundary_required",
+                        ),
+                        expected: String::from("true"),
+                        actual: String::from("false"),
+                    });
+                }
+                if !explicit_uncertainty_required {
+                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                        field: String::from(
+                            "engineering_spec_interpretation.explicit_uncertainty_required",
+                        ),
+                        expected: String::from("true"),
+                        actual: String::from("false"),
+                    });
+                }
+                if !unsupported_certainty_forbidden {
+                    return Err(PsionBenchmarkPackageError::FieldMismatch {
+                        field: String::from(
+                            "engineering_spec_interpretation.unsupported_certainty_forbidden",
+                        ),
+                        expected: String::from("true"),
+                        actual: String::from("false"),
+                    });
+                }
             }
             (
                 PsionBenchmarkPackageFamily::MemorizationVersusReasoning,
@@ -1376,7 +1433,9 @@ fn expected_acceptance_family(
         PsionBenchmarkPackageFamily::NormativeSpecReading => {
             PsionBenchmarkFamily::NormativeSpecReading
         }
-        PsionBenchmarkPackageFamily::EngineeringSpecInterpretation => return None,
+        PsionBenchmarkPackageFamily::EngineeringSpecInterpretation => {
+            PsionBenchmarkFamily::EngineeringSpecInterpretation
+        }
         PsionBenchmarkPackageFamily::MemorizationVersusReasoning => {
             PsionBenchmarkFamily::HeldOutTechnicalReasoning
         }
@@ -1995,9 +2054,12 @@ mod tests {
         PsionBenchmarkExpectedResponseFormat, PsionBenchmarkGraderInterface, PsionBenchmarkItem,
         PsionBenchmarkPackageContract, PsionBenchmarkPackageError, PsionBenchmarkPackageFamily,
         PsionBenchmarkPromptEnvelope, PsionBenchmarkPromptFormat, PsionBenchmarkRubricDimension,
-        PsionBenchmarkRubricGrader, PsionBenchmarkTaskContract, PsionNormativeSpecReadingProbeKind,
+        PsionBenchmarkRubricGrader, PsionBenchmarkTaskContract,
+        PsionEngineeringSpecInterpretationProbeKind, PsionNormativeSpecReadingProbeKind,
     };
-    use crate::{PsionMetricKind, PsionObservedMetric, PsionPhaseGate, PsionRouteKind};
+    use crate::{
+        PsionBenchmarkFamily, PsionMetricKind, PsionObservedMetric, PsionPhaseGate, PsionRouteKind,
+    };
     use psionic_data::{PsionExclusionManifest, PsionSourceLifecycleManifest};
     use psionic_environments::EnvironmentPackageKey;
     use psionic_eval::{BenchmarkAggregationKind, BenchmarkPackage, BenchmarkPackageKey};
@@ -2328,47 +2390,125 @@ mod tests {
                 PsionBenchmarkPackageFamily::EngineeringSpecInterpretation,
                 benchmark_package(
                     "psion_engineering_spec_benchmark_v1",
-                    &["eng-case-1", "eng-case-2"],
+                    &[
+                        "eng-case-implication",
+                        "eng-case-ambiguity",
+                        "eng-case-unspecified",
+                        "eng-case-portability",
+                    ],
                 ),
                 vec![explanation_prompt_format()],
                 vec![rubric_grader(), exact_label_grader()],
                 contamination_inputs(&["spec_quiz_eval_pack_v1", "wasm_core_spec_release_2"]),
                 vec![
                     PsionBenchmarkItem {
-                        item_id: String::from("eng-case-1"),
+                        item_id: String::from("eng-case-implication"),
                         family: PsionBenchmarkPackageFamily::EngineeringSpecInterpretation,
                         prompt_format_id: String::from("bounded_explanation_v1"),
                         grader_id: String::from("rubric_reasoning_v1"),
-                        prompt_digest: String::from("eng-prompt-digest-1"),
-                        source_ids: vec![String::from("spec_quiz_eval_pack_v1")],
-                        task: PsionBenchmarkTaskContract::EngineeringSpecInterpretation {
-                            artifact_ref: String::from("artifact://psion/spec/queueing_model"),
-                            expected_constraint: String::from("throughput ceiling"),
-                        },
-                        detail: String::from(
-                            "Engineering spec interpretation item checks bounded implementation inference.",
-                        ),
-                    },
-                    PsionBenchmarkItem {
-                        item_id: String::from("eng-case-2"),
-                        family: PsionBenchmarkPackageFamily::EngineeringSpecInterpretation,
-                        prompt_format_id: String::from("bounded_explanation_v1"),
-                        grader_id: String::from("exact_label_v1"),
-                        prompt_digest: String::from("eng-prompt-digest-2"),
+                        prompt_digest: String::from("eng-prompt-digest-implication"),
                         source_ids: vec![
                             String::from("spec_quiz_eval_pack_v1"),
                             String::from("wasm_core_spec_release_2"),
                         ],
                         task: PsionBenchmarkTaskContract::EngineeringSpecInterpretation {
-                            artifact_ref: String::from("artifact://psion/spec/queue_depth_limit"),
-                            expected_constraint: String::from("queue depth hard limit"),
+                            normative_source_ref: String::from("wasm://core/execution"),
+                            required_section_anchor: String::from("4.4.9"),
+                            probe_kind: PsionEngineeringSpecInterpretationProbeKind::ImplementationImplication,
+                            implementation_target: String::from(
+                                "single-threaded runtime scheduler",
+                            ),
+                            expected_consequence: String::from(
+                                "trap propagation ordering must remain visible to the runtime",
+                            ),
+                            normative_boundary_required: true,
+                            explicit_uncertainty_required: true,
+                            unsupported_certainty_forbidden: true,
                         },
                         detail: String::from(
-                            "Engineering spec interpretation exact-label item checks deterministic constraint extraction against a canonical engineering boundary.",
+                            "Engineering implication item checks whether the answer separates what the execution text guarantees from the scheduling implication an embedding should preserve.",
+                        ),
+                    },
+                    PsionBenchmarkItem {
+                        item_id: String::from("eng-case-ambiguity"),
+                        family: PsionBenchmarkPackageFamily::EngineeringSpecInterpretation,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("rubric_reasoning_v1"),
+                        prompt_digest: String::from("eng-prompt-digest-ambiguity"),
+                        source_ids: vec![
+                            String::from("spec_quiz_eval_pack_v1"),
+                            String::from("wasm_core_spec_release_2"),
+                        ],
+                        task: PsionBenchmarkTaskContract::EngineeringSpecInterpretation {
+                            normative_source_ref: String::from("wasm://core/validation"),
+                            required_section_anchor: String::from("2.5.7"),
+                            probe_kind: PsionEngineeringSpecInterpretationProbeKind::AmbiguityRisk,
+                            implementation_target: String::from("module loader import matcher"),
+                            expected_consequence: String::from(
+                                "ambiguous import matching must be surfaced as a compatibility risk",
+                            ),
+                            normative_boundary_required: true,
+                            explicit_uncertainty_required: true,
+                            unsupported_certainty_forbidden: true,
+                        },
+                        detail: String::from(
+                            "Engineering ambiguity item checks whether the answer admits where the normative text leaves matching behavior open instead of projecting one implementation as universal.",
+                        ),
+                    },
+                    PsionBenchmarkItem {
+                        item_id: String::from("eng-case-unspecified"),
+                        family: PsionBenchmarkPackageFamily::EngineeringSpecInterpretation,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("exact_label_v1"),
+                        prompt_digest: String::from("eng-prompt-digest-unspecified"),
+                        source_ids: vec![
+                            String::from("spec_quiz_eval_pack_v1"),
+                            String::from("wasm_core_spec_release_2"),
+                        ],
+                        task: PsionBenchmarkTaskContract::EngineeringSpecInterpretation {
+                            normative_source_ref: String::from("wasm://core/memory"),
+                            required_section_anchor: String::from("4.3.6"),
+                            probe_kind: PsionEngineeringSpecInterpretationProbeKind::UnspecifiedRegion,
+                            implementation_target: String::from("embedding memory-growth policy"),
+                            expected_consequence: String::from(
+                                "the answer must name the policy choice as implementation-defined rather than spec-mandated",
+                            ),
+                            normative_boundary_required: true,
+                            explicit_uncertainty_required: true,
+                            unsupported_certainty_forbidden: true,
+                        },
+                        detail: String::from(
+                            "Engineering unspecified-region item checks deterministic recognition that the embedding policy remains outside the normative text.",
+                        ),
+                    },
+                    PsionBenchmarkItem {
+                        item_id: String::from("eng-case-portability"),
+                        family: PsionBenchmarkPackageFamily::EngineeringSpecInterpretation,
+                        prompt_format_id: String::from("bounded_explanation_v1"),
+                        grader_id: String::from("rubric_reasoning_v1"),
+                        prompt_digest: String::from("eng-prompt-digest-portability"),
+                        source_ids: vec![
+                            String::from("spec_quiz_eval_pack_v1"),
+                            String::from("wasm_core_spec_release_2"),
+                        ],
+                        task: PsionBenchmarkTaskContract::EngineeringSpecInterpretation {
+                            normative_source_ref: String::from("wasm://core/modules"),
+                            required_section_anchor: String::from("2.5.11"),
+                            probe_kind: PsionEngineeringSpecInterpretationProbeKind::PortabilityConsequence,
+                            implementation_target: String::from("cross-engine module artifact cache"),
+                            expected_consequence: String::from(
+                                "the answer must identify portability risk when engine-specific assumptions outrun the spec",
+                            ),
+                            normative_boundary_required: true,
+                            explicit_uncertainty_required: true,
+                            unsupported_certainty_forbidden: true,
+                        },
+                        detail: String::from(
+                            "Engineering portability item checks whether the answer names cross-engine compatibility risk without claiming the spec guarantees more than it states.",
                         ),
                     },
                 ],
-                "Engineering spec package uses the shared contract with both rubric-backed and exact-label graders.",
+                "Engineering spec package uses typed items that keep normative anchors explicit while testing implementation implications, ambiguity risks, unspecified regions, and portability consequences.",
             )?,
             record_psion_benchmark_package(
                 "psion_memorization_reasoning_benchmark_v1",
@@ -2454,6 +2594,16 @@ mod tests {
             packages.clone(),
             "Canonical catalog proving the main Psion benchmark families can all build on one shared prompt, item, grader, contamination-input, and receipt contract.",
         )?;
+        let engineering = catalog
+            .packages
+            .iter()
+            .find(|package| package.package_id == "psion_engineering_spec_benchmark_v1")
+            .expect("engineering package should exist");
+        assert_eq!(
+            engineering.acceptance_family,
+            Some(PsionBenchmarkFamily::EngineeringSpecInterpretation),
+            "engineering package should map into the dedicated acceptance family"
+        );
         let receipts = vec![
             record_psion_benchmark_package_receipt(
                 "psion-architecture-benchmark-receipt-v1",

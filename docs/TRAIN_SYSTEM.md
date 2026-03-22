@@ -149,6 +149,11 @@ and now also has:
   freezes the typed normative item coverage, grounded-reading-versus-inference
   boundary, contamination attachment, and direct acceptance-matrix binding for
   the normative spec-reading package.
+- `docs/PSION_ENGINEERING_SPEC_INTERPRETATION_BENCHMARK.md` is the canonical
+  first engineering-interpretation benchmark doc for the `Psion` learned-model
+  lane and freezes the typed implementation-implication, ambiguity, unspecified
+  region, and portability-risk coverage plus the direct acceptance-matrix
+  binding for the engineering spec package.
 - `docs/PSION_CHECKPOINT_RECOVERY.md` is the canonical first dense-versus-
   sharded checkpoint-recovery doc for the `Psion` learned-model lane and
   freezes the explicit restart, rollback, corruption-detection, and

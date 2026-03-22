@@ -26,6 +26,11 @@ architecture item coverage and direct acceptance binding for
 `psion_normative_spec_benchmark_v1`, including the grounded-reading boundary
 that keeps normative source text separate from later engineering inference.
 
+`docs/PSION_ENGINEERING_SPEC_INTERPRETATION_BENCHMARK.md` does the same for
+`psion_engineering_spec_benchmark_v1`, including the typed probe coverage that
+keeps implementation implications, ambiguity, unspecified regions, and
+portability risks separate from normative source reading.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_benchmark_packages.rs` owns the shared

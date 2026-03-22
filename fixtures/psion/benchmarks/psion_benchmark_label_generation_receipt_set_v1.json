@@ -1,7 +1,7 @@
 {
   "schema_version": "psion.benchmark_label_generation_receipt_set.v1",
   "receipt_set_id": "psion-benchmark-label-generation-receipt-set-v1",
-  "catalog_digest": "2f18e6e84592ebb560b50e111ad622d102ff32cb70b66a0763c8db267e819f98",
+  "catalog_digest": "0b3ee8dba4848fabaf306c531adb09e809479c5e53ddb11471c25df41685ba3c",
   "lineage_schema_version": "psion.artifact_lineage.v1",
   "receipts": [
     {
@@ -290,17 +290,17 @@
       "schema_version": "psion.benchmark_label_generation_receipt.v1",
       "receipt_id": "psion_engineering_spec_benchmark_v1-label-generation-receipt-v1",
       "package_id": "psion_engineering_spec_benchmark_v1",
-      "package_digest": "5151ff5b2e5cc83338e9e4fcdff5338146cd4e9110a24743d5f2b9ddb7a315c7",
+      "package_digest": "2223c33a7301921ee440a29936d734428ebd6c4a507a12fe4e60c76afad5445a",
       "package_family": "engineering_spec_interpretation",
       "contamination_input_digest": "52821f8da4180d39b2a81a45d5be7638a0968b40605a674d834d034fa8c90146",
       "generation_mode": "hybrid",
       "item_receipts": [
         {
-          "item_id": "eng-case-1",
+          "item_id": "eng-case-implication",
           "grader_id": "rubric_reasoning_v1",
           "generation_mode": "rubric_backed",
           "label_logic": {
-            "logic_id": "eng-case-1-labelgen",
+            "logic_id": "eng-case-implication-labelgen",
             "logic_version": "v1",
             "generator_ref": "generator://psion/benchmark/rubric-label-assembly-v1",
             "detail": "Rubric-backed items pin the label-generation logic version used to assemble reasoning labels."
@@ -312,10 +312,11 @@
             "detail": "Rubric-backed labels pin the rubric reference, rubric version, and reviewer guidance used to score the item."
           },
           "derived_data_lineage": {
-            "generated_item_digest": "derived-item-eng-case-1",
-            "generated_label_digest": "derived-label-eng-case-1",
+            "generated_item_digest": "derived-item-eng-case-implication",
+            "generated_label_digest": "derived-label-eng-case-implication",
             "parent_source_ids": [
-              "spec_quiz_eval_pack_v1"
+              "spec_quiz_eval_pack_v1",
+              "wasm_core_spec_release_2"
             ],
             "parent_artifact_refs": [
               "artifact://psion/benchmark/source-pack-v1"
@@ -330,30 +331,64 @@
           "detail": "Rubric-backed item records rubric versioning and derived-data lineage."
         },
         {
-          "item_id": "eng-case-2",
+          "item_id": "eng-case-ambiguity",
+          "grader_id": "rubric_reasoning_v1",
+          "generation_mode": "rubric_backed",
+          "label_logic": {
+            "logic_id": "eng-case-ambiguity-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/rubric-label-assembly-v1",
+            "detail": "Rubric-backed items pin the label-generation logic version used to assemble reasoning labels."
+          },
+          "rubric_binding": {
+            "rubric_ref": "rubric://psion/benchmark/reasoning",
+            "rubric_version": "2026.03.22",
+            "reviewer_guidance_ref": "guidance://psion/benchmark/rubric/reasoning-v1",
+            "detail": "Rubric-backed labels pin the rubric reference, rubric version, and reviewer guidance used to score the item."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-eng-case-ambiguity",
+            "generated_label_digest": "derived-label-eng-case-ambiguity",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1",
+              "wasm_core_spec_release_2"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/rubric-label-assembly-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent reviewed sources, parent artifact reference, and rubric generator reference for the item and its label."
+          },
+          "detail": "Rubric-backed item records rubric versioning and derived-data lineage."
+        },
+        {
+          "item_id": "eng-case-unspecified",
           "grader_id": "exact_label_v1",
           "generation_mode": "exact",
           "label_logic": {
-            "logic_id": "eng-case-2-labelgen",
+            "logic_id": "eng-case-unspecified-labelgen",
             "logic_version": "v1",
             "generator_ref": "generator://psion/benchmark/exact-label-projection-v1",
             "detail": "Exact-label items pin the deterministic projection logic used to materialize labels."
           },
           "exact_truth": {
-            "truth_kind": "cpu_reference_label",
-            "runtime_ref": "runtime://psion/cpu_reference_queue_model_v1",
-            "truth_artifact_ref": "artifact://psion/benchmark/queue_depth_limit_cpu_reference_v1",
-            "truth_artifact_digest": "sha256:psion_queue_depth_limit_cpu_reference_v1",
+            "truth_kind": "equivalent_exact_label",
+            "truth_ref": "truth://psion/benchmark/spec-extract-v1",
+            "truth_artifact_digest": "sha256:truth_eng-case-unspecified",
             "label_namespace": "psion.spec.reading",
             "accepted_labels": [
               "pass",
               "boundary_clear"
             ],
-            "detail": "This exact-label item binds to a CPU-reference queue model so exact execution truth is explicit on the label-generation side."
+            "detail": "Equivalent exact truth keeps the deterministic label extraction source versioned when CPU-reference execution is not the right anchor."
           },
           "derived_data_lineage": {
-            "generated_item_digest": "derived-item-eng-case-2",
-            "generated_label_digest": "derived-label-eng-case-2",
+            "generated_item_digest": "derived-item-eng-case-unspecified",
+            "generated_label_digest": "derived-label-eng-case-unspecified",
             "parent_source_ids": [
               "spec_quiz_eval_pack_v1",
               "wasm_core_spec_release_2"
@@ -369,10 +404,45 @@
             "detail": "Derived-data lineage preserves the parent sources and deterministic generator for the exact label."
           },
           "detail": "Exact-label item records CPU-reference or equivalent exact truth plus derived-data lineage."
+        },
+        {
+          "item_id": "eng-case-portability",
+          "grader_id": "rubric_reasoning_v1",
+          "generation_mode": "rubric_backed",
+          "label_logic": {
+            "logic_id": "eng-case-portability-labelgen",
+            "logic_version": "v1",
+            "generator_ref": "generator://psion/benchmark/rubric-label-assembly-v1",
+            "detail": "Rubric-backed items pin the label-generation logic version used to assemble reasoning labels."
+          },
+          "rubric_binding": {
+            "rubric_ref": "rubric://psion/benchmark/reasoning",
+            "rubric_version": "2026.03.22",
+            "reviewer_guidance_ref": "guidance://psion/benchmark/rubric/reasoning-v1",
+            "detail": "Rubric-backed labels pin the rubric reference, rubric version, and reviewer guidance used to score the item."
+          },
+          "derived_data_lineage": {
+            "generated_item_digest": "derived-item-eng-case-portability",
+            "generated_label_digest": "derived-label-eng-case-portability",
+            "parent_source_ids": [
+              "spec_quiz_eval_pack_v1",
+              "wasm_core_spec_release_2"
+            ],
+            "parent_artifact_refs": [
+              "artifact://psion/benchmark/source-pack-v1"
+            ],
+            "generator_refs": [
+              "generator://psion/benchmark/rubric-label-assembly-v1"
+            ],
+            "derived_from_parent_sources": true,
+            "contamination_review_bound": true,
+            "detail": "Derived-data lineage preserves the parent reviewed sources, parent artifact reference, and rubric generator reference for the item and its label."
+          },
+          "detail": "Rubric-backed item records rubric versioning and derived-data lineage."
         }
       ],
       "summary": "Label-generation receipt for `psion_engineering_spec_benchmark_v1` proving benchmark labels stay bound to exact-truth or rubric-version contracts with explicit derived-data lineage.",
-      "receipt_digest": "e5b32922d549be22b6cbd52e112d767a8fec15fe48964187c2c0f91830a3ac7f"
+      "receipt_digest": "32dc4e0c000f1b24c8dae03ae5c31864b285761dbe4e1193e43b9289ce76df00"
     },
     {
       "schema_version": "psion.benchmark_label_generation_receipt.v1",
@@ -526,5 +596,5 @@
     }
   ],
   "summary": "Canonical receipt set proving the main Psion benchmark families record exact-truth bindings, rubric versions, and derived-data lineage back to reviewed parent sources or generators instead of treating benchmark labels as opaque hand-maintained state.",
-  "receipt_set_digest": "9fd1abaf9cdc4ba32cbc8eba2e197c7aa8f4077f2bc9ccc6a4f0a819cb9cd224"
+  "receipt_set_digest": "8e699e9e8c2d6e6356795fe66d89434c5fc116c3e61c177d4eff8d45633e2ec5"
 }

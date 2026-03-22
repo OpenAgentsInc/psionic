@@ -77,7 +77,7 @@
     },
     {
       "benchmark_id": "psion_engineering_spec_benchmark_v1",
-      "benchmark_digest": "5151ff5b2e5cc83338e9e4fcdff5338146cd4e9110a24743d5f2b9ddb7a315c7",
+      "benchmark_digest": "2223c33a7301921ee440a29936d734428ebd6c4a507a12fe4e60c76afad5445a",
       "source_ids": [
         "spec_quiz_eval_pack_v1",
         "wasm_core_spec_release_2"

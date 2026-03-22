@@ -50,6 +50,8 @@ pub enum PsionBenchmarkFamily {
     HeldOutTechnicalReasoning,
     /// Normative source-grounded reading on held-out specifications and manuals.
     NormativeSpecReading,
+    /// Engineering interpretation that stays explicit about where text ends and inference begins.
+    EngineeringSpecInterpretation,
     /// Specifications and manuals kept separate from the training lane.
     SpecificationAndManualComprehension,
     /// Route-selection calibration across direct, handoff, and refusal lanes.
@@ -465,6 +467,7 @@ impl PsionAcceptanceMatrix {
                     requirement.family,
                     PsionBenchmarkFamily::ArchitectureReasoning
                         | PsionBenchmarkFamily::NormativeSpecReading
+                        | PsionBenchmarkFamily::EngineeringSpecInterpretation
                 ) {
                     return Err(PsionAcceptanceMatrixError::MissingField {
                         field: format!(
@@ -1781,6 +1784,11 @@ mod tests {
             .phase_gate(PsionPhaseGate::Pilot)
             .expect("pilot gate")
             .benchmark_requirement(PsionBenchmarkFamily::ArchitectureReasoning)
+            .is_some());
+        assert!(matrix
+            .phase_gate(PsionPhaseGate::SftPromotion)
+            .expect("sft promotion gate")
+            .benchmark_requirement(PsionBenchmarkFamily::EngineeringSpecInterpretation)
             .is_some());
     }
 

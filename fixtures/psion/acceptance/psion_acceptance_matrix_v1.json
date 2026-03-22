@@ -147,6 +147,20 @@
           "rationale": "The learned lane is supposed to read specs and manuals from first principles, not only architecture notes."
         },
         {
+          "family": "engineering_spec_interpretation",
+          "benchmark_artifact_id": "psion_engineering_spec_benchmark_v1",
+          "benchmark_artifact_digest": "2223c33a7301921ee440a29936d734428ebd6c4a507a12fe4e60c76afad5445a",
+          "threshold_bands": [
+            {
+              "metric_kind": "pass_rate_bps",
+              "minimum_bps": 7500,
+              "allowed_regression_bps": 300,
+              "rationale": "Broader pretraining must begin separating implementation consequences from what the normative text literally says."
+            }
+          ],
+          "rationale": "Implementation implications, ambiguity, and unspecified regions become explicit benchmark obligations before the lane broadens."
+        },
+        {
           "family": "unsupported_request_refusal",
           "threshold_bands": [
             {
@@ -240,6 +254,20 @@
           "rationale": "The lane must preserve first-principles technical reading into the SFT phase."
         },
         {
+          "family": "engineering_spec_interpretation",
+          "benchmark_artifact_id": "psion_engineering_spec_benchmark_v1",
+          "benchmark_artifact_digest": "2223c33a7301921ee440a29936d734428ebd6c4a507a12fe4e60c76afad5445a",
+          "threshold_bands": [
+            {
+              "metric_kind": "pass_rate_bps",
+              "minimum_bps": 7900,
+              "allowed_regression_bps": 250,
+              "rationale": "SFT promotion must strengthen engineering interpretation without rewarding unsupported certainty on ambiguous text."
+            }
+          ],
+          "rationale": "The SFT lane keeps implementation inference explicit instead of blending it back into normative reading."
+        },
+        {
           "family": "route_selection",
           "threshold_bands": [
             {
@@ -323,6 +351,20 @@
             }
           ],
           "rationale": "Internal serving still remains subordinate to held-out technical reasoning receipts."
+        },
+        {
+          "family": "engineering_spec_interpretation",
+          "benchmark_artifact_id": "psion_engineering_spec_benchmark_v1",
+          "benchmark_artifact_digest": "2223c33a7301921ee440a29936d734428ebd6c4a507a12fe4e60c76afad5445a",
+          "threshold_bands": [
+            {
+              "metric_kind": "pass_rate_bps",
+              "minimum_bps": 8100,
+              "allowed_regression_bps": 200,
+              "rationale": "Internal serving requires a stronger engineering-interpretation floor before implementation-facing claims are honest."
+            }
+          ],
+          "rationale": "Serving guidance is only bounded when ambiguity, unspecified regions, and portability risk remain explicit."
         },
         {
           "family": "route_selection",
@@ -442,6 +484,20 @@
             }
           ],
           "rationale": "Specs and manuals remain part of the bounded technical reasoning lane even at scale."
+        },
+        {
+          "family": "engineering_spec_interpretation",
+          "benchmark_artifact_id": "psion_engineering_spec_benchmark_v1",
+          "benchmark_artifact_digest": "2223c33a7301921ee440a29936d734428ebd6c4a507a12fe4e60c76afad5445a",
+          "threshold_bands": [
+            {
+              "metric_kind": "pass_rate_bps",
+              "minimum_bps": 8200,
+              "allowed_regression_bps": 150,
+              "rationale": "Trusted-cluster scale-up must preserve explicit engineering boundary reasoning, not only raw spec reading."
+            }
+          ],
+          "rationale": "Cluster scale-up keeps implementation implications and portability risk as a distinct benchmark family."
         },
         {
           "family": "route_selection",
