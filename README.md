@@ -72,6 +72,8 @@ clustered execution, and machine-legible execution truth.
   learned-model lane.
 - `docs/PSION_SERVED_EVIDENCE.md` is the canonical served-evidence and
   provenance doc for the `Psion` learned-model lane.
+- `docs/PSION_SERVED_OUTPUT_CLAIMS.md` is the canonical served-output claim
+  discipline doc for the `Psion` learned-model lane.
 - `docs/PSION_CHECKPOINT_RECOVERY.md` is the canonical dense-versus-sharded
   checkpoint restart, rollback, and invalidation doc for the `Psion`
   learned-model lane.

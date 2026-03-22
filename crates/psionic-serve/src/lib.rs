@@ -23,6 +23,7 @@ mod gpt_oss;
 mod openai_http;
 mod psion_capability_matrix;
 mod psion_served_evidence;
+mod psion_served_output_claim_posture;
 mod tassadar;
 mod tassadar_article_transformer_minimal_frontier;
 mod tassadar_article_cross_machine_reproducibility_publication;
@@ -60,6 +61,7 @@ pub use gpt_oss::*;
 pub use openai_http::*;
 pub use psion_capability_matrix::*;
 pub use psion_served_evidence::*;
+pub use psion_served_output_claim_posture::*;
 pub use psionic_adapters::*;
 use psionic_backend_cpu::CpuBackend;
 use psionic_backend_cuda::{
@@ -1789,6 +1791,9 @@ pub struct GenerationProvenance {
     /// Shared Psion served-evidence bundle when the output belongs to the learned-model lane.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub psion_served_evidence: Option<PsionServedEvidenceBundle>,
+    /// Shared Psion served-output claim posture when the output belongs to the learned-model lane.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub psion_served_output_claim_posture: Option<PsionServedOutputClaimPosture>,
 }
 
 impl GenerationProvenance {
@@ -1813,6 +1818,16 @@ impl GenerationProvenance {
         psion_served_evidence: PsionServedEvidenceBundle,
     ) -> Self {
         self.psion_served_evidence = Some(psion_served_evidence);
+        self
+    }
+
+    /// Attaches shared Psion served-output claim posture to the response provenance.
+    #[must_use]
+    pub fn with_psion_served_output_claim_posture(
+        mut self,
+        psion_served_output_claim_posture: PsionServedOutputClaimPosture,
+    ) -> Self {
+        self.psion_served_output_claim_posture = Some(psion_served_output_claim_posture);
         self
     }
 }
@@ -6026,6 +6041,7 @@ where
             scheduler,
             structured_output: self.sampler.structured_output_report(),
             psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
         };
         let structured_output_value = self.sampler.structured_output_value(text.as_str())?;
         let response = GenerationResponse::new(
@@ -6936,6 +6952,7 @@ where
             scheduler: None,
             structured_output: self.sampler.structured_output_report(),
             psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
         };
         let text = self.loaded_model.model().tokenizer().decode(output_tokens);
         let structured_output_value = self
@@ -7604,6 +7621,7 @@ where
             scheduler: None,
             structured_output: structured_output_report,
             psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
         };
         let structured_output_value = sampler.structured_output_value(text.as_str())?;
         let response = GenerationResponse::new(

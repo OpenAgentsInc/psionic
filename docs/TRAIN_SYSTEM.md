@@ -173,6 +173,11 @@ and now also has:
   learned-judgment, source-grounded, executor-backed, and benchmark-backed
   schema plus the route/refusal and no-implicit-execution binding that later
   serving and provider work must reuse.
+- `docs/PSION_SERVED_OUTPUT_CLAIMS.md` is the canonical first served-output
+  claim-discipline doc for the `Psion` learned-model lane and freezes the
+  explicit assumptions, visible route-or-refusal behavior, surfaced claim
+  flags, and context/latency envelope binding that later serving work must
+  preserve.
 - `docs/PSION_CHECKPOINT_RECOVERY.md` is the canonical first dense-versus-
   sharded checkpoint-recovery doc for the `Psion` learned-model lane and
   freezes the explicit restart, rollback, corruption-detection, and

@@ -117,3 +117,7 @@ That is the main point of this issue:
   evidence bundle type
 - the capability matrix, route receipts, refusal receipts, and served output
   evidence now have one common typed join point
+
+`PSION-28` now adds the next layer on top of this at
+`docs/PSION_SERVED_OUTPUT_CLAIMS.md`: explicit assumptions, visible route or
+refusal behavior, surfaced claim flags, and published envelope limits.

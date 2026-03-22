@@ -2764,6 +2764,7 @@ async fn handle_chat_completions(
         psionic_structured_output: None,
         psionic_structured_value: None,
         psionic_tool_calls: None,
+        psionic_claim_posture: None,
         psionic_scheduler: None,
     })
     .into_response();
@@ -3002,6 +3003,15 @@ async fn handle_generic_chat_completions(
             .and_then(|value| value.structured_output.clone()),
         psionic_structured_value: structured_output_value,
         psionic_tool_calls,
+        psionic_claim_posture: state
+            .include_psionic_fields
+            .then(|| {
+                response
+                    .provenance
+                    .as_ref()
+                    .and_then(|value| value.psion_served_output_claim_posture.clone())
+            })
+            .flatten(),
         psionic_scheduler: state
             .include_psionic_fields
             .then(|| scheduler_receipt.clone())
@@ -3365,6 +3375,15 @@ async fn handle_generic_responses(
             .and_then(|value| value.structured_output.clone()),
         psionic_structured_value: structured_output_value,
         psionic_tool_calls,
+        psionic_claim_posture: state
+            .include_psionic_fields
+            .then(|| {
+                response
+                    .provenance
+                    .as_ref()
+                    .and_then(|value| value.psion_served_output_claim_posture.clone())
+            })
+            .flatten(),
         psionic_scheduler: state
             .include_psionic_fields
             .then(|| scheduler_receipt.clone())
@@ -3598,6 +3617,8 @@ struct ChatCompletionResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_tool_calls: Option<Vec<PsionicToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_claim_posture: Option<crate::PsionServedOutputClaimPosture>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     psionic_scheduler: Option<GenerationSchedulerRequestReceipt>,
 }
 
@@ -3633,6 +3654,8 @@ struct ResponsesResponse {
     psionic_structured_value: Option<StructuredOutputValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_tool_calls: Option<Vec<PsionicToolCall>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_claim_posture: Option<crate::PsionServedOutputClaimPosture>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_scheduler: Option<GenerationSchedulerRequestReceipt>,
 }
@@ -7611,6 +7634,58 @@ mod tests {
     async fn response_text(response: Response) -> Result<String, Box<dyn std::error::Error>> {
         let body = to_bytes(response.into_body(), usize::MAX).await?;
         Ok(String::from_utf8(body.to_vec())?)
+    }
+
+    #[test]
+    fn chat_completion_response_serializes_psion_claim_posture(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let psion_claim_posture: crate::PsionServedOutputClaimPosture = serde_json::from_str(
+            include_str!(
+                "../../../fixtures/psion/serve/psion_served_output_claim_direct_v1.json"
+            ),
+        )?;
+        let payload = serde_json::to_value(super::ChatCompletionResponse {
+            id: String::from("chatcmpl-test"),
+            object: "chat.completion",
+            created: 0,
+            model: String::from("tiny-gpt-oss"),
+            choices: vec![super::ChatCompletionChoice {
+                index: 0,
+                message: super::ChatCompletionResponseMessage {
+                    role: "assistant",
+                    content: Some(String::from("ok")),
+                    reasoning_content: None,
+                    tool_calls: None,
+                },
+                finish_reason: "stop",
+            }],
+            usage: super::ChatCompletionUsage {
+                prompt_tokens: 1,
+                completion_tokens: 1,
+                total_tokens: 2,
+            },
+            psionic_metrics: None,
+            psionic_harmony: None,
+            psionic_reasoning: None,
+            psionic_perf: None,
+            psionic_output_text: Some(String::from("ok")),
+            psionic_output_tokens: Some(vec![1]),
+            psionic_structured_output: None,
+            psionic_structured_value: None,
+            psionic_tool_calls: None,
+            psionic_claim_posture: Some(psion_claim_posture),
+            psionic_scheduler: None,
+        })?;
+
+        assert_eq!(
+            payload["psionic_claim_posture"]["posture_id"],
+            serde_json::json!("psion-served-output-claim-direct-v1")
+        );
+        assert_eq!(
+            payload["psionic_claim_posture"]["visible_claims"]["benchmark_backing_visible"],
+            serde_json::json!(true)
+        );
+        Ok(())
     }
 
     fn header_value(headers: &HeaderMap, name: &str) -> Option<String> {

@@ -1971,6 +1971,7 @@ fn run_cuda_generation_request(
             scheduler: None,
             structured_output: sampler.structured_output_report(),
             psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
         };
         Ok(GenerationResponse::new(
             request,
@@ -2424,6 +2425,7 @@ fn run_cuda_hybrid_generation_request(
             scheduler: None,
             structured_output: sampler.structured_output_report(),
             psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
         };
         Ok(GenerationResponse::new(
             request,
@@ -3111,6 +3113,7 @@ fn run_metal_generation_request(
             scheduler: None,
             structured_output: sampler.structured_output_report(),
             psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
         };
         Ok(GenerationResponse::new(
             request,
