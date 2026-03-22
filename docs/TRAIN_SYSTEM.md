@@ -91,6 +91,10 @@ and now also has:
   downstream-lineage doc for the `Psion` learned-model lane and freezes how
   source-state changes trigger artifact review, retraining review, and
   depublication review.
+- `docs/PSION_BENCHMARK_ISOLATION.md` is the canonical first held-out and
+  contamination-control doc for the `Psion` learned-model lane and freezes the
+  exclusion-manifest, tokenizer-exposure, and benchmark-invalidation contract
+  that later tokenizer and benchmark work must follow.
 - `docs/audits/2026-03-13-intellect-lessons-for-psionic-train-audit.md` is
   research rationale, not the canonical current-state spec.
 - `docs/audits/2026-03-14-covenant-code-lessons-for-psionic-train-audit.md`

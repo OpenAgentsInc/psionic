@@ -9,6 +9,7 @@
 mod apple_adapter;
 mod apple_adapter_curation;
 mod parameter_golf;
+mod psion_benchmark_isolation;
 mod psion_corpus_admission;
 mod psion_source_lifecycle;
 mod tassadar;
@@ -44,6 +45,7 @@ use thiserror::Error;
 pub use apple_adapter::*;
 pub use apple_adapter_curation::*;
 pub use parameter_golf::*;
+pub use psion_benchmark_isolation::*;
 pub use psion_corpus_admission::*;
 pub use psion_source_lifecycle::*;
 pub use tassadar::*;
