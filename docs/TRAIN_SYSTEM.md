@@ -99,6 +99,10 @@ and now also has:
   and normalization doc for the `Psion` learned-model lane and freezes the
   manifest, preprocessing-version, and boundary-preservation contract that
   later tokenizer and dataset stages must follow.
+- `docs/PSION_TOKENIZER_TRAINING.md` is the canonical first tokenizer manifest
+  and artifact-bundle doc for the `Psion` learned-model lane and freezes the
+  admitted/excluded source lists, tokenizer digest, config, and tokenizer-only
+  exposure reporting that later tokenized datasets and checkpoints must follow.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical first phase-gate and
   promotion-decision doc for the `Psion` learned-model lane and freezes the
   acceptance-matrix plus evidence-bound promotion contract that later pilot,

@@ -30,6 +30,8 @@ clustered execution, and machine-legible execution truth.
   contamination-control doc for the `Psion` learned-model lane.
 - `docs/PSION_RAW_SOURCE_INGESTION.md` is the canonical raw-source import and
   normalization doc for the `Psion` learned-model lane.
+- `docs/PSION_TOKENIZER_TRAINING.md` is the canonical tokenizer manifest and
+  artifact-bundle doc for the `Psion` learned-model lane.
 - `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical phase-gate and
   promotion-decision doc for the `Psion` learned-model lane.
 - `docs/PSION_CAPABILITY_MATRIX.md` is the canonical served capability and
