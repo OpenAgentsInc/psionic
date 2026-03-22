@@ -95,6 +95,10 @@ and now also has:
   contamination-control doc for the `Psion` learned-model lane and freezes the
   exclusion-manifest, tokenizer-exposure, and benchmark-invalidation contract
   that later tokenizer and benchmark work must follow.
+- `docs/PSION_ACCEPTANCE_MATRIX.md` is the canonical first phase-gate and
+  promotion-decision doc for the `Psion` learned-model lane and freezes the
+  acceptance-matrix plus evidence-bound promotion contract that later pilot,
+  pretraining, SFT, serving, and cluster issues must satisfy.
 - `docs/audits/2026-03-13-intellect-lessons-for-psionic-train-audit.md` is
   research rationale, not the canonical current-state spec.
 - `docs/audits/2026-03-14-covenant-code-lessons-for-psionic-train-audit.md`
