@@ -121,6 +121,7 @@ if [[ -z "${RUN_ROOT}" || -z "${REPO_DIR}" || -z "${RUN_ID}" || -z "${LAUNCH_MAN
 fi
 
 POLICY_FILE="${REPO_DIR}/fixtures/psion/google/psion_google_host_observability_policy_v1.json"
+BILLING_GUARDRAIL_FILE="${REPO_DIR}/fixtures/psion/google/psion_google_billing_guardrails_v1.json"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "error: jq is required" >&2
@@ -129,6 +130,10 @@ fi
 
 if [[ ! -f "${POLICY_FILE}" ]]; then
   echo "error: observability policy not found: ${POLICY_FILE}" >&2
+  exit 1
+fi
+if [[ ! -f "${BILLING_GUARDRAIL_FILE}" ]]; then
+  echo "error: billing guardrail policy not found: ${BILLING_GUARDRAIL_FILE}" >&2
   exit 1
 fi
 
@@ -174,6 +179,40 @@ safe_command_output() {
   printf '%s' "${output}"
 }
 
+iso_to_epoch() {
+  local timestamp="$1"
+  if [[ -z "${timestamp}" ]]; then
+    printf '%s' ""
+    return 0
+  fi
+  jq -nr --arg timestamp "${timestamp}" '$timestamp | fromdateiso8601'
+}
+
+seconds_between_optional() {
+  local start_timestamp="$1"
+  local end_timestamp="$2"
+  if [[ -z "${start_timestamp}" || -z "${end_timestamp}" ]]; then
+    printf '%s' "null"
+    return 0
+  fi
+  local start_epoch end_epoch
+  start_epoch="$(iso_to_epoch "${start_timestamp}")"
+  end_epoch="$(iso_to_epoch "${end_timestamp}")"
+  jq -nr \
+    --argjson start_epoch "${start_epoch}" \
+    --argjson end_epoch "${end_epoch}" \
+    'if $end_epoch >= $start_epoch then ($end_epoch - $start_epoch) else 0 end'
+}
+
+hours_from_seconds() {
+  local seconds_json="$1"
+  if [[ "${seconds_json}" == "null" || -z "${seconds_json}" ]]; then
+    printf '%s' "null"
+    return 0
+  fi
+  jq -nr --argjson seconds "${seconds_json}" '($seconds / 3600)'
+}
+
 classify_local_role() {
   local file_name="$1"
   case "${file_name}" in
@@ -208,6 +247,7 @@ host_facts_name="$(jq -r '.host_facts_name' "${POLICY_FILE}")"
 runtime_snapshot_name="$(jq -r '.runtime_snapshot_name' "${POLICY_FILE}")"
 gpu_samples_name="$(jq -r '.gpu_samples_name' "${POLICY_FILE}")"
 gpu_summary_name="$(jq -r '.gpu_summary_name' "${POLICY_FILE}")"
+run_cost_receipt_name="$(jq -r '.run_cost_receipt_name' "${POLICY_FILE}")"
 accelerator_validation_receipt_name="$(
   jq -r '.accelerator_validation_receipt_name' "${POLICY_FILE}"
 )"
@@ -271,6 +311,7 @@ host_facts_path="${scratch_dir}/${host_facts_name}"
 runtime_snapshot_path="${scratch_dir}/${runtime_snapshot_name}"
 gpu_samples_path="${log_dir}/${gpu_samples_name}"
 gpu_summary_path="${scratch_dir}/${gpu_summary_name}"
+run_cost_receipt_path="${scratch_dir}/${run_cost_receipt_name}"
 accelerator_validation_path="${scratch_dir}/${accelerator_validation_receipt_name}"
 outcome_path="${scratch_dir}/${outcome_name}"
 
@@ -795,6 +836,8 @@ jq -n \
     detail: $detail
   }' > "${accelerator_validation_path}"
 
+teardown_finished_at_utc="$(timestamp_utc)"
+
 jq -n \
   --arg schema_version "psion.google_run_timeline.v1" \
   --arg run_id "${RUN_ID}" \
@@ -805,7 +848,7 @@ jq -n \
   --arg training_finished_at_utc "${TRAINING_FINISHED_AT_UTC}" \
   --arg checkpoint_completed_at_utc "${CHECKPOINT_COMPLETED_AT_UTC}" \
   --arg teardown_started_at_utc "${TEARDOWN_STARTED_AT_UTC}" \
-  --arg teardown_finished_at_utc "$(timestamp_utc)" \
+  --arg teardown_finished_at_utc "${teardown_finished_at_utc}" \
   '{
     schema_version: $schema_version,
     run_id: $run_id,
@@ -820,6 +863,133 @@ jq -n \
       teardown_finished_at_utc: $teardown_finished_at_utc
     }
   }' > "${timeline_path}"
+
+cost_dataset_id="$(jq -r '.machine_queryable_cost_sink.dataset_id' "${BILLING_GUARDRAIL_FILE}")"
+cost_table_id="$(jq -r '.machine_queryable_cost_sink.price_profiles_table' "${BILLING_GUARDRAIL_FILE}")"
+cost_sink_class="$(jq -r '.machine_queryable_cost_sink.class' "${BILLING_GUARDRAIL_FILE}")"
+cost_query_sql="SELECT snapshot_id, captured_at_utc, project_id, region, profile_id, machine_type, accelerator_type, accelerator_count, boot_disk_type, boot_disk_gb, max_runtime_hours, declared_run_cost_ceiling_usd, cpu_hourly_usd, ram_hourly_usd, accelerator_hourly_usd, boot_disk_hourly_usd, estimated_hourly_usd, estimated_run_cost_usd, cpu_sku_description, ram_sku_description, accelerator_sku_description, disk_sku_description FROM \`${project_id}.${cost_dataset_id}.${cost_table_id}\` WHERE profile_id = '${profile_id}' ORDER BY captured_at_utc DESC LIMIT 1"
+price_profile_query_result='[]'
+price_profile_row='null'
+cost_query_status="query_failed"
+cost_query_error=""
+if command -v bq >/dev/null 2>&1; then
+  if price_profile_query_result="$(bq query --use_legacy_sql=false --format=prettyjson "${cost_query_sql}" 2>"${tmpdir}/cost_query.err")"; then
+    price_profile_row="$(jq '.[0] // null' <<<"${price_profile_query_result}")"
+    if [[ "${price_profile_row}" != "null" ]]; then
+      cost_query_status="price_profile_found"
+    else
+      cost_query_status="price_profile_missing"
+      cost_query_error="no price profile row found for ${profile_id}"
+    fi
+  else
+    cost_query_error="$(tr '\n' ' ' < "${tmpdir}/cost_query.err" | sed 's/[[:space:]]\+/ /g' | sed 's/^ //; s/ $//')"
+  fi
+else
+  cost_query_error="bq command not available on training host"
+fi
+
+launch_to_teardown_seconds="$(seconds_between_optional "${launch_created_at_utc}" "${teardown_finished_at_utc}")"
+bootstrap_seconds="$(seconds_between_optional "${BOOTSTRAP_STARTED_AT_UTC}" "${BOOTSTRAP_FINISHED_AT_UTC}")"
+training_seconds="$(seconds_between_optional "${TRAINING_STARTED_AT_UTC}" "${TRAINING_FINISHED_AT_UTC}")"
+checkpoint_seconds="$(seconds_between_optional "${TRAINING_FINISHED_AT_UTC}" "${CHECKPOINT_COMPLETED_AT_UTC}")"
+teardown_seconds="$(seconds_between_optional "${TEARDOWN_STARTED_AT_UTC}" "${teardown_finished_at_utc}")"
+launch_to_teardown_hours="$(hours_from_seconds "${launch_to_teardown_seconds}")"
+bootstrap_hours="$(hours_from_seconds "${bootstrap_seconds}")"
+training_hours="$(hours_from_seconds "${training_seconds}")"
+checkpoint_hours="$(hours_from_seconds "${checkpoint_seconds}")"
+teardown_hours="$(hours_from_seconds "${teardown_seconds}")"
+
+jq -n \
+  --arg schema_version "psion.google_run_cost_receipt.v1" \
+  --arg created_at_utc "${teardown_finished_at_utc}" \
+  --arg run_id "${RUN_ID}" \
+  --arg project_id "${project_id}" \
+  --arg zone "${zone}" \
+  --arg profile_id "${profile_id}" \
+  --arg machine_type "${machine_type}" \
+  --arg accelerator_type "${accelerator_type}" \
+  --argjson accelerator_count "${accelerator_count}" \
+  --arg cost_sink_class "${cost_sink_class}" \
+  --arg cost_dataset_id "${cost_dataset_id}" \
+  --arg cost_table_id "${cost_table_id}" \
+  --arg cost_query_status "${cost_query_status}" \
+  --arg cost_query_sql "${cost_query_sql}" \
+  --arg cost_query_error "${cost_query_error}" \
+  --argjson price_profile_row "${price_profile_row}" \
+  --argjson launch_to_teardown_seconds "${launch_to_teardown_seconds}" \
+  --argjson bootstrap_seconds "${bootstrap_seconds}" \
+  --argjson training_seconds "${training_seconds}" \
+  --argjson checkpoint_seconds "${checkpoint_seconds}" \
+  --argjson teardown_seconds "${teardown_seconds}" \
+  --argjson launch_to_teardown_hours "${launch_to_teardown_hours}" \
+  --argjson bootstrap_hours "${bootstrap_hours}" \
+  --argjson training_hours "${training_hours}" \
+  --argjson checkpoint_hours "${checkpoint_hours}" \
+  --argjson teardown_hours "${teardown_hours}" \
+  '{
+    schema_version: $schema_version,
+    created_at_utc: $created_at_utc,
+    run_id: $run_id,
+    project_id: $project_id,
+    topology: {
+      zone: $zone,
+      profile_id: $profile_id,
+      machine_type: $machine_type,
+      accelerator_type: $accelerator_type,
+      accelerator_count: $accelerator_count
+    },
+    machine_queryable_cost_sink: {
+      class: $cost_sink_class,
+      dataset_id: $cost_dataset_id,
+      table_id: $cost_table_id,
+      query_status: $cost_query_status,
+      query_sql: $cost_query_sql,
+      query_error: (if $cost_query_error == "" then null else $cost_query_error end)
+    },
+    price_profile: $price_profile_row,
+    observed_runtime: {
+      launch_to_teardown_seconds: $launch_to_teardown_seconds,
+      bootstrap_seconds: $bootstrap_seconds,
+      training_seconds: $training_seconds,
+      checkpoint_seconds: $checkpoint_seconds,
+      teardown_seconds: $teardown_seconds,
+      launch_to_teardown_hours: $launch_to_teardown_hours,
+      bootstrap_hours: $bootstrap_hours,
+      training_hours: $training_hours,
+      checkpoint_hours: $checkpoint_hours,
+      teardown_hours: $teardown_hours
+    },
+    estimated_costs: (
+      if $price_profile_row == null then
+        {
+          runtime_priced_estimate_usd: null,
+          bootstrap_estimate_usd: null,
+          training_estimate_usd: null,
+          checkpoint_estimate_usd: null,
+          teardown_estimate_usd: null,
+          within_declared_ceiling: null,
+          pricing_basis: "unavailable"
+        }
+      else
+        {
+          runtime_priced_estimate_usd: (($price_profile_row.estimated_hourly_usd | tonumber) * $launch_to_teardown_hours),
+          bootstrap_estimate_usd: (if $bootstrap_hours == null then null else (($price_profile_row.estimated_hourly_usd | tonumber) * $bootstrap_hours) end),
+          training_estimate_usd: (if $training_hours == null then null else (($price_profile_row.estimated_hourly_usd | tonumber) * $training_hours) end),
+          checkpoint_estimate_usd: (if $checkpoint_hours == null then null else (($price_profile_row.estimated_hourly_usd | tonumber) * $checkpoint_hours) end),
+          teardown_estimate_usd: (if $teardown_hours == null then null else (($price_profile_row.estimated_hourly_usd | tonumber) * $teardown_hours) end),
+          within_declared_ceiling: (((($price_profile_row.estimated_hourly_usd | tonumber) * $launch_to_teardown_hours)) <= ($price_profile_row.declared_run_cost_ceiling_usd | tonumber)),
+          pricing_basis: "machine_queryable_catalog_price_profile_times_observed_runtime"
+        }
+      end
+    ),
+    detail: (
+      if $price_profile_row == null then
+        "The run retained observed runtime windows but could not bind a machine-queryable price profile row for this launch profile."
+      else
+        "The run retained a machine-queryable BigQuery price profile row and multiplied the observed runtime windows by the profile hourly estimate to produce a bounded per-run cost receipt."
+      end
+    )
+  }' > "${run_cost_receipt_path}"
 
 jq -n \
   --arg schema_version "psion.google_run_outcome.v1" \
@@ -853,6 +1023,7 @@ upload_local_artifact "host_facts" "manifest" "${host_facts_path}" "${host_prefi
 upload_local_artifact "runtime_snapshot" "manifest" "${runtime_snapshot_path}" "${host_prefix}/${runtime_snapshot_name}"
 upload_local_artifact "run_timeline" "manifest" "${timeline_path}" "${host_prefix}/${timeline_name}"
 upload_local_artifact "run_outcome" "manifest" "${outcome_path}" "${host_prefix}/${outcome_name}"
+upload_local_artifact "run_cost_receipt" "receipt" "${run_cost_receipt_path}" "${receipts_prefix}/${run_cost_receipt_name}"
 upload_local_artifact "accelerator_validation_receipt" "receipt" "${accelerator_validation_path}" "${receipts_prefix}/${accelerator_validation_receipt_name}"
 
 if [[ -f "${event_log_path}" ]]; then
@@ -951,6 +1122,7 @@ jq -n \
   --arg manifest_of_manifests_sha256 "${manifest_of_manifests_sha256}" \
   --argjson timeline "$(cat "${timeline_path}")" \
   --argjson gpu_summary "$(cat "${gpu_summary_path}")" \
+  --argjson run_cost_receipt "$(cat "${run_cost_receipt_path}")" \
   --argjson accelerator_validation "$(cat "${accelerator_validation_path}")" \
   --argjson outcome "$(cat "${outcome_path}")" \
   --argjson retained_objects "${artifacts_json}" \
@@ -987,6 +1159,7 @@ jq -n \
     },
     timeline: $timeline,
     gpu_summary: $gpu_summary,
+    run_cost_receipt: $run_cost_receipt,
     accelerator_validation: $accelerator_validation,
     outcome: $outcome,
     manifest_of_manifests: {

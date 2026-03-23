@@ -237,6 +237,96 @@ profile_rows_jsonl() {
     --arg snapshot_id "${snapshot_id}" \
     --arg captured_at_utc "${captured_at_utc}" \
     --arg project_id "${PROJECT_ID}" \
+    --arg profile_id "g2_l4_single_node_accelerated" \
+    --arg machine_type "g2-standard-8" \
+    --arg accelerator_type "nvidia-l4" \
+    --argjson boot_disk_gb 200 \
+    --argjson max_runtime_hours 12 \
+    --argjson declared_run_cost_ceiling_usd 20 \
+    --arg cpu_sku_description "G2 Instance Core running in Americas" \
+    --arg ram_sku_description "G2 Instance Ram running in Americas" \
+    --arg accelerator_sku_description "Nvidia L4 GPU running in Americas" \
+    --arg disk_sku_description "Balanced PD Capacity" \
+    --argjson cpu_hourly_usd "${g2_cpu_hourly}" \
+    --argjson ram_hourly_usd "${g2_ram_hourly}" \
+    --argjson accelerator_hourly_usd "${l4_rate}" \
+    --argjson boot_disk_hourly_usd "${l4_disk_hourly}" \
+    --argjson estimated_hourly_usd "${g2_hourly}" \
+    --argjson estimated_run_cost_usd "${g2_estimated_run}" \
+    '{
+      snapshot_id: $snapshot_id,
+      captured_at_utc: $captured_at_utc,
+      project_id: $project_id,
+      region: "us-central1",
+      profile_id: $profile_id,
+      machine_type: $machine_type,
+      accelerator_type: $accelerator_type,
+      accelerator_count: 1,
+      boot_disk_type: "pd-balanced",
+      boot_disk_gb: $boot_disk_gb,
+      max_runtime_hours: $max_runtime_hours,
+      declared_run_cost_ceiling_usd: $declared_run_cost_ceiling_usd,
+      cpu_hourly_usd: $cpu_hourly_usd,
+      ram_hourly_usd: $ram_hourly_usd,
+      accelerator_hourly_usd: $accelerator_hourly_usd,
+      boot_disk_hourly_usd: $boot_disk_hourly_usd,
+      estimated_hourly_usd: $estimated_hourly_usd,
+      estimated_run_cost_usd: $estimated_run_cost_usd,
+      cpu_sku_description: $cpu_sku_description,
+      ram_sku_description: $ram_sku_description,
+      accelerator_sku_description: $accelerator_sku_description,
+      disk_sku_description: $disk_sku_description
+    }' >> "${outfile}"
+
+  jq -c -n \
+    --arg snapshot_id "${snapshot_id}" \
+    --arg captured_at_utc "${captured_at_utc}" \
+    --arg project_id "${PROJECT_ID}" \
+    --arg profile_id "g2_l4_single_node_plugin_host_native_accelerated" \
+    --arg machine_type "g2-standard-8" \
+    --arg accelerator_type "nvidia-l4" \
+    --argjson boot_disk_gb 200 \
+    --argjson max_runtime_hours 12 \
+    --argjson declared_run_cost_ceiling_usd 25 \
+    --arg cpu_sku_description "G2 Instance Core running in Americas" \
+    --arg ram_sku_description "G2 Instance Ram running in Americas" \
+    --arg accelerator_sku_description "Nvidia L4 GPU running in Americas" \
+    --arg disk_sku_description "Balanced PD Capacity" \
+    --argjson cpu_hourly_usd "${g2_cpu_hourly}" \
+    --argjson ram_hourly_usd "${g2_ram_hourly}" \
+    --argjson accelerator_hourly_usd "${l4_rate}" \
+    --argjson boot_disk_hourly_usd "${l4_disk_hourly}" \
+    --argjson estimated_hourly_usd "${g2_hourly}" \
+    --argjson estimated_run_cost_usd "${g2_estimated_run}" \
+    '{
+      snapshot_id: $snapshot_id,
+      captured_at_utc: $captured_at_utc,
+      project_id: $project_id,
+      region: "us-central1",
+      profile_id: $profile_id,
+      machine_type: $machine_type,
+      accelerator_type: $accelerator_type,
+      accelerator_count: 1,
+      boot_disk_type: "pd-balanced",
+      boot_disk_gb: $boot_disk_gb,
+      max_runtime_hours: $max_runtime_hours,
+      declared_run_cost_ceiling_usd: $declared_run_cost_ceiling_usd,
+      cpu_hourly_usd: $cpu_hourly_usd,
+      ram_hourly_usd: $ram_hourly_usd,
+      accelerator_hourly_usd: $accelerator_hourly_usd,
+      boot_disk_hourly_usd: $boot_disk_hourly_usd,
+      estimated_hourly_usd: $estimated_hourly_usd,
+      estimated_run_cost_usd: $estimated_run_cost_usd,
+      cpu_sku_description: $cpu_sku_description,
+      ram_sku_description: $ram_sku_description,
+      accelerator_sku_description: $accelerator_sku_description,
+      disk_sku_description: $disk_sku_description
+    }' >> "${outfile}"
+
+  jq -c -n \
+    --arg snapshot_id "${snapshot_id}" \
+    --arg captured_at_utc "${captured_at_utc}" \
+    --arg project_id "${PROJECT_ID}" \
     --arg profile_id "a2_a100_single_node" \
     --arg machine_type "a2-highgpu-1g" \
     --arg accelerator_type "nvidia-tesla-a100" \

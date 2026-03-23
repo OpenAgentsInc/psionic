@@ -11,6 +11,7 @@
   "gpu_samples_name": "psion_google_gpu_samples.csv",
   "gpu_summary_name": "psion_google_gpu_summary.json",
   "accelerator_validation_receipt_name": "psion_google_accelerator_validation_receipt.json",
+  "run_cost_receipt_name": "psion_google_run_cost_receipt.json",
   "outcome_name": "psion_google_run_outcome.json",
   "manifest_of_manifests_name": "psion_google_run_manifest_of_manifests.json",
   "final_manifest_name": "psion_google_run_final_manifest.json",
