@@ -200,6 +200,12 @@ and now also has:
   the first learned publication versus unsupported versus blocked plugin-class
   split, and the executor-backed statement posture for outputs that cite the
   bounded host-native matrix.
+- `docs/PSION_PLUGIN_MIXED_CAPABILITY_MATRIX_V2.md` is the canonical second
+  publication doc for the mixed plugin-conditioned learned lane and freezes
+  the supported host-native mixed rows, the one bounded guest admitted-use row,
+  the still-blocked guest loading/publication/universality/arbitrary-software
+  rows, and the learned-judgment-versus-executor-backed statement posture for
+  outputs that cite the bounded mixed matrix.
 - `docs/audits/2026-03-22-tassadar-full-plugin-system-state-audit.md` is the
   canonical current-state proof record for the bounded Tassadar plugin system
   and freezes the present authoring-class, publication, and guest-artifact

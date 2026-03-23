@@ -23,6 +23,12 @@ The first `PSION_PLUGIN-16` publication now lives at:
 - `fixtures/psion/plugins/capability/psion_plugin_host_native_capability_matrix_v1.json`
 - `fixtures/psion/plugins/serve/psion_plugin_host_native_served_posture_v1.json`
 
+The mixed `PSION_PLUGIN-28` publication now lives at:
+
+- `docs/PSION_PLUGIN_MIXED_CAPABILITY_MATRIX_V2.md`
+- `fixtures/psion/plugins/capability/psion_plugin_mixed_capability_matrix_v2.json`
+- `fixtures/psion/plugins/serve/psion_plugin_mixed_served_posture_v2.json`
+
 This document exists earlier because the convergence tranche already needs one
 explicit answer to a simpler question:
 
@@ -161,8 +167,8 @@ This means allowed summary language today looks like:
 - “one manual networked_read_only substrate proof exists, but the first trained
   capability publication remains local-deterministic only”
 - “one bounded digest-bound guest-artifact substrate proof exists, but generic
-  Wasm/plugin support and the first trained capability publication still
-  exclude that class”
+  Wasm/plugin support remains blocked and the mixed capability publication only
+  admits one bounded digest-bound guest row”
 - “receipt-backed plugin execution remains runtime-owned”
 
 Disallowed summary language today includes:

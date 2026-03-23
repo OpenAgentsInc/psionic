@@ -1,0 +1,53 @@
+{
+  "schema_version": "psionic.psion.plugin_mixed_served_posture.v2",
+  "posture_id": "psion_plugin_mixed_served_posture",
+  "posture_version": "v2",
+  "lane_id": "psion_plugin_conditioned_mixed_reference",
+  "capability_matrix_id": "psion_plugin_mixed_capability_matrix",
+  "capability_matrix_version": "v2",
+  "capability_matrix_digest": "7d011fd731396d7ea411d18fb9393e3117223f1a5a142f55318893d0e0759d3b",
+  "model_artifact_id": "artifact.psion.plugin_mixed_reference.model.v1",
+  "model_artifact_digest": "8e268696c0b8705431d9eb0bf697e1507ee5363c84a2b06e02ef7797e99bd317",
+  "mixed_evaluation_receipt_id": "receipt.psion.plugin_mixed_reference.evaluation.v1",
+  "mixed_evaluation_receipt_digest": "69cb0d1cc8e13204679aa251150b2161e4f513ad043035950b15cd86e50ad5f8",
+  "guest_benchmark_receipt_id": "receipt.psion.plugin.guest_capability_boundary.reference.v1",
+  "guest_benchmark_receipt_digest": "439d120ebba64177a9b59cc18b962633748f441d518d861ffdc2bedae057973b",
+  "capability_doc_ref": "docs/PSION_PLUGIN_MIXED_CAPABILITY_MATRIX_V2.md",
+  "served_evidence_doc_ref": "docs/PSION_SERVED_EVIDENCE.md",
+  "served_output_claim_doc_ref": "docs/PSION_SERVED_OUTPUT_CLAIMS.md",
+  "visibility_posture": "operator_internal_only",
+  "supported_route_labels": [
+    "answer_in_language",
+    "delegate_to_admitted_plugin",
+    "request_missing_structure_for_plugin_use",
+    "refuse_unsupported_plugin_or_capability"
+  ],
+  "supported_claim_surfaces": [
+    "learned_judgment",
+    "benchmark_backed_capability_claim",
+    "executor_backed_result"
+  ],
+  "blocked_claim_surfaces": [
+    "source_grounded_statement",
+    "verification",
+    "plugin_publication",
+    "public_plugin_universality",
+    "arbitrary_software_capability",
+    "hidden_execution_without_runtime_receipt"
+  ],
+  "not_yet_proved_plugin_classes": [],
+  "unsupported_plugin_classes": [
+    "host_native_secret_backed_or_stateful"
+  ],
+  "typed_refusal_reasons": [
+    "plugin_capability_outside_admitted_set",
+    "missing_required_structured_input",
+    "publication_or_arbitrary_loading_claim_blocked",
+    "secret_backed_or_stateful_class_not_enabled",
+    "guest_artifact_load_refusal"
+  ],
+  "execution_backed_statement_policy": "executor_backed_result requires explicit runtime receipt refs; bounded guest capability rows do not imply hidden guest execution without those receipts",
+  "benchmark_backed_statement_policy": "benchmark_backed_capability_claim may cite supported host-native mixed rows and the bounded guest admitted-use row only; blocked guest loading, publication, universality, and arbitrary-binary rows remain refusal-boundary statements",
+  "summary": "The mixed served posture keeps the lane operator-internal, allows learned_judgment and benchmark_backed_capability_claim across the published mixed matrix, and keeps guest loading/publication/universality/arbitrary-binary overclaims blocked unless runtime receipts make a narrower executor-backed result explicit.",
+  "posture_digest": "9db4fe3947949fa5bd5a50d3b97bb5737712466ef7c2cad94a1e07afb12de830"
+}

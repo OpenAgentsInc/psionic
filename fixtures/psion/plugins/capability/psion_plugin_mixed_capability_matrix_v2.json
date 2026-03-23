@@ -1,0 +1,302 @@
+{
+  "schema_version": "psionic.psion.plugin_mixed_capability_matrix.v2",
+  "matrix_id": "psion_plugin_mixed_capability_matrix",
+  "matrix_version": "v2",
+  "lane_id": "psion_plugin_conditioned_mixed_reference",
+  "model_artifact_id": "artifact.psion.plugin_mixed_reference.model.v1",
+  "model_artifact_digest": "8e268696c0b8705431d9eb0bf697e1507ee5363c84a2b06e02ef7797e99bd317",
+  "mixed_evaluation_receipt_id": "receipt.psion.plugin_mixed_reference.evaluation.v1",
+  "mixed_evaluation_receipt_digest": "69cb0d1cc8e13204679aa251150b2161e4f513ad043035950b15cd86e50ad5f8",
+  "guest_benchmark_package_id": "psion.plugin.guest_capability_boundary.v1",
+  "guest_benchmark_package_digest": "6d8820a5d3d320e11ff5034de169ea3e839221e14958d7262091f68cba311c12",
+  "guest_benchmark_receipt_id": "receipt.psion.plugin.guest_capability_boundary.reference.v1",
+  "guest_benchmark_receipt_digest": "439d120ebba64177a9b59cc18b962633748f441d518d861ffdc2bedae057973b",
+  "claim_boundary_doc_ref": "docs/PSION_PLUGIN_CLAIM_BOUNDARY_AND_CAPABILITY_POSTURE.md",
+  "served_evidence_doc_ref": "docs/PSION_SERVED_EVIDENCE.md",
+  "served_output_claim_doc_ref": "docs/PSION_SERVED_OUTPUT_CLAIMS.md",
+  "rows": [
+    {
+      "region_id": "arbitrary_software_capability",
+      "posture": "blocked",
+      "claim_class": "software_capability_boundary",
+      "evidence": {
+        "evidence_kind": "guest_capability_metric",
+        "package_id": "psion.plugin.guest_capability_boundary.v1",
+        "package_digest": "6d8820a5d3d320e11ff5034de169ea3e839221e14958d7262091f68cba311c12",
+        "receipt_id": "receipt.psion.plugin.guest_capability_boundary.reference.v1",
+        "receipt_digest": "439d120ebba64177a9b59cc18b962633748f441d518d861ffdc2bedae057973b",
+        "metric_kind": "guest_plugin_arbitrary_binary_boundary_accuracy_bps",
+        "value_bps": 10000
+      },
+      "detail": "The mixed publication does not imply arbitrary binary loading or arbitrary software capability."
+    },
+    {
+      "region_id": "guest_artifact_digest_bound",
+      "posture": "supported",
+      "claim_class": "plugin_class_boundary",
+      "plugin_class": "guest_artifact_digest_bound",
+      "admitted_plugin_ids": [
+        "plugin.example.echo_guest"
+      ],
+      "detail": "The bounded guest-artifact class is supported only for the one admitted digest-bound plugin and only inside the mixed operator-internal publication."
+    },
+    {
+      "region_id": "guest_artifact_digest_bound.admitted_use",
+      "posture": "supported",
+      "claim_class": "plugin_use_region",
+      "plugin_class": "guest_artifact_digest_bound",
+      "route_labels": [
+        "delegate_to_admitted_plugin"
+      ],
+      "admitted_plugin_ids": [
+        "plugin.example.echo_guest"
+      ],
+      "evidence": {
+        "evidence_kind": "guest_capability_metric",
+        "package_id": "psion.plugin.guest_capability_boundary.v1",
+        "package_digest": "6d8820a5d3d320e11ff5034de169ea3e839221e14958d7262091f68cba311c12",
+        "receipt_id": "receipt.psion.plugin.guest_capability_boundary.reference.v1",
+        "receipt_digest": "439d120ebba64177a9b59cc18b962633748f441d518d861ffdc2bedae057973b",
+        "metric_kind": "guest_plugin_admitted_use_accuracy_bps",
+        "value_bps": 10000
+      },
+      "detail": "The mixed publication supports one bounded guest-artifact use region: delegate only to the admitted digest-bound echo guest plugin while keeping internal-only and publication-blocked posture explicit."
+    },
+    {
+      "region_id": "guest_artifact_generic_loading_or_unadmitted_digest",
+      "posture": "blocked",
+      "claim_class": "plugin_class_boundary",
+      "plugin_class": "guest_artifact_digest_bound",
+      "route_labels": [
+        "refuse_unsupported_plugin_or_capability"
+      ],
+      "evidence": {
+        "evidence_kind": "guest_capability_metric",
+        "package_id": "psion.plugin.guest_capability_boundary.v1",
+        "package_digest": "6d8820a5d3d320e11ff5034de169ea3e839221e14958d7262091f68cba311c12",
+        "receipt_id": "receipt.psion.plugin.guest_capability_boundary.reference.v1",
+        "receipt_digest": "439d120ebba64177a9b59cc18b962633748f441d518d861ffdc2bedae057973b",
+        "metric_kind": "guest_plugin_unsupported_load_refusal_accuracy_bps",
+        "value_bps": 10000
+      },
+      "detail": "The mixed publication keeps generic guest loading and unadmitted digest claims blocked rather than implying arbitrary guest-artifact admission."
+    },
+    {
+      "region_id": "host_native_capability_free_local_deterministic",
+      "posture": "supported",
+      "claim_class": "plugin_class_boundary",
+      "plugin_class": "host_native_capability_free_local_deterministic",
+      "admitted_plugin_ids": [
+        "plugin.feed.rss_atom_parse",
+        "plugin.html.extract_readable",
+        "plugin.text.stats",
+        "plugin.text.url_extract"
+      ],
+      "detail": "The local-deterministic host-native class remains inside the mixed supported publication."
+    },
+    {
+      "region_id": "host_native_mixed.argument_construction",
+      "posture": "supported",
+      "claim_class": "plugin_use_region",
+      "route_labels": [
+        "delegate_to_admitted_plugin",
+        "request_missing_structure_for_plugin_use"
+      ],
+      "admitted_plugin_ids": [
+        "plugin.feed.rss_atom_parse",
+        "plugin.html.extract_readable",
+        "plugin.http.fetch_text",
+        "plugin.text.stats",
+        "plugin.text.url_extract"
+      ],
+      "evidence": {
+        "evidence_kind": "mixed_benchmark",
+        "benchmark_family": "argument_construction",
+        "evaluation_receipt_id": "receipt.psion.plugin_mixed_reference.evaluation.v1",
+        "evaluation_receipt_digest": "69cb0d1cc8e13204679aa251150b2161e4f513ad043035950b15cd86e50ad5f8",
+        "comparison_label": "psion_plugin_host_native_reference",
+        "comparison_reference_run_bundle_ref": "fixtures/psion/plugins/training/psion_plugin_host_native_reference_lane_v1/psion_plugin_host_native_reference_run_bundle.json",
+        "comparison_reference_run_bundle_digest": "47769a52c125de28b0a07ce11b1f44e38d9fe7bde03a5aa7819145515bdf0ce2",
+        "eligible_item_count": 6,
+        "out_of_scope_item_count": 0,
+        "host_native_reference_score_bps": 10000,
+        "mixed_score_bps": 10000,
+        "delta_vs_host_native_bps": 0
+      },
+      "detail": "The mixed lane may construct typed arguments or request missing structure across the admitted host-native plugin set, including the bounded networked_read_only fetch plugin."
+    },
+    {
+      "region_id": "host_native_mixed.discovery_selection",
+      "posture": "supported",
+      "claim_class": "plugin_use_region",
+      "route_labels": [
+        "answer_in_language",
+        "delegate_to_admitted_plugin",
+        "refuse_unsupported_plugin_or_capability"
+      ],
+      "admitted_plugin_ids": [
+        "plugin.feed.rss_atom_parse",
+        "plugin.html.extract_readable",
+        "plugin.http.fetch_text",
+        "plugin.text.stats",
+        "plugin.text.url_extract"
+      ],
+      "evidence": {
+        "evidence_kind": "mixed_benchmark",
+        "benchmark_family": "discovery_selection",
+        "evaluation_receipt_id": "receipt.psion.plugin_mixed_reference.evaluation.v1",
+        "evaluation_receipt_digest": "69cb0d1cc8e13204679aa251150b2161e4f513ad043035950b15cd86e50ad5f8",
+        "comparison_label": "psion_plugin_host_native_reference",
+        "comparison_reference_run_bundle_ref": "fixtures/psion/plugins/training/psion_plugin_host_native_reference_lane_v1/psion_plugin_host_native_reference_run_bundle.json",
+        "comparison_reference_run_bundle_digest": "47769a52c125de28b0a07ce11b1f44e38d9fe7bde03a5aa7819145515bdf0ce2",
+        "eligible_item_count": 5,
+        "out_of_scope_item_count": 0,
+        "host_native_reference_score_bps": 10000,
+        "mixed_score_bps": 10000,
+        "delta_vs_host_native_bps": 0
+      },
+      "detail": "The mixed lane may route across the admitted host-native plugin set, including the bounded networked_read_only fetch plugin, without flattening guest-artifact boundaries into generic plugin support."
+    },
+    {
+      "region_id": "host_native_mixed.refusal_request_structure",
+      "posture": "supported",
+      "claim_class": "plugin_use_region",
+      "route_labels": [
+        "answer_in_language",
+        "request_missing_structure_for_plugin_use",
+        "refuse_unsupported_plugin_or_capability"
+      ],
+      "admitted_plugin_ids": [
+        "plugin.feed.rss_atom_parse",
+        "plugin.html.extract_readable",
+        "plugin.http.fetch_text",
+        "plugin.text.stats",
+        "plugin.text.url_extract"
+      ],
+      "evidence": {
+        "evidence_kind": "mixed_benchmark",
+        "benchmark_family": "refusal_request_structure",
+        "evaluation_receipt_id": "receipt.psion.plugin_mixed_reference.evaluation.v1",
+        "evaluation_receipt_digest": "69cb0d1cc8e13204679aa251150b2161e4f513ad043035950b15cd86e50ad5f8",
+        "comparison_label": "psion_plugin_host_native_reference",
+        "comparison_reference_run_bundle_ref": "fixtures/psion/plugins/training/psion_plugin_host_native_reference_lane_v1/psion_plugin_host_native_reference_run_bundle.json",
+        "comparison_reference_run_bundle_digest": "47769a52c125de28b0a07ce11b1f44e38d9fe7bde03a5aa7819145515bdf0ce2",
+        "eligible_item_count": 5,
+        "out_of_scope_item_count": 0,
+        "host_native_reference_score_bps": 10000,
+        "mixed_score_bps": 10000,
+        "delta_vs_host_native_bps": 0
+      },
+      "detail": "The mixed lane may request missing structure, refuse unsupported capability, and reject overdelegation across the admitted host-native plugin set while keeping publication and arbitrary-loading claims blocked."
+    },
+    {
+      "region_id": "host_native_mixed.result_interpretation",
+      "posture": "supported",
+      "claim_class": "plugin_use_region",
+      "route_labels": [
+        "answer_in_language"
+      ],
+      "admitted_plugin_ids": [
+        "plugin.feed.rss_atom_parse",
+        "plugin.html.extract_readable",
+        "plugin.http.fetch_text",
+        "plugin.text.stats",
+        "plugin.text.url_extract"
+      ],
+      "evidence": {
+        "evidence_kind": "mixed_benchmark",
+        "benchmark_family": "result_interpretation",
+        "evaluation_receipt_id": "receipt.psion.plugin_mixed_reference.evaluation.v1",
+        "evaluation_receipt_digest": "69cb0d1cc8e13204679aa251150b2161e4f513ad043035950b15cd86e50ad5f8",
+        "comparison_label": "psion_plugin_host_native_reference",
+        "comparison_reference_run_bundle_ref": "fixtures/psion/plugins/training/psion_plugin_host_native_reference_lane_v1/psion_plugin_host_native_reference_run_bundle.json",
+        "comparison_reference_run_bundle_digest": "47769a52c125de28b0a07ce11b1f44e38d9fe7bde03a5aa7819145515bdf0ce2",
+        "eligible_item_count": 3,
+        "out_of_scope_item_count": 0,
+        "host_native_reference_score_bps": 10000,
+        "mixed_score_bps": 10000,
+        "delta_vs_host_native_bps": 0
+      },
+      "detail": "The mixed lane may continue in language over receipt-backed host-native results across the admitted host-native plugin set without implying hidden execution."
+    },
+    {
+      "region_id": "host_native_mixed.sequencing_multi_call",
+      "posture": "supported",
+      "claim_class": "plugin_use_region",
+      "route_labels": [
+        "delegate_to_admitted_plugin"
+      ],
+      "admitted_plugin_ids": [
+        "plugin.feed.rss_atom_parse",
+        "plugin.html.extract_readable",
+        "plugin.http.fetch_text",
+        "plugin.text.stats",
+        "plugin.text.url_extract"
+      ],
+      "evidence": {
+        "evidence_kind": "mixed_benchmark",
+        "benchmark_family": "sequencing_multi_call",
+        "evaluation_receipt_id": "receipt.psion.plugin_mixed_reference.evaluation.v1",
+        "evaluation_receipt_digest": "69cb0d1cc8e13204679aa251150b2161e4f513ad043035950b15cd86e50ad5f8",
+        "comparison_label": "psion_plugin_host_native_reference",
+        "comparison_reference_run_bundle_ref": "fixtures/psion/plugins/training/psion_plugin_host_native_reference_lane_v1/psion_plugin_host_native_reference_run_bundle.json",
+        "comparison_reference_run_bundle_digest": "47769a52c125de28b0a07ce11b1f44e38d9fe7bde03a5aa7819145515bdf0ce2",
+        "eligible_item_count": 5,
+        "out_of_scope_item_count": 0,
+        "host_native_reference_score_bps": 0,
+        "mixed_score_bps": 10000,
+        "delta_vs_host_native_bps": 10000
+      },
+      "detail": "The mixed lane may now publish bounded multi-call sequencing over the admitted host-native plugin set because the mixed comparison receipt closes the prior zero-eligible-item gap."
+    },
+    {
+      "region_id": "host_native_networked_read_only",
+      "posture": "supported",
+      "claim_class": "plugin_class_boundary",
+      "plugin_class": "host_native_networked_read_only",
+      "admitted_plugin_ids": [
+        "plugin.http.fetch_text"
+      ],
+      "detail": "The bounded networked_read_only class now moves from substrate-proved to supported in the mixed learned publication."
+    },
+    {
+      "region_id": "host_native_secret_backed_or_stateful",
+      "posture": "unsupported",
+      "claim_class": "plugin_class_boundary",
+      "plugin_class": "host_native_secret_backed_or_stateful",
+      "detail": "Secret-backed and stateful host-native plugins remain outside the mixed publication and are not implied by the mixed learned lane."
+    },
+    {
+      "region_id": "plugin_publication_or_marketplace",
+      "posture": "blocked",
+      "claim_class": "publication_boundary",
+      "evidence": {
+        "evidence_kind": "guest_capability_metric",
+        "package_id": "psion.plugin.guest_capability_boundary.v1",
+        "package_digest": "6d8820a5d3d320e11ff5034de169ea3e839221e14958d7262091f68cba311c12",
+        "receipt_id": "receipt.psion.plugin.guest_capability_boundary.reference.v1",
+        "receipt_digest": "439d120ebba64177a9b59cc18b962633748f441d518d861ffdc2bedae057973b",
+        "metric_kind": "guest_plugin_publication_boundary_accuracy_bps",
+        "value_bps": 10000
+      },
+      "detail": "The mixed publication still blocks plugin publication, marketplace, and external catalog claims for the guest lane."
+    },
+    {
+      "region_id": "public_plugin_universality",
+      "posture": "blocked",
+      "claim_class": "publication_boundary",
+      "evidence": {
+        "evidence_kind": "guest_capability_metric",
+        "package_id": "psion.plugin.guest_capability_boundary.v1",
+        "package_digest": "6d8820a5d3d320e11ff5034de169ea3e839221e14958d7262091f68cba311c12",
+        "receipt_id": "receipt.psion.plugin.guest_capability_boundary.reference.v1",
+        "receipt_digest": "439d120ebba64177a9b59cc18b962633748f441d518d861ffdc2bedae057973b",
+        "metric_kind": "guest_plugin_served_universality_boundary_accuracy_bps",
+        "value_bps": 10000
+      },
+      "detail": "The mixed publication still blocks served/public plugin universality claims."
+    }
+  ],
+  "summary": "The mixed capability matrix publishes supported host-native regions over the admitted mixed host-native set, one bounded guest admitted-use region, and benchmark-backed blocked rows for generic guest loading, publication, universality, and arbitrary-binary overclaims.",
+  "matrix_digest": "7d011fd731396d7ea411d18fb9393e3117223f1a5a142f55318893d0e0759d3b"
+}
