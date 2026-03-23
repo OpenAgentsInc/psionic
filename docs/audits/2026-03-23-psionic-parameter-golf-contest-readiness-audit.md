@@ -440,6 +440,568 @@ The shortest honest restart path is:
 7. Only after those steps, revisit record-track promotion.
    That is the role the old `PGOLF-606` promotion issue was meant to play.
 
+## Suggested Google Issue Program
+
+The repo now has a real Google operator substrate for bounded `Psion` training,
+but none of that is currently wired to the Parameter Golf lane.
+
+The right next tranche is therefore not "invent new cloud infrastructure from
+scratch." It is:
+
+- reuse the existing `openagentsgemini` Google project, bucket, service
+  account, preflight, launch, finalizer, and cost-receipt substrate where it
+  fits
+- add the missing Parameter Golf-specific trainer and H100 operator surfaces
+- only then attempt real Google-backed Parameter Golf evidence
+
+The issue set below is designed to be copied into GitHub as the new
+Google-resumption tranche.
+
+Recommended order:
+
+1. `PGOLF_GOOGLE-1`
+2. `PGOLF_GOOGLE-2`
+3. `PGOLF_GOOGLE-3`
+4. `PGOLF_GOOGLE-4`
+5. `PGOLF_GOOGLE-5`
+6. `PGOLF_GOOGLE-6`
+7. `PGOLF_GOOGLE-7`
+8. `PGOLF_GOOGLE-8`
+9. `PGOLF_GOOGLE-9`
+10. `PGOLF_GOOGLE-10`
+11. `PGOLF_GOOGLE-11`
+
+### `PGOLF_GOOGLE-1: Restore The Rust-Only Single-H100 Parameter Golf Baseline Trainer`
+
+**Summary**
+
+Restore the unfinished `PGOLF-604` execution gap by turning the current
+single-H100 bring-up seam into a real Psionic-owned single-H100 baseline
+trainer that consumes the cached FineWeb or SP1024 challenge data, trains on
+CUDA, and emits challenge-comparable outputs without invoking
+`python3 train_gpt.py` on the actual training critical path.
+
+**Why**
+
+The current repo already has:
+
+- challenge-oracle parity
+- the compact Parameter Golf decoder family
+- a bounded local-reference trainer
+- the single-H100 bring-up seam
+
+But it still does not have the most important thing needed for a real contest
+attempt:
+
+- one documented Rust-only H100 training path that produces real training
+  artifacts, `val_loss`, `val_bpb`, and compressed-model bytes directly from
+  `psionic`
+
+Without this issue, the Google tranche would still be built on a missing core
+trainer path.
+
+**Depends On**
+
+- current committed Parameter Golf foundation in `psionic-data`,
+  `psionic-models`, `psionic-eval`, and `psionic-train`
+
+**Scope**
+
+- extend `parameter_golf_single_h100_bringup` or add one new Rust entrypoint
+  that performs the real baseline train loop end to end
+- bind the command to the cached FineWeb `sp1024` shard contract and tokenizer
+  contract already modeled in `psionic-data`
+- run with
+  `ParameterGolfBatchGeometry::challenge_single_device_defaults()`
+- emit challenge-style outputs directly from the Rust path:
+  - step logs
+  - final `val_loss`
+  - final `val_bpb`
+  - compressed-model bytes
+  - artifact-byte accounting inputs
+- preserve explicit refusal when the machine contract, dataset root, tokenizer
+  path, or CUDA capability is invalid
+
+**Non-Goals**
+
+- no `8xH100` work yet
+- no record-track promotion yet
+- no new submission-folder contract yet
+
+**Acceptance Criteria**
+
+- one documented `cargo run` path on a qualifying H100 performs the baseline
+  training run end to end without `python3 train_gpt.py`
+- the run consumes cached FineWeb `sp1024` data rather than the bounded
+  local-reference fixture
+- the Rust path emits challenge-comparable logs and final metrics directly
+- the path still refuses explicitly on non-H100 or invalid-machine contracts
+
+### `PGOLF_GOOGLE-2: Profile And Reduce H100 View-Op And Host-Materialization Cost On The Baseline Path`
+
+**Summary**
+
+Resume the exact next engineering step preserved by the after-action record:
+profile and reduce host-materialized view-op cost on the real Parameter Golf
+baseline path so the restored single-H100 trainer is not bottlenecked by
+attention-adjacent data movement and view orchestration.
+
+**Why**
+
+The last honest H100 findings in the repo already identified the dominant next
+optimization direction:
+
+- `scaled_dot_product_attention`
+- `rotary_embedding`
+- `permute`
+- `expand`
+- `reshape`
+
+The lane stopped before the next optimization cycle landed. If this work stays
+undone, a real H100 trainer may exist in name but still be too inefficient to
+matter.
+
+**Depends On**
+
+- `PGOLF_GOOGLE-1`
+
+**Scope**
+
+- restore the bounded H100 trace workflow on the real Psionic baseline path
+- capture fresh forward-path and microbatch profiles on a qualifying H100
+- reduce host materialization or unnecessary copy costs where the current path
+  still widens tensors or views expensively
+- retain machine-readable profiling receipts or reports for the same path
+- keep any remaining runtime bottlenecks explicit rather than implying speed
+  closure
+
+**Non-Goals**
+
+- no `8xH100` distributed run yet
+- no claim that one optimization cycle alone reaches leaderboard speed
+
+**Acceptance Criteria**
+
+- one fresh H100 profile exists for the real Rust-only baseline trainer path
+- the current dominant view-op or host-materialization costs are materially
+  reduced or replaced by an explicit narrowed blocker list
+- the resulting path is the one later Google single-H100 runs actually use
+
+### `PGOLF_GOOGLE-3: Package Immutable FineWeb SP1024 Inputs For Google Parameter Golf Execution`
+
+**Summary**
+
+Add one repo-owned immutable Google input-package contract for Parameter Golf
+that binds the cached FineWeb `sp1024` shards, tokenizer identity, validation
+split identity, and dataset or tokenizer digests into a remote-execution
+package that the Google operator lane can consume without ambiguity.
+
+**Why**
+
+The current Google operator lane has no Parameter Golf input package at all.
+The contest lane also has stricter offline and reproducibility requirements than
+the current bounded Psion pilot lanes.
+
+Parameter Golf on Google therefore needs one explicit remote-input contract
+before any honest cloud runs begin.
+
+**Depends On**
+
+- current Parameter Golf data and oracle parity substrate in `psionic-data`
+
+**Scope**
+
+- define one immutable Google input-package descriptor for Parameter Golf
+  single-H100 runs
+- define one matching descriptor for later `8xH100` runs if the content shape
+  differs materially
+- bind dataset manifest digest, tokenizer digest, shard selection posture, and
+  fixed validation identity into the package
+- upload the package into the existing Google training bucket with stable
+  digests
+- make the input package usable by later Google manifests and final receipts
+
+**Non-Goals**
+
+- no contest submission-folder packaging here
+- no claim that the Google operator lane is already record-ready
+
+**Acceptance Criteria**
+
+- one committed Google Parameter Golf input-package descriptor exists
+- the descriptor binds the FineWeb `sp1024` contract and tokenizer identity by
+  digest
+- the package is materialized in GCS and can be referenced by later Google
+  launch profiles
+
+### `PGOLF_GOOGLE-4: Add A Google Single-H100 Operator Lane For The Psionic Parameter Golf Baseline`
+
+**Summary**
+
+Extend the existing `openagentsgemini` Google operator substrate with one
+Parameter Golf-specific single-H100 launch profile, runbook slice, preflight,
+and final-manifest surface that launches the real Rust-only Parameter Golf
+baseline trainer rather than the current generic Psion lanes.
+
+**Why**
+
+The repo already has Google operator tooling, but it is currently wired only to
+the `Psion` training lanes. Parameter Golf has:
+
+- no Google launch profile
+- no Google H100 preflight
+- no Google H100 runbook
+- no Google final-manifest authority for its own trainer path
+
+This is the first cloud integration step.
+
+**Depends On**
+
+- `PGOLF_GOOGLE-1`
+- `PGOLF_GOOGLE-3`
+
+**Scope**
+
+- add one Parameter Golf Google single-H100 launch profile
+- bind that profile to the Rust-only Parameter Golf trainer command
+- add preflight checks for the required H100 machine contract, quota, and cost
+  ceiling
+- preserve existing Google bucket, finalizer, accelerator-validation, and
+  cost-receipt seams where they fit
+- document the exact runbook for the bounded single-H100 Parameter Golf lane
+- keep machine-family, zone, and fallback posture explicit instead of implicit
+
+**Non-Goals**
+
+- no `8xH100` lane yet
+- no record-track claim yet
+
+**Acceptance Criteria**
+
+- one committed Google launch profile exists for the Parameter Golf H100 lane
+- the launch manifest records the Rust-only PGOLF trainer command explicitly
+- local preflight and manifest-only rehearsal both work for the new profile
+
+### `PGOLF_GOOGLE-5: Run And Audit The First Real Google Single-H100 Psionic Parameter Golf Baseline`
+
+**Summary**
+
+Execute and audit the first real Google-hosted single-H100 Parameter Golf
+baseline run using the new Psionic-owned Rust trainer path, the committed
+Google input package, and the Google operator lane.
+
+**Why**
+
+Until this run exists, the repo still lacks a truthful cloud proof that the
+Rust-only Parameter Golf training path works on real remote H100 hardware.
+
+This is the cloud equivalent of closing the old `PGOLF-604` gap.
+
+**Depends On**
+
+- `PGOLF_GOOGLE-2`
+- `PGOLF_GOOGLE-4`
+
+**Scope**
+
+- one bounded Google single-H100 Parameter Golf run
+- full retained evidence:
+  - launch manifest
+  - training logs
+  - final metrics
+  - compressed-model bytes
+  - accelerator evidence
+  - run-cost receipt
+  - teardown proof
+- one follow-up audit that says clearly whether the single-H100 lane is now
+  real or still blocked
+
+**Non-Goals**
+
+- no `8xH100` distributed attempt yet
+- no leaderboard or record-track claim yet
+
+**Acceptance Criteria**
+
+- one real Google single-H100 run completes or fails with preserved cause
+- successful runs emit final `val_loss`, final `val_bpb`, and compressed-model
+  bytes from the Rust path itself
+- one audit records the exact outcome and current claim boundary
+
+### `PGOLF_GOOGLE-6: Bind The Exported Submission Folder To A Real Psionic Training Runtime`
+
+**Summary**
+
+Replace the current replay-only exported-folder runtime posture with a real
+Psionic execution payload that can perform the Parameter Golf training or eval
+workflow needed by later Google contest runs from the exported submission
+surface itself.
+
+**Why**
+
+The current exported folder is honest but deliberately narrow:
+
+- `train_gpt.py` launches a shipped Psionic runtime
+- that runtime replays bounded validation on a shipped local-reference fixture
+- it does not perform the real challenge training loop
+
+The full contest path needs the exported-folder runtime to represent the actual
+Psionic execution path, not only a review-time replay path.
+
+**Depends On**
+
+- `PGOLF_GOOGLE-1`
+- `PGOLF_GOOGLE-5`
+
+**Scope**
+
+- upgrade the exported-folder runtime payload so it can perform the real
+  bounded Parameter Golf training or evaluation path needed for later Google
+  evidence
+- keep the folder self-contained and compatible with the contest repo contract
+- preserve explicit counted-byte accounting for the shipped runtime and model
+- keep offline evaluation posture explicit
+
+**Non-Goals**
+
+- no immediate record-track approval
+- no external PR yet
+
+**Acceptance Criteria**
+
+- one exported folder can invoke a real Psionic Parameter Golf execution path
+  instead of replay-only local-reference validation
+- the challenge-clone compatibility and replay-verification gates still pass
+- the runtime payload and accounting receipts stay machine-readable
+
+### `PGOLF_GOOGLE-7: Add A Google 8xH100 Parameter Golf Operator Lane`
+
+**Summary**
+
+Add one Google `8xH100` Parameter Golf operator lane that binds the public
+challenge `WORLD_SIZE=8` posture, the existing distributed receipt lane, the
+real execution payload, and the current Google launch and finalizer substrate
+into one committed cloud operator path.
+
+**Why**
+
+The contest bar is still defined by:
+
+- training in under `10` minutes on `8xH100`
+
+The repo already has distributed receipts and distributed geometry, but there
+is still no real Google `8xH100` operator lane.
+
+**Depends On**
+
+- `PGOLF_GOOGLE-3`
+- `PGOLF_GOOGLE-6`
+
+**Scope**
+
+- add one committed Google `8xH100` launch profile for Parameter Golf
+- preserve the public `WORLD_SIZE=8`, `grad_accum_steps=1` posture in the
+  launch manifest and distributed receipts
+- add preflight for H100 inventory, zonal capacity, runtime ceiling, and cost
+  ceiling
+- preserve topology, communication, timing, memory, and accelerator evidence
+  in the final bundle
+- make the machine-family or topology choice explicit rather than implicit; if
+  Google requires a specific `8xH100` family or pod shape, record that exact
+  choice in the profile
+
+**Non-Goals**
+
+- no record-track promotion yet
+- no silent fallback to weaker machines
+
+**Acceptance Criteria**
+
+- one committed Google `8xH100` PGOLF launch profile exists
+- local preflight can validate it
+- manifest-only rehearsal works
+- the finalizer and receipts preserve distributed evidence for this lane
+
+### `PGOLF_GOOGLE-8: Capture The First Real Google 8xH100 Exported-Folder Evidence Bundle`
+
+**Summary**
+
+Run the real exported submission surface on the Google `8xH100` lane and retain
+the full evidence bundle that the old `PGOLF-602` issue was intended to
+capture.
+
+**Why**
+
+This is the missing proof that turns the current distributed lane from contract
+truth into real contest-execution evidence.
+
+The key requirement is that the run be tied to:
+
+- the exact exported entrypoint
+- the exact shipped artifact bytes
+- the actual `8xH100` Google execution
+
+**Depends On**
+
+- `PGOLF_GOOGLE-6`
+- `PGOLF_GOOGLE-7`
+
+**Scope**
+
+- run the exported submission surface on real Google `8xH100` hardware
+- retain run bundles, train logs, wallclock receipts, memory receipts, final
+  metrics, and artifact-size receipts
+- bind the evidence to the exact exported-folder entrypoint digest and shipped
+  artifact bytes
+- preserve explicit measured-or-refused posture if the run misses the challenge
+  bar
+
+**Non-Goals**
+
+- no SOTA or leaderboard claim yet
+- no significance campaign yet
+
+**Acceptance Criteria**
+
+- one real `8xH100` evidence bundle exists for the exported-folder path
+- the evidence cites the exact entrypoint and artifact bytes used by the run
+- the run outcome is explicit about whether it clears or misses the challenge
+  bar
+
+### `PGOLF_GOOGLE-9: Defend Record-Track Counted-Runtime And Build-Dependency Posture For The Google Execution Payload`
+
+**Summary**
+
+Retire the current record-track accounting blocker by defending the exact
+counted-runtime and build-dependency story for the real Psionic execution
+payload used on the Google Parameter Golf lane.
+
+**Why**
+
+The current record-track contract still blocks on:
+
+- counted-runtime posture
+- build-dependency posture
+
+For a real pure-Psionic contest path, the repo must answer exactly what bytes
+count when the exported folder carries a Psionic runtime payload and any
+supporting files required for evaluation.
+
+**Depends On**
+
+- `PGOLF_GOOGLE-6`
+- `PGOLF_GOOGLE-8`
+
+**Scope**
+
+- enumerate the exact shipped runtime payload used by the Google-backed
+  Parameter Golf exported folder
+- defend which files count as code bytes and which count as compressed-model
+  bytes
+- defend whether any build-time dependencies are shipped, required, or avoided
+- update the record-track contract, accounting docs, and receipts accordingly
+- keep the answer explicit and machine-readable
+
+**Non-Goals**
+
+- no performance claim by accounting alone
+- no external maintainer claim if the accounting story remains ambiguous
+
+**Acceptance Criteria**
+
+- the record-track contract no longer treats counted-runtime posture as an
+  unnamed blocker
+- the accounting answer is explicit for the Google-backed execution payload
+- later record-track claims can point to one clear counted-runtime contract
+
+### `PGOLF_GOOGLE-10: Freeze One Google-Backed Record Candidate And Run A Repeated Evidence Campaign`
+
+**Summary**
+
+Freeze one exact Google-backed Parameter Golf candidate family and run a real
+campaign with repeated evidence bundles, explicit promotion receipts, and
+stable campaign identity.
+
+**Why**
+
+The repo already named this missing step in the old `PGOLF-609` issue:
+
+- there is still no single frozen candidate configuration
+- no repeated evidence bundle set
+- no promotion logic tied to one stable candidate
+
+Without this step, later runs remain ad hoc.
+
+**Depends On**
+
+- `PGOLF_GOOGLE-8`
+- `PGOLF_GOOGLE-9`
+
+**Scope**
+
+- choose one exact candidate family for the first serious campaign
+- freeze architecture, tokenizer, accounting posture, and run recipe
+- run repeated Google-backed evidence bundles for that exact candidate
+- retain final metrics, wallclock, artifact bytes, and promotion receipts
+- tie any significance or systems-only waiver posture to this exact candidate
+
+**Non-Goals**
+
+- no parallel multi-candidate zoo
+- no external submission until the campaign evidence is internally coherent
+
+**Acceptance Criteria**
+
+- one named record-candidate campaign exists with a frozen config
+- repeated evidence bundles are preserved for that candidate
+- promotion decisions are tied to the frozen candidate and explicit receipts
+
+### `PGOLF_GOOGLE-11: Produce The Full Google-Hosted Parameter Golf Submission Dry Run And Final Readiness Audit`
+
+**Summary**
+
+Produce the final Google-hosted end-to-end submission dry run for Parameter
+Golf, including the exported record folder, local challenge-clone dry run,
+promotion receipts, and a final readiness audit that says explicitly whether
+the repo should submit or still hold.
+
+**Why**
+
+A full Google-backed contest path is only complete when the repo can point to
+one integrated dry run that joins:
+
+- the real execution evidence
+- the exported folder
+- the counted-runtime contract
+- the promotion posture
+- the final do-submit or do-not-submit decision
+
+**Depends On**
+
+- `PGOLF_GOOGLE-10`
+
+**Scope**
+
+- generate the final exported submission folder from the Google-backed evidence
+- run the local `parameter-golf` clone dry run again on that final folder
+- preserve final PR-bundle or maintainer-facing review artifacts
+- write one final readiness audit that compares the result against the current
+  public contest README requirements
+- keep the external submission itself out of scope unless the user explicitly
+  asks for it
+
+**Non-Goals**
+
+- no automatic PR to `openai/parameter-golf`
+- no claim stronger than the final evidence bundle supports
+
+**Acceptance Criteria**
+
+- one final Google-hosted submission dry run exists with linked evidence
+- the local challenge-clone dry run passes on the final folder
+- one final readiness audit says explicitly whether the repo is ready to submit
+  or still blocked
+
 ## Validation Performed For This Audit
 
 I validated the current committed lane with:
