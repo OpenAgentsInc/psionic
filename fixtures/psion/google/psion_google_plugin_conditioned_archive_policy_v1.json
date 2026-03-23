@@ -1,0 +1,15 @@
+{
+  "schema_version": "psion.google_plugin_conditioned_archive_policy.v1",
+  "policy_id": "openagentsgemini-psion-google-plugin-conditioned-archive-v1",
+  "project_id": "openagentsgemini",
+  "bucket_url": "gs://openagentsgemini-psion-train-us-central1",
+  "checkpoint_archive_prefix": "gs://openagentsgemini-psion-train-us-central1/checkpoints/plugin_conditioned",
+  "archive_manifest_name": "psion_google_plugin_conditioned_archive_manifest.json",
+  "archive_mode": "logical_checkpoint_evidence_only",
+  "storage_profile": {
+    "hot_retention_ms": 5000,
+    "warm_retention_ms": 30000,
+    "archive_class": "restorable",
+    "cold_restore_sla_ms": 45000
+  }
+}

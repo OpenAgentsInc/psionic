@@ -35,6 +35,13 @@ metadata_value() {
     "http://metadata.google.internal/computeMetadata/v1/instance/attributes/${key}"
 }
 
+metadata_value_optional() {
+  local key="$1"
+  curl -fsSL -H "Metadata-Flavor: Google" \
+    "http://metadata.google.internal/computeMetadata/v1/instance/attributes/${key}" \
+    2>/dev/null || true
+}
+
 compute_sha256() {
   local path="$1"
   if command -v sha256sum >/dev/null 2>&1; then
@@ -310,9 +317,10 @@ main() {
   local apt_packages
   local input_package_descriptor_uri input_package_archive_uri input_package_archive_sha256
   local input_package_manifest_sha256 input_materialization_mode
+  local post_training_archive_command post_training_restore_command
   local output_dir log_dir scratch_dir repo_dir entrypoint_file input_root
   local input_descriptor_path input_archive_path input_package_root input_manifest_path
-  local archive_manifest_file cold_restore_manifest_file
+  local archive_manifest_file cold_restore_manifest_file archive_exit restore_exit
 
   BOOTSTRAP_STARTED_AT_UTC="$(timestamp_utc)"
 
@@ -334,6 +342,8 @@ main() {
   input_package_archive_sha256="$(metadata_value psion-input-package-archive-sha256)"
   input_package_manifest_sha256="$(metadata_value psion-input-package-manifest-sha256)"
   input_materialization_mode="$(metadata_value psion-input-materialization-mode)"
+  post_training_archive_command="$(metadata_value_optional psion-post-training-archive-command)"
+  post_training_restore_command="$(metadata_value_optional psion-post-training-restore-command)"
   LAUNCH_MANIFEST_URI="$(metadata_value psion-launch-manifest-uri)"
 
   echo "psion google startup: run=${run_id} repo=${repo_clone_url} revision=${git_revision}"
@@ -411,8 +421,10 @@ main() {
   export PSION_OUTPUT_DIR="${output_dir}"
   export PSION_LOG_DIR="${log_dir}"
   export PSION_SCRATCH_DIR="${scratch_dir}"
+  export PSION_REPO_DIR="${repo_dir}"
   export PSION_INPUT_PACKAGE_ROOT="${input_package_root}"
   export PSION_INPUT_PACKAGE_DESCRIPTOR="${input_descriptor_path}"
+  export PSION_INPUT_PACKAGE_DESCRIPTOR_URI="${input_package_descriptor_uri}"
   export PSION_INPUT_PACKAGE_MANIFEST="${input_manifest_path}"
   export PSION_INPUT_MATERIALIZATION_MODE="${input_materialization_mode}"
   export CARGO_TARGET_DIR="${scratch_dir}/cargo-target"
@@ -428,8 +440,10 @@ export PSION_WORKSPACE_ROOT="${PSION_WORKSPACE_ROOT}"
 export PSION_OUTPUT_DIR="${PSION_OUTPUT_DIR}"
 export PSION_LOG_DIR="${PSION_LOG_DIR}"
 export PSION_SCRATCH_DIR="${PSION_SCRATCH_DIR}"
+export PSION_REPO_DIR="${PSION_REPO_DIR}"
 export PSION_INPUT_PACKAGE_ROOT="${PSION_INPUT_PACKAGE_ROOT}"
 export PSION_INPUT_PACKAGE_DESCRIPTOR="${PSION_INPUT_PACKAGE_DESCRIPTOR}"
+export PSION_INPUT_PACKAGE_DESCRIPTOR_URI="${PSION_INPUT_PACKAGE_DESCRIPTOR_URI}"
 export PSION_INPUT_PACKAGE_MANIFEST="${PSION_INPUT_PACKAGE_MANIFEST}"
 export PSION_INPUT_MATERIALIZATION_MODE="${PSION_INPUT_MATERIALIZATION_MODE}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR}"
@@ -460,26 +474,81 @@ EOF
   fi
   emit_event "training_completed" "Reference pilot bundle completed without a non-zero process exit."
 
-  if [[ -f "${output_dir}/psion_reference_pilot_checkpoint_manifest.json" ]]; then
+  if [[ -n "${post_training_archive_command}" ]]; then
+    RUN_PHASE="artifact_upload"
+    archive_manifest_file="${scratch_dir}/psion_google_checkpoint_archive_manifest.json"
+    export PSION_ARCHIVE_MANIFEST_OUT="${archive_manifest_file}"
+    emit_event "checkpoint_archive_started" "Running the lane-specific post-training archive command."
+    set +e
+    bash -lc "${post_training_archive_command}" \
+      > "${log_dir}/checkpoint_archive.stdout.log" \
+      2> "${log_dir}/checkpoint_archive.stderr.log"
+    archive_exit="$?"
+    set -e
+    if (( archive_exit != 0 )); then
+      FAILURE_CODE="artifact_upload_failure"
+      FAILURE_DETAIL="archive command exited with status ${archive_exit}"
+      TRAINING_EXIT_CODE="${archive_exit}"
+      emit_event "checkpoint_archive_failed" "${FAILURE_DETAIL}"
+      finalize_run
+      exit "${archive_exit}"
+    fi
+    if [[ ! -f "${archive_manifest_file}" ]]; then
+      FAILURE_CODE="artifact_upload_failure"
+      FAILURE_DETAIL="archive command did not write ${archive_manifest_file}"
+      emit_event "checkpoint_archive_failed" "${FAILURE_DETAIL}"
+      finalize_run
+      exit 1
+    fi
+    ARCHIVE_MANIFEST_URI="$(jq -r '.archive_manifest_uri // empty' "${archive_manifest_file}")"
+    if [[ -z "${ARCHIVE_MANIFEST_URI}" ]]; then
+      FAILURE_CODE="artifact_upload_failure"
+      FAILURE_DETAIL="archive manifest did not include archive_manifest_uri"
+      emit_event "checkpoint_archive_failed" "${FAILURE_DETAIL}"
+      finalize_run
+      exit 1
+    fi
     CHECKPOINT_COMPLETED_AT_UTC="$(timestamp_utc)"
-    emit_event "checkpoint_emitted" "Reference pilot emitted a checkpoint manifest and dense weights artifact."
+    export PSION_ARCHIVE_MANIFEST_URI="${ARCHIVE_MANIFEST_URI}"
+    emit_event "checkpoint_archived" "Checkpoint archive manifest uploaded to GCS."
   fi
 
-  RUN_PHASE="artifact_upload"
-  archive_manifest_file="${scratch_dir}/psion_google_checkpoint_archive_manifest.json"
-  bash "${repo_dir}/scripts/psion-google-archive-reference-pilot-checkpoint.sh" \
-    --manifest-out "${archive_manifest_file}" \
-    "${output_dir}" > "${log_dir}/checkpoint_archive.stdout.log"
-  ARCHIVE_MANIFEST_URI="$(jq -r '.archive_manifest_uri' "${archive_manifest_file}")"
-  emit_event "checkpoint_archived" "Checkpoint archive manifest uploaded to GCS."
-
-  RUN_PHASE="checkpoint_restore"
-  cold_restore_manifest_file="${scratch_dir}/psion_google_cold_restore_manifest.json"
-  bash "${repo_dir}/scripts/psion-google-cold-restore-reference-pilot.sh" \
-    --manifest-out "${cold_restore_manifest_file}" \
-    "${ARCHIVE_MANIFEST_URI}" > "${log_dir}/checkpoint_restore.stdout.log"
-  COLD_RESTORE_MANIFEST_URI="$(jq -r '.cold_restore_manifest_uri' "${cold_restore_manifest_file}")"
-  emit_event "checkpoint_restored" "Cold restore probe replayed resume_from_last_stable_checkpoint."
+  if [[ -n "${post_training_restore_command}" && -n "${ARCHIVE_MANIFEST_URI}" ]]; then
+    RUN_PHASE="checkpoint_restore"
+    cold_restore_manifest_file="${scratch_dir}/psion_google_cold_restore_manifest.json"
+    export PSION_COLD_RESTORE_MANIFEST_OUT="${cold_restore_manifest_file}"
+    emit_event "checkpoint_restore_started" "Running the lane-specific cold-restore command."
+    set +e
+    bash -lc "${post_training_restore_command}" \
+      > "${log_dir}/checkpoint_restore.stdout.log" \
+      2> "${log_dir}/checkpoint_restore.stderr.log"
+    restore_exit="$?"
+    set -e
+    if (( restore_exit != 0 )); then
+      FAILURE_CODE="checkpoint_restore_failure"
+      FAILURE_DETAIL="restore command exited with status ${restore_exit}"
+      TRAINING_EXIT_CODE="${restore_exit}"
+      emit_event "checkpoint_restore_failed" "${FAILURE_DETAIL}"
+      finalize_run
+      exit "${restore_exit}"
+    fi
+    if [[ ! -f "${cold_restore_manifest_file}" ]]; then
+      FAILURE_CODE="checkpoint_restore_failure"
+      FAILURE_DETAIL="restore command did not write ${cold_restore_manifest_file}"
+      emit_event "checkpoint_restore_failed" "${FAILURE_DETAIL}"
+      finalize_run
+      exit 1
+    fi
+    COLD_RESTORE_MANIFEST_URI="$(jq -r '.cold_restore_manifest_uri // empty' "${cold_restore_manifest_file}")"
+    if [[ -z "${COLD_RESTORE_MANIFEST_URI}" ]]; then
+      FAILURE_CODE="checkpoint_restore_failure"
+      FAILURE_DETAIL="cold restore manifest did not include cold_restore_manifest_uri"
+      emit_event "checkpoint_restore_failed" "${FAILURE_DETAIL}"
+      finalize_run
+      exit 1
+    fi
+    emit_event "checkpoint_restored" "Cold restore probe replayed the lane-specific archive posture."
+  fi
 
   finalize_run
   echo "psion google startup: run completed with failure_code=${FAILURE_CODE}"

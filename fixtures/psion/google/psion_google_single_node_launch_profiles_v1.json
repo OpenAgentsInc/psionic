@@ -37,7 +37,9 @@
       "python3"
     ],
     "rustup_default_toolchain": "stable",
-    "training_command": "cargo run -p psionic-train --example psion_reference_pilot_bundle -- \"$PSION_OUTPUT_DIR\""
+    "training_command": "cargo run -p psionic-train --example psion_reference_pilot_bundle -- \"$PSION_OUTPUT_DIR\"",
+    "post_training_archive_command": "bash \"$PSION_REPO_DIR/scripts/psion-google-archive-reference-pilot-checkpoint.sh\" --manifest-out \"$PSION_SCRATCH_DIR/psion_google_checkpoint_archive_manifest.json\" \"$PSION_OUTPUT_DIR\"",
+    "post_training_restore_command": "bash \"$PSION_REPO_DIR/scripts/psion-google-cold-restore-reference-pilot.sh\" --manifest-out \"$PSION_SCRATCH_DIR/psion_google_cold_restore_manifest.json\" \"$PSION_ARCHIVE_MANIFEST_URI\""
   },
   "teardown_policy": {
     "final_manifest_object": "final/psion_google_run_final_manifest.json",

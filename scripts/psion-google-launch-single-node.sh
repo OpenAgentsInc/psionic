@@ -7,6 +7,10 @@ PROFILE_ID="${PROFILE_ID:-g2_l4_single_node}"
 ZONE="${ZONE:-}"
 RUN_ID="${RUN_ID:-}"
 INSTANCE_NAME="${INSTANCE_NAME:-}"
+INPUT_PACKAGE_DESCRIPTOR_URI_OVERRIDE="${INPUT_PACKAGE_DESCRIPTOR_URI_OVERRIDE:-}"
+TRAINING_COMMAND_OVERRIDE="${TRAINING_COMMAND_OVERRIDE:-}"
+POST_TRAINING_ARCHIVE_COMMAND_OVERRIDE="${POST_TRAINING_ARCHIVE_COMMAND_OVERRIDE:-}"
+POST_TRAINING_RESTORE_COMMAND_OVERRIDE="${POST_TRAINING_RESTORE_COMMAND_OVERRIDE:-}"
 MANIFEST_ONLY=false
 
 usage() {
@@ -18,6 +22,13 @@ Options:
   --zone <zone>               Force one zone instead of walking the fallback order.
   --run-id <run_id>           Override the generated run id.
   --instance-name <name>      Override the generated instance name.
+  --input-package-descriptor-uri <uri>
+                              Override the committed input-package descriptor.
+  --training-command <cmd>    Override the repo-owned training command.
+  --post-training-archive-command <cmd>
+                              Override the post-training archive command.
+  --post-training-restore-command <cmd>
+                              Override the post-training restore command.
   --manifest-only             Upload the launch manifest and startup snapshot without creating a VM.
 EOF
 }
@@ -38,6 +49,22 @@ while [[ $# -gt 0 ]]; do
       ;;
     --instance-name)
       INSTANCE_NAME="$2"
+      shift 2
+      ;;
+    --input-package-descriptor-uri)
+      INPUT_PACKAGE_DESCRIPTOR_URI_OVERRIDE="$2"
+      shift 2
+      ;;
+    --training-command)
+      TRAINING_COMMAND_OVERRIDE="$2"
+      shift 2
+      ;;
+    --post-training-archive-command)
+      POST_TRAINING_ARCHIVE_COMMAND_OVERRIDE="$2"
+      shift 2
+      ;;
+    --post-training-restore-command)
+      POST_TRAINING_RESTORE_COMMAND_OVERRIDE="$2"
       shift 2
       ;;
     --manifest-only)
@@ -272,6 +299,8 @@ image_family="$(jq -r '.image_policy.image_family' "${LAUNCH_FILE}")"
 driver_posture="$(jq -r '.image_policy.driver_posture' "${LAUNCH_FILE}")"
 workspace_root="$(jq -r '.startup_policy.workspace_root' "${LAUNCH_FILE}")"
 training_command="$(jq -r '.startup_policy.training_command' "${LAUNCH_FILE}")"
+post_training_archive_command="$(jq -r '.startup_policy.post_training_archive_command // empty' "${LAUNCH_FILE}")"
+post_training_restore_command="$(jq -r '.startup_policy.post_training_restore_command // empty' "${LAUNCH_FILE}")"
 rust_toolchain="$(jq -r '.startup_policy.rustup_default_toolchain' "${LAUNCH_FILE}")"
 apt_packages="$(jq -r '.startup_policy.package_install | join(" ")' "${LAUNCH_FILE}")"
 final_manifest_object="$(jq -r '.teardown_policy.final_manifest_object' "${LAUNCH_FILE}")"
@@ -292,6 +321,18 @@ if [[ -z "${RUN_ID}" ]]; then
 fi
 if [[ -z "${INSTANCE_NAME}" ]]; then
   INSTANCE_NAME="${RUN_ID}"
+fi
+if [[ -n "${INPUT_PACKAGE_DESCRIPTOR_URI_OVERRIDE}" ]]; then
+  input_package_descriptor_uri="${INPUT_PACKAGE_DESCRIPTOR_URI_OVERRIDE}"
+fi
+if [[ -n "${TRAINING_COMMAND_OVERRIDE}" ]]; then
+  training_command="${TRAINING_COMMAND_OVERRIDE}"
+fi
+if [[ -n "${POST_TRAINING_ARCHIVE_COMMAND_OVERRIDE}" ]]; then
+  post_training_archive_command="${POST_TRAINING_ARCHIVE_COMMAND_OVERRIDE}"
+fi
+if [[ -n "${POST_TRAINING_RESTORE_COMMAND_OVERRIDE}" ]]; then
+  post_training_restore_command="${POST_TRAINING_RESTORE_COMMAND_OVERRIDE}"
 fi
 
 selected_zone=""
@@ -355,8 +396,12 @@ wait_for_object "${input_package_archive_uri}"
 manifest_file="${tmpdir}/psion_google_single_node_launch_manifest.json"
 training_command_file="${tmpdir}/training_command.sh"
 apt_packages_file="${tmpdir}/apt_packages.txt"
+post_training_archive_command_file="${tmpdir}/post_training_archive_command.sh"
+post_training_restore_command_file="${tmpdir}/post_training_restore_command.sh"
 printf '%s\n' "${training_command}" > "${training_command_file}"
 printf '%s\n' "${apt_packages}" > "${apt_packages_file}"
+printf '%s\n' "${post_training_archive_command}" > "${post_training_archive_command_file}"
+printf '%s\n' "${post_training_restore_command}" > "${post_training_restore_command_file}"
 
 jq -n \
   --arg schema_version "psion.google_single_node_launch_manifest.v1" \
@@ -400,6 +445,8 @@ jq -n \
   --arg repo_clone_url "${repo_clone_url}" \
   --arg git_revision "${git_revision}" \
   --arg training_command "${training_command}" \
+  --arg post_training_archive_command "${post_training_archive_command}" \
+  --arg post_training_restore_command "${post_training_restore_command}" \
   --arg workspace_root "${workspace_root}" \
   --arg output_subdir "output" \
   --arg log_subdir "logs" \
@@ -487,6 +534,8 @@ jq -n \
     },
     training: {
       command: $training_command,
+      post_training_archive_command: (if $post_training_archive_command == "" then null else $post_training_archive_command end),
+      post_training_restore_command: (if $post_training_restore_command == "" then null else $post_training_restore_command end),
       declared_run_cost_ceiling_usd: $declared_run_cost_ceiling_usd
     },
     artifact_paths: {
@@ -511,6 +560,13 @@ fi
 
 create_stdout_file="${tmpdir}/gcloud-create.stdout"
 create_stderr_file="${tmpdir}/gcloud-create.stderr"
+metadata_from_file_arg="startup-script=${STARTUP_SCRIPT},psion-training-command=${training_command_file},psion-apt-packages=${apt_packages_file}"
+if [[ -n "${post_training_archive_command}" ]]; then
+  metadata_from_file_arg="${metadata_from_file_arg},psion-post-training-archive-command=${post_training_archive_command_file}"
+fi
+if [[ -n "${post_training_restore_command}" ]]; then
+  metadata_from_file_arg="${metadata_from_file_arg},psion-post-training-restore-command=${post_training_restore_command_file}"
+fi
 if ! gcloud compute instances create "${INSTANCE_NAME}" \
   --project="${PROJECT_ID}" \
   --zone="${selected_zone}" \
@@ -529,7 +585,7 @@ if ! gcloud compute instances create "${INSTANCE_NAME}" \
   --image="${image_name}" \
   --image-project="${image_project}" \
   --metadata="enable-oslogin=TRUE,psion-run-id=${RUN_ID},psion-bucket-url=${bucket_url},psion-repo-clone-url=${repo_clone_url},psion-git-revision=${git_revision},psion-workspace-root=${workspace_root},psion-output-subdir=output,psion-log-subdir=logs,psion-scratch-subdir=scratch,psion-repo-subdir=repo,psion-low-disk-watermark-gb=${low_disk_watermark_gb},psion-rust-toolchain=${rust_toolchain},psion-input-package-descriptor-uri=${input_package_descriptor_uri},psion-input-package-archive-uri=${input_package_archive_uri},psion-input-package-archive-sha256=${input_package_archive_sha256},psion-input-package-manifest-sha256=${input_package_manifest_sha256},psion-input-materialization-mode=${input_materialization_mode},psion-launch-manifest-uri=${manifest_uri}" \
-  --metadata-from-file="startup-script=${STARTUP_SCRIPT},psion-training-command=${training_command_file},psion-apt-packages=${apt_packages_file}" >"${create_stdout_file}" 2>"${create_stderr_file}"; then
+  --metadata-from-file="${metadata_from_file_arg}" >"${create_stdout_file}" 2>"${create_stderr_file}"; then
   failure_detail="$(tr '\n' ' ' < "${create_stderr_file}" | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
   write_launch_failure_manifest "launch_capacity_failure" "${failure_detail}" "${create_stderr_file}"
   cat "${create_stderr_file}" >&2
