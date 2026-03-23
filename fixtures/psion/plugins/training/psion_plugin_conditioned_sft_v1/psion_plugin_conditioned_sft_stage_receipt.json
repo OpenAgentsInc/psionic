@@ -4,11 +4,11 @@
   "run_id": "run-psion-plugin-conditioned-reference",
   "stage_id": "run-psion-plugin-conditioned-reference-stage-2-agentic_sft",
   "checkpoint_family": "train.psion.plugin_conditioned.reference",
-  "stage_manifest_digest": "836576c1df62ab8ff42bc08afa4a617eb47dd06eca20d9467506366d106c0987",
-  "dataset_bundle_digest": "9e4bc8b26ed7bb71a19e6f48f37904986e321d51e9af5f6282fa50e61fc821b6",
-  "agentic_sft_transition_digest": "355d533ded13912bd82dc18136c0b8f99069c2bfce926c56ba62c36aed4f9b72",
-  "general_sft_completion_digest": "2e3b0cae08ef1199ef83bac989dd07b3bae5adebc13627883405843c60407a25",
-  "agentic_sft_completion_digest": "28bd44f657f88de297d680ce3d9171ed942d03b137fea18b8c5c2cf6cc80301a",
+  "stage_manifest_digest": "6a1b5e30a5f2a014535b9330e0f110acae196895e0441bb8a3fcefdc0b56c016",
+  "dataset_bundle_digest": "dbbb9fa5d2284f60c5407154f1c4e7a01703d329db7dede9de8865970d1f5e4a",
+  "agentic_sft_transition_digest": "8081d6e45d856ff2c6f19164fab7de003d8658b1a77d0533c1da0afe71b0b0da",
+  "general_sft_completion_digest": "e01bcdbf8489e74ba9243add1e60cc2987b8d77f678be3548a03ba1bdf841f7d",
+  "agentic_sft_completion_digest": "31e6a29de66c52e1d54eb8f2c03af993409e8a52fa5ccced89110e7309bcd2e4",
   "ingested_trace_count": 3,
   "execution_evidence_trace_count": 3,
   "eval_hook_count": 7,
@@ -49,5 +49,5 @@
     }
   ],
   "summary": "The first plugin-conditioned stage completed with one accepted trace per committed host-native train record and explicit replay plus held-out audit posture.",
-  "receipt_digest": "75e7aebd37a3e7d398b2f4a8b2740de99354cfeb8d363fe2a83320453a523b53"
+  "receipt_digest": "31b9d3ad2557968c2ede25dfdf2a27e01d3815f5d4a72bb9817438af6eb0da6d"
 }

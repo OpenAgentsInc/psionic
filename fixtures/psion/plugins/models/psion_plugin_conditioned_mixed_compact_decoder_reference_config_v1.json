@@ -1,12 +1,12 @@
 {
   "schema_version": "psionic.psion.plugin_conditioned_compact_decoder_reference.v1",
-  "lane_id": "psion_plugin_conditioned_host_native_reference",
-  "stage_manifest_digest": "6a1b5e30a5f2a014535b9330e0f110acae196895e0441bb8a3fcefdc0b56c016",
-  "stage_dataset_identity": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1",
+  "lane_id": "psion_plugin_conditioned_mixed_reference",
+  "stage_manifest_digest": "c9d41c1ec637efe84cd90b7e1a7d953127fe1ba4e64503bc3e77b38568897c6e",
+  "stage_dataset_identity": "dataset://openagents/psion/plugin_conditioned_mixed_reference@2026.03.22.v1",
   "descriptor": {
     "schema_version": "psion.compact_decoder_descriptor.v1",
     "model": {
-      "model_id": "psion-plugin-conditioned-compact-decoder-reference-v1",
+      "model_id": "psion-plugin-conditioned-mixed-compact-decoder-reference-v1",
       "family": "psion_decoder",
       "revision": "plugin-conditioned-v1"
     },
@@ -1624,16 +1624,16 @@
     "detail": "The first plugin-conditioned compact decoder uses the existing tokenizer and serializes plugin-use supervision as structured JSON with schema ids, tool names, and receipt refs in ordinary token space instead of adding bespoke plugin tokens."
   },
   "checkpoint_naming": {
-    "checkpoint_family": "train.psion.plugin_conditioned.reference",
-    "stage_run_bundle_ref": "fixtures/psion/plugins/training/psion_plugin_conditioned_sft_v1/psion_plugin_conditioned_sft_run_bundle.json",
-    "stage_manifest_digest": "6a1b5e30a5f2a014535b9330e0f110acae196895e0441bb8a3fcefdc0b56c016",
-    "checkpoint_ref_prefix": "checkpoint://psion/plugin_conditioned_host_native_reference",
-    "export_directory_name": "psion_plugin_conditioned_compact_decoder_reference",
+    "checkpoint_family": "train.psion.plugin_mixed_reference",
+    "stage_run_bundle_ref": "fixtures/psion/plugins/training/psion_plugin_mixed_reference_lane_v1/psion_plugin_mixed_reference_run_bundle.json",
+    "stage_manifest_digest": "c9d41c1ec637efe84cd90b7e1a7d953127fe1ba4e64503bc3e77b38568897c6e",
+    "checkpoint_ref_prefix": "checkpoint://psion/plugin_conditioned_mixed_reference",
+    "export_directory_name": "psion_plugin_conditioned_mixed_compact_decoder_reference",
     "descriptor_file_name": "descriptor.json",
     "checkpoint_file_name": "model.safetensors",
     "export_format_id": "psionic.decoder_state_dict.safetensors.v1",
-    "detail": "Checkpoint and export naming stay on the shared compact-decoder file contract while the checkpoint family and export directory are explicitly bound to the plugin-conditioned host-native lane."
+    "detail": "Checkpoint and export naming stay on the shared compact-decoder file contract while the checkpoint family and export directory are explicitly bound to the first mixed host-native plus guest-artifact lane."
   },
-  "summary": "The first plugin-conditioned compact-decoder config freezes one pilot-sized descriptor, one no-custom-token JSON serialization posture, and lane-bound checkpoint naming.",
-  "config_digest": "84ab98cf2d184a38b494cbcba3571778b0c42345b0e2e1aed40503700e494b2c"
+  "summary": "The first mixed reference lane reuses the plugin-conditioned compact-decoder family while binding the run to the mixed dataset identity and the bounded guest-artifact posture.",
+  "config_digest": "5489ee9d4fc028da235b46d646198933bf0509216bb8c1b7a5d192513c3745a1"
 }

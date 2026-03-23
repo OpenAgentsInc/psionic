@@ -184,6 +184,11 @@ and now also has:
   tranche and freezes the proved-class-only training boundary, the retained
   stage and learned-artifact receipts, and the benchmark-delta reporting
   posture against the named non-plugin baseline.
+- `docs/PSION_PLUGIN_MIXED_REFERENCE_LANE.md` is the canonical first bounded
+  mixed host-native plus guest-artifact plugin-conditioned lane doc for the
+  convergence tranche and freezes the mixed dataset binding, retained
+  guest-artifact training-example boundary, and explicit comparison posture
+  against the committed host-native reference lane.
 - `docs/PSION_PLUGIN_HOST_NATIVE_CAPABILITY_MATRIX_V1.md` is the canonical
   first publication doc for the host-native plugin-conditioned learned lane
   and freezes the served capability rows, explicit substrate-proved-but-outside

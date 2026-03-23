@@ -1,45 +1,45 @@
 {
-  "schema_version": "psionic.psion.plugin_host_native_reference_run_bundle.v1",
-  "bundle_id": "bundle.psion.plugin_host_native_reference.v1",
-  "lane_id": "psion_plugin_conditioned_host_native_reference",
+  "schema_version": "psionic.psion.plugin_mixed_reference_run_bundle.v1",
+  "bundle_id": "bundle.psion.plugin_mixed_reference.v1",
+  "lane_id": "psion_plugin_conditioned_mixed_reference",
   "stage_bundle": {
     "schema_version": "psionic.psion.plugin_conditioned_sft_run_bundle.v1",
-    "bundle_id": "bundle.psion.plugin_host_native_reference.stage.v1",
-    "run_id": "run-psion-plugin-host-native-reference",
-    "checkpoint_family": "train.psion.plugin_host_native_reference",
+    "bundle_id": "bundle.psion.plugin_mixed_reference.stage.v1",
+    "run_id": "run-psion-plugin-mixed-reference",
+    "checkpoint_family": "train.psion.plugin_mixed_reference",
     "stage_program": {
-      "run_id": "run-psion-plugin-host-native-reference",
-      "checkpoint_family": "train.psion.plugin_host_native_reference",
+      "run_id": "run-psion-plugin-mixed-reference",
+      "checkpoint_family": "train.psion.plugin_mixed_reference",
       "stages": [
         {
-          "stage_id": "run-psion-plugin-host-native-reference-stage-1-general_sft",
+          "stage_id": "run-psion-plugin-mixed-reference-stage-1-general_sft",
           "kind": "general_sft",
           "environment": {
-            "environment_ref": "env.psion.plugin_host_native_reference",
+            "environment_ref": "env.psion.plugin_mixed_reference",
             "version": "2026.03.22"
           },
           "status": "completed",
           "ingested_traces": [
             {
-              "run_id": "run-psion-plugin-host-native-reference",
-              "stage_id": "run-psion-plugin-host-native-reference-stage-1-general_sft",
-              "trace_id": "general-sft-host-native-bridge-trace",
+              "run_id": "run-psion-plugin-mixed-reference",
+              "stage_id": "run-psion-plugin-mixed-reference-stage-1-general_sft",
+              "trace_id": "general-sft-mixed-bridge-trace",
               "trace_kind": "long_context",
-              "lineage_digest": "2cf0c3ffd2ac2f15738ba094f725232217182f6d413a47754e0adca5ea4ad83f",
-              "accepted_at_ms": 1774228785288
+              "lineage_digest": "410a735e2579c9e2c68ce22af783a2fd8be38305e994df498f634fbac32232f9",
+              "accepted_at_ms": 1774228786105
             }
           ]
         },
         {
-          "stage_id": "run-psion-plugin-host-native-reference-stage-2-agentic_sft",
+          "stage_id": "run-psion-plugin-mixed-reference-stage-2-agentic_sft",
           "kind": "agentic_sft",
           "environment": {
-            "environment_ref": "env.psion.plugin_host_native_reference",
+            "environment_ref": "env.psion.plugin_mixed_reference",
             "version": "2026.03.22"
           },
           "status": "completed",
           "base_checkpoint": {
-            "checkpoint_family": "train.psion.plugin_host_native_reference",
+            "checkpoint_family": "train.psion.plugin_mixed_reference",
             "stream_id": "stream-1",
             "manifest_digest": "manifest-1",
             "object_digest": "object-1",
@@ -47,67 +47,75 @@
             "membership_epoch": 1,
             "cluster_state_digest": "cluster-digest",
             "topology_digest": "topology-digest",
-            "started_at_ms": 1001,
-            "checkpoint_ref": "checkpoint://psion/plugin_host_native_reference/1",
+            "started_at_ms": 2001,
+            "checkpoint_ref": "checkpoint://psion/plugin_conditioned_mixed_reference/1",
             "step": 1,
-            "durable_at_ms": 2001
+            "durable_at_ms": 3001
           },
           "ingested_traces": [
             {
-              "run_id": "run-psion-plugin-host-native-reference",
-              "stage_id": "run-psion-plugin-host-native-reference-stage-2-agentic_sft",
+              "run_id": "run-psion-plugin-mixed-reference",
+              "stage_id": "run-psion-plugin-mixed-reference-stage-2-agentic_sft",
+              "trace_id": "trace://psion_plugin_training.trace_record.starter_plugin.guest_artifact_success.v1.deterministic_workflow.v1",
+              "trace_kind": "tool_call",
+              "lineage_digest": "f6e28b29c72b5085a7bdd6908dafa146546b9aa7770b046a01b6d636d8c9b939",
+              "accepted_at_ms": 1774228786105
+            },
+            {
+              "run_id": "run-psion-plugin-mixed-reference",
+              "stage_id": "run-psion-plugin-mixed-reference-stage-2-agentic_sft",
               "trace_id": "trace://psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
               "trace_kind": "tool_call",
-              "lineage_digest": "eae6e461be4af1489d0b8624a7c92495f8711767f1218d8897b778bd3073d620",
-              "accepted_at_ms": 1774228785288
+              "lineage_digest": "3ae2f648ad35a5da1d5000f26b4f057cce53731fe4034d50c197562186cbba5b",
+              "accepted_at_ms": 1774228786105
             },
             {
-              "run_id": "run-psion-plugin-host-native-reference",
-              "stage_id": "run-psion-plugin-host-native-reference-stage-2-agentic_sft",
+              "run_id": "run-psion-plugin-mixed-reference",
+              "stage_id": "run-psion-plugin-mixed-reference-stage-2-agentic_sft",
               "trace_id": "trace://psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
               "trace_kind": "tool_call",
-              "lineage_digest": "ed69cf843d1b7fcfbbb64b65fb1b2d1bb8c523de14dca01ab3b175c546f64a0b",
-              "accepted_at_ms": 1774228785288
+              "lineage_digest": "476585864c2228baa5da7cf1f6a231c299afaa35857279123bfa31415442442a",
+              "accepted_at_ms": 1774228786105
             },
             {
-              "run_id": "run-psion-plugin-host-native-reference",
-              "stage_id": "run-psion-plugin-host-native-reference-stage-2-agentic_sft",
+              "run_id": "run-psion-plugin-mixed-reference",
+              "stage_id": "run-psion-plugin-mixed-reference-stage-2-agentic_sft",
               "trace_id": "trace://psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
               "trace_kind": "tool_call",
-              "lineage_digest": "21376c2599cfc6dd6f0e0220cc9ed8a16c47558718f4157e93e735788964f830",
-              "accepted_at_ms": 1774228785288
+              "lineage_digest": "bda08afaed7e113a5370e42d741bbe2c3d5a32554dca5bc75f9c338fc1d54437",
+              "accepted_at_ms": 1774228786105
             }
           ]
         }
       ],
       "completions": [
         {
-          "run_id": "run-psion-plugin-host-native-reference",
-          "stage_id": "run-psion-plugin-host-native-reference-stage-1-general_sft",
+          "run_id": "run-psion-plugin-mixed-reference",
+          "stage_id": "run-psion-plugin-mixed-reference-stage-1-general_sft",
           "kind": "general_sft",
           "ingested_trace_count": 1,
           "pretrain_run_count": 0,
-          "completed_at_ms": 1774228785288,
-          "completion_digest": "19b9414387480bde25e7810dd2d023798383ac02965bee18243469a6103aa1d3"
+          "completed_at_ms": 1774228786105,
+          "completion_digest": "4a0515aee93ec8f60f5528b6721b9265b44136b5b1504f067090d1463a7dbb90"
         },
         {
-          "run_id": "run-psion-plugin-host-native-reference",
-          "stage_id": "run-psion-plugin-host-native-reference-stage-2-agentic_sft",
+          "run_id": "run-psion-plugin-mixed-reference",
+          "stage_id": "run-psion-plugin-mixed-reference-stage-2-agentic_sft",
           "kind": "agentic_sft",
-          "ingested_trace_count": 3,
+          "ingested_trace_count": 4,
           "pretrain_run_count": 0,
-          "completed_at_ms": 1774228785288,
-          "completion_digest": "2c47870edac62d1edda98e98e8b967e82518ef4d5b861d04e13c157151cd9094"
+          "completed_at_ms": 1774228786105,
+          "completion_digest": "d3b08206d7c0acd5ef801c3236025b3cfd2ec92da4bc69386de923f911a34927"
         }
       ],
       "promotions": [
         {
-          "run_id": "run-psion-plugin-host-native-reference",
-          "from_stage_id": "run-psion-plugin-host-native-reference-stage-1-general_sft",
+          "run_id": "run-psion-plugin-mixed-reference",
+          "from_stage_id": "run-psion-plugin-mixed-reference-stage-1-general_sft",
           "from_stage_kind": "general_sft",
           "to_stage_kind": "agentic_sft",
           "checkpoint": {
-            "checkpoint_family": "train.psion.plugin_host_native_reference",
+            "checkpoint_family": "train.psion.plugin_mixed_reference",
             "stream_id": "stream-1",
             "manifest_digest": "manifest-1",
             "object_digest": "object-1",
@@ -115,29 +123,29 @@
             "membership_epoch": 1,
             "cluster_state_digest": "cluster-digest",
             "topology_digest": "topology-digest",
-            "started_at_ms": 1001,
-            "checkpoint_ref": "checkpoint://psion/plugin_host_native_reference/1",
+            "started_at_ms": 2001,
+            "checkpoint_ref": "checkpoint://psion/plugin_conditioned_mixed_reference/1",
             "step": 1,
-            "durable_at_ms": 2001
+            "durable_at_ms": 3001
           },
-          "promotion_digest": "a79608c94397eb7d50202554b86035729631d1dc195942a21efcd7f8aa536889"
+          "promotion_digest": "65b505fddc128f338a7a7fb489d55c8369d55757aad60124b7ac8385c9038198"
         }
       ],
       "transitions": [
         {
-          "run_id": "run-psion-plugin-host-native-reference",
-          "next_stage_id": "run-psion-plugin-host-native-reference-stage-1-general_sft",
+          "run_id": "run-psion-plugin-mixed-reference",
+          "next_stage_id": "run-psion-plugin-mixed-reference-stage-1-general_sft",
           "next_stage_kind": "general_sft",
-          "transitioned_at_ms": 1774228785288,
-          "transition_digest": "e4578a43f12ed6188ab7d944502f756a7a26a82b2213e3998173a8f63965274c"
+          "transitioned_at_ms": 1774228786105,
+          "transition_digest": "31f32328f3f45bdb2accb3ad0eb13596db327834e0a633f120e3b7ed928f6124"
         },
         {
-          "run_id": "run-psion-plugin-host-native-reference",
-          "previous_stage_id": "run-psion-plugin-host-native-reference-stage-1-general_sft",
-          "next_stage_id": "run-psion-plugin-host-native-reference-stage-2-agentic_sft",
+          "run_id": "run-psion-plugin-mixed-reference",
+          "previous_stage_id": "run-psion-plugin-mixed-reference-stage-1-general_sft",
+          "next_stage_id": "run-psion-plugin-mixed-reference-stage-2-agentic_sft",
           "next_stage_kind": "agentic_sft",
           "base_checkpoint": {
-            "checkpoint_family": "train.psion.plugin_host_native_reference",
+            "checkpoint_family": "train.psion.plugin_mixed_reference",
             "stream_id": "stream-1",
             "manifest_digest": "manifest-1",
             "object_digest": "object-1",
@@ -145,31 +153,31 @@
             "membership_epoch": 1,
             "cluster_state_digest": "cluster-digest",
             "topology_digest": "topology-digest",
-            "started_at_ms": 1001,
-            "checkpoint_ref": "checkpoint://psion/plugin_host_native_reference/1",
+            "started_at_ms": 2001,
+            "checkpoint_ref": "checkpoint://psion/plugin_conditioned_mixed_reference/1",
             "step": 1,
-            "durable_at_ms": 2001
+            "durable_at_ms": 3001
           },
-          "transitioned_at_ms": 1774228785288,
-          "transition_digest": "89011a650bc66628a1712d5b336fbca793b2ef38d1d0bf170e9ff35aae0b697f"
+          "transitioned_at_ms": 1774228786105,
+          "transition_digest": "082511338df075a99d5d1d536c054d9d46aeb07ebf6ee4a7a5a7741c904bea09"
         }
       ]
     },
     "stage_manifest": {
       "schema_version": "psionic.psion.plugin_conditioned_sft_stage_manifest.v1",
-      "run_id": "run-psion-plugin-host-native-reference",
-      "stage_id": "run-psion-plugin-host-native-reference-stage-2-agentic_sft",
-      "previous_stage_id": "run-psion-plugin-host-native-reference-stage-1-general_sft",
-      "checkpoint_family": "train.psion.plugin_host_native_reference",
+      "run_id": "run-psion-plugin-mixed-reference",
+      "stage_id": "run-psion-plugin-mixed-reference-stage-2-agentic_sft",
+      "previous_stage_id": "run-psion-plugin-mixed-reference-stage-1-general_sft",
+      "checkpoint_family": "train.psion.plugin_mixed_reference",
       "dataset_binding": {
-        "dataset_ref": "dataset://openagents/psion/plugin_conditioned_host_native_reference",
-        "stable_dataset_identity": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1",
+        "dataset_ref": "dataset://openagents/psion/plugin_conditioned_mixed_reference",
+        "stable_dataset_identity": "dataset://openagents/psion/plugin_conditioned_mixed_reference@2026.03.22.v1",
         "dataset_key": {
-          "dataset_ref": "dataset://openagents/psion/plugin_conditioned_host_native_reference",
+          "dataset_ref": "dataset://openagents/psion/plugin_conditioned_mixed_reference",
           "version": "2026.03.22.v1"
         },
-        "dataset_bundle_digest": "dbbb9fa5d2284f60c5407154f1c4e7a01703d329db7dede9de8865970d1f5e4a",
-        "train_record_count": 3,
+        "dataset_bundle_digest": "bb04370bae1cd7ce4602980b39db5091e593fb75b2fe0a59166bfbc5d0db4845",
+        "train_record_count": 4,
         "held_out_record_count": 3,
         "held_out_workflow_case_ids": [
           "starter_plugin.fetch_refusal.v1"
@@ -178,56 +186,80 @@
       },
       "trace_bindings": [
         {
-          "record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
-          "trace_id": "trace://psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
-          "trace_lineage_digest": "eae6e461be4af1489d0b8624a7c92495f8711767f1218d8897b778bd3073d620",
-          "controller_surface": "apple_fm_session",
-          "route_label": "delegate_to_admitted_plugin",
-          "outcome_label": "completed_success",
-          "replay_class_ids": [
-            "deterministic_replayable"
-          ],
-          "receipt_refs": [
-            "receipt.plugin.text.url_extract.62157e9942c049fa.v1",
-            "receipt.plugin.html.extract_readable.2e53ee21f594f758.v1",
-            "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1"
-          ],
-          "detail": "The host-native reference lane keeps only the proved local-deterministic plugin subtrace from `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1`."
-        },
-        {
-          "record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
-          "trace_id": "trace://psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
-          "trace_lineage_digest": "ed69cf843d1b7fcfbbb64b65fb1b2d1bb8c523de14dca01ab3b175c546f64a0b",
+          "record_id": "psion_plugin_training.trace_record.starter_plugin.guest_artifact_success.v1.deterministic_workflow.v1",
+          "trace_id": "trace://psion_plugin_training.trace_record.starter_plugin.guest_artifact_success.v1.deterministic_workflow.v1",
+          "trace_lineage_digest": "f6e28b29c72b5085a7bdd6908dafa146546b9aa7770b046a01b6d636d8c9b939",
           "controller_surface": "deterministic_workflow",
           "route_label": "delegate_to_admitted_plugin",
           "outcome_label": "completed_success",
           "replay_class_ids": [
-            "deterministic_replayable"
+            "guest_artifact_digest_replay_only.v1"
+          ],
+          "receipt_refs": [
+            "receipt.plugin.example.echo_guest.bee52b6c5818aceb.v1"
+          ],
+          "detail": "The mixed reference lane preserves all admitted plugin receipts from `psion_plugin_training.trace_record.starter_plugin.guest_artifact_success.v1.deterministic_workflow.v1` including the bounded guest-artifact trace when present."
+        },
+        {
+          "record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+          "trace_id": "trace://psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+          "trace_lineage_digest": "3ae2f648ad35a5da1d5000f26b4f057cce53731fe4034d50c197562186cbba5b",
+          "controller_surface": "apple_fm_session",
+          "route_label": "delegate_to_admitted_plugin",
+          "outcome_label": "completed_success",
+          "replay_class_ids": [
+            "deterministic_replayable",
+            "replayable_with_snapshots"
+          ],
+          "receipt_refs": [
+            "receipt.plugin.text.url_extract.62157e9942c049fa.v1",
+            "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
+            "receipt.plugin.html.extract_readable.2e53ee21f594f758.v1",
+            "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+            "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1"
+          ],
+          "detail": "The mixed reference lane preserves all admitted plugin receipts from `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1` including the bounded guest-artifact trace when present."
+        },
+        {
+          "record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+          "trace_id": "trace://psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+          "trace_lineage_digest": "476585864c2228baa5da7cf1f6a231c299afaa35857279123bfa31415442442a",
+          "controller_surface": "deterministic_workflow",
+          "route_label": "delegate_to_admitted_plugin",
+          "outcome_label": "completed_success",
+          "replay_class_ids": [
+            "deterministic_replayable",
+            "replayable_with_snapshots"
           ],
           "receipt_refs": [
             "receipt.plugin.text.url_extract.4b99d49a956f5fb3.v1",
+            "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
             "receipt.plugin.html.extract_readable.e1417d028da0461a.v1",
             "receipt.plugin.text.stats.0307e79769277046.v1",
+            "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
             "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1"
           ],
-          "detail": "The host-native reference lane keeps only the proved local-deterministic plugin subtrace from `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1`."
+          "detail": "The mixed reference lane preserves all admitted plugin receipts from `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1` including the bounded guest-artifact trace when present."
         },
         {
           "record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
           "trace_id": "trace://psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
-          "trace_lineage_digest": "21376c2599cfc6dd6f0e0220cc9ed8a16c47558718f4157e93e735788964f830",
+          "trace_lineage_digest": "bda08afaed7e113a5370e42d741bbe2c3d5a32554dca5bc75f9c338fc1d54437",
           "controller_surface": "router_responses",
           "route_label": "delegate_to_admitted_plugin",
           "outcome_label": "completed_success",
           "replay_class_ids": [
-            "deterministic_replayable"
+            "deterministic_replayable",
+            "replayable_with_snapshots"
           ],
           "receipt_refs": [
             "receipt.plugin.text.url_extract.62157e9942c049fa.v1",
+            "receipt.plugin.http.fetch_text.aa5ae2b22543ed81.v1",
             "receipt.plugin.html.extract_readable.1646205d55c61941.v1",
+            "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
             "receipt.plugin.feed.rss_atom_parse.3430f94093b76c67.v1"
           ],
-          "detail": "The host-native reference lane keeps only the proved local-deterministic plugin subtrace from `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1`."
+          "detail": "The mixed reference lane preserves all admitted plugin receipts from `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1` including the bounded guest-artifact trace when present."
         }
       ],
       "benchmark_bindings": [
@@ -284,102 +316,102 @@
       ],
       "eval_hooks": [
         {
-          "hook_id": "hook.psion.plugin_host_native_reference.discoveryselection.post_stage",
+          "hook_id": "hook.psion.plugin_mixed_reference.discoveryselection.post_stage",
           "hook_kind": "benchmark_sweep",
           "trigger": "post_stage_completion",
           "benchmark_family": "discovery_selection",
           "benchmark_bundle_ref": "fixtures/psion/benchmarks/psion_plugin_discovery_selection_benchmark_v1/psion_plugin_discovery_selection_benchmark_bundle.json",
           "benchmark_receipt_digest": "ec41b45f2c91d466b7b72efce41e17a3afc5dd2bc4c076f0ddfe21f5c1945573",
           "execution_evidence_required": false,
-          "detail": "Run DiscoverySelection only inside the proved host-native local deterministic boundary and exclude out-of-scope items explicitly."
+          "detail": "Run DiscoverySelection on the mixed lane and keep the comparison against the host-native-only reference lane explicit."
         },
         {
-          "hook_id": "hook.psion.plugin_host_native_reference.argumentconstruction.post_stage",
+          "hook_id": "hook.psion.plugin_mixed_reference.argumentconstruction.post_stage",
           "hook_kind": "benchmark_sweep",
           "trigger": "post_stage_completion",
           "benchmark_family": "argument_construction",
           "benchmark_bundle_ref": "fixtures/psion/benchmarks/psion_plugin_argument_construction_benchmark_v1/psion_plugin_argument_construction_benchmark_bundle.json",
           "benchmark_receipt_digest": "7a5605cd10ab828546b059055e128a54b8feb318bb9ec591d1f6ba0160f9bd16",
           "execution_evidence_required": true,
-          "detail": "Run ArgumentConstruction only inside the proved host-native local deterministic boundary and exclude out-of-scope items explicitly."
+          "detail": "Run ArgumentConstruction on the mixed lane and keep the comparison against the host-native-only reference lane explicit."
         },
         {
-          "hook_id": "hook.psion.plugin_host_native_reference.sequencingmulticall.post_stage",
+          "hook_id": "hook.psion.plugin_mixed_reference.sequencingmulticall.post_stage",
           "hook_kind": "benchmark_sweep",
           "trigger": "post_stage_completion",
           "benchmark_family": "sequencing_multi_call",
           "benchmark_bundle_ref": "fixtures/psion/benchmarks/psion_plugin_sequencing_benchmark_v1/psion_plugin_sequencing_benchmark_bundle.json",
           "benchmark_receipt_digest": "d698784cfec581e40b0fc1487091e6a47bd5e211f62944f06540d487f9acef05",
           "execution_evidence_required": true,
-          "detail": "Run SequencingMultiCall only inside the proved host-native local deterministic boundary and exclude out-of-scope items explicitly."
+          "detail": "Run SequencingMultiCall on the mixed lane and keep the comparison against the host-native-only reference lane explicit."
         },
         {
-          "hook_id": "hook.psion.plugin_host_native_reference.refusalrequeststructure.post_stage",
+          "hook_id": "hook.psion.plugin_mixed_reference.refusalrequeststructure.post_stage",
           "hook_kind": "benchmark_sweep",
           "trigger": "post_stage_completion",
           "benchmark_family": "refusal_request_structure",
           "benchmark_bundle_ref": "fixtures/psion/benchmarks/psion_plugin_refusal_request_structure_benchmark_v1/psion_plugin_refusal_request_structure_benchmark_bundle.json",
           "benchmark_receipt_digest": "cedc95afee7c4aa430abb9bd5bca9a643c2b81da5f932edd0d6b04163d8658bf",
           "execution_evidence_required": false,
-          "detail": "Run RefusalRequestStructure only inside the proved host-native local deterministic boundary and exclude out-of-scope items explicitly."
+          "detail": "Run RefusalRequestStructure on the mixed lane and keep the comparison against the host-native-only reference lane explicit."
         },
         {
-          "hook_id": "hook.psion.plugin_host_native_reference.resultinterpretation.post_stage",
+          "hook_id": "hook.psion.plugin_mixed_reference.resultinterpretation.post_stage",
           "hook_kind": "benchmark_sweep",
           "trigger": "post_stage_completion",
           "benchmark_family": "result_interpretation",
           "benchmark_bundle_ref": "fixtures/psion/benchmarks/psion_plugin_result_interpretation_benchmark_v1/psion_plugin_result_interpretation_benchmark_bundle.json",
           "benchmark_receipt_digest": "b74f85ff9f4f0a82e6b9e6a99f83759536d825b88274f406e6b52c8da4f49cea",
           "execution_evidence_required": true,
-          "detail": "Run ResultInterpretation only inside the proved host-native local deterministic boundary and exclude out-of-scope items explicitly."
+          "detail": "Run ResultInterpretation on the mixed lane and keep the comparison against the host-native-only reference lane explicit."
         },
         {
-          "hook_id": "hook.psion.plugin_host_native_reference.pre_promotion_suite",
+          "hook_id": "hook.psion.plugin_mixed_reference.pre_promotion_suite",
           "hook_kind": "benchmark_sweep",
           "trigger": "pre_promotion_audit",
           "benchmark_family": "discovery_selection",
           "benchmark_bundle_ref": "fixtures/psion/benchmarks/psion_plugin_discovery_selection_benchmark_v1/psion_plugin_discovery_selection_benchmark_bundle.json",
           "benchmark_receipt_digest": "ec41b45f2c91d466b7b72efce41e17a3afc5dd2bc4c076f0ddfe21f5c1945573",
           "execution_evidence_required": false,
-          "detail": "Rerun one family before promotion so the host-native reference lane keeps a machine-checkable held-out gate."
+          "detail": "Rerun one benchmark family before promotion so the mixed reference lane keeps a machine-checkable held-out gate alongside the host-native comparison."
         },
         {
-          "hook_id": "hook.psion.plugin_host_native_reference.replay_review",
+          "hook_id": "hook.psion.plugin_mixed_reference.replay_review",
           "hook_kind": "replay_receipt_review",
           "trigger": "pre_promotion_audit",
           "execution_evidence_required": true,
-          "detail": "Review local deterministic replay classes and receipt refs before any broader capability claim is made."
+          "detail": "Review host-native and guest-artifact receipt bindings before any broader mixed capability claim is made."
         }
       ],
       "config": {
-        "max_plugin_calls_per_trace": 4,
+        "max_plugin_calls_per_trace": 6,
         "preserve_receipt_boundaries": true,
         "require_replay_class_coverage": true,
         "require_held_out_benchmark_hooks": true,
-        "detail": "The host-native reference lane keeps only the proved capability-free local deterministic plugin subtraces, preserves receipt boundaries, and retains held-out benchmark hooks for later audits."
+        "detail": "The mixed reference lane keeps host-native and bounded guest-artifact trace receipts explicit while preserving the host-native held-out benchmark hooks."
       },
-      "summary": "The host-native reference stage is explicitly limited to the currently fully proved capability-free local deterministic starter-plugin class.",
-      "manifest_digest": "85a0d41479a8e98eba5aa332febc5d6c1bc603eed00c4a562558a8fd58382663"
+      "summary": "The mixed reference stage binds the mixed dataset identity, the shared host-native benchmark suite, and explicit host-native comparison hooks onto one bounded agentic-SFT stage contract.",
+      "manifest_digest": "c9d41c1ec637efe84cd90b7e1a7d953127fe1ba4e64503bc3e77b38568897c6e"
     },
     "stage_receipt": {
       "schema_version": "psionic.psion.plugin_conditioned_sft_stage_receipt.v1",
-      "receipt_id": "receipt.psion.plugin_host_native_reference.stage.v1",
-      "run_id": "run-psion-plugin-host-native-reference",
-      "stage_id": "run-psion-plugin-host-native-reference-stage-2-agentic_sft",
-      "checkpoint_family": "train.psion.plugin_host_native_reference",
-      "stage_manifest_digest": "85a0d41479a8e98eba5aa332febc5d6c1bc603eed00c4a562558a8fd58382663",
-      "dataset_bundle_digest": "dbbb9fa5d2284f60c5407154f1c4e7a01703d329db7dede9de8865970d1f5e4a",
-      "agentic_sft_transition_digest": "89011a650bc66628a1712d5b336fbca793b2ef38d1d0bf170e9ff35aae0b697f",
-      "general_sft_completion_digest": "19b9414387480bde25e7810dd2d023798383ac02965bee18243469a6103aa1d3",
-      "agentic_sft_completion_digest": "2c47870edac62d1edda98e98e8b967e82518ef4d5b861d04e13c157151cd9094",
-      "ingested_trace_count": 3,
-      "execution_evidence_trace_count": 3,
+      "receipt_id": "receipt.psion.plugin_mixed_reference.stage.v1",
+      "run_id": "run-psion-plugin-mixed-reference",
+      "stage_id": "run-psion-plugin-mixed-reference-stage-2-agentic_sft",
+      "checkpoint_family": "train.psion.plugin_mixed_reference",
+      "stage_manifest_digest": "c9d41c1ec637efe84cd90b7e1a7d953127fe1ba4e64503bc3e77b38568897c6e",
+      "dataset_bundle_digest": "bb04370bae1cd7ce4602980b39db5091e593fb75b2fe0a59166bfbc5d0db4845",
+      "agentic_sft_transition_digest": "082511338df075a99d5d1d536c054d9d46aeb07ebf6ee4a7a5a7741c904bea09",
+      "general_sft_completion_digest": "4a0515aee93ec8f60f5528b6721b9265b44136b5b1504f067090d1463a7dbb90",
+      "agentic_sft_completion_digest": "d3b08206d7c0acd5ef801c3236025b3cfd2ec92da4bc69386de923f911a34927",
+      "ingested_trace_count": 4,
+      "execution_evidence_trace_count": 4,
       "eval_hook_count": 7,
       "controller_coverage": [
         {
           "controller_surface": "deterministic_workflow",
-          "trace_count": 1,
-          "detail": "The stage preserves 1 accepted plugin-conditioned traces from DeterministicWorkflow."
+          "trace_count": 2,
+          "detail": "The stage preserves 2 accepted plugin-conditioned traces from DeterministicWorkflow."
         },
         {
           "controller_surface": "router_responses",
@@ -395,8 +427,8 @@
       "route_coverage": [
         {
           "route_label": "delegate_to_admitted_plugin",
-          "trace_count": 3,
-          "detail": "The stage preserves 3 traces carrying DelegateToAdmittedPlugin."
+          "trace_count": 4,
+          "detail": "The stage preserves 4 traces carrying DelegateToAdmittedPlugin."
         }
       ],
       "replay_class_coverage": [
@@ -404,23 +436,33 @@
           "replay_class_id": "deterministic_replayable",
           "trace_count": 3,
           "detail": "Replay class `deterministic_replayable` stays explicit on 3 accepted traces."
+        },
+        {
+          "replay_class_id": "guest_artifact_digest_replay_only.v1",
+          "trace_count": 1,
+          "detail": "Replay class `guest_artifact_digest_replay_only.v1` stays explicit on 1 accepted traces."
+        },
+        {
+          "replay_class_id": "replayable_with_snapshots",
+          "trace_count": 3,
+          "detail": "Replay class `replayable_with_snapshots` stays explicit on 3 accepted traces."
         }
       ],
-      "summary": "The host-native reference stage completed with one accepted capability-free local deterministic trace per committed train record.",
-      "receipt_digest": "ef3266e81f6578eb52c739df81632d93afde5325348df2fd4744a376e8cb747b"
+      "summary": "The mixed reference stage completed with one accepted trace per committed mixed train record including the bounded guest-artifact training example.",
+      "receipt_digest": "822ab33a459b9a151d083797a3fe9e2b6c618d5b77a0f1fa20561d63e0b50c87"
     },
-    "summary": "Bounded stage bundle for the first host-native capability-free local deterministic plugin-conditioned reference lane.",
-    "bundle_digest": "c110d458541897ca0c3beb4208b148c3b4d68155fa8645b96badb4fb9376035d"
+    "summary": "Bounded stage bundle for the first mixed host-native plus guest-artifact plugin-conditioned reference lane.",
+    "bundle_digest": "740bd4189d0599cf98a318a2fe030ca3f8eeabccfec5b4ae378cfabb4d75428a"
   },
   "model_config": {
     "schema_version": "psionic.psion.plugin_conditioned_compact_decoder_reference.v1",
-    "lane_id": "psion_plugin_conditioned_host_native_reference",
-    "stage_manifest_digest": "85a0d41479a8e98eba5aa332febc5d6c1bc603eed00c4a562558a8fd58382663",
-    "stage_dataset_identity": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1",
+    "lane_id": "psion_plugin_conditioned_mixed_reference",
+    "stage_manifest_digest": "c9d41c1ec637efe84cd90b7e1a7d953127fe1ba4e64503bc3e77b38568897c6e",
+    "stage_dataset_identity": "dataset://openagents/psion/plugin_conditioned_mixed_reference@2026.03.22.v1",
     "descriptor": {
       "schema_version": "psion.compact_decoder_descriptor.v1",
       "model": {
-        "model_id": "psion-plugin-conditioned-compact-decoder-reference-v1",
+        "model_id": "psion-plugin-conditioned-mixed-compact-decoder-reference-v1",
         "family": "psion_decoder",
         "revision": "plugin-conditioned-v1"
       },
@@ -2022,7 +2064,7 @@
     },
     "context_assumptions": {
       "max_context_tokens": 8192,
-      "max_plugin_calls_per_trace": 4,
+      "max_plugin_calls_per_trace": 6,
       "reserved_directive_tokens": 1024,
       "reserved_schema_tokens": 2048,
       "reserved_receipt_anchor_tokens": 1024,
@@ -2038,140 +2080,193 @@
       "detail": "The first plugin-conditioned compact decoder uses the existing tokenizer and serializes plugin-use supervision as structured JSON with schema ids, tool names, and receipt refs in ordinary token space instead of adding bespoke plugin tokens."
     },
     "checkpoint_naming": {
-      "checkpoint_family": "train.psion.plugin_host_native_reference",
-      "stage_run_bundle_ref": "fixtures/psion/plugins/training/psion_plugin_conditioned_sft_v1/psion_plugin_conditioned_sft_run_bundle.json",
-      "stage_manifest_digest": "85a0d41479a8e98eba5aa332febc5d6c1bc603eed00c4a562558a8fd58382663",
-      "checkpoint_ref_prefix": "checkpoint://psion/plugin_conditioned_host_native_reference",
-      "export_directory_name": "psion_plugin_conditioned_compact_decoder_reference",
+      "checkpoint_family": "train.psion.plugin_mixed_reference",
+      "stage_run_bundle_ref": "fixtures/psion/plugins/training/psion_plugin_mixed_reference_lane_v1/psion_plugin_mixed_reference_run_bundle.json",
+      "stage_manifest_digest": "c9d41c1ec637efe84cd90b7e1a7d953127fe1ba4e64503bc3e77b38568897c6e",
+      "checkpoint_ref_prefix": "checkpoint://psion/plugin_conditioned_mixed_reference",
+      "export_directory_name": "psion_plugin_conditioned_mixed_compact_decoder_reference",
       "descriptor_file_name": "descriptor.json",
       "checkpoint_file_name": "model.safetensors",
       "export_format_id": "psionic.decoder_state_dict.safetensors.v1",
-      "detail": "Checkpoint and export naming stay on the shared compact-decoder file contract while the checkpoint family and export directory are explicitly bound to the plugin-conditioned host-native lane."
+      "detail": "Checkpoint and export naming stay on the shared compact-decoder file contract while the checkpoint family and export directory are explicitly bound to the first mixed host-native plus guest-artifact lane."
     },
-    "summary": "The first host-native reference lane reuses the plugin-conditioned compact-decoder config while staying explicitly bounded to the proved capability-free local deterministic plugin class.",
-    "config_digest": "d398eba32cbcae4ee24089360a39574d6f621c1248b6e52524175581d9548a1c"
+    "summary": "The first mixed reference lane reuses the plugin-conditioned compact-decoder family while binding the run to the mixed dataset identity and the bounded guest-artifact posture.",
+    "config_digest": "5489ee9d4fc028da235b46d646198933bf0509216bb8c1b7a5d192513c3745a1"
   },
   "model_artifact": {
-    "schema_version": "psionic.psion.plugin_host_native_reference_model_artifact.v1",
-    "artifact_id": "artifact.psion.plugin_host_native_reference.model.v1",
-    "lane_id": "psion_plugin_conditioned_host_native_reference",
-    "model_config_digest": "d398eba32cbcae4ee24089360a39574d6f621c1248b6e52524175581d9548a1c",
-    "stage_receipt_digest": "ef3266e81f6578eb52c739df81632d93afde5325348df2fd4744a376e8cb747b",
-    "training_example_count": 3,
-    "training_step_count": 3,
+    "schema_version": "psionic.psion.plugin_mixed_reference_model_artifact.v1",
+    "artifact_id": "artifact.psion.plugin_mixed_reference.model.v1",
+    "lane_id": "psion_plugin_conditioned_mixed_reference",
+    "model_config_digest": "5489ee9d4fc028da235b46d646198933bf0509216bb8c1b7a5d192513c3745a1",
+    "stage_receipt_digest": "822ab33a459b9a151d083797a3fe9e2b6c618d5b77a0f1fa20561d63e0b50c87",
+    "training_example_count": 4,
+    "training_step_count": 4,
+    "guest_artifact_training_example_count": 1,
     "learned_plugin_ids": [
+      "plugin.example.echo_guest",
       "plugin.feed.rss_atom_parse",
       "plugin.html.extract_readable",
+      "plugin.http.fetch_text",
       "plugin.text.stats",
       "plugin.text.url_extract"
     ],
     "learned_tool_names": [
+      "plugin_example_echo_guest",
       "plugin_feed_rss_atom_parse",
       "plugin_html_extract_readable",
+      "plugin_http_fetch_text",
       "plugin_text_stats",
       "plugin_text_url_extract"
     ],
+    "learned_plugin_class_counts": {
+      "host_native_capability_free_local_deterministic": 3,
+      "host_native_networked_read_only": 3,
+      "guest_artifact_digest_bound": 1
+    },
     "prompt_route_rows": [
+      {
+        "source_record_id": "psion_plugin_training.trace_record.starter_plugin.guest_artifact_success.v1.deterministic_workflow.v1",
+        "prompt_digest": "11060ed582aa4dd998fd656d617c1d71a4d78ef2e17bc74cedb091e77b2f6841",
+        "route_label": "delegate_to_admitted_plugin",
+        "plugin_ids": [
+          "plugin.example.echo_guest"
+        ],
+        "tool_names": [
+          "plugin_example_echo_guest"
+        ],
+        "response_digest": "de59d2a0bbdc9ce046e315d41b58f44ae007b1648540a831ea10c3dbe863959b",
+        "includes_guest_artifact": true,
+        "detail": "The mixed reference artifact memorizes the admitted plugin route for `psion_plugin_training.trace_record.starter_plugin.guest_artifact_success.v1.deterministic_workflow.v1` including the bounded guest-artifact row when present."
+      },
       {
         "source_record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
         "prompt_digest": "166517a68f4112e4746bc7eeecef359d35572d94b01cf14bd9f075e146afddd6",
         "route_label": "delegate_to_admitted_plugin",
+        "plugin_ids": [
+          "plugin.feed.rss_atom_parse",
+          "plugin.html.extract_readable",
+          "plugin.http.fetch_text",
+          "plugin.text.url_extract"
+        ],
         "tool_names": [
           "plugin_text_url_extract",
+          "plugin_http_fetch_text",
           "plugin_html_extract_readable",
+          "plugin_http_fetch_text",
           "plugin_feed_rss_atom_parse"
         ],
         "response_digest": "1c8c9a5e653f01268f9dcfb60a394464f7f3e1cf62627c7e887595f379f67ff5",
-        "detail": "The bounded host-native artifact memorizes the proved local-deterministic route for `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1`."
+        "includes_guest_artifact": false,
+        "detail": "The mixed reference artifact memorizes the admitted plugin route for `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1` including the bounded guest-artifact row when present."
       },
       {
         "source_record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
         "prompt_digest": "1bf870fe86d09cf153fe70dc914a22f15dbe0690a407214a6b22e16a83ff3ace",
         "route_label": "delegate_to_admitted_plugin",
+        "plugin_ids": [
+          "plugin.feed.rss_atom_parse",
+          "plugin.html.extract_readable",
+          "plugin.http.fetch_text",
+          "plugin.text.stats",
+          "plugin.text.url_extract"
+        ],
         "tool_names": [
           "plugin_text_url_extract",
+          "plugin_http_fetch_text",
           "plugin_html_extract_readable",
           "plugin_text_stats",
+          "plugin_http_fetch_text",
           "plugin_feed_rss_atom_parse"
         ],
         "response_digest": "9c3d36510cea711c55b3d255a31cfb044bd1dc32de37b01696efe873e6aa7914",
-        "detail": "The bounded host-native artifact memorizes the proved local-deterministic route for `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1`."
+        "includes_guest_artifact": false,
+        "detail": "The mixed reference artifact memorizes the admitted plugin route for `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1` including the bounded guest-artifact row when present."
       },
       {
         "source_record_id": "psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1",
         "prompt_digest": "166517a68f4112e4746bc7eeecef359d35572d94b01cf14bd9f075e146afddd6",
         "route_label": "delegate_to_admitted_plugin",
+        "plugin_ids": [
+          "plugin.feed.rss_atom_parse",
+          "plugin.html.extract_readable",
+          "plugin.http.fetch_text",
+          "plugin.text.url_extract"
+        ],
         "tool_names": [
           "plugin_text_url_extract",
+          "plugin_http_fetch_text",
           "plugin_html_extract_readable",
+          "plugin_http_fetch_text",
           "plugin_feed_rss_atom_parse"
         ],
         "response_digest": "15f089c3988fd32cfb69c05ad89eb891643f0cae31816ed36c0f2a8d9b6ef929",
-        "detail": "The bounded host-native artifact memorizes the proved local-deterministic route for `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1`."
+        "includes_guest_artifact": false,
+        "detail": "The mixed reference artifact memorizes the admitted plugin route for `psion_plugin_training.trace_record.starter_plugin.web_content_success.v1.router_responses.v1` including the bounded guest-artifact row when present."
       }
     ],
-    "summary": "The first host-native reference artifact learns only the proved capability-free local deterministic plugin subplans and keeps that limitation explicit.",
-    "artifact_digest": "391d3a2a0e6e9960e6fd1c3a79f5fd211861903ca0083603cc50372e3850a33e"
+    "summary": "The first mixed reference artifact keeps the admitted host-native starter plugins plus the bounded guest-artifact plugin in one small learned lane without widening publication or broader guest-artifact claims.",
+    "artifact_digest": "8e268696c0b8705431d9eb0bf697e1507ee5363c84a2b06e02ef7797e99bd317"
   },
   "evaluation_receipt": {
-    "schema_version": "psionic.psion.plugin_host_native_reference_evaluation_receipt.v1",
-    "receipt_id": "receipt.psion.plugin_host_native_reference.evaluation.v1",
-    "lane_id": "psion_plugin_conditioned_host_native_reference",
-    "stage_receipt_digest": "ef3266e81f6578eb52c739df81632d93afde5325348df2fd4744a376e8cb747b",
-    "model_artifact_digest": "391d3a2a0e6e9960e6fd1c3a79f5fd211861903ca0083603cc50372e3850a33e",
-    "baseline_label": "non_plugin_conditioned_baseline_v1",
-    "limited_to_proved_authoring_class": true,
-    "proved_authoring_class_label": "host_native_capability_free_local_deterministic",
-    "benchmark_deltas": [
+    "schema_version": "psionic.psion.plugin_mixed_reference_evaluation_receipt.v1",
+    "receipt_id": "receipt.psion.plugin_mixed_reference.evaluation.v1",
+    "lane_id": "psion_plugin_conditioned_mixed_reference",
+    "stage_receipt_digest": "822ab33a459b9a151d083797a3fe9e2b6c618d5b77a0f1fa20561d63e0b50c87",
+    "model_artifact_digest": "8e268696c0b8705431d9eb0bf697e1507ee5363c84a2b06e02ef7797e99bd317",
+    "comparison_label": "psion_plugin_host_native_reference",
+    "comparison_reference_run_bundle_ref": "fixtures/psion/plugins/training/psion_plugin_host_native_reference_lane_v1/psion_plugin_host_native_reference_run_bundle.json",
+    "comparison_reference_run_bundle_digest": "47769a52c125de28b0a07ce11b1f44e38d9fe7bde03a5aa7819145515bdf0ce2",
+    "guest_artifact_training_example_count": 1,
+    "benchmark_comparisons": [
       {
         "benchmark_family": "discovery_selection",
-        "eligible_item_count": 3,
-        "out_of_scope_item_count": 2,
-        "baseline_score_bps": 6666,
-        "trained_score_bps": 10000,
-        "delta_bps": 3334,
-        "detail": "DiscoverySelection is scored only on items inside the proved host-native capability-free local deterministic boundary; excluded items remain explicit rather than being flattened into failure or competence claims."
+        "eligible_item_count": 5,
+        "out_of_scope_item_count": 0,
+        "host_native_reference_score_bps": 10000,
+        "mixed_score_bps": 10000,
+        "delta_vs_host_native_bps": 0,
+        "detail": "Discovery comparisons stay tied to the host-native suite while allowing the mixed lane to score any benchmark item whose expected plugin ids are now present in the learned mixed artifact."
       },
       {
         "benchmark_family": "argument_construction",
-        "eligible_item_count": 2,
-        "out_of_scope_item_count": 4,
-        "baseline_score_bps": 0,
-        "trained_score_bps": 10000,
-        "delta_bps": 10000,
-        "detail": "ArgumentConstruction is scored only on items inside the proved host-native capability-free local deterministic boundary; excluded items remain explicit rather than being flattened into failure or competence claims."
+        "eligible_item_count": 6,
+        "out_of_scope_item_count": 0,
+        "host_native_reference_score_bps": 10000,
+        "mixed_score_bps": 10000,
+        "delta_vs_host_native_bps": 0,
+        "detail": "Argument-construction comparisons now keep networked and guest-adjacent learned tool coverage explicit instead of inheriting the host-native local-deterministic exclusion boundary."
       },
       {
         "benchmark_family": "sequencing_multi_call",
-        "eligible_item_count": 0,
-        "out_of_scope_item_count": 5,
-        "baseline_score_bps": 0,
-        "trained_score_bps": 0,
-        "delta_bps": 0,
-        "detail": "SequencingMultiCall is scored only on items inside the proved host-native capability-free local deterministic boundary; excluded items remain explicit rather than being flattened into failure or competence claims."
+        "eligible_item_count": 5,
+        "out_of_scope_item_count": 0,
+        "host_native_reference_score_bps": 0,
+        "mixed_score_bps": 10000,
+        "delta_vs_host_native_bps": 10000,
+        "detail": "Sequencing comparisons keep the host-native suite fixed while scoring any benchmark sequence whose tool names are present in the mixed learned artifact."
       },
       {
         "benchmark_family": "refusal_request_structure",
         "eligible_item_count": 5,
         "out_of_scope_item_count": 0,
-        "baseline_score_bps": 6000,
-        "trained_score_bps": 10000,
-        "delta_bps": 4000,
-        "detail": "RefusalRequestStructure is scored only on items inside the proved host-native capability-free local deterministic boundary; excluded items remain explicit rather than being flattened into failure or competence claims."
+        "host_native_reference_score_bps": 10000,
+        "mixed_score_bps": 10000,
+        "delta_vs_host_native_bps": 0,
+        "detail": "Refusal and request-for-structure comparisons remain explicit route-quality checks over the shared host-native benchmark suite."
       },
       {
         "benchmark_family": "result_interpretation",
-        "eligible_item_count": 1,
-        "out_of_scope_item_count": 2,
-        "baseline_score_bps": 0,
-        "trained_score_bps": 10000,
-        "delta_bps": 10000,
-        "detail": "ResultInterpretation is scored only on items inside the proved host-native capability-free local deterministic boundary; excluded items remain explicit rather than being flattened into failure or competence claims."
+        "eligible_item_count": 3,
+        "out_of_scope_item_count": 0,
+        "host_native_reference_score_bps": 10000,
+        "mixed_score_bps": 10000,
+        "delta_vs_host_native_bps": 0,
+        "detail": "Result-interpretation comparisons stay on the shared host-native package but score additional items when the mixed artifact has learned the referenced plugin families."
       }
     ],
-    "summary": "Benchmark deltas are reported only inside the currently proved capability-free local deterministic plugin boundary; out-of-scope networked items are excluded explicitly instead of being misrepresented as learned competence.",
-    "receipt_digest": "7047d60c7e63462c7ad17ec4214313b5ca9aabbda86854d89e6944165c4b4bd1"
+    "summary": "Benchmark comparisons keep the host-native-only reference lane explicit, report the mixed-lane deltas family by family, and preserve that the current comparison surface is still the host-native benchmark suite rather than a broader guest-artifact benchmark family.",
+    "receipt_digest": "69cb0d1cc8e13204679aa251150b2161e4f513ad043035950b15cd86e50ad5f8"
   },
-  "summary": "The first host-native starter-plugin-conditioned reference lane is explicitly limited to the currently proved capability-free local deterministic authoring class and reports benchmark deltas only inside that boundary.",
-  "bundle_digest": "d29339d5ca839abf5b0359669acd0eea7f54319e5ef1d72cd6e29dae3784eb66"
+  "summary": "The first mixed plugin-conditioned reference lane binds directly to the mixed dataset, preserves one guest-artifact training example, and reports benchmark deltas against the committed host-native-only reference lane instead of collapsing the comparison into architecture intent.",
+  "bundle_digest": "184d435cd273f5cb3735edb5e20cd34f9221000e0950ad84dcbab047fa7b69cb"
 }

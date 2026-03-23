@@ -51,6 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         ),
     ];
     let trace_bindings = trace_bindings(&dataset_bundle)?;
+    let max_plugin_calls_per_trace = max_plugin_calls_per_trace(&trace_bindings);
     let eval_hooks = eval_hooks(benchmark_bindings.as_slice());
     let stage_manifest = record_psion_plugin_conditioned_sft_stage_manifest(
         &stage_program,
@@ -59,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         benchmark_bindings,
         eval_hooks,
         PsionPluginConditionedSftStageConfig {
-            max_plugin_calls_per_trace: 5,
+            max_plugin_calls_per_trace,
             preserve_receipt_boundaries: true,
             require_replay_class_coverage: true,
             require_held_out_benchmark_hooks: true,
@@ -184,6 +185,14 @@ fn trace_bindings(
             }
         })
         .collect())
+}
+
+fn max_plugin_calls_per_trace(trace_bindings: &[PsionPluginConditionedTraceBinding]) -> u32 {
+    trace_bindings
+        .iter()
+        .map(|binding| binding.receipt_refs.len() as u32)
+        .max()
+        .unwrap_or(1)
 }
 
 fn eval_hooks(

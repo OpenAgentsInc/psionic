@@ -506,6 +506,11 @@ fn build_stage_bundle(
 ) -> Result<PsionPluginConditionedSftRunBundle, PsionPluginHostNativeReferenceLaneError> {
     let environment =
         EnvironmentPackageKey::new("env.psion.plugin_host_native_reference", "2026.03.22");
+    let max_plugin_calls_per_trace = training_examples
+        .iter()
+        .map(|example| example.local_receipt_refs.len() as u32)
+        .max()
+        .unwrap_or(1);
     let mut stage_program = TrainingStageProgramState::new(
         "run-psion-plugin-host-native-reference",
         "train.psion.plugin_host_native_reference",
@@ -562,7 +567,7 @@ fn build_stage_bundle(
         benchmark_bindings,
         eval_hooks,
         PsionPluginConditionedSftStageConfig {
-            max_plugin_calls_per_trace: 3,
+            max_plugin_calls_per_trace,
             preserve_receipt_boundaries: true,
             require_replay_class_coverage: true,
             require_held_out_benchmark_hooks: true,

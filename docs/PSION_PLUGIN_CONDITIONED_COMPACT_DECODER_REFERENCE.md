@@ -4,11 +4,16 @@
 > first plugin-conditioned learned lane, written 2026-03-22 after landing the
 > lane-specific compact-decoder wrapper in `psionic-train`.
 
-This document freezes the first model config for the plugin-conditioned Psion
-lane.
+This document freezes the first lane-bound model-config contract for the
+plugin-conditioned Psion training tranche.
 
 It reuses the shared Psion compact-decoder family instead of inventing a new
 plugin-specific model family.
+
+The same contract now has two committed bounded lane instances:
+
+- host-native reference
+- mixed host-native plus guest-artifact reference
 
 ## Canonical Artifacts
 
@@ -16,9 +21,13 @@ plugin-specific model family.
   the lane-specific reference config around the shared compact-decoder
   descriptor.
 - `crates/psionic-train/examples/psion_plugin_conditioned_compact_decoder_fixtures.rs`
-  writes the committed reference config.
+  writes the committed host-native reference config.
+- `crates/psionic-train/examples/psion_plugin_conditioned_mixed_compact_decoder_fixtures.rs`
+  writes the committed mixed reference config.
 - `fixtures/psion/plugins/models/psion_plugin_conditioned_compact_decoder_reference_config_v1.json`
-  is the committed reference output.
+  is the committed host-native reference output.
+- `fixtures/psion/plugins/models/psion_plugin_conditioned_mixed_compact_decoder_reference_config_v1.json`
+  is the committed mixed reference output.
 
 Stable schema version:
 
@@ -34,7 +43,10 @@ The first reference config now freezes:
 - one no-custom-plugin-token serialization posture
 - one structured JSON serialization strategy carrying schema ids, tool names,
   and receipt refs in ordinary token space
-- one lane-bound checkpoint family and export-directory naming posture
+- one lane-bound checkpoint family, stage-run-bundle ref, and export-directory
+  naming posture
+- one direct binding to the committed stage dataset identity instead of only an
+  unversioned dataset ref
 
 ## Context And Vocabulary Assumptions
 
@@ -82,6 +94,7 @@ But it binds those files to:
 
 - the plugin-conditioned checkpoint family from the stage manifest
 - the committed plugin-conditioned stage-bundle ref
+- the committed stage dataset identity
 - a lane-specific checkpoint-ref prefix
 - a lane-specific export directory name
 
@@ -90,13 +103,13 @@ floating as a generic decoder preset.
 
 ## Boundary
 
-This issue does not yet claim:
+These configs do not yet claim:
 
 - a trained plugin-conditioned checkpoint
-- guest-artifact support
 - broader model-family proliferation
 - served capability closure
 - a Google training audit
 
-It is only the first truthful reference model config for the host-native
-plugin-conditioned lane.
+Guest-artifact training is now exercised by the mixed reference lane, but that
+does not widen the served claim boundary. These are only the first truthful
+reference configs for the host-native and mixed bounded lanes.

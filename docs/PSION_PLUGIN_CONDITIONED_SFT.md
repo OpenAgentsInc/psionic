@@ -7,11 +7,11 @@
 This document freezes the first machine-checkable stage contract for
 plugin-conditioned supervised fine-tuning.
 
-It sits above the already-landed canonical plugin-conditioned dataset and the
+It sits above the already-landed canonical plugin-conditioned datasets and the
 five host-native plugin benchmark packages.
 
-It does not yet pick the model family or run a real trained model. Those are
-later issues.
+It is now reused by both the bounded host-native reference lane and the bounded
+mixed host-native plus guest-artifact reference lane.
 
 ## Canonical Artifacts
 
@@ -34,7 +34,8 @@ Stable schema versions:
 The first stage contract now freezes:
 
 - one dedicated plugin-conditioned `agentic_sft` stage identity
-- direct binding to the canonical plugin-conditioned dataset identity and digest
+- direct binding to the committed dataset ref, stable dataset identity, and
+  bundle digest
 - one trace-binding row per committed train record
 - one benchmark-binding row per host-native benchmark family
 - explicit later evaluation hooks instead of implicit “we will evaluate later”
@@ -44,7 +45,7 @@ The first stage contract now freezes:
 The stage is intentionally narrow:
 
 - it assumes the current stage graph ends in `general_sft -> agentic_sft`
-- it binds only the current host-native plugin-conditioned dataset
+- it binds one committed plugin-conditioned dataset bundle at a time
 - it binds only the five current host-native benchmark families
 - it keeps later held-out benchmark and replay review hooks explicit
 
@@ -72,8 +73,16 @@ That means:
 The first manifest binds directly to:
 
 - `fixtures/psion/plugins/datasets/psion_plugin_conditioned_dataset_v1/psion_plugin_conditioned_dataset_bundle.json`
-- stable dataset identity
+- committed dataset ref
   `dataset://openagents/psion/plugin_conditioned_host_native_reference`
+- committed stable dataset identity
+  `dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1`
+
+The same stage contract is also now reused by the mixed reference lane against:
+
+- `fixtures/psion/plugins/datasets/psion_plugin_mixed_conditioned_dataset_v1/psion_plugin_mixed_conditioned_dataset_bundle.json`
+- committed stable dataset identity
+  `dataset://openagents/psion/plugin_conditioned_mixed_reference@2026.03.22.v1`
 
 For each accepted trace, the manifest preserves:
 
@@ -121,9 +130,10 @@ It does not yet claim:
 
 - model-family closure
 - trained checkpoint quality
-- guest-artifact coverage
 - `networked_read_only` authoring closure
 - served capability-matrix closure
 - Google operator proof
 
-Those are later `PSION_PLUGIN-*` issues.
+Guest-artifact training coverage is now exercised by the mixed reference lane,
+but broader guest-artifact publication and operator proof remain later
+`PSION_PLUGIN-*` issues.

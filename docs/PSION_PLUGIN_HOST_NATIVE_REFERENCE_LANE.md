@@ -48,6 +48,14 @@ The first host-native reference lane now:
 - keeps out-of-scope benchmark items explicit instead of flattening them into
   competence claims
 
+Its retained stage bundle now also binds:
+
+- the unversioned dataset ref for the host-native dataset family
+- the committed stable dataset identity
+  `dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1`
+- a max-plugin-call ceiling derived from the retained local-deterministic trace
+  bindings instead of a stale hand-written constant
+
 ## Boundary
 
 The learned artifact is not presented as broad plugin competence.
@@ -75,4 +83,4 @@ Instead, the reference lane:
 - reports benchmark coverage and exclusions per family
 
 That makes the first trained lane honest enough to support the later capability
-matrix issue.
+matrix issue and the later mixed-lane comparison issue.

@@ -19,12 +19,21 @@ pub const PSION_PLUGIN_CONDITIONED_COMPACT_DECODER_REFERENCE_SCHEMA_VERSION: &st
 /// Stable committed config ref for the first plugin-conditioned compact-decoder config.
 pub const PSION_PLUGIN_CONDITIONED_COMPACT_DECODER_REFERENCE_CONFIG_REF: &str =
     "fixtures/psion/plugins/models/psion_plugin_conditioned_compact_decoder_reference_config_v1.json";
+/// Stable committed config ref for the first mixed plugin-conditioned compact-decoder config.
+pub const PSION_PLUGIN_CONDITIONED_MIXED_COMPACT_DECODER_REFERENCE_CONFIG_REF: &str =
+    "fixtures/psion/plugins/models/psion_plugin_conditioned_mixed_compact_decoder_reference_config_v1.json";
 /// Stable lane identifier for the first plugin-conditioned compact-decoder config.
 pub const PSION_PLUGIN_CONDITIONED_REFERENCE_LANE_ID: &str =
     "psion_plugin_conditioned_host_native_reference";
+/// Stable lane identifier for the first mixed plugin-conditioned compact-decoder config.
+pub const PSION_PLUGIN_CONDITIONED_MIXED_REFERENCE_LANE_ID: &str =
+    "psion_plugin_conditioned_mixed_reference";
 /// Stable model id for the first plugin-conditioned compact-decoder reference config.
 pub const PSION_PLUGIN_CONDITIONED_REFERENCE_MODEL_ID: &str =
     "psion-plugin-conditioned-compact-decoder-reference-v1";
+/// Stable model id for the first mixed plugin-conditioned compact-decoder reference config.
+pub const PSION_PLUGIN_CONDITIONED_MIXED_REFERENCE_MODEL_ID: &str =
+    "psion-plugin-conditioned-mixed-compact-decoder-reference-v1";
 /// Stable revision for the first plugin-conditioned compact-decoder reference config.
 pub const PSION_PLUGIN_CONDITIONED_REFERENCE_REVISION: &str = "plugin-conditioned-v1";
 /// Stable tokenizer id reused for the first plugin-conditioned compact-decoder reference config.
@@ -44,6 +53,16 @@ pub const PSION_PLUGIN_CONDITIONED_REFERENCE_TEMPLATE_DIGEST: &str =
 pub const PSION_PLUGIN_CONDITIONED_REFERENCE_VOCAB_SIZE: usize = 32_768;
 /// Stable context window for the first plugin-conditioned compact-decoder reference config.
 pub const PSION_PLUGIN_CONDITIONED_REFERENCE_CONTEXT_TOKENS: usize = 8_192;
+
+#[derive(Clone, Copy)]
+struct PsionPluginConditionedReferenceLaneProfile<'a> {
+    lane_id: &'a str,
+    model_id: &'a str,
+    stage_run_bundle_ref: &'a str,
+    checkpoint_ref_prefix: &'a str,
+    export_directory_name: &'a str,
+    checkpoint_detail: &'a str,
+}
 
 /// How plugin-conditioned structure is serialized into the decoder token stream.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -260,14 +279,13 @@ impl PsionPluginConditionedCheckpointNaming {
             "plugin_conditioned_checkpoint_naming.checkpoint_family",
         )?;
         check_string_match(
-            self.stage_run_bundle_ref.as_str(),
-            PSION_PLUGIN_CONDITIONED_SFT_RUN_BUNDLE_REF,
-            "plugin_conditioned_checkpoint_naming.stage_run_bundle_ref",
-        )?;
-        check_string_match(
             self.stage_manifest_digest.as_str(),
             stage_manifest.manifest_digest.as_str(),
             "plugin_conditioned_checkpoint_naming.stage_manifest_digest",
+        )?;
+        ensure_nonempty(
+            self.stage_run_bundle_ref.as_str(),
+            "plugin_conditioned_checkpoint_naming.stage_run_bundle_ref",
         )?;
         check_string_match(
             self.descriptor_file_name.as_str(),
@@ -348,9 +366,8 @@ impl PsionPluginConditionedCompactDecoderReferenceConfig {
             PSION_PLUGIN_CONDITIONED_COMPACT_DECODER_REFERENCE_SCHEMA_VERSION,
             "plugin_conditioned_compact_decoder_reference.schema_version",
         )?;
-        check_string_match(
+        ensure_nonempty(
             self.lane_id.as_str(),
-            PSION_PLUGIN_CONDITIONED_REFERENCE_LANE_ID,
             "plugin_conditioned_compact_decoder_reference.lane_id",
         )?;
         check_string_match(
@@ -371,9 +388,8 @@ impl PsionPluginConditionedCompactDecoderReferenceConfig {
             "plugin_conditioned_compact_decoder_reference.summary",
         )?;
         self.descriptor.validate()?;
-        check_string_match(
+        ensure_nonempty(
             self.descriptor.model.model_id.as_str(),
-            PSION_PLUGIN_CONDITIONED_REFERENCE_MODEL_ID,
             "plugin_conditioned_compact_decoder_reference.descriptor.model.model_id",
         )?;
         check_string_match(
@@ -411,12 +427,59 @@ pub fn record_psion_plugin_conditioned_compact_decoder_reference_config(
     PsionPluginConditionedCompactDecoderReferenceConfig,
     PsionPluginConditionedCompactDecoderError,
 > {
-    let descriptor = reference_descriptor()?;
+    record_psion_plugin_conditioned_compact_decoder_reference_config_for_lane(
+        stage_manifest,
+        PsionPluginConditionedReferenceLaneProfile {
+            lane_id: PSION_PLUGIN_CONDITIONED_REFERENCE_LANE_ID,
+            model_id: PSION_PLUGIN_CONDITIONED_REFERENCE_MODEL_ID,
+            stage_run_bundle_ref: PSION_PLUGIN_CONDITIONED_SFT_RUN_BUNDLE_REF,
+            checkpoint_ref_prefix: "checkpoint://psion/plugin_conditioned_host_native_reference",
+            export_directory_name: "psion_plugin_conditioned_compact_decoder_reference",
+            checkpoint_detail:
+                "Checkpoint and export naming stay on the shared compact-decoder file contract while the checkpoint family and export directory are explicitly bound to the plugin-conditioned host-native lane.",
+        },
+        summary,
+    )
+}
+
+/// Records the first mixed plugin-conditioned compact-decoder reference config.
+pub fn record_psion_plugin_conditioned_mixed_compact_decoder_reference_config(
+    stage_manifest: &PsionPluginConditionedSftStageManifest,
+    stage_run_bundle_ref: &str,
+    summary: impl Into<String>,
+) -> Result<
+    PsionPluginConditionedCompactDecoderReferenceConfig,
+    PsionPluginConditionedCompactDecoderError,
+> {
+    record_psion_plugin_conditioned_compact_decoder_reference_config_for_lane(
+        stage_manifest,
+        PsionPluginConditionedReferenceLaneProfile {
+            lane_id: PSION_PLUGIN_CONDITIONED_MIXED_REFERENCE_LANE_ID,
+            model_id: PSION_PLUGIN_CONDITIONED_MIXED_REFERENCE_MODEL_ID,
+            stage_run_bundle_ref,
+            checkpoint_ref_prefix: "checkpoint://psion/plugin_conditioned_mixed_reference",
+            export_directory_name: "psion_plugin_conditioned_mixed_compact_decoder_reference",
+            checkpoint_detail:
+                "Checkpoint and export naming stay on the shared compact-decoder file contract while the checkpoint family and export directory are explicitly bound to the first mixed host-native plus guest-artifact lane.",
+        },
+        summary,
+    )
+}
+
+fn record_psion_plugin_conditioned_compact_decoder_reference_config_for_lane(
+    stage_manifest: &PsionPluginConditionedSftStageManifest,
+    lane: PsionPluginConditionedReferenceLaneProfile<'_>,
+    summary: impl Into<String>,
+) -> Result<
+    PsionPluginConditionedCompactDecoderReferenceConfig,
+    PsionPluginConditionedCompactDecoderError,
+> {
+    let descriptor = reference_descriptor_with_model_id(lane.model_id)?;
     let mut config = PsionPluginConditionedCompactDecoderReferenceConfig {
         schema_version: String::from(
             PSION_PLUGIN_CONDITIONED_COMPACT_DECODER_REFERENCE_SCHEMA_VERSION,
         ),
-        lane_id: String::from(PSION_PLUGIN_CONDITIONED_REFERENCE_LANE_ID),
+        lane_id: String::from(lane.lane_id),
         stage_manifest_digest: stage_manifest.manifest_digest.clone(),
         stage_dataset_identity: stage_manifest.dataset_binding.stable_dataset_identity.clone(),
         descriptor: descriptor.clone(),
@@ -444,20 +507,14 @@ pub fn record_psion_plugin_conditioned_compact_decoder_reference_config(
         },
         checkpoint_naming: PsionPluginConditionedCheckpointNaming {
             checkpoint_family: stage_manifest.checkpoint_family.clone(),
-            stage_run_bundle_ref: String::from(PSION_PLUGIN_CONDITIONED_SFT_RUN_BUNDLE_REF),
+            stage_run_bundle_ref: String::from(lane.stage_run_bundle_ref),
             stage_manifest_digest: stage_manifest.manifest_digest.clone(),
-            checkpoint_ref_prefix: String::from(
-                "checkpoint://psion/plugin_conditioned_host_native_reference",
-            ),
-            export_directory_name: String::from(
-                "psion_plugin_conditioned_compact_decoder_reference",
-            ),
+            checkpoint_ref_prefix: String::from(lane.checkpoint_ref_prefix),
+            export_directory_name: String::from(lane.export_directory_name),
             descriptor_file_name: descriptor.export_contract.descriptor_file_name.clone(),
             checkpoint_file_name: descriptor.export_contract.checkpoint_file_name.clone(),
             export_format_id: descriptor.export_contract.export_format_id.clone(),
-            detail: String::from(
-                "Checkpoint and export naming stay on the shared compact-decoder file contract while the checkpoint family and export directory are explicitly bound to the plugin-conditioned host-native lane.",
-            ),
+            detail: String::from(lane.checkpoint_detail),
         },
         summary: summary.into(),
         config_digest: String::new(),
@@ -473,7 +530,19 @@ pub fn psion_plugin_conditioned_compact_decoder_reference_config_path() -> PathB
     repo_root().join(PSION_PLUGIN_CONDITIONED_COMPACT_DECODER_REFERENCE_CONFIG_REF)
 }
 
+/// Returns the canonical output path for the committed mixed reference config.
+#[must_use]
+pub fn psion_plugin_conditioned_mixed_compact_decoder_reference_config_path() -> PathBuf {
+    repo_root().join(PSION_PLUGIN_CONDITIONED_MIXED_COMPACT_DECODER_REFERENCE_CONFIG_REF)
+}
+
 fn reference_descriptor(
+) -> Result<PsionCompactDecoderDescriptor, PsionPluginConditionedCompactDecoderError> {
+    reference_descriptor_with_model_id(PSION_PLUGIN_CONDITIONED_REFERENCE_MODEL_ID)
+}
+
+fn reference_descriptor_with_model_id(
+    model_id: &str,
 ) -> Result<PsionCompactDecoderDescriptor, PsionPluginConditionedCompactDecoderError> {
     let mut descriptor = PsionCompactDecoderDescriptor::new(
         PsionCompactDecoderSizeAnchor::Pilot32m,
@@ -493,7 +562,7 @@ fn reference_descriptor(
             )),
         },
     )?;
-    descriptor.model.model_id = String::from(PSION_PLUGIN_CONDITIONED_REFERENCE_MODEL_ID);
+    descriptor.model.model_id = String::from(model_id);
     descriptor.validate()?;
     Ok(descriptor)
 }

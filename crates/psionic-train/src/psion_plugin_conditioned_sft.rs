@@ -5,9 +5,8 @@ use std::{
 };
 
 use psionic_data::{
-    DatasetKey, DatasetSplitKind, PsionPluginConditionedDatasetBundle,
-    PsionPluginControllerSurface, PsionPluginOutcomeLabel, PsionPluginRouteLabel,
-    PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_REF, PSION_PLUGIN_CONDITIONED_DATASET_REF,
+    DatasetKey, DatasetSplitKind, PsionPluginConditionedDatasetBundle, PsionPluginControllerSurface,
+    PsionPluginOutcomeLabel, PsionPluginRouteLabel,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -79,12 +78,12 @@ impl PsionPluginConditionedDatasetBinding {
         )?;
         check_string_match(
             self.dataset_ref.as_str(),
-            PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_REF,
+            dataset_bundle.dataset_key.dataset_ref.as_str(),
             "plugin_conditioned_dataset_binding.dataset_ref",
         )?;
         check_string_match(
             self.stable_dataset_identity.as_str(),
-            PSION_PLUGIN_CONDITIONED_DATASET_REF,
+            dataset_bundle.stable_dataset_identity.as_str(),
             "plugin_conditioned_dataset_binding.stable_dataset_identity",
         )?;
         if self.dataset_key != dataset_bundle.dataset_key {
@@ -1002,8 +1001,8 @@ pub fn record_psion_plugin_conditioned_sft_stage_manifest(
         previous_stage_id: stage_context.general_sft_stage.stage_id.clone(),
         checkpoint_family: stage_program.checkpoint_family.clone(),
         dataset_binding: PsionPluginConditionedDatasetBinding {
-            dataset_ref: String::from(PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_REF),
-            stable_dataset_identity: String::from(PSION_PLUGIN_CONDITIONED_DATASET_REF),
+            dataset_ref: dataset_bundle.dataset_key.dataset_ref.clone(),
+            stable_dataset_identity: dataset_bundle.stable_dataset_identity.clone(),
             dataset_key: dataset_bundle.dataset_key.clone(),
             dataset_bundle_digest: dataset_bundle.bundle_digest.clone(),
             train_record_count: dataset_split_records(dataset_bundle, DatasetSplitKind::Train)?
@@ -1011,7 +1010,7 @@ pub fn record_psion_plugin_conditioned_sft_stage_manifest(
             held_out_record_count: held_out_records.len() as u32,
             held_out_workflow_case_ids,
             detail: String::from(
-                "The plugin-conditioned stage binds directly to the committed host-native dataset identity and preserves the held-out workflow split for later audits.",
+                "The plugin-conditioned stage binds directly to the committed dataset identity and preserves the held-out workflow split for later audits.",
             ),
         },
         trace_bindings,
@@ -1603,6 +1602,7 @@ mod tests {
         let stage_program = plugin_conditioned_stage_program(&dataset_bundle)?;
         let benchmark_bindings = benchmark_bindings()?;
         let trace_bindings = trace_bindings(&dataset_bundle, &stage_program)?;
+        let max_plugin_calls_per_trace = max_plugin_calls_per_trace(&trace_bindings);
         let eval_hooks = eval_hooks(&benchmark_bindings);
         let stage_manifest = record_psion_plugin_conditioned_sft_stage_manifest(
             &stage_program,
@@ -1611,7 +1611,7 @@ mod tests {
             benchmark_bindings,
             eval_hooks,
             PsionPluginConditionedSftStageConfig {
-                max_plugin_calls_per_trace: 5,
+                max_plugin_calls_per_trace,
                 preserve_receipt_boundaries: true,
                 require_replay_class_coverage: true,
                 require_held_out_benchmark_hooks: true,
@@ -1647,14 +1647,16 @@ mod tests {
         let full_benchmark_bindings = benchmark_bindings()?;
         let mut incomplete_benchmark_bindings = full_benchmark_bindings.clone();
         incomplete_benchmark_bindings.pop();
+        let trace_bindings = trace_bindings(&dataset_bundle, &stage_program)?;
+        let max_plugin_calls_per_trace = max_plugin_calls_per_trace(&trace_bindings);
         let error = record_psion_plugin_conditioned_sft_stage_manifest(
             &stage_program,
             &dataset_bundle,
-            trace_bindings(&dataset_bundle, &stage_program)?,
+            trace_bindings,
             incomplete_benchmark_bindings,
             eval_hooks(&full_benchmark_bindings),
             PsionPluginConditionedSftStageConfig {
-                max_plugin_calls_per_trace: 5,
+                max_plugin_calls_per_trace,
                 preserve_receipt_boundaries: true,
                 require_replay_class_coverage: true,
                 require_held_out_benchmark_hooks: true,
@@ -1827,6 +1829,14 @@ mod tests {
                 }
             })
             .collect())
+    }
+
+    fn max_plugin_calls_per_trace(trace_bindings: &[PsionPluginConditionedTraceBinding]) -> u32 {
+        trace_bindings
+            .iter()
+            .map(|binding| binding.receipt_refs.len() as u32)
+            .max()
+            .unwrap_or(1)
     }
 
     fn training_trace(
