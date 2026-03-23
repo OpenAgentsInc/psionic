@@ -17,6 +17,7 @@ path = "src/lib.rs"
 [dependencies]
 half = "2.4.1"
 libloading = "0.8.9"
+rayon = "1.10"
 psionic-compiler = { path = "../psionic-compiler" }
 psionic-core = { path = "../psionic-core" }
 psionic-ir = { path = "../psionic-ir" }

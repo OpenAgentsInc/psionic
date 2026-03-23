@@ -36,6 +36,7 @@ use psionic_runtime::{
     NvidiaDeviceMetadata, NvidiaRecoveryAction, NvidiaRecoveryProfile, NvidiaRiskLevel,
     NvidiaRiskProfile, NvidiaTopologyInfo, RuntimeError, RuntimeHealth, ServedProductBackendPolicy,
 };
+use rayon::prelude::*;
 
 /// Human-readable crate ownership summary.
 pub const CRATE_ROLE: &str = "CUDA backend discovery, allocation, and submission";
@@ -4519,99 +4520,115 @@ fn scaled_dot_product_attention_backward_host_values(
     let mut query_gradient = vec![0.0_f32; query.len()];
     let mut key_gradient = vec![0.0_f32; key.len()];
     let mut value_gradient = vec![0.0_f32; value.len()];
-    let mut scores = vec![0.0_f32; sequence_length];
-    let mut weights = vec![0.0_f32; sequence_length];
+    let query_batch_width = query_heads
+        .checked_mul(sequence_length)
+        .and_then(|value| value.checked_mul(head_dim))
+        .ok_or_else(|| {
+            RuntimeError::Backend(String::from(
+                "cuda scaled_dot_product_attention backward query batch width overflow",
+            ))
+        })?;
+    let kv_batch_width = kv_heads
+        .checked_mul(sequence_length)
+        .and_then(|value| value.checked_mul(head_dim))
+        .ok_or_else(|| {
+            RuntimeError::Backend(String::from(
+                "cuda scaled_dot_product_attention backward kv batch width overflow",
+            ))
+        })?;
 
-    for batch_index in 0..batch_size {
-        for query_head in 0..query_heads {
-            let kv_head = query_head / group_size;
-            for query_position in 0..sequence_length {
-                let query_base = rank4_token_head_element_offset(
-                    query_dims,
-                    batch_index,
-                    query_head,
-                    query_position,
-                )?;
-                let grad_output_base = rank4_token_head_element_offset(
-                    query_dims,
-                    batch_index,
-                    query_head,
-                    query_position,
-                )?;
-                let valid_scores = query_position + 1;
-                let mut max_score = f32::NEG_INFINITY;
-                for key_position in 0..valid_scores {
-                    let key_base = rank4_token_head_element_offset(
-                        key_dims,
-                        batch_index,
-                        kv_head,
-                        key_position,
-                    )?;
-                    let mut dot = 0.0_f32;
-                    for feature in 0..head_dim {
-                        dot += query[query_base + feature] * key[key_base + feature];
-                    }
-                    let score = dot * scale;
-                    scores[key_position] = score;
-                    max_score = max_score.max(score);
-                }
-                let mut denom = 0.0_f32;
-                for key_position in 0..valid_scores {
-                    let weight = (scores[key_position] - max_score).exp();
-                    weights[key_position] = weight;
-                    denom += weight;
-                }
-                for key_position in 0..valid_scores {
-                    weights[key_position] /= denom;
-                }
+    query_gradient
+        .par_chunks_mut(query_batch_width)
+        .zip(key_gradient.par_chunks_mut(kv_batch_width))
+        .zip(value_gradient.par_chunks_mut(kv_batch_width))
+        .enumerate()
+        .try_for_each(
+            |(batch_index, ((query_gradient_batch, key_gradient_batch), value_gradient_batch))| {
+                let query_batch_start = batch_index
+                    .checked_mul(query_batch_width)
+                    .ok_or_else(|| {
+                        RuntimeError::Backend(String::from(
+                            "cuda scaled_dot_product_attention backward query batch offset overflow",
+                        ))
+                    })?;
+                let kv_batch_start = batch_index.checked_mul(kv_batch_width).ok_or_else(|| {
+                    RuntimeError::Backend(String::from(
+                        "cuda scaled_dot_product_attention backward kv batch offset overflow",
+                    ))
+                })?;
+                let query_batch = &query[query_batch_start..query_batch_start + query_batch_width];
+                let key_batch = &key[kv_batch_start..kv_batch_start + kv_batch_width];
+                let value_batch = &value[kv_batch_start..kv_batch_start + kv_batch_width];
+                let grad_output_batch =
+                    &grad_output[query_batch_start..query_batch_start + query_batch_width];
+                let mut scores = vec![0.0_f32; sequence_length];
+                let mut weights = vec![0.0_f32; sequence_length];
 
-                let mut weighted_grad_sum = 0.0_f32;
-                for key_position in 0..valid_scores {
-                    let value_base = rank4_token_head_element_offset(
-                        value_dims,
-                        batch_index,
-                        kv_head,
-                        key_position,
-                    )?;
-                    let mut grad_weight = 0.0_f32;
-                    for feature in 0..head_dim {
-                        grad_weight +=
-                            grad_output[grad_output_base + feature] * value[value_base + feature];
-                    }
-                    weighted_grad_sum += weights[key_position] * grad_weight;
-                }
+                for query_head in 0..query_heads {
+                    let kv_head = query_head / group_size;
+                    let query_head_offset = query_head * sequence_length * head_dim;
+                    let kv_head_offset = kv_head * sequence_length * head_dim;
+                    for query_position in 0..sequence_length {
+                        let query_base = query_head_offset + query_position * head_dim;
+                        let valid_scores = query_position + 1;
+                        let mut max_score = f32::NEG_INFINITY;
+                        for key_position in 0..valid_scores {
+                            let key_base = kv_head_offset + key_position * head_dim;
+                            let mut dot = 0.0_f32;
+                            for feature in 0..head_dim {
+                                dot += query_batch[query_base + feature]
+                                    * key_batch[key_base + feature];
+                            }
+                            let score = dot * scale;
+                            scores[key_position] = score;
+                            max_score = max_score.max(score);
+                        }
+                        let mut denom = 0.0_f32;
+                        for key_position in 0..valid_scores {
+                            let weight = (scores[key_position] - max_score).exp();
+                            weights[key_position] = weight;
+                            denom += weight;
+                        }
+                        for key_position in 0..valid_scores {
+                            weights[key_position] /= denom;
+                        }
 
-                for key_position in 0..valid_scores {
-                    let key_base = rank4_token_head_element_offset(
-                        key_dims,
-                        batch_index,
-                        kv_head,
-                        key_position,
-                    )?;
-                    let value_base = rank4_token_head_element_offset(
-                        value_dims,
-                        batch_index,
-                        kv_head,
-                        key_position,
-                    )?;
-                    let mut grad_weight = 0.0_f32;
-                    for feature in 0..head_dim {
-                        grad_weight +=
-                            grad_output[grad_output_base + feature] * value[value_base + feature];
-                    }
-                    let grad_score = weights[key_position] * (grad_weight - weighted_grad_sum);
-                    for feature in 0..head_dim {
-                        query_gradient[query_base + feature] +=
-                            grad_score * scale * key[key_base + feature];
-                        key_gradient[key_base + feature] +=
-                            grad_score * scale * query[query_base + feature];
-                        value_gradient[value_base + feature] +=
-                            weights[key_position] * grad_output[grad_output_base + feature];
+                        let mut weighted_grad_sum = 0.0_f32;
+                        for key_position in 0..valid_scores {
+                            let value_base = kv_head_offset + key_position * head_dim;
+                            let mut grad_weight = 0.0_f32;
+                            for feature in 0..head_dim {
+                                grad_weight += grad_output_batch[query_base + feature]
+                                    * value_batch[value_base + feature];
+                            }
+                            weighted_grad_sum += weights[key_position] * grad_weight;
+                        }
+
+                        for key_position in 0..valid_scores {
+                            let key_base = kv_head_offset + key_position * head_dim;
+                            let value_base = kv_head_offset + key_position * head_dim;
+                            let mut grad_weight = 0.0_f32;
+                            for feature in 0..head_dim {
+                                grad_weight += grad_output_batch[query_base + feature]
+                                    * value_batch[value_base + feature];
+                            }
+                            let grad_score =
+                                weights[key_position] * (grad_weight - weighted_grad_sum);
+                            for feature in 0..head_dim {
+                                query_gradient_batch[query_base + feature] +=
+                                    grad_score * scale * key_batch[key_base + feature];
+                                key_gradient_batch[key_base + feature] +=
+                                    grad_score * scale * query_batch[query_base + feature];
+                                value_gradient_batch[value_base + feature] +=
+                                    weights[key_position]
+                                        * grad_output_batch[query_base + feature];
+                            }
+                        }
                     }
                 }
-            }
-        }
-    }
+                Ok::<(), RuntimeError>(())
+            },
+        )?;
 
     Ok(ScaledDotProductAttentionBackwardHostValues {
         query: query_gradient,
