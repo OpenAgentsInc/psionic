@@ -35,9 +35,10 @@ explicit answer to a simpler question:
   human-readable contract.
 - `docs/PSION_PLUGIN_PROGRAM_MAP.md` is the canonical dependency map and track split
   that this document sharpens into publication and route/refusal posture.
-- `docs/PSION_PLUGIN_GUEST_ARTIFACT_DIRECTION.md` is the canonical later-lane
-  direction record for guest-artifact restoration and freezes that this class
-  remains separate from current starter-plugin truth.
+- `docs/PSION_PLUGIN_GUEST_ARTIFACT_DIRECTION.md` is the canonical bounded-lane
+  direction record for the digest-bound guest-artifact starter-plugin proof and
+  freezes that this class is now real only in one narrow operator-internal
+  form, not as generic Wasm/plugin support.
 - `docs/TRAIN_SYSTEM.md` is the canonical training-system authority doc that
   inherits this bounded posture for the convergence tranche.
 - `docs/PSION_SERVED_EVIDENCE.md` and `docs/PSION_SERVED_OUTPUT_CLAIMS.md`
@@ -95,7 +96,7 @@ The current posture for each class is:
 | `host_native_capability_free_local_deterministic` | `proved_supported_substrate` | real runtime, bridge, catalog, controller, weighted-controller, and user-authoring proof already exist |
 | `host_native_networked_read_only` | `proved_supported_substrate` | one bounded manual user-authored proof now exists across runtime, bridge, catalog, controller, weighted-controller, and receipt truth, but the first trained publication still excludes this class |
 | `host_native_secret_backed_or_stateful` | `out_of_scope_for_this_tranche` | class remains later bounded substrate work and must not be implied by the current convergence lane |
-| `guest_artifact_digest_bound` | `later_separate_bounded_lane` | class does not describe present-tense starter-plugin truth and remains separate from the current host-native substrate |
+| `guest_artifact_digest_bound` | `proved_supported_substrate` | one bounded digest-bound user-provided Wasm proof now exists across runtime, bridge, catalog, deterministic controller, weighted-controller, and receipt truth, but generic Wasm/plugin support remains blocked and the first trained publication still excludes this class |
 
 That table is the most important posture split in this tranche.
 
@@ -145,7 +146,9 @@ following posture:
 - one manual `networked_read_only` substrate proof now exists, but it remains
   outside the first trained capability publication
 - secret-backed and stateful classes remain unsupported in this tranche
-- guest-artifact support remains later and separate
+- one bounded digest-bound guest-artifact substrate proof now exists, but it
+  remains outside the first trained capability publication and does not imply
+  generic Wasm/plugin support
 - execution claims require explicit runtime receipts
 - learned outputs may reason about plugin use, but may not imply hidden
   execution without receipts
@@ -157,13 +160,16 @@ This means allowed summary language today looks like:
 - “operator-internal bounded plugin-use training tranche”
 - “one manual networked_read_only substrate proof exists, but the first trained
   capability publication remains local-deterministic only”
+- “one bounded digest-bound guest-artifact substrate proof exists, but generic
+  Wasm/plugin support and the first trained capability publication still
+  exclude that class”
 - “receipt-backed plugin execution remains runtime-owned”
 
 Disallowed summary language today includes:
 
 - “plugin-supporting model” without class qualifiers
 - “user-plugin-capable” without class qualifiers
-- “Wasm plugin support” in the present tense
+- “generic Wasm plugin support” in the present tense
 - “general plugin platform” or “plugin marketplace”
 - “software execution in weights”
 

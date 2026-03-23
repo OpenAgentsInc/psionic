@@ -75,8 +75,8 @@ mod tests {
         let receipt = TassadarPostArticleStarterPluginCatalogReceipt::from_summary(&summary);
 
         assert_eq!(receipt.eval_status, "green");
-        assert_eq!(receipt.starter_plugin_count, 5);
-        assert_eq!(receipt.local_deterministic_plugin_count, 4);
+        assert_eq!(receipt.starter_plugin_count, 6);
+        assert_eq!(receipt.local_deterministic_plugin_count, 5);
         assert_eq!(receipt.read_only_network_plugin_count, 1);
         assert_eq!(receipt.bounded_flow_count, 2);
         assert!(receipt.operator_internal_only_posture);

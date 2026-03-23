@@ -338,6 +338,9 @@ fn map_plugin_class(authoring_class: StarterPluginAuthoringClass) -> PsionPlugin
         StarterPluginAuthoringClass::NetworkedReadOnly => {
             PsionPluginClass::HostNativeNetworkedReadOnly
         }
+        StarterPluginAuthoringClass::GuestArtifactDigestBound => {
+            PsionPluginClass::GuestArtifactDigestBound
+        }
     }
 }
 

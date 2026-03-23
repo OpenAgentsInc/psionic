@@ -3,8 +3,8 @@
 > Status: canonical `PSION_PLUGIN-19` guest-artifact manifest and identity
 > contract, written 2026-03-22.
 
-This document freezes the first digest-bound manifest contract for the later
-guest-artifact plugin lane.
+This document freezes the first digest-bound manifest contract for the bounded
+guest-artifact starter-plugin lane.
 
 It is a contract-only tranche.
 
@@ -49,8 +49,9 @@ The first guest-artifact contract requires all of the following to be explicit:
 - provenance digests
 - evidence settings
 
-That is the minimum surface needed to keep a later guest-artifact lane
-digest-bound and attributable instead of drifting into vague binary loading.
+That is the minimum surface needed to keep the bounded guest-artifact starter-
+plugin lane digest-bound and attributable instead of drifting into vague binary
+loading.
 
 ## Digest Identity Surface
 
@@ -112,4 +113,3 @@ direction:
 - the lane remains digest-bound
 - the lane remains trust-tiered
 - the lane remains publication-blocked
-

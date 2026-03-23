@@ -14,13 +14,13 @@
   "control_trace_profile_id": "tassadar.weighted_plugin.control_trace_profile.v1",
   "determinism_profile_id": "tassadar.weighted_plugin.controller_determinism_profile.v1",
   "closure_bundle_report_id": "tassadar.post_article_canonical_machine_closure_bundle.report.v1",
-  "closure_bundle_report_digest": "cb69ea3637d8a415d869c90ce7ae46b85dabaac11a7180f2c8ad6e3271e8d06d",
-  "closure_bundle_digest": "9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003",
+  "closure_bundle_report_digest": "0a0e569551cd9b6207a5e13b72fb859d2ece38104df054c102a0e97f52c8e4d6",
+  "closure_bundle_digest": "6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9",
   "runtime_bundle_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.runtime_bundle.v1",
   "contract_status": "green",
   "dependency_row_count": 5,
-  "controller_case_row_count": 5,
-  "control_trace_row_count": 40,
+  "controller_case_row_count": 6,
+  "control_trace_row_count": 46,
   "host_negative_row_count": 10,
   "validation_row_count": 10,
   "deferred_issue_ids": [],
@@ -37,6 +37,6 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "detail": "post-article weighted plugin controller summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1`, contract_status=Green, controller_case_rows=5, control_trace_rows=40, validation_rows=10, closure_bundle_digest=`9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003`, weighted_plugin_control_allowed=true, and deferred_issue_ids=0.",
-  "summary_digest": "08b2d55a28ed07114880309439e808edbb4dbf7f4140af41da9867bf72f34d36"
+  "detail": "post-article weighted plugin controller summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1`, contract_status=Green, controller_case_rows=6, control_trace_rows=46, validation_rows=10, closure_bundle_digest=`6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9`, weighted_plugin_control_allowed=true, and deferred_issue_ids=0.",
+  "summary_digest": "272d9f881b7877c5adccd09063f1d4c4f6323f492275a58394b0672739a80c87"
 }

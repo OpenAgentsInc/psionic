@@ -4,7 +4,7 @@
 > contract, written 2026-03-22.
 
 This document freezes the first receipt-equivalent invocation path for the
-later guest-artifact plugin lane.
+bounded digest-bound guest-artifact starter-plugin lane.
 
 It is intentionally narrow.
 
@@ -92,7 +92,7 @@ errors.
 
 This invocation proof does not claim:
 
-- guest-artifact catalog exposure
+- generic guest-artifact catalog exposure beyond the admitted digest-bound row
 - controller parity with the full starter-plugin lane
 - weighted-controller promotion breadth
 - user-facing plugin publication

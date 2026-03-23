@@ -165,11 +165,11 @@ bounded networked classes.
 The shared starter-plugin bridge is now real and reusable across multiple
 surfaces.
 
-It projects five starter plugins into:
-
-- deterministic workflow tools
-- router `/v1/responses` function tools
-- Apple FM tool definitions
+It now projects six starter plugins into the shared deterministic workflow and
+router `/v1/responses` tool surfaces, including one digest-bound guest-artifact
+entry alongside the earlier capability-free and bounded networked rows. The
+Apple FM projection remains narrower and still exposes only the earlier
+host-native local deterministic set.
 
 The bridge also preserves:
 

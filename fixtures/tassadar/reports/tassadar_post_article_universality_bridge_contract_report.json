@@ -5213,7 +5213,7 @@
         "satisfied": true,
         "source_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_report.json",
         "source_artifact_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.report.v1",
-        "source_artifact_digest": "e3e30045a3372ae5278c8461d2ac6038f9828061878737a648fe2df22d1f8fc7",
+        "source_artifact_digest": "b0f2c65ae9c374b705f70f9188d8c44fda9bbe9d9f0f345cb1abd9cadff5652a",
         "detail": "the weighted controller trace proves plugin-facing sequencing stays model-owned and host-executes-but-is-not-planner on the same canonical machine."
       },
       {
@@ -5378,7 +5378,7 @@
         "surface_class": "weighted_controller_trace",
         "source_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_report.json",
         "source_artifact_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.report.v1",
-        "source_artifact_digest": "e3e30045a3372ae5278c8461d2ac6038f9828061878737a648fe2df22d1f8fc7",
+        "source_artifact_digest": "b0f2c65ae9c374b705f70f9188d8c44fda9bbe9d9f0f345cb1abd9cadff5652a",
         "machine_identity_id": "tassadar.post_article_universality_bridge.machine_identity.v1",
         "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
         "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
@@ -5539,7 +5539,7 @@
     "arbitrary_software_capability_allowed": false,
     "claim_boundary": "this eval-owned audit freezes one canonical execution-semantics proof-transport boundary for the post-article machine. It binds the historical universal-machine proof, the post-article rebinding receipts, the canonical computational-model statement, the declared TCM.v1 continuation carrier, and the current plugin-facing runtime/conformance/controller surfaces to the same proof-bearing machine without overclaiming a stronger machine. It still leaves fast-route legitimacy, downward non-influence, anti-drift closeout, and the final closure bundle as later issues.",
     "summary": "Post-article execution-semantics proof-transport audit keeps status=Green, supporting_material_rows=11, dependency_rows=9, plugin_surface_rows=3, invalidation_rows=6, validation_rows=9, next_stability_issue_id=`TAS-215`, and closure_bundle_issue_id=`TAS-215`.",
-    "report_digest": "9883ca4bca3648d0b2d521cf1c74da3cd088387e71bb1042f0f12654402ef446"
+    "report_digest": "9c03dcd769b47bbe078243a8d62c3e52c5d5a1b842ea8c98629a93c5f3b1c7cf"
   },
   "tcm_v1_runtime_contract_report": {
     "schema_version": 1,
@@ -12128,5 +12128,5 @@
   "served_public_universality_allowed": false,
   "claim_boundary": "this bridge contract freezes only the post-`TAS-186` rebasing boundary between the historical `TCM.v1` universality closeout and the canonical owned article-equivalence route. It binds the old closeout to one explicit post-article machine identity tuple, one coarse direct-vs-resumable carrier topology, one separately published canonical computational-model statement, one separately published execution-semantics proof-transport audit, and one explicit three-plane contract. It does not by itself prove fast-route legitimacy, control-plane provenance, final canonical carrier binding, served/public universality, weighted plugin control, or arbitrary software capability.",
   "summary": "Post-article universality bridge contract keeps dependencies=9/9, historical_bindings=4, carrier_topology=ExplicitSplitAcrossDirectAndResumableLanes, validation_rows=8/8, bridge_status=Green, rebase_claim_allowed=false, and reserved_capability_hooks=4.",
-  "report_digest": "6bb52f345fa6991e235dca9fba1c98364ec17d03e4abc6e79a77592115fcc72d"
+  "report_digest": "15aaadaabe20259bf06968121a10c15b268a10d335946fa153a0e23fc6346810"
 }

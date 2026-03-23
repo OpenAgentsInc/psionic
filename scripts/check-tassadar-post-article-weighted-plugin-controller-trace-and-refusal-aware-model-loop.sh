@@ -22,13 +22,17 @@ jq -e '
   and .control_trace_contract_id == "tassadar.weighted_plugin.controller_trace_contract.v1"
   and .control_trace_profile_id == "tassadar.weighted_plugin.control_trace_profile.v1"
   and .determinism_profile_id == "tassadar.weighted_plugin.controller_determinism_profile.v1"
-  and ((.starter_plugin_admission_rows | length) == 1)
-  and ((.controller_case_rows | length) == 5)
-  and ((.control_trace_rows | length) == 40)
+  and ((.starter_plugin_admission_rows | length) == 3)
+  and ((.controller_case_rows | length) == 6)
+  and ((.control_trace_rows | length) == 46)
   and ((.host_negative_rows | length) == 10)
   and (.starter_plugin_admission_rows | any(.plugin_id == "plugin.text.stats" and .derived_from_shared_registration == true and .derived_from_catalog_exposure == true))
+  and (.starter_plugin_admission_rows | any(.plugin_id == "plugin.http.fetch_text" and .derived_from_shared_registration == true and .derived_from_catalog_exposure == true))
+  and (.starter_plugin_admission_rows | any(.plugin_id == "plugin.example.echo_guest" and .derived_from_shared_registration == true and .derived_from_catalog_exposure == true))
   and (.controller_case_rows | any(.case_id == "text_stats_stop_after_success"))
+  and (.controller_case_rows | any(.case_id == "guest_echo_stop_after_success"))
   and (.control_trace_rows | any(.case_id == "text_stats_stop_after_success" and .control_token_kind == "plugin_select" and .plugin_id == "plugin.text.stats"))
+  and (.control_trace_rows | any(.case_id == "guest_echo_stop_after_success" and .control_token_kind == "plugin_select" and .plugin_id == "plugin.example.echo_guest"))
 ' fixtures/tassadar/runs/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_v1/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_bundle.json >/dev/null
 
 jq -e '
@@ -52,8 +56,10 @@ jq -e '
   and .plugin_publication_allowed == false
   and .served_public_universality_allowed == false
   and .arbitrary_software_capability_allowed == false
-  and ((.runtime_bundle.starter_plugin_admission_rows | length) == 1)
+  and ((.runtime_bundle.starter_plugin_admission_rows | length) == 3)
   and (.runtime_bundle.starter_plugin_admission_rows | any(.plugin_id == "plugin.text.stats"))
+  and (.runtime_bundle.starter_plugin_admission_rows | any(.plugin_id == "plugin.http.fetch_text"))
+  and (.runtime_bundle.starter_plugin_admission_rows | any(.plugin_id == "plugin.example.echo_guest"))
   and (.deferred_issue_ids == [])
 ' fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_report.json >/dev/null
 
@@ -82,8 +88,8 @@ jq -e '
   and .determinism_profile_id == "tassadar.weighted_plugin.controller_determinism_profile.v1"
   and .contract_status == "green"
   and .dependency_row_count == 5
-  and .controller_case_row_count == 5
-  and .control_trace_row_count == 40
+  and .controller_case_row_count == 6
+  and .control_trace_row_count == 46
   and .host_negative_row_count == 10
   and .validation_row_count == 10
   and .closure_bundle_bound_by_digest == true

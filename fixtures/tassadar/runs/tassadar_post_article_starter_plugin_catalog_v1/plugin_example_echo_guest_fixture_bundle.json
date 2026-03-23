@@ -1,0 +1,72 @@
+{
+  "plugin_id": "plugin.example.echo_guest",
+  "plugin_version": "v1",
+  "fixture_bundle_id": "fixture_bundle.plugin.example.echo_guest.v1",
+  "packet_abi_version": "packet.v1",
+  "success_case_ids": [
+    "guest_artifact_echo_success"
+  ],
+  "malformed_case_ids": [
+    "guest_artifact_schema_invalid"
+  ],
+  "refusal_case_ids": [
+    "guest_artifact_packet_too_large",
+    "guest_artifact_runtime_unavailable"
+  ],
+  "negative_claim_ids": [
+    "ambient_host_sdk_not_claimed",
+    "guest_artifact_publication_not_claimed",
+    "arbitrary_wasm_plugin_support_not_claimed",
+    "secret_or_stateful_guest_capability_not_claimed"
+  ],
+  "cases": [
+    {
+      "case_id": "guest_artifact_echo_success",
+      "status": "exact_success",
+      "request_schema_id": "plugin.example.echo_guest.input.v1",
+      "request_packet_digest": "c3484e135344a8de94d18bc0f9a6d15ce67b9a54f5ccdac27418bd4765c806a6",
+      "response_or_refusal_schema_id": "plugin.example.echo_guest.output.v1",
+      "response_or_refusal_digest": "80537d85230f55ae6362ecf7e02453874b49034d5e367a2df4d675988a449119",
+      "replay_class_id": "guest_artifact_digest_replay_only.v1",
+      "receipt_id": "receipt.plugin.example.echo_guest.0cabf8eb3bc77379.v1",
+      "detail": "the first digest-bound guest-artifact starter plugin now contributes real invocation evidence to the starter catalog instead of a synthetic host-native stand-in."
+    },
+    {
+      "case_id": "guest_artifact_schema_invalid",
+      "status": "typed_malformed_packet",
+      "request_schema_id": "plugin.example.echo_guest.input.v1",
+      "request_packet_digest": "8a04e406819f8b688203408d5be0a7fa70a1134038c95a67acf10da962c90727",
+      "response_or_refusal_schema_id": "plugin.refusal.schema_invalid.v1",
+      "response_or_refusal_digest": "bac652f7a15eafa74b21429025c4db24af720851e6b74471618644d6562584f3",
+      "replay_class_id": "guest_artifact_digest_replay_only.v1",
+      "receipt_id": "receipt.plugin.example.echo_guest.951aa16a2ebd56eb.v1",
+      "refusal_or_failure_class_id": "schema_invalid",
+      "detail": "guest-artifact invocation accepts only the bounded JSON packet form for the reference echo plugin."
+    },
+    {
+      "case_id": "guest_artifact_packet_too_large",
+      "status": "typed_refusal",
+      "request_schema_id": "plugin.example.echo_guest.input.v1",
+      "request_packet_digest": "a426d7ccbfdb27a7cc1bbd9d17331bb4f0ecc8d48c1b0444326916d5fbe0b025",
+      "response_or_refusal_schema_id": "plugin.refusal.packet_too_large.v1",
+      "response_or_refusal_digest": "2b078b4e529978ae8f532ac00b49378e046cb32c47116883e600b87a3719b8fc",
+      "replay_class_id": "guest_artifact_digest_replay_only.v1",
+      "receipt_id": "receipt.plugin.example.echo_guest.dc375bfa5e14d0a4.v1",
+      "refusal_or_failure_class_id": "packet_too_large",
+      "detail": "guest-artifact invocation refuses packets above 4096 bytes to keep the first guest lane bounded."
+    },
+    {
+      "case_id": "guest_artifact_runtime_unavailable",
+      "status": "typed_refusal",
+      "request_schema_id": "plugin.example.echo_guest.input.v1",
+      "request_packet_digest": "c3484e135344a8de94d18bc0f9a6d15ce67b9a54f5ccdac27418bd4765c806a6",
+      "response_or_refusal_schema_id": "plugin.refusal.runtime_unavailable.v1",
+      "response_or_refusal_digest": "6ff1bd1cde9a62e771597b17dd6a9603a29029c335580e24aaadf4f913bd6dfa",
+      "replay_class_id": "guest_artifact_digest_replay_only.v1",
+      "receipt_id": "receipt.plugin.example.echo_guest.0cabf8eb3bc77379.v1",
+      "refusal_or_failure_class_id": "guest_artifact_load_refusal",
+      "detail": "guest-artifact invocation refused because load failed closed: guest-artifact loading fails closed when artifact bytes do not match the manifest-bound digest."
+    }
+  ],
+  "bundle_digest": "e63c1a133305c876598f8d90997013315624d055cfd9e03810e7ba2f9f6ce100"
+}

@@ -250,6 +250,84 @@
       "detail": "the shared bridge derives deterministic, router-owned, and Apple FM tool definitions from one starter-plugin projection without inventing a second schema vocabulary."
     },
     {
+      "plugin_id": "plugin.example.echo_guest",
+      "tool_name": "plugin_example_echo_guest",
+      "result_schema_id": "plugin.example.echo_guest.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.packet_too_large.v1",
+        "plugin.refusal.runtime_resource_limit.v1",
+        "plugin.refusal.runtime_unavailable.v1"
+      ],
+      "replay_class_id": "guest_artifact_digest_replay_only.v1",
+      "deterministic_projection": {
+        "plugin_id": "plugin.example.echo_guest",
+        "tool_name": "plugin_example_echo_guest",
+        "description": "Echo one text field through the bounded guest-artifact packet path while preserving the host-native receipt and replay envelope.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "description": "Text echoed by the bounded guest-artifact reference plugin.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        },
+        "result_schema_id": "plugin.example.echo_guest.output.v1",
+        "refusal_schema_ids": [
+          "plugin.refusal.schema_invalid.v1",
+          "plugin.refusal.packet_too_large.v1",
+          "plugin.refusal.runtime_resource_limit.v1",
+          "plugin.refusal.runtime_unavailable.v1"
+        ],
+        "replay_class_id": "guest_artifact_digest_replay_only.v1"
+      },
+      "router_projection": {
+        "kind": "function",
+        "name": "plugin_example_echo_guest",
+        "description": "Echo one text field through the bounded guest-artifact packet path while preserving the host-native receipt and replay envelope.",
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "description": "Text echoed by the bounded guest-artifact reference plugin.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        }
+      },
+      "apple_fm_projection": {
+        "name": "plugin_example_echo_guest",
+        "description": "Echo one text field through the bounded guest-artifact packet path while preserving the host-native receipt and replay envelope.",
+        "arguments_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "description": "Text echoed by the bounded guest-artifact reference plugin.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        }
+      },
+      "arguments_schema_digest": "50cc90085b3823328872337f1075f100958907bfcc082cd09776842e793ef4df",
+      "router_parameters_digest": "50cc90085b3823328872337f1075f100958907bfcc082cd09776842e793ef4df",
+      "apple_fm_schema_digest": "50cc90085b3823328872337f1075f100958907bfcc082cd09776842e793ef4df",
+      "stable_across_surfaces": true,
+      "detail": "the shared bridge derives deterministic, router-owned, and Apple FM tool definitions from one starter-plugin projection without inventing a second schema vocabulary."
+    },
+    {
       "plugin_id": "plugin.html.extract_readable",
       "tool_name": "plugin_html_extract_readable",
       "result_schema_id": "plugin.html.extract_readable.output.v1",
@@ -488,6 +566,20 @@
       "detail": "read-only network results stay structured and receipt-bound at the same bridge boundary."
     },
     {
+      "case_id": "guest_echo_success_bridge",
+      "tool_name": "plugin_example_echo_guest",
+      "plugin_id": "plugin.example.echo_guest",
+      "status": "success",
+      "output_or_refusal_schema_id": "plugin.example.echo_guest.output.v1",
+      "structured_payload_digest": "f6c53f11ca17bda3e921ad4bfab9da3a94c75649bc7b3ab277057cec37fecd13",
+      "rendered_output_digest": "7437636f8f0bca5495cf4d8279bfb382d4c8ef6f60f4aff1e055e4c9f05dcbe4",
+      "plugin_receipt_id": "receipt.plugin.example.echo_guest.6ad0c469d0d42883.v1",
+      "plugin_receipt_digest": "3b2698297d024b7d1c351485d417ea555b1953a39e4dba617a35855a22705366",
+      "receipt_binding_preserved": true,
+      "typed_refusal_preserved": false,
+      "detail": "the first digest-bound guest-artifact starter plugin projects through the same shared bridge and preserves the same receipt-bound structured envelope as the host-native starter surface."
+    },
+    {
       "case_id": "extract_readable_success_bridge",
       "tool_name": "plugin_html_extract_readable",
       "plugin_id": "plugin.html.extract_readable",
@@ -516,8 +608,8 @@
       "detail": "typed plugin refusals stay typed and receipt-bound instead of degrading into free-form tool text."
     }
   ],
-  "plugin_count": 5,
+  "plugin_count": 6,
   "claim_boundary": "this bundle freezes one shared starter-plugin projection and receipt bridge above the plugin runtime and below deterministic, router-owned, and Apple FM controller lanes. It keeps tool-schema derivation, structured outputs, typed refusals, and plugin receipt identity explicit without claiming weighted controller closure.",
-  "summary": "starter plugin tool bridge covers projection_rows=5 and execution_cases=5 across deterministic, router-owned, and Apple FM controller surfaces.",
-  "bundle_digest": "021d606709a244ce78e9877a03633a0bd10ba27996019c5f58539a8ba0ebb3d9"
+  "summary": "starter plugin tool bridge covers projection_rows=6 and execution_cases=6 across deterministic, router-owned, and Apple FM controller surfaces.",
+  "bundle_digest": "fc934187061861bdcc128b6855faa89465561520b8b088e2a7b544842cb7d724"
 }

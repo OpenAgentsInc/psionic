@@ -3,8 +3,8 @@
 > Status: canonical `PSION_PLUGIN-20` bounded guest-artifact runtime-loading
 > contract, written 2026-03-22.
 
-This document freezes the first runtime-loading path for the later
-guest-artifact lane.
+This document freezes the first runtime-loading path for the bounded digest-
+bound guest-artifact starter-plugin lane.
 
 It is intentionally narrow.
 

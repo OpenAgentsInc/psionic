@@ -959,9 +959,9 @@ mod tests {
             "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.report.v1"
         );
         assert_eq!(report.dependency_rows.len(), 6);
-        assert_eq!(report.runtime_bundle.starter_plugin_admission_rows.len(), 2);
-        assert_eq!(report.controller_case_rows.len(), 5);
-        assert_eq!(report.control_trace_rows.len(), 40);
+        assert_eq!(report.runtime_bundle.starter_plugin_admission_rows.len(), 3);
+        assert_eq!(report.controller_case_rows.len(), 6);
+        assert_eq!(report.control_trace_rows.len(), 46);
         assert_eq!(report.host_negative_rows.len(), 10);
         assert_eq!(report.validation_rows.len(), 12);
         assert!(report.contract_green);
@@ -978,6 +978,11 @@ mod tests {
             .starter_plugin_admission_rows
             .iter()
             .any(|row| row.plugin_id == "plugin.http.fetch_text"));
+        assert!(report
+            .runtime_bundle
+            .starter_plugin_admission_rows
+            .iter()
+            .any(|row| row.plugin_id == "plugin.example.echo_guest"));
         assert_eq!(
             report.machine_identity_binding.control_trace_contract_id,
             "tassadar.weighted_plugin.controller_trace_contract.v1"

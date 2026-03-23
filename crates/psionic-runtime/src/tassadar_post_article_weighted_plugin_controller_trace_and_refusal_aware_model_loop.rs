@@ -10,10 +10,12 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    invoke_text_stats_json_packet,
+    invoke_psion_plugin_guest_artifact_json_packet, invoke_text_stats_json_packet,
+    reference_psion_plugin_guest_artifact_bytes, reference_psion_plugin_guest_artifact_manifest,
     weighted_controller_admissible_user_added_starter_plugin_registrations,
     StarterPluginAuthoringClass, StarterPluginOriginClass, StarterPluginRegistration,
-    TextStatsConfig, TextStatsRequest, STARTER_PLUGIN_TEXT_STATS_ID,
+    TextStatsConfig, TextStatsRequest, PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_INPUT_SCHEMA_ID,
+    STARTER_PLUGIN_GUEST_ECHO_ID, STARTER_PLUGIN_TEXT_STATS_ID,
     STARTER_PLUGIN_TEXT_STATS_INPUT_SCHEMA_ID,
     TASSADAR_POST_ARTICLE_PLUGIN_HOST_OWNED_RUNTIME_API_ID,
     TASSADAR_POST_ARTICLE_PLUGIN_INVOCATION_RECEIPT_PROFILE_ID,
@@ -195,6 +197,7 @@ pub fn build_tassadar_post_article_weighted_plugin_controller_trace_and_refusal_
             .map(starter_plugin_admission_row)
             .collect::<Vec<_>>();
     let text_stats_trace = weighted_text_stats_success_trace_fixture();
+    let guest_echo_trace = weighted_guest_echo_success_trace_fixture();
     let controller_case_rows = vec![
         controller_case(
             "fetch_text_stop_after_success",
@@ -241,6 +244,14 @@ pub fn build_tassadar_post_article_weighted_plugin_controller_trace_and_refusal_
             &["text_stats_exact_binding"],
             true,
             "the model selects the user-added capability-free `plugin.text.stats` entry admitted from the shared starter-plugin registration and catalog path, accepts the typed result packet, and stops without host-authored continuation.",
+        ),
+        controller_case(
+            "guest_echo_stop_after_success",
+            TassadarPostArticleWeightedPluginControllerCaseOutcome::StopAfterSuccess,
+            &[STARTER_PLUGIN_GUEST_ECHO_ID],
+            &["guest_echo_exact_binding"],
+            true,
+            "the model selects the user-added digest-bound guest-artifact starter plugin admitted from the shared registration and catalog path, accepts the typed result packet, and stops without host-authored continuation.",
         ),
     ];
 
@@ -841,6 +852,90 @@ pub fn build_tassadar_post_article_weighted_plugin_controller_trace_and_refusal_
             None,
             "the model stops after accepting the user-added text-stats result instead of relying on hidden host chaining.",
         ),
+        trace_row(
+            "guest_echo_stop_after_success",
+            0,
+            TassadarPostArticleWeightedPluginControlTokenKind::PluginSelect,
+            "model_weights",
+            Some(STARTER_PLUGIN_GUEST_ECHO_ID),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "the model selects the admitted digest-bound guest-artifact starter plugin from the shared starter-plugin registry instead of a host-curated one-off exception.",
+        ),
+        trace_row(
+            "guest_echo_stop_after_success",
+            1,
+            TassadarPostArticleWeightedPluginControlTokenKind::ExportSelect,
+            "model_weights",
+            Some(STARTER_PLUGIN_GUEST_ECHO_ID),
+            Some("handle_packet"),
+            None,
+            None,
+            None,
+            None,
+            None,
+            "the model keeps export choice explicit on the guest-artifact starter path as well.",
+        ),
+        trace_row(
+            "guest_echo_stop_after_success",
+            2,
+            TassadarPostArticleWeightedPluginControlTokenKind::PacketEncode,
+            "model_weights",
+            Some(STARTER_PLUGIN_GUEST_ECHO_ID),
+            Some("handle_packet"),
+            Some(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_INPUT_SCHEMA_ID),
+            Some(guest_echo_trace.packet_digest.clone()),
+            None,
+            None,
+            None,
+            "the model encodes one bounded guest-artifact packet under the canonical packet ABI without host-authored argument synthesis.",
+        ),
+        trace_row(
+            "guest_echo_stop_after_success",
+            3,
+            TassadarPostArticleWeightedPluginControlTokenKind::InvocationCommit,
+            "host_runtime",
+            Some(STARTER_PLUGIN_GUEST_ECHO_ID),
+            Some("handle_packet"),
+            Some(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_INPUT_SCHEMA_ID),
+            Some(guest_echo_trace.packet_digest.clone()),
+            Some(guest_echo_trace.receipt_id.as_str()),
+            None,
+            None,
+            "the host validates and executes the declared guest-artifact call without changing the selected plugin or next step.",
+        ),
+        trace_row(
+            "guest_echo_stop_after_success",
+            4,
+            TassadarPostArticleWeightedPluginControlTokenKind::ResultAccept,
+            "host_runtime",
+            Some(STARTER_PLUGIN_GUEST_ECHO_ID),
+            Some("handle_packet"),
+            None,
+            None,
+            Some(guest_echo_trace.receipt_id.as_str()),
+            Some("guest_echo_exact_binding"),
+            None,
+            "the host returns one typed guest-artifact result packet to the model loop under the shared result-binding contract.",
+        ),
+        trace_row(
+            "guest_echo_stop_after_success",
+            5,
+            TassadarPostArticleWeightedPluginControlTokenKind::Stop,
+            "model_weights",
+            None,
+            None,
+            None,
+            None,
+            Some(guest_echo_trace.receipt_id.as_str()),
+            Some("guest_echo_exact_binding"),
+            None,
+            "the model stops after accepting the guest-artifact result instead of relying on hidden host chaining.",
+        ),
     ];
 
     let host_negative_rows = vec![
@@ -1143,6 +1238,12 @@ struct WeightedTextStatsTraceFixture {
     receipt_id: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct WeightedGuestEchoTraceFixture {
+    packet_digest: String,
+    receipt_id: String,
+}
+
 fn starter_plugin_admission_row(
     registration: &StarterPluginRegistration,
 ) -> TassadarPostArticleWeightedPluginStarterPluginAdmissionRow {
@@ -1173,6 +1274,7 @@ fn authoring_class_id(authoring_class: StarterPluginAuthoringClass) -> String {
             "capability_free_local_deterministic"
         }
         StarterPluginAuthoringClass::NetworkedReadOnly => "networked_read_only",
+        StarterPluginAuthoringClass::GuestArtifactDigestBound => "guest_artifact_digest_bound",
     })
 }
 
@@ -1198,6 +1300,30 @@ fn weighted_text_stats_success_trace_fixture() -> WeightedTextStatsTraceFixture 
     WeightedTextStatsTraceFixture {
         packet_digest: outcome.receipt.input_packet_digest.clone(),
         receipt_id: outcome.receipt.receipt_id,
+    }
+}
+
+fn weighted_guest_echo_success_trace_fixture() -> WeightedGuestEchoTraceFixture {
+    let manifest = reference_psion_plugin_guest_artifact_manifest();
+    let artifact_bytes = reference_psion_plugin_guest_artifact_bytes();
+    let packet = serde_json::to_vec(&serde_json::json!({
+        "text": "Weighted guest-artifact controller proof."
+    }))
+    .expect("serialize weighted guest-artifact request");
+    let outcome = invoke_psion_plugin_guest_artifact_json_packet(
+        "weighted_guest_echo_success",
+        &manifest,
+        artifact_bytes.as_slice(),
+        packet.as_slice(),
+    )
+    .expect("invoke guest-artifact trace fixture");
+    assert!(
+        outcome.projected_result.status == crate::StarterPluginInvocationStatus::Success,
+        "weighted guest-artifact trace fixture must stay successful",
+    );
+    WeightedGuestEchoTraceFixture {
+        packet_digest: outcome.projected_result.plugin_receipt.input_packet_digest.clone(),
+        receipt_id: outcome.projected_result.plugin_receipt.receipt_id,
     }
 }
 
@@ -1271,9 +1397,9 @@ mod tests {
             bundle.bundle_id,
             "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.runtime_bundle.v1"
         );
-        assert_eq!(bundle.starter_plugin_admission_rows.len(), 2);
-        assert_eq!(bundle.controller_case_rows.len(), 5);
-        assert_eq!(bundle.control_trace_rows.len(), 40);
+        assert_eq!(bundle.starter_plugin_admission_rows.len(), 3);
+        assert_eq!(bundle.controller_case_rows.len(), 6);
+        assert_eq!(bundle.control_trace_rows.len(), 46);
         assert_eq!(bundle.host_negative_rows.len(), 10);
         assert!(bundle.starter_plugin_admission_rows.iter().any(|row| {
             row.plugin_id == "plugin.text.stats"
@@ -1283,6 +1409,13 @@ mod tests {
         assert!(bundle.starter_plugin_admission_rows.iter().any(|row| {
             row.plugin_id == "plugin.http.fetch_text"
                 && row.authoring_class_id == "networked_read_only"
+                && row.origin_class_id == "user_added"
+                && row.derived_from_shared_registration
+                && row.derived_from_catalog_exposure
+        }));
+        assert!(bundle.starter_plugin_admission_rows.iter().any(|row| {
+            row.plugin_id == "plugin.example.echo_guest"
+                && row.authoring_class_id == "guest_artifact_digest_bound"
                 && row.origin_class_id == "user_added"
                 && row.derived_from_shared_registration
                 && row.derived_from_catalog_exposure
@@ -1304,6 +1437,10 @@ mod tests {
         assert!(bundle.control_trace_rows.iter().any(|row| {
             row.case_id == "text_stats_stop_after_success"
                 && row.plugin_id.as_deref() == Some("plugin.text.stats")
+        }));
+        assert!(bundle.control_trace_rows.iter().any(|row| {
+            row.case_id == "guest_echo_stop_after_success"
+                && row.plugin_id.as_deref() == Some("plugin.example.echo_guest")
         }));
         assert!(bundle.controller_case_rows.iter().any(|row| {
             row.case_outcome

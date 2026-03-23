@@ -26,26 +26,29 @@ The boundary is narrow on purpose:
 - checker:
   `scripts/check-tassadar-post-article-starter-plugin-catalog.sh`
 
-The current starter catalog freezes five bounded starter-plugin entries:
+The current starter catalog freezes six bounded starter-plugin entries:
 
 - `plugin.text.url_extract`
 - `plugin.text.stats`
 - `plugin.http.fetch_text`
+- `plugin.example.echo_guest`
 - `plugin.html.extract_readable`
 - `plugin.feed.rss_atom_parse`
 
 Capability posture stays explicit:
 
-- four local deterministic entries
+- five local deterministic entries, including one digest-bound guest-artifact
+  row
 - one read-only network entry
 - two bounded composition flows
 
-`plugin.text.stats` and `plugin.http.fetch_text` are now part of the cataloged
-starter-plugin surface with their own descriptor, fixture bundle, and sample
-mount-envelope sidecars, which means the repo can now point to one
-machine-legible path from runtime plugin truth to catalog, eval, summary, and
-provider-report truth for both the capability-free and manual
-`networked_read_only` user-added classes.
+`plugin.text.stats`, `plugin.http.fetch_text`, and
+`plugin.example.echo_guest` are now part of the cataloged starter-plugin
+surface with their own descriptor, fixture bundle, and sample mount-envelope
+sidecars, which means the repo can now point to one machine-legible path from
+runtime plugin truth to catalog, eval, summary, and provider-report truth for
+the capability-free, manual `networked_read_only`, and one narrow
+digest-bound guest-artifact user-added classes.
 
 ## Planned
 

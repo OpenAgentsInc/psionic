@@ -126,6 +126,8 @@ pub fn build_starter_plugin_workflow_controller_bundle() -> StarterPluginWorkflo
     let case_rows = vec![
         run_web_content_success_case(workflow_graph_id).expect("web content success workflow case"),
         run_web_content_refusal_case(workflow_graph_id).expect("web content refusal workflow case"),
+        run_guest_echo_success_case(workflow_graph_id)
+            .expect("guest-artifact success workflow case"),
     ];
     let mut bundle = StarterPluginWorkflowControllerBundle {
         schema_version: 1,
@@ -206,6 +208,59 @@ fn run_web_content_refusal_case(
         directive_text,
         deterministic_workflow_bridge_config(),
     )
+}
+
+fn run_guest_echo_success_case(
+    workflow_graph_id: &str,
+) -> Result<StarterPluginWorkflowCase, StarterPluginWorkflowControllerError> {
+    let projected_result = execute_starter_plugin_tool_call(
+        "plugin_example_echo_guest",
+        serde_json::json!({
+            "text": "controller-visible guest-artifact echo"
+        }),
+        &deterministic_workflow_bridge_config(),
+    )?;
+    let echoed_text = decode_guest_echo_text(projected_result.structured_payload.clone())?;
+    Ok(StarterPluginWorkflowCase {
+        case_id: String::from("guest_artifact_echo_success"),
+        workflow_graph_id: String::from(workflow_graph_id),
+        directive_text: String::from("Echo one bounded guest-artifact packet through the shared starter-plugin controller surface."),
+        decision_rows: vec![
+            decision_row(
+                0,
+                "guest_artifact_branch",
+                "guest_artifact_echo_success",
+                "branch.plugin_example_echo_guest",
+                "the host-owned controller admits the digest-bound guest-artifact starter plugin on the same shared bridge surface as the host-native starter set.",
+            ),
+            decision_row(
+                1,
+                "stop_condition",
+                "guest_artifact_echo_success",
+                "controller_stop.guest_artifact_echo_complete",
+                "the host-owned controller stops after the guest-artifact result is accepted without hidden chaining.",
+            ),
+        ],
+        step_rows: vec![workflow_step_row(
+            0,
+            "guest_artifact_echo_success",
+            projected_result.clone(),
+            "execute the first digest-bound guest-artifact starter plugin through the shared starter-plugin controller surface.",
+        )],
+        refusal_rows: Vec::new(),
+        final_artifact: StarterPluginWorkflowFinalArtifact {
+            extracted_urls: Vec::new(),
+            article_titles: vec![echoed_text],
+            feed_titles: Vec::new(),
+            text_stats_rows: Vec::new(),
+            step_receipt_ids: vec![projected_result.plugin_receipt.receipt_id.clone()],
+        },
+        stop_condition_id: String::from("controller_stop.guest_artifact_echo_complete"),
+        green: true,
+        detail: String::from(
+            "the workflow controller now proves one bounded guest-artifact starter plugin can execute through the same shared bridge and receipt envelope as the host-native starter surface.",
+        ),
+    })
 }
 
 fn run_workflow_case(
@@ -547,6 +602,21 @@ fn decode_text_stats_response(
     })
 }
 
+fn decode_guest_echo_text(
+    payload: serde_json::Value,
+) -> Result<String, StarterPluginWorkflowControllerError> {
+    #[derive(Deserialize)]
+    struct GuestEchoPayload {
+        text: String,
+    }
+    serde_json::from_value::<GuestEchoPayload>(payload)
+        .map(|payload| payload.text)
+        .map_err(|error| StarterPluginWorkflowControllerError::DecodePayload {
+            tool_name: String::from("plugin_example_echo_guest"),
+            error,
+        })
+}
+
 fn content_type_is_html(content_type: &str) -> bool {
     matches!(content_type, "text/html" | "application/xhtml+xml")
 }
@@ -657,8 +727,8 @@ fn read_json<T: for<'de> Deserialize<'de>>(
 mod tests {
     use super::{
         build_starter_plugin_workflow_controller_bundle, deterministic_workflow_bridge_config,
-        load_starter_plugin_workflow_controller_bundle, run_web_content_refusal_case,
-        run_web_content_success_case,
+        load_starter_plugin_workflow_controller_bundle, run_guest_echo_success_case,
+        run_web_content_refusal_case, run_web_content_success_case,
         tassadar_post_article_starter_plugin_workflow_controller_bundle_path,
         write_starter_plugin_workflow_controller_bundle,
     };
@@ -703,12 +773,30 @@ mod tests {
     }
 
     #[test]
+    fn starter_plugin_workflow_guest_artifact_case_uses_shared_bridge_surface() {
+        let case = run_guest_echo_success_case("starter_flow.web_content_intake.v1")
+            .expect("guest workflow case");
+
+        assert!(case.green);
+        assert_eq!(case.step_rows.len(), 1);
+        assert_eq!(case.step_rows[0].tool_name, "plugin_example_echo_guest");
+        assert_eq!(
+            case.final_artifact.article_titles,
+            vec![String::from("controller-visible guest-artifact echo")]
+        );
+    }
+
+    #[test]
     fn starter_plugin_workflow_bundle_covers_success_and_refusal_cases() {
         let bundle = build_starter_plugin_workflow_controller_bundle();
 
-        assert_eq!(bundle.case_rows.len(), 2);
+        assert_eq!(bundle.case_rows.len(), 3);
         assert!(bundle.case_rows.iter().any(|row| row.green));
         assert!(bundle.case_rows.iter().any(|row| !row.green));
+        assert!(bundle
+            .case_rows
+            .iter()
+            .any(|row| row.case_id == "guest_artifact_echo_success"));
     }
 
     #[test]

@@ -23,12 +23,18 @@ pub const PSION_PLUGIN_GUEST_ARTIFACT_MANIFEST_REF: &str =
 pub const PSION_PLUGIN_GUEST_ARTIFACT_IDENTITY_REF: &str =
     "fixtures/psion/plugins/guest_artifact/psion_plugin_guest_artifact_identity_v1.json";
 
-const REFERENCE_PACKET_ABI_VERSION: &str = "packet.v1";
-const REFERENCE_GUEST_EXPORT_NAME: &str = "handle_packet";
-const REFERENCE_REPLAY_CLASS_ID: &str = "guest_artifact_digest_replay_only.v1";
-const REFERENCE_PLUGIN_ID: &str = "plugin.example.echo_guest";
-const REFERENCE_PLUGIN_VERSION: &str = "v1";
-const REFERENCE_ARTIFACT_ID: &str = "artifact.plugin.example.echo_guest.v1";
+pub const PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PACKET_ABI_VERSION: &str = "packet.v1";
+pub const PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_GUEST_EXPORT_NAME: &str = "handle_packet";
+pub const PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_REPLAY_CLASS_ID: &str =
+    "guest_artifact_digest_replay_only.v1";
+pub const PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_ID: &str = "plugin.example.echo_guest";
+pub const PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_VERSION: &str = "v1";
+pub const PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_ARTIFACT_ID: &str =
+    "artifact.plugin.example.echo_guest.v1";
+pub const PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_INPUT_SCHEMA_ID: &str =
+    "plugin.example.echo_guest.input.v1";
+pub const PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_OUTPUT_SCHEMA_ID: &str =
+    "plugin.example.echo_guest.output.v1";
 const REFERENCE_DECLARED_ARTIFACT_REF: &str =
     "artifacts/operator_internal/plugin_example_echo_guest.wasm";
 const REFERENCE_GUEST_MEMORY_PAGES: u64 = 2;
@@ -176,12 +182,12 @@ impl PsionPluginGuestArtifactManifest {
         }
         check_string_match(
             self.packet_abi_version.as_str(),
-            REFERENCE_PACKET_ABI_VERSION,
+            PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PACKET_ABI_VERSION,
             "psion_plugin_guest_artifact_manifest.packet_abi_version",
         )?;
         check_string_match(
             self.guest_export_name.as_str(),
-            REFERENCE_GUEST_EXPORT_NAME,
+            PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_GUEST_EXPORT_NAME,
             "psion_plugin_guest_artifact_manifest.guest_export_name",
         )?;
         ensure_prefixed_id(
@@ -225,7 +231,7 @@ impl PsionPluginGuestArtifactManifest {
         }
         check_string_match(
             self.replay_class_id.as_str(),
-            REFERENCE_REPLAY_CLASS_ID,
+            PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_REPLAY_CLASS_ID,
             "psion_plugin_guest_artifact_manifest.replay_class_id",
         )?;
         self.provenance.validate()?;
@@ -401,16 +407,16 @@ pub fn reference_psion_plugin_guest_artifact_manifest() -> PsionPluginGuestArtif
     let mut manifest = PsionPluginGuestArtifactManifest {
         schema_version: String::from(PSION_PLUGIN_GUEST_ARTIFACT_MANIFEST_SCHEMA_VERSION),
         manifest_id: String::from("psion_plugin_guest_artifact_manifest_reference"),
-        plugin_id: String::from(REFERENCE_PLUGIN_ID),
-        plugin_version: String::from(REFERENCE_PLUGIN_VERSION),
-        artifact_id: String::from(REFERENCE_ARTIFACT_ID),
+        plugin_id: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_ID),
+        plugin_version: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_VERSION),
+        artifact_id: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_ARTIFACT_ID),
         artifact_format: PsionPluginGuestArtifactFormat::WasmModulePacketV1,
         artifact_digest,
         artifact_byte_len: artifact_bytes.len() as u64,
-        packet_abi_version: String::from(REFERENCE_PACKET_ABI_VERSION),
-        guest_export_name: String::from(REFERENCE_GUEST_EXPORT_NAME),
-        input_schema_id: String::from("plugin.example.echo_guest.input.v1"),
-        success_output_schema_id: String::from("plugin.example.echo_guest.output.v1"),
+        packet_abi_version: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PACKET_ABI_VERSION),
+        guest_export_name: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_GUEST_EXPORT_NAME),
+        input_schema_id: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_INPUT_SCHEMA_ID),
+        success_output_schema_id: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_OUTPUT_SCHEMA_ID),
         refusal_schema_ids: vec![
             String::from("plugin.refusal.schema_invalid.v1"),
             String::from("plugin.refusal.packet_too_large.v1"),
@@ -418,7 +424,7 @@ pub fn reference_psion_plugin_guest_artifact_manifest() -> PsionPluginGuestArtif
             String::from("plugin.refusal.runtime_unavailable.v1"),
         ],
         capability_namespace_ids: vec![],
-        replay_class_id: String::from(REFERENCE_REPLAY_CLASS_ID),
+        replay_class_id: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_REPLAY_CLASS_ID),
         trust_tier: PsionPluginGuestArtifactTrustTier::OperatorReviewedDigestBoundInternalOnly,
         publication_posture:
             PsionPluginGuestArtifactPublicationPosture::OperatorInternalOnlyPublicationBlocked,
@@ -576,7 +582,7 @@ fn build_reference_psion_plugin_guest_artifact_wasm() -> Vec<u8> {
 
     let mut exports = ExportSection::new();
     exports.export("memory", ExportKind::Memory, 0);
-    exports.export(REFERENCE_GUEST_EXPORT_NAME, ExportKind::Func, 0);
+    exports.export(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_GUEST_EXPORT_NAME, ExportKind::Func, 0);
     module.section(&exports);
 
     let mut code = CodeSection::new();

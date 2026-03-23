@@ -32,9 +32,10 @@ The current repo truth is:
    - the current Google proof is still CPU-bound on the L4 host, so broader
      accelerator-backed pretraining remains later
 2. `Tassadar` plugin substrate
-   - the repo now has five host-native starter plugins, including the first
-     user-added capability-free plugin and the first manual user-added
-     `networked_read_only` plugin
+   - the repo now has six bounded starter plugins, including the first
+     user-added capability-free plugin, the first manual user-added
+     `networked_read_only` plugin, and the first digest-bound user-provided
+     guest-artifact starter plugin
    - the shared starter-plugin bridge, deterministic workflow controller,
      router-owned tool loop, Apple FM tool lane, and lane-neutral multi-plugin
      trace corpus are all implemented
@@ -46,10 +47,12 @@ The current repo truth is:
    - secret-backed and stateful starter-plugin authoring remain later bounded
      substrate work, not already-closed platform facts
    - weighted-controller and publication posture remain bounded and internal
-   - the old guest-artifact / user-provided Wasm path is still not a live
-     shared catalog/controller lane, but the repo now has bounded digest-bound
-     manifest, load, and receipt-equivalent invocation proofs for one later
-     guest-artifact class
+   - one narrow digest-bound guest-artifact starter-plugin lane is now real
+     across runtime, bridge, catalog, deterministic controller, and
+     weighted-controller evidence surfaces
+   - the old broad guest-artifact / arbitrary user-provided Wasm path is still
+     not live; the current guest lane remains trust-tiered, publication-blocked,
+     and limited to one admitted digest-bound class
 3. Convergence gap
    - the plugin runtime now emits enough truth to bootstrap learned plugin-use
      training
@@ -216,8 +219,8 @@ The Psion plugin convergence program is dependency-ordered in nine tracks:
 ### Track 6: Narrow guest-artifact Wasm restoration
 
 - `PSION_PLUGIN-18`: make an explicit product decision that guest-artifact
-  restoration is a later separate bounded lane and not present-tense
-  starter-plugin truth
+  support may exist only as a bounded digest-bound operator-internal lane and
+  not as generic Wasm/plugin support
 - `PSION_PLUGIN-19`: digest-bound guest-artifact manifest and identity contract
 - `PSION_PLUGIN-20`: bounded guest-artifact runtime loading path
 - `PSION_PLUGIN-21`: receipt-equivalent guest-artifact invocation path

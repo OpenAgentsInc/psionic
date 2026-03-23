@@ -33,13 +33,13 @@
     "control_trace_profile_id": "tassadar.weighted_plugin.control_trace_profile.v1",
     "determinism_profile_id": "tassadar.weighted_plugin.controller_determinism_profile.v1",
     "closure_bundle_report_id": "tassadar.post_article_canonical_machine_closure_bundle.report.v1",
-    "closure_bundle_report_digest": "cb69ea3637d8a415d869c90ce7ae46b85dabaac11a7180f2c8ad6e3271e8d06d",
-    "closure_bundle_digest": "9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003",
+    "closure_bundle_report_digest": "0a0e569551cd9b6207a5e13b72fb859d2ece38104df054c102a0e97f52c8e4d6",
+    "closure_bundle_digest": "6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9",
     "sandbox_report_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.report.v1",
-    "sandbox_report_digest": "e3e30045a3372ae5278c8461d2ac6038f9828061878737a648fe2df22d1f8fc7",
+    "sandbox_report_digest": "b0f2c65ae9c374b705f70f9188d8c44fda9bbe9d9f0f345cb1abd9cadff5652a",
     "runtime_bundle_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.runtime_bundle.v1",
-    "runtime_bundle_digest": "5f6ec4b486f430312ea8f3a63b6a20a3f9ab080a36e16c5750bd4912847f5152",
-    "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` sandbox_report_id=`tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.report.v1` control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1` and closure_bundle_digest=`9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003` remain bound together."
+    "runtime_bundle_digest": "51140e4ed7679a312fe1e7c38424fe95c005e143ef7c05bb75c610c8b6646f50",
+    "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` sandbox_report_id=`tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.report.v1` control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1` and closure_bundle_digest=`6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9` remain bound together."
   },
   "transformer_contract": {
     "schema_version": 1,
@@ -162,7 +162,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_report.json",
       "bound_report_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.report.v1",
-      "bound_report_digest": "e3e30045a3372ae5278c8461d2ac6038f9828061878737a648fe2df22d1f8fc7",
+      "bound_report_digest": "b0f2c65ae9c374b705f70f9188d8c44fda9bbe9d9f0f345cb1abd9cadff5652a",
       "detail": "the sandbox report must already close the bounded controller trace and turn weighted plugin control green on the canonical route."
     },
     {
@@ -180,7 +180,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_machine_closure_bundle_report.json",
       "bound_report_id": "tassadar.post_article_canonical_machine_closure_bundle.report.v1",
-      "bound_report_digest": "cb69ea3637d8a415d869c90ce7ae46b85dabaac11a7180f2c8ad6e3271e8d06d",
+      "bound_report_digest": "0a0e569551cd9b6207a5e13b72fb859d2ece38104df054c102a0e97f52c8e4d6",
       "detail": "the weighted controller claim must inherit the canonical machine closure bundle by report id and digest instead of reconstructing machine identity from the sandbox report alone."
     },
     {
@@ -336,6 +336,33 @@
       "host_executes_only": true,
       "replay_stable": true,
       "detail": "the model selects the user-added capability-free `plugin.text.stats` entry admitted from the shared starter-plugin registration and catalog path, accepts the typed result packet, and stops without host-authored continuation."
+    },
+    {
+      "case_id": "guest_echo_stop_after_success",
+      "case_outcome": "stop_after_success",
+      "model_version_id": "tassadar.weighted_plugin_controller.schema_set.v1",
+      "plugin_chain_ids": [
+        "plugin.example.echo_guest"
+      ],
+      "result_binding_case_ids": [
+        "guest_echo_exact_binding"
+      ],
+      "determinism_class_id": "strict_deterministic",
+      "sampling_policy_id": "sampling_policy.greedy_single_path.v1",
+      "temperature_policy_id": "temperature.fixed_zero.v1",
+      "randomness_control_id": "randomness.disallowed.v1",
+      "external_signal_boundary_id": "tassadar.weighted_plugin.external_signal_boundary.v1",
+      "model_selects_plugin": true,
+      "model_selects_export": true,
+      "packet_arguments_model_owned": true,
+      "sequencing_model_owned": true,
+      "retry_model_owned": true,
+      "stop_model_owned": true,
+      "typed_refusal_returned_to_model_loop": true,
+      "host_validates_only": true,
+      "host_executes_only": true,
+      "replay_stable": true,
+      "detail": "the model selects the user-added digest-bound guest-artifact starter plugin admitted from the shared registration and catalog path, accepts the typed result packet, and stops without host-authored continuation."
     }
   ],
   "control_trace_rows": [
@@ -1025,6 +1052,108 @@
       "time_semantics_contract_id": "tassadar.post_article.control_time_semantics.v1",
       "information_boundary_id": "tassadar.post_article.control_information_boundary.v1",
       "detail": "the model stops after accepting the user-added text-stats result instead of relying on hidden host chaining."
+    },
+    {
+      "case_id": "guest_echo_stop_after_success",
+      "step_index": 0,
+      "control_token_kind": "plugin_select",
+      "decision_owner_id": "model_weights",
+      "plugin_id": "plugin.example.echo_guest",
+      "previous_control_state_digest": "4d550ad1aa462cf8746b16f9dcc3bc94c3bf575f19727621fb40f8c57ba982d0",
+      "next_control_state_id": "controller_state.guest_echo_stop_after_success.0.v1",
+      "next_control_state_digest": "56f24cd338681f86760823519a809cdb1474f877378ebfcaeb17a4142022bd25",
+      "equivalent_choice_relation_id": "singleton_exact_control_trace.v1",
+      "failure_semantics_lattice_id": "tassadar.post_article.failure_semantics_lattice.v1",
+      "time_semantics_contract_id": "tassadar.post_article.control_time_semantics.v1",
+      "information_boundary_id": "tassadar.post_article.control_information_boundary.v1",
+      "detail": "the model selects the admitted digest-bound guest-artifact starter plugin from the shared starter-plugin registry instead of a host-curated one-off exception."
+    },
+    {
+      "case_id": "guest_echo_stop_after_success",
+      "step_index": 1,
+      "control_token_kind": "export_select",
+      "decision_owner_id": "model_weights",
+      "plugin_id": "plugin.example.echo_guest",
+      "export_name": "handle_packet",
+      "previous_control_state_digest": "4d550ad1aa462cf8746b16f9dcc3bc94c3bf575f19727621fb40f8c57ba982d0",
+      "next_control_state_id": "controller_state.guest_echo_stop_after_success.1.v1",
+      "next_control_state_digest": "db9ba30fdaac822cec46d1aca6d45760989b32b41ada7e51d912ec20bee07910",
+      "equivalent_choice_relation_id": "singleton_exact_control_trace.v1",
+      "failure_semantics_lattice_id": "tassadar.post_article.failure_semantics_lattice.v1",
+      "time_semantics_contract_id": "tassadar.post_article.control_time_semantics.v1",
+      "information_boundary_id": "tassadar.post_article.control_information_boundary.v1",
+      "detail": "the model keeps export choice explicit on the guest-artifact starter path as well."
+    },
+    {
+      "case_id": "guest_echo_stop_after_success",
+      "step_index": 2,
+      "control_token_kind": "packet_encode",
+      "decision_owner_id": "model_weights",
+      "plugin_id": "plugin.example.echo_guest",
+      "export_name": "handle_packet",
+      "packet_schema_id": "plugin.example.echo_guest.input.v1",
+      "packet_digest": "4812049429d15fbaa0e1bd49ac53fff6d5760fdfee34f72b1b23a6ab5cedd676",
+      "previous_control_state_digest": "f8e40b6af0db14f23157bcc786cae2a6d7de448f76e64ef230ecdac0e07019bc",
+      "next_control_state_id": "controller_state.guest_echo_stop_after_success.2.v1",
+      "next_control_state_digest": "6b95aea10195523be4065ffc816a5b37135afd2dc167bfab4351a181645ed94f",
+      "equivalent_choice_relation_id": "singleton_exact_control_trace.v1",
+      "failure_semantics_lattice_id": "tassadar.post_article.failure_semantics_lattice.v1",
+      "time_semantics_contract_id": "tassadar.post_article.control_time_semantics.v1",
+      "information_boundary_id": "tassadar.post_article.control_information_boundary.v1",
+      "detail": "the model encodes one bounded guest-artifact packet under the canonical packet ABI without host-authored argument synthesis."
+    },
+    {
+      "case_id": "guest_echo_stop_after_success",
+      "step_index": 3,
+      "control_token_kind": "invocation_commit",
+      "decision_owner_id": "host_runtime",
+      "plugin_id": "plugin.example.echo_guest",
+      "export_name": "handle_packet",
+      "packet_schema_id": "plugin.example.echo_guest.input.v1",
+      "packet_digest": "4812049429d15fbaa0e1bd49ac53fff6d5760fdfee34f72b1b23a6ab5cedd676",
+      "invocation_receipt_id": "receipt.plugin.example.echo_guest.4812049429d15fba.v1",
+      "previous_control_state_digest": "313f8b914a45e760a9a34d5a9747c9679cb7ad3199065b5ebbdb0b7f764d54a1",
+      "next_control_state_id": "controller_state.guest_echo_stop_after_success.3.v1",
+      "next_control_state_digest": "b8959139a97c74b0d1e161b7324aa69210728a8f4bdf6cf347123af8c8392634",
+      "equivalent_choice_relation_id": "singleton_exact_control_trace.v1",
+      "failure_semantics_lattice_id": "tassadar.post_article.failure_semantics_lattice.v1",
+      "time_semantics_contract_id": "tassadar.post_article.control_time_semantics.v1",
+      "information_boundary_id": "tassadar.post_article.control_information_boundary.v1",
+      "detail": "the host validates and executes the declared guest-artifact call without changing the selected plugin or next step."
+    },
+    {
+      "case_id": "guest_echo_stop_after_success",
+      "step_index": 4,
+      "control_token_kind": "result_accept",
+      "decision_owner_id": "host_runtime",
+      "plugin_id": "plugin.example.echo_guest",
+      "export_name": "handle_packet",
+      "invocation_receipt_id": "receipt.plugin.example.echo_guest.4812049429d15fba.v1",
+      "result_binding_case_id": "guest_echo_exact_binding",
+      "previous_control_state_digest": "c8d808abbaf6426587eb951a549a7da179ad1f97ef528a49e1bd5b58d6a94fea",
+      "next_control_state_id": "controller_state.guest_echo_stop_after_success.4.v1",
+      "next_control_state_digest": "e134350da8e90f7466c8cb0630d2dc898c243fed4a4c3940bd1a44e90991ce75",
+      "equivalent_choice_relation_id": "singleton_exact_control_trace.v1",
+      "failure_semantics_lattice_id": "tassadar.post_article.failure_semantics_lattice.v1",
+      "time_semantics_contract_id": "tassadar.post_article.control_time_semantics.v1",
+      "information_boundary_id": "tassadar.post_article.control_information_boundary.v1",
+      "detail": "the host returns one typed guest-artifact result packet to the model loop under the shared result-binding contract."
+    },
+    {
+      "case_id": "guest_echo_stop_after_success",
+      "step_index": 5,
+      "control_token_kind": "stop",
+      "decision_owner_id": "model_weights",
+      "invocation_receipt_id": "receipt.plugin.example.echo_guest.4812049429d15fba.v1",
+      "result_binding_case_id": "guest_echo_exact_binding",
+      "previous_control_state_digest": "ca24e19d61e0316dff2ee4a0ba10121cd6d2dd35428b4e404a2eb35f7e68a5f7",
+      "next_control_state_id": "controller_state.guest_echo_stop_after_success.5.v1",
+      "next_control_state_digest": "6e734f8320e7f2d8a222644531ed09117e393848543832833e3a74f069a068bd",
+      "equivalent_choice_relation_id": "singleton_exact_control_trace.v1",
+      "failure_semantics_lattice_id": "tassadar.post_article.failure_semantics_lattice.v1",
+      "time_semantics_contract_id": "tassadar.post_article.control_time_semantics.v1",
+      "information_boundary_id": "tassadar.post_article.control_information_boundary.v1",
+      "detail": "the model stops after accepting the guest-artifact result instead of relying on hidden host chaining."
     }
   ],
   "host_negative_rows": [
@@ -1215,6 +1344,6 @@
   "arbitrary_software_capability_allowed": false,
   "deferred_issue_ids": [],
   "claim_boundary": "this eval-owned closure report makes the weighted plugin controller trace true on the canonical post-article route. It closes model ownership over plugin selection, export selection, packet argument construction, sequencing, typed-refusal handling, retry, and stop conditions while inheriting the canonical machine closure bundle by report id and digest instead of reconstructing machine identity locally. It still keeps plugin authority, publication, trust-tier promotion, served/public universality, and arbitrary public software execution deferred to the later platform gate.",
-  "summary": "Post-article weighted plugin controller eval report keeps contract_status=Green, dependency_rows=5, controller_case_rows=5, control_trace_rows=40, host_negative_rows=10, validation_rows=10, closure_bundle_digest=`9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003`, weighted_plugin_control_allowed=true, and deferred_issue_ids=0.",
-  "report_digest": "42a0cff3557d956f57bfd29ec817512727e97bff46ec6da549569f0a5c3ecf68"
+  "summary": "Post-article weighted plugin controller eval report keeps contract_status=Green, dependency_rows=5, controller_case_rows=6, control_trace_rows=46, host_negative_rows=10, validation_rows=10, closure_bundle_digest=`6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9`, weighted_plugin_control_allowed=true, and deferred_issue_ids=0.",
+  "report_digest": "7eff8d8014dbd4e5cb983bd2ef7358fe64c6b0bf867788d1a9ccd1c9cc585445"
 }

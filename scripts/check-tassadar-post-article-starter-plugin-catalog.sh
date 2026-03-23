@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+cargo run -p psionic-catalog --example tassadar_post_article_plugin_authority_promotion_publication_and_trust_tier_gate_report
+cargo run -p psionic-research --example tassadar_post_article_plugin_authority_promotion_publication_and_trust_tier_gate_summary
+cargo run -p psionic-eval --example tassadar_post_article_bounded_weighted_plugin_platform_closeout_audit_report
+cargo run -p psionic-research --example tassadar_post_article_bounded_weighted_plugin_platform_closeout_summary
 cargo run -p psionic-runtime --example tassadar_post_article_starter_plugin_catalog_bundle
 cargo run -p psionic-catalog --example tassadar_post_article_starter_plugin_catalog_report
 cargo run -p psionic-eval --example tassadar_post_article_starter_plugin_catalog_eval_report
@@ -17,12 +21,12 @@ cargo test -p psionic-provider post_article_starter_plugin_catalog_receipt_proje
 
 jq -e '
   .bundle_id == "tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1"
-  and .plugin_count == 5
-  and .local_deterministic_plugin_count == 4
+  and .plugin_count == 6
+  and .local_deterministic_plugin_count == 5
   and .read_only_network_plugin_count == 1
   and .bounded_flow_count == 2
-  and ((.descriptor_rows | length) == 5)
-  and ((.capability_matrix_rows | length) == 5)
+  and ((.descriptor_rows | length) == 6)
+  and ((.capability_matrix_rows | length) == 6)
   and ((.composition_case_rows | length) == 2)
   and .operator_only_posture == true
   and .runtime_builtins_separate == true
@@ -30,6 +34,7 @@ jq -e '
   and (.descriptor_rows | any(.plugin_id == "plugin.text.url_extract"))
   and (.descriptor_rows | any(.plugin_id == "plugin.text.stats"))
   and (.descriptor_rows | any(.plugin_id == "plugin.http.fetch_text"))
+  and (.descriptor_rows | any(.plugin_id == "plugin.example.echo_guest"))
   and (.descriptor_rows | any(.plugin_id == "plugin.html.extract_readable"))
   and (.descriptor_rows | any(.plugin_id == "plugin.feed.rss_atom_parse"))
 ' fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json >/dev/null
@@ -39,8 +44,8 @@ jq -e '
   and .contract_status == "green"
   and .contract_green == true
   and ((.dependency_rows | length) == 7)
-  and ((.entry_rows | length) == 5)
-  and ((.capability_rows | length) == 5)
+  and ((.entry_rows | length) == 6)
+  and ((.capability_rows | length) == 6)
   and ((.composition_rows | length) == 2)
   and ((.validation_rows | length) == 8)
   and .operator_internal_only_posture == true
@@ -64,8 +69,8 @@ jq -e '
   and .eval_green == true
   and ((.dependency_rows | length) == 2)
   and ((.validation_rows | length) == 4)
-  and .starter_plugin_count == 5
-  and .local_deterministic_plugin_count == 4
+  and .starter_plugin_count == 6
+  and .local_deterministic_plugin_count == 5
   and .read_only_network_plugin_count == 1
   and .bounded_flow_count == 2
   and .operator_internal_only_posture == true
@@ -80,8 +85,8 @@ jq -e '
 jq -e '
   .report_id == "tassadar.post_article.starter_plugin_catalog.eval_report.v1"
   and .eval_status == "green"
-  and .starter_plugin_count == 5
-  and .local_deterministic_plugin_count == 4
+  and .starter_plugin_count == 6
+  and .local_deterministic_plugin_count == 5
   and .read_only_network_plugin_count == 1
   and .bounded_flow_count == 2
   and .operator_internal_only_posture == true

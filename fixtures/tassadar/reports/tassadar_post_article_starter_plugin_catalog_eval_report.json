@@ -13,13 +13,13 @@
     "continuation_contract_id": "tassadar.tcm_v1.runtime_contract.report.v1",
     "continuation_contract_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
     "computational_model_statement_id": "tassadar.post_article.canonical_computational_model.statement.v1",
-    "closure_bundle_digest": "9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003",
+    "closure_bundle_digest": "6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9",
     "catalog_report_id": "tassadar.post_article.starter_plugin_catalog.report.v1",
-    "catalog_report_digest": "a6662b967ad3cd91d9d4dff2ed2347a0ec41412998c2ac5c7d80b6001dfb2292",
+    "catalog_report_digest": "f10fbaef63170c12edac4a739782cc4390416a99cdaf2e07ceb53ab6dbb38079",
     "runtime_bundle_id": "tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1",
-    "runtime_bundle_digest": "e84c0137c3ae6f45f55f6418f1e29997b1204065e91dcb26bbff6385a1768ec1",
+    "runtime_bundle_digest": "29469643cbd87b3ace804d45731756aa6e8dc3febd80c6415e2214b875102ecd",
     "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json",
-    "detail": "starter catalog eval keeps catalog_report_id=`tassadar.post_article.starter_plugin_catalog.report.v1`, runtime_bundle_id=`tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1`, machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, and closure_bundle_digest=`9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003` aligned."
+    "detail": "starter catalog eval keeps catalog_report_id=`tassadar.post_article.starter_plugin_catalog.report.v1`, runtime_bundle_id=`tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1`, machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, and closure_bundle_digest=`6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9` aligned."
   },
   "dependency_rows": [
     {
@@ -28,7 +28,7 @@
       "satisfied": true,
       "source_ref": "tassadar.post_article.starter_plugin_catalog.report.v1",
       "bound_report_id": "tassadar.post_article.starter_plugin_catalog.report.v1",
-      "bound_report_digest": "a6662b967ad3cd91d9d4dff2ed2347a0ec41412998c2ac5c7d80b6001dfb2292",
+      "bound_report_digest": "f10fbaef63170c12edac4a739782cc4390416a99cdaf2e07ceb53ab6dbb38079",
       "detail": "the catalog-owned starter plugin report is green and keeps the catalog digest-bound and operator-only."
     },
     {
@@ -37,7 +37,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_machine_closure_bundle_report.json",
       "bound_report_id": "tassadar.post_article_canonical_machine_closure_bundle.report.v1",
-      "bound_report_digest": "cb69ea3637d8a415d869c90ce7ae46b85dabaac11a7180f2c8ad6e3271e8d06d",
+      "bound_report_digest": "0a0e569551cd9b6207a5e13b72fb859d2ece38104df054c102a0e97f52c8e4d6",
       "detail": "the eval posture inherits the same closure-bundle digest binding as the catalog report."
     }
   ],
@@ -48,7 +48,7 @@
       "source_refs": [
         "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json"
       ],
-      "detail": "the eval report keeps the starter catalog fixed to five operator-curated entries, including the user-added capability-free and manual networked_read_only plugins."
+      "detail": "the eval report keeps the starter catalog fixed to six operator-curated entries, including the digest-bound guest-artifact row plus the earlier capability-free and manual networked_read_only plugins."
     },
     {
       "validation_id": "local_network_distinction_explicit",
@@ -57,7 +57,7 @@
         "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json",
         "tassadar.post_article.starter_plugin_catalog.report.v1"
       ],
-      "detail": "four local deterministic plugins remain distinct from one read-only network plugin."
+      "detail": "five local deterministic plugins, including one digest-bound guest-artifact row, remain distinct from one read-only network plugin."
     },
     {
       "validation_id": "composition_harness_green",
@@ -80,8 +80,8 @@
   "catalog_status": "green",
   "eval_status": "green",
   "eval_green": true,
-  "starter_plugin_count": 5,
-  "local_deterministic_plugin_count": 4,
+  "starter_plugin_count": 6,
+  "local_deterministic_plugin_count": 5,
   "read_only_network_plugin_count": 1,
   "bounded_flow_count": 2,
   "operator_internal_only_posture": true,
@@ -98,6 +98,6 @@
   "arbitrary_software_capability_allowed": false,
   "next_issue_id": "TAS-217",
   "claim_boundary": "this eval report keeps the starter catalog within the same operator-only, digest-bound, no-public-marketplace boundary as the catalog report and does not widen to served or public plugin rights.",
-  "summary": "starter catalog eval binds 5 starter plugins and 2 bounded flows to the catalog report with operator-only posture, marketplace suppression, and closure-bundle binding still explicit.",
-  "report_digest": "7dec82cd4d10a3740d0c99bf1437bd146a2393c3a2947dbeba28fc3067959f3d"
+  "summary": "starter catalog eval binds 6 starter plugins and 2 bounded flows to the catalog report with operator-only posture, marketplace suppression, and closure-bundle binding still explicit.",
+  "report_digest": "2e080024faab4a4901844136ad641c729dfaab9bed7488bcb22548b633b7b019"
 }

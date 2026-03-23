@@ -14,7 +14,17 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use url::Url;
 
-use crate::TASSADAR_POST_ARTICLE_PLUGIN_PACKET_ABI_VERSION;
+use crate::{
+    psion_plugin_guest_artifact_tool_projection, reference_psion_plugin_guest_artifact_manifest,
+    TASSADAR_POST_ARTICLE_PLUGIN_PACKET_ABI_VERSION,
+    PSION_PLUGIN_GUEST_ARTIFACT_INVOCATION_REF,
+    PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_INPUT_SCHEMA_ID,
+    PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_OUTPUT_SCHEMA_ID,
+    PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_ID,
+    PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_VERSION,
+    PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_REPLAY_CLASS_ID,
+    PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_TOOL_NAME,
+};
 
 pub const TASSADAR_POST_ARTICLE_PLUGIN_TEXT_URL_EXTRACT_RUNTIME_BUNDLE_REF: &str = "fixtures/tassadar/runs/tassadar_post_article_plugin_text_url_extract_v1/tassadar_post_article_plugin_text_url_extract_bundle.json";
 pub const TASSADAR_POST_ARTICLE_PLUGIN_TEXT_URL_EXTRACT_RUN_ROOT_REF: &str =
@@ -34,6 +44,8 @@ pub const TASSADAR_POST_ARTICLE_PLUGIN_FEED_RSS_ATOM_PARSE_RUNTIME_BUNDLE_REF: &
     "fixtures/tassadar/runs/tassadar_post_article_plugin_feed_rss_atom_parse_v1/tassadar_post_article_plugin_feed_rss_atom_parse_bundle.json";
 pub const TASSADAR_POST_ARTICLE_PLUGIN_FEED_RSS_ATOM_PARSE_RUN_ROOT_REF: &str =
     "fixtures/tassadar/runs/tassadar_post_article_plugin_feed_rss_atom_parse_v1";
+pub const PSION_PLUGIN_GUEST_ARTIFACT_RUNTIME_RUN_ROOT_REF: &str =
+    "fixtures/psion/plugins/guest_artifact";
 
 pub const STARTER_PLUGIN_VERSION: &str = "v1";
 pub const STARTER_PLUGIN_TEXT_URL_EXTRACT_ID: &str = "plugin.text.url_extract";
@@ -68,6 +80,9 @@ pub const STARTER_PLUGIN_FEED_RSS_ATOM_PARSE_INPUT_SCHEMA_ID: &str =
     "plugin.feed.rss_atom_parse.input.v1";
 pub const STARTER_PLUGIN_FEED_RSS_ATOM_PARSE_OUTPUT_SCHEMA_ID: &str =
     "plugin.feed.rss_atom_parse.output.v1";
+pub const STARTER_PLUGIN_GUEST_ECHO_ID: &str = PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_ID;
+pub const STARTER_PLUGIN_GUEST_ECHO_TOOL_NAME: &str =
+    PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_TOOL_NAME;
 pub const STARTER_PLUGIN_REFUSAL_NETWORK_DENIED_ID: &str = "plugin.refusal.network_denied.v1";
 pub const STARTER_PLUGIN_REFUSAL_URL_NOT_PERMITTED_ID: &str = "plugin.refusal.url_not_permitted.v1";
 pub const STARTER_PLUGIN_REFUSAL_TIMEOUT_ID: &str = "plugin.refusal.timeout.v1";
@@ -614,6 +629,7 @@ pub enum StarterPluginCapabilityClass {
 pub enum StarterPluginAuthoringClass {
     CapabilityFreeLocalDeterministic,
     NetworkedReadOnly,
+    GuestArtifactDigestBound,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -694,6 +710,11 @@ const FEED_PARSE_REFUSAL_SCHEMA_IDS: &[&str] = &[
     STARTER_PLUGIN_REFUSAL_INPUT_TOO_LARGE_ID,
     STARTER_PLUGIN_REFUSAL_UNSUPPORTED_FEED_FORMAT_ID,
 ];
+const GUEST_ECHO_REFUSAL_SCHEMA_IDS: &[&str] = &[
+    STARTER_PLUGIN_REFUSAL_SCHEMA_INVALID_ID,
+    STARTER_PLUGIN_REFUSAL_PACKET_TOO_LARGE_ID,
+    "plugin.refusal.runtime_unavailable.v1",
+];
 
 const URL_EXTRACT_NEGATIVE_CLAIM_IDS: &[&str] = &[
     "url_validation_truth_not_claimed",
@@ -724,6 +745,12 @@ const FEED_PARSE_NEGATIVE_CLAIM_IDS: &[&str] = &[
     "arbitrary_xml_support_not_claimed",
     "opml_support_not_claimed",
     "general_document_parsing_not_claimed",
+];
+const GUEST_ECHO_NEGATIVE_CLAIM_IDS: &[&str] = &[
+    "ambient_host_sdk_not_claimed",
+    "guest_artifact_publication_not_claimed",
+    "arbitrary_wasm_plugin_support_not_claimed",
+    "secret_or_stateful_guest_capability_not_claimed",
 ];
 
 const NO_CAPABILITY_NAMESPACE_IDS: &[&str] = &[];
@@ -831,6 +858,40 @@ const STARTER_PLUGIN_REGISTRATIONS: &[StarterPluginRegistration] = &[
             sample_mount_envelope_ref: "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_http_fetch_text_mount_envelope.json",
             descriptor_detail: "the first manual user-added network starter plugin freezes GET-only read-only text fetch behind host-mediated allowlist, timeout, redirect, and response-size policy.",
             capability_matrix_detail: "the fetch-text starter plugin is the only networked starter entry, remains bounded to host-mediated read-only HTTP, and now proves the first manual user-added networked lane.",
+        }),
+    },
+    StarterPluginRegistration {
+        plugin_id: STARTER_PLUGIN_GUEST_ECHO_ID,
+        plugin_version: PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_VERSION,
+        tool_name: STARTER_PLUGIN_GUEST_ECHO_TOOL_NAME,
+        input_schema_id: PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_INPUT_SCHEMA_ID,
+        success_output_schema_id: PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_OUTPUT_SCHEMA_ID,
+        refusal_schema_ids: GUEST_ECHO_REFUSAL_SCHEMA_IDS,
+        replay_class_id: PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_REPLAY_CLASS_ID,
+        capability_class: StarterPluginCapabilityClass::LocalDeterministic,
+        authoring_class: StarterPluginAuthoringClass::GuestArtifactDigestBound,
+        origin_class: StarterPluginOriginClass::UserAdded,
+        capability_namespace_ids: NO_CAPABILITY_NAMESPACE_IDS,
+        negative_claim_ids: GUEST_ECHO_NEGATIVE_CLAIM_IDS,
+        mount_envelope_id: "psion.plugin_guest_artifact.mount_envelope.reference.v1",
+        manifest_id: "psion_plugin_guest_artifact_manifest_reference",
+        artifact_id: "artifact.plugin.example.echo_guest.v1",
+        runtime_bundle_id: "psion.plugin_guest_artifact.invocation.v1",
+        runtime_bundle_ref: PSION_PLUGIN_GUEST_ARTIFACT_INVOCATION_REF,
+        runtime_run_root_ref: PSION_PLUGIN_GUEST_ARTIFACT_RUNTIME_RUN_ROOT_REF,
+        tool_description: "echo one bounded text field through the digest-bound guest-artifact packet lane while preserving the shared starter-plugin receipt envelope.",
+        bridge_exposed: true,
+        catalog_exposed: true,
+        catalog: Some(StarterPluginCatalogRegistration {
+            catalog_entry_id: "plugin.example.echo_guest@v1",
+            trust_tier_id: "operator_reviewed_guest_artifact_digest_bound_internal_only",
+            evidence_posture_id: "evidence.manifest_digest_invocation_receipt_bound.v1",
+            catalog_capability_namespace_ids: NO_CAPABILITY_NAMESPACE_IDS,
+            descriptor_ref: "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_descriptor.json",
+            fixture_bundle_ref: "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_fixture_bundle.json",
+            sample_mount_envelope_ref: "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_mount_envelope.json",
+            descriptor_detail: "the first user-provided guest-artifact starter plugin stays digest-bound, operator-reviewed, local deterministic at runtime, and receipt-equivalent to the host-native starter surface.",
+            capability_matrix_detail: "the guest echo starter plugin is capability-free and deterministic at runtime but remains a separate digest-bound guest-artifact lane instead of collapsing into host-native plugin truth.",
         }),
     },
     StarterPluginRegistration {
@@ -964,6 +1025,16 @@ pub fn networked_starter_plugin_registrations() -> Vec<&'static StarterPluginReg
 }
 
 #[must_use]
+pub fn guest_artifact_starter_plugin_registrations() -> Vec<&'static StarterPluginRegistration> {
+    STARTER_PLUGIN_REGISTRATIONS
+        .iter()
+        .filter(|registration| {
+            registration.authoring_class == StarterPluginAuthoringClass::GuestArtifactDigestBound
+        })
+        .collect()
+}
+
+#[must_use]
 pub fn user_added_starter_plugin_registrations() -> Vec<&'static StarterPluginRegistration> {
     STARTER_PLUGIN_REGISTRATIONS
         .iter()
@@ -982,6 +1053,7 @@ pub fn weighted_controller_admissible_user_added_starter_plugin_registrations(
                     registration.authoring_class,
                     StarterPluginAuthoringClass::CapabilityFreeLocalDeterministic
                         | StarterPluginAuthoringClass::NetworkedReadOnly
+                        | StarterPluginAuthoringClass::GuestArtifactDigestBound
                 )
                 && registration.bridge_exposed
                 && registration.catalog_exposed
@@ -1026,6 +1098,7 @@ pub fn starter_plugin_tool_projection_for_plugin_id(
         STARTER_PLUGIN_TEXT_URL_EXTRACT_ID => Some(url_extract_tool_projection()),
         STARTER_PLUGIN_TEXT_STATS_ID => Some(text_stats_tool_projection()),
         STARTER_PLUGIN_HTTP_FETCH_TEXT_ID => Some(fetch_text_tool_projection()),
+        STARTER_PLUGIN_GUEST_ECHO_ID => Some(guest_echo_tool_projection()),
         STARTER_PLUGIN_HTML_EXTRACT_READABLE_ID => Some(extract_readable_tool_projection()),
         STARTER_PLUGIN_FEED_RSS_ATOM_PARSE_ID => Some(feed_parse_tool_projection()),
         _ => None,
@@ -1078,6 +1151,11 @@ fn starter_plugin_receipt_from_registration(
     };
     receipt.receipt_digest = stable_json_digest(digest_prefix, &receipt);
     receipt
+}
+
+#[must_use]
+pub fn guest_echo_tool_projection() -> StarterPluginToolProjection {
+    psion_plugin_guest_artifact_tool_projection(&reference_psion_plugin_guest_artifact_manifest())
 }
 
 #[must_use]
@@ -3451,6 +3529,7 @@ mod tests {
         build_feed_parse_runtime_bundle, build_fetch_text_runtime_bundle,
         build_text_stats_runtime_bundle, build_url_extract_runtime_bundle,
         capability_free_starter_plugin_registrations, catalog_exposed_starter_plugin_registrations,
+        guest_artifact_starter_plugin_registrations,
         invoke_extract_readable_json_packet, invoke_feed_parse_json_packet,
         invoke_fetch_text_json_packet, invoke_text_stats_json_packet,
         invoke_url_extract_json_packet, networked_starter_plugin_registrations,
@@ -3490,16 +3569,19 @@ mod tests {
             .expect("text-stats registration");
         let fetch_text = starter_plugin_registration_by_plugin_id("plugin.http.fetch_text")
             .expect("fetch-text registration");
+        let guest_echo = starter_plugin_registration_by_plugin_id("plugin.example.echo_guest")
+            .expect("guest echo registration");
 
-        assert_eq!(starter_plugin_registrations().len(), 5);
-        assert_eq!(bridge_exposed_starter_plugin_registrations().len(), 5);
-        assert_eq!(catalog_exposed_starter_plugin_registrations().len(), 5);
+        assert_eq!(starter_plugin_registrations().len(), 6);
+        assert_eq!(bridge_exposed_starter_plugin_registrations().len(), 6);
+        assert_eq!(catalog_exposed_starter_plugin_registrations().len(), 6);
         assert_eq!(capability_free_starter_plugin_registrations().len(), 4);
         assert_eq!(networked_starter_plugin_registrations().len(), 1);
-        assert_eq!(user_added_starter_plugin_registrations().len(), 2);
+        assert_eq!(guest_artifact_starter_plugin_registrations().len(), 1);
+        assert_eq!(user_added_starter_plugin_registrations().len(), 3);
         assert_eq!(
             weighted_controller_admissible_user_added_starter_plugin_registrations().len(),
-            2
+            3
         );
         assert_eq!(text_stats.tool_name, "plugin_text_stats");
         assert_eq!(
@@ -3517,6 +3599,14 @@ mod tests {
         assert_eq!(fetch_text.origin_class, StarterPluginOriginClass::UserAdded);
         assert!(fetch_text.bridge_exposed);
         assert!(fetch_text.catalog_exposed);
+        assert_eq!(guest_echo.tool_name, "plugin_example_echo_guest");
+        assert_eq!(
+            guest_echo.authoring_class,
+            StarterPluginAuthoringClass::GuestArtifactDigestBound
+        );
+        assert_eq!(guest_echo.origin_class, StarterPluginOriginClass::UserAdded);
+        assert!(guest_echo.bridge_exposed);
+        assert!(guest_echo.catalog_exposed);
     }
 
     #[test]

@@ -8,8 +8,8 @@
   "control_trace_contract_id": "tassadar.weighted_plugin.controller_trace_contract.v1",
   "canonical_architecture_anchor_crate": "psionic-transformer",
   "closure_bundle_report_id": "tassadar.post_article_canonical_machine_closure_bundle.report.v1",
-  "closure_bundle_report_digest": "cb69ea3637d8a415d869c90ce7ae46b85dabaac11a7180f2c8ad6e3271e8d06d",
-  "closure_bundle_digest": "9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003",
+  "closure_bundle_report_digest": "0a0e569551cd9b6207a5e13b72fb859d2ece38104df054c102a0e97f52c8e4d6",
+  "closure_bundle_digest": "6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9",
   "closeout_status": "operator_green_served_suppressed",
   "supporting_material_row_count": 15,
   "dependency_row_count": 12,
@@ -25,6 +25,6 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "detail": "post-article bounded weighted plugin-platform closeout summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1`, closeout_status=OperatorGreenServedSuppressed, dependency_rows=12, validation_rows=11, closure_bundle_digest=`9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003`, and closure_bundle_issue_id=`TAS-215`.",
-  "summary_digest": "00d3bccf650851c14d58303694b9d02e0a22c8012b2621faa4c60d9e06700dca"
+  "detail": "post-article bounded weighted plugin-platform closeout summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1`, closeout_status=OperatorGreenServedSuppressed, dependency_rows=12, validation_rows=11, closure_bundle_digest=`6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9`, and closure_bundle_issue_id=`TAS-215`.",
+  "summary_digest": "5671e9a399f69b78233d044fd4ccd335cf22486c2d1354b65e4a2e7b200df97a"
 }

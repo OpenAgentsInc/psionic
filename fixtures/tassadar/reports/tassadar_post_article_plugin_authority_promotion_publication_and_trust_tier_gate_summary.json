@@ -7,8 +7,8 @@
   "computational_model_statement_id": "tassadar.post_article.canonical_computational_model.statement.v1",
   "control_trace_contract_id": "tassadar.weighted_plugin.controller_trace_contract.v1",
   "closure_bundle_report_id": "tassadar.post_article_canonical_machine_closure_bundle.report.v1",
-  "closure_bundle_report_digest": "cb69ea3637d8a415d869c90ce7ae46b85dabaac11a7180f2c8ad6e3271e8d06d",
-  "closure_bundle_digest": "9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003",
+  "closure_bundle_report_digest": "0a0e569551cd9b6207a5e13b72fb859d2ece38104df054c102a0e97f52c8e4d6",
+  "closure_bundle_digest": "6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9",
   "contract_status": "green",
   "dependency_row_count": 9,
   "trust_tier_row_count": 4,
@@ -33,6 +33,6 @@
   "plugin_publication_allowed": false,
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
-  "detail": "post-article plugin authority summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1`, contract_status=Green, trust_tier_rows=4, publication_posture_rows=5, validation_rows=9, closure_bundle_digest=`9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003`, weighted_plugin_control_allowed=true, and deferred_issue_ids=0.",
-  "summary_digest": "5519ae4aaf7a27eb9b9ddc2b940e9aa531b45113eabb559428e1af754eca45c7"
+  "detail": "post-article plugin authority summary keeps machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1`, control_trace_contract_id=`tassadar.weighted_plugin.controller_trace_contract.v1`, contract_status=Green, trust_tier_rows=4, publication_posture_rows=5, validation_rows=9, closure_bundle_digest=`6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9`, weighted_plugin_control_allowed=true, and deferred_issue_ids=0.",
+  "summary_digest": "4fe75d0a2be8599759ee2e9b7685919fc225510d3f20b1dd8997e69230eab41f"
 }

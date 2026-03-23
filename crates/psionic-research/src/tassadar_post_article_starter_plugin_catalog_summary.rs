@@ -202,8 +202,8 @@ mod tests {
             summary.report_id,
             "tassadar.post_article.starter_plugin_catalog.eval_report.v1"
         );
-        assert_eq!(summary.starter_plugin_count, 5);
-        assert_eq!(summary.local_deterministic_plugin_count, 4);
+        assert_eq!(summary.starter_plugin_count, 6);
+        assert_eq!(summary.local_deterministic_plugin_count, 5);
         assert_eq!(summary.read_only_network_plugin_count, 1);
         assert_eq!(summary.bounded_flow_count, 2);
         assert!(summary.operator_internal_only_posture);

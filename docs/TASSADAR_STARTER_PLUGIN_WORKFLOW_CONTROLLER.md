@@ -32,10 +32,11 @@ for one bounded web-content intake graph:
 - route extracted readable text into `plugin_text_stats` on the html branch
 - stop explicitly on typed refusal or when the extracted URL set is exhausted
 
-The committed bundle freezes two pilot cases:
+The committed bundle freezes three pilot cases:
 
 - `web_content_intake_success`
 - `web_content_intake_fetch_refusal`
+- `guest_artifact_echo_success`
 
 Each case carries:
 
@@ -53,6 +54,9 @@ Each case carries:
   user-added `plugin_text_stats` enrichment step
 - one refusal pilot that stops on typed fetch refusal instead of hiding retry
   logic
+- one guest-artifact echo pilot that executes the shared bridge over the
+  digest-bound Wasm starter-plugin row and stops on an explicit guest-artifact
+  completion condition
 - explicit html-versus-feed branch decisions
 - one explicit html-to-text-stats enrichment branch above the shared bridge
 - explicit final stop conditions for success and refusal

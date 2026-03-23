@@ -1,0 +1,16 @@
+{
+  "envelope_id": "psion.plugin_guest_artifact.mount_envelope.reference.v1",
+  "plugin_id": "plugin.example.echo_guest",
+  "plugin_version": "v1",
+  "world_mount_id": "world_mount.starter.guest_artifact_digest_bound.v1",
+  "capability_namespace_ids": [],
+  "allowlisted_url_prefixes": [],
+  "allowed_method_ids": [],
+  "timeout_millis": 1000,
+  "response_size_limit_bytes": 4096,
+  "redirect_limit": 0,
+  "replay_posture_id": "guest_artifact_digest_replay_only.v1",
+  "green": true,
+  "detail": "the first guest-artifact starter plugin binds one explicit no-capability, digest-bound, packet-size-limited mount envelope instead of inheriting host-native policy by accident.",
+  "envelope_digest": "c93d5001c1f1bc034594beb244f09f4a2aae679afc70c529b46b46172c2b2747"
+}

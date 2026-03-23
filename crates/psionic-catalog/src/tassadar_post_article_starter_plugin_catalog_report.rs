@@ -344,8 +344,8 @@ pub fn build_tassadar_post_article_starter_plugin_catalog_report() -> Result<
         && world_mount.operator_internal_only_posture
         && !authority.plugin_publication_allowed
         && !platform.plugin_publication_allowed;
-    let local_network_distinction_explicit = runtime.plugin_count == 5
-        && runtime.local_deterministic_plugin_count == 4
+    let local_network_distinction_explicit = runtime.plugin_count == 6
+        && runtime.local_deterministic_plugin_count == 5
         && runtime.read_only_network_plugin_count == 1
         && runtime
             .capability_matrix_rows
@@ -435,11 +435,11 @@ pub fn build_tassadar_post_article_starter_plugin_catalog_report() -> Result<
         dependency_row(
             "runtime_bundle_present",
             TassadarPostArticleStarterPluginCatalogDependencyClass::RuntimeBundle,
-            runtime.plugin_count == 5,
+            runtime.plugin_count == 6,
             STARTER_PLUGIN_CATALOG_RUNTIME_BUNDLE_REF,
             Some(runtime.bundle_id.clone()),
             Some(runtime.bundle_digest.clone()),
-            "the runtime-owned starter catalog bundle exists and names the five bounded starter plugins explicitly, including the user-added capability-free and manual networked_read_only entries.",
+            "the runtime-owned starter catalog bundle exists and names the six bounded starter plugins explicitly, including the digest-bound guest-artifact entry plus the earlier capability-free and manual networked_read_only rows.",
         ),
         dependency_row(
             "bounded_platform_closeout_green",
@@ -528,23 +528,25 @@ pub fn build_tassadar_post_article_starter_plugin_catalog_report() -> Result<
     let capability_rows = runtime
         .capability_matrix_rows
         .iter()
-        .map(|row| TassadarPostArticleStarterPluginCatalogCapabilityRow {
-            plugin_id: row.plugin_id.clone(),
-            capability_class_id: capability_class_id(&row.capability_class),
-            deterministic_replayable: row.deterministic_replayable,
-            snapshot_backed_replay: row.snapshot_backed_replay,
-            mount_required: row.mount_required,
-            host_mediated_network_only: row.host_mediated_network_only,
-            green: if matches!(
-                row.capability_class,
-                RuntimeCapabilityClassInput::ReadOnlyNetwork
-            ) {
-                row.mount_required && row.host_mediated_network_only
-            } else {
-                !row.mount_required && !row.host_mediated_network_only
-            },
-            detail: row.detail.clone(),
-        })
+            .map(|row| TassadarPostArticleStarterPluginCatalogCapabilityRow {
+                plugin_id: row.plugin_id.clone(),
+                capability_class_id: capability_class_id(&row.capability_class),
+                deterministic_replayable: row.deterministic_replayable,
+                snapshot_backed_replay: row.snapshot_backed_replay,
+                mount_required: row.mount_required,
+                host_mediated_network_only: row.host_mediated_network_only,
+                green: if matches!(
+                    row.capability_class,
+                    RuntimeCapabilityClassInput::ReadOnlyNetwork
+                ) {
+                    row.mount_required && row.host_mediated_network_only
+                } else if row.plugin_id == "plugin.example.echo_guest" {
+                    row.mount_required && !row.host_mediated_network_only
+                } else {
+                    !row.mount_required && !row.host_mediated_network_only
+                },
+                detail: row.detail.clone(),
+            })
         .collect::<Vec<_>>();
 
     let composition_rows = runtime
@@ -566,15 +568,15 @@ pub fn build_tassadar_post_article_starter_plugin_catalog_report() -> Result<
     let validation_rows = vec![
         validation_row(
             "starter_plugin_count_exact",
-            runtime.plugin_count == 5,
+            runtime.plugin_count == 6,
             &[STARTER_PLUGIN_CATALOG_RUNTIME_BUNDLE_REF],
-            "the starter catalog names exactly five operator-curated plugins, including two user-added entries across the capability-free and networked_read_only classes, and does not imply a broader marketplace.",
+            "the starter catalog names exactly six operator-curated plugins, including one digest-bound guest-artifact entry plus the earlier capability-free and networked_read_only user-added rows, and does not imply a broader marketplace.",
         ),
         validation_row(
             "local_vs_network_distinction_explicit",
             local_network_distinction_explicit,
             &[STARTER_PLUGIN_CATALOG_RUNTIME_BUNDLE_REF],
-            "the catalog keeps four local deterministic plugins distinct from one read-only network plugin.",
+            "the catalog keeps five local deterministic plugins, including one digest-bound guest-artifact row, distinct from one read-only network plugin.",
         ),
         validation_row(
             "per_plugin_sidecars_complete",
@@ -863,8 +865,8 @@ mod tests {
         assert!(report.weighted_plugin_control_allowed);
         assert!(!report.plugin_publication_allowed);
         assert_eq!(report.next_issue_id, "TAS-217");
-        assert_eq!(report.entry_rows.len(), 5);
-        assert_eq!(report.capability_rows.len(), 5);
+        assert_eq!(report.entry_rows.len(), 6);
+        assert_eq!(report.capability_rows.len(), 6);
         assert_eq!(report.composition_rows.len(), 2);
     }
 

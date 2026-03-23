@@ -94,24 +94,27 @@ and now also has:
   learned-plugin-use work must follow without widening publication or executor
   claims.
 - `docs/PSION_PLUGIN_GUEST_ARTIFACT_DIRECTION.md` is the canonical product
-  direction record for the later guest-artifact plugin lane and freezes that
-  guest artifacts remain a digest-bound, trust-tiered, publication-blocked,
-  later separate tranche rather than present-tense starter-plugin truth.
+  direction record for the bounded digest-bound guest-artifact starter-plugin
+  lane and freezes that this class is now present-tense starter-plugin truth
+  only in one trust-tiered, publication-blocked, operator-internal form rather
+  than broad Wasm/plugin support.
 - `docs/PSION_PLUGIN_GUEST_ARTIFACT_MANIFEST.md` is the canonical first guest-
-  artifact manifest and identity contract for the later lane and freezes the
-  digest-bound manifest fields, provenance fields, trust tier, publication
-  posture, and fail-closed validation rules that later runtime loading and
-  receipt issues must reuse.
+  artifact manifest and identity contract for the bounded digest-bound lane and
+  freezes the manifest fields, provenance fields, trust tier, publication
+  posture, and fail-closed validation rules that runtime loading, shared
+  catalog exposure, and receipt issues must reuse.
 - `docs/PSION_PLUGIN_GUEST_ARTIFACT_RUNTIME_LOADING.md` is the canonical first
-  bounded guest-artifact runtime-loading contract for the later lane and
+  bounded guest-artifact runtime-loading contract for the current digest-bound
+  lane and
   freezes that load means manifest-bound byte admission, digest verification,
   minimal Wasm header checks, host-owned capability mediation, and typed
-  load-time refusals rather than broad present-tense guest-plugin support.
+  load-time refusals rather than broad generic guest-plugin support.
 - `docs/PSION_PLUGIN_GUEST_ARTIFACT_INVOCATION.md` is the canonical first
-  bounded guest-artifact invocation contract for the later lane and freezes one
+  bounded guest-artifact invocation contract for the current digest-bound lane
+  and freezes one
   digest-bound Wasm packet invocation with host-native-equivalent receipt,
-  replay, and typed-refusal evidence while still keeping catalog breadth,
-  controller breadth, and publication blocked.
+  replay, and typed-refusal evidence while still keeping generic guest-artifact
+  breadth, publication, and arbitrary loading blocked.
 - `docs/PSION_PLUGIN_CLAIM_BOUNDARY_AND_CAPABILITY_POSTURE.md` is the canonical
   claim-boundary and capability-posture contract for the convergence tranche
   and freezes which plugin classes are currently proved, not yet proved, later

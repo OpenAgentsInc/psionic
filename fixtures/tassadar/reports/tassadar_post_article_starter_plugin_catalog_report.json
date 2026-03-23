@@ -27,16 +27,16 @@
     "continuation_contract_digest": "435d8e13f17854acc785f5b18ec4ac4e4a5d489a61b511b1e18e9a6a25d1e017",
     "computational_model_statement_id": "tassadar.post_article.canonical_computational_model.statement.v1",
     "closure_bundle_report_id": "tassadar.post_article_canonical_machine_closure_bundle.report.v1",
-    "closure_bundle_report_digest": "cb69ea3637d8a415d869c90ce7ae46b85dabaac11a7180f2c8ad6e3271e8d06d",
-    "closure_bundle_digest": "9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003",
+    "closure_bundle_report_digest": "0a0e569551cd9b6207a5e13b72fb859d2ece38104df054c102a0e97f52c8e4d6",
+    "closure_bundle_digest": "6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9",
     "platform_closeout_report_id": "tassadar.post_article_bounded_weighted_plugin_platform_closeout_audit.report.v1",
-    "platform_closeout_report_digest": "373e300f95251f777a060df8a52007512a85c1abf83d2b10f131b16966d18bfe",
+    "platform_closeout_report_digest": "96535704afab37fb42c7247c5881b2778c2098f50172a20f9bdef07e86e3e132",
     "authority_gate_report_id": "tassadar.post_article_plugin_authority_promotion_publication_and_trust_tier_gate.report.v1",
-    "authority_gate_report_digest": "1e1826667fd8aab0e314d3286d25628a940489be2eba6a5ac5f32a9dbc4871f8",
+    "authority_gate_report_digest": "2e2223513ef6c9c6807a4677666a78f6c3a4428d0f8d16a10d49a2dff475d7a3",
     "runtime_bundle_id": "tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1",
-    "runtime_bundle_digest": "e84c0137c3ae6f45f55f6418f1e29997b1204065e91dcb26bbff6385a1768ec1",
+    "runtime_bundle_digest": "29469643cbd87b3ace804d45731756aa6e8dc3febd80c6415e2214b875102ecd",
     "runtime_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json",
-    "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` closure_bundle_digest=`9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003` and runtime_bundle_id=`tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1` stay bound together for the starter plugin catalog."
+    "detail": "machine_identity_id=`tassadar.post_article_universality_bridge.machine_identity.v1` canonical_route_id=`tassadar.article_route.direct_hull_cache_runtime.v1` closure_bundle_digest=`6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9` and runtime_bundle_id=`tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1` stay bound together for the starter plugin catalog."
   },
   "dependency_rows": [
     {
@@ -45,8 +45,8 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json",
       "bound_report_id": "tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1",
-      "bound_report_digest": "e84c0137c3ae6f45f55f6418f1e29997b1204065e91dcb26bbff6385a1768ec1",
-      "detail": "the runtime-owned starter catalog bundle exists and names the five bounded starter plugins explicitly, including the user-added capability-free and manual networked_read_only entries."
+      "bound_report_digest": "29469643cbd87b3ace804d45731756aa6e8dc3febd80c6415e2214b875102ecd",
+      "detail": "the runtime-owned starter catalog bundle exists and names the six bounded starter plugins explicitly, including the digest-bound guest-artifact entry plus the earlier capability-free and manual networked_read_only rows."
     },
     {
       "dependency_id": "bounded_platform_closeout_green",
@@ -54,7 +54,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_bounded_weighted_plugin_platform_closeout_audit_report.json",
       "bound_report_id": "tassadar.post_article_bounded_weighted_plugin_platform_closeout_audit.report.v1",
-      "bound_report_digest": "373e300f95251f777a060df8a52007512a85c1abf83d2b10f131b16966d18bfe",
+      "bound_report_digest": "96535704afab37fb42c7247c5881b2778c2098f50172a20f9bdef07e86e3e132",
       "detail": "the bounded weighted-plugin platform remains green before the starter catalog widens from substrate to a small curated plugin set."
     },
     {
@@ -63,7 +63,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_plugin_authority_promotion_publication_and_trust_tier_gate_report.json",
       "bound_report_id": "tassadar.post_article_plugin_authority_promotion_publication_and_trust_tier_gate.report.v1",
-      "bound_report_digest": "1e1826667fd8aab0e314d3286d25628a940489be2eba6a5ac5f32a9dbc4871f8",
+      "bound_report_digest": "2e2223513ef6c9c6807a4677666a78f6c3a4428d0f8d16a10d49a2dff475d7a3",
       "detail": "the authority or promotion or publication gate remains green and keeps the starter catalog operator-only."
     },
     {
@@ -81,7 +81,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_canonical_machine_closure_bundle_report.json",
       "bound_report_id": "tassadar.post_article_canonical_machine_closure_bundle.report.v1",
-      "bound_report_digest": "cb69ea3637d8a415d869c90ce7ae46b85dabaac11a7180f2c8ad6e3271e8d06d",
+      "bound_report_digest": "0a0e569551cd9b6207a5e13b72fb859d2ece38104df054c102a0e97f52c8e4d6",
       "detail": "the starter catalog stays bound to the canonical machine closure bundle by digest instead of widening via host-only composition."
     },
     {
@@ -146,6 +146,21 @@
       "detail": "the first manual user-added network starter plugin freezes GET-only read-only text fetch behind host-mediated allowlist, timeout, redirect, and response-size policy."
     },
     {
+      "plugin_id": "plugin.example.echo_guest",
+      "plugin_version": "v1",
+      "catalog_entry_id": "plugin.example.echo_guest@v1",
+      "capability_class_id": "local_deterministic",
+      "replay_class_id": "guest_artifact_digest_replay_only.v1",
+      "trust_tier_id": "operator_reviewed_guest_artifact_digest_bound_internal_only",
+      "descriptor_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_descriptor.json",
+      "fixture_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_fixture_bundle.json",
+      "sample_mount_envelope_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_mount_envelope.json",
+      "operator_only": true,
+      "local_deterministic": true,
+      "read_only_network": false,
+      "detail": "the first user-provided guest-artifact starter plugin stays digest-bound, operator-reviewed, local deterministic at runtime, and receipt-equivalent to the host-native starter surface."
+    },
+    {
       "plugin_id": "plugin.html.extract_readable",
       "plugin_version": "v1",
       "catalog_entry_id": "plugin.html.extract_readable@v1",
@@ -208,6 +223,16 @@
       "detail": "the fetch-text starter plugin is the only networked starter entry, remains bounded to host-mediated read-only HTTP, and now proves the first manual user-added networked lane."
     },
     {
+      "plugin_id": "plugin.example.echo_guest",
+      "capability_class_id": "local_deterministic",
+      "deterministic_replayable": true,
+      "snapshot_backed_replay": false,
+      "mount_required": true,
+      "host_mediated_network_only": false,
+      "green": true,
+      "detail": "the guest echo starter plugin is capability-free and deterministic at runtime but remains a separate digest-bound guest-artifact lane instead of collapsing into host-native plugin truth."
+    },
+    {
       "plugin_id": "plugin.html.extract_readable",
       "capability_class_id": "local_deterministic",
       "deterministic_replayable": true,
@@ -262,7 +287,7 @@
       "source_refs": [
         "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json"
       ],
-      "detail": "the starter catalog names exactly five operator-curated plugins, including two user-added entries across the capability-free and networked_read_only classes, and does not imply a broader marketplace."
+      "detail": "the starter catalog names exactly six operator-curated plugins, including one digest-bound guest-artifact entry plus the earlier capability-free and networked_read_only user-added rows, and does not imply a broader marketplace."
     },
     {
       "validation_id": "local_vs_network_distinction_explicit",
@@ -270,7 +295,7 @@
       "source_refs": [
         "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/tassadar_post_article_starter_plugin_catalog_bundle.json"
       ],
-      "detail": "the catalog keeps four local deterministic plugins distinct from one read-only network plugin."
+      "detail": "the catalog keeps five local deterministic plugins, including one digest-bound guest-artifact row, distinct from one read-only network plugin."
     },
     {
       "validation_id": "per_plugin_sidecars_complete",
@@ -356,6 +381,6 @@
   ],
   "next_issue_id": "TAS-217",
   "claim_boundary": "this catalog report publishes one small operator-curated starter plugin set above the bounded weighted-plugin platform while keeping plugin publication suppressed, served or public universality suppressed, arbitrary public tool use suppressed, and public marketplace language refused.",
-  "summary": "starter catalog report binds 5 starter plugins, 4 local deterministic entries, 1 read-only network entry, and 2 bounded composition flows to the canonical machine closure bundle while keeping operator-only posture explicit.",
-  "report_digest": "a6662b967ad3cd91d9d4dff2ed2347a0ec41412998c2ac5c7d80b6001dfb2292"
+  "summary": "starter catalog report binds 6 starter plugins, 5 local deterministic entries, 1 read-only network entry, and 2 bounded composition flows to the canonical machine closure bundle while keeping operator-only posture explicit.",
+  "report_digest": "f10fbaef63170c12edac4a739782cc4390416a99cdaf2e07ceb53ab6dbb38079"
 }

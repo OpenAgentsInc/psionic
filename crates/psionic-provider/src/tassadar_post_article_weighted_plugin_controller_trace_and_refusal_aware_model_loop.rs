@@ -115,8 +115,8 @@ mod tests {
             );
 
         assert_eq!(receipt.contract_status, "green");
-        assert_eq!(receipt.controller_case_row_count, 5);
-        assert_eq!(receipt.control_trace_row_count, 40);
+        assert_eq!(receipt.controller_case_row_count, 6);
+        assert_eq!(receipt.control_trace_row_count, 46);
         assert_eq!(receipt.host_negative_row_count, 10);
         assert_eq!(receipt.validation_row_count, 10);
         assert!(receipt.deferred_issue_ids.is_empty());

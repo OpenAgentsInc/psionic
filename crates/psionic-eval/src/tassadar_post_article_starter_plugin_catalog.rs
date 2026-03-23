@@ -222,17 +222,17 @@ pub fn build_tassadar_post_article_starter_plugin_catalog_eval_report() -> Resul
     let validation_rows = vec![
         validation_row(
             "starter_plugin_count_exact",
-            starter_plugin_count == 5,
+            starter_plugin_count == 6,
             &[&catalog.runtime_bundle_ref],
-            "the eval report keeps the starter catalog fixed to five operator-curated entries, including the user-added capability-free and manual networked_read_only plugins.",
+            "the eval report keeps the starter catalog fixed to six operator-curated entries, including the digest-bound guest-artifact row plus the earlier capability-free and manual networked_read_only plugins.",
         ),
         validation_row(
             "local_network_distinction_explicit",
             catalog.local_network_distinction_explicit
-                && local_deterministic_plugin_count == 4
+                && local_deterministic_plugin_count == 5
                 && read_only_network_plugin_count == 1,
             &[&catalog.runtime_bundle_ref, &catalog.report_id],
-            "four local deterministic plugins remain distinct from one read-only network plugin.",
+            "five local deterministic plugins, including one digest-bound guest-artifact row, remain distinct from one read-only network plugin.",
         ),
         validation_row(
             "composition_harness_green",
@@ -424,8 +424,8 @@ mod tests {
             "tassadar.post_article.starter_plugin_catalog.eval_report.v1"
         );
         assert!(report.eval_green);
-        assert_eq!(report.starter_plugin_count, 5);
-        assert_eq!(report.local_deterministic_plugin_count, 4);
+        assert_eq!(report.starter_plugin_count, 6);
+        assert_eq!(report.local_deterministic_plugin_count, 5);
         assert_eq!(report.read_only_network_plugin_count, 1);
         assert_eq!(report.bounded_flow_count, 2);
         assert!(report.operator_internal_only_posture);

@@ -1,0 +1,33 @@
+{
+  "plugin_id": "plugin.example.echo_guest",
+  "plugin_version": "v1",
+  "catalog_entry_id": "plugin.example.echo_guest@v1",
+  "manifest_id": "psion_plugin_guest_artifact_manifest_reference",
+  "artifact_id": "artifact.plugin.example.echo_guest.v1",
+  "artifact_digest": "e570dd3e366b8848da7c1680552a95c3e66001922c4be817ee5f3be83bc2018e",
+  "packet_abi_version": "packet.v1",
+  "packet_schemas": {
+    "input_schema_id": "plugin.example.echo_guest.input.v1",
+    "success_output_schema_id": "plugin.example.echo_guest.output.v1",
+    "refusal_schema_ids": [
+      "plugin.refusal.schema_invalid.v1",
+      "plugin.refusal.packet_too_large.v1",
+      "plugin.refusal.runtime_unavailable.v1"
+    ]
+  },
+  "capability_class": "local_deterministic",
+  "replay_class_id": "guest_artifact_digest_replay_only.v1",
+  "trust_tier_id": "operator_reviewed_guest_artifact_digest_bound_internal_only",
+  "evidence_posture_id": "evidence.manifest_digest_invocation_receipt_bound.v1",
+  "capability_namespace_ids": [],
+  "negative_claim_ids": [
+    "ambient_host_sdk_not_claimed",
+    "guest_artifact_publication_not_claimed",
+    "arbitrary_wasm_plugin_support_not_claimed",
+    "secret_or_stateful_guest_capability_not_claimed"
+  ],
+  "descriptor_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_descriptor.json",
+  "fixture_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_fixture_bundle.json",
+  "sample_mount_envelope_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_mount_envelope.json",
+  "detail": "the first user-provided guest-artifact starter plugin stays digest-bound, operator-reviewed, local deterministic at runtime, and receipt-equivalent to the host-native starter surface."
+}

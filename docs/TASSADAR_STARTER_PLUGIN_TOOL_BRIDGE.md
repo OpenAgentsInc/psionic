@@ -34,11 +34,12 @@ with three main surfaces:
 - OpenAI-compatible router-facing function-tool projection
 - Apple FM-facing tool-definition projection over the same argument schemas
 
-The current bridge freezes five starter-plugin definitions:
+The current bridge freezes six starter-plugin definitions:
 
 - `plugin_text_url_extract`
 - `plugin_text_stats`
 - `plugin_http_fetch_text`
+- `plugin_example_echo_guest`
 - `plugin_html_extract_readable`
 - `plugin_feed_rss_atom_parse`
 
@@ -57,8 +58,11 @@ lanes.
 ## What Is Green
 
 - one shared projection layer above the starter-plugin runtime
-- stable argument-schema digests across deterministic, router-owned, and Apple
-  FM surfaces for all current starter plugins
+- stable argument-schema digests across deterministic and router-owned surfaces
+  for all current starter plugins, including the digest-bound guest-artifact
+  row
+- Apple FM reuses the same bridge contract for the currently admitted host-
+  native subset without widening to generic guest-artifact callbacks
 - shared execution entrypoint that dispatches projected tool calls into the real
   starter-plugin runtime
 - projected tool results that preserve plugin receipt identity at the tool

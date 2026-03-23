@@ -1,7 +1,7 @@
 # PSION Plugin Guest-Artifact Direction
 
-> Status: canonical `PSION_PLUGIN-18` product-direction record for the later
-> guest-artifact lane, written 2026-03-22 after the host-native
+> Status: canonical `PSION_PLUGIN-18` product-direction record for the bounded
+> digest-bound guest-artifact starter-plugin lane, written 2026-03-22 after the host-native
 > `networked_read_only` substrate proof closed.
 
 This document freezes the product direction for guest-artifact plugin support
@@ -9,12 +9,11 @@ in the Psion plugin convergence program.
 
 ## Decision
 
-Guest-artifact restoration remains a **later separate bounded lane**.
+One bounded digest-bound guest-artifact starter-plugin lane is now live.
 
-It is still worth keeping in the program, but only under a narrow internal
-training and evaluation posture.
+It remains intentionally narrow and internal.
 
-It does **not** describe current starter-plugin truth.
+It does **not** authorize generic Wasm/plugin support.
 
 The current live plugin substrate is:
 
@@ -28,8 +27,10 @@ That substrate now includes:
 
 - the capability-free local deterministic user-authored path
 - one manual `networked_read_only` user-authored proof
+- one digest-bound guest-artifact starter-plugin proof
 
-It does not include live guest-artifact loading.
+It does not include arbitrary guest-artifact loading or broad user-provided
+binary admission.
 
 ## Why This Decision Exists
 
@@ -42,14 +43,15 @@ be misread as current product truth.
 
 This doc closes that ambiguity:
 
-- guest-artifact support remains intentionally later
-- host-native starter plugins remain the only present-tense plugin substrate
-- any future guest-artifact tranche must earn its own bounded contracts and
-  evidence
+- one digest-bound guest-artifact starter-plugin lane is now real
+- host-native starter plugins remain the broad present-tense user-authoring
+  substrate
+- any broader future guest-artifact tranche must earn its own bounded contracts
+  and evidence
 
 ## Required Boundary For Any Future Guest-Artifact Lane
 
-If the repo restores guest artifacts later, that lane must remain:
+Any guest-artifact lane beyond the current bounded proof must remain:
 
 - digest-bound
 - trust-tiered
@@ -88,7 +90,7 @@ The first concrete contract for that lane now lives in:
 - `docs/PSION_PLUGIN_GUEST_ARTIFACT_INVOCATION.md`
 - `crates/psionic-runtime/src/psion_plugin_guest_artifact_invocation.rs`
 
-They are not authorization for:
+The current proof is not authorization for:
 
 - generic Wasm plugin support
 - arbitrary user binary support
@@ -99,9 +101,10 @@ They are not authorization for:
 
 This decision record does not:
 
-- add guest-artifact runtime loading
-- add a manifest implementation
-- add a user-provided Wasm plugin
+- authorize generic guest-artifact runtime loading
+- authorize arbitrary manifest admission
+- authorize user-provided Wasm plugins beyond the single digest-bound admitted
+  class
 - change the current served capability matrix
 - widen publication or serving posture
 
@@ -109,13 +112,14 @@ This decision record does not:
 
 Allowed:
 
-- “guest-artifact restoration remains a later separate bounded lane”
-- “current plugin truth is still host-native starter plugins only”
+- “one bounded digest-bound guest-artifact starter-plugin lane now exists”
+- “current broader plugin truth is still host-native starter plugins plus one
+  narrow digest-bound guest-artifact exception”
 - “any future guest-artifact path must be digest-bound, trust-tiered, and
   publication-blocked”
 
 Disallowed:
 
-- “the repo supports Wasm plugins” in the present tense
+- “the repo supports generic Wasm plugins” in the present tense
 - “user-provided plugins are supported” without class qualifiers
-- “guest plugins are part of the current starter-plugin platform”
+- “guest plugins are broadly part of the current starter-plugin platform”

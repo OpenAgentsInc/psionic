@@ -11,13 +11,14 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    bridge_exposed_starter_plugin_registrations, invoke_extract_readable_json_packet,
+    bridge_exposed_starter_plugin_registrations,
+    execute_reference_psion_plugin_guest_artifact_tool_call, invoke_extract_readable_json_packet,
     invoke_feed_parse_json_packet, invoke_fetch_text_json_packet, invoke_text_stats_json_packet,
     invoke_url_extract_json_packet, starter_plugin_registration_by_tool_name,
     starter_plugin_tool_projection_for_plugin_id, ExtractReadableConfig, FeedParseConfig,
     FetchTextConfig, FetchTextSnapshotResponse, FetchTextSnapshotResult,
     StarterPluginInvocationReceipt, StarterPluginInvocationStatus, StarterPluginRefusal,
-    StarterPluginToolProjection, TextStatsConfig, UrlExtractConfig,
+    StarterPluginToolProjection, TextStatsConfig, UrlExtractConfig, STARTER_PLUGIN_GUEST_ECHO_ID,
 };
 
 pub const TASSADAR_POST_ARTICLE_STARTER_PLUGIN_TOOL_BRIDGE_BUNDLE_REF: &str = "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_tool_bridge_v1/tassadar_post_article_starter_plugin_tool_bridge_bundle.json";
@@ -147,6 +148,8 @@ pub enum StarterPluginToolBridgeError {
         tool_name: String,
         error: serde_json::Error,
     },
+    #[error("guest-artifact invocation failed for `{tool_name}`: {detail}")]
+    GuestArtifactInvocation { tool_name: String, detail: String },
 }
 
 #[derive(Debug, Error)]
@@ -248,6 +251,13 @@ pub fn execute_starter_plugin_tool_call(
                 outcome.refusal,
             )
         }
+        STARTER_PLUGIN_GUEST_ECHO_ID => execute_reference_psion_plugin_guest_artifact_tool_call(
+            packet.as_slice(),
+        )
+        .map_err(|error| StarterPluginToolBridgeError::GuestArtifactInvocation {
+            tool_name: String::from(tool_name),
+            detail: error.to_string(),
+        })?,
         "plugin.html.extract_readable" => {
             let outcome =
                 invoke_extract_readable_json_packet("json", &packet, &config.extract_readable);
@@ -360,6 +370,18 @@ pub fn build_starter_plugin_tool_bridge_bundle() -> StarterPluginToolBridgeBundl
             )
             .expect("fetch-text bridge result"),
             "read-only network results stay structured and receipt-bound at the same bridge boundary.",
+        ),
+        bridge_execution_case(
+            "guest_echo_success_bridge",
+            execute_starter_plugin_tool_call(
+                "plugin_example_echo_guest",
+                serde_json::json!({
+                    "text": "guest-artifact bridge proof"
+                }),
+                &config,
+            )
+            .expect("guest-artifact bridge result"),
+            "the first digest-bound guest-artifact starter plugin projects through the same shared bridge and preserves the same receipt-bound structured envelope as the host-native starter surface.",
         ),
         bridge_execution_case(
             "extract_readable_success_bridge",
@@ -599,7 +621,7 @@ mod tests {
     fn starter_plugin_tool_bridge_keeps_projection_rows_stable() {
         let bundle = build_starter_plugin_tool_bridge_bundle();
 
-        assert_eq!(bundle.projection_rows.len(), 5);
+        assert_eq!(bundle.projection_rows.len(), 6);
         assert_eq!(
             bundle.surface_ids,
             vec![
@@ -616,6 +638,10 @@ mod tests {
             .projection_rows
             .iter()
             .any(|row| row.tool_name == "plugin_text_stats"));
+        assert!(bundle
+            .projection_rows
+            .iter()
+            .any(|row| row.tool_name == "plugin_example_echo_guest"));
     }
 
     #[test]
@@ -666,8 +692,8 @@ mod tests {
     fn starter_plugin_tool_bridge_bundle_covers_projection_and_execution_rows() {
         let bundle = build_starter_plugin_tool_bridge_bundle();
 
-        assert_eq!(starter_plugin_tool_bridge_projections().len(), 5);
-        assert_eq!(bundle.execution_cases.len(), 5);
+        assert_eq!(starter_plugin_tool_bridge_projections().len(), 6);
+        assert_eq!(bundle.execution_cases.len(), 6);
         assert!(bundle
             .execution_cases
             .iter()
@@ -676,6 +702,10 @@ mod tests {
             .execution_cases
             .iter()
             .any(|row| row.plugin_id == "plugin.text.stats"));
+        assert!(bundle
+            .execution_cases
+            .iter()
+            .any(|row| row.plugin_id == "plugin.example.echo_guest"));
         assert!(bundle
             .execution_cases
             .iter()

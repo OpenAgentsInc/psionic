@@ -267,7 +267,7 @@
       "satisfied": true,
       "source_ref": "fixtures/tassadar/reports/tassadar_post_article_universality_bridge_contract_report.json",
       "source_artifact_id": "tassadar.post_article_universality_bridge.contract.report.v1",
-      "source_artifact_digest": "772d2dcad36599e1de3da1b2780b4baf8fc0722aec2c9c8ad2754f2e3525be7e",
+      "source_artifact_digest": "15aaadaabe20259bf06968121a10c15b268a10d335946fa153a0e23fc6346810",
       "detail": "the closure bundle keeps the rebased bridge carrier split and supported machine classes explicit."
     },
     {
@@ -724,7 +724,7 @@
   "served_public_universality_allowed": false,
   "arbitrary_software_capability_allowed": false,
   "claim_boundary": "this eval-owned report publishes one digest-bound canonical machine closure bundle for the post-article route. It binds the historical proof chain, the canonical machine tuple, the published computational model, the control-plane provenance proof, execution-semantics transport, continuation boundary, carrier split, state classes, hidden-state closure, failure lattice, observer model, portability/minimality posture, plugin charter boundary, and anti-drift closeout into one indivisible machine object. Later terminal universality, weighted plugin controller, plugin invocation receipt, plugin publication, and bounded plugin-platform claims must reference this closure bundle by digest instead of silently recomposing the machine. It still does not by itself publish plugin catalogs, plugin publication, served/public universality, or arbitrary software capability.",
-  "summary": "Post-article canonical machine closure bundle keeps supporting_material_rows=19/19, dependency_rows=8/8, invalidation_rows=9/9, validation_rows=9/9, bundle_status=Green, closure_bundle_digest=`9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003`, closure_bundle_issue_id=`TAS-215`, and next_issue_id=`TAS-217`.",
-  "closure_bundle_digest": "9ac0dfa48ef13bca57b02c0c643672efe4aae9f821607ef9ba4b0c24978a3003",
-  "report_digest": "cb69ea3637d8a415d869c90ce7ae46b85dabaac11a7180f2c8ad6e3271e8d06d"
+  "summary": "Post-article canonical machine closure bundle keeps supporting_material_rows=19/19, dependency_rows=8/8, invalidation_rows=9/9, validation_rows=9/9, bundle_status=Green, closure_bundle_digest=`6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9`, closure_bundle_issue_id=`TAS-215`, and next_issue_id=`TAS-217`.",
+  "closure_bundle_digest": "6dc5a888f301649cee10ccf61129784eac4337e93041c86a384a94451ac26bd9",
+  "report_digest": "0a0e569551cd9b6207a5e13b72fb859d2ece38104df054c102a0e97f52c8e4d6"
 }

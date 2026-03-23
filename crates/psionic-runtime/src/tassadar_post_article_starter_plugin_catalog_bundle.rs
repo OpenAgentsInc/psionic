@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    build_psion_plugin_guest_artifact_invocation_bundle,
     catalog_exposed_starter_plugin_registrations, starter_plugin_registration_by_plugin_id,
     StarterPluginCapabilityClass, StarterPluginRegistration,
     TASSADAR_POST_ARTICLE_PLUGIN_PACKET_ABI_VERSION,
@@ -277,6 +278,75 @@ fn starter_fixture_bundle_from_registration(
     )
 }
 
+fn guest_artifact_fixture_bundle_from_registration(
+    registration: &StarterPluginRegistration,
+) -> TassadarPostArticleStarterPluginFixtureBundle {
+    let invocation_bundle = build_psion_plugin_guest_artifact_invocation_bundle();
+    let mut cases = vec![starter_fixture_case(
+        invocation_bundle.success_case.case_id.as_str(),
+        TassadarPostArticleStarterPluginFixtureStatus::ExactSuccess,
+        registration.input_schema_id,
+        &serde_json::json!({
+            "text": "guest-artifact echo proof"
+        }),
+        invocation_bundle
+            .success_case
+            .response_or_refusal_schema_id
+            .as_str(),
+        &invocation_bundle.success_case.projected_result.structured_payload,
+        invocation_bundle.success_case.replay_class_id.as_str(),
+        invocation_bundle
+            .success_case
+            .projected_result
+            .plugin_receipt
+            .receipt_id
+            .as_str(),
+        None,
+        "the first digest-bound guest-artifact starter plugin now contributes real invocation evidence to the starter catalog instead of a synthetic host-native stand-in.",
+    )];
+    for refusal_case in &invocation_bundle.refusal_cases {
+        let refusal_class_id = refusal_case
+            .projected_result
+            .plugin_receipt
+            .refusal_class_id
+            .as_deref();
+        let status = match refusal_class_id {
+            Some("schema_invalid") => {
+                TassadarPostArticleStarterPluginFixtureStatus::TypedMalformedPacket
+            }
+            _ => TassadarPostArticleStarterPluginFixtureStatus::TypedRefusal,
+        };
+        let request = match refusal_case.case_id.as_str() {
+            "guest_artifact_schema_invalid" => serde_json::json!({
+                "message": "wrong field"
+            }),
+            "guest_artifact_packet_too_large" => serde_json::json!({
+                "text_digest": "input.exceeds.guest_artifact.packet_limit.v1"
+            }),
+            _ => serde_json::json!({
+                "text": "guest-artifact echo proof"
+            }),
+        };
+        cases.push(starter_fixture_case(
+            refusal_case.case_id.as_str(),
+            status,
+            registration.input_schema_id,
+            &request,
+            refusal_case.response_or_refusal_schema_id.as_str(),
+            &refusal_case.projected_result.structured_payload,
+            refusal_case.replay_class_id.as_str(),
+            refusal_case
+                .projected_result
+                .plugin_receipt
+                .receipt_id
+                .as_str(),
+            refusal_class_id,
+            refusal_case.detail.as_str(),
+        ));
+    }
+    starter_fixture_bundle_from_registration(registration, cases.as_slice())
+}
+
 fn starter_mount_envelope_from_registration(
     registration: &StarterPluginRegistration,
     world_mount_id: &str,
@@ -343,6 +413,7 @@ fn build_tassadar_post_article_starter_plugin_catalog_artifacts(
     let url_extract = catalog_registration("plugin.text.url_extract");
     let text_stats = catalog_registration("plugin.text.stats");
     let fetch_text = catalog_registration("plugin.http.fetch_text");
+    let guest_echo = catalog_registration("plugin.example.echo_guest");
     let extract_readable = catalog_registration("plugin.html.extract_readable");
     let feed_parse = catalog_registration("plugin.feed.rss_atom_parse");
 
@@ -563,6 +634,7 @@ fn build_tassadar_post_article_starter_plugin_catalog_artifacts(
                 ),
             ],
         ),
+        guest_artifact_fixture_bundle_from_registration(guest_echo),
         starter_fixture_bundle_from_registration(
             extract_readable,
             &[
@@ -769,6 +841,17 @@ fn build_tassadar_post_article_starter_plugin_catalog_artifacts(
             "the fetch-text starter plugin binds allowlist, timeout, response-size, and redirect posture to one explicit host-mediated mount envelope.",
         ),
         starter_mount_envelope_from_registration(
+            guest_echo,
+            "world_mount.starter.guest_artifact_digest_bound.v1",
+            &[],
+            &[],
+            1000,
+            4096,
+            0,
+            "guest_artifact_digest_replay_only.v1",
+            "the first guest-artifact starter plugin binds one explicit no-capability, digest-bound, packet-size-limited mount envelope instead of inheriting host-native policy by accident.",
+        ),
+        starter_mount_envelope_from_registration(
             extract_readable,
             "world_mount.starter.local_no_capabilities.v1",
             &[],
@@ -810,6 +893,9 @@ fn build_tassadar_post_article_starter_plugin_catalog_artifacts(
         ),
         capability_matrix_row_from_registration(
             fetch_text, true, false, true, false, false, true, true, true, true,
+        ),
+        capability_matrix_row_from_registration(
+            guest_echo, false, true, false, false, false, true, false, true, true,
         ),
         capability_matrix_row_from_registration(
             extract_readable,
@@ -950,7 +1036,7 @@ fn build_tassadar_post_article_starter_plugin_catalog_artifacts(
             "this runtime-owned starter catalog freezes one small operator-curated plugin set above the canonical post-article machine closure bundle without implying served or public plugin rights, arbitrary public Wasm execution, arbitrary public tool use, or a public plugin marketplace.",
         ),
         summary: String::from(
-            "starter catalog bundle publishes four operator-curated plugins, four per-plugin descriptor or fixture or mount sidecars, and two bounded composition flows across local deterministic and read-only network capability classes.",
+            "starter catalog bundle publishes six operator-curated starter plugins, including one digest-bound guest-artifact entry, with per-plugin descriptor or fixture or mount sidecars and two bounded composition flows across local deterministic and read-only network capability classes.",
         ),
         bundle_digest: String::new(),
     };
@@ -1356,8 +1442,8 @@ mod tests {
             bundle.bundle_id,
             "tassadar.post_article.starter_plugin_catalog.runtime_bundle.v1"
         );
-        assert_eq!(bundle.plugin_count, 5);
-        assert_eq!(bundle.local_deterministic_plugin_count, 4);
+        assert_eq!(bundle.plugin_count, 6);
+        assert_eq!(bundle.local_deterministic_plugin_count, 5);
         assert_eq!(bundle.read_only_network_plugin_count, 1);
         assert_eq!(bundle.bounded_flow_count, 2);
         assert!(bundle.operator_only_posture);
@@ -1375,6 +1461,10 @@ mod tests {
             .descriptor_rows
             .iter()
             .any(|row| row.plugin_id == "plugin.http.fetch_text"));
+        assert!(bundle
+            .descriptor_rows
+            .iter()
+            .any(|row| row.plugin_id == "plugin.example.echo_guest"));
         assert!(bundle
             .descriptor_rows
             .iter()
@@ -1407,6 +1497,10 @@ mod tests {
             )
             .expect("fetch text descriptor"),
             read_json::<TassadarPostArticleStarterPluginDescriptor>(
+                output_dir.join("plugin_example_echo_guest_descriptor.json"),
+            )
+            .expect("guest echo descriptor"),
+            read_json::<TassadarPostArticleStarterPluginDescriptor>(
                 output_dir.join("plugin_html_extract_readable_descriptor.json"),
             )
             .expect("extract readable descriptor"),
@@ -1429,6 +1523,10 @@ mod tests {
             )
             .expect("fetch text fixture bundle"),
             read_json::<TassadarPostArticleStarterPluginFixtureBundle>(
+                output_dir.join("plugin_example_echo_guest_fixture_bundle.json"),
+            )
+            .expect("guest echo fixture bundle"),
+            read_json::<TassadarPostArticleStarterPluginFixtureBundle>(
                 output_dir.join("plugin_html_extract_readable_fixture_bundle.json"),
             )
             .expect("extract readable fixture bundle"),
@@ -1450,6 +1548,10 @@ mod tests {
                 output_dir.join("plugin_http_fetch_text_mount_envelope.json"),
             )
             .expect("fetch text mount"),
+            read_json::<TassadarPostArticleStarterPluginMountEnvelope>(
+                output_dir.join("plugin_example_echo_guest_mount_envelope.json"),
+            )
+            .expect("guest echo mount"),
             read_json::<TassadarPostArticleStarterPluginMountEnvelope>(
                 output_dir.join("plugin_html_extract_readable_mount_envelope.json"),
             )
@@ -1502,6 +1604,10 @@ mod tests {
         assert!(tempdir
             .path()
             .join("plugin_http_fetch_text_descriptor.json")
+            .exists());
+        assert!(tempdir
+            .path()
+            .join("plugin_example_echo_guest_descriptor.json")
             .exists());
         assert!(tempdir
             .path()

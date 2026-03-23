@@ -16,7 +16,8 @@ use crate::{
     PsionPluginGuestArtifactManifest, PsionPluginGuestArtifactManifestError,
     PsionPluginGuestArtifactRuntimeLoadingError, StarterPluginInvocationReceipt,
     StarterPluginInvocationStatus, StarterPluginProjectedToolResultEnvelope, StarterPluginRefusal,
-    StarterPluginToolProjection,
+    StarterPluginToolProjection, PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_ID,
+    PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_VERSION,
 };
 
 pub const PSION_PLUGIN_GUEST_ARTIFACT_INVOCATION_SCHEMA_VERSION: &str =
@@ -331,6 +332,24 @@ pub fn psion_plugin_guest_artifact_tool_projection(
     }
 }
 
+pub fn execute_reference_psion_plugin_guest_artifact_tool_call(
+    packet: &[u8],
+) -> Result<StarterPluginProjectedToolResultEnvelope, PsionPluginGuestArtifactInvocationError> {
+    let manifest = reference_psion_plugin_guest_artifact_manifest();
+    let artifact_bytes = reference_psion_plugin_guest_artifact_bytes();
+    let case_id = format!(
+        "guest_artifact_tool_call_{}",
+        &sha256_hex(packet)[..12]
+    );
+    let case = invoke_psion_plugin_guest_artifact_json_packet(
+        case_id.as_str(),
+        &manifest,
+        artifact_bytes.as_slice(),
+        packet,
+    )?;
+    Ok(case.projected_result)
+}
+
 pub fn invoke_psion_plugin_guest_artifact_json_packet(
     case_id: &str,
     manifest: &PsionPluginGuestArtifactManifest,
@@ -452,7 +471,7 @@ pub fn invoke_psion_plugin_guest_artifact_json_packet(
     let projected_result = StarterPluginProjectedToolResultEnvelope {
         tool_name: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_TOOL_NAME),
         plugin_id: manifest.plugin_id.clone(),
-        plugin_version: manifest.plugin_version.clone(),
+        plugin_version: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_VERSION),
         status: StarterPluginInvocationStatus::Success,
         output_or_refusal_schema_id: manifest.success_output_schema_id.clone(),
         replay_class_id: manifest.replay_class_id.clone(),
@@ -588,7 +607,7 @@ fn refusal_case(
     let projected_result = StarterPluginProjectedToolResultEnvelope {
         tool_name: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_TOOL_NAME),
         plugin_id: manifest.plugin_id.clone(),
-        plugin_version: manifest.plugin_version.clone(),
+        plugin_version: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_VERSION),
         status: StarterPluginInvocationStatus::Refusal,
         output_or_refusal_schema_id: refusal.schema_id.clone(),
         replay_class_id: manifest.replay_class_id.clone(),
@@ -632,8 +651,8 @@ fn guest_artifact_receipt(
             manifest.plugin_id,
             &input_packet_digest[..16]
         ),
-        plugin_id: manifest.plugin_id.clone(),
-        plugin_version: manifest.plugin_version.clone(),
+        plugin_id: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_ID),
+        plugin_version: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_PLUGIN_VERSION),
         tool_name: String::from(PSION_PLUGIN_GUEST_ARTIFACT_REFERENCE_TOOL_NAME),
         packet_abi_version: manifest.packet_abi_version.clone(),
         mount_envelope_id: String::from(PSION_PLUGIN_GUEST_ARTIFACT_MOUNT_ENVELOPE_ID),

@@ -13,6 +13,7 @@
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_text_url_extract_descriptor.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_text_stats_descriptor.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_http_fetch_text_descriptor.json",
+    "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_descriptor.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_html_extract_readable_descriptor.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_feed_rss_atom_parse_descriptor.json"
   ],
@@ -20,6 +21,7 @@
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_text_url_extract_fixture_bundle.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_text_stats_fixture_bundle.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_http_fetch_text_fixture_bundle.json",
+    "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_fixture_bundle.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_html_extract_readable_fixture_bundle.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_feed_rss_atom_parse_fixture_bundle.json"
   ],
@@ -27,6 +29,7 @@
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_text_url_extract_mount_envelope.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_text_stats_mount_envelope.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_http_fetch_text_mount_envelope.json",
+    "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_mount_envelope.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_html_extract_readable_mount_envelope.json",
     "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_feed_rss_atom_parse_mount_envelope.json"
   ],
@@ -141,6 +144,39 @@
       "detail": "the first manual user-added network starter plugin freezes GET-only read-only text fetch behind host-mediated allowlist, timeout, redirect, and response-size policy."
     },
     {
+      "plugin_id": "plugin.example.echo_guest",
+      "plugin_version": "v1",
+      "catalog_entry_id": "plugin.example.echo_guest@v1",
+      "manifest_id": "psion_plugin_guest_artifact_manifest_reference",
+      "artifact_id": "artifact.plugin.example.echo_guest.v1",
+      "artifact_digest": "e570dd3e366b8848da7c1680552a95c3e66001922c4be817ee5f3be83bc2018e",
+      "packet_abi_version": "packet.v1",
+      "packet_schemas": {
+        "input_schema_id": "plugin.example.echo_guest.input.v1",
+        "success_output_schema_id": "plugin.example.echo_guest.output.v1",
+        "refusal_schema_ids": [
+          "plugin.refusal.schema_invalid.v1",
+          "plugin.refusal.packet_too_large.v1",
+          "plugin.refusal.runtime_unavailable.v1"
+        ]
+      },
+      "capability_class": "local_deterministic",
+      "replay_class_id": "guest_artifact_digest_replay_only.v1",
+      "trust_tier_id": "operator_reviewed_guest_artifact_digest_bound_internal_only",
+      "evidence_posture_id": "evidence.manifest_digest_invocation_receipt_bound.v1",
+      "capability_namespace_ids": [],
+      "negative_claim_ids": [
+        "ambient_host_sdk_not_claimed",
+        "guest_artifact_publication_not_claimed",
+        "arbitrary_wasm_plugin_support_not_claimed",
+        "secret_or_stateful_guest_capability_not_claimed"
+      ],
+      "descriptor_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_descriptor.json",
+      "fixture_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_fixture_bundle.json",
+      "sample_mount_envelope_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_catalog_v1/plugin_example_echo_guest_mount_envelope.json",
+      "detail": "the first user-provided guest-artifact starter plugin stays digest-bound, operator-reviewed, local deterministic at runtime, and receipt-equivalent to the host-native starter surface."
+    },
+    {
       "plugin_id": "plugin.html.extract_readable",
       "plugin_version": "v1",
       "catalog_entry_id": "plugin.html.extract_readable@v1",
@@ -251,6 +287,21 @@
       "schema_local_composition": true,
       "operator_only": true,
       "detail": "the fetch-text starter plugin is the only networked starter entry, remains bounded to host-mediated read-only HTTP, and now proves the first manual user-added networked lane."
+    },
+    {
+      "plugin_id": "plugin.example.echo_guest",
+      "catalog_entry_id": "plugin.example.echo_guest@v1",
+      "capability_class": "local_deterministic",
+      "reads_network": false,
+      "deterministic_replayable": true,
+      "snapshot_backed_replay": false,
+      "filesystem_access": false,
+      "secrets_access": false,
+      "mount_required": true,
+      "host_mediated_network_only": false,
+      "schema_local_composition": true,
+      "operator_only": true,
+      "detail": "the guest echo starter plugin is capability-free and deterministic at runtime but remains a separate digest-bound guest-artifact lane instead of collapsing into host-native plugin truth."
     },
     {
       "plugin_id": "plugin.html.extract_readable",
@@ -375,14 +426,14 @@
       "detail": "the second starter flow proves that fetched feed content can enter a deterministic local parser without hidden schema repair or host-side feed parsing."
     }
   ],
-  "plugin_count": 5,
-  "local_deterministic_plugin_count": 4,
+  "plugin_count": 6,
+  "local_deterministic_plugin_count": 5,
   "read_only_network_plugin_count": 1,
   "bounded_flow_count": 2,
   "operator_only_posture": true,
   "runtime_builtins_separate": true,
   "public_marketplace_implication_allowed": false,
   "claim_boundary": "this runtime-owned starter catalog freezes one small operator-curated plugin set above the canonical post-article machine closure bundle without implying served or public plugin rights, arbitrary public Wasm execution, arbitrary public tool use, or a public plugin marketplace.",
-  "summary": "starter catalog bundle publishes four operator-curated plugins, four per-plugin descriptor or fixture or mount sidecars, and two bounded composition flows across local deterministic and read-only network capability classes.",
-  "bundle_digest": "e84c0137c3ae6f45f55f6418f1e29997b1204065e91dcb26bbff6385a1768ec1"
+  "summary": "starter catalog bundle publishes six operator-curated starter plugins, including one digest-bound guest-artifact entry, with per-plugin descriptor or fixture or mount sidecars and two bounded composition flows across local deterministic and read-only network capability classes.",
+  "bundle_digest": "29469643cbd87b3ace804d45731756aa6e8dc3febd80c6415e2214b875102ecd"
 }

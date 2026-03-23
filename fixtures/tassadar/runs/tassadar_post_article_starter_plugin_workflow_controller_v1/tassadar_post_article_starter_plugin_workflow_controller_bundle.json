@@ -435,9 +435,82 @@
       "stop_condition_id": "controller_stop.typed_refusal",
       "green": false,
       "detail": "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge."
+    },
+    {
+      "case_id": "guest_artifact_echo_success",
+      "workflow_graph_id": "starter_flow.web_content_intake.v1",
+      "directive_text": "Echo one bounded guest-artifact packet through the shared starter-plugin controller surface.",
+      "decision_rows": [
+        {
+          "decision_index": 0,
+          "decision_kind": "guest_artifact_branch",
+          "subject_id": "guest_artifact_echo_success",
+          "chosen_path_id": "branch.plugin_example_echo_guest",
+          "detail": "the host-owned controller admits the digest-bound guest-artifact starter plugin on the same shared bridge surface as the host-native starter set."
+        },
+        {
+          "decision_index": 1,
+          "decision_kind": "stop_condition",
+          "subject_id": "guest_artifact_echo_success",
+          "chosen_path_id": "controller_stop.guest_artifact_echo_complete",
+          "detail": "the host-owned controller stops after the guest-artifact result is accepted without hidden chaining."
+        }
+      ],
+      "step_rows": [
+        {
+          "step_index": 0,
+          "subject_id": "guest_artifact_echo_success",
+          "tool_name": "plugin_example_echo_guest",
+          "plugin_id": "plugin.example.echo_guest",
+          "projected_result": {
+            "tool_name": "plugin_example_echo_guest",
+            "plugin_id": "plugin.example.echo_guest",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.example.echo_guest.output.v1",
+            "replay_class_id": "guest_artifact_digest_replay_only.v1",
+            "structured_payload": {
+              "text": "controller-visible guest-artifact echo"
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.example.echo_guest.bee52b6c5818aceb.v1",
+              "plugin_id": "plugin.example.echo_guest",
+              "plugin_version": "v1",
+              "tool_name": "plugin_example_echo_guest",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "psion.plugin_guest_artifact.mount_envelope.reference.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "guest_artifact_digest_replay_only.v1",
+              "status": "success",
+              "input_schema_id": "plugin.example.echo_guest.input.v1",
+              "input_packet_digest": "bee52b6c5818aceb9cd64feacf6ae61631e960c2f320724978259f24afe10eee",
+              "output_or_refusal_schema_id": "plugin.example.echo_guest.output.v1",
+              "output_or_refusal_digest": "bee52b6c5818aceb9cd64feacf6ae61631e960c2f320724978259f24afe10eee",
+              "detail": "guest-artifact invocation emits the same receipt class as host-native starter plugins while keeping the guest lane digest-bound and replay-explicit.",
+              "receipt_digest": "384381469d85793219b83507292e3c0fc8ccf899d0823600666319f1f521c673"
+            }
+          },
+          "detail": "execute the first digest-bound guest-artifact starter plugin through the shared starter-plugin controller surface."
+        }
+      ],
+      "refusal_rows": [],
+      "final_artifact": {
+        "extracted_urls": [],
+        "article_titles": [
+          "controller-visible guest-artifact echo"
+        ],
+        "feed_titles": [],
+        "text_stats_rows": [],
+        "step_receipt_ids": [
+          "receipt.plugin.example.echo_guest.bee52b6c5818aceb.v1"
+        ]
+      },
+      "stop_condition_id": "controller_stop.guest_artifact_echo_complete",
+      "green": true,
+      "detail": "the workflow controller now proves one bounded guest-artifact starter plugin can execute through the same shared bridge and receipt envelope as the host-native starter surface."
     }
   ],
   "claim_boundary": "this bundle freezes one host-owned deterministic starter-plugin workflow controller above the shared bridge. It keeps URL extraction, fetch, content-type branching, readable-html extraction, readable-text measurement, feed parsing, refusal capture, and stop conditions explicit without claiming open-ended planning or weighted controller closure.",
-  "summary": "starter workflow controller bundle covers case_rows=2 over one host-owned web-content intake graph.",
-  "bundle_digest": "fc4fa612040c74c3cb3560850347c5eb2df0a75faad1a2364ca832e18a70c91e"
+  "summary": "starter workflow controller bundle covers case_rows=3 over one host-owned web-content intake graph.",
+  "bundle_digest": "eb5936396c28c52c035b55cb0c5e44e6e2c4bbd20b9c56497abf91b637157e81"
 }
