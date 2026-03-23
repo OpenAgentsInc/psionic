@@ -4019,6 +4019,7 @@ dependencies = [
  "psionic-core",
  "psionic-ir",
  "psionic-runtime",
+ "rayon",
 ]
 
 [[package]]

@@ -1,23 +1,24 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use psionic_backend_cuda::CudaBackend;
 use psionic_core::{PsionicRefusal, PsionicRefusalCode, PsionicRefusalScope, TensorData, TensorId};
 use psionic_data::{
-    DatasetIterationMode, DatasetKey, PARAMETER_GOLF_TRAIN_SPLIT_NAME, ParameterGolfDataError,
-    ParameterGolfDatasetBundle, ParameterGolfSentencePieceByteLuts,
-    ParameterGolfTokenStreamContract, ParameterGolfTokenStreamCursor,
     builtin_parameter_golf_sentencepiece_byte_luts,
     load_parameter_golf_validation_tokens_from_paths, materialize_parameter_golf_token_window,
-    parameter_golf_dataset_bundle_from_local_dir,
+    parameter_golf_dataset_bundle_from_local_dir, DatasetIterationMode, DatasetKey,
+    ParameterGolfDataError, ParameterGolfDatasetBundle, ParameterGolfSentencePieceByteLuts,
+    ParameterGolfTokenStreamContract, ParameterGolfTokenStreamCursor,
+    PARAMETER_GOLF_TRAIN_SPLIT_NAME,
 };
 use psionic_ir::AutodiffBackwardResult;
 use psionic_ir::{AutodiffError, GraphError};
 use psionic_models::{
-    PARAMETER_GOLF_BASELINE_MODEL_ID, PARAMETER_GOLF_BASELINE_REVISION, ParameterGolfModelError,
-    ParameterGolfReferenceModel,
+    ParameterGolfModelError, ParameterGolfReferenceModel, PARAMETER_GOLF_BASELINE_MODEL_ID,
+    PARAMETER_GOLF_BASELINE_REVISION,
 };
 use psionic_runtime::{DeliveredExecutionContext, DeviceDescriptor, RuntimeError, RuntimeHealth};
 use serde::{Deserialize, Serialize};
@@ -25,19 +26,18 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    PARAMETER_GOLF_SINGLE_H100_DATASET_REF, PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION,
-    PARAMETER_GOLF_SINGLE_H100_VARIANT, ParameterGolfBaselineTrainingGraph,
-    ParameterGolfBatchGeometry, ParameterGolfOptimizerExecution,
-    ParameterGolfReferenceTrainingError, ParameterGolfSingleH100BringupError,
-    ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100MachineObservation,
-    ParameterGolfTrainError, ParameterGolfTrainingHyperparameters, TrainingOptimizerConfig,
-    TrainingOptimizerState, apply_parameter_golf_cuda_muon_step,
-    bind_parameter_golf_baseline_training_graph_inputs,
+    apply_parameter_golf_cuda_muon_step, bind_parameter_golf_baseline_training_graph_inputs,
     build_parameter_golf_baseline_training_graph, build_tokenizer_digest,
     builtin_parameter_golf_cuda_training_capability_report, device_matches_single_h100,
     export_parameter_golf_int8_zlib_model_artifact, inspect_local_single_h100_machine,
     materialize_parameter_golf_baseline_training_gradients, parameter_golf_optimizer_plan,
-    training_batch_from_window_tokens,
+    training_batch_from_window_tokens, ParameterGolfBaselineTrainingGraph,
+    ParameterGolfBatchGeometry, ParameterGolfOptimizerExecution,
+    ParameterGolfReferenceTrainingError, ParameterGolfSingleH100BringupError,
+    ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100MachineObservation,
+    ParameterGolfTrainError, ParameterGolfTrainingHyperparameters, TrainingOptimizerConfig,
+    TrainingOptimizerState, PARAMETER_GOLF_SINGLE_H100_DATASET_REF,
+    PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION, PARAMETER_GOLF_SINGLE_H100_VARIANT,
 };
 
 /// Config for the bounded Rust-owned single-H100 Parameter Golf trainer lane.
@@ -498,6 +498,19 @@ pub fn build_parameter_golf_single_h100_training_report(
     let delivered_execution =
         DeliveredExecutionContext::new("cuda", None, vec![selected_device.inventory_qualifiers()]);
 
+    emit_progress_line(format!(
+        "single_h100_train_start run_id={} device={} max_steps={} grad_accum_steps={} local_train_sequences={} local_validation_sequences={}",
+        config.run_id,
+        selected_device
+            .device_name
+            .as_deref()
+            .unwrap_or("unknown"),
+        config.max_steps,
+        config.geometry.grad_accum_steps,
+        config.geometry.local_train_batch_sequences(),
+        config.geometry.local_validation_batch_sequences(),
+    ));
+
     let byte_luts = builtin_parameter_golf_sentencepiece_byte_luts()?;
     let validation_tokens = load_parameter_golf_validation_tokens_from_paths(
         &bundle
@@ -508,17 +521,11 @@ pub fn build_parameter_golf_single_h100_training_report(
         config.geometry.train_sequence_length,
     )?;
     let mut train_graph_cache = BTreeMap::new();
-    let initial_validation = Some(evaluate_validation_on_cuda(
-        &mut cuda_backend,
-        &selected_device.device,
-        initial_model.descriptor(),
-        &initial_model,
-        validation_tokens.as_slice(),
-        &byte_luts,
-        config.geometry.train_sequence_length,
-        config.geometry.local_validation_batch_sequences(),
-        &mut train_graph_cache,
-    )?);
+    emit_progress_line(format!(
+        "initial_validation_skipped reason=issue_454_first_h100_proof focuses on the real training critical path and final challenge metrics token_count={}",
+        validation_tokens.len(),
+    ));
+    let initial_validation = None;
 
     let mut trainer_state = seed_parameter_states(&initial_model, &optimizer_plan)?;
     let train_contract = ParameterGolfTokenStreamContract::new(
@@ -534,11 +541,17 @@ pub fn build_parameter_golf_single_h100_training_report(
         config.geometry.local_train_batch_tokens().saturating_add(1) as u64;
 
     for step_index in 0..config.max_steps {
+        emit_progress_line(format!(
+            "train_step_start step={}/{} grad_accum_steps={}",
+            step_index + 1,
+            config.max_steps,
+            config.geometry.grad_accum_steps,
+        ));
         let mut accumulated_gradients = zero_gradients(&trainer_state);
         let mut microbatch_loss_sum = 0.0_f32;
         let mut window_ids = Vec::new();
         let mut step_profile = ParameterGolfSingleH100PhaseTimings::default();
-        for _micro_step in 0..config.geometry.grad_accum_steps {
+        for micro_step in 0..config.geometry.grad_accum_steps {
             let plan_started = Instant::now();
             let window = train_contract
                 .plan_window(&bundle.manifest, &cursor, requested_train_tokens)?
@@ -648,6 +661,20 @@ pub fn build_parameter_golf_single_h100_training_report(
                 &gradients.parameter_gradients,
                 config.geometry.grad_accum_steps as f32,
             )?;
+            emit_progress_line(format!(
+                "micro_step_complete step={}/{} micro_step={}/{} window_id={} train_loss={:.8} forward_ms={} backward_ms={} host_materialization_ms={} retained_binding_f32={} gradient_f32={}",
+                step_index + 1,
+                config.max_steps,
+                micro_step + 1,
+                config.geometry.grad_accum_steps,
+                window.window_id,
+                loss,
+                step_profile.forward_loss_cuda_ms,
+                step_profile.backward_cuda_ms,
+                step_profile.host_materialization_ms(),
+                step_profile.retained_binding_f32_count,
+                step_profile.gradient_f32_count,
+            ));
         }
 
         clip_gradients(
@@ -678,8 +705,23 @@ pub fn build_parameter_golf_single_h100_training_report(
             muon_momentum,
             phase_timings: step_profile,
         });
+        let step = step_metrics.last().expect("step metrics should be present");
+        emit_progress_line(format!(
+            "train_step_complete step={} mean_microbatch_loss={:.8} lr_mult={:.8} muon_momentum={:.8} host_materialization_ms={} optimizer_step_ms={}",
+            step.global_step,
+            step.mean_microbatch_loss,
+            step.learning_rate_multiplier,
+            step.muon_momentum,
+            step.phase_timings.host_materialization_ms(),
+            step.phase_timings.optimizer_step_ms,
+        ));
     }
 
+    emit_progress_line(format!(
+        "final_validation_start sequences={} batch_sequences={}",
+        (validation_tokens.len() - 1) / config.geometry.train_sequence_length,
+        config.geometry.local_validation_batch_sequences(),
+    ));
     let final_validation = Some(evaluate_validation_on_cuda(
         &mut cuda_backend,
         &selected_device.device,
@@ -690,6 +732,7 @@ pub fn build_parameter_golf_single_h100_training_report(
         config.geometry.train_sequence_length,
         config.geometry.local_validation_batch_sequences(),
         &mut train_graph_cache,
+        "final_validation",
     )?);
     let compressed_model_artifact = export_parameter_golf_int8_zlib_model_artifact(
         &current_model,
@@ -977,6 +1020,7 @@ fn evaluate_validation_on_cuda(
     sequence_length: usize,
     batch_sequences: usize,
     graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineTrainingGraph>,
+    stage_label: &str,
 ) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
     if validation_tokens.len() <= sequence_length {
         return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
@@ -989,9 +1033,15 @@ fn evaluate_validation_on_cuda(
     let mut total_loss_sum = 0.0_f64;
     let mut total_token_count = 0_u64;
     let mut total_byte_count = 0_u64;
+    let validation_batch_sequences = batch_sequences.max(1);
+    let total_batches = total_sequences.div_ceil(validation_batch_sequences);
+    let validation_started = Instant::now();
 
-    for batch_start in (0..total_sequences).step_by(batch_sequences.max(1)) {
-        let batch_end = (batch_start + batch_sequences).min(total_sequences);
+    for (batch_index, batch_start) in (0..total_sequences)
+        .step_by(validation_batch_sequences)
+        .enumerate()
+    {
+        let batch_end = (batch_start + validation_batch_sequences).min(total_sequences);
         let raw_start = batch_start * sequence_length;
         let raw_end = batch_end * sequence_length + 1;
         let local = &validation_tokens[raw_start..raw_end];
@@ -1058,11 +1108,31 @@ fn evaluate_validation_on_cuda(
                     .as_slice(),
             )?,
         );
+        if batch_index == 0 || (batch_index + 1) % 32 == 0 || batch_index + 1 == total_batches {
+            emit_progress_line(format!(
+                "validation_progress stage={} batch={}/{} sequences={} tokens={} elapsed_ms={}",
+                stage_label,
+                batch_index + 1,
+                total_batches,
+                batch_end,
+                total_token_count,
+                duration_ms(validation_started),
+            ));
+        }
     }
 
     let mean_loss = total_loss_sum / total_token_count.max(1) as f64;
     let bits_per_byte = (mean_loss / std::f64::consts::LN_2)
         * (total_token_count as f64 / total_byte_count.max(1) as f64);
+    emit_progress_line(format!(
+        "validation_complete stage={} mean_loss={:.8} val_bpb={:.8} evaluated_tokens={} evaluated_bytes={} elapsed_ms={}",
+        stage_label,
+        mean_loss,
+        bits_per_byte,
+        total_token_count,
+        total_byte_count,
+        duration_ms(validation_started),
+    ));
     Ok(ParameterGolfSingleH100ValidationSummary {
         evaluated_sequence_count: total_sequences,
         evaluated_token_count: total_token_count,
@@ -1275,6 +1345,12 @@ fn unix_time_ms() -> u64 {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("system time should be after unix epoch")
         .as_millis() as u64
+}
+
+fn emit_progress_line(message: String) {
+    let mut stdout = io::stdout().lock();
+    let _ = writeln!(stdout, "{message}");
+    let _ = stdout.flush();
 }
 
 fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
