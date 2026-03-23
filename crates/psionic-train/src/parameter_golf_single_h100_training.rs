@@ -1209,12 +1209,22 @@ fn backward_result_from_outputs(
     backward_plan: &psionic_ir::AutodiffBackwardPlan,
     outputs: &[(TensorId, Vec<f32>)],
 ) -> AutodiffBackwardResult {
+    let gradient_targets = backward_plan
+        .gradient_targets
+        .iter()
+        .map(|target| (target.gradient_tensor, target.primal_tensor))
+        .collect::<BTreeMap<_, _>>();
     AutodiffBackwardResult {
         forward_values: BTreeMap::new(),
         plan: backward_plan.clone(),
         gradients: outputs
             .iter()
-            .map(|(tensor_id, values)| (*tensor_id, TensorData::F32(values.clone())))
+            .filter_map(|(tensor_id, values)| {
+                gradient_targets
+                    .get(tensor_id)
+                    .copied()
+                    .map(|primal_tensor| (primal_tensor, TensorData::F32(values.clone())))
+            })
             .collect(),
     }
 }
@@ -1328,6 +1338,39 @@ fn clip_gradients(gradients: &mut [(String, Vec<f32>)], max_norm: f32) {
         for value in values {
             *value *= scale;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use psionic_core::{DType, Device, Shape};
+    use psionic_ir::{AutodiffContext, AutodiffGraphBuilder};
+
+    use super::*;
+
+    #[test]
+    fn backward_result_from_outputs_rekeys_gradient_outputs_to_primal_tensors(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let input = builder.input("x", Shape::new(vec![1, 1]), DType::F32, true);
+        let squared = builder.mul(&input, &input)?;
+        let graph = builder.finish(vec![squared.clone()]);
+        let backward_plan = graph.backward_plan(squared.id())?;
+        let gradient_tensor_id = backward_plan
+            .gradient_for(input.id())
+            .ok_or("missing input gradient target")?;
+
+        let backward_result =
+            backward_result_from_outputs(&backward_plan, &[(gradient_tensor_id, vec![42.0_f32])]);
+
+        assert_eq!(
+            backward_result
+                .gradient(input.id())
+                .and_then(TensorData::as_f32_slice),
+            Some(&[42.0_f32][..])
+        );
+        Ok(())
     }
 }
 

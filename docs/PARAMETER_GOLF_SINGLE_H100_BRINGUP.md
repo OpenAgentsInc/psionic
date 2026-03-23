@@ -7,6 +7,10 @@
 > Parameter Golf development stopped on 2026-03-19 before this seam became a
 > full Rust-only trainer path; see `docs/PARAMETER_GOLF_AFTER_ACTION.md`.
 
+Update 2026-03-23: the real bounded trainer entrypoint now exists separately in
+`docs/PARAMETER_GOLF_SINGLE_H100_TRAINER.md`. This bring-up doc remains the
+narrower machine-admission and first-microbatch seam.
+
 This document records the current honest single-H100 bring-up posture for the
 Psionic Parameter Golf lane.
 

@@ -3185,6 +3185,7 @@ impl AvailableCudaBackend {
             platform: self.platform.begin_submission()?,
         };
         let mut values = BTreeMap::new();
+        let mut retain_counts = execution_value_retain_counts(plan);
 
         for step in &plan.steps {
             match &step.op {
@@ -3561,6 +3562,7 @@ impl AvailableCudaBackend {
                     return Err(RuntimeError::UnsupportedStep(step.op.label().to_string()));
                 }
             }
+            release_dead_execution_values(&mut values, &mut retain_counts, step);
         }
 
         let _report = submission.commit(CudaCommandWait::Completed)?;
@@ -3583,6 +3585,40 @@ impl AvailableCudaBackend {
                 compile_path: None,
             },
         })
+    }
+}
+
+fn execution_value_retain_counts(plan: &ExecutionPlan) -> BTreeMap<TensorId, usize> {
+    let mut retain_counts = BTreeMap::new();
+    for step in &plan.steps {
+        for input in &step.inputs {
+            *retain_counts.entry(*input).or_insert(0) += 1;
+        }
+    }
+    for output in &plan.outputs {
+        *retain_counts.entry(*output).or_insert(0) += 1;
+    }
+    retain_counts
+}
+
+fn release_dead_execution_values(
+    values: &mut BTreeMap<TensorId, CudaBuffer>,
+    retain_counts: &mut BTreeMap<TensorId, usize>,
+    step: &ExecutionStep,
+) {
+    for input in &step.inputs {
+        let Some(count) = retain_counts.get_mut(input) else {
+            continue;
+        };
+        *count = count.saturating_sub(1);
+        if *count == 0 {
+            retain_counts.remove(input);
+            values.remove(input);
+        }
+    }
+
+    if retain_counts.get(&step.output).copied().unwrap_or(0) == 0 {
+        values.remove(&step.output);
     }
 }
 
@@ -9691,6 +9727,26 @@ mod tests {
             error,
             psionic_runtime::RuntimeError::UnsupportedStep(String::from("reshape"))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn execution_value_retain_counts_track_consumers_and_final_outputs(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let device = Device::new(DeviceKind::Cuda, 0, Some(String::from("cuda:0")));
+        let mut builder = GraphBuilder::new(device);
+        let left = builder.input("left", Shape::new(vec![1, 2]), DType::F32);
+        let right = builder.input("right", Shape::new(vec![1, 2]), DType::F32);
+        let summed = builder.add(&left, &right)?;
+        let scaled = builder.mul(&summed, &right)?;
+        let graph = builder.finish(vec![scaled.clone()]);
+        let plan = compile_graph(&graph)?;
+        let retain_counts = super::execution_value_retain_counts(&plan);
+
+        assert_eq!(retain_counts.get(&left.id()).copied(), Some(1));
+        assert_eq!(retain_counts.get(&right.id()).copied(), Some(2));
+        assert_eq!(retain_counts.get(&summed.id()).copied(), Some(1));
+        assert_eq!(retain_counts.get(&scaled.id()).copied(), Some(1));
         Ok(())
     }
 
