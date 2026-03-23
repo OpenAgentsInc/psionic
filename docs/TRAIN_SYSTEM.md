@@ -335,7 +335,9 @@ and now also has:
   lane and freezes the local preflight, launch, host evidence, checkpoint
   archive, cold-restore, and teardown procedure for the bounded Google pilot
   without widening the claim boundary to trusted-cluster or broader-pretrain
-  posture.
+  posture, and explicitly freezes that the current CPU-reference pilot and
+  plugin reference lanes are not valid accelerator-backed training proof
+  targets.
 - `docs/audits/2026-03-22-openagentsgemini-first-google-single-gpu-pilot-run-audit.md`
   is the canonical proof record for the first bounded Google single-node
   `Psion` pilot and freezes the typed live-attempt history, retained evidence,

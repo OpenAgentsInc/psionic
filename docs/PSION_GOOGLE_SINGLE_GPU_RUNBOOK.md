@@ -6,8 +6,8 @@
 > by the bounded-success `PSION-45` / `#411` follow-up audit later the same
 > day.
 
-This runbook is the operator entrypoint for the first truthful Google-hosted
-`Psion` pilot.
+This runbook is the operator entrypoint for the bounded Google-hosted `Psion`
+pilot lane.
 
 It is intentionally narrow:
 
@@ -20,6 +20,34 @@ It is intentionally narrow:
 It does not claim broader pretraining completion, trusted-cluster readiness,
 cross-region orchestration, or production serving readiness for trained
 checkpoints.
+
+## CPU-Reference Boundary
+
+The historical bounded Google lane in this runbook is a GPU-hosted operator
+proof, not an accelerator-backed training proof.
+
+Explicitly:
+
+- `psion_reference_pilot_bundle` is a CPU-reference lane
+- the current host-native plugin-conditioned reference lane is a bounded
+  reference or evidence lane, not a GPU proof target
+- the current mixed plugin-conditioned reference lane is a bounded reference or
+  evidence lane, not a GPU proof target
+
+These lanes remain valid for:
+
+- operator bootstrap proof
+- retained evidence proof
+- archive and restore proof
+- bounded route, refusal, and capability-boundary fixtures
+
+They are not valid as the primary proof target for Google GPU training claims.
+
+Every future GPU-training audit must name:
+
+- the exact trainer command
+- the delivered execution backend
+- whether the run is only GPU-hosted or truly accelerator-backed
 
 ## Canonical Artifacts
 
@@ -189,7 +217,7 @@ Expected launch artifacts:
 
 ## 3. Paid Launch
 
-Default first lane:
+Historical CPU-reference lane:
 
 - profile: `g2_l4_single_node`
 - fallback order:
@@ -214,6 +242,10 @@ What happens:
 - the VM boots without an external IP on `oa-lightning`
 - the startup script owns bootstrap, repo checkout, input materialization,
   training, checkpoint archive, cold restore, and final evidence upload
+
+This historical lane remains acceptable for bounded operator rehearsals and
+CPU-reference evidence retention. It is no longer an acceptable primary target
+for accelerator-backed GPU validation.
 
 If `gcloud compute instances create` fails before the VM exists, the launch
 folder still retains:

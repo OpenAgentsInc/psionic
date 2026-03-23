@@ -9,6 +9,11 @@ It does not claim broader pretraining closure. It records one explicit pilot
 bundle that proves the corpus, tokenizer, decoder, trainer, replay, checkpoint,
 and promotion surfaces can survive one bounded end-to-end run.
 
+It also does not claim accelerator-backed training. The current reference pilot
+is the canonical CPU-reference lane. It remains valuable for bounded receipts,
+checkpoint, replay, and promotion truth, but it is not a valid Google GPU
+training proof target by itself.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_pilot_pretraining_run.rs` owns the pilot

@@ -59,6 +59,9 @@ The current repo truth is:
    - the learned lane is not yet trained on canonical plugin-conditioned task
      records, plugin-use benchmarks, or guest-artifact-aware capability
      boundaries
+   - the current host-native and mixed reference lanes are still bounded
+     reference or evidence surfaces and may not be used as the primary proof
+     target for Google GPU training claims
 
 ## Claim Boundary
 
@@ -92,6 +95,10 @@ The runtime still owns:
 - receipts
 - replay posture
 - runtime-side refusal
+
+The current host-native and mixed plugin reference lanes also do not yet imply
+accelerator-backed plugin-conditioned training. Future Google plugin GPU audits
+must name the exact trainer path and execution backend explicitly.
 
 ## Canonical Inputs
 

@@ -18,6 +18,10 @@ authoring class:
 It does **not** claim `networked_read_only`, secret-backed, stateful, or
 guest-artifact competence.
 
+It also does **not** claim accelerator-backed plugin-conditioned training. The
+current host-native reference lane is a bounded learned reference artifact and
+evaluation lane, not the canonical GPU-training target for Google audits.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_plugin_host_native_reference_lane.rs` owns
@@ -84,3 +88,8 @@ Instead, the reference lane:
 
 That makes the first trained lane honest enough to support the later capability
 matrix issue and the later mixed-lane comparison issue.
+
+The current lane remains a valid bounded reference surface for receipts,
+datasets, and benchmark deltas. It is not a valid GPU proof target until a
+later accelerated plugin-conditioned lane exists and emits explicit CUDA-backed
+training evidence.

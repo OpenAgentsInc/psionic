@@ -15,6 +15,10 @@ competence. It only proves that the current bounded training substrate can bind
 to the mixed dataset identity, train one mixed learned artifact, and compare
 that bounded result against the committed host-native reference lane.
 
+It also does **not** claim accelerator-backed plugin-conditioned training. The
+current mixed reference lane is a bounded learned comparison artifact and
+evidence lane, not a valid Google GPU training proof target.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_plugin_mixed_reference_lane.rs` owns the
@@ -93,3 +97,7 @@ and served posture, and keeps the claim boundary explicit:
 - mixed host-native plus guest-artifact evidence is retained end to end
 - the lane was still CPU-bound on the L4 host, so this is not yet
   accelerator-backed throughput proof
+
+That CPU-bound mixed run remains valid as an operator and boundary proof. It is
+not a valid GPU-backed training proof until a later accelerated mixed or
+host-native lane is wired to a real CUDA trainer.

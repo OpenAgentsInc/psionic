@@ -29,6 +29,12 @@ It is not:
 Exact executor closure remains separate work under the `Tassadar` lane and its
 canonical docs.
 
+The current reference pilot is also a CPU-reference lane. It remains a valid
+bounded operator, receipt, checkpoint, and promotion fixture, but it is not a
+valid GPU training proof target. Future Google GPU audits must name the exact
+trainer command and execution backend explicitly instead of treating
+GPU-hosted reference runs as accelerator-backed training proof.
+
 ## Dependency Order
 
 The `Psion` program is dependency-ordered in four tracks:
@@ -100,6 +106,10 @@ Every later `Psion` artifact must preserve the following:
   `docs/PSION_CAPABILITY_MATRIX.md`
 - rollback and downgrade history stay bound to
   `docs/PSION_CAPABILITY_WITHDRAWAL.md`
+- CPU-reference lanes may not be used as the primary proof target for Google
+  GPU training claims
+- future GPU audits must state the trainer path and delivered execution backend
+  explicitly
 
 No part of this map authorizes widening the learned lane into hidden executor
 claims or using decentralized participation as a shortcut around evaluation,
