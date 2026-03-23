@@ -323,6 +323,19 @@ impl PsionPretrainCheckpointLineageReceipt {
     }
 }
 
+/// Accelerator-backed execution summary for one realized pretrain stage.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionPretrainStageAcceleratorReceipt {
+    /// Whether this stage should count as accelerator-backed.
+    pub accelerator_backed: bool,
+    /// Optimizer steps completed on the realized trainer path.
+    pub optimizer_steps_completed: u32,
+    /// Mean observed step latency for the realized path.
+    pub mean_step_latency_ms: u64,
+    /// Short explanation of the accelerator posture.
+    pub detail: String,
+}
+
 /// Full pretrain-stage receipt for one Psion stage run.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionPretrainStageRunReceipt {
@@ -358,6 +371,10 @@ pub struct PsionPretrainStageRunReceipt {
     /// binds explicit backend truth.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivered_execution: Option<DeliveredExecutionContext>,
+    /// Accelerator-backed execution facts for the realized trainer path when
+    /// the stage is intended to prove one accelerator lane.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accelerator_execution: Option<PsionPretrainStageAcceleratorReceipt>,
     /// Short summary of the run.
     pub summary: String,
     /// Stable digest over the run receipt.
@@ -437,6 +454,7 @@ impl PsionPretrainStageRunReceipt {
         self.validate_replay_receipt(tokenized_corpus)?;
         self.validate_checkpoint_lineage(model_descriptor)?;
         self.validate_delivered_execution()?;
+        self.validate_accelerator_execution()?;
         ensure_nonempty(self.summary.as_str(), "pretrain_stage_receipt.summary")?;
         if self.receipt_digest != stable_pretrain_stage_receipt_digest(self) {
             return Err(PsionPretrainStageError::ReceiptDigestMismatch);
@@ -721,6 +739,38 @@ impl PsionPretrainStageRunReceipt {
         }
         Ok(())
     }
+
+    fn validate_accelerator_execution(&self) -> Result<(), PsionPretrainStageError> {
+        let Some(accelerator_execution) = &self.accelerator_execution else {
+            return Ok(());
+        };
+        ensure_nonempty(
+            accelerator_execution.detail.as_str(),
+            "pretrain_stage_receipt.accelerator_execution.detail",
+        )?;
+        if accelerator_execution.optimizer_steps_completed == 0 {
+            return Err(PsionPretrainStageError::InvalidDeliveredExecution {
+                detail: String::from(
+                    "pretrain_stage_receipt.accelerator_execution.optimizer_steps_completed must be greater than zero",
+                ),
+            });
+        }
+        if accelerator_execution.mean_step_latency_ms == 0 {
+            return Err(PsionPretrainStageError::InvalidDeliveredExecution {
+                detail: String::from(
+                    "pretrain_stage_receipt.accelerator_execution.mean_step_latency_ms must be greater than zero",
+                ),
+            });
+        }
+        if self.delivered_execution.is_none() {
+            return Err(PsionPretrainStageError::InvalidDeliveredExecution {
+                detail: String::from(
+                    "pretrain_stage_receipt.accelerator_execution requires delivered_execution",
+                ),
+            });
+        }
+        Ok(())
+    }
 }
 
 /// Runs one declared Psion pretrain stage and emits the typed receipt.
@@ -740,6 +790,7 @@ pub fn run_psion_pretrain_stage(
         replay_receipt,
         checkpoint_lineage,
         None,
+        None,
         summary,
         model_descriptor,
         tokenized_corpus,
@@ -755,6 +806,7 @@ pub fn run_psion_pretrain_stage_with_execution(
     replay_receipt: PsionPretrainReplayReceipt,
     checkpoint_lineage: PsionPretrainCheckpointLineageReceipt,
     delivered_execution: Option<DeliveredExecutionContext>,
+    accelerator_execution: Option<PsionPretrainStageAcceleratorReceipt>,
     summary: impl Into<String>,
     model_descriptor: &PsionCompactDecoderDescriptor,
     tokenized_corpus: &PsionTokenizedCorpusManifest,
@@ -776,6 +828,7 @@ pub fn run_psion_pretrain_stage_with_execution(
         replay_receipt,
         checkpoint_lineage,
         delivered_execution,
+        accelerator_execution,
         summary: summary.into(),
         receipt_digest: String::new(),
     };
@@ -1021,6 +1074,28 @@ fn stable_pretrain_stage_receipt_digest(receipt: &PsionPretrainStageRunReceipt) 
             hasher.update(execution_topology.effective_backend.as_bytes());
         }
     }
+    if let Some(accelerator_execution) = &receipt.accelerator_execution {
+        hasher.update(b"|accelerator|");
+        hasher.update(if accelerator_execution.accelerator_backed {
+            b"true".as_slice()
+        } else {
+            b"false".as_slice()
+        });
+        hasher.update(b"|");
+        hasher.update(
+            accelerator_execution
+                .optimizer_steps_completed
+                .to_string()
+                .as_bytes(),
+        );
+        hasher.update(b"|");
+        hasher.update(
+            accelerator_execution
+                .mean_step_latency_ms
+                .to_string()
+                .as_bytes(),
+        );
+    }
     hasher.update(b"|");
     hasher.update(receipt.summary.as_bytes());
     for row in &receipt.source_family_reports {
@@ -1193,6 +1268,14 @@ mod tests {
                 free_memory_bytes: Some(20 * 1024 * 1024 * 1024),
             }],
         ));
+        receipt.accelerator_execution = Some(PsionPretrainStageAcceleratorReceipt {
+            accelerator_backed: true,
+            optimizer_steps_completed: 16,
+            mean_step_latency_ms: 40,
+            detail: String::from(
+                "Accelerated reference stage completed bounded CUDA-backed optimizer steps.",
+            ),
+        });
         receipt.receipt_digest = stable_pretrain_stage_receipt_digest(&receipt);
         receipt
             .validate_against_inputs(

@@ -55,6 +55,39 @@ The default Google single-node profile is now the bounded accelerated lane:
 - trainer lane: `psion_accelerated_reference_pilot`
 - expected execution backend: `cuda`
 
+## Accelerator-Backed Pass Criteria
+
+The accelerated Google lane is no longer allowed to count a run as successful
+only because the VM booted and the training command exited zero.
+
+For any launch profile whose manifest declares `expected_execution_backend =
+cuda`, the Google host lane now requires:
+
+- a stage receipt whose `delivered_execution.runtime_backend` is `cuda`
+- a stage receipt whose `accelerator_execution.accelerator_backed` flag is
+  `true`
+- non-zero post-warmup GPU utilization in the retained `nvidia-smi` sample log
+- non-zero post-warmup GPU memory residency in the retained `nvidia-smi`
+  sample log
+- a retained accelerator-validation receipt that links backend truth, GPU
+  sample truth, and throughput truth
+
+If those conditions are not met, the run is classified as
+`training_runtime_failure` rather than `bounded_success`.
+
+The committed accelerator gate policy lives in:
+
+- `fixtures/psion/google/psion_google_host_observability_policy_v1.json`
+
+The committed retained accelerator evidence now includes:
+
+- `psion_google_gpu_samples.csv`
+- `psion_google_gpu_summary.json`
+- `psion_google_accelerator_validation_receipt.json`
+- the training stage receipt
+- the training observability receipt
+- the final manifest that links all of the above by digest and remote URI
+
 ## Canonical Artifacts
 
 - launch authority:

@@ -190,6 +190,12 @@ classify_local_role() {
   esac
 }
 
+first_matching_file() {
+  local search_root="$1"
+  local pattern="$2"
+  find "${search_root}" -type f -name "${pattern}" | sort | head -n 1 || true
+}
+
 bucket_url="$(jq -r '.bucket_url' "${POLICY_FILE}")"
 host_prefix_name="$(jq -r '.artifact_paths.host_prefix' "${POLICY_FILE}")"
 logs_prefix_name="$(jq -r '.artifact_paths.logs_prefix' "${POLICY_FILE}")"
@@ -202,6 +208,9 @@ host_facts_name="$(jq -r '.host_facts_name' "${POLICY_FILE}")"
 runtime_snapshot_name="$(jq -r '.runtime_snapshot_name' "${POLICY_FILE}")"
 gpu_samples_name="$(jq -r '.gpu_samples_name' "${POLICY_FILE}")"
 gpu_summary_name="$(jq -r '.gpu_summary_name' "${POLICY_FILE}")"
+accelerator_validation_receipt_name="$(
+  jq -r '.accelerator_validation_receipt_name' "${POLICY_FILE}"
+)"
 outcome_name="$(jq -r '.outcome_name' "${POLICY_FILE}")"
 manifest_of_manifests_name="$(jq -r '.manifest_of_manifests_name' "${POLICY_FILE}")"
 final_manifest_name="$(jq -r '.final_manifest_name' "${POLICY_FILE}")"
@@ -241,6 +250,11 @@ input_descriptor_uri="$(jq -r '.input_package.descriptor_uri' "${launch_manifest
 input_archive_uri="$(jq -r '.input_package.archive_uri' "${launch_manifest_file}")"
 input_archive_sha256="$(jq -r '.input_package.archive_sha256' "${launch_manifest_file}")"
 input_manifest_sha256="$(jq -r '.input_package.manifest_sha256' "${launch_manifest_file}")"
+trainer_lane_id="$(jq -r '.trainer_lane_id // .training.trainer_lane_id // "unknown_trainer_lane"' "${launch_manifest_file}")"
+expected_execution_backend="$(
+  jq -r '.expected_execution_backend // .training.expected_execution_backend // "cpu"' \
+    "${launch_manifest_file}"
+)"
 image_project="$(jq -r '.image.image_project' "${launch_manifest_file}")"
 image_family="$(jq -r '.image.image_family' "${launch_manifest_file}")"
 image_name="$(jq -r '.image.image_name' "${launch_manifest_file}")"
@@ -257,6 +271,7 @@ host_facts_path="${scratch_dir}/${host_facts_name}"
 runtime_snapshot_path="${scratch_dir}/${runtime_snapshot_name}"
 gpu_samples_path="${log_dir}/${gpu_samples_name}"
 gpu_summary_path="${scratch_dir}/${gpu_summary_name}"
+accelerator_validation_path="${scratch_dir}/${accelerator_validation_receipt_name}"
 outcome_path="${scratch_dir}/${outcome_name}"
 
 mkdir -p "${log_dir}" "${scratch_dir}"
@@ -524,6 +539,258 @@ jq -n \
     stats: $stats
   }' > "${gpu_summary_path}"
 
+final_result_classification="${FAILURE_CODE}"
+final_failure_detail="${FAILURE_DETAIL}"
+stage_receipt_file="$(first_matching_file "${output_dir}" '*stage_receipt.json')"
+observability_receipt_file="$(first_matching_file "${output_dir}" '*observability_receipt.json')"
+sample_interval_seconds="$(jq -r '.gpu_sample_interval_seconds // 5' "${POLICY_FILE}")"
+warmup_seconds="$(jq -r '.accelerator_validation.warmup_seconds // 0' "${POLICY_FILE}")"
+minimum_post_warmup_samples="$(
+  jq -r '.accelerator_validation.minimum_post_warmup_samples // 1' "${POLICY_FILE}"
+)"
+require_nonzero_gpu_utilization="$(
+  jq -r '.accelerator_validation.require_nonzero_gpu_utilization // true' "${POLICY_FILE}"
+)"
+require_nonzero_gpu_memory_residency="$(
+  jq -r '.accelerator_validation.require_nonzero_gpu_memory_residency // true' "${POLICY_FILE}"
+)"
+if [[ ! "${sample_interval_seconds}" =~ ^[0-9]+$ ]] || (( sample_interval_seconds < 1 )); then
+  sample_interval_seconds=5
+fi
+if [[ ! "${warmup_seconds}" =~ ^[0-9]+$ ]] || (( warmup_seconds < 0 )); then
+  warmup_seconds=0
+fi
+if [[ ! "${minimum_post_warmup_samples}" =~ ^[0-9]+$ ]] || (( minimum_post_warmup_samples < 1 )); then
+  minimum_post_warmup_samples=1
+fi
+warmup_samples=$(( (warmup_seconds + sample_interval_seconds - 1) / sample_interval_seconds ))
+accelerator_validation_required=false
+if [[ "${expected_execution_backend}" == "cuda" ]]; then
+  accelerator_validation_required=true
+fi
+
+accelerator_stage_backend=""
+accelerator_observability_backend=""
+accelerator_backed_declared=false
+accelerator_stage_optimizer_steps=0
+accelerator_stage_mean_step_latency_ms=0
+accelerator_mean_tokens_per_second=0
+accelerator_peak_tokens_per_second=0
+accelerator_optimizer_steps_completed=0
+accelerator_wall_clock_ms=0
+if [[ -n "${stage_receipt_file}" ]]; then
+  accelerator_stage_backend="$(
+    jq -r '.delivered_execution.runtime_backend // empty' "${stage_receipt_file}"
+  )"
+  accelerator_backed_declared="$(
+    jq -r '.accelerator_execution.accelerator_backed // false' "${stage_receipt_file}"
+  )"
+  accelerator_stage_optimizer_steps="$(
+    jq -r '.accelerator_execution.optimizer_steps_completed // 0' "${stage_receipt_file}"
+  )"
+  accelerator_stage_mean_step_latency_ms="$(
+    jq -r '.accelerator_execution.mean_step_latency_ms // 0' "${stage_receipt_file}"
+  )"
+fi
+if [[ -n "${observability_receipt_file}" ]]; then
+  accelerator_observability_backend="$(
+    jq -r '.hardware_topology.delivered_execution.runtime_backend // empty' \
+      "${observability_receipt_file}"
+  )"
+  accelerator_mean_tokens_per_second="$(
+    jq -r '.throughput.mean_tokens_per_second // 0' "${observability_receipt_file}"
+  )"
+  accelerator_peak_tokens_per_second="$(
+    jq -r '.throughput.peak_tokens_per_second // 0' "${observability_receipt_file}"
+  )"
+  accelerator_optimizer_steps_completed="$(
+    jq -r '.throughput.optimizer_steps_completed // 0' "${observability_receipt_file}"
+  )"
+  accelerator_wall_clock_ms="$(
+    jq -r '.throughput.wall_clock_ms // 0' "${observability_receipt_file}"
+  )"
+fi
+
+accelerator_gpu_stats_json="$(
+  awk -F',' -v warmup_samples="${warmup_samples}" '
+    BEGIN {
+      raw_samples = 0
+      considered = 0
+      nonzero_util = 0
+      nonzero_mem = 0
+      sum_gpu = 0
+      max_gpu = 0
+      max_mem = 0
+      observed_mem_total = 0
+    }
+    NR == 1 {
+      next
+    }
+    NF < 6 {
+      next
+    }
+    {
+      raw_samples += 1
+      if (raw_samples <= warmup_samples) {
+        next
+      }
+      gpu_util = $3
+      mem_used = $5
+      mem_total = $6
+      gsub(/^[ \t]+|[ \t]+$/, "", gpu_util)
+      gsub(/^[ \t]+|[ \t]+$/, "", mem_used)
+      gsub(/^[ \t]+|[ \t]+$/, "", mem_total)
+      gpu_util += 0
+      mem_used += 0
+      mem_total += 0
+      considered += 1
+      sum_gpu += gpu_util
+      if (gpu_util > 0) {
+        nonzero_util += 1
+      }
+      if (mem_used > 0) {
+        nonzero_mem += 1
+      }
+      if (gpu_util > max_gpu) {
+        max_gpu = gpu_util
+      }
+      if (mem_used > max_mem) {
+        max_mem = mem_used
+      }
+      observed_mem_total = mem_total
+    }
+    END {
+      avg_gpu = considered > 0 ? sum_gpu / considered : 0
+      printf("{\"considered_samples\":%d,\"nonzero_utilization_samples\":%d,\"nonzero_memory_samples\":%d,\"avg_gpu_util_percent\":%.2f,\"max_gpu_util_percent\":%.2f,\"max_memory_used_mib\":%.2f,\"observed_memory_total_mib\":%.2f}", considered, nonzero_util, nonzero_mem, avg_gpu, max_gpu, max_mem, observed_mem_total)
+    }
+  ' "${gpu_samples_path}" 2>/dev/null || printf '%s' '{"considered_samples":0,"nonzero_utilization_samples":0,"nonzero_memory_samples":0,"avg_gpu_util_percent":0,"max_gpu_util_percent":0,"max_memory_used_mib":0,"observed_memory_total_mib":0}'
+)"
+accelerator_considered_samples="$(jq -r '.considered_samples' <<<"${accelerator_gpu_stats_json}")"
+accelerator_nonzero_utilization_samples="$(
+  jq -r '.nonzero_utilization_samples' <<<"${accelerator_gpu_stats_json}"
+)"
+accelerator_nonzero_memory_samples="$(
+  jq -r '.nonzero_memory_samples' <<<"${accelerator_gpu_stats_json}"
+)"
+
+accelerator_failure_reasons=()
+if [[ "${accelerator_validation_required}" == "true" ]]; then
+  if [[ -z "${stage_receipt_file}" ]]; then
+    accelerator_failure_reasons+=("missing_stage_receipt")
+  fi
+  if [[ -z "${observability_receipt_file}" ]]; then
+    accelerator_failure_reasons+=("missing_observability_receipt")
+  fi
+  if [[ "${accelerator_stage_backend}" != "cuda" ]]; then
+    accelerator_failure_reasons+=("stage_backend_not_cuda")
+  fi
+  if [[ -n "${observability_receipt_file}" && "${accelerator_observability_backend}" != "cuda" ]]; then
+    accelerator_failure_reasons+=("observability_backend_not_cuda")
+  fi
+  if [[ "${accelerator_backed_declared}" != "true" ]]; then
+    accelerator_failure_reasons+=("accelerator_execution_not_declared")
+  fi
+  if (( accelerator_considered_samples < minimum_post_warmup_samples )); then
+    accelerator_failure_reasons+=("insufficient_post_warmup_gpu_samples")
+  fi
+  if [[ "${require_nonzero_gpu_utilization}" == "true" ]] && (( accelerator_nonzero_utilization_samples == 0 )); then
+    accelerator_failure_reasons+=("zero_post_warmup_gpu_utilization")
+  fi
+  if [[ "${require_nonzero_gpu_memory_residency}" == "true" ]] && (( accelerator_nonzero_memory_samples == 0 )); then
+    accelerator_failure_reasons+=("zero_post_warmup_gpu_memory_residency")
+  fi
+  if (( accelerator_mean_tokens_per_second == 0 )); then
+    accelerator_failure_reasons+=("zero_mean_tokens_per_second")
+  fi
+  if (( accelerator_optimizer_steps_completed == 0 )); then
+    accelerator_failure_reasons+=("zero_optimizer_steps_completed")
+  fi
+fi
+accelerator_failure_reasons_json="$(
+  printf '%s\n' "${accelerator_failure_reasons[@]}" | jq -R . | jq -s '.'
+)"
+accelerator_backed_pass=true
+if [[ "${accelerator_validation_required}" == "true" && "${accelerator_failure_reasons_json}" != "[]" ]]; then
+  accelerator_backed_pass=false
+fi
+accelerator_validation_detail="$(
+  if [[ "${accelerator_validation_required}" != "true" ]]; then
+    printf 'Launch manifest expected backend `%s`; accelerator validation was not required for this lane.' "${expected_execution_backend}"
+  elif [[ "${accelerator_backed_pass}" == "true" ]]; then
+    printf 'Trainer lane `%s` satisfied cuda backend, non-zero post-warmup GPU utilization, non-zero GPU memory residency, and non-zero throughput evidence.' "${trainer_lane_id}"
+  else
+    printf 'Trainer lane `%s` failed accelerator validation for reasons: %s.' "${trainer_lane_id}" "$(jq -r 'join(", ")' <<<"${accelerator_failure_reasons_json}")"
+  fi
+)"
+if [[ "${accelerator_validation_required}" == "true" && "${accelerator_backed_pass}" != "true" && "${final_result_classification}" == "bounded_success" ]]; then
+  final_result_classification="training_runtime_failure"
+  if [[ -z "${final_failure_detail}" ]]; then
+    final_failure_detail="${accelerator_validation_detail}"
+  fi
+fi
+
+jq -n \
+  --arg schema_version "psion.google_accelerator_validation_receipt.v1" \
+  --arg created_at_utc "$(timestamp_utc)" \
+  --arg run_id "${RUN_ID}" \
+  --arg trainer_lane_id "${trainer_lane_id}" \
+  --arg expected_execution_backend "${expected_execution_backend}" \
+  --arg observed_stage_execution_backend "${accelerator_stage_backend}" \
+  --arg observed_observability_execution_backend "${accelerator_observability_backend}" \
+  --arg stage_receipt_path "${stage_receipt_file}" \
+  --arg observability_receipt_path "${observability_receipt_file}" \
+  --argjson accelerator_validation_required "${accelerator_validation_required}" \
+  --argjson accelerator_backed_declared "${accelerator_backed_declared}" \
+  --argjson accelerator_backed_pass "${accelerator_backed_pass}" \
+  --argjson sample_interval_seconds "${sample_interval_seconds}" \
+  --argjson warmup_seconds "${warmup_seconds}" \
+  --argjson warmup_samples_skipped "${warmup_samples}" \
+  --argjson minimum_post_warmup_samples "${minimum_post_warmup_samples}" \
+  --argjson stage_optimizer_steps "${accelerator_stage_optimizer_steps}" \
+  --argjson stage_mean_step_latency_ms "${accelerator_stage_mean_step_latency_ms}" \
+  --argjson mean_tokens_per_second "${accelerator_mean_tokens_per_second}" \
+  --argjson peak_tokens_per_second "${accelerator_peak_tokens_per_second}" \
+  --argjson optimizer_steps_completed "${accelerator_optimizer_steps_completed}" \
+  --argjson wall_clock_ms "${accelerator_wall_clock_ms}" \
+  --argjson gpu_summary "$(cat "${gpu_summary_path}")" \
+  --argjson gpu_post_warmup_stats "${accelerator_gpu_stats_json}" \
+  --argjson failure_reasons "${accelerator_failure_reasons_json}" \
+  --arg detail "${accelerator_validation_detail}" \
+  '{
+    schema_version: $schema_version,
+    created_at_utc: $created_at_utc,
+    run_id: $run_id,
+    trainer_lane_id: $trainer_lane_id,
+    expected_execution_backend: $expected_execution_backend,
+    observed_stage_execution_backend: (if $observed_stage_execution_backend == "" then null else $observed_stage_execution_backend end),
+    observed_observability_execution_backend: (if $observed_observability_execution_backend == "" then null else $observed_observability_execution_backend end),
+    stage_receipt_path: (if $stage_receipt_path == "" then null else $stage_receipt_path end),
+    observability_receipt_path: (if $observability_receipt_path == "" then null else $observability_receipt_path end),
+    accelerator_validation_required: $accelerator_validation_required,
+    accelerator_backed_declared: $accelerator_backed_declared,
+    accelerator_backed_pass: $accelerator_backed_pass,
+    sampling_policy: {
+      sample_interval_seconds: $sample_interval_seconds,
+      warmup_seconds: $warmup_seconds,
+      warmup_samples_skipped: $warmup_samples_skipped,
+      minimum_post_warmup_samples: $minimum_post_warmup_samples
+    },
+    stage_metrics: {
+      optimizer_steps_completed: $stage_optimizer_steps,
+      mean_step_latency_ms: $stage_mean_step_latency_ms
+    },
+    throughput_metrics: {
+      mean_tokens_per_second: $mean_tokens_per_second,
+      peak_tokens_per_second: $peak_tokens_per_second,
+      optimizer_steps_completed: $optimizer_steps_completed,
+      wall_clock_ms: $wall_clock_ms
+    },
+    gpu_summary: $gpu_summary,
+    gpu_post_warmup_stats: $gpu_post_warmup_stats,
+    failure_reasons: $failure_reasons,
+    detail: $detail
+  }' > "${accelerator_validation_path}"
+
 jq -n \
   --arg schema_version "psion.google_run_timeline.v1" \
   --arg run_id "${RUN_ID}" \
@@ -554,11 +821,12 @@ jq -n \
   --arg schema_version "psion.google_run_outcome.v1" \
   --arg created_at_utc "$(timestamp_utc)" \
   --arg run_id "${RUN_ID}" \
-  --arg failure_code "${FAILURE_CODE}" \
-  --arg failure_detail "${FAILURE_DETAIL}" \
+  --arg failure_code "${final_result_classification}" \
+  --arg failure_detail "${final_failure_detail}" \
   --arg training_exit_code "${TRAINING_EXIT_CODE}" \
   --arg archive_manifest_uri "${ARCHIVE_MANIFEST_URI}" \
   --arg cold_restore_manifest_uri "${COLD_RESTORE_MANIFEST_URI}" \
+  --argjson accelerator_validation "$(cat "${accelerator_validation_path}")" \
   '{
     schema_version: $schema_version,
     created_at_utc: $created_at_utc,
@@ -567,7 +835,8 @@ jq -n \
     training_exit_code: ($training_exit_code | tonumber),
     failure_detail: (if $failure_detail == "" then null else $failure_detail end),
     archive_manifest_uri: (if $archive_manifest_uri == "" then null else $archive_manifest_uri end),
-    cold_restore_manifest_uri: (if $cold_restore_manifest_uri == "" then null else $cold_restore_manifest_uri end)
+    cold_restore_manifest_uri: (if $cold_restore_manifest_uri == "" then null else $cold_restore_manifest_uri end),
+    accelerator_validation: $accelerator_validation
   }' > "${outcome_path}"
 
 collect_remote_sha_record "launch_manifest" "manifest" "${LAUNCH_MANIFEST_URI}" "${tmpdir}/launch_reference.json"
@@ -580,6 +849,7 @@ upload_local_artifact "host_facts" "manifest" "${host_facts_path}" "${host_prefi
 upload_local_artifact "runtime_snapshot" "manifest" "${runtime_snapshot_path}" "${host_prefix}/${runtime_snapshot_name}"
 upload_local_artifact "run_timeline" "manifest" "${timeline_path}" "${host_prefix}/${timeline_name}"
 upload_local_artifact "run_outcome" "manifest" "${outcome_path}" "${host_prefix}/${outcome_name}"
+upload_local_artifact "accelerator_validation_receipt" "receipt" "${accelerator_validation_path}" "${receipts_prefix}/${accelerator_validation_receipt_name}"
 
 if [[ -f "${event_log_path}" ]]; then
   upload_local_artifact "run_events" "event_log" "${event_log_path}" "${logs_prefix}/${event_log_name}"
@@ -662,8 +932,8 @@ jq -n \
   --arg machine_type "${machine_type}" \
   --arg accelerator_type "${accelerator_type}" \
   --argjson accelerator_count "${accelerator_count}" \
-  --arg result_classification "${FAILURE_CODE}" \
-  --arg failure_detail "${FAILURE_DETAIL}" \
+  --arg result_classification "${final_result_classification}" \
+  --arg failure_detail "${final_failure_detail}" \
   --arg launch_manifest_uri "${LAUNCH_MANIFEST_URI}" \
   --arg startup_script_uri "${startup_script_uri}" \
   --arg quota_preflight_uri "${preflight_uri}" \
@@ -677,6 +947,7 @@ jq -n \
   --arg manifest_of_manifests_sha256 "${manifest_of_manifests_sha256}" \
   --argjson timeline "$(cat "${timeline_path}")" \
   --argjson gpu_summary "$(cat "${gpu_summary_path}")" \
+  --argjson accelerator_validation "$(cat "${accelerator_validation_path}")" \
   --argjson outcome "$(cat "${outcome_path}")" \
   --argjson retained_objects "${artifacts_json}" \
   '{
@@ -712,13 +983,14 @@ jq -n \
     },
     timeline: $timeline,
     gpu_summary: $gpu_summary,
+    accelerator_validation: $accelerator_validation,
     outcome: $outcome,
     manifest_of_manifests: {
       remote_uri: $manifest_of_manifests_uri,
       sha256: $manifest_of_manifests_sha256
     },
     retained_objects: $retained_objects,
-    detail: "Google single-node Psion run folder preserves launch truth, host facts, training receipts, checkpoint recovery receipts, logs, and per-object digests for postmortem audit."
+    detail: "Google single-node Psion run folder preserves launch truth, host facts, accelerator validation, training receipts, checkpoint recovery receipts, logs, and per-object digests for postmortem audit."
   }' > "${final_manifest_file}"
 
 final_manifest_uri="${final_prefix}/${final_manifest_name}"

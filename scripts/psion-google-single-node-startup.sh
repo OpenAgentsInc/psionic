@@ -21,9 +21,11 @@ COLD_RESTORE_MANIFEST_URI=""
 FINALIZED=0
 GPU_MONITOR_PID=""
 LAUNCH_MANIFEST_URI=""
+LAUNCH_MANIFEST_FILE=""
 RUN_ROOT=""
 REPO_DIR=""
 EVENT_LOG_FILE=""
+GPU_SAMPLE_INTERVAL_SECONDS=5
 
 timestamp_utc() {
   date -u '+%Y-%m-%dT%H:%M:%SZ'
@@ -156,8 +158,15 @@ phase_failure_code() {
   esac
 }
 
+first_matching_file() {
+  local search_root="$1"
+  local pattern="$2"
+  find "${search_root}" -type f -name "${pattern}" | sort | head -n 1 || true
+}
+
 start_gpu_monitor() {
   local sample_file="$1"
+  local sample_interval_seconds="${2:-5}"
   if ! command -v nvidia-smi >/dev/null 2>&1; then
     return 0
   fi
@@ -167,7 +176,7 @@ start_gpu_monitor() {
       nvidia-smi \
         --query-gpu=timestamp,name,utilization.gpu,utilization.memory,memory.used,memory.total,temperature.gpu,power.draw \
         --format=csv,noheader,nounits >> "${sample_file}"
-      sleep 5
+      sleep "${sample_interval_seconds}"
     done
   ) &
   GPU_MONITOR_PID="$!"
@@ -179,6 +188,162 @@ stop_gpu_monitor() {
     wait "${GPU_MONITOR_PID}" 2>/dev/null || true
     GPU_MONITOR_PID=""
   fi
+}
+
+validate_accelerated_training_evidence() {
+  local launch_manifest_file="$1"
+  local output_dir="$2"
+  local gpu_sample_file="$3"
+  local policy_file="$4"
+  local expected_backend trainer_lane_id stage_receipt_file observed_backend accelerator_backed
+  local sample_interval_seconds warmup_seconds minimum_post_warmup_samples warmup_samples
+  local require_nonzero_gpu_utilization require_nonzero_gpu_memory_residency validation_json
+  local considered_samples nonzero_utilization_samples nonzero_memory_samples avg_gpu_util_percent
+  local max_gpu_util_percent max_memory_used_mib
+
+  if [[ ! -f "${launch_manifest_file}" ]]; then
+    FAILURE_CODE="training_runtime_failure"
+    FAILURE_DETAIL="accelerator validation could not read ${launch_manifest_file}"
+    return 1
+  fi
+
+  expected_backend="$(
+    jq -r '.expected_execution_backend // .training.expected_execution_backend // "cpu"' \
+      "${launch_manifest_file}"
+  )"
+  trainer_lane_id="$(
+    jq -r '.trainer_lane_id // .training.trainer_lane_id // "unknown_trainer_lane"' \
+      "${launch_manifest_file}"
+  )"
+  if [[ "${expected_backend}" != "cuda" ]]; then
+    return 0
+  fi
+
+  stage_receipt_file="$(first_matching_file "${output_dir}" '*stage_receipt.json')"
+  if [[ -z "${stage_receipt_file}" ]]; then
+    FAILURE_CODE="training_runtime_failure"
+    FAILURE_DETAIL="accelerator validation could not find a stage receipt under ${output_dir}"
+    return 1
+  fi
+
+  observed_backend="$(jq -r '.delivered_execution.runtime_backend // empty' "${stage_receipt_file}")"
+  accelerator_backed="$(jq -r '.accelerator_execution.accelerator_backed // false' "${stage_receipt_file}")"
+  if [[ "${observed_backend}" != "cuda" ]]; then
+    FAILURE_CODE="training_runtime_failure"
+    FAILURE_DETAIL="accelerator validation expected backend cuda for ${trainer_lane_id}, found ${observed_backend:-unset}"
+    return 1
+  fi
+  if [[ "${accelerator_backed}" != "true" ]]; then
+    FAILURE_CODE="training_runtime_failure"
+    FAILURE_DETAIL="accelerator validation expected accelerator_execution.accelerator_backed=true for ${trainer_lane_id}"
+    return 1
+  fi
+
+  if [[ ! -f "${gpu_sample_file}" || ! -s "${gpu_sample_file}" ]]; then
+    FAILURE_CODE="training_runtime_failure"
+    FAILURE_DETAIL="accelerator validation could not read GPU samples from ${gpu_sample_file}"
+    return 1
+  fi
+
+  sample_interval_seconds="$(jq -r '.gpu_sample_interval_seconds // 5' "${policy_file}")"
+  warmup_seconds="$(jq -r '.accelerator_validation.warmup_seconds // 0' "${policy_file}")"
+  minimum_post_warmup_samples="$(
+    jq -r '.accelerator_validation.minimum_post_warmup_samples // 1' "${policy_file}"
+  )"
+  require_nonzero_gpu_utilization="$(
+    jq -r '.accelerator_validation.require_nonzero_gpu_utilization // true' "${policy_file}"
+  )"
+  require_nonzero_gpu_memory_residency="$(
+    jq -r '.accelerator_validation.require_nonzero_gpu_memory_residency // true' "${policy_file}"
+  )"
+  if [[ ! "${sample_interval_seconds}" =~ ^[0-9]+$ ]] || (( sample_interval_seconds < 1 )); then
+    sample_interval_seconds=5
+  fi
+  if [[ ! "${warmup_seconds}" =~ ^[0-9]+$ ]] || (( warmup_seconds < 0 )); then
+    warmup_seconds=0
+  fi
+  if [[ ! "${minimum_post_warmup_samples}" =~ ^[0-9]+$ ]] || (( minimum_post_warmup_samples < 1 )); then
+    minimum_post_warmup_samples=1
+  fi
+  warmup_samples=$(( (warmup_seconds + sample_interval_seconds - 1) / sample_interval_seconds ))
+
+  validation_json="$(
+    awk -F',' -v warmup_samples="${warmup_samples}" '
+      BEGIN {
+        raw_samples = 0
+        considered = 0
+        nonzero_util = 0
+        nonzero_mem = 0
+        sum_gpu = 0
+        max_gpu = 0
+        max_mem = 0
+      }
+      NR == 1 {
+        next
+      }
+      NF < 6 {
+        next
+      }
+      {
+        raw_samples += 1
+        if (raw_samples <= warmup_samples) {
+          next
+        }
+        gpu_util = $3
+        mem_used = $5
+        gsub(/^[ \t]+|[ \t]+$/, "", gpu_util)
+        gsub(/^[ \t]+|[ \t]+$/, "", mem_used)
+        gpu_util += 0
+        mem_used += 0
+        considered += 1
+        sum_gpu += gpu_util
+        if (gpu_util > 0) {
+          nonzero_util += 1
+        }
+        if (mem_used > 0) {
+          nonzero_mem += 1
+        }
+        if (gpu_util > max_gpu) {
+          max_gpu = gpu_util
+        }
+        if (mem_used > max_mem) {
+          max_mem = mem_used
+        }
+      }
+      END {
+        avg_gpu = considered > 0 ? sum_gpu / considered : 0
+        printf("{\"considered_samples\":%d,\"nonzero_utilization_samples\":%d,\"nonzero_memory_samples\":%d,\"avg_gpu_util_percent\":%.2f,\"max_gpu_util_percent\":%.2f,\"max_memory_used_mib\":%.2f}", considered, nonzero_util, nonzero_mem, avg_gpu, max_gpu, max_mem)
+      }
+    ' "${gpu_sample_file}"
+  )"
+
+  considered_samples="$(jq -r '.considered_samples' <<<"${validation_json}")"
+  nonzero_utilization_samples="$(jq -r '.nonzero_utilization_samples' <<<"${validation_json}")"
+  nonzero_memory_samples="$(jq -r '.nonzero_memory_samples' <<<"${validation_json}")"
+  avg_gpu_util_percent="$(jq -r '.avg_gpu_util_percent' <<<"${validation_json}")"
+  max_gpu_util_percent="$(jq -r '.max_gpu_util_percent' <<<"${validation_json}")"
+  max_memory_used_mib="$(jq -r '.max_memory_used_mib' <<<"${validation_json}")"
+
+  if (( considered_samples < minimum_post_warmup_samples )); then
+    FAILURE_CODE="training_runtime_failure"
+    FAILURE_DETAIL="accelerator validation observed ${considered_samples} post-warmup GPU samples for ${trainer_lane_id}, required ${minimum_post_warmup_samples}"
+    return 1
+  fi
+  if [[ "${require_nonzero_gpu_utilization}" == "true" ]] && (( nonzero_utilization_samples == 0 )); then
+    FAILURE_CODE="training_runtime_failure"
+    FAILURE_DETAIL="accelerator validation observed zero post-warmup GPU utilization for ${trainer_lane_id}"
+    return 1
+  fi
+  if [[ "${require_nonzero_gpu_memory_residency}" == "true" ]] && (( nonzero_memory_samples == 0 )); then
+    FAILURE_CODE="training_runtime_failure"
+    FAILURE_DETAIL="accelerator validation observed zero post-warmup GPU memory residency for ${trainer_lane_id}"
+    return 1
+  fi
+
+  emit_event \
+    "accelerator_validation_passed" \
+    "Validated ${trainer_lane_id} on cuda with ${considered_samples} post-warmup samples, avg GPU util ${avg_gpu_util_percent}%, peak GPU util ${max_gpu_util_percent}%, and peak memory ${max_memory_used_mib} MiB."
+  return 0
 }
 
 finalize_run() {
@@ -360,6 +525,8 @@ main() {
   input_root="${RUN_ROOT}/inputs"
   EVENT_LOG_FILE="${log_dir}/psion_google_run_events.jsonl"
   mkdir -p "${output_dir}" "${log_dir}" "${scratch_dir}" "${input_root}"
+  LAUNCH_MANIFEST_FILE="${scratch_dir}/psion_google_launch_manifest.json"
+  gcs_download "${LAUNCH_MANIFEST_URI}" "${LAUNCH_MANIFEST_FILE}"
   emit_event "bootstrap_started" "Startup script began bounded Google single-node training setup."
 
   export DEBIAN_FRONTEND=noninteractive
@@ -389,6 +556,13 @@ main() {
   git -C "${repo_dir}" checkout --detach "${git_revision}"
   git config --global --add safe.directory "${repo_dir}"
   REPO_DIR="${repo_dir}"
+  GPU_SAMPLE_INTERVAL_SECONDS="$(
+    jq -r '.gpu_sample_interval_seconds // 5' \
+      "${repo_dir}/fixtures/psion/google/psion_google_host_observability_policy_v1.json"
+  )"
+  if [[ ! "${GPU_SAMPLE_INTERVAL_SECONDS}" =~ ^[0-9]+$ ]] || (( GPU_SAMPLE_INTERVAL_SECONDS < 1 )); then
+    GPU_SAMPLE_INTERVAL_SECONDS=5
+  fi
   emit_event "repo_checked_out" "Repo cloned and detached to the requested revision."
 
   RUN_PHASE="bootstrap"
@@ -456,7 +630,7 @@ EOF
   RUN_PHASE="training"
   TRAINING_STARTED_AT_UTC="$(timestamp_utc)"
   emit_event "training_started" "Launching the repo-owned training command on the GPU host."
-  start_gpu_monitor "${log_dir}/psion_google_gpu_samples.csv"
+  start_gpu_monitor "${log_dir}/psion_google_gpu_samples.csv" "${GPU_SAMPLE_INTERVAL_SECONDS}"
   set +e
   "${entrypoint_file}" \
     > "${log_dir}/training.stdout.log" \
@@ -472,7 +646,17 @@ EOF
     finalize_run
     exit "${TRAINING_EXIT_CODE}"
   fi
+  stop_gpu_monitor
   emit_event "training_completed" "The repo-owned training command completed without a non-zero process exit."
+  if ! validate_accelerated_training_evidence \
+    "${LAUNCH_MANIFEST_FILE}" \
+    "${output_dir}" \
+    "${log_dir}/psion_google_gpu_samples.csv" \
+    "${repo_dir}/fixtures/psion/google/psion_google_host_observability_policy_v1.json"; then
+    emit_event "accelerator_validation_failed" "${FAILURE_DETAIL}"
+    finalize_run
+    exit 1
+  fi
 
   if [[ -n "${post_training_archive_command}" ]]; then
     RUN_PHASE="artifact_upload"
