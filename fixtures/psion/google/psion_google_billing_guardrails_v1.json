@@ -93,6 +93,29 @@
         "capacity_failure_result": "launch_capacity_failure"
       },
       {
+        "profile_id": "g2_l4_single_node_plugin_host_native_accelerated",
+        "trainer_lane_id": "psion_plugin_host_native_accelerated",
+        "expected_execution_backend": "cuda",
+        "machine_type": "g2-standard-8",
+        "accelerator_type": "nvidia-l4",
+        "accelerator_count": 1,
+        "cpu_quota_metric": "CPUS",
+        "gpu_quota_metric": "NVIDIA_L4_GPUS",
+        "required_vcpus": 8,
+        "required_memory_mb": 32768,
+        "boot_disk_type": "pd-balanced",
+        "boot_disk_gb": 200,
+        "max_runtime_hours": 12.0,
+        "declared_run_cost_ceiling_usd": 25.0,
+        "max_launch_attempts": 3,
+        "zone_fallback_order": [
+          "us-central1-a",
+          "us-central1-b",
+          "us-central1-c"
+        ],
+        "capacity_failure_result": "launch_capacity_failure"
+      },
+      {
         "profile_id": "a2_a100_single_node",
         "trainer_lane_id": "psion_reference_pilot_bundle",
         "expected_execution_backend": "cpu",

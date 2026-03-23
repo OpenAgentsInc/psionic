@@ -18,6 +18,7 @@
   ],
   "supported_profiles": [
     "g2_l4_single_node_accelerated",
+    "g2_l4_single_node_plugin_host_native_accelerated",
     "g2_l4_single_node",
     "a2_a100_single_node"
   ],

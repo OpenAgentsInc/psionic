@@ -55,6 +55,12 @@ The default Google single-node profile is now the bounded accelerated lane:
 - trainer lane: `psion_accelerated_reference_pilot`
 - expected execution backend: `cuda`
 
+The first plugin-conditioned accelerated Google profile is also committed:
+
+- profile: `g2_l4_single_node_plugin_host_native_accelerated`
+- trainer lane: `psion_plugin_host_native_accelerated`
+- expected execution backend: `cuda`
+
 The first successful retained run on that lane is:
 
 - Google run id: `psion-g2-l4-accelerated-20260323t074419z`
@@ -231,6 +237,14 @@ bash scripts/psion-google-operator-preflight.sh \
   --zone us-central1-a
 ```
 
+Plugin-conditioned accelerated preflight:
+
+```bash
+bash scripts/psion-google-operator-preflight.sh \
+  --profile g2_l4_single_node_plugin_host_native_accelerated \
+  --zone us-central1-a
+```
+
 This command rejects:
 
 - missing local CLI dependencies
@@ -320,6 +334,30 @@ What happens:
 
 For the accelerated profile, the same host lifecycle stays intact, but the VM
 now executes the canonical CUDA trainer instead of the CPU reference bundle.
+
+Bounded plugin-conditioned accelerated lane:
+
+- profile: `g2_l4_single_node_plugin_host_native_accelerated`
+- trainer lane:
+  `"$CARGO_TARGET_DIR/debug/examples/psion_google_plugin_host_native_accelerated_run" "$PSION_OUTPUT_DIR"`
+- expected backend: `cuda`
+- fallback order:
+  `us-central1-a`, `us-central1-b`, `us-central1-c`
+
+Launch:
+
+```bash
+RUN_ID="psion-g2-l4-plugin-host-native-accelerated-$(date -u +%Y%m%dt%H%M%Sz | tr '[:upper:]' '[:lower:]')"
+
+bash scripts/psion-google-launch-single-node.sh \
+  --profile g2_l4_single_node_plugin_host_native_accelerated \
+  --run-id "${RUN_ID}" \
+  --instance-name "${RUN_ID}"
+```
+
+This lane keeps the same single-node archive, observability, and teardown
+policy but swaps the CPU-reference plugin receipt path for the real accelerated
+host-native plugin-conditioned trainer.
 
 This historical lane remains acceptable for bounded operator rehearsals and
 CPU-reference evidence retention. It is no longer an acceptable primary target
