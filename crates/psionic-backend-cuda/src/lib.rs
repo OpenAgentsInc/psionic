@@ -17,7 +17,14 @@
     )
 )]
 
-use std::{collections::BTreeMap, fmt, io::ErrorKind, process::Command};
+use std::{
+    collections::BTreeMap,
+    env, fmt,
+    fs::OpenOptions,
+    io::{ErrorKind, Write},
+    process::Command,
+    time::{Duration, Instant},
+};
 
 use half::bf16;
 use psionic_compiler::compile_graph;
@@ -278,6 +285,35 @@ impl CudaBuffer {
     #[must_use]
     pub fn allocation_identity(&self) -> usize {
         self.platform.allocation_identity()
+    }
+
+    fn alias_with_spec(&self, spec: &TensorSpec) -> Result<Self, RuntimeError> {
+        let expected_byte_len = spec
+            .storage_size()
+            .checked_mul(size_of_dtype(spec.dtype()))
+            .ok_or_else(|| {
+                RuntimeError::Backend(format!(
+                    "cuda buffer alias size overflow for tensor storage size {}",
+                    spec.storage_size()
+                ))
+            })?;
+        if spec.dtype() != self.spec.dtype()
+            || spec.storage_size() != self.spec.storage_size()
+            || spec.device() != self.spec.device()
+            || expected_byte_len != self.byte_len
+        {
+            return Err(RuntimeError::Backend(format!(
+                "cuda buffer alias requires identical dtype, storage size, device, and byte length: source={:?} alias={:?}",
+                self.spec, spec
+            )));
+        }
+        Ok(Self {
+            spec: spec.clone(),
+            byte_len: self.byte_len,
+            memory_space: self.memory_space,
+            host_visible: self.host_visible,
+            platform: self.platform.clone(),
+        })
     }
 
     /// Writes raw bytes into the CUDA buffer via an explicit host-to-device transfer.
@@ -2535,6 +2571,104 @@ impl ExecutionBackend for CudaBackend {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct CudaHostFallbackOpProfile {
+    count: u64,
+    logical_values: u64,
+    elapsed_ms: u64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct CudaHostFallbackExecutionProfile {
+    ops: BTreeMap<String, CudaHostFallbackOpProfile>,
+}
+
+impl CudaHostFallbackExecutionProfile {
+    fn record(&mut self, label: &str, logical_values: u64, elapsed: Duration) {
+        let entry = self.ops.entry(label.to_string()).or_default();
+        entry.count = entry.count.saturating_add(1);
+        entry.logical_values = entry.logical_values.saturating_add(logical_values);
+        entry.elapsed_ms = entry
+            .elapsed_ms
+            .saturating_add(elapsed.as_millis().try_into().unwrap_or(u64::MAX));
+    }
+
+    fn total_elapsed_ms(&self) -> u64 {
+        self.ops
+            .values()
+            .map(|profile| profile.elapsed_ms)
+            .sum::<u64>()
+    }
+}
+
+fn host_fallback_profile_path() -> Option<String> {
+    env::var("PSIONIC_CUDA_HOST_FALLBACK_PROFILE_PATH")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn append_host_fallback_profile_report(
+    path: &str,
+    plan: &ExecutionPlan,
+    profile: &CudaHostFallbackExecutionProfile,
+) -> Result<(), RuntimeError> {
+    if profile.ops.is_empty() {
+        return Ok(());
+    }
+    let mut report = format!(
+        "{{\"scope_window\":\"psionic_cuda_host_fallback_profile_v1\",\"pid\":{},\"plan_steps\":{},\"plan_outputs\":{},\"total_host_fallback_ms\":{},\"ops\":[",
+        std::process::id(),
+        plan.steps.len(),
+        plan.outputs.len(),
+        profile.total_elapsed_ms(),
+    );
+    for (index, (label, op_profile)) in profile.ops.iter().enumerate() {
+        if index > 0 {
+            report.push(',');
+        }
+        report.push_str(&format!(
+            "{{\"label\":\"{}\",\"count\":{},\"logical_values\":{},\"elapsed_ms\":{}}}",
+            label, op_profile.count, op_profile.logical_values, op_profile.elapsed_ms
+        ));
+    }
+    report.push_str("]}");
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|error| {
+            RuntimeError::Backend(format!(
+                "failed to open cuda host fallback profile sink `{path}`: {error}"
+            ))
+        })?;
+    writeln!(file, "{report}").map_err(|error| {
+        RuntimeError::Backend(format!(
+            "failed to append cuda host fallback profile report `{path}`: {error}"
+        ))
+    })
+}
+
+fn execute_profiled_host_fallback<F>(
+    profile: &mut Option<CudaHostFallbackExecutionProfile>,
+    step: &ExecutionStep,
+    op: F,
+) -> Result<CudaBuffer, RuntimeError>
+where
+    F: FnOnce() -> Result<CudaBuffer, RuntimeError>,
+{
+    let started = Instant::now();
+    let output = op()?;
+    if let Some(profile) = profile.as_mut() {
+        profile.record(
+            step.op.label(),
+            step.spec.shape().element_count() as u64,
+            started.elapsed(),
+        );
+    }
+    Ok(output)
+}
+
 impl AvailableCudaBackend {
     fn lookup_or_compile(
         &mut self,
@@ -3186,6 +3320,10 @@ impl AvailableCudaBackend {
         };
         let mut values = BTreeMap::new();
         let mut retain_counts = execution_value_retain_counts(plan);
+        let profile_path = host_fallback_profile_path();
+        let mut host_fallback_profile = profile_path
+            .as_ref()
+            .map(|_| CudaHostFallbackExecutionProfile::default());
 
         for step in &plan.steps {
             match &step.op {
@@ -3207,106 +3345,155 @@ impl AvailableCudaBackend {
                 }
                 ExecutionOp::Detach => {
                     let input = step_input(step, &values, 0)?;
-                    let output = self.materialize_host_view_step(step, &input.read_f32()?)?;
+                    let output = input.alias_with_spec(&step.spec)?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Reshape => {
                     let input = step_input(step, &values, 0)?;
-                    let output = self.materialize_host_view_step(step, &input.read_f32()?)?;
+                    let output = input.alias_with_spec(&step.spec)?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Permute { axes } => {
-                    let input = step_input(step, &values, 0)?;
-                    let values_out =
-                        permute_contiguous_values(&input.read_f32()?, input.spec().shape().dims(), axes)?;
-                    let output = self.materialize_host_view_step(step, &values_out)?;
+                    let output = execute_profiled_host_fallback(
+                        &mut host_fallback_profile,
+                        step,
+                        || {
+                            let input = step_input(step, &values, 0)?;
+                            let values_out = permute_contiguous_values(
+                                &input.read_f32()?,
+                                input.spec().shape().dims(),
+                                axes,
+                            )?;
+                            self.materialize_host_view_step(step, &values_out)
+                        },
+                    )?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Slice { axis, start, end } => {
-                    let input = step_input(step, &values, 0)?;
-                    let values_out = slice_contiguous_values(
-                        &input.read_f32()?,
-                        input.spec().shape().dims(),
-                        *axis,
-                        *start,
-                        *end,
+                    let output = execute_profiled_host_fallback(
+                        &mut host_fallback_profile,
+                        step,
+                        || {
+                            let input = step_input(step, &values, 0)?;
+                            let values_out = slice_contiguous_values(
+                                &input.read_f32()?,
+                                input.spec().shape().dims(),
+                                *axis,
+                                *start,
+                                *end,
+                            )?;
+                            self.materialize_host_view_step(step, &values_out)
+                        },
                     )?;
-                    let output = self.materialize_host_view_step(step, &values_out)?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Select { axis, index } => {
-                    let input = step_input(step, &values, 0)?;
-                    let values_out = select_contiguous_values(
-                        &input.read_f32()?,
-                        input.spec().shape().dims(),
-                        *axis,
-                        *index,
+                    let output = execute_profiled_host_fallback(
+                        &mut host_fallback_profile,
+                        step,
+                        || {
+                            let input = step_input(step, &values, 0)?;
+                            let values_out = select_contiguous_values(
+                                &input.read_f32()?,
+                                input.spec().shape().dims(),
+                                *axis,
+                                *index,
+                            )?;
+                            self.materialize_host_view_step(step, &values_out)
+                        },
                     )?;
-                    let output = self.materialize_host_view_step(step, &values_out)?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Concat { axis } => {
-                    let tensors = step
-                        .inputs
-                        .iter()
-                        .map(|tensor_id| {
-                            values
-                                .get(tensor_id)
-                                .ok_or(RuntimeError::MissingInput(*tensor_id))
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    let value_slices = tensors
-                        .iter()
-                        .map(|buffer| buffer.read_f32())
-                        .collect::<Result<Vec<_>, _>>()?;
-                    let shape_slices = tensors
-                        .iter()
-                        .map(|buffer| buffer.spec().shape().dims().to_vec())
-                        .collect::<Vec<_>>();
-                    let value_refs = value_slices
-                        .iter()
-                        .map(Vec::as_slice)
-                        .collect::<Vec<_>>();
-                    let shape_refs = shape_slices
-                        .iter()
-                        .map(Vec::as_slice)
-                        .collect::<Vec<_>>();
-                    let values_out = concat_contiguous_values(
-                        value_refs.as_slice(),
-                        shape_refs.as_slice(),
-                        *axis,
+                    let output = execute_profiled_host_fallback(
+                        &mut host_fallback_profile,
+                        step,
+                        || {
+                            let tensors = step
+                                .inputs
+                                .iter()
+                                .map(|tensor_id| {
+                                    values
+                                        .get(tensor_id)
+                                        .ok_or(RuntimeError::MissingInput(*tensor_id))
+                                })
+                                .collect::<Result<Vec<_>, _>>()?;
+                            let value_slices = tensors
+                                .iter()
+                                .map(|buffer| buffer.read_f32())
+                                .collect::<Result<Vec<_>, _>>()?;
+                            let shape_slices = tensors
+                                .iter()
+                                .map(|buffer| buffer.spec().shape().dims().to_vec())
+                                .collect::<Vec<_>>();
+                            let value_refs = value_slices
+                                .iter()
+                                .map(Vec::as_slice)
+                                .collect::<Vec<_>>();
+                            let shape_refs = shape_slices
+                                .iter()
+                                .map(Vec::as_slice)
+                                .collect::<Vec<_>>();
+                            let values_out = concat_contiguous_values(
+                                value_refs.as_slice(),
+                                shape_refs.as_slice(),
+                                *axis,
+                            )?;
+                            self.materialize_host_view_step(step, &values_out)
+                        },
                     )?;
-                    let output = self.materialize_host_view_step(step, &values_out)?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Expand { shape } => {
-                    let input = step_input(step, &values, 0)?;
-                    let values_out = expand_contiguous_values(
-                        &input.read_f32()?,
-                        input.spec().shape().dims(),
-                        shape.dims(),
+                    let output = execute_profiled_host_fallback(
+                        &mut host_fallback_profile,
+                        step,
+                        || {
+                            let input = step_input(step, &values, 0)?;
+                            let values_out = expand_contiguous_values(
+                                &input.read_f32()?,
+                                input.spec().shape().dims(),
+                                shape.dims(),
+                            )?;
+                            self.materialize_host_view_step(step, &values_out)
+                        },
                     )?;
-                    let output = self.materialize_host_view_step(step, &values_out)?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Cast { dtype } => {
                     let input = step_input(step, &values, 0)?;
-                    let values_out = cast_contiguous_values(
-                        &input.read_f32()?,
-                        input.spec().dtype(),
-                        *dtype,
-                    )?;
-                    let output = self.materialize_host_view_step(step, &values_out)?;
+                    let output = if input.spec().dtype() == *dtype {
+                        input.alias_with_spec(&step.spec)?
+                    } else {
+                        execute_profiled_host_fallback(
+                            &mut host_fallback_profile,
+                            step,
+                            || {
+                                let values_out = cast_contiguous_values(
+                                    &input.read_f32()?,
+                                    input.spec().dtype(),
+                                    *dtype,
+                                )?;
+                                self.materialize_host_view_step(step, &values_out)
+                            },
+                        )?
+                    };
                     values.insert(step.output, output);
                 }
                 ExecutionOp::ReduceSum { axis } => {
-                    let input = step_input(step, &values, 0)?;
-                    let values_out = reduce_sum_contiguous_values(
-                        &input.read_f32()?,
-                        input.spec().shape().dims(),
-                        *axis,
+                    let output = execute_profiled_host_fallback(
+                        &mut host_fallback_profile,
+                        step,
+                        || {
+                            let input = step_input(step, &values, 0)?;
+                            let values_out = reduce_sum_contiguous_values(
+                                &input.read_f32()?,
+                                input.spec().shape().dims(),
+                                *axis,
+                            )?;
+                            self.materialize_host_view_step(step, &values_out)
+                        },
                     )?;
-                    let output = self.materialize_host_view_step(step, &values_out)?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Add => {
@@ -3501,10 +3688,16 @@ impl AvailableCudaBackend {
                         values.insert(step.output, output);
                     }
                     BackendExtensionOp::RotaryEmbeddingBackward { interleaved } => {
-                        let output = self.execute_rotary_embedding_backward_step(
+                        let output = execute_profiled_host_fallback(
+                            &mut host_fallback_profile,
                             step,
-                            &values,
-                            *interleaved,
+                            || {
+                                self.execute_rotary_embedding_backward_step(
+                                    step,
+                                    &values,
+                                    *interleaved,
+                                )
+                            },
                         )?;
                         values.insert(step.output, output);
                     }
@@ -3522,22 +3715,34 @@ impl AvailableCudaBackend {
                         scale,
                         causal,
                     } => {
-                        let output = self.execute_scaled_dot_product_attention_backward_step(
+                        let output = execute_profiled_host_fallback(
+                            &mut host_fallback_profile,
                             step,
-                            &values,
-                            scale.to_f32(),
-                            *causal,
-                            ScaledDotProductAttentionBackwardTarget::Query,
+                            || {
+                                self.execute_scaled_dot_product_attention_backward_step(
+                                    step,
+                                    &values,
+                                    scale.to_f32(),
+                                    *causal,
+                                    ScaledDotProductAttentionBackwardTarget::Query,
+                                )
+                            },
                         )?;
                         values.insert(step.output, output);
                     }
                     BackendExtensionOp::ScaledDotProductAttentionKeyBackward { scale, causal } => {
-                        let output = self.execute_scaled_dot_product_attention_backward_step(
+                        let output = execute_profiled_host_fallback(
+                            &mut host_fallback_profile,
                             step,
-                            &values,
-                            scale.to_f32(),
-                            *causal,
-                            ScaledDotProductAttentionBackwardTarget::Key,
+                            || {
+                                self.execute_scaled_dot_product_attention_backward_step(
+                                    step,
+                                    &values,
+                                    scale.to_f32(),
+                                    *causal,
+                                    ScaledDotProductAttentionBackwardTarget::Key,
+                                )
+                            },
                         )?;
                         values.insert(step.output, output);
                     }
@@ -3545,12 +3750,18 @@ impl AvailableCudaBackend {
                         scale,
                         causal,
                     } => {
-                        let output = self.execute_scaled_dot_product_attention_backward_step(
+                        let output = execute_profiled_host_fallback(
+                            &mut host_fallback_profile,
                             step,
-                            &values,
-                            scale.to_f32(),
-                            *causal,
-                            ScaledDotProductAttentionBackwardTarget::Value,
+                            || {
+                                self.execute_scaled_dot_product_attention_backward_step(
+                                    step,
+                                    &values,
+                                    scale.to_f32(),
+                                    *causal,
+                                    ScaledDotProductAttentionBackwardTarget::Value,
+                                )
+                            },
                         )?;
                         values.insert(step.output, output);
                     }
@@ -3566,6 +3777,11 @@ impl AvailableCudaBackend {
         }
 
         let _report = submission.commit(CudaCommandWait::Completed)?;
+        if let (Some(path), Some(profile)) =
+            (profile_path.as_deref(), host_fallback_profile.as_ref())
+        {
+            let _ = append_host_fallback_profile_report(path, plan, profile);
+        }
         let mut outputs = BTreeMap::new();
         for output_id in &plan.outputs {
             let Some(buffer) = values.remove(output_id) else {

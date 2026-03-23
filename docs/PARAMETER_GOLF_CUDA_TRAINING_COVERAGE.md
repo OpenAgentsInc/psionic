@@ -118,6 +118,25 @@ The report now keeps the following families explicit:
 
 The current canonical blocker set is empty.
 
+That statement is about family-level runtime coverage, not contest-speed
+closure.
+
+Fresh H100 fallback profiling on 2026-03-23 still found substantial
+host-executed cost on the real single-H100 trainer path, recorded in:
+
+- `fixtures/parameter_golf/reports/parameter_golf_single_h100_host_fallback_profile.jsonl`
+- `docs/audits/2026-03-23-psionic-parameter-golf-single-h100-host-fallback-profile-audit.md`
+
+The fresh narrowed blocker list from that live profile is:
+
+- forward replay: `expand`, `permute`
+- backward replay: `permute`, `reduce_sum`,
+  `scaled_dot_product_attention_{query,key,value}_backward`,
+  `rotary_embedding_backward`
+
+The same profile also showed that `reshape` and `detach` were removed from the
+measured fallback cost after the zero-copy alias path landed for those ops.
+
 ## Current Honest Boundary
 
 The report is intentionally not a fake green badge.
