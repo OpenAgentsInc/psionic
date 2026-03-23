@@ -903,6 +903,7 @@ impl PortableModelStateDict {
                 optimizer_state,
                 optimizer_residency_policy: assignment.optimizer_residency_policy,
                 optimizer_residency: assignment.optimizer_residency,
+                accelerated_master_weights: None,
                 applied_steps: assignment.applied_steps,
             });
         }

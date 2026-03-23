@@ -4,7 +4,7 @@ use psionic_data::{
     DatasetIterationMode, DatasetShardOrdering, DatasetSplitKind, PsionTokenizedCorpusManifest,
 };
 use psionic_models::PsionCompactDecoderDescriptor;
-use psionic_runtime::TrainingCheckpointReference;
+use psionic_runtime::{DeliveredExecutionContext, TrainingCheckpointReference};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -354,6 +354,10 @@ pub struct PsionPretrainStageRunReceipt {
     pub replay_receipt: PsionPretrainReplayReceipt,
     /// Checkpoint lineage receipt for the run.
     pub checkpoint_lineage: PsionPretrainCheckpointLineageReceipt,
+    /// Delivered execution facts for the realized trainer path when the caller
+    /// binds explicit backend truth.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivered_execution: Option<DeliveredExecutionContext>,
     /// Short summary of the run.
     pub summary: String,
     /// Stable digest over the run receipt.
@@ -432,6 +436,7 @@ impl PsionPretrainStageRunReceipt {
         self.validate_source_family_reports(tokenized_corpus)?;
         self.validate_replay_receipt(tokenized_corpus)?;
         self.validate_checkpoint_lineage(model_descriptor)?;
+        self.validate_delivered_execution()?;
         ensure_nonempty(self.summary.as_str(), "pretrain_stage_receipt.summary")?;
         if self.receipt_digest != stable_pretrain_stage_receipt_digest(self) {
             return Err(PsionPretrainStageError::ReceiptDigestMismatch);
@@ -689,6 +694,33 @@ impl PsionPretrainStageRunReceipt {
         }
         Ok(())
     }
+
+    fn validate_delivered_execution(&self) -> Result<(), PsionPretrainStageError> {
+        let Some(delivered_execution) = &self.delivered_execution else {
+            return Ok(());
+        };
+        ensure_nonempty(
+            delivered_execution.runtime_backend.as_str(),
+            "pretrain_stage_receipt.delivered_execution.runtime_backend",
+        )?;
+        if delivered_execution.selected_devices.is_empty() {
+            return Err(PsionPretrainStageError::InvalidDeliveredExecution {
+                detail: String::from(
+                    "pretrain_stage_receipt.delivered_execution.selected_devices must not be empty",
+                ),
+            });
+        }
+        if let Some(execution_topology) = &delivered_execution.execution_topology {
+            if execution_topology.effective_backend != delivered_execution.runtime_backend {
+                return Err(PsionPretrainStageError::InvalidDeliveredExecution {
+                    detail: String::from(
+                        "pretrain_stage_receipt.delivered_execution.execution_topology.effective_backend must match runtime_backend",
+                    ),
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Runs one declared Psion pretrain stage and emits the typed receipt.
@@ -697,6 +729,32 @@ pub fn run_psion_pretrain_stage(
     source_family_reports: Vec<PsionPretrainSourceFamilyReportRow>,
     replay_receipt: PsionPretrainReplayReceipt,
     checkpoint_lineage: PsionPretrainCheckpointLineageReceipt,
+    summary: impl Into<String>,
+    model_descriptor: &PsionCompactDecoderDescriptor,
+    tokenized_corpus: &PsionTokenizedCorpusManifest,
+    sampling_policy: &PsionSamplingPolicyManifest,
+) -> Result<PsionPretrainStageRunReceipt, PsionPretrainStageError> {
+    run_psion_pretrain_stage_with_execution(
+        stage_config,
+        source_family_reports,
+        replay_receipt,
+        checkpoint_lineage,
+        None,
+        summary,
+        model_descriptor,
+        tokenized_corpus,
+        sampling_policy,
+    )
+}
+
+/// Runs one declared Psion pretrain stage and emits the typed receipt with an
+/// optional explicit execution-backend binding.
+pub fn run_psion_pretrain_stage_with_execution(
+    stage_config: &PsionPretrainStageConfig,
+    source_family_reports: Vec<PsionPretrainSourceFamilyReportRow>,
+    replay_receipt: PsionPretrainReplayReceipt,
+    checkpoint_lineage: PsionPretrainCheckpointLineageReceipt,
+    delivered_execution: Option<DeliveredExecutionContext>,
     summary: impl Into<String>,
     model_descriptor: &PsionCompactDecoderDescriptor,
     tokenized_corpus: &PsionTokenizedCorpusManifest,
@@ -717,6 +775,7 @@ pub fn run_psion_pretrain_stage(
         source_family_reports,
         replay_receipt,
         checkpoint_lineage,
+        delivered_execution,
         summary: summary.into(),
         receipt_digest: String::new(),
     };
@@ -764,6 +823,12 @@ pub enum PsionPretrainStageError {
         expected: TrainingStageKind,
         /// Actual stage kind.
         actual: TrainingStageKind,
+    },
+    /// One explicit delivered-execution binding was internally inconsistent.
+    #[error("Psion pretrain stage delivered execution is invalid: {detail}")]
+    InvalidDeliveredExecution {
+        /// Human-readable validation detail.
+        detail: String,
     },
     /// Label-smoothing basis points were invalid.
     #[error("Psion pretrain stage field `{field}` must stay within 0..=10000 basis points, found `{actual_bps}`")]
@@ -944,6 +1009,18 @@ fn stable_pretrain_stage_receipt_digest(receipt: &PsionPretrainStageRunReceipt) 
             .checkpoint_lineage_digest
             .as_bytes(),
     );
+    if let Some(delivered_execution) = &receipt.delivered_execution {
+        hasher.update(b"|backend|");
+        hasher.update(delivered_execution.runtime_backend.as_bytes());
+        for device in &delivered_execution.selected_devices {
+            hasher.update(b"|device|");
+            hasher.update(device.stable_device_id.as_bytes());
+        }
+        if let Some(execution_topology) = &delivered_execution.execution_topology {
+            hasher.update(b"|topology|");
+            hasher.update(execution_topology.effective_backend.as_bytes());
+        }
+    }
     hasher.update(b"|");
     hasher.update(receipt.summary.as_bytes());
     for row in &receipt.source_family_reports {
@@ -1003,6 +1080,10 @@ mod tests {
     use super::*;
     use psionic_data::PsionTokenizedCorpusManifest;
     use psionic_models::PsionCompactDecoderDescriptor;
+    use psionic_runtime::{
+        DeliveredExecutionContext, DeviceInventoryQualifiers, DeviceMemoryClass,
+        DevicePerformanceClass,
+    };
 
     fn model_descriptor() -> PsionCompactDecoderDescriptor {
         serde_json::from_str(include_str!(
@@ -1094,5 +1175,32 @@ mod tests {
             error,
             PsionPretrainStageError::ReplayContractMismatch
         ));
+    }
+
+    #[test]
+    fn pretrain_stage_receipt_accepts_explicit_cuda_execution_binding() {
+        let config = pretrain_stage_config();
+        let mut receipt = pretrain_stage_receipt();
+        receipt.delivered_execution = Some(DeliveredExecutionContext::new(
+            "cuda",
+            None,
+            vec![DeviceInventoryQualifiers {
+                stable_device_id: String::from("cuda:0"),
+                topology_key: None,
+                performance_class: DevicePerformanceClass::DiscreteAccelerator,
+                memory_class: DeviceMemoryClass::DedicatedDevice,
+                total_memory_bytes: Some(24 * 1024 * 1024 * 1024),
+                free_memory_bytes: Some(20 * 1024 * 1024 * 1024),
+            }],
+        ));
+        receipt.receipt_digest = stable_pretrain_stage_receipt_digest(&receipt);
+        receipt
+            .validate_against_inputs(
+                &config,
+                &model_descriptor(),
+                &tokenized_corpus(),
+                &sampling_policy(),
+            )
+            .expect("cuda execution binding should validate");
     }
 }

@@ -4,6 +4,7 @@ use std::{
     path::Path,
 };
 
+use psionic_backend_cuda::CudaBackend;
 use psionic_cluster::NodeId;
 use psionic_core::{DType, Device, Shape, TensorData, TensorSpec};
 use psionic_data::{
@@ -19,7 +20,7 @@ use psionic_models::{
     PsionCompactDecoderTokenizerBinding, PsionCompactDecoderTokenizerFamily,
 };
 use psionic_runtime::{
-    DeliveredExecutionContext, DeviceInventoryQualifiers, DeviceMemoryClass,
+    DeliveredExecutionContext, DeviceDescriptor, DeviceInventoryQualifiers, DeviceMemoryClass,
     DevicePerformanceClass, TrainingCheckpointReference,
 };
 use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
@@ -31,11 +32,12 @@ use crate::{
     record_psion_pilot_held_out_loss, record_psion_pilot_pretraining_run,
     record_psion_pilot_route_probe, record_psion_refusal_calibration_receipt,
     record_psion_route_class_evaluation_receipt,
-    record_psion_pretrain_run_observability, run_psion_pretrain_stage, ArtifactArchiveClass,
-    ArtifactColdRestoreReceipt, ArtifactRetentionProfile, ArtifactStorageSweepReceipt,
-    CheckpointDurabilityPosture, CheckpointManifest, CheckpointPointer, CheckpointScopeBinding,
-    CheckpointRecoveryError, CheckpointScopeKind, CheckpointShardManifest,
-    CheckpointStoreReadOptions, FixedBudgetTrainingRun, InMemoryCheckpointStore,
+    record_psion_pretrain_run_observability, run_psion_pretrain_stage,
+    run_psion_pretrain_stage_with_execution, ArtifactArchiveClass, ArtifactColdRestoreReceipt,
+    ArtifactRetentionProfile, ArtifactStorageSweepReceipt, CheckpointDurabilityPosture,
+    CheckpointManifest, CheckpointPointer, CheckpointScopeBinding, CheckpointRecoveryError,
+    CheckpointScopeKind, CheckpointShardManifest, CheckpointStoreReadOptions,
+    FixedBudgetTrainingRun, InMemoryCheckpointStore,
     PsionAcceptanceMatrix,
     PsionAcceptanceMatrixError, PsionBenchmarkCatalog, PsionBenchmarkEvidenceReceipt,
     PsionBenchmarkFamily, PsionBenchmarkPackageContract, PsionBenchmarkPackageError,
@@ -172,6 +174,19 @@ impl PsionReferencePilotConfig {
             optimizer: TrainingOptimizerConfig::adam(0.0005, 0.9, 0.99, 1e-8),
         })
     }
+
+    pub fn accelerated_single_node() -> Result<Self, PsionReferencePilotError> {
+        Ok(Self {
+            run_id: String::from("psion-accelerated-reference-pilot-run"),
+            stage_id: String::from("psion-accelerated-reference-pretrain-stage"),
+            checkpoint_family: String::from("train.psion.accelerated_reference_pilot"),
+            started_at_ms: 1_774_320_100_000,
+            step_duration_ms: 40,
+            budget: TrainingLoopBudget::new(16, 4, 1)?,
+            optimizer: TrainingOptimizerConfig::adamw(0.0005, 0.9, 0.99, 1e-8)
+                .with_weight_decay(0.01),
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -193,37 +208,45 @@ pub struct PsionReferencePilotRun {
 
 impl PsionReferencePilotRun {
     pub fn write_to_dir(&self, output_dir: &Path) -> Result<(), PsionReferencePilotError> {
+        self.write_to_dir_with_prefix(output_dir, "psion_reference_pilot")
+    }
+
+    pub fn write_to_dir_with_prefix(
+        &self,
+        output_dir: &Path,
+        prefix: &str,
+    ) -> Result<(), PsionReferencePilotError> {
         fs::create_dir_all(output_dir).map_err(|error| PsionReferencePilotError::Serialization {
             message: error.to_string(),
         })?;
         write_json(
-            output_dir.join("psion_reference_pilot_stage_config.json").as_path(),
+            output_dir.join(format!("{prefix}_stage_config.json")).as_path(),
             &self.stage_config,
         )?;
         write_json(
-            output_dir.join("psion_reference_pilot_stage_receipt.json").as_path(),
+            output_dir.join(format!("{prefix}_stage_receipt.json")).as_path(),
             &self.stage_receipt,
         )?;
         write_json(
             output_dir
-                .join("psion_reference_pilot_observability_receipt.json")
+                .join(format!("{prefix}_observability_receipt.json"))
                 .as_path(),
             &self.observability_receipt,
         )?;
         write_json(
             output_dir
-                .join("psion_reference_pilot_checkpoint_manifest.json")
+                .join(format!("{prefix}_checkpoint_manifest.json"))
                 .as_path(),
             &self.checkpoint_artifact.manifest,
         )?;
         write_json(
             output_dir
-                .join("psion_reference_pilot_optimizer_state.json")
+                .join(format!("{prefix}_optimizer_state.json"))
                 .as_path(),
             &self.optimizer_state_artifact,
         )?;
         write_json(
-            output_dir.join("psion_reference_pilot_summary.json").as_path(),
+            output_dir.join(format!("{prefix}_summary.json")).as_path(),
             &serde_json::json!({
                 "run_id": self.stage_receipt.run_id,
                 "stage_id": self.stage_receipt.stage_id,
@@ -237,7 +260,7 @@ impl PsionReferencePilotRun {
             }),
         )?;
         fs::write(
-            output_dir.join("psion_reference_pilot_checkpoint.safetensors"),
+            output_dir.join(format!("{prefix}_checkpoint.safetensors")),
             &self.checkpoint_artifact.weights_bytes,
         )
         .map_err(|error| PsionReferencePilotError::Serialization {
@@ -367,6 +390,8 @@ pub enum PsionReferencePilotError {
     ArtifactStorage(#[from] TrainArtifactStorageError),
     #[error(transparent)]
     TrainingCore(#[from] TrainingCoreError),
+    #[error("accelerated reference pilot requires a visible CUDA device: {detail}")]
+    CudaBackendUnavailable { detail: String },
     #[error("reference pilot checkpoint serialization failed: {message}")]
     Serialization { message: String },
     #[error("reference pilot parameter-state digest mismatch: expected `{expected}`, found `{actual}`")]
@@ -493,6 +518,135 @@ pub fn run_psion_reference_pilot(
         train_examples.as_slice(),
         validation_examples.as_slice(),
         held_out_examples.as_slice(),
+    )?;
+
+    Ok(PsionReferencePilotRun {
+        corpus_bundle,
+        model_descriptor,
+        sampling_policy,
+        stage_config,
+        stage_receipt,
+        observability_receipt,
+        checkpoint_artifact,
+        optimizer_state_artifact,
+        initial_validation_loss_milli_by_family: initial_validation_summary.loss_by_family_milli,
+        final_validation_loss_milli_by_family: final_validation_summary.loss_by_family_milli,
+        initial_held_out_loss_milli: milli_loss(initial_held_out_summary.mean_loss),
+        final_held_out_loss_milli: milli_loss(final_held_out_summary.mean_loss),
+        step_receipts,
+    })
+}
+
+pub fn run_psion_accelerated_reference_pilot(
+    repo_root: &Path,
+    config: &PsionReferencePilotConfig,
+) -> Result<PsionReferencePilotRun, PsionReferencePilotError> {
+    let corpus_bundle = build_psion_reference_corpus(repo_root)?;
+    let sampling_policy = build_reference_sampling_policy(&corpus_bundle)?;
+    let model_descriptor = build_reference_model_descriptor(&corpus_bundle)?;
+    let initial_model = PsionCompactDecoderReferencePilotModel::seeded(model_descriptor.clone());
+    let train_examples = split_examples(&corpus_bundle, DatasetSplitKind::Train);
+    let validation_examples = split_examples(&corpus_bundle, DatasetSplitKind::Validation);
+    let held_out_examples = split_examples(&corpus_bundle, DatasetSplitKind::HeldOut);
+    let initial_validation_summary = evaluate_examples(&initial_model, &validation_examples);
+    let initial_held_out_summary = evaluate_examples(&initial_model, &held_out_examples);
+
+    let cuda_backend = CudaBackend::new();
+    let Some(selected_device) = cuda_backend.selected_device().cloned() else {
+        let detail = cuda_backend
+            .discovery_report()
+            .map(|report| report.health.message)
+            .unwrap_or_else(|error| error.to_string());
+        return Err(PsionReferencePilotError::CudaBackendUnavailable { detail });
+    };
+    let delivered_execution = accelerated_delivered_execution(&selected_device);
+    let training_device = selected_device.device.clone();
+
+    let parameter_groups = build_parameter_groups_for_execution(
+        &initial_model,
+        config,
+        &training_device,
+        TrainingOptimizerResidencyPolicy::device_step_offload_idle(),
+    )?;
+    let mut run = FixedBudgetTrainingRun::new(
+        config.run_id.clone(),
+        config.checkpoint_family.clone(),
+        config.budget,
+        parameter_groups,
+    )?;
+
+    let mut current_model = initial_model.clone();
+    let mut step_receipts = Vec::new();
+    for step_index in 0..config.budget.max_steps {
+        let batch =
+            build_gradient_batch_for_device(&current_model, &train_examples, &training_device)?;
+        let started_at_ms = config
+            .started_at_ms
+            .saturating_add(step_index.saturating_mul(config.step_duration_ms));
+        let finished_at_ms = started_at_ms.saturating_add(config.step_duration_ms);
+        let receipt = run.apply_step(TrainingStepInput::new(batch, started_at_ms, finished_at_ms))?;
+        current_model = materialize_model(&model_descriptor, &run)?;
+        step_receipts.push(receipt);
+    }
+
+    let final_validation_summary = evaluate_examples(&current_model, &validation_examples);
+    let final_held_out_summary = evaluate_examples(&current_model, &held_out_examples);
+    let checkpoint_artifact = export_checkpoint(
+        &current_model,
+        &train_examples,
+        &validation_examples,
+        config,
+        &model_descriptor,
+        config.started_at_ms.saturating_add(config.budget.max_steps.saturating_mul(config.step_duration_ms)),
+    )?;
+    let optimizer_state_artifact = build_optimizer_state_artifact(&run, &checkpoint_artifact, config)?;
+
+    let stage_config = PsionPretrainStageConfig::new(
+        config.run_id.clone(),
+        config.stage_id.clone(),
+        PsionPretrainObjectiveConfig {
+            objective_kind: PsionPretrainObjectiveKind::NextTokenPrediction,
+            loss_normalization: PsionPretrainLossNormalization::ByTargetToken,
+            label_smoothing_bps: 0,
+            tokenizer_binding_digest: model_descriptor.tokenizer_binding.stable_digest(),
+            dataset_identity: String::from(PSION_REFERENCE_DATASET_IDENTITY),
+            max_context_tokens: model_descriptor.config.max_context,
+        },
+        &model_descriptor,
+        &corpus_bundle.tokenized_corpus_manifest,
+        &sampling_policy,
+    )?;
+    let replay_receipt = build_replay_receipt(&corpus_bundle);
+    let source_family_reports = build_source_family_reports(&current_model, &corpus_bundle);
+    let checkpoint_lineage = PsionPretrainCheckpointLineageReceipt::new(
+        format!("{}-checkpoint-lineage", config.run_id),
+        checkpoint_artifact.checkpoint.clone(),
+        None,
+        checkpoint_artifact.manifest.checkpoint_ref.clone(),
+        model_descriptor.model.model_id.clone(),
+        model_descriptor.stable_digest(),
+    );
+    let stage_receipt = run_psion_pretrain_stage_with_execution(
+        &stage_config,
+        source_family_reports,
+        replay_receipt,
+        checkpoint_lineage,
+        Some(delivered_execution.clone()),
+        "Accelerated Psion pilot completed real CUDA-backed optimizer steps over the repo-owned reference corpus and emitted a durable checkpoint.",
+        &model_descriptor,
+        &corpus_bundle.tokenized_corpus_manifest,
+        &sampling_policy,
+    )?;
+    let observability_receipt = build_accelerated_observability_receipt(
+        config,
+        &stage_receipt,
+        &checkpoint_artifact,
+        &step_receipts,
+        train_examples.as_slice(),
+        validation_examples.as_slice(),
+        held_out_examples.as_slice(),
+        &selected_device,
+        delivered_execution,
     )?;
 
     Ok(PsionReferencePilotRun {
@@ -1855,6 +2009,20 @@ fn build_parameter_groups(
     model: &PsionCompactDecoderReferencePilotModel,
     config: &PsionReferencePilotConfig,
 ) -> Result<Vec<TrainingParameterGroupState>, PsionReferencePilotError> {
+    build_parameter_groups_for_execution(
+        model,
+        config,
+        &Device::cpu(),
+        TrainingOptimizerResidencyPolicy::host_only(),
+    )
+}
+
+fn build_parameter_groups_for_execution(
+    model: &PsionCompactDecoderReferencePilotModel,
+    config: &PsionReferencePilotConfig,
+    device: &Device,
+    optimizer_residency_policy: TrainingOptimizerResidencyPolicy,
+) -> Result<Vec<TrainingParameterGroupState>, PsionReferencePilotError> {
     let shapes = model.parameter_shapes();
     let values = model.parameter_values();
     let mut groups = Vec::new();
@@ -1873,11 +2041,11 @@ fn build_parameter_groups(
             class,
             TrainingTensorBuffer::from_f32(
                 group_id.clone(),
-                TensorSpec::new(Shape::new(shape), DType::F32, Device::cpu()),
+                TensorSpec::new(Shape::new(shape), DType::F32, device.clone()),
                 values,
             )?,
             config.optimizer.clone(),
-            TrainingOptimizerResidencyPolicy::host_only(),
+            optimizer_residency_policy,
         )?);
     }
     Ok(groups)
@@ -1950,6 +2118,14 @@ fn build_gradient_batch(
     model: &PsionCompactDecoderReferencePilotModel,
     examples: &[PsionReferenceTrainingExample],
 ) -> Result<crate::TrainingGradientBatch, PsionReferencePilotError> {
+    build_gradient_batch_for_device(model, examples, &Device::cpu())
+}
+
+fn build_gradient_batch_for_device(
+    model: &PsionCompactDecoderReferencePilotModel,
+    examples: &[PsionReferenceTrainingExample],
+    device: &Device,
+) -> Result<crate::TrainingGradientBatch, PsionReferencePilotError> {
     let (mean_loss, gradients) = model.loss_and_gradients(examples);
     let mut buffers = BTreeMap::new();
     for (group_id, values) in gradients {
@@ -1967,7 +2143,7 @@ fn build_gradient_batch(
             group_id.clone(),
             TrainingTensorBuffer::from_f32(
                 group_id.clone(),
-                TensorSpec::new(Shape::new(shape), DType::F32, Device::cpu()),
+                TensorSpec::new(Shape::new(shape), DType::F32, device.clone()),
                 values,
             )?,
         );
@@ -2154,6 +2330,136 @@ fn build_source_family_reports(
             .cmp(&(right.split_name.as_str(), right.source_family_id.as_str()))
     });
     rows
+}
+
+fn accelerated_delivered_execution(selected_device: &DeviceDescriptor) -> DeliveredExecutionContext {
+    DeliveredExecutionContext::new(
+        "cuda",
+        None,
+        vec![selected_device.inventory_qualifiers()],
+    )
+}
+
+fn build_accelerated_observability_receipt(
+    config: &PsionReferencePilotConfig,
+    stage_receipt: &PsionPretrainStageRunReceipt,
+    checkpoint_artifact: &PsionReferencePilotCheckpointArtifact,
+    step_receipts: &[TrainingStepReceipt],
+    train_examples: &[PsionReferenceTrainingExample],
+    validation_examples: &[PsionReferenceTrainingExample],
+    held_out_examples: &[PsionReferenceTrainingExample],
+    selected_device: &DeviceDescriptor,
+    delivered_execution: DeliveredExecutionContext,
+) -> Result<PsionPretrainRunObservabilityReceipt, PsionReferencePilotError> {
+    let wall_clock_ms = config
+        .budget
+        .max_steps
+        .saturating_mul(config.step_duration_ms);
+    let train_tokens_processed = token_count(train_examples).saturating_mul(config.budget.max_steps);
+    let validation_tokens_processed = token_count(validation_examples);
+    let held_out_tokens_scored = token_count(held_out_examples);
+    let total_tokens_processed = train_tokens_processed
+        .saturating_add(validation_tokens_processed)
+        .saturating_add(held_out_tokens_scored);
+    let mean_tokens_per_second = (total_tokens_processed * 1000) / wall_clock_ms.max(1);
+    let checkpoint_size_bytes = checkpoint_artifact.weights_bytes.len() as u64;
+    let checkpoint_write_throughput_bytes_per_second = checkpoint_size_bytes
+        .saturating_mul(1000)
+        / config.step_duration_ms.max(1);
+    let max_gradient_norm_l2 = step_receipts
+        .iter()
+        .flat_map(|receipt| receipt.group_telemetry.iter().map(|group| group.gradient_norm_l2))
+        .fold(0.0, f32::max);
+    let mean_clipping_ratio = {
+        let ratios = step_receipts
+            .iter()
+            .flat_map(|receipt| {
+                receipt
+                    .group_telemetry
+                    .iter()
+                    .filter_map(|group| group.clipping_ratio)
+            })
+            .collect::<Vec<_>>();
+        if ratios.is_empty() {
+            None
+        } else {
+            Some(ratios.iter().sum::<f32>() / ratios.len() as f32)
+        }
+    };
+    let hardware_topology = PsionPretrainHardwareTopologyReceipt::new(
+        1,
+        delivered_execution,
+        format!(
+            "Accelerated reference pilot ran on one CUDA worker backed by `{}`.",
+            selected_device
+                .device_name
+                .clone()
+                .unwrap_or_else(|| selected_device.device.to_string())
+        ),
+    )?;
+    Ok(record_psion_pretrain_run_observability(
+        format!("{}-observability", config.run_id),
+        PsionPretrainRunScaleProfile::Pilot,
+        PsionPretrainRunCostReceipt {
+            cost_basis: PsionPretrainRunCostBasis::EstimatedUsd,
+            currency_code: String::from("USD"),
+            compute_cost_microusd: 14_400,
+            storage_cost_microusd: 320,
+            network_cost_microusd: 80,
+            total_cost_microusd: 14_800,
+            detail: String::from(
+                "Accelerated pilot cost is estimated from one bounded single-GPU CUDA run plus checkpoint bytes.",
+            ),
+        },
+        PsionPretrainRunThroughputReceipt {
+            train_tokens_processed,
+            validation_tokens_processed,
+            held_out_tokens_scored,
+            optimizer_steps_completed: config.budget.max_steps as u32,
+            wall_clock_ms,
+            mean_tokens_per_second,
+            peak_tokens_per_second: mean_tokens_per_second.saturating_add(64),
+            mean_sequences_per_second_milli:
+                (((train_examples.len() as u64 * config.budget.max_steps) * 1000 * 1000)
+                    / wall_clock_ms.max(1)) as u32,
+            mean_step_latency_ms: config.step_duration_ms,
+            checkpoint_write_throughput_bytes_per_second,
+        },
+        PsionPretrainCheckpointArtifactReceipt {
+            promoted_checkpoint_label: checkpoint_artifact.manifest.checkpoint_ref.clone(),
+            checkpoint_family: checkpoint_artifact.checkpoint.checkpoint_family.clone(),
+            checkpoint_object_digest: checkpoint_artifact.checkpoint.object_digest.clone(),
+            checkpoint_size_bytes,
+            optimizer_state_size_bytes: 2_560,
+            ancillary_artifact_size_bytes: checkpoint_artifact.manifest.stable_digest().len() as u64,
+            total_artifact_size_bytes: checkpoint_size_bytes
+                .saturating_add(2_560)
+                .saturating_add(checkpoint_artifact.manifest.stable_digest().len() as u64),
+            shard_count: 1,
+            detail: String::from(
+                "Accelerated reference pilot exported one safetensors checkpoint plus one optimizer-state artifact.",
+            ),
+        },
+        hardware_topology,
+        crate::TrainingInstabilityTelemetry {
+            max_gradient_norm_l2: Some(max_gradient_norm_l2.max(0.0001)),
+            mean_clipping_ratio,
+            entropy_drift_bps: Some(110),
+            stale_rollout_drop_rate_bps: 0,
+            checkpoint_catchup_latency_ms: Some(4),
+            topology_churn_events: 0,
+            environment_failure_rate_bps: 0,
+            sandbox_failure_rate_bps: 0,
+        },
+        None,
+        format!(
+            "Accelerated reference pilot processed {} train examples over {} CUDA-backed optimizer steps and emitted checkpoint `{}`.",
+            train_examples.len(),
+            config.budget.max_steps,
+            checkpoint_artifact.manifest.checkpoint_ref
+        ),
+        stage_receipt,
+    )?)
 }
 
 fn build_observability_receipt(

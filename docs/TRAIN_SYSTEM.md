@@ -337,7 +337,8 @@ and now also has:
   without widening the claim boundary to trusted-cluster or broader-pretrain
   posture, and explicitly freezes that the current CPU-reference pilot and
   plugin reference lanes are not valid accelerator-backed training proof
-  targets.
+  targets; the canonical bounded accelerator-backed trainer now lives at
+  `crates/psionic-train/examples/psion_accelerated_reference_pilot.rs`.
 - `docs/audits/2026-03-22-openagentsgemini-first-google-single-gpu-pilot-run-audit.md`
   is the canonical proof record for the first bounded Google single-node
   `Psion` pilot and freezes the typed live-attempt history, retained evidence,

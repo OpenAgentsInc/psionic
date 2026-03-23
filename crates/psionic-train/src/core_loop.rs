@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use psionic_core::{DType, TensorData, TensorSpec};
+use psionic_core::{DType, DeviceKind, TensorData, TensorSpec};
 use psionic_datastream::DatastreamManifestRef;
 use psionic_runtime::TrainingCheckpointReference;
 use serde::{Deserialize, Serialize};
@@ -686,6 +686,10 @@ pub struct TrainingParameterGroupState {
     pub optimizer_residency_policy: TrainingOptimizerResidencyPolicy,
     /// Current residency posture.
     pub optimizer_residency: OptimizerStateResidency,
+    /// Optional FP32 master weights preserved when the train-visible tensor is
+    /// staged through bounded CUDA BF16 buffers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accelerated_master_weights: Option<Vec<f32>>,
     /// Number of updates already applied to this group.
     pub applied_steps: u64,
 }
@@ -714,6 +718,7 @@ impl TrainingParameterGroupState {
             scheduler: None,
             optimizer_residency_policy,
             optimizer_residency: optimizer_residency_policy.idle_residency,
+            accelerated_master_weights: None,
             parameter,
             applied_steps: 0,
         })
@@ -1290,18 +1295,48 @@ fn apply_group_step(
                 message: error.to_string(),
             }
         })?;
-    let parameter_values = group.parameter.as_f32_slice_mut(group.group_id.as_str())?;
-    let optimizer_report = crate::optimizer::apply_training_optimizer_step(
-        parameter_values,
-        clipped_gradients.as_slice(),
-        &resolved_optimizer.optimizer,
-        &mut group.optimizer_state,
-        group.applied_steps.saturating_add(1),
-    )
-    .map_err(|error| TrainingCoreError::OptimizerStepFailed {
-        group_id: group.group_id.clone(),
-        message: error.to_string(),
-    })?;
+    let optimizer_report = if group.parameter.spec.device().kind() == DeviceKind::Cuda {
+        let parameter_values = group.parameter.as_f32_slice_mut(group.group_id.as_str())?;
+        let master_weight_values = group
+            .accelerated_master_weights
+            .get_or_insert_with(|| parameter_values.to_vec());
+        if master_weight_values.len() != parameter_values.len() {
+            return Err(TrainingCoreError::OptimizerStepFailed {
+                group_id: group.group_id.clone(),
+                message: format!(
+                    "accelerated master weights expected length {}, found {}",
+                    parameter_values.len(),
+                    master_weight_values.len()
+                ),
+            });
+        }
+        crate::apply_parameter_golf_cuda_bf16_master_weight_optimizer_step(
+            parameter_values,
+            master_weight_values.as_mut_slice(),
+            clipped_gradients.as_slice(),
+            &resolved_optimizer.optimizer,
+            &mut group.optimizer_state,
+            group.applied_steps.saturating_add(1),
+        )
+        .map_err(|error| TrainingCoreError::OptimizerStepFailed {
+            group_id: group.group_id.clone(),
+            message: error.to_string(),
+        })?
+        .step_report
+    } else {
+        let parameter_values = group.parameter.as_f32_slice_mut(group.group_id.as_str())?;
+        crate::optimizer::apply_training_optimizer_step(
+            parameter_values,
+            clipped_gradients.as_slice(),
+            &resolved_optimizer.optimizer,
+            &mut group.optimizer_state,
+            group.applied_steps.saturating_add(1),
+        )
+        .map_err(|error| TrainingCoreError::OptimizerStepFailed {
+            group_id: group.group_id.clone(),
+            message: error.to_string(),
+        })?
+    };
     let update_norm_l2 = optimizer_report.update_norm_l2;
     let parameter_norm_l2 = optimizer_report.parameter_norm_l2_after;
     group.applied_steps = group.applied_steps.saturating_add(1);

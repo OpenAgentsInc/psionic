@@ -14,11 +14,24 @@ is the canonical CPU-reference lane. It remains valuable for bounded receipts,
 checkpoint, replay, and promotion truth, but it is not a valid Google GPU
 training proof target by itself.
 
+The canonical bounded accelerator-backed single-node trainer now exists
+separately at:
+
+- `crates/psionic-train/examples/psion_accelerated_reference_pilot.rs`
+
+That accelerated lane reuses the same bounded corpus, decoder, checkpoint, and
+receipt contract, but binds the training step path to CUDA instead of the CPU
+reference optimizer lane.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_pilot_pretraining_run.rs` owns the pilot
   held-out-loss receipt, route/refusal probe receipt, and full pilot run
   bundle.
+- `crates/psionic-train/examples/psion_reference_pilot.rs` is the canonical
+  CPU-reference trainer entrypoint for bounded receipt and checkpoint truth.
+- `crates/psionic-train/examples/psion_accelerated_reference_pilot.rs` is the
+  canonical bounded CUDA-backed single-node trainer entrypoint.
 - `crates/psionic-train/examples/psion_pilot_pretraining_run_fixtures.rs`
   regenerates the canonical pilot fixtures.
 - `fixtures/psion/pilot/psion_pilot_held_out_loss_receipt_v1.json` is the

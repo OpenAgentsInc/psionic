@@ -35,6 +35,10 @@ valid GPU training proof target. Future Google GPU audits must name the exact
 trainer command and execution backend explicitly instead of treating
 GPU-hosted reference runs as accelerator-backed training proof.
 
+The canonical bounded accelerator-backed trainer is now the dedicated
+`psion_accelerated_reference_pilot` lane, not the CPU reference pilot or the
+plugin reference bundle paths.
+
 ## Dependency Order
 
 The `Psion` program is dependency-ordered in four tracks:
