@@ -873,7 +873,12 @@ price_profile_row='null'
 cost_query_status="query_failed"
 cost_query_error=""
 if command -v bq >/dev/null 2>&1; then
-  if price_profile_query_result="$(bq query --use_legacy_sql=false --format=prettyjson "${cost_query_sql}" 2>"${tmpdir}/cost_query.err")"; then
+  if price_profile_query_result="$(
+    bq --project_id="${project_id}" --location=US query \
+      --use_legacy_sql=false \
+      --format=prettyjson \
+      "${cost_query_sql}" 2>"${tmpdir}/cost_query.err"
+  )"; then
     price_profile_row="$(jq '.[0] // null' <<<"${price_profile_query_result}")"
     if [[ "${price_profile_row}" != "null" ]]; then
       cost_query_status="price_profile_found"
@@ -883,6 +888,9 @@ if command -v bq >/dev/null 2>&1; then
     fi
   else
     cost_query_error="$(tr '\n' ' ' < "${tmpdir}/cost_query.err" | sed 's/[[:space:]]\+/ /g' | sed 's/^ //; s/ $//')"
+    if [[ -z "${cost_query_error}" ]]; then
+      cost_query_error="bq query failed for ${profile_id}"
+    fi
   fi
 else
   cost_query_error="bq command not available on training host"
