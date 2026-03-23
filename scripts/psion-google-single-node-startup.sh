@@ -455,7 +455,7 @@ EOF
   BOOTSTRAP_FINISHED_AT_UTC="$(timestamp_utc)"
   RUN_PHASE="training"
   TRAINING_STARTED_AT_UTC="$(timestamp_utc)"
-  emit_event "training_started" "Launching repo-owned reference pilot bundle on the GPU host."
+  emit_event "training_started" "Launching the repo-owned training command on the GPU host."
   start_gpu_monitor "${log_dir}/psion_google_gpu_samples.csv"
   set +e
   "${entrypoint_file}" \
@@ -472,7 +472,7 @@ EOF
     finalize_run
     exit "${TRAINING_EXIT_CODE}"
   fi
-  emit_event "training_completed" "Reference pilot bundle completed without a non-zero process exit."
+  emit_event "training_completed" "The repo-owned training command completed without a non-zero process exit."
 
   if [[ -n "${post_training_archive_command}" ]]; then
     RUN_PHASE="artifact_upload"

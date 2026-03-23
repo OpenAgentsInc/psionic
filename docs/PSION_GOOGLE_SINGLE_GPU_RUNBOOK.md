@@ -49,6 +49,8 @@ checkpoints.
   `docs/audits/2026-03-22-openagentsgemini-gpu-training-pilot-audit.md`
 - first real run audit:
   `docs/audits/2026-03-22-openagentsgemini-first-google-single-gpu-pilot-run-audit.md`
+- first real host-native plugin-conditioned run audit:
+  `docs/audits/2026-03-22-openagentsgemini-first-google-host-native-plugin-conditioned-run-audit.md`
 
 ## Local Requirements
 
@@ -105,6 +107,34 @@ It still refuses to claim:
 - arbitrary machine-family support beyond the committed launch profiles
 - broad cost optimality across Google GPU families
 - broader pretraining completion for `Psion`
+
+## Bounded Lane Overrides
+
+The launcher now also supports bounded lane overrides on top of the committed
+single-node profile:
+
+- `--input-package-descriptor-uri`
+- `--training-command`
+- `--post-training-archive-command`
+- `--post-training-restore-command`
+
+Use these only when the alternate lane still preserves:
+
+- one committed input-package descriptor
+- one explicit training command in the launch manifest
+- one explicit archive or restore posture in the launch manifest
+- the same operator-internal, single-node, no-publication claim boundary
+
+To disable the default post-training restore path for a bounded lane that
+retains archive evidence but does not prove the reference-pilot cold-restore
+surface, pass:
+
+```bash
+--post-training-restore-command __none__
+```
+
+The first committed example of this bounded-override posture is the host-native
+plugin-conditioned Google audit above.
 
 ## 1. Local Preflight
 
