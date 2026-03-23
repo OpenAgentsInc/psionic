@@ -59,6 +59,8 @@ const CUDA_POOL_MAX_CACHED_BUFFERS: usize = 128;
 const CUDA_POOL_MAX_CACHED_BYTES: u64 = 64 * 1024 * 1024;
 const CUDA_EXECUTION_PLAN_CACHE_MAX_ENTRIES: usize = 64;
 const CUDA_EXECUTION_PLAN_CACHE_MAX_CACHED_BYTES: u64 = 1024 * 1024;
+const HOST_FALLBACK_PARALLEL_MIN_ELEMENTS: usize = 16 * 1024;
+const HOST_FALLBACK_PARALLEL_MIN_CHUNK_ELEMENTS: usize = 1024;
 
 /// Exact plan surface currently covered by the first CUDA-backed served-product
 /// milestone.
@@ -3354,10 +3356,8 @@ impl AvailableCudaBackend {
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Permute { axes } => {
-                    let output = execute_profiled_host_fallback(
-                        &mut host_fallback_profile,
-                        step,
-                        || {
+                    let output =
+                        execute_profiled_host_fallback(&mut host_fallback_profile, step, || {
                             let input = step_input(step, &values, 0)?;
                             let values_out = permute_contiguous_values(
                                 &input.read_f32()?,
@@ -3365,15 +3365,12 @@ impl AvailableCudaBackend {
                                 axes,
                             )?;
                             self.materialize_host_view_step(step, &values_out)
-                        },
-                    )?;
+                        })?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Slice { axis, start, end } => {
-                    let output = execute_profiled_host_fallback(
-                        &mut host_fallback_profile,
-                        step,
-                        || {
+                    let output =
+                        execute_profiled_host_fallback(&mut host_fallback_profile, step, || {
                             let input = step_input(step, &values, 0)?;
                             let values_out = slice_contiguous_values(
                                 &input.read_f32()?,
@@ -3383,15 +3380,12 @@ impl AvailableCudaBackend {
                                 *end,
                             )?;
                             self.materialize_host_view_step(step, &values_out)
-                        },
-                    )?;
+                        })?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Select { axis, index } => {
-                    let output = execute_profiled_host_fallback(
-                        &mut host_fallback_profile,
-                        step,
-                        || {
+                    let output =
+                        execute_profiled_host_fallback(&mut host_fallback_profile, step, || {
                             let input = step_input(step, &values, 0)?;
                             let values_out = select_contiguous_values(
                                 &input.read_f32()?,
@@ -3400,15 +3394,12 @@ impl AvailableCudaBackend {
                                 *index,
                             )?;
                             self.materialize_host_view_step(step, &values_out)
-                        },
-                    )?;
+                        })?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Concat { axis } => {
-                    let output = execute_profiled_host_fallback(
-                        &mut host_fallback_profile,
-                        step,
-                        || {
+                    let output =
+                        execute_profiled_host_fallback(&mut host_fallback_profile, step, || {
                             let tensors = step
                                 .inputs
                                 .iter()
@@ -3426,29 +3417,22 @@ impl AvailableCudaBackend {
                                 .iter()
                                 .map(|buffer| buffer.spec().shape().dims().to_vec())
                                 .collect::<Vec<_>>();
-                            let value_refs = value_slices
-                                .iter()
-                                .map(Vec::as_slice)
-                                .collect::<Vec<_>>();
-                            let shape_refs = shape_slices
-                                .iter()
-                                .map(Vec::as_slice)
-                                .collect::<Vec<_>>();
+                            let value_refs =
+                                value_slices.iter().map(Vec::as_slice).collect::<Vec<_>>();
+                            let shape_refs =
+                                shape_slices.iter().map(Vec::as_slice).collect::<Vec<_>>();
                             let values_out = concat_contiguous_values(
                                 value_refs.as_slice(),
                                 shape_refs.as_slice(),
                                 *axis,
                             )?;
                             self.materialize_host_view_step(step, &values_out)
-                        },
-                    )?;
+                        })?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Expand { shape } => {
-                    let output = execute_profiled_host_fallback(
-                        &mut host_fallback_profile,
-                        step,
-                        || {
+                    let output =
+                        execute_profiled_host_fallback(&mut host_fallback_profile, step, || {
                             let input = step_input(step, &values, 0)?;
                             let values_out = expand_contiguous_values(
                                 &input.read_f32()?,
@@ -3456,8 +3440,7 @@ impl AvailableCudaBackend {
                                 shape.dims(),
                             )?;
                             self.materialize_host_view_step(step, &values_out)
-                        },
-                    )?;
+                        })?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Cast { dtype } => {
@@ -3465,26 +3448,20 @@ impl AvailableCudaBackend {
                     let output = if input.spec().dtype() == *dtype {
                         input.alias_with_spec(&step.spec)?
                     } else {
-                        execute_profiled_host_fallback(
-                            &mut host_fallback_profile,
-                            step,
-                            || {
-                                let values_out = cast_contiguous_values(
-                                    &input.read_f32()?,
-                                    input.spec().dtype(),
-                                    *dtype,
-                                )?;
-                                self.materialize_host_view_step(step, &values_out)
-                            },
-                        )?
+                        execute_profiled_host_fallback(&mut host_fallback_profile, step, || {
+                            let values_out = cast_contiguous_values(
+                                &input.read_f32()?,
+                                input.spec().dtype(),
+                                *dtype,
+                            )?;
+                            self.materialize_host_view_step(step, &values_out)
+                        })?
                     };
                     values.insert(step.output, output);
                 }
                 ExecutionOp::ReduceSum { axis } => {
-                    let output = execute_profiled_host_fallback(
-                        &mut host_fallback_profile,
-                        step,
-                        || {
+                    let output =
+                        execute_profiled_host_fallback(&mut host_fallback_profile, step, || {
                             let input = step_input(step, &values, 0)?;
                             let values_out = reduce_sum_contiguous_values(
                                 &input.read_f32()?,
@@ -3492,8 +3469,7 @@ impl AvailableCudaBackend {
                                 *axis,
                             )?;
                             self.materialize_host_view_step(step, &values_out)
-                        },
-                    )?;
+                        })?;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Add => {
@@ -4229,18 +4205,46 @@ fn permute_contiguous_values(
             axes.len()
         )));
     }
-    let output_shape = axes.iter().map(|&axis| input_shape[axis]).collect::<Vec<_>>();
+    let output_shape = axes
+        .iter()
+        .map(|&axis| input_shape[axis])
+        .collect::<Vec<_>>();
     let input_strides = contiguous_strides(input_shape);
     let output_strides = contiguous_strides(&output_shape);
     let mut output = vec![0.0_f32; output_shape.iter().product()];
-    for output_linear in 0..output.len() {
-        let output_coords = linear_to_coords(output_linear, &output_shape, &output_strides);
-        let mut input_coords = vec![0_usize; input_shape.len()];
-        for (output_axis, &input_axis) in axes.iter().enumerate() {
-            input_coords[input_axis] = output_coords[output_axis];
+    let chunk_len = host_fallback_chunk_len(output.len());
+    let fill_chunk = |chunk_index: usize, chunk: &mut [f32]| {
+        let start_linear = chunk_index.saturating_mul(chunk_len);
+        let last_offset = chunk.len().saturating_sub(1);
+        let mut output_coords = vec![0_usize; output_shape.len()];
+        linear_to_coords_in_place(
+            start_linear,
+            &output_shape,
+            &output_strides,
+            output_coords.as_mut_slice(),
+        );
+        for (offset, output_value) in chunk.iter_mut().enumerate() {
+            let mut input_linear = 0_usize;
+            for (output_axis, &input_axis) in axes.iter().enumerate() {
+                input_linear = input_linear.saturating_add(
+                    output_coords[output_axis].saturating_mul(input_strides[input_axis]),
+                );
+            }
+            *output_value = values[input_linear];
+            if offset != last_offset {
+                advance_coords(output_coords.as_mut_slice(), &output_shape);
+            }
         }
-        let input_linear = coords_to_linear(&input_coords, &input_strides);
-        output[output_linear] = values[input_linear];
+    };
+    if output.len() >= HOST_FALLBACK_PARALLEL_MIN_ELEMENTS {
+        output
+            .par_chunks_mut(chunk_len)
+            .enumerate()
+            .for_each(|(chunk_index, chunk)| fill_chunk(chunk_index, chunk));
+    } else {
+        for (chunk_index, chunk) in output.chunks_mut(chunk_len).enumerate() {
+            fill_chunk(chunk_index, chunk);
+        }
     }
     Ok(output)
 }
@@ -4383,14 +4387,40 @@ fn expand_contiguous_values(
     let input_strides = contiguous_strides(&padded_input);
     let output_strides = contiguous_strides(output_shape);
     let mut output = vec![0.0_f32; output_shape.iter().product()];
-    for output_linear in 0..output.len() {
-        let output_coords = linear_to_coords(output_linear, output_shape, &output_strides);
-        let mut input_coords = Vec::with_capacity(output_shape.len());
-        for (axis, &coord) in output_coords.iter().enumerate() {
-            input_coords.push(if padded_input[axis] == 1 { 0 } else { coord });
+    let chunk_len = host_fallback_chunk_len(output.len());
+    let fill_chunk = |chunk_index: usize, chunk: &mut [f32]| {
+        let start_linear = chunk_index.saturating_mul(chunk_len);
+        let last_offset = chunk.len().saturating_sub(1);
+        let mut output_coords = vec![0_usize; output_shape.len()];
+        linear_to_coords_in_place(
+            start_linear,
+            output_shape,
+            &output_strides,
+            output_coords.as_mut_slice(),
+        );
+        for (offset, output_value) in chunk.iter_mut().enumerate() {
+            let mut input_linear = 0_usize;
+            for axis in 0..output_shape.len() {
+                if padded_input[axis] != 1 {
+                    input_linear = input_linear
+                        .saturating_add(output_coords[axis].saturating_mul(input_strides[axis]));
+                }
+            }
+            *output_value = values[input_linear];
+            if offset != last_offset {
+                advance_coords(output_coords.as_mut_slice(), output_shape);
+            }
         }
-        let input_linear = coords_to_linear(&input_coords, &input_strides);
-        output[output_linear] = values[input_linear];
+    };
+    if output.len() >= HOST_FALLBACK_PARALLEL_MIN_ELEMENTS {
+        output
+            .par_chunks_mut(chunk_len)
+            .enumerate()
+            .for_each(|(chunk_index, chunk)| fill_chunk(chunk_index, chunk));
+    } else {
+        for (chunk_index, chunk) in output.chunks_mut(chunk_len).enumerate() {
+            fill_chunk(chunk_index, chunk);
+        }
     }
     Ok(output)
 }
@@ -4413,24 +4443,52 @@ fn reduce_sum_contiguous_values(
     let input_strides = contiguous_strides(input_shape);
     let output_strides = contiguous_strides(&output_shape);
     let mut output = vec![0.0_f32; output_shape.iter().product::<usize>().max(1)];
-    for output_linear in 0..output.len() {
-        let output_coords = linear_to_coords(output_linear, &output_shape, &output_strides);
-        let mut sum = 0.0_f32;
-        for reduced_index in 0..input_shape[axis] {
-            let mut input_coords = Vec::with_capacity(input_shape.len());
+    let reduction_len = input_shape[axis];
+    let reduction_stride = input_strides[axis];
+    let chunk_len = host_fallback_chunk_len(output.len());
+    let fill_chunk = |chunk_index: usize, chunk: &mut [f32]| {
+        let start_linear = chunk_index.saturating_mul(chunk_len);
+        let last_offset = chunk.len().saturating_sub(1);
+        let mut output_coords = vec![0_usize; output_shape.len()];
+        linear_to_coords_in_place(
+            start_linear,
+            &output_shape,
+            &output_strides,
+            output_coords.as_mut_slice(),
+        );
+        for (offset, output_value) in chunk.iter_mut().enumerate() {
+            let mut base_linear = 0_usize;
             let mut output_axis = 0;
             for input_axis in 0..input_shape.len() {
                 if input_axis == axis {
-                    input_coords.push(reduced_index);
-                } else {
-                    input_coords.push(output_coords[output_axis]);
-                    output_axis += 1;
+                    continue;
                 }
+                base_linear = base_linear.saturating_add(
+                    output_coords[output_axis].saturating_mul(input_strides[input_axis]),
+                );
+                output_axis += 1;
             }
-            let input_linear = coords_to_linear(&input_coords, &input_strides);
-            sum += values[input_linear];
+
+            let mut sum = 0.0_f32;
+            for reduced_index in 0..reduction_len {
+                sum += values
+                    [base_linear.saturating_add(reduced_index.saturating_mul(reduction_stride))];
+            }
+            *output_value = sum;
+            if offset != last_offset {
+                advance_coords(output_coords.as_mut_slice(), &output_shape);
+            }
         }
-        output[output_linear] = sum;
+    };
+    if output.len() >= HOST_FALLBACK_PARALLEL_MIN_ELEMENTS {
+        output
+            .par_chunks_mut(chunk_len)
+            .enumerate()
+            .for_each(|(chunk_index, chunk)| fill_chunk(chunk_index, chunk));
+    } else {
+        for (chunk_index, chunk) in output.chunks_mut(chunk_len).enumerate() {
+            fill_chunk(chunk_index, chunk);
+        }
     }
     Ok(output)
 }
@@ -4445,16 +4503,46 @@ fn contiguous_strides(shape: &[usize]) -> Vec<usize> {
     strides
 }
 
-fn linear_to_coords(linear: usize, shape: &[usize], strides: &[usize]) -> Vec<usize> {
+fn host_fallback_chunk_len(total_elements: usize) -> usize {
+    if total_elements <= 1 {
+        return 1;
+    }
+    let target_chunks = rayon::current_num_threads().max(1).saturating_mul(4);
+    total_elements
+        .div_ceil(target_chunks)
+        .max(HOST_FALLBACK_PARALLEL_MIN_CHUNK_ELEMENTS)
+        .min(total_elements)
+}
+
+fn linear_to_coords_in_place(
+    linear: usize,
+    shape: &[usize],
+    strides: &[usize],
+    coords: &mut [usize],
+) {
     if shape.is_empty() {
-        return Vec::new();
+        return;
     }
     let mut remaining = linear;
-    let mut coords = vec![0; shape.len()];
     for axis in 0..shape.len() {
         coords[axis] = remaining / strides[axis];
         remaining %= strides[axis];
     }
+}
+
+fn advance_coords(coords: &mut [usize], shape: &[usize]) {
+    for axis in (0..coords.len()).rev() {
+        coords[axis] += 1;
+        if coords[axis] < shape[axis] {
+            return;
+        }
+        coords[axis] = 0;
+    }
+}
+
+fn linear_to_coords(linear: usize, shape: &[usize], strides: &[usize]) -> Vec<usize> {
+    let mut coords = vec![0; shape.len()];
+    linear_to_coords_in_place(linear, shape, strides, coords.as_mut_slice());
     coords
 }
 
@@ -9963,6 +10051,37 @@ mod tests {
         assert_eq!(retain_counts.get(&right.id()).copied(), Some(2));
         assert_eq!(retain_counts.get(&summed.id()).copied(), Some(1));
         assert_eq!(retain_counts.get(&scaled.id()).copied(), Some(1));
+        Ok(())
+    }
+
+    #[test]
+    fn permute_contiguous_values_matches_expected_layout() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let values = vec![0.0_f32, 1.0, 2.0, 3.0, 4.0, 5.0];
+        let permuted = super::permute_contiguous_values(&values, &[2, 3], &[1, 0])?;
+        assert_eq!(permuted, vec![0.0, 3.0, 1.0, 4.0, 2.0, 5.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn expand_contiguous_values_repeats_broadcast_dimensions(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let values = vec![10.0_f32, 20.0];
+        let expanded = super::expand_contiguous_values(&values, &[1, 2], &[3, 2])?;
+        assert_eq!(expanded, vec![10.0, 20.0, 10.0, 20.0, 10.0, 20.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn reduce_sum_contiguous_values_reduces_requested_axis(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let values = vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0];
+        let reduced = super::reduce_sum_contiguous_values(&values, &[2, 3], Some(1))?;
+        assert_eq!(reduced, vec![6.0, 15.0]);
+        assert_eq!(
+            super::reduce_sum_contiguous_values(&values, &[2, 3], None)?,
+            vec![21.0]
+        );
         Ok(())
     }
 
