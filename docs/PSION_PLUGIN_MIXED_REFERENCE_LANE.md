@@ -78,3 +78,18 @@ This issue does not yet claim:
 - cluster-scale plugin-conditioned training readiness
 
 It is only the first truthful bounded mixed reference lane.
+
+## First Google Operator Proof
+
+The first real Google-hosted mixed operator proof now lives at:
+
+- `docs/audits/2026-03-22-openagentsgemini-first-google-mixed-plugin-conditioned-run-audit.md`
+
+That audit proves the bounded mixed lane on real operator infrastructure,
+retains the guest benchmark bundle plus the run-derived mixed capability matrix
+and served posture, and keeps the claim boundary explicit:
+
+- real single-node Google operator proof now exists
+- mixed host-native plus guest-artifact evidence is retained end to end
+- the lane was still CPU-bound on the L4 host, so this is not yet
+  accelerator-backed throughput proof

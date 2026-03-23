@@ -51,6 +51,8 @@ checkpoints.
   `docs/audits/2026-03-22-openagentsgemini-first-google-single-gpu-pilot-run-audit.md`
 - first real host-native plugin-conditioned run audit:
   `docs/audits/2026-03-22-openagentsgemini-first-google-host-native-plugin-conditioned-run-audit.md`
+- first real mixed plugin-conditioned run audit:
+  `docs/audits/2026-03-22-openagentsgemini-first-google-mixed-plugin-conditioned-run-audit.md`
 
 ## Local Requirements
 
@@ -134,7 +136,8 @@ surface, pass:
 ```
 
 The first committed example of this bounded-override posture is the host-native
-plugin-conditioned Google audit above.
+plugin-conditioned Google audit above, followed by the mixed plugin-conditioned
+Google audit.
 
 ## 1. Local Preflight
 
