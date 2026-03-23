@@ -477,7 +477,7 @@ trap 'on_signal TERM' TERM
 trap 'on_signal INT' INT
 
 main() {
-  local run_id bucket_url repo_clone_url git_revision training_command workspace_root
+  local run_id bucket_url repo_clone_url git_revision pre_training_command training_command workspace_root
   local output_subdir log_subdir scratch_subdir repo_subdir low_disk_watermark_gb toolchain
   local apt_packages
   local input_package_descriptor_uri input_package_archive_uri input_package_archive_sha256
@@ -493,6 +493,7 @@ main() {
   bucket_url="$(metadata_value psion-bucket-url)"
   repo_clone_url="$(metadata_value psion-repo-clone-url)"
   git_revision="$(metadata_value psion-git-revision)"
+  pre_training_command="$(metadata_value_optional psion-pre-training-command)"
   training_command="$(metadata_value psion-training-command)"
   workspace_root="$(metadata_value psion-workspace-root)"
   output_subdir="$(metadata_value psion-output-subdir)"
@@ -604,6 +605,48 @@ main() {
   export CARGO_TARGET_DIR="${scratch_dir}/cargo-target"
 
   entrypoint_file="${RUN_ROOT}/psion_google_training_entrypoint.sh"
+  if [[ -n "${pre_training_command}" ]]; then
+    local pre_training_entrypoint_file
+    pre_training_entrypoint_file="${RUN_ROOT}/psion_google_pre_training_entrypoint.sh"
+    cat > "${pre_training_entrypoint_file}" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "${HOME}/.cargo/env"
+export PSION_RUN_ID="${PSION_RUN_ID}"
+export PSION_BUCKET_URL="${PSION_BUCKET_URL}"
+export PSION_WORKSPACE_ROOT="${PSION_WORKSPACE_ROOT}"
+export PSION_OUTPUT_DIR="${PSION_OUTPUT_DIR}"
+export PSION_LOG_DIR="${PSION_LOG_DIR}"
+export PSION_SCRATCH_DIR="${PSION_SCRATCH_DIR}"
+export PSION_REPO_DIR="${PSION_REPO_DIR}"
+export PSION_INPUT_PACKAGE_ROOT="${PSION_INPUT_PACKAGE_ROOT}"
+export PSION_INPUT_PACKAGE_DESCRIPTOR="${PSION_INPUT_PACKAGE_DESCRIPTOR}"
+export PSION_INPUT_PACKAGE_DESCRIPTOR_URI="${PSION_INPUT_PACKAGE_DESCRIPTOR_URI}"
+export PSION_INPUT_PACKAGE_MANIFEST="${PSION_INPUT_PACKAGE_MANIFEST}"
+export PSION_INPUT_MATERIALIZATION_MODE="${PSION_INPUT_MATERIALIZATION_MODE}"
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR}"
+cd "${repo_dir}"
+${pre_training_command}
+EOF
+    chmod +x "${pre_training_entrypoint_file}"
+    emit_event "pre_training_started" "Running the repo-owned pre-training command before measured accelerator validation."
+    set +e
+    "${pre_training_entrypoint_file}" \
+      > "${log_dir}/pre_training.stdout.log" \
+      2> "${log_dir}/pre_training.stderr.log"
+    TRAINING_EXIT_CODE="$?"
+    set -e
+    if (( TRAINING_EXIT_CODE != 0 )); then
+      FAILURE_CODE="bootstrap_failure"
+      FAILURE_DETAIL="pre-training command exited with status ${TRAINING_EXIT_CODE}"
+      emit_event "pre_training_failed" "${FAILURE_DETAIL}"
+      finalize_run
+      exit "${TRAINING_EXIT_CODE}"
+    fi
+    emit_event "pre_training_completed" "The repo-owned pre-training command completed before the measured training window."
+    check_free_disk_gb "${RUN_ROOT}" "${low_disk_watermark_gb}"
+  fi
+
   cat > "${entrypoint_file}" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail

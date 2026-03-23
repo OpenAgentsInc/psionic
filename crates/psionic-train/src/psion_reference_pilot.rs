@@ -6,7 +6,7 @@ use std::{
 
 use psionic_backend_cuda::CudaBackend;
 use psionic_cluster::NodeId;
-use psionic_core::{DType, Device, Shape, TensorData, TensorSpec};
+use psionic_core::{DType, Device, Shape, TensorData, TensorId, TensorSpec};
 use psionic_data::{
     build_psion_reference_corpus, DatasetSplitKind, PsionArtifactLineageManifest,
     PsionReferenceCorpusBundle, PsionReferenceCorpusError, PsionReferenceEncodedSequence,
@@ -15,13 +15,17 @@ use psionic_data::{
 use psionic_datastream::{
     DatastreamCheckpointBinding, DatastreamEncoding, DatastreamManifestRef, DatastreamSubjectKind,
 };
+use psionic_ir::{
+    evaluate_graph, AutodiffBackwardPlan, AutodiffContext, AutodiffError, AutodiffGraph,
+    AutodiffGraphBuilder, GraphError, ReferenceEvaluationError,
+};
 use psionic_models::{
     PsionCompactDecoderDescriptor, PsionCompactDecoderError, PsionCompactDecoderSizeAnchor,
     PsionCompactDecoderTokenizerBinding, PsionCompactDecoderTokenizerFamily,
 };
 use psionic_runtime::{
     DeliveredExecutionContext, DeviceDescriptor, DeviceInventoryQualifiers, DeviceMemoryClass,
-    DevicePerformanceClass, TrainingCheckpointReference,
+    DevicePerformanceClass, RuntimeError, TrainingCheckpointReference,
 };
 use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -71,6 +75,7 @@ use crate::{
 const TOKEN_EMBEDDING_GROUP_ID: &str = "decoder.embed_tokens.weight";
 const POSITION_EMBEDDING_GROUP_ID: &str = "decoder.embed_positions.weight";
 const LM_HEAD_BIAS_GROUP_ID: &str = "lm_head.bias";
+const ACCELERATED_REFERENCE_BATCH_ROWS: usize = 8_192;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionReferencePilotCheckpointManifest {
@@ -182,8 +187,8 @@ impl PsionReferencePilotConfig {
             stage_id: String::from("psion-accelerated-reference-pretrain-stage"),
             checkpoint_family: String::from("train.psion.accelerated_reference_pilot"),
             started_at_ms: 1_774_320_100_000,
-            step_duration_ms: 40,
-            budget: TrainingLoopBudget::new(16, 4, 1)?,
+            step_duration_ms: 1_000,
+            budget: TrainingLoopBudget::new(4, 1, 1)?,
             optimizer: TrainingOptimizerConfig::adamw(0.0005, 0.9, 0.99, 1e-8)
                 .with_weight_decay(0.01),
         })
@@ -391,6 +396,14 @@ pub enum PsionReferencePilotError {
     ArtifactStorage(#[from] TrainArtifactStorageError),
     #[error(transparent)]
     TrainingCore(#[from] TrainingCoreError),
+    #[error(transparent)]
+    Graph(#[from] GraphError),
+    #[error(transparent)]
+    Autodiff(#[from] AutodiffError),
+    #[error(transparent)]
+    ReferenceEvaluation(#[from] ReferenceEvaluationError),
+    #[error(transparent)]
+    Runtime(#[from] RuntimeError),
     #[error("accelerated reference pilot requires a visible CUDA device: {detail}")]
     CudaBackendUnavailable { detail: String },
     #[error("reference pilot checkpoint serialization failed: {message}")]
@@ -426,6 +439,17 @@ pub(crate) struct PsionCompactDecoderReferencePilotModel {
 struct PilotLossSummary {
     mean_loss: f32,
     loss_by_family_milli: BTreeMap<String, u32>,
+}
+
+#[derive(Clone, Debug)]
+struct PsionAcceleratedGradientProgram {
+    graph: AutodiffGraph,
+    backward_plan: AutodiffBackwardPlan,
+    hidden_input_tensor_id: TensorId,
+    token_embeddings_tensor_id: TensorId,
+    lm_head_bias_tensor_id: TensorId,
+    target_ids_tensor_id: TensorId,
+    loss_tensor_id: TensorId,
 }
 
 pub fn run_psion_reference_pilot(
@@ -552,7 +576,7 @@ pub fn run_psion_accelerated_reference_pilot(
     let initial_validation_summary = evaluate_examples(&initial_model, &validation_examples);
     let initial_held_out_summary = evaluate_examples(&initial_model, &held_out_examples);
 
-    let cuda_backend = CudaBackend::new();
+    let mut cuda_backend = CudaBackend::new();
     let Some(selected_device) = cuda_backend.selected_device().cloned() else {
         let detail = cuda_backend
             .discovery_report()
@@ -562,6 +586,15 @@ pub fn run_psion_accelerated_reference_pilot(
     };
     let delivered_execution = accelerated_delivered_execution(&selected_device);
     let training_device = selected_device.device.clone();
+    let accelerated_train_examples = build_accelerated_train_examples(
+        train_examples.as_slice(),
+        ACCELERATED_REFERENCE_BATCH_ROWS,
+    );
+    let accelerated_gradient_program = build_accelerated_gradient_program(
+        training_device.clone(),
+        &model_descriptor,
+        accelerated_train_examples.len(),
+    )?;
 
     let parameter_groups = build_parameter_groups_for_execution(
         &initial_model,
@@ -579,8 +612,13 @@ pub fn run_psion_accelerated_reference_pilot(
     let mut current_model = initial_model.clone();
     let mut step_receipts = Vec::new();
     for step_index in 0..config.budget.max_steps {
-        let batch =
-            build_gradient_batch_for_device(&current_model, &train_examples, &training_device)?;
+        let batch = build_accelerated_gradient_batch(
+            &mut cuda_backend,
+            &accelerated_gradient_program,
+            &current_model,
+            accelerated_train_examples.as_slice(),
+            &training_device,
+        )?;
         let started_at_ms = config
             .started_at_ms
             .saturating_add(step_index.saturating_mul(config.step_duration_ms));
@@ -651,7 +689,7 @@ pub fn run_psion_accelerated_reference_pilot(
         &stage_receipt,
         &checkpoint_artifact,
         &step_receipts,
-        train_examples.as_slice(),
+        accelerated_train_examples.as_slice(),
         validation_examples.as_slice(),
         held_out_examples.as_slice(),
         &selected_device,
@@ -2121,6 +2159,342 @@ fn build_examples_from_sequences(
         }
     }
     examples
+}
+
+fn build_accelerated_train_examples(
+    examples: &[PsionReferenceTrainingExample],
+    target_rows: usize,
+) -> Vec<PsionReferenceTrainingExample> {
+    if examples.is_empty() {
+        return Vec::new();
+    }
+    let row_count = target_rows.max(examples.len());
+    let mut expanded = Vec::with_capacity(row_count);
+    for index in 0..row_count {
+        expanded.push(examples[index % examples.len()].clone());
+    }
+    expanded
+}
+
+fn build_accelerated_gradient_program(
+    device: Device,
+    descriptor: &PsionCompactDecoderDescriptor,
+    batch_size: usize,
+) -> Result<PsionAcceleratedGradientProgram, PsionReferencePilotError> {
+    let hidden_size = descriptor.config.hidden_size;
+    let vocab_size = descriptor.config.vocab_size;
+    let mut builder = AutodiffGraphBuilder::with_context(device, AutodiffContext::training());
+    let hidden_inputs = builder.input(
+        "psion_accelerated_hidden_inputs",
+        Shape::new(vec![batch_size, hidden_size]),
+        DType::F32,
+        true,
+    );
+    let token_embeddings = builder.input(
+        TOKEN_EMBEDDING_GROUP_ID,
+        Shape::new(vec![vocab_size, hidden_size]),
+        DType::F32,
+        true,
+    );
+    let lm_head_bias = builder.input(
+        LM_HEAD_BIAS_GROUP_ID,
+        Shape::new(vec![vocab_size]),
+        DType::F32,
+        true,
+    );
+    let target_ids = builder.input(
+        "psion_accelerated_target_ids",
+        Shape::new(vec![batch_size, 1]),
+        DType::F32,
+        false,
+    );
+    let transposed_embeddings = builder.permute(&token_embeddings, vec![1, 0])?;
+    let logits_2d = builder.matmul(&hidden_inputs, &transposed_embeddings)?;
+    let biased_logits = builder.add(&logits_2d, &lm_head_bias)?;
+    let logits = builder.reshape(&biased_logits, Shape::new(vec![batch_size, 1, vocab_size]))?;
+    let loss = builder.parameter_golf_projection_loss(&logits, &target_ids, 30.0)?;
+    let graph = builder.finish(vec![loss.clone()]);
+    let backward_plan = graph.backward_plan(loss.id())?;
+    Ok(PsionAcceleratedGradientProgram {
+        graph,
+        backward_plan,
+        hidden_input_tensor_id: hidden_inputs.id(),
+        token_embeddings_tensor_id: token_embeddings.id(),
+        lm_head_bias_tensor_id: lm_head_bias.id(),
+        target_ids_tensor_id: target_ids.id(),
+        loss_tensor_id: loss.id(),
+    })
+}
+
+fn build_accelerated_gradient_batch(
+    cuda_backend: &mut CudaBackend,
+    program: &PsionAcceleratedGradientProgram,
+    model: &PsionCompactDecoderReferencePilotModel,
+    examples: &[PsionReferenceTrainingExample],
+    device: &Device,
+) -> Result<crate::TrainingGradientBatch, PsionReferencePilotError> {
+    let hidden_inputs = build_accelerated_hidden_inputs(model, examples);
+    let target_ids = examples
+        .iter()
+        .flat_map(|example| [example.target_token_id as f32])
+        .collect::<Vec<_>>();
+    let primal_inputs = BTreeMap::from([
+        (
+            program.hidden_input_tensor_id,
+            TensorData::F32(hidden_inputs.clone()),
+        ),
+        (
+            program.token_embeddings_tensor_id,
+            TensorData::F32(model.token_embeddings.clone()),
+        ),
+        (
+            program.lm_head_bias_tensor_id,
+            TensorData::F32(model.lm_head_bias.clone()),
+        ),
+        (program.target_ids_tensor_id, TensorData::F32(target_ids)),
+    ]);
+    let forward_values = evaluate_graph(program.graph.graph(), &primal_inputs)?;
+    let loss_value = dense_scalar(
+        forward_values.get(&program.loss_tensor_id).ok_or_else(|| {
+            PsionReferencePilotError::Serialization {
+                message: String::from("accelerated gradient forward pass did not materialize loss"),
+            }
+        })?,
+        "psion_accelerated_loss",
+    )?;
+
+    let mut backward_inputs = BTreeMap::new();
+    for binding in &program.backward_plan.primal_bindings {
+        let value = forward_values
+            .get(&binding.primal_tensor)
+            .ok_or_else(|| PsionReferencePilotError::Serialization {
+                message: format!(
+                    "accelerated gradient pass is missing forward value for tensor {}",
+                    binding.primal_tensor
+                ),
+            })?;
+        let spec = program
+            .backward_plan
+            .gradient_graph
+            .node(binding.gradient_graph_input)
+            .ok_or_else(|| PsionReferencePilotError::Serialization {
+                message: format!(
+                    "accelerated gradient pass is missing backward input tensor {}",
+                    binding.gradient_graph_input
+                ),
+            })?
+            .tensor()
+            .spec()
+            .shape()
+            .clone();
+        backward_inputs.insert(
+            binding.gradient_graph_input,
+            cuda_backend.input_buffer(
+                spec,
+                dense_values(
+                    value,
+                    format!("accelerated forward tensor {}", binding.primal_tensor).as_str(),
+                )?,
+            )?,
+        );
+    }
+    let seed_shape = program
+        .backward_plan
+        .gradient_graph
+        .node(program.backward_plan.seed_input)
+        .ok_or_else(|| PsionReferencePilotError::Serialization {
+            message: String::from("accelerated gradient pass is missing backward seed tensor"),
+        })?
+        .tensor()
+        .spec()
+        .shape()
+        .clone();
+    backward_inputs.insert(
+        program.backward_plan.seed_input,
+        cuda_backend.input_buffer(seed_shape, vec![1.0_f32])?,
+    );
+
+    let backward_result =
+        cuda_backend.compile_and_execute(&program.backward_plan.gradient_graph, &backward_inputs)?;
+    let mut token_gradients = read_cuda_gradient(
+        &backward_result.outputs,
+        program
+            .backward_plan
+            .gradient_for(program.token_embeddings_tensor_id)
+            .ok_or_else(|| PsionReferencePilotError::Serialization {
+                message: String::from(
+                    "accelerated gradient pass is missing token-embedding gradient target",
+                ),
+            })?,
+        TOKEN_EMBEDDING_GROUP_ID,
+    )?;
+    let hidden_input_gradients = read_cuda_gradient(
+        &backward_result.outputs,
+        program
+            .backward_plan
+            .gradient_for(program.hidden_input_tensor_id)
+            .ok_or_else(|| PsionReferencePilotError::Serialization {
+                message: String::from(
+                    "accelerated gradient pass is missing hidden-input gradient target",
+                ),
+            })?,
+        "psion_accelerated_hidden_inputs",
+    )?;
+    let bias_gradients = read_cuda_gradient(
+        &backward_result.outputs,
+        program
+            .backward_plan
+            .gradient_for(program.lm_head_bias_tensor_id)
+            .ok_or_else(|| PsionReferencePilotError::Serialization {
+                message: String::from("accelerated gradient pass is missing bias gradient target"),
+            })?,
+        LM_HEAD_BIAS_GROUP_ID,
+    )?;
+    let mut position_gradients = vec![0.0; model.position_embeddings.len()];
+    scatter_accelerated_hidden_input_gradients(
+        model,
+        examples,
+        hidden_input_gradients.as_slice(),
+        token_gradients.as_mut_slice(),
+        position_gradients.as_mut_slice(),
+    );
+
+    let mut buffers = BTreeMap::new();
+    buffers.insert(
+        String::from(TOKEN_EMBEDDING_GROUP_ID),
+        TrainingTensorBuffer::from_f32(
+            String::from(TOKEN_EMBEDDING_GROUP_ID),
+            TensorSpec::new(
+                Shape::new(vec![model.descriptor.config.vocab_size, model.descriptor.config.hidden_size]),
+                DType::F32,
+                device.clone(),
+            ),
+            token_gradients,
+        )?,
+    );
+    buffers.insert(
+        String::from(POSITION_EMBEDDING_GROUP_ID),
+        TrainingTensorBuffer::from_f32(
+            String::from(POSITION_EMBEDDING_GROUP_ID),
+            TensorSpec::new(
+                Shape::new(vec![model.descriptor.config.max_context, model.descriptor.config.hidden_size]),
+                DType::F32,
+                device.clone(),
+            ),
+            position_gradients,
+        )?,
+    );
+    buffers.insert(
+        String::from(LM_HEAD_BIAS_GROUP_ID),
+        TrainingTensorBuffer::from_f32(
+            String::from(LM_HEAD_BIAS_GROUP_ID),
+            TensorSpec::new(
+                Shape::new(vec![model.descriptor.config.vocab_size]),
+                DType::F32,
+                device.clone(),
+            ),
+            bias_gradients,
+        )?,
+    );
+    Ok(crate::TrainingGradientBatch::new(
+        "psion-accelerated-reference-gradient-batch",
+        loss_value,
+        examples.len() as u32,
+        buffers,
+    ))
+}
+
+fn build_accelerated_hidden_inputs(
+    model: &PsionCompactDecoderReferencePilotModel,
+    examples: &[PsionReferenceTrainingExample],
+) -> Vec<f32> {
+    let hidden_size = model.descriptor.config.hidden_size;
+    let vocab_size = model.descriptor.config.vocab_size;
+    let mut hidden_inputs = Vec::with_capacity(examples.len().saturating_mul(hidden_size));
+    for example in examples {
+        let context_len = example
+            .context_token_ids
+            .len()
+            .min(model.descriptor.config.max_context)
+            .max(1);
+        let mut hidden = vec![0.0; hidden_size];
+        for (position, token_id) in example.context_token_ids.iter().take(context_len).enumerate() {
+            let token_index = (*token_id as usize).min(vocab_size.saturating_sub(1));
+            let token_offset = token_index * hidden_size;
+            let position_offset = position * hidden_size;
+            for index in 0..hidden_size {
+                hidden[index] += model.token_embeddings[token_offset + index];
+                hidden[index] += model.position_embeddings[position_offset + index];
+            }
+        }
+        let scale = 1.0 / context_len as f32;
+        scale_in_place(hidden.as_mut_slice(), scale);
+        hidden_inputs.extend(hidden);
+    }
+    hidden_inputs
+}
+
+fn scatter_accelerated_hidden_input_gradients(
+    model: &PsionCompactDecoderReferencePilotModel,
+    examples: &[PsionReferenceTrainingExample],
+    hidden_input_gradients: &[f32],
+    token_gradients: &mut [f32],
+    position_gradients: &mut [f32],
+) {
+    let hidden_size = model.descriptor.config.hidden_size;
+    let vocab_size = model.descriptor.config.vocab_size;
+    for (example_index, example) in examples.iter().enumerate() {
+        let context_len = example
+            .context_token_ids
+            .len()
+            .min(model.descriptor.config.max_context)
+            .max(1);
+        let row_offset = example_index * hidden_size;
+        let hidden_grad = &hidden_input_gradients[row_offset..row_offset + hidden_size];
+        let input_scale = 1.0 / context_len as f32;
+        for (position, token_id) in example.context_token_ids.iter().take(context_len).enumerate() {
+            let token_index = (*token_id as usize).min(vocab_size.saturating_sub(1));
+            let token_offset = token_index * hidden_size;
+            let position_offset = position * hidden_size;
+            for index in 0..hidden_size {
+                token_gradients[token_offset + index] += hidden_grad[index] * input_scale;
+                position_gradients[position_offset + index] += hidden_grad[index] * input_scale;
+            }
+        }
+    }
+}
+
+fn dense_scalar(data: &TensorData, context: &str) -> Result<f32, PsionReferencePilotError> {
+    let values = dense_values(data, context)?;
+    values
+        .first()
+        .copied()
+        .ok_or_else(|| PsionReferencePilotError::Serialization {
+            message: format!("{context} was empty"),
+        })
+}
+
+fn dense_values(data: &TensorData, context: &str) -> Result<Vec<f32>, PsionReferencePilotError> {
+    match data {
+        TensorData::F32(values) => Ok(values.clone()),
+        TensorData::QuantizedBlocks(_) => Err(PsionReferencePilotError::Serialization {
+            message: format!("{context} must be dense f32"),
+        }),
+    }
+}
+
+fn read_cuda_gradient(
+    outputs: &BTreeMap<TensorId, psionic_backend_cuda::CudaBuffer>,
+    tensor_id: TensorId,
+    context: &str,
+) -> Result<Vec<f32>, PsionReferencePilotError> {
+    outputs
+        .get(&tensor_id)
+        .ok_or_else(|| PsionReferencePilotError::Serialization {
+            message: format!("accelerated gradient pass is missing CUDA output for {context}"),
+        })?
+        .read_f32()
+        .map_err(PsionReferencePilotError::from)
 }
 
 fn build_gradient_batch(

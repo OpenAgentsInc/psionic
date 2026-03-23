@@ -706,9 +706,13 @@ if [[ "${accelerator_validation_required}" == "true" ]]; then
     accelerator_failure_reasons+=("zero_optimizer_steps_completed")
   fi
 fi
-accelerator_failure_reasons_json="$(
-  printf '%s\n' "${accelerator_failure_reasons[@]}" | jq -R . | jq -s '.'
-)"
+if (( ${#accelerator_failure_reasons[@]} == 0 )); then
+  accelerator_failure_reasons_json='[]'
+else
+  accelerator_failure_reasons_json="$(
+    printf '%s\n' "${accelerator_failure_reasons[@]}" | jq -R . | jq -s '.'
+  )"
+fi
 accelerator_backed_pass=true
 if [[ "${accelerator_validation_required}" == "true" && "${accelerator_failure_reasons_json}" != "[]" ]]; then
   accelerator_backed_pass=false

@@ -8,6 +8,7 @@ ZONE="${ZONE:-}"
 RUN_ID="${RUN_ID:-}"
 INSTANCE_NAME="${INSTANCE_NAME:-}"
 INPUT_PACKAGE_DESCRIPTOR_URI_OVERRIDE="${INPUT_PACKAGE_DESCRIPTOR_URI_OVERRIDE:-}"
+PRE_TRAINING_COMMAND_OVERRIDE="${PRE_TRAINING_COMMAND_OVERRIDE:-}"
 TRAINING_COMMAND_OVERRIDE="${TRAINING_COMMAND_OVERRIDE:-}"
 POST_TRAINING_ARCHIVE_COMMAND_OVERRIDE="${POST_TRAINING_ARCHIVE_COMMAND_OVERRIDE:-}"
 POST_TRAINING_RESTORE_COMMAND_OVERRIDE="${POST_TRAINING_RESTORE_COMMAND_OVERRIDE:-}"
@@ -24,6 +25,8 @@ Options:
   --instance-name <name>      Override the generated instance name.
   --input-package-descriptor-uri <uri>
                               Override the committed input-package descriptor.
+  --pre-training-command <cmd>
+                              Override the repo-owned pre-training command.
   --training-command <cmd>    Override the repo-owned training command.
   --post-training-archive-command <cmd>
                               Override the post-training archive command.
@@ -53,6 +56,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --input-package-descriptor-uri)
       INPUT_PACKAGE_DESCRIPTOR_URI_OVERRIDE="$2"
+      shift 2
+      ;;
+    --pre-training-command)
+      PRE_TRAINING_COMMAND_OVERRIDE="$2"
       shift 2
       ;;
     --training-command)
@@ -298,6 +305,7 @@ image_project="$(jq -r '.image_policy.image_project' "${LAUNCH_FILE}")"
 image_family="$(jq -r '.image_policy.image_family' "${LAUNCH_FILE}")"
 driver_posture="$(jq -r '.image_policy.driver_posture' "${LAUNCH_FILE}")"
 workspace_root="$(jq -r '.startup_policy.workspace_root' "${LAUNCH_FILE}")"
+pre_training_command="$(jq -r '.startup_policy.pre_training_command // empty' "${LAUNCH_FILE}")"
 training_command="$(jq -r '.startup_policy.training_command' "${LAUNCH_FILE}")"
 post_training_archive_command="$(jq -r '.startup_policy.post_training_archive_command // empty' "${LAUNCH_FILE}")"
 post_training_restore_command="$(jq -r '.startup_policy.post_training_restore_command // empty' "${LAUNCH_FILE}")"
@@ -316,16 +324,22 @@ boot_disk_type="$(jq -r '.boot_disk_type' <<<"${profile_json}")"
 boot_disk_gb="$(jq -r '.boot_disk_gb' <<<"${profile_json}")"
 low_disk_watermark_gb="$(jq -r '.low_disk_watermark_gb' <<<"${profile_json}")"
 declared_run_cost_ceiling_usd="$(jq -r '.declared_run_cost_ceiling_usd' <<<"${profile_json}")"
+profile_pre_training_command="$(jq -r '.startup_policy_overrides.pre_training_command // empty' <<<"${profile_json}")"
 profile_training_command="$(jq -r '.startup_policy_overrides.training_command // empty' <<<"${profile_json}")"
 profile_post_training_archive_command="$(jq -r '.startup_policy_overrides.post_training_archive_command // empty' <<<"${profile_json}")"
 profile_post_training_restore_command="$(jq -r '.startup_policy_overrides.post_training_restore_command // empty' <<<"${profile_json}")"
+if [[ -n "${profile_pre_training_command}" ]]; then
+  pre_training_command="${profile_pre_training_command}"
+fi
 if [[ -n "${profile_training_command}" ]]; then
   training_command="${profile_training_command}"
 fi
 if [[ -n "${profile_post_training_archive_command}" ]]; then
   post_training_archive_command="${profile_post_training_archive_command}"
 fi
-if [[ -n "${profile_post_training_restore_command}" ]]; then
+if [[ "${profile_post_training_restore_command}" == "__none__" ]]; then
+  post_training_restore_command=""
+elif [[ -n "${profile_post_training_restore_command}" ]]; then
   post_training_restore_command="${profile_post_training_restore_command}"
 fi
 
@@ -338,6 +352,11 @@ if [[ -z "${INSTANCE_NAME}" ]]; then
 fi
 if [[ -n "${INPUT_PACKAGE_DESCRIPTOR_URI_OVERRIDE}" ]]; then
   input_package_descriptor_uri="${INPUT_PACKAGE_DESCRIPTOR_URI_OVERRIDE}"
+fi
+if [[ "${PRE_TRAINING_COMMAND_OVERRIDE}" == "__none__" ]]; then
+  pre_training_command=""
+elif [[ -n "${PRE_TRAINING_COMMAND_OVERRIDE}" ]]; then
+  pre_training_command="${PRE_TRAINING_COMMAND_OVERRIDE}"
 fi
 if [[ -n "${TRAINING_COMMAND_OVERRIDE}" ]]; then
   training_command="${TRAINING_COMMAND_OVERRIDE}"
@@ -412,10 +431,12 @@ input_materialization_max_local_gb="$(jq -r '.materialization.max_local_working_
 wait_for_object "${input_package_archive_uri}"
 
 manifest_file="${tmpdir}/psion_google_single_node_launch_manifest.json"
+pre_training_command_file="${tmpdir}/pre_training_command.sh"
 training_command_file="${tmpdir}/training_command.sh"
 apt_packages_file="${tmpdir}/apt_packages.txt"
 post_training_archive_command_file="${tmpdir}/post_training_archive_command.sh"
 post_training_restore_command_file="${tmpdir}/post_training_restore_command.sh"
+printf '%s\n' "${pre_training_command}" > "${pre_training_command_file}"
 printf '%s\n' "${training_command}" > "${training_command_file}"
 printf '%s\n' "${apt_packages}" > "${apt_packages_file}"
 printf '%s\n' "${post_training_archive_command}" > "${post_training_archive_command_file}"
@@ -464,6 +485,7 @@ jq -n \
   --arg startup_script_sha256 "${startup_script_sha256}" \
   --arg repo_clone_url "${repo_clone_url}" \
   --arg git_revision "${git_revision}" \
+  --arg pre_training_command "${pre_training_command}" \
   --arg training_command "${training_command}" \
   --arg post_training_archive_command "${post_training_archive_command}" \
   --arg post_training_restore_command "${post_training_restore_command}" \
@@ -557,6 +579,7 @@ jq -n \
     training: {
       trainer_lane_id: $trainer_lane_id,
       expected_execution_backend: $expected_execution_backend,
+      pre_training_command: (if $pre_training_command == "" then null else $pre_training_command end),
       command: $training_command,
       post_training_archive_command: (if $post_training_archive_command == "" then null else $post_training_archive_command end),
       post_training_restore_command: (if $post_training_restore_command == "" then null else $post_training_restore_command end),
@@ -585,6 +608,9 @@ fi
 create_stdout_file="${tmpdir}/gcloud-create.stdout"
 create_stderr_file="${tmpdir}/gcloud-create.stderr"
 metadata_from_file_arg="startup-script=${STARTUP_SCRIPT},psion-training-command=${training_command_file},psion-apt-packages=${apt_packages_file}"
+if [[ -n "${pre_training_command}" ]]; then
+  metadata_from_file_arg="${metadata_from_file_arg},psion-pre-training-command=${pre_training_command_file}"
+fi
 if [[ -n "${post_training_archive_command}" ]]; then
   metadata_from_file_arg="${metadata_from_file_arg},psion-post-training-archive-command=${post_training_archive_command_file}"
 fi
