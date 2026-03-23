@@ -1,10 +1,10 @@
 # Psion Google Single-GPU Runbook
 
-> Status: canonical `PSION-44` / `#410` runbook, written 2026-03-22 after the
-> Google launch bundle, immutable input package, checkpoint archive, host
-> observability finalizer, and validation folders landed on `main`, then proved
-> by the bounded-success `PSION-45` / `#411` follow-up audit later the same
-> day.
+> Status: canonical `PSION-44` / `#410` runbook, written on March 22, 2026
+> after the Google launch bundle, immutable input package, checkpoint archive,
+> host observability finalizer, and validation folders landed on `main`, then
+> extended on March 23, 2026 after the first truthful accelerator-backed
+> single-node follow-up audit landed.
 
 This runbook is the operator entrypoint for the bounded Google-hosted `Psion`
 pilot lane.
@@ -54,6 +54,13 @@ The default Google single-node profile is now the bounded accelerated lane:
 - profile: `g2_l4_single_node_accelerated`
 - trainer lane: `psion_accelerated_reference_pilot`
 - expected execution backend: `cuda`
+
+The first successful retained run on that lane is:
+
+- Google run id: `psion-g2-l4-accelerated-20260323t074419z`
+- result classification: `bounded_success`
+- audit:
+  `docs/audits/2026-03-23-openagentsgemini-first-google-accelerator-backed-single-node-psion-training-audit.md`
 
 ## Accelerator-Backed Pass Criteria
 
@@ -116,6 +123,8 @@ The committed retained accelerator evidence now includes:
   `docs/audits/2026-03-22-openagentsgemini-gpu-training-pilot-audit.md`
 - first real run audit:
   `docs/audits/2026-03-22-openagentsgemini-first-google-single-gpu-pilot-run-audit.md`
+- first real accelerator-backed single-node run audit:
+  `docs/audits/2026-03-23-openagentsgemini-first-google-accelerator-backed-single-node-psion-training-audit.md`
 - first real host-native plugin-conditioned run audit:
   `docs/audits/2026-03-22-openagentsgemini-first-google-host-native-plugin-conditioned-run-audit.md`
 - first real mixed plugin-conditioned run audit:

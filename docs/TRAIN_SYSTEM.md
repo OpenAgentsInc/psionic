@@ -342,6 +342,11 @@ and now also has:
   purported Google accelerator-backed success now requires explicit `cuda`
   backend truth plus non-zero post-warmup GPU utilization and memory-residency
   evidence retained in the committed accelerator-validation receipt.
+- `docs/audits/2026-03-23-openagentsgemini-first-google-accelerator-backed-single-node-psion-training-audit.md`
+  is the canonical proof record for the first truthful accelerator-backed
+  Google single-node `Psion` run and freezes the actual trainer path, backend
+  truth, GPU-sample truth, throughput truth, checkpoint truth, and post-run VM
+  deletion boundary for the bounded single-node accelerator lane.
 - `docs/audits/2026-03-22-openagentsgemini-first-google-single-gpu-pilot-run-audit.md`
   is the canonical proof record for the first bounded Google single-node
   `Psion` pilot and freezes the typed live-attempt history, retained evidence,
