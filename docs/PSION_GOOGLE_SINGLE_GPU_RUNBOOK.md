@@ -15,7 +15,7 @@ It is intentionally narrow:
 - one region family: `us-central1`
 - one node at a time
 - one Google Compute Engine VM, not a trusted cluster
-- one bounded reference-pilot lane with retained evidence
+- one bounded single-node lane with retained evidence
 
 It does not claim broader pretraining completion, trusted-cluster readiness,
 cross-region orchestration, or production serving readiness for trained
@@ -48,6 +48,12 @@ Every future GPU-training audit must name:
 - the exact trainer command
 - the delivered execution backend
 - whether the run is only GPU-hosted or truly accelerator-backed
+
+The default Google single-node profile is now the bounded accelerated lane:
+
+- profile: `g2_l4_single_node_accelerated`
+- trainer lane: `psion_accelerated_reference_pilot`
+- expected execution backend: `cuda`
 
 ## Canonical Artifacts
 
@@ -172,14 +178,14 @@ Google audit.
 Run the repo-owned operator gate before any paid launch:
 
 ```bash
-bash scripts/psion-google-operator-preflight.sh --profile g2_l4_single_node
+bash scripts/psion-google-operator-preflight.sh --profile g2_l4_single_node_accelerated
 ```
 
 Optional explicit zone override:
 
 ```bash
 bash scripts/psion-google-operator-preflight.sh \
-  --profile g2_l4_single_node \
+  --profile g2_l4_single_node_accelerated \
   --zone us-central1-a
 ```
 
@@ -201,9 +207,10 @@ Before the paid launch, you may upload only the launch manifest, startup-script
 snapshot, and quota-preflight receipt:
 
 ```bash
-RUN_ID="psion-g2-l4-$(date -u +%Y%m%dt%H%M%Sz | tr '[:upper:]' '[:lower:]')"
+RUN_ID="psion-g2-l4-accelerated-$(date -u +%Y%m%dt%H%M%Sz | tr '[:upper:]' '[:lower:]')"
 
 bash scripts/psion-google-launch-single-node.sh \
+  --profile g2_l4_single_node_accelerated \
   --manifest-only \
   --run-id "${RUN_ID}" \
   --instance-name "${RUN_ID}"
@@ -216,6 +223,32 @@ Expected launch artifacts:
 - `gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}/launch/psion_google_quota_preflight.json`
 
 ## 3. Paid Launch
+
+Primary accelerated lane:
+
+- profile: `g2_l4_single_node_accelerated`
+- trainer lane:
+  `cargo run -p psionic-train --example psion_accelerated_reference_pilot -- "$PSION_OUTPUT_DIR"`
+- expected backend: `cuda`
+- fallback order:
+  `us-central1-a`, `us-central1-b`, `us-central1-c`
+
+Launch:
+
+```bash
+RUN_ID="psion-g2-l4-accelerated-$(date -u +%Y%m%dt%H%M%Sz | tr '[:upper:]' '[:lower:]')"
+
+bash scripts/psion-google-launch-single-node.sh \
+  --profile g2_l4_single_node_accelerated \
+  --run-id "${RUN_ID}" \
+  --instance-name "${RUN_ID}"
+```
+
+The launch manifest for this profile now records:
+
+- `trainer_lane_id = psion_accelerated_reference_pilot`
+- `expected_execution_backend = cuda`
+- the exact `cargo run ... psion_accelerated_reference_pilot` training command
 
 Historical CPU-reference lane:
 
@@ -242,6 +275,9 @@ What happens:
 - the VM boots without an external IP on `oa-lightning`
 - the startup script owns bootstrap, repo checkout, input materialization,
   training, checkpoint archive, cold restore, and final evidence upload
+
+For the accelerated profile, the same host lifecycle stays intact, but the VM
+now executes the canonical CUDA trainer instead of the CPU reference bundle.
 
 This historical lane remains acceptable for bounded operator rehearsals and
 CPU-reference evidence retention. It is no longer an acceptable primary target

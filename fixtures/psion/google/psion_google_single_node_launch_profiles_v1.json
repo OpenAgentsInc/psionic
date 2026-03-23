@@ -49,6 +49,8 @@
     {
       "profile_id": "g2_l4_single_node",
       "profile_label": "g2-l4",
+      "trainer_lane_id": "psion_reference_pilot_bundle",
+      "expected_execution_backend": "cpu",
       "machine_type": "g2-standard-8",
       "accelerator_type": "nvidia-l4",
       "accelerator_count": 1,
@@ -63,8 +65,31 @@
       "declared_run_cost_ceiling_usd": 15.0
     },
     {
+      "profile_id": "g2_l4_single_node_accelerated",
+      "profile_label": "g2-l4-accelerated",
+      "trainer_lane_id": "psion_accelerated_reference_pilot",
+      "expected_execution_backend": "cuda",
+      "machine_type": "g2-standard-8",
+      "accelerator_type": "nvidia-l4",
+      "accelerator_count": 1,
+      "boot_disk_type": "pd-balanced",
+      "boot_disk_gb": 200,
+      "low_disk_watermark_gb": 40,
+      "zone_fallback_order": [
+        "us-central1-a",
+        "us-central1-b",
+        "us-central1-c"
+      ],
+      "declared_run_cost_ceiling_usd": 20.0,
+      "startup_policy_overrides": {
+        "training_command": "cargo run -p psionic-train --example psion_accelerated_reference_pilot -- \"$PSION_OUTPUT_DIR\""
+      }
+    },
+    {
       "profile_id": "a2_a100_single_node",
       "profile_label": "a2-a100",
+      "trainer_lane_id": "psion_reference_pilot_bundle",
+      "expected_execution_backend": "cpu",
       "machine_type": "a2-highgpu-1g",
       "accelerator_type": "nvidia-tesla-a100",
       "accelerator_count": 1,

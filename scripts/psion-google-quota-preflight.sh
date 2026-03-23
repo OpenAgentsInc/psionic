@@ -3,7 +3,7 @@
 set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:-openagentsgemini}"
-PROFILE_ID="${PROFILE_ID:-g2_l4_single_node}"
+PROFILE_ID="${PROFILE_ID:-g2_l4_single_node_accelerated}"
 ZONE="${ZONE:-}"
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"

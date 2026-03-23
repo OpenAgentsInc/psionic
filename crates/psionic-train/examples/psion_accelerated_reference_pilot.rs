@@ -12,6 +12,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let config = PsionReferencePilotConfig::accelerated_single_node()?;
     let run = run_psion_accelerated_reference_pilot(root.as_path(), &config)?;
+    run.write_to_dir(output_dir.as_path())?;
     run.write_to_dir_with_prefix(output_dir.as_path(), "psion_accelerated_reference_pilot")?;
 
     println!(

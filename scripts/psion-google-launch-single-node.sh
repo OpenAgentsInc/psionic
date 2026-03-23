@@ -3,7 +3,7 @@
 set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:-openagentsgemini}"
-PROFILE_ID="${PROFILE_ID:-g2_l4_single_node}"
+PROFILE_ID="${PROFILE_ID:-g2_l4_single_node_accelerated}"
 ZONE="${ZONE:-}"
 RUN_ID="${RUN_ID:-}"
 INSTANCE_NAME="${INSTANCE_NAME:-}"
@@ -307,6 +307,8 @@ final_manifest_object="$(jq -r '.teardown_policy.final_manifest_object' "${LAUNC
 input_package_descriptor_uri="$(jq -r '.default_input_package_descriptor_uri' "${LAUNCH_FILE}")"
 
 profile_label="$(jq -r '.profile_label' <<<"${profile_json}")"
+trainer_lane_id="$(jq -r '.trainer_lane_id // "psion_reference_pilot_bundle"' <<<"${profile_json}")"
+expected_execution_backend="$(jq -r '.expected_execution_backend // "cpu"' <<<"${profile_json}")"
 machine_type="$(jq -r '.machine_type' <<<"${profile_json}")"
 accelerator_type="$(jq -r '.accelerator_type' <<<"${profile_json}")"
 accelerator_count="$(jq -r '.accelerator_count' <<<"${profile_json}")"
@@ -314,6 +316,18 @@ boot_disk_type="$(jq -r '.boot_disk_type' <<<"${profile_json}")"
 boot_disk_gb="$(jq -r '.boot_disk_gb' <<<"${profile_json}")"
 low_disk_watermark_gb="$(jq -r '.low_disk_watermark_gb' <<<"${profile_json}")"
 declared_run_cost_ceiling_usd="$(jq -r '.declared_run_cost_ceiling_usd' <<<"${profile_json}")"
+profile_training_command="$(jq -r '.startup_policy_overrides.training_command // empty' <<<"${profile_json}")"
+profile_post_training_archive_command="$(jq -r '.startup_policy_overrides.post_training_archive_command // empty' <<<"${profile_json}")"
+profile_post_training_restore_command="$(jq -r '.startup_policy_overrides.post_training_restore_command // empty' <<<"${profile_json}")"
+if [[ -n "${profile_training_command}" ]]; then
+  training_command="${profile_training_command}"
+fi
+if [[ -n "${profile_post_training_archive_command}" ]]; then
+  post_training_archive_command="${profile_post_training_archive_command}"
+fi
+if [[ -n "${profile_post_training_restore_command}" ]]; then
+  post_training_restore_command="${profile_post_training_restore_command}"
+fi
 
 timestamp_tag="$(date -u '+%Y%m%dt%H%M%Sz' | tr '[:upper:]' '[:lower:]')"
 if [[ -z "${RUN_ID}" ]]; then
@@ -415,6 +429,8 @@ jq -n \
   --arg project_id "${PROJECT_ID}" \
   --arg profile_id "${PROFILE_ID}" \
   --arg profile_label "${profile_label}" \
+  --arg trainer_lane_id "${trainer_lane_id}" \
+  --arg expected_execution_backend "${expected_execution_backend}" \
   --arg zone "${selected_zone}" \
   --arg zone_selection_reason "${zone_selection_reason}" \
   --arg machine_type "${machine_type}" \
@@ -476,6 +492,8 @@ jq -n \
     project_id: $project_id,
     profile_id: $profile_id,
     profile_label: $profile_label,
+    trainer_lane_id: $trainer_lane_id,
+    expected_execution_backend: $expected_execution_backend,
     zone: $zone,
     zone_selection_reason: $zone_selection_reason,
     quota_preflight: $quota_preflight,
@@ -537,6 +555,8 @@ jq -n \
       package_install: $package_install
     },
     training: {
+      trainer_lane_id: $trainer_lane_id,
+      expected_execution_backend: $expected_execution_backend,
       command: $training_command,
       post_training_archive_command: (if $post_training_archive_command == "" then null else $post_training_archive_command end),
       post_training_restore_command: (if $post_training_restore_command == "" then null else $post_training_restore_command end),

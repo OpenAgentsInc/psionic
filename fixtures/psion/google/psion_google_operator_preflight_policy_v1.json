@@ -17,6 +17,7 @@
     "git"
   ],
   "supported_profiles": [
+    "g2_l4_single_node_accelerated",
     "g2_l4_single_node",
     "a2_a100_single_node"
   ],

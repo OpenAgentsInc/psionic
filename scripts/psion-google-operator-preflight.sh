@@ -12,7 +12,7 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 PROJECT_ID="${PROJECT_ID:-$(jq -r '.project_id' "${POLICY_FILE}")}"
-PROFILE_ID="${PROFILE_ID:-g2_l4_single_node}"
+PROFILE_ID="${PROFILE_ID:-g2_l4_single_node_accelerated}"
 ZONE="${ZONE:-}"
 
 usage() {
