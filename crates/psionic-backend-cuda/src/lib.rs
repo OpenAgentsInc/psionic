@@ -2621,6 +2621,33 @@ impl AvailableCudaBackend {
         Ok(buffer)
     }
 
+    fn materialize_host_view_step(
+        &self,
+        step: &ExecutionStep,
+        values: &[f32],
+    ) -> Result<CudaBuffer, RuntimeError> {
+        if step.spec.dtype() != DType::F32 {
+            return Err(RuntimeError::UnsupportedStep(format!(
+                "{} host fallback currently supports only f32 tensors",
+                step.op.label()
+            )));
+        }
+        let contiguous = TensorSpec::new(
+            step.spec.shape().clone(),
+            step.spec.dtype(),
+            step.spec.device().clone(),
+        );
+        if values.len() != contiguous.element_count() {
+            return Err(RuntimeError::Backend(format!(
+                "{} host fallback expected {} logical values, found {}",
+                step.op.label(),
+                contiguous.element_count(),
+                values.len()
+            )));
+        }
+        self.buffer_from_tensor_data(&contiguous, &TensorData::F32(values.to_vec()))
+    }
+
     fn execute_rotary_embedding_step(
         &self,
         submission: &mut CudaSubmission,
@@ -3175,6 +3202,110 @@ impl AvailableCudaBackend {
                 }
                 ExecutionOp::Constant { data } => {
                     values.insert(step.output, self.buffer_from_tensor_data(&step.spec, data)?);
+                }
+                ExecutionOp::Detach => {
+                    let input = step_input(step, &values, 0)?;
+                    let output = self.materialize_host_view_step(step, &input.read_f32()?)?;
+                    values.insert(step.output, output);
+                }
+                ExecutionOp::Reshape => {
+                    let input = step_input(step, &values, 0)?;
+                    let output = self.materialize_host_view_step(step, &input.read_f32()?)?;
+                    values.insert(step.output, output);
+                }
+                ExecutionOp::Permute { axes } => {
+                    let input = step_input(step, &values, 0)?;
+                    let values_out =
+                        permute_contiguous_values(&input.read_f32()?, input.spec().shape().dims(), axes)?;
+                    let output = self.materialize_host_view_step(step, &values_out)?;
+                    values.insert(step.output, output);
+                }
+                ExecutionOp::Slice { axis, start, end } => {
+                    let input = step_input(step, &values, 0)?;
+                    let values_out = slice_contiguous_values(
+                        &input.read_f32()?,
+                        input.spec().shape().dims(),
+                        *axis,
+                        *start,
+                        *end,
+                    )?;
+                    let output = self.materialize_host_view_step(step, &values_out)?;
+                    values.insert(step.output, output);
+                }
+                ExecutionOp::Select { axis, index } => {
+                    let input = step_input(step, &values, 0)?;
+                    let values_out = select_contiguous_values(
+                        &input.read_f32()?,
+                        input.spec().shape().dims(),
+                        *axis,
+                        *index,
+                    )?;
+                    let output = self.materialize_host_view_step(step, &values_out)?;
+                    values.insert(step.output, output);
+                }
+                ExecutionOp::Concat { axis } => {
+                    let tensors = step
+                        .inputs
+                        .iter()
+                        .map(|tensor_id| {
+                            values
+                                .get(tensor_id)
+                                .ok_or(RuntimeError::MissingInput(*tensor_id))
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let value_slices = tensors
+                        .iter()
+                        .map(|buffer| buffer.read_f32())
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let shape_slices = tensors
+                        .iter()
+                        .map(|buffer| buffer.spec().shape().dims().to_vec())
+                        .collect::<Vec<_>>();
+                    let value_refs = value_slices
+                        .iter()
+                        .map(Vec::as_slice)
+                        .collect::<Vec<_>>();
+                    let shape_refs = shape_slices
+                        .iter()
+                        .map(Vec::as_slice)
+                        .collect::<Vec<_>>();
+                    let values_out = concat_contiguous_values(
+                        value_refs.as_slice(),
+                        shape_refs.as_slice(),
+                        *axis,
+                    )?;
+                    let output = self.materialize_host_view_step(step, &values_out)?;
+                    values.insert(step.output, output);
+                }
+                ExecutionOp::Expand { shape } => {
+                    let input = step_input(step, &values, 0)?;
+                    let values_out = expand_contiguous_values(
+                        &input.read_f32()?,
+                        input.spec().shape().dims(),
+                        shape.dims(),
+                    )?;
+                    let output = self.materialize_host_view_step(step, &values_out)?;
+                    values.insert(step.output, output);
+                }
+                ExecutionOp::Cast { dtype } => {
+                    let input = step_input(step, &values, 0)?;
+                    let values_out = cast_contiguous_values(
+                        &input.read_f32()?,
+                        input.spec().dtype(),
+                        *dtype,
+                    )?;
+                    let output = self.materialize_host_view_step(step, &values_out)?;
+                    values.insert(step.output, output);
+                }
+                ExecutionOp::ReduceSum { axis } => {
+                    let input = step_input(step, &values, 0)?;
+                    let values_out = reduce_sum_contiguous_values(
+                        &input.read_f32()?,
+                        input.spec().shape().dims(),
+                        *axis,
+                    )?;
+                    let output = self.materialize_host_view_step(step, &values_out)?;
+                    values.insert(step.output, output);
                 }
                 ExecutionOp::Add => {
                     let (left, right) = binary_inputs(step, &values)?;
@@ -3817,6 +3948,269 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
         }
     }
     Ok(())
+}
+
+fn cast_contiguous_values(
+    values: &[f32],
+    input_dtype: DType,
+    output_dtype: DType,
+) -> Result<Vec<f32>, RuntimeError> {
+    if input_dtype != DType::F32 || output_dtype != DType::F32 {
+        return Err(RuntimeError::UnsupportedStep(format!(
+            "cast {:?}->{:?}",
+            input_dtype, output_dtype
+        )));
+    }
+    Ok(values.to_vec())
+}
+
+fn permute_contiguous_values(
+    values: &[f32],
+    input_shape: &[usize],
+    axes: &[usize],
+) -> Result<Vec<f32>, RuntimeError> {
+    if input_shape.len() != axes.len() {
+        return Err(RuntimeError::Backend(format!(
+            "permute rank mismatch: shape rank {} axes {}",
+            input_shape.len(),
+            axes.len()
+        )));
+    }
+    let output_shape = axes.iter().map(|&axis| input_shape[axis]).collect::<Vec<_>>();
+    let input_strides = contiguous_strides(input_shape);
+    let output_strides = contiguous_strides(&output_shape);
+    let mut output = vec![0.0_f32; output_shape.iter().product()];
+    for output_linear in 0..output.len() {
+        let output_coords = linear_to_coords(output_linear, &output_shape, &output_strides);
+        let mut input_coords = vec![0_usize; input_shape.len()];
+        for (output_axis, &input_axis) in axes.iter().enumerate() {
+            input_coords[input_axis] = output_coords[output_axis];
+        }
+        let input_linear = coords_to_linear(&input_coords, &input_strides);
+        output[output_linear] = values[input_linear];
+    }
+    Ok(output)
+}
+
+fn slice_contiguous_values(
+    values: &[f32],
+    input_shape: &[usize],
+    axis: usize,
+    start: usize,
+    end: usize,
+) -> Result<Vec<f32>, RuntimeError> {
+    if axis >= input_shape.len() || start > end || end > input_shape[axis] {
+        return Err(RuntimeError::Backend(format!(
+            "invalid slice axis={axis} start={start} end={end} for shape {input_shape:?}"
+        )));
+    }
+    let mut output_shape = input_shape.to_vec();
+    output_shape[axis] = end - start;
+    let input_strides = contiguous_strides(input_shape);
+    let output_strides = contiguous_strides(&output_shape);
+    let mut output = vec![0.0_f32; output_shape.iter().product()];
+    for output_linear in 0..output.len() {
+        let mut input_coords = linear_to_coords(output_linear, &output_shape, &output_strides);
+        input_coords[axis] += start;
+        let input_linear = coords_to_linear(&input_coords, &input_strides);
+        output[output_linear] = values[input_linear];
+    }
+    Ok(output)
+}
+
+fn select_contiguous_values(
+    values: &[f32],
+    input_shape: &[usize],
+    axis: usize,
+    index: usize,
+) -> Result<Vec<f32>, RuntimeError> {
+    if axis >= input_shape.len() || index >= input_shape[axis] {
+        return Err(RuntimeError::Backend(format!(
+            "invalid select axis={axis} index={index} for shape {input_shape:?}"
+        )));
+    }
+    let mut output_shape = input_shape.to_vec();
+    output_shape.remove(axis);
+    let input_strides = contiguous_strides(input_shape);
+    let output_strides = contiguous_strides(&output_shape);
+    let mut output = vec![0.0_f32; output_shape.iter().product::<usize>().max(1)];
+    for output_linear in 0..output.len() {
+        let output_coords = linear_to_coords(output_linear, &output_shape, &output_strides);
+        let mut input_coords = Vec::with_capacity(input_shape.len());
+        let mut output_axis = 0;
+        for input_axis in 0..input_shape.len() {
+            if input_axis == axis {
+                input_coords.push(index);
+            } else {
+                input_coords.push(output_coords[output_axis]);
+                output_axis += 1;
+            }
+        }
+        let input_linear = coords_to_linear(&input_coords, &input_strides);
+        output[output_linear] = values[input_linear];
+    }
+    Ok(output)
+}
+
+fn concat_contiguous_values(
+    values: &[&[f32]],
+    shapes: &[&[usize]],
+    axis: usize,
+) -> Result<Vec<f32>, RuntimeError> {
+    let Some(first_shape) = shapes.first() else {
+        return Err(RuntimeError::Backend(String::from(
+            "concat requires at least one input",
+        )));
+    };
+    if axis >= first_shape.len() {
+        return Err(RuntimeError::Backend(format!(
+            "invalid concat axis={axis} for shape {first_shape:?}"
+        )));
+    }
+    let rank = first_shape.len();
+    if shapes.iter().any(|shape| shape.len() != rank) {
+        return Err(RuntimeError::Backend(String::from(
+            "concat requires matching input ranks",
+        )));
+    }
+    let mut output_shape = first_shape.to_vec();
+    output_shape[axis] = 0;
+    for shape in shapes {
+        for check_axis in 0..rank {
+            if check_axis != axis && shape[check_axis] != first_shape[check_axis] {
+                return Err(RuntimeError::Backend(String::from(
+                    "concat requires matching non-concatenated dimensions",
+                )));
+            }
+        }
+        output_shape[axis] += shape[axis];
+    }
+    let output_strides = contiguous_strides(&output_shape);
+    let input_strides = shapes
+        .iter()
+        .map(|shape| contiguous_strides(shape))
+        .collect::<Vec<_>>();
+    let mut output = vec![0.0_f32; output_shape.iter().product()];
+    let mut axis_offset = 0;
+    for ((input_values, input_shape), input_stride) in values.iter().zip(shapes).zip(&input_strides)
+    {
+        let input_len = input_shape.iter().product();
+        for input_linear in 0..input_len {
+            let mut output_coords = linear_to_coords(input_linear, input_shape, input_stride);
+            output_coords[axis] += axis_offset;
+            let output_linear = coords_to_linear(&output_coords, &output_strides);
+            output[output_linear] = input_values[input_linear];
+        }
+        axis_offset += input_shape[axis];
+    }
+    Ok(output)
+}
+
+fn expand_contiguous_values(
+    values: &[f32],
+    input_shape: &[usize],
+    output_shape: &[usize],
+) -> Result<Vec<f32>, RuntimeError> {
+    if output_shape.len() < input_shape.len() {
+        return Err(RuntimeError::Backend(format!(
+            "expand requires output rank >= input rank, found input={input_shape:?} output={output_shape:?}"
+        )));
+    }
+    let input_padding = output_shape.len() - input_shape.len();
+    let padded_input = std::iter::repeat_n(1_usize, input_padding)
+        .chain(input_shape.iter().copied())
+        .collect::<Vec<_>>();
+    for (&input_dim, &output_dim) in padded_input.iter().zip(output_shape) {
+        if input_dim != output_dim && input_dim != 1 {
+            return Err(RuntimeError::Backend(format!(
+                "invalid expand from {input_shape:?} to {output_shape:?}"
+            )));
+        }
+    }
+    let input_strides = contiguous_strides(&padded_input);
+    let output_strides = contiguous_strides(output_shape);
+    let mut output = vec![0.0_f32; output_shape.iter().product()];
+    for output_linear in 0..output.len() {
+        let output_coords = linear_to_coords(output_linear, output_shape, &output_strides);
+        let mut input_coords = Vec::with_capacity(output_shape.len());
+        for (axis, &coord) in output_coords.iter().enumerate() {
+            input_coords.push(if padded_input[axis] == 1 { 0 } else { coord });
+        }
+        let input_linear = coords_to_linear(&input_coords, &input_strides);
+        output[output_linear] = values[input_linear];
+    }
+    Ok(output)
+}
+
+fn reduce_sum_contiguous_values(
+    values: &[f32],
+    input_shape: &[usize],
+    axis: Option<usize>,
+) -> Result<Vec<f32>, RuntimeError> {
+    let Some(axis) = axis else {
+        return Ok(vec![values.iter().copied().sum()]);
+    };
+    if axis >= input_shape.len() {
+        return Err(RuntimeError::Backend(format!(
+            "invalid reduce_sum axis={axis} for shape {input_shape:?}"
+        )));
+    }
+    let mut output_shape = input_shape.to_vec();
+    output_shape.remove(axis);
+    let input_strides = contiguous_strides(input_shape);
+    let output_strides = contiguous_strides(&output_shape);
+    let mut output = vec![0.0_f32; output_shape.iter().product::<usize>().max(1)];
+    for output_linear in 0..output.len() {
+        let output_coords = linear_to_coords(output_linear, &output_shape, &output_strides);
+        let mut sum = 0.0_f32;
+        for reduced_index in 0..input_shape[axis] {
+            let mut input_coords = Vec::with_capacity(input_shape.len());
+            let mut output_axis = 0;
+            for input_axis in 0..input_shape.len() {
+                if input_axis == axis {
+                    input_coords.push(reduced_index);
+                } else {
+                    input_coords.push(output_coords[output_axis]);
+                    output_axis += 1;
+                }
+            }
+            let input_linear = coords_to_linear(&input_coords, &input_strides);
+            sum += values[input_linear];
+        }
+        output[output_linear] = sum;
+    }
+    Ok(output)
+}
+
+fn contiguous_strides(shape: &[usize]) -> Vec<usize> {
+    let mut strides = vec![0; shape.len()];
+    let mut running = 1;
+    for (index, dim) in shape.iter().enumerate().rev() {
+        strides[index] = running;
+        running *= *dim;
+    }
+    strides
+}
+
+fn linear_to_coords(linear: usize, shape: &[usize], strides: &[usize]) -> Vec<usize> {
+    if shape.is_empty() {
+        return Vec::new();
+    }
+    let mut remaining = linear;
+    let mut coords = vec![0; shape.len()];
+    for axis in 0..shape.len() {
+        coords[axis] = remaining / strides[axis];
+        remaining %= strides[axis];
+    }
+    coords
+}
+
+fn coords_to_linear(coords: &[usize], strides: &[usize]) -> usize {
+    coords
+        .iter()
+        .zip(strides.iter())
+        .map(|(coord, stride)| coord.saturating_mul(*stride))
+        .sum()
 }
 
 fn relu_squared_forward_values(input: &[f32]) -> Vec<f32> {
