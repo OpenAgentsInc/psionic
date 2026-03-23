@@ -206,6 +206,11 @@ and now also has:
   the still-blocked guest loading/publication/universality/arbitrary-software
   rows, and the learned-judgment-versus-executor-backed statement posture for
   outputs that cite the bounded mixed matrix.
+- `docs/PSION_PLUGIN_ROUTE_REFUSAL_HARDENING.md` is the canonical hardening
+  doc for the follow-on plugin-conditioned route/refusal tranche and freezes the
+  committed regression rows, explicit zero-bps overdelegation budget, and
+  no-implicit-execution failure cases that later operator or cluster decisions
+  must cite instead of narrative-only confidence.
 - `docs/audits/2026-03-22-tassadar-full-plugin-system-state-audit.md` is the
   canonical current-state proof record for the bounded Tassadar plugin system
   and freezes the present authoring-class, publication, and guest-artifact
