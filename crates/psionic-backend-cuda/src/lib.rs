@@ -85,7 +85,7 @@ pub const TEXT_GENERATION_SUPPORTED_OPS: &[&str] =
     &["quantized_matvec_q8_0", "quantized_matvec_mxfp4"];
 pub const GGML_Q8_1_BLOCK_ELEMENTS: usize = 32;
 pub const GGML_Q8_1_BLOCK_BYTES: usize = 36;
-const CUDA_PUBLIC_ATTENTION_MAX_SEQUENCE: usize = 512;
+const CUDA_PUBLIC_ATTENTION_MAX_SEQUENCE: usize = 1024;
 const CUDA_PUBLIC_STANDARD_ROPE_BASE: f32 = 10_000.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -15,7 +15,7 @@ constexpr int kMaxWarpsPerBlock = 1024 / kWarpSize;
 constexpr int kQ81ElementsPerBlock = 32;
 constexpr int kQ80BlockBytes = 34;
 constexpr int kQ81BlockBytes = 36;
-constexpr int kAttentionMaxPositions = 513;
+constexpr int kAttentionMaxPositions = 1024;
 constexpr int kMoeMaxExperts = 128;
 constexpr int kMoeMaxSelected = 32;
 
@@ -1559,6 +1559,7 @@ __global__ void attention_decode_kernel(
 
     __shared__ float logits[kAttentionMaxPositions];
     __shared__ float weights[kAttentionMaxPositions];
+    __shared__ float reduction_scratch[kAttentionBlockSize];
 
     int window_tokens = past_tokens;
     if (sliding_window > 0 && window_tokens > sliding_window) {
@@ -1573,41 +1574,47 @@ __global__ void attention_decode_kernel(
     const float scale = rsqrtf(static_cast<float>(head_dim));
     const float *query_head = query + query_offset + head_index * head_dim;
 
-    if (threadIdx.x <= window_tokens) {
-        const bool current = threadIdx.x == window_tokens;
-        const float *key_head = current
-            ? current_key + key_offset + kv_head * head_dim
-            : cache_keys + (start + threadIdx.x) * cache_width + layer_offset + kv_head * head_dim;
+    for (int token_index = static_cast<int>(threadIdx.x); token_index < window_tokens;
+         token_index += blockDim.x) {
+        const float *key_head =
+            cache_keys + (start + token_index) * cache_width + layer_offset + kv_head * head_dim;
         float dot = 0.0f;
         for (int dim = 0; dim < head_dim; ++dim) {
             dot += query_head[dim] * key_head[dim];
         }
-        logits[threadIdx.x] = dot * scale;
+        logits[token_index] = dot * scale;
+    }
+    if (threadIdx.x == 0) {
+        float dot = 0.0f;
+        const float *current_key_head = current_key + key_offset + kv_head * head_dim;
+        for (int dim = 0; dim < head_dim; ++dim) {
+            dot += query_head[dim] * current_key_head[dim];
+        }
+        logits[window_tokens] = dot * scale;
     }
     __syncthreads();
 
-    if (threadIdx.x == 0) {
-        float max_value = logits[0];
-        for (int index = 1; index <= window_tokens; ++index) {
-            max_value = fmaxf(max_value, logits[index]);
-        }
-        if (attention_sinks != nullptr) {
-            max_value = fmaxf(max_value, attention_sinks[head_index]);
-        }
+    float local_max = -INFINITY;
+    for (int index = static_cast<int>(threadIdx.x); index <= window_tokens; index += blockDim.x) {
+        local_max = fmaxf(local_max, logits[index]);
+    }
+    if (threadIdx.x == 0 && attention_sinks != nullptr) {
+        local_max = fmaxf(local_max, attention_sinks[head_index]);
+    }
+    const float max_value = reduce_block_max(local_max, reduction_scratch);
 
-        float denom = 0.0f;
-        for (int index = 0; index <= window_tokens; ++index) {
-            weights[index] = expf(logits[index] - max_value);
-            denom += weights[index];
-        }
-        if (attention_sinks != nullptr) {
-            denom += expf(attention_sinks[head_index] - max_value);
-        }
-        if (denom != 0.0f) {
-            for (int index = 0; index <= window_tokens; ++index) {
-                weights[index] /= denom;
-            }
-        }
+    float local_denom = 0.0f;
+    for (int index = static_cast<int>(threadIdx.x); index <= window_tokens; index += blockDim.x) {
+        const float weight = expf(logits[index] - max_value);
+        weights[index] = weight;
+        local_denom += weight;
+    }
+    if (threadIdx.x == 0 && attention_sinks != nullptr) {
+        local_denom += expf(attention_sinks[head_index] - max_value);
+    }
+    const float denom = reduce_block_sum(local_denom, reduction_scratch);
+    for (int index = static_cast<int>(threadIdx.x); index <= window_tokens; index += blockDim.x) {
+        weights[index] = denom != 0.0f ? weights[index] / denom : 0.0f;
     }
     __syncthreads();
 
