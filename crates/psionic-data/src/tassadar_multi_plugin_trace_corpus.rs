@@ -5,10 +5,11 @@ use std::{
 };
 
 use psionic_runtime::{
+    build_starter_plugin_tool_bridge_bundle, starter_plugin_registration_by_tool_name,
+    tassadar_post_article_starter_plugin_workflow_controller_bundle_path,
+    StarterPluginAuthoringClass, StarterPluginOriginClass,
     StarterPluginProjectedToolResultEnvelope, StarterPluginToolBridgeBundle,
     StarterPluginWorkflowCase, StarterPluginWorkflowControllerBundle,
-    build_starter_plugin_tool_bridge_bundle,
-    tassadar_post_article_starter_plugin_workflow_controller_bundle_path,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -21,6 +22,7 @@ pub const TASSADAR_MULTI_PLUGIN_TRACE_CORPUS_RUN_ROOT_REF: &str =
 
 const ROUTER_PLUGIN_TOOL_LOOP_BUNDLE_REF: &str = "fixtures/tassadar/runs/tassadar_post_article_router_plugin_tool_loop_pilot_v1/tassadar_post_article_router_plugin_tool_loop_pilot_bundle.json";
 const APPLE_FM_PLUGIN_SESSION_BUNDLE_REF: &str = "fixtures/tassadar/runs/tassadar_post_article_apple_fm_plugin_session_pilot_v1/tassadar_post_article_apple_fm_plugin_session_pilot_bundle.json";
+const WEIGHTED_CONTROLLER_REPORT_REF: &str = "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_report.json";
 
 const TRACE_RECORD_SCHEMA_ID: &str = "psionic.tassadar.multi_plugin_trace_record.v1";
 const PARITY_MATRIX_SCHEMA_ID: &str = "psionic.tassadar.multi_plugin_parity_matrix.v1";
@@ -58,6 +60,8 @@ pub struct TassadarMultiPluginSourceBundleRow {
 pub struct TassadarMultiPluginProjectedToolSchemaRow {
     pub tool_name: String,
     pub plugin_id: String,
+    pub authoring_class_id: String,
+    pub origin_class_id: String,
     pub description: String,
     pub arguments_schema: Value,
     pub arguments_schema_digest: String,
@@ -84,8 +88,25 @@ pub struct TassadarMultiPluginTraceStepRow {
     pub result_ref: String,
     pub tool_name: String,
     pub plugin_id: String,
+    pub authoring_class_id: String,
+    pub origin_class_id: String,
     pub arguments: Value,
     pub projected_result: StarterPluginProjectedToolResultEnvelope,
+    pub detail: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TassadarMultiPluginClassExpansionRow {
+    pub authoring_class_id: String,
+    pub origin_class_id: String,
+    pub plugin_ids: Vec<String>,
+    pub tool_names: Vec<String>,
+    pub workflow_case_ids: Vec<String>,
+    pub lane_ids: Vec<String>,
+    pub trace_record_ids: Vec<String>,
+    pub weighted_controller_report_ref: String,
+    pub weighted_controller_report_id: String,
+    pub weighted_controller_runtime_bundle_id: String,
     pub detail: String,
 }
 
@@ -186,6 +207,7 @@ pub struct TassadarMultiPluginTraceCorpusBundle {
     pub source_bundle_rows: Vec<TassadarMultiPluginSourceBundleRow>,
     pub projected_tool_schema_rows: Vec<TassadarMultiPluginProjectedToolSchemaRow>,
     pub trace_records: Vec<TassadarMultiPluginTraceRecord>,
+    pub class_expansion_rows: Vec<TassadarMultiPluginClassExpansionRow>,
     pub parity_matrix: TassadarMultiPluginParityMatrix,
     pub bootstrap_contract: TassadarMultiPluginTrainingBootstrapContract,
     pub claim_boundary: String,
@@ -214,6 +236,8 @@ pub enum TassadarMultiPluginTraceCorpusError {
     MissingToolDigest { lane_id: String, tool_name: String },
     #[error("trace corpus could not find projected tool schema for `{tool_name}`")]
     MissingProjectedToolSchema { tool_name: String },
+    #[error("trace corpus could not find runtime registration for `{tool_name}`")]
+    MissingRuntimeRegistration { tool_name: String },
     #[error("workflow parity could not find all expected lane records for `{workflow_case_id}`")]
     MissingWorkflowLane { workflow_case_id: String },
     #[error(transparent)]
@@ -322,6 +346,27 @@ struct AppleFmTranscript {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+struct WeightedControllerReport {
+    report_id: String,
+    runtime_bundle: WeightedControllerRuntimeBundle,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct WeightedControllerRuntimeBundle {
+    bundle_id: String,
+    starter_plugin_admission_rows: Vec<WeightedControllerStarterPluginAdmissionRow>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct WeightedControllerStarterPluginAdmissionRow {
+    plugin_id: String,
+    tool_name: String,
+    authoring_class_id: String,
+    origin_class_id: String,
+    detail: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 struct AppleFmTranscriptPayload {
     entries: Vec<AppleFmTranscriptEntry>,
 }
@@ -347,8 +392,8 @@ pub fn tassadar_multi_plugin_trace_corpus_bundle_path() -> PathBuf {
     repo_root().join(TASSADAR_MULTI_PLUGIN_TRACE_CORPUS_BUNDLE_REF)
 }
 
-pub fn build_tassadar_multi_plugin_trace_corpus_bundle()
--> Result<TassadarMultiPluginTraceCorpusBundle, TassadarMultiPluginTraceCorpusError> {
+pub fn build_tassadar_multi_plugin_trace_corpus_bundle(
+) -> Result<TassadarMultiPluginTraceCorpusBundle, TassadarMultiPluginTraceCorpusError> {
     let bridge_bundle = build_starter_plugin_tool_bridge_bundle();
 
     let deterministic_bundle: StarterPluginWorkflowControllerBundle =
@@ -357,6 +402,8 @@ pub fn build_tassadar_multi_plugin_trace_corpus_bundle()
         read_json(repo_root().join(ROUTER_PLUGIN_TOOL_LOOP_BUNDLE_REF))?;
     let apple_bundle: AppleFmPilotBundle =
         read_json(repo_root().join(APPLE_FM_PLUGIN_SESSION_BUNDLE_REF))?;
+    let weighted_controller_report: WeightedControllerReport =
+        read_json(repo_root().join(WEIGHTED_CONTROLLER_REPORT_REF))?;
 
     let source_bundle_rows = vec![
         TassadarMultiPluginSourceBundleRow {
@@ -392,16 +439,12 @@ pub fn build_tassadar_multi_plugin_trace_corpus_bundle()
         &deterministic_bundle,
         &bridge_bundle,
     )?);
-    trace_records.extend(build_router_trace_records(
-        &router_bundle,
-        &bridge_bundle,
-    )?);
-    trace_records.extend(build_apple_fm_trace_records(
-        &apple_bundle,
-        &bridge_bundle,
-    )?);
+    trace_records.extend(build_router_trace_records(&router_bundle, &bridge_bundle)?);
+    trace_records.extend(build_apple_fm_trace_records(&apple_bundle, &bridge_bundle)?);
     trace_records.sort_by(|left, right| left.record_id.cmp(&right.record_id));
     let projected_tool_schema_rows = projected_tool_schema_rows_from_trace_records(&trace_records);
+    let class_expansion_rows =
+        build_class_expansion_rows(&weighted_controller_report, trace_records.as_slice());
 
     let parity_matrix = build_parity_matrix(
         &bridge_bundle,
@@ -416,6 +459,7 @@ pub fn build_tassadar_multi_plugin_trace_corpus_bundle()
         source_bundle_rows,
         projected_tool_schema_rows,
         trace_records,
+        class_expansion_rows,
         parity_matrix,
         bootstrap_contract,
         claim_boundary: String::from(
@@ -425,9 +469,10 @@ pub fn build_tassadar_multi_plugin_trace_corpus_bundle()
         bundle_digest: String::new(),
     };
     bundle.summary = format!(
-        "multi-plugin trace corpus freezes source_bundles={}, trace_records={}, workflow_parity_rows={}, and explicit_disagreements={}.",
+        "multi-plugin trace corpus freezes source_bundles={}, trace_records={}, class_expansion_rows={}, workflow_parity_rows={}, and explicit_disagreements={}.",
         bundle.source_bundle_rows.len(),
         bundle.trace_records.len(),
+        bundle.class_expansion_rows.len(),
         bundle.parity_matrix.workflow_parity_rows.len(),
         bundle.parity_matrix.explicit_disagreement_count,
     );
@@ -471,10 +516,85 @@ fn projected_tool_schema_rows_from_trace_records(
     let mut rows = BTreeMap::new();
     for record in trace_records {
         for row in &record.projected_tool_schema_rows {
-            rows.entry(row.tool_name.clone()).or_insert_with(|| row.clone());
+            rows.entry(row.tool_name.clone())
+                .or_insert_with(|| row.clone());
         }
     }
     rows.into_values().collect()
+}
+
+fn build_class_expansion_rows(
+    weighted_controller_report: &WeightedControllerReport,
+    trace_records: &[TassadarMultiPluginTraceRecord],
+) -> Vec<TassadarMultiPluginClassExpansionRow> {
+    let mut rows = weighted_controller_report
+        .runtime_bundle
+        .starter_plugin_admission_rows
+        .iter()
+        .filter(|row| {
+            matches!(
+                row.authoring_class_id.as_str(),
+                "networked_read_only" | "guest_artifact_digest_bound"
+            )
+        })
+        .map(|admission| {
+            let matching_records = trace_records
+                .iter()
+                .filter(|record| {
+                    record
+                        .step_rows
+                        .iter()
+                        .any(|step| step.tool_name == admission.tool_name)
+                })
+                .collect::<Vec<_>>();
+            let mut workflow_case_ids = matching_records
+                .iter()
+                .map(|record| record.workflow_case_id.clone())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+            workflow_case_ids.sort();
+            let mut lane_ids = matching_records
+                .iter()
+                .map(|record| record.lane_id.clone())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+            lane_ids.sort();
+            let mut trace_record_ids = matching_records
+                .iter()
+                .map(|record| record.record_id.clone())
+                .collect::<Vec<_>>();
+            trace_record_ids.sort();
+            let detail = match admission.authoring_class_id.as_str() {
+                "networked_read_only" => String::from(
+                    "The networked_read_only class now has explicit corpus growth only because the admitted fetch plugin landed in the weighted-controller lane and appears across the shared host-native workflow families.",
+                ),
+                "guest_artifact_digest_bound" => String::from(
+                    "The guest_artifact_digest_bound class now has explicit corpus growth only because the admitted digest-bound guest plugin landed in the weighted-controller lane and appears as a separate deterministic-only workflow without false three-lane parity.",
+                ),
+                _ => admission.detail.clone(),
+            };
+            TassadarMultiPluginClassExpansionRow {
+                authoring_class_id: admission.authoring_class_id.clone(),
+                origin_class_id: admission.origin_class_id.clone(),
+                plugin_ids: vec![admission.plugin_id.clone()],
+                tool_names: vec![admission.tool_name.clone()],
+                workflow_case_ids,
+                lane_ids,
+                trace_record_ids,
+                weighted_controller_report_ref: String::from(WEIGHTED_CONTROLLER_REPORT_REF),
+                weighted_controller_report_id: weighted_controller_report.report_id.clone(),
+                weighted_controller_runtime_bundle_id: weighted_controller_report
+                    .runtime_bundle
+                    .bundle_id
+                    .clone(),
+                detail,
+            }
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|left, right| left.authoring_class_id.cmp(&right.authoring_class_id));
+    rows
 }
 
 fn projected_tool_schema_rows_for_requested_tool_names(
@@ -488,12 +608,22 @@ fn projected_tool_schema_rows_for_requested_tool_names(
                 .projection_rows
                 .iter()
                 .find(|row| row.tool_name == *tool_name)
-                .ok_or_else(|| TassadarMultiPluginTraceCorpusError::MissingProjectedToolSchema {
-                    tool_name: tool_name.clone(),
+                .ok_or_else(
+                    || TassadarMultiPluginTraceCorpusError::MissingProjectedToolSchema {
+                        tool_name: tool_name.clone(),
+                    },
+                )?;
+            let registration =
+                starter_plugin_registration_by_tool_name(tool_name).ok_or_else(|| {
+                    TassadarMultiPluginTraceCorpusError::MissingRuntimeRegistration {
+                        tool_name: tool_name.clone(),
+                    }
                 })?;
             Ok(TassadarMultiPluginProjectedToolSchemaRow {
                 tool_name: row.tool_name.clone(),
                 plugin_id: row.plugin_id.clone(),
+                authoring_class_id: authoring_class_id(registration.authoring_class),
+                origin_class_id: origin_class_id(registration.origin_class),
                 description: row.deterministic_projection.description.clone(),
                 arguments_schema: row.deterministic_projection.arguments_schema.clone(),
                 arguments_schema_digest: row.arguments_schema_digest.clone(),
@@ -545,6 +675,8 @@ fn build_deterministic_trace_records(
                     result_ref: format!("deterministic.tool_result.{}", step.step_index),
                     tool_name: step.tool_name.clone(),
                     plugin_id: step.plugin_id.clone(),
+                    authoring_class_id: authoring_class_id_for_tool_name(step.tool_name.as_str())?,
+                    origin_class_id: origin_class_id_for_tool_name(step.tool_name.as_str())?,
                     arguments: deterministic_step_arguments(case, step.step_index)?,
                     projected_result: step.projected_result.clone(),
                     detail: step.detail.clone(),
@@ -685,7 +817,11 @@ fn build_router_trace_records(
                 .tool_loop_outcome
                 .steps
                 .iter()
-                .filter_map(|step| step.tool_results.first().map(|result| result.tool_name.clone()))
+                .filter_map(|step| {
+                    step.tool_results
+                        .first()
+                        .map(|result| result.tool_name.clone())
+                })
                 .collect::<BTreeSet<_>>();
             let projected_tool_schema_rows = projected_tool_schema_rows_for_requested_tool_names(
                 bridge_bundle,
@@ -729,6 +865,10 @@ fn build_router_trace_records(
                     result_ref: tool_result.tool_call_id.clone(),
                     tool_name: tool_result.tool_name.clone(),
                     plugin_id: tool_result.structured.plugin_id.clone(),
+                    authoring_class_id: authoring_class_id_for_tool_name(
+                        tool_result.tool_name.as_str(),
+                    )?,
+                    origin_class_id: origin_class_id_for_tool_name(tool_result.tool_name.as_str())?,
                     arguments: tool_call.arguments.clone(),
                     projected_result: tool_result.structured.clone(),
                     detail,
@@ -817,6 +957,8 @@ fn build_apple_fm_trace_records(
                     result_ref: step.transcript_tool_entry_id.clone(),
                     tool_name: step.tool_name.clone(),
                     plugin_id: step.projected_result.plugin_id.clone(),
+                    authoring_class_id: authoring_class_id_for_tool_name(step.tool_name.as_str())?,
+                    origin_class_id: origin_class_id_for_tool_name(step.tool_name.as_str())?,
                     arguments: step.arguments.clone(),
                     projected_result: step.projected_result.clone(),
                     detail,
@@ -989,7 +1131,9 @@ fn build_workflow_parity_rows(
         let expected_lanes = expected_lane_ids_for_workflow_case(workflow_case_id)?;
         if group.len() != expected_lanes.len()
             || expected_lanes.iter().any(|lane_id| {
-                !group.iter().any(|record| record.lane_id.as_str() == *lane_id)
+                !group
+                    .iter()
+                    .any(|record| record.lane_id.as_str() == *lane_id)
             })
         {
             return Err(TassadarMultiPluginTraceCorpusError::MissingWorkflowLane {
@@ -1253,6 +1397,45 @@ fn expected_lane_ids_for_workflow_case(
     }
 }
 
+fn authoring_class_id_for_tool_name(
+    tool_name: &str,
+) -> Result<String, TassadarMultiPluginTraceCorpusError> {
+    let registration = starter_plugin_registration_by_tool_name(tool_name).ok_or_else(|| {
+        TassadarMultiPluginTraceCorpusError::MissingRuntimeRegistration {
+            tool_name: String::from(tool_name),
+        }
+    })?;
+    Ok(authoring_class_id(registration.authoring_class))
+}
+
+fn origin_class_id_for_tool_name(
+    tool_name: &str,
+) -> Result<String, TassadarMultiPluginTraceCorpusError> {
+    let registration = starter_plugin_registration_by_tool_name(tool_name).ok_or_else(|| {
+        TassadarMultiPluginTraceCorpusError::MissingRuntimeRegistration {
+            tool_name: String::from(tool_name),
+        }
+    })?;
+    Ok(origin_class_id(registration.origin_class))
+}
+
+fn authoring_class_id(authoring_class: StarterPluginAuthoringClass) -> String {
+    String::from(match authoring_class {
+        StarterPluginAuthoringClass::CapabilityFreeLocalDeterministic => {
+            "capability_free_local_deterministic"
+        }
+        StarterPluginAuthoringClass::NetworkedReadOnly => "networked_read_only",
+        StarterPluginAuthoringClass::GuestArtifactDigestBound => "guest_artifact_digest_bound",
+    })
+}
+
+fn origin_class_id(origin_class: StarterPluginOriginClass) -> String {
+    String::from(match origin_class {
+        StarterPluginOriginClass::OperatorBuiltin => "operator_builtin",
+        StarterPluginOriginClass::UserAdded => "user_added",
+    })
+}
+
 fn invocation_status_label(status: psionic_runtime::StarterPluginInvocationStatus) -> String {
     match status {
         psionic_runtime::StarterPluginInvocationStatus::Success => String::from("success"),
@@ -1296,24 +1479,24 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        APPLE_FM_PLUGIN_SESSION_BUNDLE_REF, BOOTSTRAP_CONTRACT_ID, PARITY_MATRIX_SCHEMA_ID,
-        ROUTER_PLUGIN_TOOL_LOOP_BUNDLE_REF, TASSADAR_MULTI_PLUGIN_TRACE_CORPUS_BUNDLE_REF,
-        TRACE_RECORD_SCHEMA_ID, WORKFLOW_FETCH_REFUSAL, WORKFLOW_GUEST_ARTIFACT_SUCCESS,
-        WORKFLOW_WEB_CONTENT_SUCCESS,
         build_tassadar_multi_plugin_trace_corpus_bundle,
         load_tassadar_multi_plugin_trace_corpus_bundle,
         tassadar_multi_plugin_trace_corpus_bundle_path,
-        write_tassadar_multi_plugin_trace_corpus_bundle,
+        write_tassadar_multi_plugin_trace_corpus_bundle, APPLE_FM_PLUGIN_SESSION_BUNDLE_REF,
+        BOOTSTRAP_CONTRACT_ID, PARITY_MATRIX_SCHEMA_ID, ROUTER_PLUGIN_TOOL_LOOP_BUNDLE_REF,
+        TASSADAR_MULTI_PLUGIN_TRACE_CORPUS_BUNDLE_REF, TRACE_RECORD_SCHEMA_ID,
+        WORKFLOW_FETCH_REFUSAL, WORKFLOW_GUEST_ARTIFACT_SUCCESS, WORKFLOW_WEB_CONTENT_SUCCESS,
     };
 
     #[test]
-    fn multi_plugin_trace_corpus_bundle_covers_all_lanes_and_workflows()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn multi_plugin_trace_corpus_bundle_covers_all_lanes_and_workflows(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let bundle = build_tassadar_multi_plugin_trace_corpus_bundle()?;
 
         assert_eq!(bundle.source_bundle_rows.len(), 3);
         assert_eq!(bundle.projected_tool_schema_rows.len(), 6);
         assert_eq!(bundle.trace_records.len(), 7);
+        assert_eq!(bundle.class_expansion_rows.len(), 2);
         assert_eq!(bundle.parity_matrix.schema_id, PARITY_MATRIX_SCHEMA_ID);
         assert_eq!(bundle.parity_matrix.workflow_parity_rows.len(), 3);
         assert_eq!(bundle.bootstrap_contract.contract_id, BOOTSTRAP_CONTRACT_ID);
@@ -1322,42 +1505,48 @@ mod tests {
             bundle.bootstrap_contract.trace_record_schema_id,
             TRACE_RECORD_SCHEMA_ID
         );
-        assert!(
-            bundle
-                .bootstrap_contract
-                .admitted_workflow_case_ids
-                .contains(&String::from(WORKFLOW_WEB_CONTENT_SUCCESS))
-        );
-        assert!(
-            bundle
-                .bootstrap_contract
-                .admitted_workflow_case_ids
-                .contains(&String::from(WORKFLOW_FETCH_REFUSAL))
-        );
-        assert!(
-            bundle
-                .bootstrap_contract
-                .admitted_workflow_case_ids
-                .contains(&String::from(WORKFLOW_GUEST_ARTIFACT_SUCCESS))
-        );
-        assert!(
-            bundle
-                .source_bundle_rows
-                .iter()
-                .any(|row| { row.bundle_ref == ROUTER_PLUGIN_TOOL_LOOP_BUNDLE_REF })
-        );
-        assert!(
-            bundle
-                .source_bundle_rows
-                .iter()
-                .any(|row| { row.bundle_ref == APPLE_FM_PLUGIN_SESSION_BUNDLE_REF })
-        );
+        assert!(bundle
+            .bootstrap_contract
+            .admitted_workflow_case_ids
+            .contains(&String::from(WORKFLOW_WEB_CONTENT_SUCCESS)));
+        assert!(bundle
+            .bootstrap_contract
+            .admitted_workflow_case_ids
+            .contains(&String::from(WORKFLOW_FETCH_REFUSAL)));
+        assert!(bundle
+            .bootstrap_contract
+            .admitted_workflow_case_ids
+            .contains(&String::from(WORKFLOW_GUEST_ARTIFACT_SUCCESS)));
+        assert!(bundle
+            .source_bundle_rows
+            .iter()
+            .any(|row| { row.bundle_ref == ROUTER_PLUGIN_TOOL_LOOP_BUNDLE_REF }));
+        assert!(bundle
+            .source_bundle_rows
+            .iter()
+            .any(|row| { row.bundle_ref == APPLE_FM_PLUGIN_SESSION_BUNDLE_REF }));
+        assert!(bundle
+            .class_expansion_rows
+            .iter()
+            .any(|row| row.authoring_class_id == "networked_read_only"
+                && row.workflow_case_ids
+                    == vec![
+                        String::from(WORKFLOW_FETCH_REFUSAL),
+                        String::from(WORKFLOW_WEB_CONTENT_SUCCESS)
+                    ]));
+        assert!(bundle
+            .class_expansion_rows
+            .iter()
+            .any(
+                |row| row.authoring_class_id == "guest_artifact_digest_bound"
+                    && row.workflow_case_ids == vec![String::from(WORKFLOW_GUEST_ARTIFACT_SUCCESS)]
+            ));
         Ok(())
     }
 
     #[test]
-    fn multi_plugin_trace_corpus_bundle_keeps_disagreement_rows_explicit()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn multi_plugin_trace_corpus_bundle_keeps_disagreement_rows_explicit(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let bundle = build_tassadar_multi_plugin_trace_corpus_bundle()?;
         let success = bundle
             .parity_matrix
@@ -1366,12 +1555,10 @@ mod tests {
             .find(|row| row.workflow_case_id == WORKFLOW_WEB_CONTENT_SUCCESS)
             .expect("success workflow");
 
-        assert!(
-            success
-                .disagreement_rows
-                .iter()
-                .any(|row| row.disagreement_kind == "directive_text_drift")
-        );
+        assert!(success
+            .disagreement_rows
+            .iter()
+            .any(|row| row.disagreement_kind == "directive_text_drift"));
         assert!(success.step_parity_rows.iter().any(|row| {
             row.agreement_class == "digest_drift"
                 && row
@@ -1385,15 +1572,21 @@ mod tests {
             .find(|row| row.workflow_case_id == WORKFLOW_GUEST_ARTIFACT_SUCCESS)
             .expect("guest workflow");
         assert_eq!(
-            guest
-                .lane_record_ids
-                .keys()
-                .cloned()
-                .collect::<Vec<_>>(),
+            guest.lane_record_ids.keys().cloned().collect::<Vec<_>>(),
             vec![String::from("deterministic_workflow")]
         );
         assert!(guest.disagreement_rows.is_empty());
         assert_eq!(guest.step_parity_rows.len(), 1);
+        let guest_step = bundle
+            .trace_records
+            .iter()
+            .find(|record| record.workflow_case_id == WORKFLOW_GUEST_ARTIFACT_SUCCESS)
+            .expect("guest trace record")
+            .step_rows
+            .first()
+            .expect("guest step");
+        assert_eq!(guest_step.authoring_class_id, "guest_artifact_digest_bound");
+        assert_eq!(guest_step.origin_class_id, "user_added");
         Ok(())
     }
 

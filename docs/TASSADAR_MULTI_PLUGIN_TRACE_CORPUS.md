@@ -39,6 +39,9 @@ The committed bundle now freezes:
 - three source controller bundles
 - seven normalized trace records across the two shared host-native workflow
   families plus one deterministic-only guest-artifact workflow
+- two explicit class-expansion rows, one for `networked_read_only` and one for
+  `guest_artifact_digest_bound`, both tied back to the canonical
+  weighted-controller admission surface
 - six projected tool-schema rows in the committed corpus union
 - three workflow parity rows
 - twenty-three explicit disagreement rows
@@ -55,6 +58,9 @@ The committed bundle now freezes:
   record
 - explicit disagreement rows for directive drift, payload drift, receipt drift,
   and stop-condition drift instead of synthetic consensus
+- explicit class provenance on projected tool rows and trace steps so the new
+  `networked_read_only` and guest-artifact growth is visible as class expansion
+  rather than generic corpus bulk
 - one honest bootstrap boundary to later weighted-controller work with
   `bootstrap_ready = true` while still refusing weighted-controller closure
 - one explicit partial-lane guest-artifact record that preserves digest-bound

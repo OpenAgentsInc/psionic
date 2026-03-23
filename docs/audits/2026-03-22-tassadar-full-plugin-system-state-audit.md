@@ -222,13 +222,17 @@ plugin marketplace.
 The multi-plugin trace corpus now freezes:
 
 - 3 source bundles
-- 6 normalized trace records
-- 2 workflow parity rows
-- 0 disagreement rows
+- 7 normalized trace records
+- 2 explicit class-expansion rows for the landed `networked_read_only` and
+  bounded guest-artifact classes
+- 3 workflow parity rows
+- 23 disagreement rows
 - `bootstrap_ready = true`
 
 That gives the repo one shared evidence surface across deterministic, router,
-and Apple FM plugin-controller lanes instead of three disconnected local demos.
+and Apple FM plugin-controller lanes instead of three disconnected local demos,
+while keeping the new class growth tied to real networked and guest landings
+instead of random trace bulk.
 
 ## Where The Current System Matches The Original Alpha Plans
 

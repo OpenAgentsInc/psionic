@@ -31,6 +31,8 @@
     {
       "tool_name": "plugin_example_echo_guest",
       "plugin_id": "plugin.example.echo_guest",
+      "authoring_class_id": "guest_artifact_digest_bound",
+      "origin_class_id": "user_added",
       "description": "Echo one text field through the bounded guest-artifact packet path while preserving the host-native receipt and replay envelope.",
       "arguments_schema": {
         "additionalProperties": false,
@@ -58,6 +60,8 @@
     {
       "tool_name": "plugin_feed_rss_atom_parse",
       "plugin_id": "plugin.feed.rss_atom_parse",
+      "authoring_class_id": "capability_free_local_deterministic",
+      "origin_class_id": "operator_builtin",
       "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
       "arguments_schema": {
         "additionalProperties": false,
@@ -91,6 +95,8 @@
     {
       "tool_name": "plugin_html_extract_readable",
       "plugin_id": "plugin.html.extract_readable",
+      "authoring_class_id": "capability_free_local_deterministic",
+      "origin_class_id": "operator_builtin",
       "description": "extract already-fetched HTML into bounded readable text, metadata, and harvested links without browser rendering, JavaScript, or full DOM claims.",
       "arguments_schema": {
         "additionalProperties": false,
@@ -124,6 +130,8 @@
     {
       "tool_name": "plugin_http_fetch_text",
       "plugin_id": "plugin.http.fetch_text",
+      "authoring_class_id": "networked_read_only",
+      "origin_class_id": "user_added",
       "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
       "arguments_schema": {
         "additionalProperties": false,
@@ -156,6 +164,8 @@
     {
       "tool_name": "plugin_text_stats",
       "plugin_id": "plugin.text.stats",
+      "authoring_class_id": "capability_free_local_deterministic",
+      "origin_class_id": "user_added",
       "description": "count bytes, Unicode scalar values, lines, non-empty lines, and whitespace-delimited words from packet-local text without tokenizer, language, or semantic-structure claims.",
       "arguments_schema": {
         "additionalProperties": false,
@@ -182,6 +192,8 @@
     {
       "tool_name": "plugin_text_url_extract",
       "plugin_id": "plugin.text.url_extract",
+      "authoring_class_id": "capability_free_local_deterministic",
+      "origin_class_id": "operator_builtin",
       "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
       "arguments_schema": {
         "additionalProperties": false,
@@ -226,6 +238,8 @@
         {
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -258,6 +272,8 @@
         {
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -315,6 +331,8 @@
           "result_ref": "apple_fm_plugin_session_fetch_refusal-tool-1",
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "text": "Read https://snapshot.example/binary."
           },
@@ -356,6 +374,8 @@
           "result_ref": "apple_fm_plugin_session_fetch_refusal-tool-2",
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "arguments": {
             "url": "https://snapshot.example/binary"
           },
@@ -400,7 +420,7 @@
       "final_message_text": "The local Apple FM pilot stopped after a typed fetch refusal.",
       "typed_refusal_preserved": true,
       "detail": "the local Apple FM pilot keeps one session-local callback registry, one transcript envelope, and one shared starter-plugin runtime surface explicit instead of inventing Apple-only plugin semantics.",
-      "record_digest": "099bdfbd32c4b9efb3bfc4ee5d610f383c515aa89a5dff4d33d81cf86e231494"
+      "record_digest": "115d673735043c8ab40c9f7d128ee1d2b49b63274908e99615e555a015089cfc"
     },
     {
       "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
@@ -420,6 +440,8 @@
         {
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -452,6 +474,8 @@
         {
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -509,6 +533,8 @@
           "result_ref": "deterministic.tool_result.0",
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "text": "Review https://snapshot.example/binary"
           },
@@ -550,6 +576,8 @@
           "result_ref": "deterministic.tool_result.1",
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "arguments": {
             "url": "https://snapshot.example/binary"
           },
@@ -594,7 +622,7 @@
       "final_message_text": "The deterministic controller stopped after a typed plugin refusal.",
       "typed_refusal_preserved": true,
       "detail": "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops immediately when fetch returns a typed refusal.",
-      "record_digest": "49f14f05fe7ec1ee782a9dd8d22cba799ead882ffe7ad75413525510b5093ad2"
+      "record_digest": "287b7380c199c4360fdaf9034a184c50b04ef33d6495f6c35a96c23457f8757e"
     },
     {
       "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
@@ -614,6 +642,8 @@
         {
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -646,6 +676,8 @@
         {
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -703,6 +735,8 @@
           "result_ref": "psionic-resp-1-tool-0",
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "text": "Read https://snapshot.example/binary."
           },
@@ -744,6 +778,8 @@
           "result_ref": "tool-1",
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "arguments": {
             "url": "https://snapshot.example/binary"
           },
@@ -788,7 +824,7 @@
       "final_message_text": "The router-owned plugin tool loop stopped after a typed fetch refusal.",
       "typed_refusal_preserved": true,
       "detail": "the refusal case proves typed fetch refusals remain structured and receipt-bound after crossing the router-owned tool loop.",
-      "record_digest": "ce503a1af112ad8ae182410a6125f27caf770eb7c1f60cb431248b1768999513"
+      "record_digest": "36732460100c750e6758b6237c83fdae620291e1b05120c81e50cc581e835a2d"
     },
     {
       "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
@@ -807,6 +843,8 @@
         {
           "tool_name": "plugin_example_echo_guest",
           "plugin_id": "plugin.example.echo_guest",
+          "authoring_class_id": "guest_artifact_digest_bound",
+          "origin_class_id": "user_added",
           "description": "Echo one text field through the bounded guest-artifact packet path while preserving the host-native receipt and replay envelope.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -863,6 +901,8 @@
           "result_ref": "deterministic.tool_result.0",
           "tool_name": "plugin_example_echo_guest",
           "plugin_id": "plugin.example.echo_guest",
+          "authoring_class_id": "guest_artifact_digest_bound",
+          "origin_class_id": "user_added",
           "arguments": {
             "text": "controller-visible guest-artifact echo"
           },
@@ -902,7 +942,7 @@
       "final_message_text": "The deterministic controller completed after the digest-bound guest-artifact echo succeeded.",
       "typed_refusal_preserved": false,
       "detail": "the workflow controller now proves one bounded guest-artifact starter plugin can execute through the same shared bridge and receipt envelope as the host-native starter surface. stop_detail=the host-owned controller stops after the guest-artifact result is accepted without hidden chaining.",
-      "record_digest": "268cce09dbedccb17044e1d4a4dcba153d4c0ce0501641a53a587a7f2f8e0bb0"
+      "record_digest": "02310903e4b9d65c0507d45e7a0370fc9b93773f764691f6702a8969c074f361"
     },
     {
       "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
@@ -924,6 +964,8 @@
         {
           "tool_name": "plugin_feed_rss_atom_parse",
           "plugin_id": "plugin.feed.rss_atom_parse",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -957,6 +999,8 @@
         {
           "tool_name": "plugin_html_extract_readable",
           "plugin_id": "plugin.html.extract_readable",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "extract already-fetched HTML into bounded readable text, metadata, and harvested links without browser rendering, JavaScript, or full DOM claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -990,6 +1034,8 @@
         {
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -1022,6 +1068,8 @@
         {
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -1103,6 +1151,8 @@
           "result_ref": "apple_fm_plugin_session_success-tool-1",
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "text": "Read https://snapshot.example/article and https://snapshot.example/feed.rss."
           },
@@ -1145,6 +1195,8 @@
           "result_ref": "apple_fm_plugin_session_success-tool-2",
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "arguments": {
             "url": "https://snapshot.example/article"
           },
@@ -1191,6 +1243,8 @@
           "result_ref": "apple_fm_plugin_session_success-tool-3",
           "tool_name": "plugin_html_extract_readable",
           "plugin_id": "plugin.html.extract_readable",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "body_text": "<html lang=\"en\"><head><title>Snapshot Article</title></head><body><main><p>Bounded starter plugin content.</p></main></body></html>",
             "content_type": "text/html",
@@ -1237,6 +1291,8 @@
           "result_ref": "apple_fm_plugin_session_success-tool-4",
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "arguments": {
             "url": "https://snapshot.example/feed.rss"
           },
@@ -1283,6 +1339,8 @@
           "result_ref": "apple_fm_plugin_session_success-tool-5",
           "tool_name": "plugin_feed_rss_atom_parse",
           "plugin_id": "plugin.feed.rss_atom_parse",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "content_type": "application/rss+xml",
             "feed_text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Snapshot Feed</title><link>https://snapshot.example/</link><description>Snapshot feed updates.</description><item><title>Feed Entry</title><link>/posts/feed-entry</link><description>Snapshot entry summary.</description></item></channel></rss>",
@@ -1334,7 +1392,7 @@
       "final_message_text": "The local Apple FM pilot extracted one article and one feed through the shared starter-plugin runtime.",
       "typed_refusal_preserved": false,
       "detail": "the local Apple FM pilot keeps one session-local callback registry, one transcript envelope, and one shared starter-plugin runtime surface explicit instead of inventing Apple-only plugin semantics.",
-      "record_digest": "e613a08e0cc7d88699b045c9e9c555a3521ab83274192ffc1b48b906ce918937"
+      "record_digest": "e38045f14d49c07fd40166b266d0ece4c0c522f246654bcac45636671d7ea814"
     },
     {
       "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
@@ -1357,6 +1415,8 @@
         {
           "tool_name": "plugin_feed_rss_atom_parse",
           "plugin_id": "plugin.feed.rss_atom_parse",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -1390,6 +1450,8 @@
         {
           "tool_name": "plugin_html_extract_readable",
           "plugin_id": "plugin.html.extract_readable",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "extract already-fetched HTML into bounded readable text, metadata, and harvested links without browser rendering, JavaScript, or full DOM claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -1423,6 +1485,8 @@
         {
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -1455,6 +1519,8 @@
         {
           "tool_name": "plugin_text_stats",
           "plugin_id": "plugin.text.stats",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "user_added",
           "description": "count bytes, Unicode scalar values, lines, non-empty lines, and whitespace-delimited words from packet-local text without tokenizer, language, or semantic-structure claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -1481,6 +1547,8 @@
         {
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -1591,6 +1659,8 @@
           "result_ref": "deterministic.tool_result.0",
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "text": "Review https://snapshot.example/article and https://snapshot.example/feed.rss"
           },
@@ -1633,6 +1703,8 @@
           "result_ref": "deterministic.tool_result.1",
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "arguments": {
             "url": "https://snapshot.example/article"
           },
@@ -1679,6 +1751,8 @@
           "result_ref": "deterministic.tool_result.2",
           "tool_name": "plugin_html_extract_readable",
           "plugin_id": "plugin.html.extract_readable",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "body_text": "<html lang=\"en\"><head><title>Snapshot Article</title></head><body><main><h1>Snapshot Article</h1><p>Bounded starter plugin content.</p></main></body></html>",
             "content_type": "text/html",
@@ -1725,6 +1799,8 @@
           "result_ref": "deterministic.tool_result.3",
           "tool_name": "plugin_text_stats",
           "plugin_id": "plugin.text.stats",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "user_added",
           "arguments": null,
           "projected_result": {
             "tool_name": "plugin_text_stats",
@@ -1766,6 +1842,8 @@
           "result_ref": "deterministic.tool_result.4",
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "arguments": {
             "url": "https://snapshot.example/feed.rss"
           },
@@ -1812,6 +1890,8 @@
           "result_ref": "deterministic.tool_result.5",
           "tool_name": "plugin_feed_rss_atom_parse",
           "plugin_id": "plugin.feed.rss_atom_parse",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "content_type": "application/rss+xml",
             "feed_text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Snapshot Feed</title><link>https://snapshot.example/</link><description>Snapshot feed updates.</description><item><title>Feed Entry</title><link>/posts/feed-entry</link><description>Snapshot entry summary.</description></item></channel></rss>",
@@ -1863,7 +1943,7 @@
       "final_message_text": "The deterministic controller completed after exhausting the extracted URL set.",
       "typed_refusal_preserved": false,
       "detail": "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops after the extracted URL set is exhausted.",
-      "record_digest": "1eeef4fe33cf53981f0c86290eafabfd685a3a985513abe11fd207c6a41df604"
+      "record_digest": "090d1141003147fa64d324d30f0d43db3890582ba550ab6d2fccae135ad964c4"
     },
     {
       "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
@@ -1885,6 +1965,8 @@
         {
           "tool_name": "plugin_feed_rss_atom_parse",
           "plugin_id": "plugin.feed.rss_atom_parse",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -1918,6 +2000,8 @@
         {
           "tool_name": "plugin_html_extract_readable",
           "plugin_id": "plugin.html.extract_readable",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "extract already-fetched HTML into bounded readable text, metadata, and harvested links without browser rendering, JavaScript, or full DOM claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -1951,6 +2035,8 @@
         {
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "description": "fetch allowlisted text content through a host-mediated read-only HTTP mount without browser execution, cookies, auth sessions, or unrestricted network access.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -1983,6 +2069,8 @@
         {
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
           "arguments_schema": {
             "additionalProperties": false,
@@ -2064,6 +2152,8 @@
           "result_ref": "psionic-resp-1-tool-0",
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "text": "Read https://snapshot.example/article and https://snapshot.example/feed.rss."
           },
@@ -2106,6 +2196,8 @@
           "result_ref": "tool-1",
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "arguments": {
             "url": "https://snapshot.example/article"
           },
@@ -2152,6 +2244,8 @@
           "result_ref": "tool-2",
           "tool_name": "plugin_html_extract_readable",
           "plugin_id": "plugin.html.extract_readable",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "body_text": "<html lang=\"en\"><head><title>Snapshot Article</title></head><body><main><p>Bounded starter plugin content.</p></main></body></html>",
             "content_type": "text/html",
@@ -2198,6 +2292,8 @@
           "result_ref": "tool-3",
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
+          "authoring_class_id": "networked_read_only",
+          "origin_class_id": "user_added",
           "arguments": {
             "url": "https://snapshot.example/feed.rss"
           },
@@ -2244,6 +2340,8 @@
           "result_ref": "tool-4",
           "tool_name": "plugin_feed_rss_atom_parse",
           "plugin_id": "plugin.feed.rss_atom_parse",
+          "authoring_class_id": "capability_free_local_deterministic",
+          "origin_class_id": "operator_builtin",
           "arguments": {
             "content_type": "application/rss+xml",
             "feed_text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><rss version=\"2.0\"><channel><title>Snapshot Feed</title><link>https://snapshot.example/</link><description>Snapshot feed updates.</description><item><title>Feed Entry</title><link>/posts/feed-entry</link><description>Snapshot entry summary.</description></item></channel></rss>",
@@ -2295,7 +2393,63 @@
       "final_message_text": "I extracted one article and one feed through the router-owned plugin tool loop.",
       "typed_refusal_preserved": false,
       "detail": "the first step comes from a real `/v1/responses` tool-call response, while the bounded follow-on turns stay router-owned and execute real starter plugins through the shared bridge.",
-      "record_digest": "64f301db8185e90589cba77f9e261b304295c0df2a3269ea88919c821282e717"
+      "record_digest": "53366dc2c9b8a11a7223713653edf02f245ee3f43382476f4877160cb28b91e3"
+    }
+  ],
+  "class_expansion_rows": [
+    {
+      "authoring_class_id": "guest_artifact_digest_bound",
+      "origin_class_id": "user_added",
+      "plugin_ids": [
+        "plugin.example.echo_guest"
+      ],
+      "tool_names": [
+        "plugin_example_echo_guest"
+      ],
+      "workflow_case_ids": [
+        "starter_plugin.guest_artifact_success.v1"
+      ],
+      "lane_ids": [
+        "deterministic_workflow"
+      ],
+      "trace_record_ids": [
+        "trace_record.starter_plugin.guest_artifact_success.v1.deterministic_workflow.v1"
+      ],
+      "weighted_controller_report_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_report.json",
+      "weighted_controller_report_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.report.v1",
+      "weighted_controller_runtime_bundle_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.runtime_bundle.v1",
+      "detail": "The guest_artifact_digest_bound class now has explicit corpus growth only because the admitted digest-bound guest plugin landed in the weighted-controller lane and appears as a separate deterministic-only workflow without false three-lane parity."
+    },
+    {
+      "authoring_class_id": "networked_read_only",
+      "origin_class_id": "user_added",
+      "plugin_ids": [
+        "plugin.http.fetch_text"
+      ],
+      "tool_names": [
+        "plugin_http_fetch_text"
+      ],
+      "workflow_case_ids": [
+        "starter_plugin.fetch_refusal.v1",
+        "starter_plugin.web_content_success.v1"
+      ],
+      "lane_ids": [
+        "apple_fm_session",
+        "deterministic_workflow",
+        "router_responses"
+      ],
+      "trace_record_ids": [
+        "trace_record.starter_plugin.fetch_refusal.v1.apple_fm_session.v1",
+        "trace_record.starter_plugin.fetch_refusal.v1.deterministic_workflow.v1",
+        "trace_record.starter_plugin.fetch_refusal.v1.router_responses.v1",
+        "trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
+        "trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1",
+        "trace_record.starter_plugin.web_content_success.v1.router_responses.v1"
+      ],
+      "weighted_controller_report_ref": "fixtures/tassadar/reports/tassadar_post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop_report.json",
+      "weighted_controller_report_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.report.v1",
+      "weighted_controller_runtime_bundle_id": "tassadar.post_article_weighted_plugin_controller_trace_and_refusal_aware_model_loop.runtime_bundle.v1",
+      "detail": "The networked_read_only class now has explicit corpus growth only because the admitted fetch plugin landed in the weighted-controller lane and appears across the shared host-native workflow families."
     }
   ],
   "parity_matrix": {
@@ -3009,6 +3163,6 @@
     "bootstrap_boundary": "later weighted-controller and training-derivation work may bootstrap from these records only if they preserve plugin receipt identity, keep disagreement rows explicit, and keep the single-lane guest-artifact proof separate from the three-lane host-native parity families instead of collapsing them into a false proof of controller closure."
   },
   "claim_boundary": "this bundle freezes a repo-owned multi-plugin trace corpus plus an explicit parity matrix across deterministic, router-owned, and local Apple FM controller lanes. It preserves the three-lane host-native workflow families and one separate deterministic-only digest-bound guest-artifact workflow without collapsing them into one false controller-equivalence story. It is bootstrap input to later TAS-204 weighted-controller work and does not claim weighted-controller closure, served-model equivalence, or canonical Tassadar proof closure.",
-  "summary": "multi-plugin trace corpus freezes source_bundles=3, trace_records=7, workflow_parity_rows=3, and explicit_disagreements=23.",
-  "bundle_digest": "86560b6ecd973db915d77d77ec9a7d8eb7ca47722511ff9bc632e4f276b1e1dc"
+  "summary": "multi-plugin trace corpus freezes source_bundles=3, trace_records=7, class_expansion_rows=2, workflow_parity_rows=3, and explicit_disagreements=23.",
+  "bundle_digest": "1e734368be73db6ab65544b63698119d480f7e31881001dbb6d7890fa113d3f9"
 }
