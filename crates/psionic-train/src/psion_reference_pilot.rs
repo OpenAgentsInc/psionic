@@ -448,8 +448,7 @@ struct PsionAcceleratedGradientProgram {
     hidden_input_tensor_id: TensorId,
     token_embeddings_tensor_id: TensorId,
     lm_head_bias_tensor_id: TensorId,
-    target_ids_tensor_id: TensorId,
-    loss_tensor_id: TensorId,
+    logits_tensor_id: TensorId,
 }
 
 pub fn run_psion_reference_pilot(
@@ -2202,27 +2201,18 @@ fn build_accelerated_gradient_program(
         DType::F32,
         true,
     );
-    let target_ids = builder.input(
-        "psion_accelerated_target_ids",
-        Shape::new(vec![batch_size, 1]),
-        DType::F32,
-        false,
-    );
     let transposed_embeddings = builder.permute(&token_embeddings, vec![1, 0])?;
     let logits_2d = builder.matmul(&hidden_inputs, &transposed_embeddings)?;
-    let biased_logits = builder.add(&logits_2d, &lm_head_bias)?;
-    let logits = builder.reshape(&biased_logits, Shape::new(vec![batch_size, 1, vocab_size]))?;
-    let loss = builder.parameter_golf_projection_loss(&logits, &target_ids, 30.0)?;
-    let graph = builder.finish(vec![loss.clone()]);
-    let backward_plan = graph.backward_plan(loss.id())?;
+    let logits = builder.add(&logits_2d, &lm_head_bias)?;
+    let graph = builder.finish(vec![logits.clone()]);
+    let backward_plan = graph.backward_plan(logits.id())?;
     Ok(PsionAcceleratedGradientProgram {
         graph,
         backward_plan,
         hidden_input_tensor_id: hidden_inputs.id(),
         token_embeddings_tensor_id: token_embeddings.id(),
         lm_head_bias_tensor_id: lm_head_bias.id(),
-        target_ids_tensor_id: target_ids.id(),
-        loss_tensor_id: loss.id(),
+        logits_tensor_id: logits.id(),
     })
 }
 
@@ -2234,10 +2224,6 @@ fn build_accelerated_gradient_batch(
     device: &Device,
 ) -> Result<crate::TrainingGradientBatch, PsionReferencePilotError> {
     let hidden_inputs = build_accelerated_hidden_inputs(model, examples);
-    let target_ids = examples
-        .iter()
-        .flat_map(|example| [example.target_token_id as f32])
-        .collect::<Vec<_>>();
     let primal_inputs = BTreeMap::from([
         (
             program.hidden_input_tensor_id,
@@ -2251,16 +2237,18 @@ fn build_accelerated_gradient_batch(
             program.lm_head_bias_tensor_id,
             TensorData::F32(model.lm_head_bias.clone()),
         ),
-        (program.target_ids_tensor_id, TensorData::F32(target_ids)),
     ]);
     let forward_values = evaluate_graph(program.graph.graph(), &primal_inputs)?;
-    let loss_value = dense_scalar(
-        forward_values.get(&program.loss_tensor_id).ok_or_else(|| {
+    let (loss_value, logits_seed) = dense_logits_loss_seed(
+        forward_values.get(&program.logits_tensor_id).ok_or_else(|| {
             PsionReferencePilotError::Serialization {
-                message: String::from("accelerated gradient forward pass did not materialize loss"),
+                message: String::from(
+                    "accelerated gradient forward pass did not materialize logits",
+                ),
             }
         })?,
-        "psion_accelerated_loss",
+        examples,
+        model.descriptor.config.vocab_size,
     )?;
 
     let mut backward_inputs = BTreeMap::new();
@@ -2311,7 +2299,7 @@ fn build_accelerated_gradient_batch(
         .clone();
     backward_inputs.insert(
         program.backward_plan.seed_input,
-        cuda_backend.input_buffer(seed_shape, vec![1.0_f32])?,
+        cuda_backend.input_buffer(seed_shape, logits_seed)?,
     );
 
     let backward_result =
@@ -2464,16 +2452,6 @@ fn scatter_accelerated_hidden_input_gradients(
     }
 }
 
-fn dense_scalar(data: &TensorData, context: &str) -> Result<f32, PsionReferencePilotError> {
-    let values = dense_values(data, context)?;
-    values
-        .first()
-        .copied()
-        .ok_or_else(|| PsionReferencePilotError::Serialization {
-            message: format!("{context} was empty"),
-        })
-}
-
 fn dense_values(data: &TensorData, context: &str) -> Result<Vec<f32>, PsionReferencePilotError> {
     match data {
         TensorData::F32(values) => Ok(values.clone()),
@@ -2481,6 +2459,43 @@ fn dense_values(data: &TensorData, context: &str) -> Result<Vec<f32>, PsionRefer
             message: format!("{context} must be dense f32"),
         }),
     }
+}
+
+fn dense_logits_loss_seed(
+    logits: &TensorData,
+    examples: &[PsionReferenceTrainingExample],
+    vocab_size: usize,
+) -> Result<(f32, Vec<f32>), PsionReferencePilotError> {
+    let logits = dense_values(logits, "psion_accelerated_logits")?;
+    if examples.is_empty() {
+        return Ok((0.0, Vec::new()));
+    }
+    let expected_len = examples.len().saturating_mul(vocab_size);
+    if logits.len() != expected_len {
+        return Err(PsionReferencePilotError::Serialization {
+            message: format!(
+                "accelerated logits length mismatch: expected {}, found {}",
+                expected_len,
+                logits.len()
+            ),
+        });
+    }
+
+    let mut total_loss = 0.0_f32;
+    let mut logits_seed = vec![0.0_f32; logits.len()];
+    for (example_index, example) in examples.iter().enumerate() {
+        let row_start = example_index * vocab_size;
+        let row = &logits[row_start..row_start + vocab_size];
+        let probabilities = softmax(row);
+        let target_index = (example.target_token_id as usize).min(vocab_size.saturating_sub(1));
+        total_loss += -probabilities[target_index].max(1e-9).ln();
+        let seed_row = &mut logits_seed[row_start..row_start + vocab_size];
+        seed_row.copy_from_slice(probabilities.as_slice());
+        seed_row[target_index] -= 1.0;
+    }
+    let example_scale = 1.0 / examples.len() as f32;
+    scale_in_place(logits_seed.as_mut_slice(), example_scale);
+    Ok((total_loss * example_scale, logits_seed))
 }
 
 fn read_cuda_gradient(
