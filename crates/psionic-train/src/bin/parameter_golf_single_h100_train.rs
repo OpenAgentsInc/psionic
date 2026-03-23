@@ -39,6 +39,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         report.disposition,
         report.executed_steps
     );
+    for step in &report.step_metrics {
+        println!(
+            "train_step step:{} train_loss:{:.8} lr_mult:{:.8} muon_momentum:{:.8} windows:{}",
+            step.global_step,
+            step.mean_microbatch_loss,
+            step.learning_rate_multiplier,
+            step.muon_momentum,
+            step.train_window_ids.join(",")
+        );
+    }
     if let Some(final_validation) = report.final_validation {
         println!(
             "final_validation val_loss:{:.8} val_bpb:{:.8}",
@@ -47,6 +57,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     if let Some(bytes) = report.compressed_model_bytes {
         println!("compressed_model_bytes={bytes}");
+    }
+    if let Some(ref artifact_ref) = report.compressed_model_artifact_ref {
+        println!("compressed_model_artifact_ref={artifact_ref}");
+    }
+    if let Some(ref artifact_digest) = report.compressed_model_artifact_digest {
+        println!("compressed_model_artifact_digest={artifact_digest}");
     }
     if let Some(refusal) = report.refusal {
         println!(
