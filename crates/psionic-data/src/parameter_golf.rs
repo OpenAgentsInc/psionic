@@ -10,7 +10,7 @@ use psionic_datastream::{
     DatastreamEncoding, DatastreamManifest, DatastreamManifestRef, DatastreamSubjectKind,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -622,6 +622,59 @@ impl ParameterGolfSentencePieceByteLuts {
     }
 }
 
+#[derive(Deserialize)]
+struct BuiltinParameterGolfOracleParityFixture {
+    sentencepiece_entries: Vec<BuiltinParameterGolfSentencePieceEntry>,
+}
+
+#[derive(Deserialize)]
+struct BuiltinParameterGolfSentencePieceEntry {
+    token_id: u32,
+    piece: String,
+    kind: String,
+}
+
+/// Returns the canonical Parameter Golf SentencePiece byte-accounting LUTs from
+/// the frozen oracle parity fixture shipped in this repo.
+pub fn builtin_parameter_golf_sentencepiece_byte_luts()
+-> Result<ParameterGolfSentencePieceByteLuts, ParameterGolfDataError> {
+    let fixture: BuiltinParameterGolfOracleParityFixture = serde_json::from_str(include_str!(
+        "../../../fixtures/parameter_golf/parity/parameter_golf_oracle_parity_fixture.json"
+    ))
+    .map_err(|error| ParameterGolfDataError::BuiltinOracleFixtureDecode {
+        detail: error.to_string(),
+    })?;
+    let entries = fixture
+        .sentencepiece_entries
+        .into_iter()
+        .map(|entry| {
+            Ok::<ParameterGolfSentencePieceTokenEntry, ParameterGolfDataError>(
+                ParameterGolfSentencePieceTokenEntry::new(
+                    entry.token_id,
+                    entry.piece,
+                    builtin_sentencepiece_token_kind(entry.kind.as_str())?,
+                ),
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    ParameterGolfSentencePieceByteLuts::build(1024, entries.as_slice())
+}
+
+fn builtin_sentencepiece_token_kind(
+    kind: &str,
+) -> Result<ParameterGolfSentencePieceTokenKind, ParameterGolfDataError> {
+    match kind {
+        "normal" => Ok(ParameterGolfSentencePieceTokenKind::Normal),
+        "byte" => Ok(ParameterGolfSentencePieceTokenKind::Byte),
+        "control" => Ok(ParameterGolfSentencePieceTokenKind::Control),
+        "unknown" => Ok(ParameterGolfSentencePieceTokenKind::Unknown),
+        "unused" => Ok(ParameterGolfSentencePieceTokenKind::Unused),
+        other => Err(ParameterGolfDataError::BuiltinOracleFixtureDecode {
+            detail: format!("unknown sentencepiece token kind `{other}`"),
+        }),
+    }
+}
+
 /// Loads and validates one current-format Parameter Golf shard as a `u16` token vector.
 pub fn load_parameter_golf_shard_tokens(
     path: impl AsRef<Path>,
@@ -996,12 +1049,12 @@ pub enum ParameterGolfDataError {
         expected: u32,
         actual: u32,
     },
-    #[error(
-        "parameter golf requested {requested} train shards but only {available} are available"
-    )]
+    #[error("parameter golf requested {requested} train shards but only {available} are available")]
     InvalidTrainShardLimit { requested: usize, available: usize },
     #[error("parameter golf token window size must be greater than zero")]
     InvalidTokenWindowSize,
+    #[error("parameter golf builtin oracle fixture decode failed: {detail}")]
+    BuiltinOracleFixtureDecode { detail: String },
     #[error("parameter golf SentencePiece token id `{token_id}` is duplicated")]
     DuplicateSentencePieceTokenId { token_id: u32 },
     #[error(
@@ -1029,7 +1082,9 @@ pub enum ParameterGolfDataError {
     CursorSplitMismatch { expected: String, actual: String },
     #[error("parameter golf manifest does not declare split `{split_name}`")]
     UnknownSplit { split_name: String },
-    #[error("parameter golf token window references unknown shard `{shard_key}` in split `{split_name}`")]
+    #[error(
+        "parameter golf token window references unknown shard `{shard_key}` in split `{split_name}`"
+    )]
     UnknownWindowShard {
         split_name: String,
         shard_key: String,
@@ -1722,6 +1777,27 @@ mod tests {
             .expect("val_bpb should compute");
         for oracle in fixture.oracles.values() {
             assert!((val_bpb - oracle.val_bpb).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn builtin_sentencepiece_byte_luts_match_frozen_oracle_fixture() {
+        let fixture = load_oracle_parity_fixture();
+        let builtin = builtin_parameter_golf_sentencepiece_byte_luts()
+            .expect("builtin oracle byte luts should load");
+        for oracle in fixture.oracles.values() {
+            assert_eq!(
+                &builtin.base_bytes_lut[..oracle.luts.base_bytes_lut.len()],
+                oracle.luts.base_bytes_lut.as_slice()
+            );
+            assert_eq!(
+                &builtin.has_leading_space_lut[..oracle.luts.has_leading_space_lut.len()],
+                oracle.luts.has_leading_space_lut.as_slice()
+            );
+            assert_eq!(
+                &builtin.is_boundary_token_lut[..oracle.luts.is_boundary_token_lut.len()],
+                oracle.luts.is_boundary_token_lut.as_slice()
+            );
         }
     }
 }

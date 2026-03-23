@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf};
 
 use psionic_train::{
-    ParameterGolfSingleH100BringupConfig, write_parameter_golf_single_h100_bringup_report,
+    ParameterGolfSingleH100TrainingConfig, write_parameter_golf_single_h100_training_report,
 };
 
 fn main() {
@@ -23,15 +23,31 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let output_path = env::args()
         .nth(3)
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/tmp/parameter_golf_single_h100_bringup.json"));
-    let config =
-        ParameterGolfSingleH100BringupConfig::challenge_defaults(dataset_root, tokenizer_path);
-    let report = write_parameter_golf_single_h100_bringup_report(&output_path, &config)?;
+        .unwrap_or_else(|| PathBuf::from("/tmp/parameter_golf_single_h100_training.json"));
+    let max_steps = env::args()
+        .nth(4)
+        .map(|value| value.parse::<u64>())
+        .transpose()?
+        .unwrap_or(1);
+    let mut config =
+        ParameterGolfSingleH100TrainingConfig::challenge_defaults(dataset_root, tokenizer_path);
+    config.max_steps = max_steps;
+    let report = write_parameter_golf_single_h100_training_report(&output_path, &config)?;
     println!(
-        "wrote {} with disposition {:?}",
+        "wrote {} with disposition {:?} executed_steps={}",
         output_path.display(),
-        report.disposition
+        report.disposition,
+        report.executed_steps
     );
+    if let Some(final_validation) = report.final_validation {
+        println!(
+            "final_validation val_loss:{:.8} val_bpb:{:.8}",
+            final_validation.mean_loss, final_validation.bits_per_byte
+        );
+    }
+    if let Some(bytes) = report.compressed_model_bytes {
+        println!("compressed_model_bytes={bytes}");
+    }
     if let Some(refusal) = report.refusal {
         println!(
             "refusal subject={:?} detail={}",

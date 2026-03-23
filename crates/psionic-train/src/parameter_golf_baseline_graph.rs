@@ -6,10 +6,10 @@ use psionic_ir::{
     GraphError, ReferenceEvaluationError,
 };
 use psionic_models::{
-    ParameterGolfConfig, ParameterGolfConfigError, ParameterGolfExecutionError,
-    ParameterGolfModelDescriptor, ParameterGolfModelError, ParameterGolfReferenceModel,
-    ParameterGolfTensor3, ParameterGolfTensorError, ParameterGolfWeights,
-    PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON,
+    PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON, ParameterGolfConfig, ParameterGolfConfigError,
+    ParameterGolfExecutionError, ParameterGolfModelDescriptor, ParameterGolfModelError,
+    ParameterGolfReferenceModel, ParameterGolfTensor3, ParameterGolfTensorError,
+    ParameterGolfWeights,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -55,6 +55,35 @@ pub struct ParameterGolfBaselineGraph {
 }
 
 impl ParameterGolfBaselineGraph {
+    /// Looks up one parameter binding by stable parameter id.
+    #[must_use]
+    pub fn parameter_binding(
+        &self,
+        parameter_id: &str,
+    ) -> Option<&ParameterGolfBaselineGraphParameterBinding> {
+        self.parameter_bindings
+            .iter()
+            .find(|binding| binding.parameter_id == parameter_id)
+    }
+}
+
+/// Lowered Parameter Golf baseline training graph that applies the bounded
+/// projection loss directly on-device.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfBaselineTrainingGraph {
+    /// The lowered autodiff graph.
+    pub graph: AutodiffGraph,
+    /// Non-trainable dense embedded-input tensor consumed by the graph.
+    pub embedded_input_tensor_id: TensorId,
+    /// Dense `f32` target ids consumed by the projection-loss op.
+    pub target_ids_tensor_id: TensorId,
+    /// Final scalar mean-loss tensor emitted by the graph.
+    pub loss_tensor_id: TensorId,
+    /// Parameter bindings in deterministic order.
+    pub parameter_bindings: Vec<ParameterGolfBaselineGraphParameterBinding>,
+}
+
+impl ParameterGolfBaselineTrainingGraph {
     /// Looks up one parameter binding by stable parameter id.
     #[must_use]
     pub fn parameter_binding(
@@ -124,6 +153,12 @@ pub enum ParameterGolfBaselineGraphError {
     NonDenseTensorData { context: String },
 }
 
+struct ParameterGolfBaselineGraphBuildState {
+    embedded_input: AutodiffTensor,
+    parameter_bindings: Vec<ParameterGolfBaselineGraphParameterBinding>,
+    pre_softcap_logits: AutodiffTensor,
+}
+
 /// Builds one trainer-owned Parameter Golf baseline graph that emits pre-softcap
 /// logits from dense embedded inputs plus the explicit baseline parameter
 /// surface.
@@ -133,131 +168,48 @@ pub fn build_parameter_golf_baseline_graph(
     batch_size: usize,
     sequence_length: usize,
 ) -> Result<ParameterGolfBaselineGraph, ParameterGolfBaselineGraphError> {
-    let config = &descriptor.config;
-    if batch_size == 0 {
-        return Err(ParameterGolfExecutionError::EmptyBatch.into());
-    }
-    if sequence_length == 0 {
-        return Err(ParameterGolfExecutionError::EmptySequence.into());
-    }
-    if !config.tie_embeddings
-        && !descriptor
-            .weights
-            .tensors
-            .iter()
-            .any(|tensor| tensor.name == "lm_head.weight")
-    {
-        return Err(ParameterGolfBaselineGraphError::InvalidHeadPosture {
-            model_id: descriptor.model.model_id.clone(),
-            tie_embeddings: config.tie_embeddings,
-            lm_head_present: false,
-        });
-    }
-
     let mut builder = AutodiffGraphBuilder::with_context(device, AutodiffContext::training());
-    let embedded_input = builder.input(
-        "embedded_inputs",
-        Shape::new(vec![batch_size, sequence_length, config.model_dim]),
-        DType::F32,
-        true,
-    );
-
-    let mut parameter_inputs = BTreeMap::new();
-    let mut parameter_bindings = Vec::new();
-    for tensor in &descriptor.weights.tensors {
-        let tensor_input = builder.input(tensor.name.clone(), tensor.shape.clone(), DType::F32, true);
-        let gradient_source = if tensor.name == "tok_emb.weight" {
-            if config.tie_embeddings {
-                ParameterGolfBaselineGradientSource::GraphAndInputEmbeddingScatter
-            } else {
-                ParameterGolfBaselineGradientSource::InputEmbeddingScatterOnly
-            }
-        } else {
-            ParameterGolfBaselineGradientSource::GraphOnly
-        };
-        parameter_bindings.push(ParameterGolfBaselineGraphParameterBinding {
-            parameter_id: tensor.name.clone(),
-            shape: tensor.shape.clone(),
-            graph_input_tensor_id: tensor_input.id(),
-            gradient_source,
-        });
-        parameter_inputs.insert(tensor.name.clone(), tensor_input);
-    }
-
-    let ones_model = builder.constant_f32(Shape::new(vec![config.model_dim]), vec![1.0; config.model_dim])?;
-    let head_dim = config.head_dim()?;
-    let ones_head = builder.constant_f32(Shape::new(vec![head_dim]), vec![1.0; head_dim])?;
-    let (rope_cos, rope_sin) =
-        rope_table_constants(&mut builder, sequence_length, head_dim, config.rope_base)?;
-
-    let mut x = builder.rms_norm(&embedded_input, &ones_model, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON)?;
-    let x0 = x.clone();
-    let mut skips = Vec::new();
-    for layer_index in 0..config.num_encoder_layers() {
-        x = block_forward_graph(
-            &mut builder,
-            &parameter_inputs,
-            &x,
-            &x0,
-            config,
-            batch_size,
-            sequence_length,
-            layer_index,
-            &ones_model,
-            &ones_head,
-            &rope_cos,
-            &rope_sin,
-        )?;
-        skips.push(x.clone());
-    }
-    let skip_weights = parameter_inputs
-        .get("skip_weights")
-        .cloned()
-        .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
-            parameter_id: String::from("skip_weights"),
-        })?;
-    for decoder_index in 0..config.num_decoder_layers() {
-        if let Some(skip) = skips.pop() {
-            let skip_scale = builder.select(&skip_weights, 0, decoder_index)?;
-            x = add_scaled_graph(
-                &mut builder,
-                &x,
-                &skip,
-                &skip_scale,
-                Shape::new(vec![batch_size, sequence_length, config.model_dim]),
-            )?;
-        }
-        x = block_forward_graph(
-            &mut builder,
-            &parameter_inputs,
-            &x,
-            &x0,
-            config,
-            batch_size,
-            sequence_length,
-            config.num_encoder_layers() + decoder_index,
-            &ones_model,
-            &ones_head,
-            &rope_cos,
-            &rope_sin,
-        )?;
-    }
-    let hidden = builder.rms_norm(&x, &ones_model, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON)?;
-    let pre_softcap_logits = hidden_to_pre_softcap_logits_graph(
-        &mut builder,
-        &parameter_inputs,
-        &hidden,
-        config,
-        batch_size,
-        sequence_length,
-    )?;
-    let graph = builder.finish(vec![pre_softcap_logits.clone()]);
+    let state = build_baseline_graph_state(&mut builder, descriptor, batch_size, sequence_length)?;
+    let graph = builder.finish(vec![state.pre_softcap_logits.clone()]);
 
     Ok(ParameterGolfBaselineGraph {
-        embedded_input_tensor_id: embedded_input.id(),
-        pre_softcap_logits_tensor_id: pre_softcap_logits.id(),
+        embedded_input_tensor_id: state.embedded_input.id(),
+        pre_softcap_logits_tensor_id: state.pre_softcap_logits.id(),
         graph,
-        parameter_bindings,
+        parameter_bindings: state.parameter_bindings,
+    })
+}
+
+/// Builds one trainer-owned Parameter Golf baseline graph that emits the
+/// bounded on-device projection loss directly from dense embedded inputs,
+/// target ids, and the explicit baseline parameter surface.
+pub fn build_parameter_golf_baseline_training_graph(
+    device: Device,
+    descriptor: &ParameterGolfModelDescriptor,
+    batch_size: usize,
+    sequence_length: usize,
+) -> Result<ParameterGolfBaselineTrainingGraph, ParameterGolfBaselineGraphError> {
+    let mut builder = AutodiffGraphBuilder::with_context(device, AutodiffContext::training());
+    let state = build_baseline_graph_state(&mut builder, descriptor, batch_size, sequence_length)?;
+    let target_ids = builder.input(
+        "target_ids",
+        Shape::new(vec![batch_size, sequence_length]),
+        DType::F32,
+        false,
+    );
+    let loss = builder.parameter_golf_projection_loss(
+        &state.pre_softcap_logits,
+        &target_ids,
+        descriptor.config.logit_softcap,
+    )?;
+    let graph = builder.finish(vec![loss.clone()]);
+
+    Ok(ParameterGolfBaselineTrainingGraph {
+        embedded_input_tensor_id: state.embedded_input.id(),
+        target_ids_tensor_id: target_ids.id(),
+        loss_tensor_id: loss.id(),
+        graph,
+        parameter_bindings: state.parameter_bindings,
     })
 }
 
@@ -273,11 +225,11 @@ pub fn gather_parameter_golf_embedded_inputs(
     for (batch_index, row) in input_ids.iter().enumerate() {
         for (position_index, &token_id) in row.iter().enumerate() {
             let source_offset = token_id as usize * config.model_dim;
-            let destination_offset = (batch_index * sequence_length + position_index) * config.model_dim;
-            values[destination_offset..destination_offset + config.model_dim]
-                .copy_from_slice(
-                    &weights.token_embedding[source_offset..source_offset + config.model_dim],
-                );
+            let destination_offset =
+                (batch_index * sequence_length + position_index) * config.model_dim;
+            values[destination_offset..destination_offset + config.model_dim].copy_from_slice(
+                &weights.token_embedding[source_offset..source_offset + config.model_dim],
+            );
         }
     }
     Ok(ParameterGolfTensor3::new(
@@ -289,6 +241,51 @@ pub fn gather_parameter_golf_embedded_inputs(
 /// Builds one dense input map for the lowered Parameter Golf baseline graph.
 pub fn bind_parameter_golf_baseline_graph_inputs(
     graph: &ParameterGolfBaselineGraph,
+    model: &ParameterGolfReferenceModel,
+    embedded_inputs: &ParameterGolfTensor3,
+) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
+    bind_parameter_golf_graph_inputs(
+        graph.embedded_input_tensor_id,
+        graph.parameter_bindings.as_slice(),
+        model,
+        embedded_inputs,
+    )
+}
+
+/// Builds one dense input map for the lowered Parameter Golf baseline training graph.
+pub fn bind_parameter_golf_baseline_training_graph_inputs(
+    graph: &ParameterGolfBaselineTrainingGraph,
+    model: &ParameterGolfReferenceModel,
+    embedded_inputs: &ParameterGolfTensor3,
+    target_ids: &[Vec<u32>],
+) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
+    let mut inputs = bind_parameter_golf_graph_inputs(
+        graph.embedded_input_tensor_id,
+        graph.parameter_bindings.as_slice(),
+        model,
+        embedded_inputs,
+    )?;
+    validate_target_shape(
+        target_ids,
+        embedded_inputs.batch_size(),
+        embedded_inputs.sequence_length(),
+    )?;
+    validate_token_batch(target_ids, model.descriptor().config.vocab_size)?;
+    inputs.insert(
+        graph.target_ids_tensor_id,
+        TensorData::F32(
+            target_ids
+                .iter()
+                .flat_map(|row| row.iter().map(|token_id| *token_id as f32))
+                .collect(),
+        ),
+    );
+    Ok(inputs)
+}
+
+fn bind_parameter_golf_graph_inputs(
+    embedded_input_tensor_id: TensorId,
+    parameter_bindings: &[ParameterGolfBaselineGraphParameterBinding],
     model: &ParameterGolfReferenceModel,
     embedded_inputs: &ParameterGolfTensor3,
 ) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
@@ -321,15 +318,15 @@ pub fn bind_parameter_golf_baseline_graph_inputs(
         .collect::<BTreeMap<_, _>>();
     let mut inputs = BTreeMap::new();
     inputs.insert(
-        graph.embedded_input_tensor_id,
+        embedded_input_tensor_id,
         TensorData::F32(embedded_inputs.values().to_vec()),
     );
-    for binding in &graph.parameter_bindings {
-        let parameter = parameter_vectors.get(&binding.parameter_id).ok_or_else(|| {
-            ParameterGolfBaselineGraphError::MissingWeightVector {
+    for binding in parameter_bindings {
+        let parameter = parameter_vectors
+            .get(&binding.parameter_id)
+            .ok_or_else(|| ParameterGolfBaselineGraphError::MissingWeightVector {
                 parameter_id: binding.parameter_id.clone(),
-            }
-        })?;
+            })?;
         inputs.insert(
             binding.graph_input_tensor_id,
             TensorData::F32(parameter.values.clone()),
@@ -351,18 +348,23 @@ pub fn parameter_golf_projection_seed(
         }
         .into());
     }
-    validate_target_shape(target_ids, pre_softcap_logits.batch_size(), pre_softcap_logits.sequence_length())?;
+    validate_target_shape(
+        target_ids,
+        pre_softcap_logits.batch_size(),
+        pre_softcap_logits.sequence_length(),
+    )?;
     validate_token_batch(target_ids, pre_softcap_logits.width())?;
 
     let mut softcapped = vec![0.0_f32; pre_softcap_logits.values().len()];
     let mut seed = vec![0.0_f32; pre_softcap_logits.values().len()];
     let mut total_loss = 0.0_f32;
-    let position_count = (pre_softcap_logits.batch_size() * pre_softcap_logits.sequence_length()) as f32;
+    let position_count =
+        (pre_softcap_logits.batch_size() * pre_softcap_logits.sequence_length()) as f32;
 
     for batch in 0..pre_softcap_logits.batch_size() {
         for position in 0..pre_softcap_logits.sequence_length() {
-            let offset =
-                (batch * pre_softcap_logits.sequence_length() + position) * pre_softcap_logits.width();
+            let offset = (batch * pre_softcap_logits.sequence_length() + position)
+                * pre_softcap_logits.width();
             let logits_row =
                 &pre_softcap_logits.values()[offset..offset + pre_softcap_logits.width()];
             let softcapped_row = &mut softcapped[offset..offset + pre_softcap_logits.width()];
@@ -409,13 +411,46 @@ pub fn materialize_parameter_golf_baseline_gradients(
     config: &ParameterGolfConfig,
     input_ids: &[Vec<u32>],
 ) -> Result<ParameterGolfBaselineGradientBundle, ParameterGolfBaselineGraphError> {
+    materialize_parameter_golf_gradients_from_bindings(
+        graph.embedded_input_tensor_id,
+        graph.parameter_bindings.as_slice(),
+        backward,
+        config,
+        input_ids,
+    )
+}
+
+/// Reconstructs stable Parameter Golf parameter gradients from one seeded
+/// backward replay over the lowered training graph.
+pub fn materialize_parameter_golf_baseline_training_gradients(
+    graph: &ParameterGolfBaselineTrainingGraph,
+    backward: &psionic_ir::AutodiffBackwardResult,
+    config: &ParameterGolfConfig,
+    input_ids: &[Vec<u32>],
+) -> Result<ParameterGolfBaselineGradientBundle, ParameterGolfBaselineGraphError> {
+    materialize_parameter_golf_gradients_from_bindings(
+        graph.embedded_input_tensor_id,
+        graph.parameter_bindings.as_slice(),
+        backward,
+        config,
+        input_ids,
+    )
+}
+
+fn materialize_parameter_golf_gradients_from_bindings(
+    embedded_input_tensor_id: TensorId,
+    parameter_bindings: &[ParameterGolfBaselineGraphParameterBinding],
+    backward: &psionic_ir::AutodiffBackwardResult,
+    config: &ParameterGolfConfig,
+    input_ids: &[Vec<u32>],
+) -> Result<ParameterGolfBaselineGradientBundle, ParameterGolfBaselineGraphError> {
     let scattered_embedding_gradient = scatter_input_embedding_gradient(
         tensor3_from_dense_gradient(
-            backward
-                .gradient(graph.embedded_input_tensor_id)
-                .ok_or_else(|| ParameterGolfBaselineGraphError::MissingGradient {
+            backward.gradient(embedded_input_tensor_id).ok_or_else(|| {
+                ParameterGolfBaselineGraphError::MissingGradient {
                     parameter_id: String::from("embedded_inputs"),
-                })?,
+                }
+            })?,
             [
                 input_ids.len(),
                 input_ids.first().map(Vec::len).unwrap_or(0),
@@ -429,7 +464,7 @@ pub fn materialize_parameter_golf_baseline_gradients(
     )?;
 
     let mut gradients = BTreeMap::new();
-    for binding in &graph.parameter_bindings {
+    for binding in parameter_bindings {
         let graph_gradient = backward.gradient(binding.graph_input_tensor_id);
         let values = match binding.gradient_source {
             ParameterGolfBaselineGradientSource::GraphOnly => dense_gradient_values(
@@ -449,13 +484,16 @@ pub fn materialize_parameter_golf_baseline_gradients(
             }
             ParameterGolfBaselineGradientSource::GraphAndInputEmbeddingScatter => {
                 let mut values = dense_gradient_values(
-                    graph_gradient.ok_or_else(|| ParameterGolfBaselineGraphError::MissingGradient {
-                        parameter_id: binding.parameter_id.clone(),
+                    graph_gradient.ok_or_else(|| {
+                        ParameterGolfBaselineGraphError::MissingGradient {
+                            parameter_id: binding.parameter_id.clone(),
+                        }
                     })?,
                     binding.parameter_id.clone(),
                 )?;
                 if binding.parameter_id == "tok_emb.weight" {
-                    for (value, scattered) in values.iter_mut().zip(scattered_embedding_gradient.iter())
+                    for (value, scattered) in
+                        values.iter_mut().zip(scattered_embedding_gradient.iter())
                     {
                         *value += *scattered;
                     }
@@ -467,6 +505,147 @@ pub fn materialize_parameter_golf_baseline_gradients(
     }
     Ok(ParameterGolfBaselineGradientBundle {
         parameter_gradients: gradients,
+    })
+}
+
+fn build_baseline_graph_state(
+    builder: &mut AutodiffGraphBuilder,
+    descriptor: &ParameterGolfModelDescriptor,
+    batch_size: usize,
+    sequence_length: usize,
+) -> Result<ParameterGolfBaselineGraphBuildState, ParameterGolfBaselineGraphError> {
+    let config = &descriptor.config;
+    if batch_size == 0 {
+        return Err(ParameterGolfExecutionError::EmptyBatch.into());
+    }
+    if sequence_length == 0 {
+        return Err(ParameterGolfExecutionError::EmptySequence.into());
+    }
+    if !config.tie_embeddings
+        && !descriptor
+            .weights
+            .tensors
+            .iter()
+            .any(|tensor| tensor.name == "lm_head.weight")
+    {
+        return Err(ParameterGolfBaselineGraphError::InvalidHeadPosture {
+            model_id: descriptor.model.model_id.clone(),
+            tie_embeddings: config.tie_embeddings,
+            lm_head_present: false,
+        });
+    }
+
+    let embedded_input = builder.input(
+        "embedded_inputs",
+        Shape::new(vec![batch_size, sequence_length, config.model_dim]),
+        DType::F32,
+        true,
+    );
+
+    let mut parameter_inputs = BTreeMap::new();
+    let mut parameter_bindings = Vec::new();
+    for tensor in &descriptor.weights.tensors {
+        let tensor_input =
+            builder.input(tensor.name.clone(), tensor.shape.clone(), DType::F32, true);
+        let gradient_source = if tensor.name == "tok_emb.weight" {
+            if config.tie_embeddings {
+                ParameterGolfBaselineGradientSource::GraphAndInputEmbeddingScatter
+            } else {
+                ParameterGolfBaselineGradientSource::InputEmbeddingScatterOnly
+            }
+        } else {
+            ParameterGolfBaselineGradientSource::GraphOnly
+        };
+        parameter_bindings.push(ParameterGolfBaselineGraphParameterBinding {
+            parameter_id: tensor.name.clone(),
+            shape: tensor.shape.clone(),
+            graph_input_tensor_id: tensor_input.id(),
+            gradient_source,
+        });
+        parameter_inputs.insert(tensor.name.clone(), tensor_input);
+    }
+
+    let ones_model = builder.constant_f32(
+        Shape::new(vec![config.model_dim]),
+        vec![1.0; config.model_dim],
+    )?;
+    let head_dim = config.head_dim()?;
+    let ones_head = builder.constant_f32(Shape::new(vec![head_dim]), vec![1.0; head_dim])?;
+    let (rope_cos, rope_sin) =
+        rope_table_constants(builder, sequence_length, head_dim, config.rope_base)?;
+
+    let mut x = builder.rms_norm(
+        &embedded_input,
+        &ones_model,
+        PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON,
+    )?;
+    let x0 = x.clone();
+    let mut skips = Vec::new();
+    for layer_index in 0..config.num_encoder_layers() {
+        x = block_forward_graph(
+            builder,
+            &parameter_inputs,
+            &x,
+            &x0,
+            config,
+            batch_size,
+            sequence_length,
+            layer_index,
+            &ones_model,
+            &ones_head,
+            &rope_cos,
+            &rope_sin,
+        )?;
+        skips.push(x.clone());
+    }
+    let skip_weights = parameter_inputs
+        .get("skip_weights")
+        .cloned()
+        .ok_or_else(
+            || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                parameter_id: String::from("skip_weights"),
+            },
+        )?;
+    for decoder_index in 0..config.num_decoder_layers() {
+        if let Some(skip) = skips.pop() {
+            let skip_scale = builder.select(&skip_weights, 0, decoder_index)?;
+            x = add_scaled_graph(
+                builder,
+                &x,
+                &skip,
+                &skip_scale,
+                Shape::new(vec![batch_size, sequence_length, config.model_dim]),
+            )?;
+        }
+        x = block_forward_graph(
+            builder,
+            &parameter_inputs,
+            &x,
+            &x0,
+            config,
+            batch_size,
+            sequence_length,
+            config.num_encoder_layers() + decoder_index,
+            &ones_model,
+            &ones_head,
+            &rope_cos,
+            &rope_sin,
+        )?;
+    }
+    let hidden = builder.rms_norm(&x, &ones_model, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON)?;
+    let pre_softcap_logits = hidden_to_pre_softcap_logits_graph(
+        builder,
+        &parameter_inputs,
+        &hidden,
+        config,
+        batch_size,
+        sequence_length,
+    )?;
+
+    Ok(ParameterGolfBaselineGraphBuildState {
+        embedded_input,
+        parameter_bindings,
+        pre_softcap_logits,
     })
 }
 
@@ -487,9 +666,11 @@ fn block_forward_graph(
     let resid_mix = parameters
         .get(format!("blocks.{layer_index}.resid_mix").as_str())
         .cloned()
-        .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
-            parameter_id: format!("blocks.{layer_index}.resid_mix"),
-        })?;
+        .ok_or_else(
+            || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                parameter_id: format!("blocks.{layer_index}.resid_mix"),
+            },
+        )?;
     let mixed = blend_with_source_graph(
         builder,
         x,
@@ -516,9 +697,11 @@ fn block_forward_graph(
     let attn_scale = parameters
         .get(format!("blocks.{layer_index}.attn_scale").as_str())
         .cloned()
-        .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
-            parameter_id: format!("blocks.{layer_index}.attn_scale"),
-        })?;
+        .ok_or_else(
+            || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                parameter_id: format!("blocks.{layer_index}.attn_scale"),
+            },
+        )?;
     let x = add_scaled_graph(
         builder,
         &mixed,
@@ -526,7 +709,8 @@ fn block_forward_graph(
         &attn_scale,
         Shape::new(vec![batch_size, sequence_length, config.model_dim]),
     )?;
-    let normed_for_mlp = builder.rms_norm(&x, ones_model, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON)?;
+    let normed_for_mlp =
+        builder.rms_norm(&x, ones_model, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON)?;
     let mlp = mlp_forward_graph(
         builder,
         parameters,
@@ -539,9 +723,11 @@ fn block_forward_graph(
     let mlp_scale = parameters
         .get(format!("blocks.{layer_index}.mlp_scale").as_str())
         .cloned()
-        .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
-            parameter_id: format!("blocks.{layer_index}.mlp_scale"),
-        })?;
+        .ok_or_else(
+            || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                parameter_id: format!("blocks.{layer_index}.mlp_scale"),
+            },
+        )?;
     add_scaled_graph(
         builder,
         &x,
@@ -570,9 +756,11 @@ fn attention_forward_graph(
         input,
         parameters
             .get(format!("blocks.{layer_index}.attn.c_q.weight").as_str())
-            .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
-                parameter_id: format!("blocks.{layer_index}.attn.c_q.weight"),
-            })?,
+            .ok_or_else(
+                || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                    parameter_id: format!("blocks.{layer_index}.attn.c_q.weight"),
+                },
+            )?,
         batch_size,
         sequence_length,
         config.model_dim,
@@ -583,9 +771,11 @@ fn attention_forward_graph(
         input,
         parameters
             .get(format!("blocks.{layer_index}.attn.c_k.weight").as_str())
-            .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
-                parameter_id: format!("blocks.{layer_index}.attn.c_k.weight"),
-            })?,
+            .ok_or_else(
+                || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                    parameter_id: format!("blocks.{layer_index}.attn.c_k.weight"),
+                },
+            )?,
         batch_size,
         sequence_length,
         config.model_dim,
@@ -596,9 +786,11 @@ fn attention_forward_graph(
         input,
         parameters
             .get(format!("blocks.{layer_index}.attn.c_v.weight").as_str())
-            .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
-                parameter_id: format!("blocks.{layer_index}.attn.c_v.weight"),
-            })?,
+            .ok_or_else(
+                || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                    parameter_id: format!("blocks.{layer_index}.attn.c_v.weight"),
+                },
+            )?,
         batch_size,
         sequence_length,
         config.model_dim,
@@ -637,13 +829,20 @@ fn attention_forward_graph(
     let q_gain = parameters
         .get(format!("blocks.{layer_index}.attn.q_gain").as_str())
         .cloned()
-        .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
-            parameter_id: format!("blocks.{layer_index}.attn.q_gain"),
-        })?;
+        .ok_or_else(
+            || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                parameter_id: format!("blocks.{layer_index}.attn.q_gain"),
+            },
+        )?;
     let q_gain = builder.reshape(&q_gain, Shape::new(vec![1, config.num_heads, 1, 1]))?;
     let q_gain = builder.expand(
         &q_gain,
-        Shape::new(vec![batch_size, config.num_heads, sequence_length, head_dim]),
+        Shape::new(vec![
+            batch_size,
+            config.num_heads,
+            sequence_length,
+            head_dim,
+        ]),
     )?;
     let q = builder.mul(&q, &q_gain)?;
     let attended = builder.scaled_dot_product_attention(
@@ -654,16 +853,20 @@ fn attention_forward_graph(
         true,
     )?;
     let merged = builder.permute(&attended, vec![0, 2, 1, 3])?;
-    let merged =
-        builder.reshape(&merged, Shape::new(vec![batch_size, sequence_length, config.model_dim]))?;
+    let merged = builder.reshape(
+        &merged,
+        Shape::new(vec![batch_size, sequence_length, config.model_dim]),
+    )?;
     linear_3d(
         builder,
         &merged,
         parameters
             .get(format!("blocks.{layer_index}.attn.proj.weight").as_str())
-            .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
-                parameter_id: format!("blocks.{layer_index}.attn.proj.weight"),
-            })?,
+            .ok_or_else(
+                || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                    parameter_id: format!("blocks.{layer_index}.attn.proj.weight"),
+                },
+            )?,
         batch_size,
         sequence_length,
         config.model_dim,
@@ -686,9 +889,11 @@ fn mlp_forward_graph(
         input,
         parameters
             .get(format!("blocks.{layer_index}.mlp.fc.weight").as_str())
-            .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
-                parameter_id: format!("blocks.{layer_index}.mlp.fc.weight"),
-            })?,
+            .ok_or_else(
+                || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                    parameter_id: format!("blocks.{layer_index}.mlp.fc.weight"),
+                },
+            )?,
         batch_size,
         sequence_length,
         config.model_dim,
@@ -700,9 +905,11 @@ fn mlp_forward_graph(
         &activated,
         parameters
             .get(format!("blocks.{layer_index}.mlp.proj.weight").as_str())
-            .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
-                parameter_id: format!("blocks.{layer_index}.mlp.proj.weight"),
-            })?,
+            .ok_or_else(
+                || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                    parameter_id: format!("blocks.{layer_index}.mlp.proj.weight"),
+                },
+            )?,
         batch_size,
         sequence_length,
         hidden_dim,
@@ -719,19 +926,17 @@ fn hidden_to_pre_softcap_logits_graph(
     sequence_length: usize,
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
     let head_weight = if config.tie_embeddings {
-        parameters
-            .get("tok_emb.weight")
-            .cloned()
-            .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
+        parameters.get("tok_emb.weight").cloned().ok_or_else(|| {
+            ParameterGolfBaselineGraphError::MissingParameterBinding {
                 parameter_id: String::from("tok_emb.weight"),
-            })?
+            }
+        })?
     } else {
-        parameters
-            .get("lm_head.weight")
-            .cloned()
-            .ok_or_else(|| ParameterGolfBaselineGraphError::MissingParameterBinding {
+        parameters.get("lm_head.weight").cloned().ok_or_else(|| {
+            ParameterGolfBaselineGraphError::MissingParameterBinding {
                 parameter_id: String::from("lm_head.weight"),
-            })?
+            }
+        })?
     };
     linear_3d(
         builder,
@@ -753,11 +958,16 @@ fn linear_3d(
     in_features: usize,
     out_features: usize,
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
-    let flattened =
-        builder.reshape(input, Shape::new(vec![batch_size * sequence_length, in_features]))?;
+    let flattened = builder.reshape(
+        input,
+        Shape::new(vec![batch_size * sequence_length, in_features]),
+    )?;
     let transposed_weight = builder.permute(weight, vec![1, 0])?;
     let output = builder.matmul(&flattened, &transposed_weight)?;
-    Ok(builder.reshape(&output, Shape::new(vec![batch_size, sequence_length, out_features]))?)
+    Ok(builder.reshape(
+        &output,
+        Shape::new(vec![batch_size, sequence_length, out_features]),
+    )?)
 }
 
 fn reshape_to_attention_heads(
@@ -768,8 +978,10 @@ fn reshape_to_attention_heads(
     head_count: usize,
     head_dim: usize,
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
-    let reshaped =
-        builder.reshape(tensor, Shape::new(vec![batch_size, sequence_length, head_count, head_dim]))?;
+    let reshaped = builder.reshape(
+        tensor,
+        Shape::new(vec![batch_size, sequence_length, head_count, head_dim]),
+    )?;
     Ok(builder.permute(&reshaped, vec![0, 2, 1, 3])?)
 }
 
@@ -786,10 +998,14 @@ fn blend_with_source_graph(
     let source_mix = builder.select(mix, 0, 1)?;
     let current_mix = builder.reshape(&current_mix, Shape::new(vec![1, 1, model_dim]))?;
     let source_mix = builder.reshape(&source_mix, Shape::new(vec![1, 1, model_dim]))?;
-    let current_mix =
-        builder.expand(&current_mix, Shape::new(vec![batch_size, sequence_length, model_dim]))?;
-    let source_mix =
-        builder.expand(&source_mix, Shape::new(vec![batch_size, sequence_length, model_dim]))?;
+    let current_mix = builder.expand(
+        &current_mix,
+        Shape::new(vec![batch_size, sequence_length, model_dim]),
+    )?;
+    let source_mix = builder.expand(
+        &source_mix,
+        Shape::new(vec![batch_size, sequence_length, model_dim]),
+    )?;
     let current = builder.mul(current, &current_mix)?;
     let source = builder.mul(source, &source_mix)?;
     Ok(builder.add(&current, &source)?)
@@ -954,7 +1170,9 @@ mod tests {
 
     fn baseline_model() -> Result<ParameterGolfReferenceModel, Box<dyn std::error::Error>> {
         let fixture = load_baseline_fixture();
-        Ok(ParameterGolfReferenceModel::baseline_fixture(fixture.initializer)?)
+        Ok(ParameterGolfReferenceModel::baseline_fixture(
+            fixture.initializer,
+        )?)
     }
 
     fn loss_with_parameter_override(
@@ -982,8 +1200,8 @@ mod tests {
     }
 
     #[test]
-    fn parameter_golf_baseline_graph_matches_reference_logits_on_fixture_batch(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn parameter_golf_baseline_graph_matches_reference_logits_on_fixture_batch()
+    -> Result<(), Box<dyn std::error::Error>> {
         let fixture = load_baseline_fixture();
         let model = baseline_model()?;
         let graph = build_parameter_golf_baseline_graph(
@@ -1023,8 +1241,8 @@ mod tests {
     }
 
     #[test]
-    fn parameter_golf_baseline_graph_materializes_seeded_gradients_for_parameter_families(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn parameter_golf_baseline_graph_materializes_seeded_gradients_for_parameter_families()
+    -> Result<(), Box<dyn std::error::Error>> {
         let fixture = load_baseline_fixture();
         let model = baseline_model()?;
         let graph = build_parameter_golf_baseline_graph(
@@ -1056,7 +1274,9 @@ mod tests {
         let backward = graph.graph.backward_materialized_with_seed(
             graph.pre_softcap_logits_tensor_id,
             &inputs,
-            Some(TensorData::F32(seeded.pre_softcap_gradient.values().to_vec())),
+            Some(TensorData::F32(
+                seeded.pre_softcap_gradient.values().to_vec(),
+            )),
         )?;
         let gradients = materialize_parameter_golf_baseline_gradients(
             &graph,
@@ -1105,6 +1325,89 @@ mod tests {
             assert!(
                 (actual - finite).abs() < 5e-2,
                 "gradient drift for {parameter_id}[{flat_index}] exceeded tolerance: actual={actual} finite={finite}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_baseline_training_graph_matches_reference_loss_and_gradients()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = load_baseline_fixture();
+        let model = baseline_model()?;
+        let graph = build_parameter_golf_baseline_training_graph(
+            Device::cpu(),
+            model.descriptor(),
+            fixture.input_ids.len(),
+            fixture.input_ids[0].len(),
+        )?;
+
+        let embedded_inputs = gather_parameter_golf_embedded_inputs(
+            model.weights(),
+            &model.descriptor().config,
+            fixture.input_ids.as_slice(),
+        )?;
+        let inputs = bind_parameter_golf_baseline_training_graph_inputs(
+            &graph,
+            &model,
+            &embedded_inputs,
+            fixture.target_ids.as_slice(),
+        )?;
+        let forward = evaluate_graph(graph.graph.graph(), &inputs)?;
+        let loss = forward
+            .get(&graph.loss_tensor_id)
+            .ok_or("missing training loss tensor")?
+            .as_f32_slice()
+            .ok_or("loss tensor should be dense f32")?[0];
+        let reference_loss =
+            model.loss(fixture.input_ids.as_slice(), fixture.target_ids.as_slice())?;
+        assert!(
+            (loss - reference_loss).abs() < 5e-5,
+            "training-graph loss drift exceeded tolerance: actual={loss} expected={reference_loss}"
+        );
+
+        let backward = graph
+            .graph
+            .backward_materialized(graph.loss_tensor_id, &inputs)?;
+        let gradients = materialize_parameter_golf_baseline_training_gradients(
+            &graph,
+            &backward,
+            &model.descriptor().config,
+            fixture.input_ids.as_slice(),
+        )?;
+        let delta = 1e-3_f32;
+        for (parameter_id, flat_index) in [
+            ("tok_emb.weight", 17 * model.descriptor().config.model_dim),
+            ("blocks.0.attn.c_q.weight", 0),
+        ] {
+            let baseline = model
+                .weights()
+                .parameter_vector(&model.descriptor().config, parameter_id)
+                .ok_or("missing baseline parameter")?;
+            let mut plus = baseline.values.clone();
+            plus[flat_index] += delta;
+            let mut minus = baseline.values.clone();
+            minus[flat_index] -= delta;
+            let finite = (loss_with_parameter_override(
+                &model,
+                parameter_id,
+                plus,
+                fixture.input_ids.as_slice(),
+                fixture.target_ids.as_slice(),
+            )? - loss_with_parameter_override(
+                &model,
+                parameter_id,
+                minus,
+                fixture.input_ids.as_slice(),
+                fixture.target_ids.as_slice(),
+            )?) / (2.0 * delta);
+            let actual = gradients
+                .parameter_gradients
+                .get(parameter_id)
+                .ok_or("missing parameter gradient")?[flat_index];
+            assert!(
+                (actual - finite).abs() < 5e-2,
+                "training-graph gradient drift for {parameter_id}[{flat_index}] exceeded tolerance: actual={actual} finite={finite}"
             );
         }
         Ok(())
