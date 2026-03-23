@@ -608,7 +608,8 @@ fn build_baseline_graph_state(
         )?;
     for decoder_index in 0..config.num_decoder_layers() {
         if let Some(skip) = skips.pop() {
-            let skip_scale = builder.select(&skip_weights, 0, decoder_index)?;
+            let skip_scale =
+                select_parameter_row_graph(builder, &skip_weights, decoder_index, config.model_dim)?;
             x = add_scaled_graph(
                 builder,
                 &x,
@@ -994,8 +995,8 @@ fn blend_with_source_graph(
     sequence_length: usize,
     model_dim: usize,
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
-    let current_mix = builder.select(mix, 0, 0)?;
-    let source_mix = builder.select(mix, 0, 1)?;
+    let current_mix = select_parameter_row_graph(builder, mix, 0, model_dim)?;
+    let source_mix = select_parameter_row_graph(builder, mix, 1, model_dim)?;
     let current_mix = builder.reshape(&current_mix, Shape::new(vec![1, 1, model_dim]))?;
     let source_mix = builder.reshape(&source_mix, Shape::new(vec![1, 1, model_dim]))?;
     let current_mix = builder.expand(
@@ -1026,6 +1027,60 @@ fn add_scaled_graph(
     let scale = builder.expand(&scale, target_shape)?;
     let scaled_delta = builder.mul(delta, &scale)?;
     Ok(builder.add(base, &scaled_delta)?)
+}
+
+fn select_parameter_row_graph(
+    builder: &mut AutodiffGraphBuilder,
+    parameter: &AutodiffTensor,
+    row_index: usize,
+    row_width: usize,
+) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
+    let row_count = *parameter
+        .spec()
+        .shape()
+        .dims()
+        .first()
+        .ok_or_else(|| ParameterGolfBaselineGraphError::Graph(GraphError::InvalidOperatorInputs {
+            op: String::from("select_parameter_row_graph"),
+            message: format!(
+                "expected rank-2 parameter [rows, width], found shape {:?}",
+                parameter.spec().shape().dims()
+            ),
+        }))?;
+    let actual_row_width = *parameter
+        .spec()
+        .shape()
+        .dims()
+        .get(1)
+        .ok_or_else(|| ParameterGolfBaselineGraphError::Graph(GraphError::InvalidOperatorInputs {
+            op: String::from("select_parameter_row_graph"),
+            message: format!(
+                "expected rank-2 parameter [rows, width], found shape {:?}",
+                parameter.spec().shape().dims()
+            ),
+        }))?;
+    if actual_row_width != row_width {
+        return Err(ParameterGolfBaselineGraphError::Graph(
+            GraphError::InvalidOperatorInputs {
+                op: String::from("select_parameter_row_graph"),
+                message: format!(
+                    "expected row width {row_width}, found {actual_row_width}"
+                ),
+            },
+        ));
+    }
+    if row_index >= row_count {
+        return Err(ParameterGolfBaselineGraphError::Graph(GraphError::InvalidOperatorInputs {
+            op: String::from("select_parameter_row_graph"),
+            message: format!("row index {row_index} exceeds row count {row_count}"),
+        }));
+    }
+    let mut selector = vec![0.0_f32; row_count];
+    selector[row_index] = 1.0;
+    let selector =
+        builder.constant_f32(Shape::new(vec![1, row_count]), selector)?;
+    let selected = builder.matmul(&selector, parameter)?;
+    builder.reshape(&selected, Shape::new(vec![row_width])).map_err(Into::into)
 }
 
 fn rope_table_constants(
