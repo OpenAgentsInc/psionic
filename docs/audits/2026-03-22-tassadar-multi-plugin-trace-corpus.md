@@ -20,7 +20,9 @@ and local Apple FM controller lanes.
 
 - one repo-owned trace record schema covering deterministic, router-owned, and
   Apple FM controller traces without using an Apple-only dataset shape
-- six normalized trace records bound back to three committed source bundles
+- seven normalized trace records bound back to three committed source bundles
+- one deterministic-only guest-artifact workflow kept explicit instead of
+  being flattened into false three-lane parity
 - one parity matrix that keeps directive drift, payload drift, receipt drift,
   and stop-condition drift explicit
 - one bootstrap contract that requires receipt identity plus disagreement-row

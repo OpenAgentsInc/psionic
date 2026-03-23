@@ -1,8 +1,8 @@
 # Tassadar Multi-Plugin Trace Corpus
 
-This document tracks the first repo-owned, lane-neutral multi-plugin trace
-corpus and parity matrix above the deterministic, router-owned, and local
-Apple FM controller lanes.
+This document tracks the first repo-owned multi-plugin trace corpus and parity
+matrix above the deterministic, router-owned, and local Apple FM controller
+lanes.
 
 The boundary is narrow on purpose:
 
@@ -14,6 +14,9 @@ The boundary is narrow on purpose:
   into a synthetic consensus result
 - this bundle is bootstrap input to later `TAS-204` weighted-controller work,
   not proof that `TAS-204` is already solved
+- one bounded digest-bound guest-artifact workflow may appear as an explicit
+  deterministic-only record without being flattened into false three-lane
+  parity
 
 ## Implemented
 
@@ -31,13 +34,14 @@ committed deterministic workflow bundle, router-owned served pilot bundle, and
 Apple FM local session bundle without collapsing them into one fake canonical
 controller trace.
 
-The committed bundle freezes:
+The committed bundle now freezes:
 
 - three source controller bundles
-- six normalized trace records across the two shared workflow families
-- four projected tool-schema rows
-- two workflow parity rows
-- fifteen explicit disagreement rows
+- seven normalized trace records across the two shared host-native workflow
+  families plus one deterministic-only guest-artifact workflow
+- six projected tool-schema rows in the committed corpus union
+- three workflow parity rows
+- twenty-three explicit disagreement rows
 - one bootstrap contract that keeps receipt identity and disagreement
   retention mandatory
 
@@ -53,6 +57,8 @@ The committed bundle freezes:
   and stop-condition drift instead of synthetic consensus
 - one honest bootstrap boundary to later weighted-controller work with
   `bootstrap_ready = true` while still refusing weighted-controller closure
+- one explicit partial-lane guest-artifact record that preserves digest-bound
+  receipt truth without pretending router or Apple FM parity already exists
 
 ## Adjacent Surface
 

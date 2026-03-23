@@ -26,6 +26,8 @@ pub const PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_REF: &str =
     "fixtures/psion/plugins/datasets/psion_plugin_conditioned_dataset_v1/psion_plugin_conditioned_dataset_bundle.json";
 const TRAIN_WORKFLOW_CASE_ID: &str = "starter_plugin.web_content_success.v1";
 const HELD_OUT_WORKFLOW_CASE_ID: &str = "starter_plugin.fetch_refusal.v1";
+const EXCLUDED_GUEST_ARTIFACT_WORKFLOW_CASE_ID: &str =
+    "starter_plugin.guest_artifact_success.v1";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionPluginConditionedSplitStats {
@@ -273,6 +275,7 @@ pub fn build_psion_plugin_conditioned_dataset_bundle_from_derivation(
         match workflow_case_id {
             TRAIN_WORKFLOW_CASE_ID => train_records.push(record.clone()),
             HELD_OUT_WORKFLOW_CASE_ID => held_out_records.push(record.clone()),
+            EXCLUDED_GUEST_ARTIFACT_WORKFLOW_CASE_ID => {}
             _ => {
                 return Err(PsionPluginConditionedDatasetError::HeldOutIsolationBroken {
                     detail: format!("unexpected workflow case id `{workflow_case_id}`"),
@@ -304,7 +307,7 @@ pub fn build_psion_plugin_conditioned_dataset_bundle_from_derivation(
             train_workflow_case_ids: train_split.stats.workflow_case_ids.clone(),
             held_out_workflow_case_ids: held_out_split.stats.workflow_case_ids.clone(),
             detail: String::from(
-                "train and held-out splits stay disjoint by normalized workflow case id across all controller surfaces.",
+                "train and held-out splits stay disjoint by normalized workflow case id across all controller surfaces while the out-of-scope guest-artifact workflow remains excluded from this host-native v1 dataset.",
             ),
         },
         split_rows: vec![train_split, held_out_split],
@@ -406,6 +409,7 @@ mod tests {
         PSION_PLUGIN_CONDITIONED_DATASET_BUNDLE_SCHEMA_VERSION,
         PsionPluginConditionedDatasetError, build_psion_plugin_conditioned_dataset_bundle,
     };
+    use crate::PsionPluginClass;
 
     #[test]
     fn dataset_bundle_builds() -> Result<(), Box<dyn std::error::Error>> {
@@ -416,6 +420,12 @@ mod tests {
         );
         assert_eq!(bundle.split_rows.len(), 2);
         assert!(bundle.held_out_isolation.workflow_case_disjoint);
+        assert!(bundle.split_rows.iter().all(|split| {
+            !split
+                .stats
+                .plugin_class_counts
+                .contains_key(&PsionPluginClass::GuestArtifactDigestBound)
+        }));
         assert!(!bundle.bundle_digest.is_empty());
         Ok(())
     }

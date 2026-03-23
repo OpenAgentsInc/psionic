@@ -35,6 +35,7 @@ corpus built from:
 - deterministic workflow traces
 - router-owned `/v1/responses` plugin-loop traces
 - local Apple FM plugin-session traces
+- one deterministic-only digest-bound guest-artifact workflow trace
 
 The derivation path does not special-case those lanes into separate training
 schemas.
@@ -47,6 +48,7 @@ preserving:
 - source case identity
 - receipt refs and digests
 - plugin class and runtime schema identity
+- guest-artifact replay and digest linkage where present
 
 ## Drift Rejection
 
@@ -83,3 +85,7 @@ The current bundle is the minimal bridge between:
 - later benchmark and training stages
 
 without inventing a second intermediate schema.
+
+The current host-native dataset builder still filters the guest-artifact
+workflow out explicitly. Derivation is broader than the first dataset on
+purpose.

@@ -162,7 +162,7 @@ pub fn build_psion_plugin_training_derivation_bundle_from_corpus(
         controller_surface_counts,
         records,
         claim_boundary: String::from(
-            "this derivation bundle normalizes deterministic workflow, router-owned plugin-loop, and local Apple FM plugin-session traces from the committed Tassadar multi-plugin trace corpus into one canonical plugin-training record schema. It preserves plugin receipt identity, plugin class, controller provenance, and route-or-outcome labels without inventing a second plugin API or implying trained-lane closure by itself.",
+            "this derivation bundle normalizes deterministic workflow, router-owned plugin-loop, local Apple FM plugin-session, and the bounded deterministic guest-artifact trace from the committed Tassadar multi-plugin trace corpus into one canonical plugin-training record schema. It preserves plugin receipt identity, plugin class, guest-artifact digest-bound replay linkage, controller provenance, and route-or-outcome labels without inventing a second plugin API or implying trained-lane closure by itself.",
         ),
         summary: String::new(),
         bundle_digest: String::new(),
@@ -409,6 +409,7 @@ mod tests {
         build_psion_plugin_training_derivation_bundle_from_corpus,
         load_committed_tassadar_multi_plugin_trace_corpus_bundle,
     };
+    use crate::PsionPluginClass;
 
     #[test]
     fn derivation_bundle_builds_from_committed_corpus() -> Result<(), Box<dyn std::error::Error>> {
@@ -417,13 +418,44 @@ mod tests {
             bundle.schema_version,
             PSION_PLUGIN_TRAINING_DERIVATION_BUNDLE_SCHEMA_VERSION
         );
-        assert_eq!(bundle.records.len(), 6);
+        assert_eq!(bundle.records.len(), 7);
         assert_eq!(bundle.controller_surface_counts.len(), 3);
         assert!(
             bundle
                 .records
                 .iter()
                 .all(|record| !record.record_digest.is_empty())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn derivation_bundle_preserves_guest_artifact_class_and_receipt_linkage(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let bundle = build_psion_plugin_training_derivation_bundle()?;
+        let guest_record = bundle
+            .records
+            .iter()
+            .find(|record| {
+                record
+                    .admitted_plugins
+                    .iter()
+                    .any(|plugin| plugin.plugin_class == PsionPluginClass::GuestArtifactDigestBound)
+            })
+            .expect("guest artifact record");
+        assert_eq!(guest_record.admitted_plugins.len(), 1);
+        assert_eq!(guest_record.plugin_invocations.len(), 1);
+        assert_eq!(
+            guest_record.admitted_plugins[0].replay_class_id,
+            "guest_artifact_digest_replay_only.v1"
+        );
+        assert_eq!(
+            guest_record.plugin_invocations[0].receipt_ref,
+            "receipt.plugin.example.echo_guest.bee52b6c5818aceb.v1"
+        );
+        assert_eq!(
+            guest_record.plugin_invocations[0].receipt_digest,
+            "384381469d85793219b83507292e3c0fc8ccf899d0823600666319f1f521c673"
         );
         Ok(())
     }

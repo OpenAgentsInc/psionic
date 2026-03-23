@@ -6,7 +6,7 @@
   },
   "stable_dataset_identity": "dataset://openagents/psion/plugin_conditioned_host_native_reference@2026.03.22.v1",
   "source_derivation_bundle_ref": "fixtures/psion/plugins/datasets/psion_plugin_training_derivation_v1/psion_plugin_training_derivation_bundle.json",
-  "source_derivation_bundle_digest": "ee0ddb7b6e959e99b5559e69ceac96d9748181ffa37c29ea8f45862163566fda",
+  "source_derivation_bundle_digest": "eb47e6896549707f5898b7546e7368799bce9d85c5b83b33688e6a2e9003d773",
   "held_out_isolation": {
     "policy_id": "workflow_case_disjoint.v1",
     "workflow_case_disjoint": true,
@@ -16,7 +16,7 @@
     "held_out_workflow_case_ids": [
       "starter_plugin.fetch_refusal.v1"
     ],
-    "detail": "train and held-out splits stay disjoint by normalized workflow case id across all controller surfaces."
+    "detail": "train and held-out splits stay disjoint by normalized workflow case id across all controller surfaces while the out-of-scope guest-artifact workflow remains excluded from this host-native v1 dataset."
   },
   "split_rows": [
     {
@@ -62,7 +62,7 @@
               "tool_name": "plugin_http_fetch_text",
               "plugin_class": "host_native_networked_read_only",
               "capability_class": "read_only_network",
-              "origin_class": "operator_builtin",
+              "origin_class": "user_added",
               "input_schema_id": "plugin.http.fetch_text.input.v1",
               "result_schema_id": "plugin.http.fetch_text.output.v1",
               "refusal_schema_ids": [
@@ -222,7 +222,7 @@
           "outcome_label": "completed_success",
           "final_response_text": "The local Apple FM pilot extracted one article and one feed through the shared starter-plugin runtime.",
           "detail": "the local Apple FM pilot keeps one session-local callback registry, one transcript envelope, and one shared starter-plugin runtime surface explicit instead of inventing Apple-only plugin semantics.",
-          "record_digest": "b98831464f6da0aff5c0412e61f62f954cd27cbfb5a7e4b05c84ff7369ad82bc"
+          "record_digest": "aec1b80116bfd2bad4d113dcae4f1837cef2d3ddca63bd614267d4cf82dc3abe"
         },
         {
           "schema_version": "psionic.psion.plugin_training_record.v1",
@@ -264,7 +264,7 @@
               "tool_name": "plugin_http_fetch_text",
               "plugin_class": "host_native_networked_read_only",
               "capability_class": "read_only_network",
-              "origin_class": "operator_builtin",
+              "origin_class": "user_added",
               "input_schema_id": "plugin.http.fetch_text.input.v1",
               "result_schema_id": "plugin.http.fetch_text.output.v1",
               "refusal_schema_ids": [
@@ -279,6 +279,21 @@
                 "plugin.refusal.upstream_failure.v1"
               ],
               "replay_class_id": "replayable_with_snapshots"
+            },
+            {
+              "plugin_id": "plugin.text.stats",
+              "tool_name": "plugin_text_stats",
+              "plugin_class": "host_native_capability_free_local_deterministic",
+              "capability_class": "local_deterministic",
+              "origin_class": "user_added",
+              "input_schema_id": "plugin.text.stats.input.v1",
+              "result_schema_id": "plugin.text.stats.output.v1",
+              "refusal_schema_ids": [
+                "plugin.refusal.schema_invalid.v1",
+                "plugin.refusal.packet_too_large.v1",
+                "plugin.refusal.unsupported_codec.v1"
+              ],
+              "replay_class_id": "deterministic_replayable"
             },
             {
               "plugin_id": "plugin.text.url_extract",
@@ -301,10 +316,10 @@
             "controller_surface": "deterministic_workflow",
             "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
             "source_bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
-            "source_bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
+            "source_bundle_digest": "eb5936396c28c52c035b55cb0c5e44e6e2c4bbd20b9c56497abf91b637157e81",
             "source_case_id": "web_content_intake_success",
             "workflow_case_id": "starter_plugin.web_content_success.v1",
-            "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops after the extracted URL set is exhausted."
+            "detail": "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops after the extracted URL set is exhausted."
           },
           "plugin_invocations": [
             {
@@ -373,6 +388,24 @@
             {
               "invocation_id": "trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1.invoke.3",
               "decision_ref": "deterministic.tool_call.3",
+              "plugin_id": "plugin.text.stats",
+              "tool_name": "plugin_text_stats",
+              "arguments": null,
+              "receipt_ref": "receipt.plugin.text.stats.0307e79769277046.v1",
+              "receipt_digest": "fff59e9755264d47d668e98ad8e1a300cad3c7d09638640da5d057a9bcb30217",
+              "status": "success",
+              "result_payload": {
+                "byte_count": 48,
+                "line_count": 1,
+                "non_empty_line_count": 1,
+                "unicode_scalar_count": 48,
+                "word_count": 6
+              },
+              "detail": "measure extracted readable text with the user-added capability-free text-stats plugin through the shared bridge."
+            },
+            {
+              "invocation_id": "trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1.invoke.4",
+              "decision_ref": "deterministic.tool_call.4",
               "plugin_id": "plugin.http.fetch_text",
               "tool_name": "plugin_http_fetch_text",
               "arguments": {
@@ -392,8 +425,8 @@
               "detail": "fetch the URL through the shared bridge before any content-type branch decision."
             },
             {
-              "invocation_id": "trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1.invoke.4",
-              "decision_ref": "deterministic.tool_call.4",
+              "invocation_id": "trace_record.starter_plugin.web_content_success.v1.deterministic_workflow.v1.invoke.5",
+              "decision_ref": "deterministic.tool_call.5",
               "plugin_id": "plugin.feed.rss_atom_parse",
               "tool_name": "plugin_feed_rss_atom_parse",
               "arguments": {
@@ -423,8 +456,8 @@
           "route_label": "delegate_to_admitted_plugin",
           "outcome_label": "completed_success",
           "final_response_text": "The deterministic controller completed after exhausting the extracted URL set.",
-          "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops after the extracted URL set is exhausted.",
-          "record_digest": "0e2c0ad683f9b596efbd22e5c1d25e29b8660cecf0da2b597681fe01a8542190"
+          "detail": "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops after the extracted URL set is exhausted.",
+          "record_digest": "bb59195ec72a2768e1806e5717218b9a3d0bb848221a20ae0bc2241b47b4dfc0"
         },
         {
           "schema_version": "psionic.psion.plugin_training_record.v1",
@@ -466,7 +499,7 @@
               "tool_name": "plugin_http_fetch_text",
               "plugin_class": "host_native_networked_read_only",
               "capability_class": "read_only_network",
-              "origin_class": "operator_builtin",
+              "origin_class": "user_added",
               "input_schema_id": "plugin.http.fetch_text.input.v1",
               "result_schema_id": "plugin.http.fetch_text.output.v1",
               "refusal_schema_ids": [
@@ -626,7 +659,7 @@
           "outcome_label": "completed_success",
           "final_response_text": "I extracted one article and one feed through the router-owned plugin tool loop.",
           "detail": "the first step comes from a real `/v1/responses` tool-call response, while the bounded follow-on turns stay router-owned and execute real starter plugins through the shared bridge.",
-          "record_digest": "2131d1edb42de12c814b0ae9413875be0799cbf7e0fbf578260cc2e398c6df52"
+          "record_digest": "8023e9f96dc8033923743573721841667a53ab9e2f3da83c85da3e2b403eb1ef"
         }
       ],
       "stats": {
@@ -641,7 +674,7 @@
           "apple_fm_session": 1
         },
         "plugin_class_counts": {
-          "host_native_capability_free_local_deterministic": 9,
+          "host_native_capability_free_local_deterministic": 10,
           "host_native_networked_read_only": 3
         },
         "route_label_counts": {
@@ -661,41 +694,11 @@
           "directive_text": "Read https://snapshot.example/binary.",
           "admitted_plugins": [
             {
-              "plugin_id": "plugin.feed.rss_atom_parse",
-              "tool_name": "plugin_feed_rss_atom_parse",
-              "plugin_class": "host_native_capability_free_local_deterministic",
-              "capability_class": "local_deterministic",
-              "origin_class": "operator_builtin",
-              "input_schema_id": "plugin.feed.rss_atom_parse.input.v1",
-              "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
-              "refusal_schema_ids": [
-                "plugin.refusal.schema_invalid.v1",
-                "plugin.refusal.input_too_large.v1",
-                "plugin.refusal.unsupported_feed_format.v1"
-              ],
-              "replay_class_id": "deterministic_replayable"
-            },
-            {
-              "plugin_id": "plugin.html.extract_readable",
-              "tool_name": "plugin_html_extract_readable",
-              "plugin_class": "host_native_capability_free_local_deterministic",
-              "capability_class": "local_deterministic",
-              "origin_class": "operator_builtin",
-              "input_schema_id": "plugin.html.extract_readable.input.v1",
-              "result_schema_id": "plugin.html.extract_readable.output.v1",
-              "refusal_schema_ids": [
-                "plugin.refusal.schema_invalid.v1",
-                "plugin.refusal.input_too_large.v1",
-                "plugin.refusal.content_type_unsupported.v1"
-              ],
-              "replay_class_id": "deterministic_replayable"
-            },
-            {
               "plugin_id": "plugin.http.fetch_text",
               "tool_name": "plugin_http_fetch_text",
               "plugin_class": "host_native_networked_read_only",
               "capability_class": "read_only_network",
-              "origin_class": "operator_builtin",
+              "origin_class": "user_added",
               "input_schema_id": "plugin.http.fetch_text.input.v1",
               "result_schema_id": "plugin.http.fetch_text.output.v1",
               "refusal_schema_ids": [
@@ -775,7 +778,7 @@
           "outcome_label": "typed_runtime_refusal",
           "final_response_text": "The local Apple FM pilot stopped after a typed fetch refusal.",
           "detail": "the local Apple FM pilot keeps one session-local callback registry, one transcript envelope, and one shared starter-plugin runtime surface explicit instead of inventing Apple-only plugin semantics.",
-          "record_digest": "52d3615bc179e16e151ace468065aa9772864079ec3312f85eed0a591ccee071"
+          "record_digest": "b1dd26366002bd3dd526ec2b26eaa9c51140e837bb3a9bbd7a5e4771164ce01d"
         },
         {
           "schema_version": "psionic.psion.plugin_training_record.v1",
@@ -783,41 +786,11 @@
           "directive_text": "Review https://snapshot.example/binary",
           "admitted_plugins": [
             {
-              "plugin_id": "plugin.feed.rss_atom_parse",
-              "tool_name": "plugin_feed_rss_atom_parse",
-              "plugin_class": "host_native_capability_free_local_deterministic",
-              "capability_class": "local_deterministic",
-              "origin_class": "operator_builtin",
-              "input_schema_id": "plugin.feed.rss_atom_parse.input.v1",
-              "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
-              "refusal_schema_ids": [
-                "plugin.refusal.schema_invalid.v1",
-                "plugin.refusal.input_too_large.v1",
-                "plugin.refusal.unsupported_feed_format.v1"
-              ],
-              "replay_class_id": "deterministic_replayable"
-            },
-            {
-              "plugin_id": "plugin.html.extract_readable",
-              "tool_name": "plugin_html_extract_readable",
-              "plugin_class": "host_native_capability_free_local_deterministic",
-              "capability_class": "local_deterministic",
-              "origin_class": "operator_builtin",
-              "input_schema_id": "plugin.html.extract_readable.input.v1",
-              "result_schema_id": "plugin.html.extract_readable.output.v1",
-              "refusal_schema_ids": [
-                "plugin.refusal.schema_invalid.v1",
-                "plugin.refusal.input_too_large.v1",
-                "plugin.refusal.content_type_unsupported.v1"
-              ],
-              "replay_class_id": "deterministic_replayable"
-            },
-            {
               "plugin_id": "plugin.http.fetch_text",
               "tool_name": "plugin_http_fetch_text",
               "plugin_class": "host_native_networked_read_only",
               "capability_class": "read_only_network",
-              "origin_class": "operator_builtin",
+              "origin_class": "user_added",
               "input_schema_id": "plugin.http.fetch_text.input.v1",
               "result_schema_id": "plugin.http.fetch_text.output.v1",
               "refusal_schema_ids": [
@@ -854,10 +827,10 @@
             "controller_surface": "deterministic_workflow",
             "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
             "source_bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
-            "source_bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
+            "source_bundle_digest": "eb5936396c28c52c035b55cb0c5e44e6e2c4bbd20b9c56497abf91b637157e81",
             "source_case_id": "web_content_intake_fetch_refusal",
             "workflow_case_id": "starter_plugin.fetch_refusal.v1",
-            "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops immediately when fetch returns a typed refusal."
+            "detail": "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops immediately when fetch returns a typed refusal."
           },
           "plugin_invocations": [
             {
@@ -896,8 +869,8 @@
           "route_label": "delegate_to_admitted_plugin",
           "outcome_label": "typed_runtime_refusal",
           "final_response_text": "The deterministic controller stopped after a typed plugin refusal.",
-          "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops immediately when fetch returns a typed refusal.",
-          "record_digest": "656761325f7cf5a9d8363611759cfdf563c207b43cdb97412892f4d5f0f9a6e7"
+          "detail": "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops immediately when fetch returns a typed refusal.",
+          "record_digest": "a5e8cfea04dda628a93e7f72c82532fec2a2e6bbd4ac8aa3b4a64c2892c3cb4c"
         },
         {
           "schema_version": "psionic.psion.plugin_training_record.v1",
@@ -905,41 +878,11 @@
           "directive_text": "Read https://snapshot.example/binary.",
           "admitted_plugins": [
             {
-              "plugin_id": "plugin.feed.rss_atom_parse",
-              "tool_name": "plugin_feed_rss_atom_parse",
-              "plugin_class": "host_native_capability_free_local_deterministic",
-              "capability_class": "local_deterministic",
-              "origin_class": "operator_builtin",
-              "input_schema_id": "plugin.feed.rss_atom_parse.input.v1",
-              "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
-              "refusal_schema_ids": [
-                "plugin.refusal.schema_invalid.v1",
-                "plugin.refusal.input_too_large.v1",
-                "plugin.refusal.unsupported_feed_format.v1"
-              ],
-              "replay_class_id": "deterministic_replayable"
-            },
-            {
-              "plugin_id": "plugin.html.extract_readable",
-              "tool_name": "plugin_html_extract_readable",
-              "plugin_class": "host_native_capability_free_local_deterministic",
-              "capability_class": "local_deterministic",
-              "origin_class": "operator_builtin",
-              "input_schema_id": "plugin.html.extract_readable.input.v1",
-              "result_schema_id": "plugin.html.extract_readable.output.v1",
-              "refusal_schema_ids": [
-                "plugin.refusal.schema_invalid.v1",
-                "plugin.refusal.input_too_large.v1",
-                "plugin.refusal.content_type_unsupported.v1"
-              ],
-              "replay_class_id": "deterministic_replayable"
-            },
-            {
               "plugin_id": "plugin.http.fetch_text",
               "tool_name": "plugin_http_fetch_text",
               "plugin_class": "host_native_networked_read_only",
               "capability_class": "read_only_network",
-              "origin_class": "operator_builtin",
+              "origin_class": "user_added",
               "input_schema_id": "plugin.http.fetch_text.input.v1",
               "result_schema_id": "plugin.http.fetch_text.output.v1",
               "refusal_schema_ids": [
@@ -1019,7 +962,7 @@
           "outcome_label": "typed_runtime_refusal",
           "final_response_text": "The router-owned plugin tool loop stopped after a typed fetch refusal.",
           "detail": "the refusal case proves typed fetch refusals remain structured and receipt-bound after crossing the router-owned tool loop.",
-          "record_digest": "bfc90e2a70ce0217fe558de291c16666fb390b73f2585fed8bd866c947838f6d"
+          "record_digest": "b81911060e0132393d7ca37b77ce8e11c5fdb6e1c24029bf8f9fdbb34f3b2597"
         }
       ],
       "stats": {
@@ -1034,7 +977,7 @@
           "apple_fm_session": 1
         },
         "plugin_class_counts": {
-          "host_native_capability_free_local_deterministic": 9,
+          "host_native_capability_free_local_deterministic": 3,
           "host_native_networked_read_only": 3
         },
         "route_label_counts": {
@@ -1048,5 +991,5 @@
   ],
   "claim_boundary": "this bundle freezes one small host-native plugin-conditioned dataset built from the committed derivation bundle with workflow-case-disjoint train and held-out splits. It preserves controller-surface, plugin-class, route-label, and outcome-label counts instead of collapsing the records into anonymous prompt/response rows. It does not claim scale, generalization, or mixed guest-artifact coverage by itself.",
   "summary": "plugin-conditioned dataset bundle keeps train_records=3 and held_out_records=3 under workflow_case_disjoint=true.",
-  "bundle_digest": "9e4bc8b26ed7bb71a19e6f48f37904986e321d51e9af5f6282fa50e61fc821b6"
+  "bundle_digest": "f62d6c1e3cfa5c442e5088d3447f6f3dacf53d1d20c0b0ba5233cfd502aa51bf"
 }

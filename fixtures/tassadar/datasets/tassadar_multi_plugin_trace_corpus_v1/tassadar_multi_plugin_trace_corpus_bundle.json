@@ -6,9 +6,9 @@
       "lane_id": "deterministic_workflow",
       "bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
       "bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
-      "bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
-      "case_count": 2,
-      "claim_boundary": "this bundle freezes one host-owned deterministic starter-plugin workflow controller above the shared bridge. It keeps URL extraction, fetch, content-type branching, readable-html extraction, feed parsing, refusal capture, and stop conditions explicit without claiming open-ended planning or weighted controller closure."
+      "bundle_digest": "eb5936396c28c52c035b55cb0c5e44e6e2c4bbd20b9c56497abf91b637157e81",
+      "case_count": 3,
+      "claim_boundary": "this bundle freezes one host-owned deterministic starter-plugin workflow controller above the shared bridge. It keeps URL extraction, fetch, content-type branching, readable-html extraction, readable-text measurement, feed parsing, refusal capture, and stop conditions explicit without claiming open-ended planning or weighted controller closure."
     },
     {
       "lane_id": "router_responses",
@@ -28,6 +28,33 @@
     }
   ],
   "projected_tool_schema_rows": [
+    {
+      "tool_name": "plugin_example_echo_guest",
+      "plugin_id": "plugin.example.echo_guest",
+      "description": "Echo one text field through the bounded guest-artifact packet path while preserving the host-native receipt and replay envelope.",
+      "arguments_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "description": "Text echoed by the bounded guest-artifact reference plugin.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "type": "object"
+      },
+      "arguments_schema_digest": "50cc90085b3823328872337f1075f100958907bfcc082cd09776842e793ef4df",
+      "result_schema_id": "plugin.example.echo_guest.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.packet_too_large.v1",
+        "plugin.refusal.runtime_resource_limit.v1",
+        "plugin.refusal.runtime_unavailable.v1"
+      ],
+      "replay_class_id": "guest_artifact_digest_replay_only.v1"
+    },
     {
       "tool_name": "plugin_feed_rss_atom_parse",
       "plugin_id": "plugin.feed.rss_atom_parse",
@@ -64,7 +91,7 @@
     {
       "tool_name": "plugin_html_extract_readable",
       "plugin_id": "plugin.html.extract_readable",
-      "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+      "description": "extract already-fetched HTML into bounded readable text, metadata, and harvested links without browser rendering, JavaScript, or full DOM claims.",
       "arguments_schema": {
         "additionalProperties": false,
         "properties": {
@@ -127,6 +154,32 @@
       "replay_class_id": "replayable_with_snapshots"
     },
     {
+      "tool_name": "plugin_text_stats",
+      "plugin_id": "plugin.text.stats",
+      "description": "count bytes, Unicode scalar values, lines, non-empty lines, and whitespace-delimited words from packet-local text without tokenizer, language, or semantic-structure claims.",
+      "arguments_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "description": "packet-local text counted with Rust byte length, chars(), lines(), and split_whitespace() semantics.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "type": "object"
+      },
+      "arguments_schema_digest": "08bc2f97a094970d8c33a86c97db1adc5f99c5138d8ba19b5dd4eefd7e4f604d",
+      "result_schema_id": "plugin.text.stats.output.v1",
+      "refusal_schema_ids": [
+        "plugin.refusal.schema_invalid.v1",
+        "plugin.refusal.packet_too_large.v1",
+        "plugin.refusal.unsupported_codec.v1"
+      ],
+      "replay_class_id": "deterministic_replayable"
+    },
+    {
       "tool_name": "plugin_text_url_extract",
       "plugin_id": "plugin.text.url_extract",
       "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
@@ -166,78 +219,10 @@
       "source_bundle_digest": "9818a877307685deb471bceb59722272c78ef259b28683ee0461b2eb063e66f5",
       "directive_text": "Read https://snapshot.example/binary.",
       "admissible_tool_names": [
-        "plugin_feed_rss_atom_parse",
-        "plugin_html_extract_readable",
         "plugin_http_fetch_text",
         "plugin_text_url_extract"
       ],
       "projected_tool_schema_rows": [
-        {
-          "tool_name": "plugin_feed_rss_atom_parse",
-          "plugin_id": "plugin.feed.rss_atom_parse",
-          "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
-          "arguments_schema": {
-            "additionalProperties": false,
-            "properties": {
-              "content_type": {
-                "type": "string"
-              },
-              "feed_text": {
-                "type": "string"
-              },
-              "source_url": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "source_url",
-              "content_type",
-              "feed_text"
-            ],
-            "type": "object"
-          },
-          "arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
-          "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
-          "refusal_schema_ids": [
-            "plugin.refusal.schema_invalid.v1",
-            "plugin.refusal.input_too_large.v1",
-            "plugin.refusal.unsupported_feed_format.v1"
-          ],
-          "replay_class_id": "deterministic_replayable"
-        },
-        {
-          "tool_name": "plugin_html_extract_readable",
-          "plugin_id": "plugin.html.extract_readable",
-          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
-          "arguments_schema": {
-            "additionalProperties": false,
-            "properties": {
-              "body_text": {
-                "type": "string"
-              },
-              "content_type": {
-                "type": "string"
-              },
-              "source_url": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "source_url",
-              "content_type",
-              "body_text"
-            ],
-            "type": "object"
-          },
-          "arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
-          "result_schema_id": "plugin.html.extract_readable.output.v1",
-          "refusal_schema_ids": [
-            "plugin.refusal.schema_invalid.v1",
-            "plugin.refusal.input_too_large.v1",
-            "plugin.refusal.content_type_unsupported.v1"
-          ],
-          "replay_class_id": "deterministic_replayable"
-        },
         {
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
@@ -415,7 +400,7 @@
       "final_message_text": "The local Apple FM pilot stopped after a typed fetch refusal.",
       "typed_refusal_preserved": true,
       "detail": "the local Apple FM pilot keeps one session-local callback registry, one transcript envelope, and one shared starter-plugin runtime surface explicit instead of inventing Apple-only plugin semantics.",
-      "record_digest": "3b4335fdc43777bfc03897622f1305c54776f0fcba7f6e31299e8e45a66a8872"
+      "record_digest": "099bdfbd32c4b9efb3bfc4ee5d610f383c515aa89a5dff4d33d81cf86e231494"
     },
     {
       "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
@@ -425,81 +410,13 @@
       "lane_id": "deterministic_workflow",
       "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
       "source_bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
-      "source_bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
+      "source_bundle_digest": "eb5936396c28c52c035b55cb0c5e44e6e2c4bbd20b9c56497abf91b637157e81",
       "directive_text": "Review https://snapshot.example/binary",
       "admissible_tool_names": [
-        "plugin_feed_rss_atom_parse",
-        "plugin_html_extract_readable",
         "plugin_http_fetch_text",
         "plugin_text_url_extract"
       ],
       "projected_tool_schema_rows": [
-        {
-          "tool_name": "plugin_feed_rss_atom_parse",
-          "plugin_id": "plugin.feed.rss_atom_parse",
-          "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
-          "arguments_schema": {
-            "additionalProperties": false,
-            "properties": {
-              "content_type": {
-                "type": "string"
-              },
-              "feed_text": {
-                "type": "string"
-              },
-              "source_url": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "source_url",
-              "content_type",
-              "feed_text"
-            ],
-            "type": "object"
-          },
-          "arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
-          "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
-          "refusal_schema_ids": [
-            "plugin.refusal.schema_invalid.v1",
-            "plugin.refusal.input_too_large.v1",
-            "plugin.refusal.unsupported_feed_format.v1"
-          ],
-          "replay_class_id": "deterministic_replayable"
-        },
-        {
-          "tool_name": "plugin_html_extract_readable",
-          "plugin_id": "plugin.html.extract_readable",
-          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
-          "arguments_schema": {
-            "additionalProperties": false,
-            "properties": {
-              "body_text": {
-                "type": "string"
-              },
-              "content_type": {
-                "type": "string"
-              },
-              "source_url": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "source_url",
-              "content_type",
-              "body_text"
-            ],
-            "type": "object"
-          },
-          "arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
-          "result_schema_id": "plugin.html.extract_readable.output.v1",
-          "refusal_schema_ids": [
-            "plugin.refusal.schema_invalid.v1",
-            "plugin.refusal.input_too_large.v1",
-            "plugin.refusal.content_type_unsupported.v1"
-          ],
-          "replay_class_id": "deterministic_replayable"
-        },
         {
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
@@ -676,8 +593,8 @@
       "source_stop_condition_id": "controller_stop.typed_refusal",
       "final_message_text": "The deterministic controller stopped after a typed plugin refusal.",
       "typed_refusal_preserved": true,
-      "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops immediately when fetch returns a typed refusal.",
-      "record_digest": "c7db2fb8bcfbf4731cf886420e79574d73b118c01b55aed811d56dab761d8321"
+      "detail": "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops immediately when fetch returns a typed refusal.",
+      "record_digest": "49f14f05fe7ec1ee782a9dd8d22cba799ead882ffe7ad75413525510b5093ad2"
     },
     {
       "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
@@ -690,78 +607,10 @@
       "source_bundle_digest": "c5b29de4b470c88c8b17fd04b93a13b73b81b36fa6071a2a330de0201f890d8f",
       "directive_text": "Read https://snapshot.example/binary.",
       "admissible_tool_names": [
-        "plugin_feed_rss_atom_parse",
-        "plugin_html_extract_readable",
         "plugin_http_fetch_text",
         "plugin_text_url_extract"
       ],
       "projected_tool_schema_rows": [
-        {
-          "tool_name": "plugin_feed_rss_atom_parse",
-          "plugin_id": "plugin.feed.rss_atom_parse",
-          "description": "parse already-fetched RSS 2.0 or Atom 1.0 documents into bounded feed metadata and entry rows without network access or general XML claims.",
-          "arguments_schema": {
-            "additionalProperties": false,
-            "properties": {
-              "content_type": {
-                "type": "string"
-              },
-              "feed_text": {
-                "type": "string"
-              },
-              "source_url": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "source_url",
-              "content_type",
-              "feed_text"
-            ],
-            "type": "object"
-          },
-          "arguments_schema_digest": "33887f75ddd1343b915ff3e45d75bc9d975793dd0eb227abe1b795b9bb0257bd",
-          "result_schema_id": "plugin.feed.rss_atom_parse.output.v1",
-          "refusal_schema_ids": [
-            "plugin.refusal.schema_invalid.v1",
-            "plugin.refusal.input_too_large.v1",
-            "plugin.refusal.unsupported_feed_format.v1"
-          ],
-          "replay_class_id": "deterministic_replayable"
-        },
-        {
-          "tool_name": "plugin_html_extract_readable",
-          "plugin_id": "plugin.html.extract_readable",
-          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
-          "arguments_schema": {
-            "additionalProperties": false,
-            "properties": {
-              "body_text": {
-                "type": "string"
-              },
-              "content_type": {
-                "type": "string"
-              },
-              "source_url": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "source_url",
-              "content_type",
-              "body_text"
-            ],
-            "type": "object"
-          },
-          "arguments_schema_digest": "e5936b10b5c78da6287b74c626ca7b48589fe280fb05f2407057f18306e60ac9",
-          "result_schema_id": "plugin.html.extract_readable.output.v1",
-          "refusal_schema_ids": [
-            "plugin.refusal.schema_invalid.v1",
-            "plugin.refusal.input_too_large.v1",
-            "plugin.refusal.content_type_unsupported.v1"
-          ],
-          "replay_class_id": "deterministic_replayable"
-        },
         {
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
@@ -939,7 +788,121 @@
       "final_message_text": "The router-owned plugin tool loop stopped after a typed fetch refusal.",
       "typed_refusal_preserved": true,
       "detail": "the refusal case proves typed fetch refusals remain structured and receipt-bound after crossing the router-owned tool loop.",
-      "record_digest": "b15af5f92dab4dfa4236a9d52cd50e6c0eee7cd6f53496fc0e33d553c1a6c55c"
+      "record_digest": "ce503a1af112ad8ae182410a6125f27caf770eb7c1f60cb431248b1768999513"
+    },
+    {
+      "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
+      "record_id": "trace_record.starter_plugin.guest_artifact_success.v1.deterministic_workflow.v1",
+      "workflow_case_id": "starter_plugin.guest_artifact_success.v1",
+      "source_case_id": "guest_artifact_echo_success",
+      "lane_id": "deterministic_workflow",
+      "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
+      "source_bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
+      "source_bundle_digest": "eb5936396c28c52c035b55cb0c5e44e6e2c4bbd20b9c56497abf91b637157e81",
+      "directive_text": "Echo one bounded guest-artifact packet through the shared starter-plugin controller surface.",
+      "admissible_tool_names": [
+        "plugin_example_echo_guest"
+      ],
+      "projected_tool_schema_rows": [
+        {
+          "tool_name": "plugin_example_echo_guest",
+          "plugin_id": "plugin.example.echo_guest",
+          "description": "Echo one text field through the bounded guest-artifact packet path while preserving the host-native receipt and replay envelope.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "description": "Text echoed by the bounded guest-artifact reference plugin.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "50cc90085b3823328872337f1075f100958907bfcc082cd09776842e793ef4df",
+          "result_schema_id": "plugin.example.echo_guest.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.packet_too_large.v1",
+            "plugin.refusal.runtime_resource_limit.v1",
+            "plugin.refusal.runtime_unavailable.v1"
+          ],
+          "replay_class_id": "guest_artifact_digest_replay_only.v1"
+        }
+      ],
+      "controller_decision_rows": [
+        {
+          "decision_index": 0,
+          "decision_source": "host_owned",
+          "decision_kind": "tool_call",
+          "decision_ref": "deterministic.tool_call.0",
+          "tool_name": "plugin_example_echo_guest",
+          "detail": "execute the first digest-bound guest-artifact starter plugin through the shared starter-plugin controller surface."
+        },
+        {
+          "decision_index": 1,
+          "decision_source": "host_owned",
+          "decision_kind": "guest_artifact_branch",
+          "decision_ref": "deterministic.decision.0",
+          "detail": "the host-owned controller admits the digest-bound guest-artifact starter plugin on the same shared bridge surface as the host-native starter set."
+        },
+        {
+          "decision_index": 2,
+          "decision_source": "host_owned",
+          "decision_kind": "stop_condition",
+          "decision_ref": "deterministic.decision.1",
+          "detail": "the host-owned controller stops after the guest-artifact result is accepted without hidden chaining."
+        }
+      ],
+      "step_rows": [
+        {
+          "step_index": 0,
+          "decision_ref": "deterministic.tool_call.0",
+          "result_ref": "deterministic.tool_result.0",
+          "tool_name": "plugin_example_echo_guest",
+          "plugin_id": "plugin.example.echo_guest",
+          "arguments": {
+            "text": "controller-visible guest-artifact echo"
+          },
+          "projected_result": {
+            "tool_name": "plugin_example_echo_guest",
+            "plugin_id": "plugin.example.echo_guest",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.example.echo_guest.output.v1",
+            "replay_class_id": "guest_artifact_digest_replay_only.v1",
+            "structured_payload": {
+              "text": "controller-visible guest-artifact echo"
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.example.echo_guest.bee52b6c5818aceb.v1",
+              "plugin_id": "plugin.example.echo_guest",
+              "plugin_version": "v1",
+              "tool_name": "plugin_example_echo_guest",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "psion.plugin_guest_artifact.mount_envelope.reference.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "guest_artifact_digest_replay_only.v1",
+              "status": "success",
+              "input_schema_id": "plugin.example.echo_guest.input.v1",
+              "input_packet_digest": "bee52b6c5818aceb9cd64feacf6ae61631e960c2f320724978259f24afe10eee",
+              "output_or_refusal_schema_id": "plugin.example.echo_guest.output.v1",
+              "output_or_refusal_digest": "bee52b6c5818aceb9cd64feacf6ae61631e960c2f320724978259f24afe10eee",
+              "detail": "guest-artifact invocation emits the same receipt class as host-native starter plugins while keeping the guest lane digest-bound and replay-explicit.",
+              "receipt_digest": "384381469d85793219b83507292e3c0fc8ccf899d0823600666319f1f521c673"
+            }
+          },
+          "detail": "execute the first digest-bound guest-artifact starter plugin through the shared starter-plugin controller surface."
+        }
+      ],
+      "normalized_stop_condition_id": "workflow_stop.guest_artifact_completed_success",
+      "source_stop_condition_id": "controller_stop.guest_artifact_echo_complete",
+      "final_message_text": "The deterministic controller completed after the digest-bound guest-artifact echo succeeded.",
+      "typed_refusal_preserved": false,
+      "detail": "the workflow controller now proves one bounded guest-artifact starter plugin can execute through the same shared bridge and receipt envelope as the host-native starter surface. stop_detail=the host-owned controller stops after the guest-artifact result is accepted without hidden chaining.",
+      "record_digest": "268cce09dbedccb17044e1d4a4dcba153d4c0ce0501641a53a587a7f2f8e0bb0"
     },
     {
       "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
@@ -994,7 +957,7 @@
         {
           "tool_name": "plugin_html_extract_readable",
           "plugin_id": "plugin.html.extract_readable",
-          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+          "description": "extract already-fetched HTML into bounded readable text, metadata, and harvested links without browser rendering, JavaScript, or full DOM claims.",
           "arguments_schema": {
             "additionalProperties": false,
             "properties": {
@@ -1371,7 +1334,7 @@
       "final_message_text": "The local Apple FM pilot extracted one article and one feed through the shared starter-plugin runtime.",
       "typed_refusal_preserved": false,
       "detail": "the local Apple FM pilot keeps one session-local callback registry, one transcript envelope, and one shared starter-plugin runtime surface explicit instead of inventing Apple-only plugin semantics.",
-      "record_digest": "dc44e9417aec57b194f7654c92915aebefe4a2e94c5a4625f3bbcc13fcacbf82"
+      "record_digest": "e613a08e0cc7d88699b045c9e9c555a3521ab83274192ffc1b48b906ce918937"
     },
     {
       "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
@@ -1381,12 +1344,13 @@
       "lane_id": "deterministic_workflow",
       "source_bundle_ref": "fixtures/tassadar/runs/tassadar_post_article_starter_plugin_workflow_controller_v1/tassadar_post_article_starter_plugin_workflow_controller_bundle.json",
       "source_bundle_id": "tassadar.post_article.starter_plugin_workflow_controller.bundle.v1",
-      "source_bundle_digest": "79703c1b4e80381dfc0c8728c29d7cbfda6d5ee68983fa0df529756a7c14ba7a",
+      "source_bundle_digest": "eb5936396c28c52c035b55cb0c5e44e6e2c4bbd20b9c56497abf91b637157e81",
       "directive_text": "Review https://snapshot.example/article and https://snapshot.example/feed.rss",
       "admissible_tool_names": [
         "plugin_feed_rss_atom_parse",
         "plugin_html_extract_readable",
         "plugin_http_fetch_text",
+        "plugin_text_stats",
         "plugin_text_url_extract"
       ],
       "projected_tool_schema_rows": [
@@ -1426,7 +1390,7 @@
         {
           "tool_name": "plugin_html_extract_readable",
           "plugin_id": "plugin.html.extract_readable",
-          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+          "description": "extract already-fetched HTML into bounded readable text, metadata, and harvested links without browser rendering, JavaScript, or full DOM claims.",
           "arguments_schema": {
             "additionalProperties": false,
             "properties": {
@@ -1489,6 +1453,32 @@
           "replay_class_id": "replayable_with_snapshots"
         },
         {
+          "tool_name": "plugin_text_stats",
+          "plugin_id": "plugin.text.stats",
+          "description": "count bytes, Unicode scalar values, lines, non-empty lines, and whitespace-delimited words from packet-local text without tokenizer, language, or semantic-structure claims.",
+          "arguments_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "description": "packet-local text counted with Rust byte length, chars(), lines(), and split_whitespace() semantics.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "type": "object"
+          },
+          "arguments_schema_digest": "08bc2f97a094970d8c33a86c97db1adc5f99c5138d8ba19b5dd4eefd7e4f604d",
+          "result_schema_id": "plugin.text.stats.output.v1",
+          "refusal_schema_ids": [
+            "plugin.refusal.schema_invalid.v1",
+            "plugin.refusal.packet_too_large.v1",
+            "plugin.refusal.unsupported_codec.v1"
+          ],
+          "replay_class_id": "deterministic_replayable"
+        },
+        {
           "tool_name": "plugin_text_url_extract",
           "plugin_id": "plugin.text.url_extract",
           "description": "extract literal http:// and https:// strings from packet-local text without URL validation, DNS, or network reachability claims.",
@@ -1546,36 +1536,51 @@
           "decision_source": "host_owned",
           "decision_kind": "tool_call",
           "decision_ref": "deterministic.tool_call.3",
-          "tool_name": "plugin_http_fetch_text",
-          "detail": "fetch the URL through the shared bridge before any content-type branch decision."
+          "tool_name": "plugin_text_stats",
+          "detail": "measure extracted readable text with the user-added capability-free text-stats plugin through the shared bridge."
         },
         {
           "decision_index": 4,
           "decision_source": "host_owned",
           "decision_kind": "tool_call",
           "decision_ref": "deterministic.tool_call.4",
+          "tool_name": "plugin_http_fetch_text",
+          "detail": "fetch the URL through the shared bridge before any content-type branch decision."
+        },
+        {
+          "decision_index": 5,
+          "decision_source": "host_owned",
+          "decision_kind": "tool_call",
+          "decision_ref": "deterministic.tool_call.5",
           "tool_name": "plugin_feed_rss_atom_parse",
           "detail": "run bounded feed parsing on fetched rss-or-atom content through the shared bridge."
         },
         {
-          "decision_index": 5,
+          "decision_index": 6,
           "decision_source": "host_owned",
           "decision_kind": "content_type_branch",
           "decision_ref": "deterministic.decision.0",
           "detail": "the host-owned controller routes html content into the readability plugin."
         },
         {
-          "decision_index": 6,
+          "decision_index": 7,
+          "decision_source": "host_owned",
+          "decision_kind": "post_extract_enrichment",
+          "decision_ref": "deterministic.decision.1",
+          "detail": "the host-owned controller routes bounded readable text into the user-added text-stats plugin for explicit packet-local measurement."
+        },
+        {
+          "decision_index": 8,
           "decision_source": "host_owned",
           "decision_kind": "content_type_branch",
-          "decision_ref": "deterministic.decision.1",
+          "decision_ref": "deterministic.decision.2",
           "detail": "the host-owned controller routes rss-or-atom content into the feed parser."
         },
         {
-          "decision_index": 7,
+          "decision_index": 9,
           "decision_source": "host_owned",
           "decision_kind": "stop_condition",
-          "decision_ref": "deterministic.decision.2",
+          "decision_ref": "deterministic.decision.3",
           "detail": "the host-owned controller stops after the extracted URL set is exhausted."
         }
       ],
@@ -1718,6 +1723,47 @@
           "step_index": 3,
           "decision_ref": "deterministic.tool_call.3",
           "result_ref": "deterministic.tool_result.3",
+          "tool_name": "plugin_text_stats",
+          "plugin_id": "plugin.text.stats",
+          "arguments": null,
+          "projected_result": {
+            "tool_name": "plugin_text_stats",
+            "plugin_id": "plugin.text.stats",
+            "plugin_version": "v1",
+            "status": "success",
+            "output_or_refusal_schema_id": "plugin.text.stats.output.v1",
+            "replay_class_id": "deterministic_replayable",
+            "structured_payload": {
+              "byte_count": 48,
+              "line_count": 1,
+              "non_empty_line_count": 1,
+              "unicode_scalar_count": 48,
+              "word_count": 6
+            },
+            "plugin_receipt": {
+              "receipt_id": "receipt.plugin.text.stats.0307e79769277046.v1",
+              "plugin_id": "plugin.text.stats",
+              "plugin_version": "v1",
+              "tool_name": "plugin_text_stats",
+              "packet_abi_version": "packet.v1",
+              "mount_envelope_id": "mount.plugin.text.stats.no_capabilities.v1",
+              "capability_namespace_ids": [],
+              "replay_class_id": "deterministic_replayable",
+              "status": "success",
+              "input_schema_id": "plugin.text.stats.input.v1",
+              "input_packet_digest": "0307e797692770463de0fc3badbf158bad0c799dd2d53eead3ffa4a411c328cd",
+              "output_or_refusal_schema_id": "plugin.text.stats.output.v1",
+              "output_or_refusal_digest": "87381ec3013d2cf47a751b23d526fdd7e04dd07db6d8c6595f3901447f365b82",
+              "detail": "text-stats keeps byte, scalar, line, and whitespace-delimited word counts explicit and packet-local instead of borrowing tokenizer or semantic structure claims.",
+              "receipt_digest": "fff59e9755264d47d668e98ad8e1a300cad3c7d09638640da5d057a9bcb30217"
+            }
+          },
+          "detail": "measure extracted readable text with the user-added capability-free text-stats plugin through the shared bridge."
+        },
+        {
+          "step_index": 4,
+          "decision_ref": "deterministic.tool_call.4",
+          "result_ref": "deterministic.tool_result.4",
           "tool_name": "plugin_http_fetch_text",
           "plugin_id": "plugin.http.fetch_text",
           "arguments": {
@@ -1761,9 +1807,9 @@
           "detail": "fetch the URL through the shared bridge before any content-type branch decision."
         },
         {
-          "step_index": 4,
-          "decision_ref": "deterministic.tool_call.4",
-          "result_ref": "deterministic.tool_result.4",
+          "step_index": 5,
+          "decision_ref": "deterministic.tool_call.5",
+          "result_ref": "deterministic.tool_result.5",
           "tool_name": "plugin_feed_rss_atom_parse",
           "plugin_id": "plugin.feed.rss_atom_parse",
           "arguments": {
@@ -1816,8 +1862,8 @@
       "source_stop_condition_id": "controller_stop.all_urls_processed",
       "final_message_text": "The deterministic controller completed after exhausting the extracted URL set.",
       "typed_refusal_preserved": false,
-      "detail": "the deterministic controller keeps extraction, fetch, branch, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops after the extracted URL set is exhausted.",
-      "record_digest": "af82d98ab50b98bceabebfa67966b84ef5d0c85d9f6f4db5025f93da5b9f1ca2"
+      "detail": "the deterministic controller keeps extraction, fetch, branch, user-added text measurement, refusal, and stop semantics explicit above the shared starter-plugin bridge. stop_detail=the host-owned controller stops after the extracted URL set is exhausted.",
+      "record_digest": "1eeef4fe33cf53981f0c86290eafabfd685a3a985513abe11fd207c6a41df604"
     },
     {
       "record_schema_id": "psionic.tassadar.multi_plugin_trace_record.v1",
@@ -1872,7 +1918,7 @@
         {
           "tool_name": "plugin_html_extract_readable",
           "plugin_id": "plugin.html.extract_readable",
-          "description": "extract bounded readable text, metadata, and harvested links from already-fetched HTML without browser rendering or network access.",
+          "description": "extract already-fetched HTML into bounded readable text, metadata, and harvested links without browser rendering, JavaScript, or full DOM claims.",
           "arguments_schema": {
             "additionalProperties": false,
             "properties": {
@@ -2249,7 +2295,7 @@
       "final_message_text": "I extracted one article and one feed through the router-owned plugin tool loop.",
       "typed_refusal_preserved": false,
       "detail": "the first step comes from a real `/v1/responses` tool-call response, while the bounded follow-on turns stay router-owned and execute real starter plugins through the shared bridge.",
-      "record_digest": "d1a9f3f82d819291d3fec769f212633d03b76d1f8e3ce7f86191029c0174062d"
+      "record_digest": "64f301db8185e90589cba77f9e261b304295c0df2a3269ea88919c821282e717"
     }
   ],
   "parity_matrix": {
@@ -2449,6 +2495,45 @@
         ]
       },
       {
+        "workflow_case_id": "starter_plugin.guest_artifact_success.v1",
+        "lane_record_ids": {
+          "deterministic_workflow": "trace_record.starter_plugin.guest_artifact_success.v1.deterministic_workflow.v1"
+        },
+        "directive_digest_by_lane": {
+          "deterministic_workflow": "4e043bae897ab98acab261a924c1f4a9bc8f367371dd877129f6ab9f1fde1280"
+        },
+        "normalized_stop_condition_id": "workflow_stop.guest_artifact_completed_success",
+        "source_stop_condition_id_by_lane": {
+          "deterministic_workflow": "controller_stop.guest_artifact_echo_complete"
+        },
+        "step_parity_rows": [
+          {
+            "step_index": 0,
+            "lanes_present": [
+              "deterministic_workflow"
+            ],
+            "tool_name_by_lane": {
+              "deterministic_workflow": "plugin_example_echo_guest"
+            },
+            "status_by_lane": {
+              "deterministic_workflow": "success"
+            },
+            "arguments_digest_by_lane": {
+              "deterministic_workflow": "1487f8205033ddd3a332d95a32e1e75d3d63192f46a56f0771cb9030c2e88fa3"
+            },
+            "payload_digest_by_lane": {
+              "deterministic_workflow": "907fde8c77e5e12e02b95408580a9172ffa8c0954263e8a691d127c3f8d8cfe0"
+            },
+            "receipt_id_by_lane": {
+              "deterministic_workflow": "receipt.plugin.example.echo_guest.bee52b6c5818aceb.v1"
+            },
+            "agreement_class": "exact_match",
+            "disagreement_reasons": []
+          }
+        ],
+        "disagreement_rows": []
+      },
+      {
         "workflow_case_id": "starter_plugin.web_content_success.v1",
         "lane_record_ids": {
           "apple_fm_session": "trace_record.starter_plugin.web_content_success.v1.apple_fm_session.v1",
@@ -2591,7 +2676,7 @@
             ],
             "tool_name_by_lane": {
               "apple_fm_session": "plugin_http_fetch_text",
-              "deterministic_workflow": "plugin_http_fetch_text",
+              "deterministic_workflow": "plugin_text_stats",
               "router_responses": "plugin_http_fetch_text"
             },
             "status_by_lane": {
@@ -2601,21 +2686,26 @@
             },
             "arguments_digest_by_lane": {
               "apple_fm_session": "b83c505202850cccc683a91d4a1beb544f5fccac15a96e13fe21179459c3494d",
-              "deterministic_workflow": "b83c505202850cccc683a91d4a1beb544f5fccac15a96e13fe21179459c3494d",
+              "deterministic_workflow": "3c27d0799eec4960f7861bdafd0f4816c836fedf1c23bc3b510f6e4d55829c1a",
               "router_responses": "b83c505202850cccc683a91d4a1beb544f5fccac15a96e13fe21179459c3494d"
             },
             "payload_digest_by_lane": {
               "apple_fm_session": "1f6103b441344c171dfa57728470dccb80415d1d854a4dd565419846deebf692",
-              "deterministic_workflow": "1f6103b441344c171dfa57728470dccb80415d1d854a4dd565419846deebf692",
+              "deterministic_workflow": "fce2ebf9e336715f90ce344613bf48243fb4586d506c62c13c215c48406eb4dd",
               "router_responses": "1f6103b441344c171dfa57728470dccb80415d1d854a4dd565419846deebf692"
             },
             "receipt_id_by_lane": {
               "apple_fm_session": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
-              "deterministic_workflow": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+              "deterministic_workflow": "receipt.plugin.text.stats.0307e79769277046.v1",
               "router_responses": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1"
             },
-            "agreement_class": "exact_match",
-            "disagreement_reasons": []
+            "agreement_class": "lane_disagreement",
+            "disagreement_reasons": [
+              "tool_name_drift",
+              "arguments_drift",
+              "payload_drift",
+              "receipt_identity_drift"
+            ]
           },
           {
             "step_index": 4,
@@ -2626,7 +2716,7 @@
             ],
             "tool_name_by_lane": {
               "apple_fm_session": "plugin_feed_rss_atom_parse",
-              "deterministic_workflow": "plugin_feed_rss_atom_parse",
+              "deterministic_workflow": "plugin_http_fetch_text",
               "router_responses": "plugin_feed_rss_atom_parse"
             },
             "status_by_lane": {
@@ -2636,22 +2726,50 @@
             },
             "arguments_digest_by_lane": {
               "apple_fm_session": "a011e6f8d9ae7ce783953364407733390b05d65bb6edb82c1c30cd46191992aa",
-              "deterministic_workflow": "a011e6f8d9ae7ce783953364407733390b05d65bb6edb82c1c30cd46191992aa",
+              "deterministic_workflow": "b83c505202850cccc683a91d4a1beb544f5fccac15a96e13fe21179459c3494d",
               "router_responses": "a011e6f8d9ae7ce783953364407733390b05d65bb6edb82c1c30cd46191992aa"
             },
             "payload_digest_by_lane": {
               "apple_fm_session": "4b04d9b8c4d01a72db94896649d548bf2734b78e24c62b51ebf238a61eb2303c",
-              "deterministic_workflow": "4b04d9b8c4d01a72db94896649d548bf2734b78e24c62b51ebf238a61eb2303c",
+              "deterministic_workflow": "1f6103b441344c171dfa57728470dccb80415d1d854a4dd565419846deebf692",
               "router_responses": "4b04d9b8c4d01a72db94896649d548bf2734b78e24c62b51ebf238a61eb2303c"
             },
             "receipt_id_by_lane": {
               "apple_fm_session": "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
-              "deterministic_workflow": "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
+              "deterministic_workflow": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
               "router_responses": "receipt.plugin.feed.rss_atom_parse.3430f94093b76c67.v1"
             },
-            "agreement_class": "digest_drift",
+            "agreement_class": "lane_disagreement",
             "disagreement_reasons": [
+              "tool_name_drift",
+              "arguments_drift",
+              "payload_drift",
               "receipt_identity_drift"
+            ]
+          },
+          {
+            "step_index": 5,
+            "lanes_present": [
+              "deterministic_workflow"
+            ],
+            "tool_name_by_lane": {
+              "deterministic_workflow": "plugin_feed_rss_atom_parse"
+            },
+            "status_by_lane": {
+              "deterministic_workflow": "success"
+            },
+            "arguments_digest_by_lane": {
+              "deterministic_workflow": "a011e6f8d9ae7ce783953364407733390b05d65bb6edb82c1c30cd46191992aa"
+            },
+            "payload_digest_by_lane": {
+              "deterministic_workflow": "4b04d9b8c4d01a72db94896649d548bf2734b78e24c62b51ebf238a61eb2303c"
+            },
+            "receipt_id_by_lane": {
+              "deterministic_workflow": "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1"
+            },
+            "agreement_class": "lane_disagreement",
+            "disagreement_reasons": [
+              "lane_missing"
             ]
           }
         ],
@@ -2765,19 +2883,111 @@
           {
             "workflow_case_id": "starter_plugin.web_content_success.v1",
             "scope_kind": "step",
+            "step_index": 3,
+            "disagreement_kind": "tool_name_drift",
+            "detail": "step 3 keeps `tool_name_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "plugin_http_fetch_text",
+              "deterministic_workflow": "plugin_text_stats",
+              "router_responses": "plugin_http_fetch_text"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 3,
+            "disagreement_kind": "arguments_drift",
+            "detail": "step 3 keeps `arguments_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "b83c505202850cccc683a91d4a1beb544f5fccac15a96e13fe21179459c3494d",
+              "deterministic_workflow": "3c27d0799eec4960f7861bdafd0f4816c836fedf1c23bc3b510f6e4d55829c1a",
+              "router_responses": "b83c505202850cccc683a91d4a1beb544f5fccac15a96e13fe21179459c3494d"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 3,
+            "disagreement_kind": "payload_drift",
+            "detail": "step 3 keeps `payload_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "1f6103b441344c171dfa57728470dccb80415d1d854a4dd565419846deebf692",
+              "deterministic_workflow": "fce2ebf9e336715f90ce344613bf48243fb4586d506c62c13c215c48406eb4dd",
+              "router_responses": "1f6103b441344c171dfa57728470dccb80415d1d854a4dd565419846deebf692"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 3,
+            "disagreement_kind": "receipt_identity_drift",
+            "detail": "step 3 keeps `receipt_identity_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
+              "deterministic_workflow": "receipt.plugin.text.stats.0307e79769277046.v1",
+              "router_responses": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 4,
+            "disagreement_kind": "tool_name_drift",
+            "detail": "step 4 keeps `tool_name_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "plugin_feed_rss_atom_parse",
+              "deterministic_workflow": "plugin_http_fetch_text",
+              "router_responses": "plugin_feed_rss_atom_parse"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 4,
+            "disagreement_kind": "arguments_drift",
+            "detail": "step 4 keeps `arguments_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "a011e6f8d9ae7ce783953364407733390b05d65bb6edb82c1c30cd46191992aa",
+              "deterministic_workflow": "b83c505202850cccc683a91d4a1beb544f5fccac15a96e13fe21179459c3494d",
+              "router_responses": "a011e6f8d9ae7ce783953364407733390b05d65bb6edb82c1c30cd46191992aa"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 4,
+            "disagreement_kind": "payload_drift",
+            "detail": "step 4 keeps `payload_drift` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {
+              "apple_fm_session": "4b04d9b8c4d01a72db94896649d548bf2734b78e24c62b51ebf238a61eb2303c",
+              "deterministic_workflow": "1f6103b441344c171dfa57728470dccb80415d1d854a4dd565419846deebf692",
+              "router_responses": "4b04d9b8c4d01a72db94896649d548bf2734b78e24c62b51ebf238a61eb2303c"
+            }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
             "step_index": 4,
             "disagreement_kind": "receipt_identity_drift",
             "detail": "step 4 keeps `receipt_identity_drift` explicit instead of smoothing it into synthetic consensus.",
             "lane_values": {
               "apple_fm_session": "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
-              "deterministic_workflow": "receipt.plugin.feed.rss_atom_parse.122c9fad2c22555f.v1",
+              "deterministic_workflow": "receipt.plugin.http.fetch_text.818e6c686ecfff73.v1",
               "router_responses": "receipt.plugin.feed.rss_atom_parse.3430f94093b76c67.v1"
             }
+          },
+          {
+            "workflow_case_id": "starter_plugin.web_content_success.v1",
+            "scope_kind": "step",
+            "step_index": 5,
+            "disagreement_kind": "lane_missing",
+            "detail": "step 5 keeps `lane_missing` explicit instead of smoothing it into synthetic consensus.",
+            "lane_values": {}
           }
         ]
       }
     ],
-    "explicit_disagreement_count": 15
+    "explicit_disagreement_count": 23
   },
   "bootstrap_contract": {
     "contract_id": "psionic.tassadar.multi_plugin_training_bootstrap.v1",
@@ -2790,14 +3000,15 @@
     ],
     "admitted_workflow_case_ids": [
       "starter_plugin.fetch_refusal.v1",
+      "starter_plugin.guest_artifact_success.v1",
       "starter_plugin.web_content_success.v1"
     ],
     "requires_receipt_identity": true,
     "preserves_disagreement_rows": true,
     "bootstrap_ready": true,
-    "bootstrap_boundary": "later weighted-controller work may bootstrap from these lane-neutral records only if it preserves plugin receipt identity, keeps disagreement rows explicit, and does not collapse deterministic, router-owned, and Apple FM traces into a false proof of controller closure."
+    "bootstrap_boundary": "later weighted-controller and training-derivation work may bootstrap from these records only if they preserve plugin receipt identity, keep disagreement rows explicit, and keep the single-lane guest-artifact proof separate from the three-lane host-native parity families instead of collapsing them into a false proof of controller closure."
   },
-  "claim_boundary": "this bundle freezes a repo-owned, lane-neutral multi-plugin trace corpus plus an explicit parity matrix across deterministic, router-owned, and local Apple FM controller lanes. It is bootstrap input to later TAS-204 weighted-controller work and does not claim weighted-controller closure, served-model equivalence, or canonical Tassadar proof closure.",
-  "summary": "multi-plugin trace corpus freezes source_bundles=3, trace_records=6, workflow_parity_rows=2, and explicit_disagreements=15.",
-  "bundle_digest": "d26765f7d2f0bdedc4113dc754cb627a566076b5c994228025500b64eeaa69bb"
+  "claim_boundary": "this bundle freezes a repo-owned multi-plugin trace corpus plus an explicit parity matrix across deterministic, router-owned, and local Apple FM controller lanes. It preserves the three-lane host-native workflow families and one separate deterministic-only digest-bound guest-artifact workflow without collapsing them into one false controller-equivalence story. It is bootstrap input to later TAS-204 weighted-controller work and does not claim weighted-controller closure, served-model equivalence, or canonical Tassadar proof closure.",
+  "summary": "multi-plugin trace corpus freezes source_bundles=3, trace_records=7, workflow_parity_rows=3, and explicit_disagreements=23.",
+  "bundle_digest": "86560b6ecd973db915d77d77ec9a7d8eb7ca47722511ff9bc632e4f276b1e1dc"
 }

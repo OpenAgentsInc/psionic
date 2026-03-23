@@ -46,6 +46,25 @@ The current v1 build keeps:
 
 This is enough for the first bounded SFT and evaluation lane.
 
+## Current Exclusion Boundary
+
+The current committed derivation bundle is now broader than this dataset.
+
+It includes one bounded guest-artifact training record.
+
+This dataset still excludes that workflow on purpose.
+
+Why:
+
+- `PSION_PLUGIN-24` extends the derivation pipeline to a shared schema
+- `PSION_PLUGIN-25` is the later issue that builds the first mixed dataset
+
+So v1 dataset truth remains:
+
+- host-native only
+- workflow-case-disjoint
+- no mixed guest-artifact training split yet
+
 ## Preserved Labels
 
 The dataset bundle keeps the following labels visible per split:
