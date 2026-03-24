@@ -124,17 +124,26 @@ closure.
 Fresh H100 fallback profiling on 2026-03-23 still found substantial
 host-executed cost on the real single-H100 trainer path, recorded in:
 
-- `fixtures/parameter_golf/reports/parameter_golf_single_h100_host_fallback_profile.jsonl`
+- `fixtures/parameter_golf/reports/parameter_golf_single_h100_host_fallback_profile_forward_before_after.jsonl`
+- `fixtures/parameter_golf/reports/parameter_golf_single_h100_host_fallback_profile_full_microstep_pre_layout_parallelization.jsonl`
 - `docs/audits/2026-03-23-psionic-parameter-golf-single-h100-host-fallback-profile-audit.md`
 
-The fresh narrowed blocker list from that live profile is:
+The same-node forward comparison after the chunked layout-transform path landed
+reduced:
 
-- forward replay: `expand`, `permute`
+- total forward host fallback from `158060 ms` to `20667 ms`
+- `expand` from `85344 ms` to `10244 ms`
+- `permute` from `72716 ms` to `10423 ms`
+
+The fresh narrowed blocker list is now:
+
 - backward replay: `permute`, `reduce_sum`,
   `scaled_dot_product_attention_{query,key,value}_backward`,
   `rotary_embedding_backward`
 
-The same profile also showed that `reshape` and `detach` were removed from the
+Forward `expand` and `permute` still exist on the fallback surface, but they no
+longer dominate at the same order of magnitude after the parallel layout path
+landed. The same receipts also keep `reshape` and `detach` retired from the
 measured fallback cost after the zero-copy alias path landed for those ops.
 
 ## Current Honest Boundary
