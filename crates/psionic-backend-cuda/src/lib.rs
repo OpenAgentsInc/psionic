@@ -3099,14 +3099,38 @@ impl AvailableCudaBackend {
     }
 
     fn read_float_buffer_to_f32(&self, buffer: &CudaBuffer) -> Result<Vec<f32>, RuntimeError> {
-        match buffer.spec().dtype() {
+        let storage_values = match buffer.spec().dtype() {
             DType::F32 => buffer.read_f32(),
             DType::BF16 => buffer.read_bf16_to_f32(),
             actual => Err(RuntimeError::Backend(format!(
                 "cuda float readback requires F32 or BF16 buffer, actual {:?}",
                 actual
             ))),
+        }?;
+        if buffer.spec().layout().is_contiguous()
+            && buffer.spec().layout().offset() == 0
+            && buffer.spec().storage_size() == buffer.spec().element_count()
+        {
+            return Ok(storage_values);
         }
+        let layout = buffer.spec().layout();
+        let logical_shape = buffer.spec().shape().dims();
+        let logical_strides = layout.strides();
+        let logical_count = buffer.spec().element_count();
+        let mut values = vec![0.0_f32; logical_count];
+        let contiguous = contiguous_strides(logical_shape);
+        let mut coords = vec![0_usize; logical_shape.len()];
+        for (logical_index, value) in values.iter_mut().enumerate() {
+            linear_to_coords_in_place(logical_index, logical_shape, &contiguous, &mut coords);
+            let storage_index = layout.offset()
+                + coords
+                    .iter()
+                    .zip(logical_strides.iter())
+                    .map(|(index, stride)| index.saturating_mul(*stride))
+                    .sum::<usize>();
+            *value = storage_values[storage_index];
+        }
+        Ok(values)
     }
 
     fn execute_rotary_embedding_step(
@@ -4055,15 +4079,56 @@ impl AvailableCudaBackend {
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Add => {
-                    let (left, right) = binary_inputs(step, &values)?;
-                    let output = self.allocate(&step.spec)?;
-                    submission.platform.encode_add(
-                        &left.platform,
-                        &right.platform,
-                        &output.platform,
-                        step.spec.element_count(),
-                    )?;
-                    submission.encoded_operations += 1;
+                    let left = step_input(step, &values, 0)?;
+                    let right = step_input(step, &values, 1)?;
+                    let output = if step.spec.dtype() == DType::F32
+                        && left.spec().shape() == step.spec.shape()
+                        && right.spec().shape() == step.spec.shape()
+                        && left.spec().dtype() == DType::F32
+                        && right.spec().dtype() == DType::F32
+                    {
+                        let contiguous = TensorSpec::new(
+                            step.spec.shape().clone(),
+                            step.spec.dtype(),
+                            step.spec.device().clone(),
+                        );
+                        let left = if left.spec() == &contiguous {
+                            left.clone()
+                        } else {
+                            self.buffer_from_tensor_data(
+                                &contiguous,
+                                &TensorData::F32(self.read_float_buffer_to_f32(left)?),
+                            )?
+                        };
+                        let right = if right.spec() == &contiguous {
+                            right.clone()
+                        } else {
+                            self.buffer_from_tensor_data(
+                                &contiguous,
+                                &TensorData::F32(self.read_float_buffer_to_f32(right)?),
+                            )?
+                        };
+                        let output = self.allocate(&contiguous)?;
+                        submission.platform.encode_add(
+                            &left.platform,
+                            &right.platform,
+                            &output.platform,
+                            contiguous.element_count(),
+                        )?;
+                        submission.encoded_operations += 1;
+                        output
+                    } else {
+                        let (left, right) = binary_inputs(step, &values)?;
+                        let output = self.allocate(&step.spec)?;
+                        submission.platform.encode_add(
+                            &left.platform,
+                            &right.platform,
+                            &output.platform,
+                            step.spec.element_count(),
+                        )?;
+                        submission.encoded_operations += 1;
+                        output
+                    };
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Mul => {
@@ -12330,6 +12395,62 @@ mod tests {
                 1e-5,
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_add_after_expand_materialization_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let expand_shape = Shape::new(vec![1, 1, 3]);
+        let dense_shape = Shape::new(vec![2, 4, 3]);
+        let expand_values = vec![1.0_f32, 2.0, 3.0];
+        let dense_values = (0..24).map(|value| value as f32).collect::<Vec<_>>();
+
+        let mut builder = GraphBuilder::new(selected.device.clone());
+        let expand_input = builder.input("expand_input", expand_shape.clone(), DType::F32);
+        let dense_input = builder.input("dense_input", dense_shape.clone(), DType::F32);
+        let expanded = builder.expand(&expand_input, dense_shape.clone())?;
+        let summed = builder.add(&expanded, &dense_input)?;
+        let graph = builder.finish(vec![summed.clone()]);
+
+        let inputs = std::collections::BTreeMap::from([
+            (
+                expand_input.id(),
+                backend.input_buffer(expand_shape, expand_values.clone())?,
+            ),
+            (
+                dense_input.id(),
+                backend.input_buffer(dense_shape, dense_values.clone())?,
+            ),
+        ]);
+        let result = backend.compile_and_execute(&graph, &inputs)?;
+        let expected = evaluate_graph(
+            &graph,
+            &std::collections::BTreeMap::from([
+                (expand_input.id(), TensorData::F32(expand_values)),
+                (dense_input.id(), TensorData::F32(dense_values)),
+            ]),
+        )?;
+
+        assert_close(
+            &result
+                .outputs
+                .get(&summed.id())
+                .ok_or("missing add output")?
+                .read_f32()?,
+            expected
+                .get(&summed.id())
+                .ok_or("missing expected add output")?
+                .as_f32_slice()
+                .ok_or("expected add output is not f32")?,
+            1e-5,
+        );
         Ok(())
     }
 
