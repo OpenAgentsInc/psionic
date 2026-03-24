@@ -91,10 +91,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-LAUNCH_FILE="${REPO_ROOT}/fixtures/psion/google/psion_google_single_node_launch_profiles_v1.json"
-OBSERVABILITY_FILE="${REPO_ROOT}/fixtures/psion/google/psion_google_host_observability_policy_v1.json"
-STARTUP_SCRIPT="${REPO_ROOT}/scripts/psion-google-single-node-startup.sh"
-QUOTA_PREFLIGHT="${REPO_ROOT}/scripts/psion-google-quota-preflight.sh"
+LAUNCH_FILE="${LAUNCH_FILE:-${REPO_ROOT}/fixtures/psion/google/psion_google_single_node_launch_profiles_v1.json}"
+OBSERVABILITY_FILE="${OBSERVABILITY_FILE:-${REPO_ROOT}/fixtures/psion/google/psion_google_host_observability_policy_v1.json}"
+STARTUP_SCRIPT="${STARTUP_SCRIPT:-${REPO_ROOT}/scripts/psion-google-single-node-startup.sh}"
+QUOTA_PREFLIGHT="${QUOTA_PREFLIGHT:-${REPO_ROOT}/scripts/psion-google-quota-preflight.sh}"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "error: jq is required" >&2
@@ -301,6 +301,7 @@ service_account_email="$(jq -r '.service_account_email' "${LAUNCH_FILE}")"
 network="$(jq -r '.network' "${LAUNCH_FILE}")"
 subnetwork="$(jq -r '.subnetwork' "${LAUNCH_FILE}")"
 target_tags="$(jq -r '.target_tags | join(",")' "${LAUNCH_FILE}")"
+lane_label="$(jq -r '.lane_label // "psion"' "${LAUNCH_FILE}")"
 image_project="$(jq -r '.image_policy.image_project' "${LAUNCH_FILE}")"
 image_family="$(jq -r '.image_policy.image_family' "${LAUNCH_FILE}")"
 driver_posture="$(jq -r '.image_policy.driver_posture' "${LAUNCH_FILE}")"
@@ -313,6 +314,11 @@ rust_toolchain="$(jq -r '.startup_policy.rustup_default_toolchain' "${LAUNCH_FIL
 apt_packages="$(jq -r '.startup_policy.package_install | join(" ")' "${LAUNCH_FILE}")"
 final_manifest_object="$(jq -r '.teardown_policy.final_manifest_object' "${LAUNCH_FILE}")"
 input_package_descriptor_uri="$(jq -r '.default_input_package_descriptor_uri' "${LAUNCH_FILE}")"
+provisioning_model="$(jq -r '.provisioning_model' "${LAUNCH_FILE}")"
+maintenance_policy="$(jq -r '.maintenance_policy' "${LAUNCH_FILE}")"
+restart_on_failure="$(jq -r '.restart_on_failure' "${LAUNCH_FILE}")"
+external_ip="$(jq -r '.external_ip' "${LAUNCH_FILE}")"
+os_login="$(jq -r '.os_login' "${LAUNCH_FILE}")"
 
 profile_label="$(jq -r '.profile_label' <<<"${profile_json}")"
 trainer_lane_id="$(jq -r '.trainer_lane_id // "psion_reference_pilot_bundle"' <<<"${profile_json}")"
@@ -331,6 +337,11 @@ profile_pre_training_command="$(jq -r '.startup_policy_overrides.pre_training_co
 profile_training_command="$(jq -r '.startup_policy_overrides.training_command // empty' <<<"${profile_json}")"
 profile_post_training_archive_command="$(jq -r '.startup_policy_overrides.post_training_archive_command // empty' <<<"${profile_json}")"
 profile_post_training_restore_command="$(jq -r '.startup_policy_overrides.post_training_restore_command // empty' <<<"${profile_json}")"
+profile_provisioning_model="$(jq -r '.provisioning_model // empty' <<<"${profile_json}")"
+profile_maintenance_policy="$(jq -r '.maintenance_policy // empty' <<<"${profile_json}")"
+profile_restart_on_failure="$(jq -r '.restart_on_failure // empty' <<<"${profile_json}")"
+profile_external_ip="$(jq -r '.external_ip // empty' <<<"${profile_json}")"
+profile_os_login="$(jq -r '.os_login // empty' <<<"${profile_json}")"
 if [[ -n "${profile_pre_training_command}" ]]; then
   pre_training_command="${profile_pre_training_command}"
 fi
@@ -347,6 +358,21 @@ if [[ "${profile_post_training_restore_command}" == "__none__" ]]; then
   post_training_restore_command=""
 elif [[ -n "${profile_post_training_restore_command}" ]]; then
   post_training_restore_command="${profile_post_training_restore_command}"
+fi
+if [[ -n "${profile_provisioning_model}" ]]; then
+  provisioning_model="${profile_provisioning_model}"
+fi
+if [[ -n "${profile_maintenance_policy}" ]]; then
+  maintenance_policy="${profile_maintenance_policy}"
+fi
+if [[ -n "${profile_restart_on_failure}" ]]; then
+  restart_on_failure="${profile_restart_on_failure}"
+fi
+if [[ -n "${profile_external_ip}" ]]; then
+  external_ip="${profile_external_ip}"
+fi
+if [[ -n "${profile_os_login}" ]]; then
+  os_login="${profile_os_login}"
 fi
 
 timestamp_tag="$(date -u '+%Y%m%dt%H%M%Sz' | tr '[:upper:]' '[:lower:]')"
@@ -506,11 +532,11 @@ jq -n \
   --argjson boot_disk_gb "${boot_disk_gb}" \
   --argjson low_disk_watermark_gb "${low_disk_watermark_gb}" \
   --argjson declared_run_cost_ceiling_usd "${declared_run_cost_ceiling_usd}" \
-  --arg provisioning_model "$(jq -r '.provisioning_model' "${LAUNCH_FILE}")" \
-  --arg maintenance_policy "$(jq -r '.maintenance_policy' "${LAUNCH_FILE}")" \
-  --argjson restart_on_failure "$(jq -r '.restart_on_failure' "${LAUNCH_FILE}")" \
-  --argjson external_ip "$(jq -r '.external_ip' "${LAUNCH_FILE}")" \
-  --argjson os_login "$(jq -r '.os_login' "${LAUNCH_FILE}")" \
+  --arg provisioning_model "${provisioning_model}" \
+  --arg maintenance_policy "${maintenance_policy}" \
+  --argjson restart_on_failure "${restart_on_failure}" \
+  --argjson external_ip "${external_ip}" \
+  --argjson os_login "${os_login}" \
   --argjson quota_preflight "$(cat "${preflight_report_file}")" \
   '{
     schema_version: $schema_version,
@@ -611,6 +637,19 @@ if [[ "${MANIFEST_ONLY}" == "true" ]]; then
   exit 0
 fi
 
+restart_on_failure_flag="--no-restart-on-failure"
+if [[ "${restart_on_failure}" == "true" ]]; then
+  restart_on_failure_flag="--restart-on-failure"
+fi
+network_interface_arg="network=${network},subnet=${subnetwork},no-address"
+if [[ "${external_ip}" == "true" ]]; then
+  network_interface_arg="network=${network},subnet=${subnetwork}"
+fi
+os_login_metadata="FALSE"
+if [[ "${os_login}" == "true" ]]; then
+  os_login_metadata="TRUE"
+fi
+
 create_stdout_file="${tmpdir}/gcloud-create.stdout"
 create_stderr_file="${tmpdir}/gcloud-create.stderr"
 metadata_from_file_arg="startup-script=${STARTUP_SCRIPT},psion-training-command=${training_command_file},psion-apt-packages=${apt_packages_file}"
@@ -628,19 +667,19 @@ if ! gcloud compute instances create "${INSTANCE_NAME}" \
   --zone="${selected_zone}" \
   --machine-type="${machine_type}" \
   --accelerator="type=${accelerator_type},count=${accelerator_count}" \
-  --maintenance-policy=TERMINATE \
-  --provisioning-model=STANDARD \
-  --no-restart-on-failure \
-  --network-interface="network=${network},subnet=${subnetwork},no-address" \
+  --maintenance-policy="${maintenance_policy}" \
+  --provisioning-model="${provisioning_model}" \
+  "${restart_on_failure_flag}" \
+  --network-interface="${network_interface_arg}" \
   --service-account="${service_account_email}" \
   --scopes="https://www.googleapis.com/auth/cloud-platform" \
   --tags="${target_tags}" \
-  --labels="lane=psion,purpose=train,track=single-node,profile=$(sanitize_label "${profile_label}")" \
+  --labels="lane=$(sanitize_label "${lane_label}"),purpose=train,track=single-node,profile=$(sanitize_label "${profile_label}")" \
   --boot-disk-size="${boot_disk_gb}GB" \
   --boot-disk-type="${boot_disk_type}" \
   --image="${image_name}" \
   --image-project="${image_project}" \
-  --metadata="enable-oslogin=TRUE,psion-run-id=${RUN_ID},psion-bucket-url=${bucket_url},psion-repo-clone-url=${repo_clone_url},psion-git-revision=${git_revision},psion-workspace-root=${workspace_root},psion-output-subdir=output,psion-log-subdir=logs,psion-scratch-subdir=scratch,psion-repo-subdir=repo,psion-low-disk-watermark-gb=${low_disk_watermark_gb},psion-rust-toolchain=${rust_toolchain},psion-input-package-descriptor-uri=${input_package_descriptor_uri},psion-input-package-archive-uri=${input_package_archive_uri},psion-input-package-archive-sha256=${input_package_archive_sha256},psion-input-package-manifest-sha256=${input_package_manifest_sha256},psion-input-materialization-mode=${input_materialization_mode},psion-launch-manifest-uri=${manifest_uri}" \
+  --metadata="enable-oslogin=${os_login_metadata},psion-run-id=${RUN_ID},psion-bucket-url=${bucket_url},psion-repo-clone-url=${repo_clone_url},psion-git-revision=${git_revision},psion-workspace-root=${workspace_root},psion-output-subdir=output,psion-log-subdir=logs,psion-scratch-subdir=scratch,psion-repo-subdir=repo,psion-low-disk-watermark-gb=${low_disk_watermark_gb},psion-rust-toolchain=${rust_toolchain},psion-input-package-descriptor-uri=${input_package_descriptor_uri},psion-input-package-archive-uri=${input_package_archive_uri},psion-input-package-archive-sha256=${input_package_archive_sha256},psion-input-package-manifest-sha256=${input_package_manifest_sha256},psion-input-materialization-mode=${input_materialization_mode},psion-launch-manifest-uri=${manifest_uri}" \
   --metadata-from-file="${metadata_from_file_arg}" >"${create_stdout_file}" 2>"${create_stderr_file}"; then
   failure_detail="$(tr '\n' ' ' < "${create_stderr_file}" | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
   write_launch_failure_manifest "launch_capacity_failure" "${failure_detail}" "${create_stderr_file}"

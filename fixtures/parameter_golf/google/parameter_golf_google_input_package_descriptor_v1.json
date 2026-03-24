@@ -1,0 +1,40 @@
+{
+  "schema_version": "psion.google_training_input_package_descriptor.v1",
+  "package_id": "parameter-golf-google-inputs-sp1024-v1",
+  "created_at_utc": "2026-03-23T00:00:00Z",
+  "git_revision": "1fded3cfa89d4b7f7796035944445a5cb4a34b72",
+  "descriptor_uri": "gs://openagentsgemini-psion-train-us-central1/manifests/parameter_golf_google_input_package_v1.json",
+  "archive_uri": "gs://openagentsgemini-psion-train-us-central1/runs/staging/input_packages/parameter_golf_google_input_package_v1.tar.gz",
+  "archive_sha256": "aca9bc214d577ed9c70f02cdabe5bc2ff3ee649402f5cd58532456e27de7e310",
+  "manifest_path_in_archive": "psion_google_reference_input_package_manifest.json",
+  "manifest_sha256": "433b843c565a84d9e738ce5f35dc532ba5211a2aa7e30f6519f26492e0f20c77",
+  "materialization": {
+    "mode": "materialize_public_parameter_golf_cache_to_local_disk",
+    "max_local_working_set_gb": 40
+  },
+  "benchmark_execution_posture": {
+    "single_h100": [
+      "Materialize the public Parameter Golf challenge cache into local disk before launching the Rust-only single-H100 trainer.",
+      "Keep the fixed fineweb_val_* first-50k-doc validation split identity explicit in the contract."
+    ],
+    "distributed_8xh100": [
+      "Reuse the same dataset and tokenizer identity for the later RunPod 8xH100 lane unless a materially different shard layout is introduced."
+    ],
+    "post_hoc_allowed": [
+      "Remote object upload can be deferred until Google operator authority is available, but later launch profiles must keep the descriptor URI stable."
+    ]
+  },
+  "key_digests": {
+    "dataset_manifest_sha256": "e83387a68b96075c410061b62f7c82bdc86449f8b6d9890bb6fd1a61210396d4",
+    "tokenizer_sha256": "4f5e8adb109c66b4886963bc75a7befd73bda36d27fd7102df8e9e66503b0e2a",
+    "validation_identity_sha256": "4c59b04b911aca4ca8547155156cc1d708351408dcb36a7d8c77e67a48e34474",
+    "input_contract_sha256": "80dfb2c5bd0fa37791c6274f0d21c92a97a78760037302f50ada04439e5d73f2",
+    "parameter_golf_single_h100_bringup_report_sha256": "84ce4a7927b6110519f8b49933c76f9c06c638bf47a78d53066e177a455d0a1c",
+    "dataset_ref": "dataset://parameter-golf/fineweb-sp1024",
+    "dataset_version": "2026.03.18",
+    "validation_identity": "fineweb_val_* fixed first-50k-doc validation split",
+    "parameter_golf_git_revision": "c933d3a848346079adfb84cc85022378d3a8c01d",
+    "train_shards": 80,
+    "validation_shards": 1
+  }
+}

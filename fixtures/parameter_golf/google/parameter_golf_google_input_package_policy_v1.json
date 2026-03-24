@@ -1,0 +1,39 @@
+{
+  "schema_version": "parameter_golf.google_input_package_policy.v1",
+  "policy_id": "openagentsgemini-parameter-golf-google-inputs-v1",
+  "bucket_url": "gs://openagentsgemini-psion-train-us-central1",
+  "descriptor_uri": "gs://openagentsgemini-psion-train-us-central1/manifests/parameter_golf_google_input_package_v1.json",
+  "archive_uri": "gs://openagentsgemini-psion-train-us-central1/runs/staging/input_packages/parameter_golf_google_input_package_v1.tar.gz",
+  "package_id": "parameter-golf-google-inputs-sp1024-v1",
+  "materialization": {
+    "mode": "materialize_public_parameter_golf_cache_to_local_disk",
+    "max_local_working_set_gb": 40
+  },
+  "dataset": {
+    "local_relative_root": "data/datasets/fineweb10B_sp1024"
+  },
+  "tokenizer": {
+    "local_relative_path": "data/tokenizers/fineweb_1024_bpe.model",
+    "vocab_relative_path": "data/tokenizers/fineweb_1024_bpe.vocab"
+  },
+  "matched_fineweb": {
+    "repo_id": "willdepueoai/parameter-golf",
+    "remote_root_prefix": "datasets"
+  },
+  "consumers": [
+    "google_single_h100",
+    "runpod_8xh100"
+  ],
+  "benchmark_execution_posture": {
+    "single_h100": [
+      "Materialize the public Parameter Golf challenge cache into local disk before launching the Rust-only single-H100 trainer.",
+      "Keep the fixed fineweb_val_* first-50k-doc validation split identity explicit in the contract."
+    ],
+    "distributed_8xh100": [
+      "Reuse the same dataset and tokenizer identity for the later RunPod 8xH100 lane unless a materially different shard layout is introduced."
+    ],
+    "post_hoc_allowed": [
+      "Remote object upload can be deferred until Google operator authority is available, but later launch profiles must keep the descriptor URI stable."
+    ]
+  }
+}

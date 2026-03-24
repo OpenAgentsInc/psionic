@@ -1,0 +1,77 @@
+{
+  "schema_version": "psion.google_single_node_launch_profiles.v1",
+  "launch_bundle_id": "openagentsgemini-parameter-golf-google-single-node-launch-v1",
+  "project_id": "openagentsgemini",
+  "bucket_url": "gs://openagentsgemini-psion-train-us-central1",
+  "default_input_package_descriptor_uri": "gs://openagentsgemini-psion-train-us-central1/manifests/parameter_golf_google_input_package_v1.json",
+  "repo_clone_url": "https://github.com/OpenAgentsInc/psionic.git",
+  "service_account_email": "psion-train-single-node@openagentsgemini.iam.gserviceaccount.com",
+  "network": "oa-lightning",
+  "subnetwork": "oa-lightning-us-central1",
+  "target_tags": [
+    "psion-train-host"
+  ],
+  "lane_label": "parameter-golf",
+  "external_ip": false,
+  "os_login": true,
+  "provisioning_model": "STANDARD",
+  "maintenance_policy": "TERMINATE",
+  "restart_on_failure": false,
+  "image_policy": {
+    "image_project": "deeplearning-platform-release",
+    "image_family": "common-cu128-ubuntu-2204-nvidia-570",
+    "driver_posture": "verify_prevalidated_gpu_image"
+  },
+  "startup_policy": {
+    "script_path": "scripts/psion-google-single-node-startup.sh",
+    "workspace_root": "/var/lib/psion-google",
+    "package_install": [
+      "build-essential",
+      "pkg-config",
+      "libssl-dev",
+      "clang",
+      "cmake",
+      "git",
+      "curl",
+      "jq",
+      "ca-certificates",
+      "python3",
+      "python3-venv"
+    ],
+    "rustup_default_toolchain": "1.88.0",
+    "pre_training_command": "",
+    "training_command": "true",
+    "post_training_archive_command": "",
+    "post_training_restore_command": ""
+  },
+  "teardown_policy": {
+    "final_manifest_object": "final/psion_google_run_final_manifest.json",
+    "force_flag": "--force"
+  },
+  "profiles": [
+    {
+      "profile_id": "a3_h100_single_node_parameter_golf",
+      "profile_label": "a3-h100-parameter-golf",
+      "trainer_lane_id": "parameter_golf_single_h100",
+      "expected_execution_backend": "cuda",
+      "machine_type": "a3-highgpu-1g",
+      "accelerator_type": "nvidia-h100-80gb",
+      "accelerator_count": 1,
+      "boot_disk_type": "pd-balanced",
+      "boot_disk_gb": 250,
+      "low_disk_watermark_gb": 80,
+      "zone_fallback_order": [
+        "us-central1-a",
+        "us-central1-b",
+        "us-central1-c"
+      ],
+      "declared_run_cost_ceiling_usd": 150.0,
+      "provisioning_model": "FLEX_START",
+      "startup_policy_overrides": {
+        "pre_training_command": "bash \"$PSION_REPO_DIR/scripts/parameter-golf-materialize-public-cache.sh\" --contract \"$PSION_INPUT_PACKAGE_ROOT/parameter_golf_google_input_contract_v1.json\" --target-root \"$PSION_INPUT_PACKAGE_ROOT/parameter-golf\" && bash \"$PSION_REPO_DIR/scripts/check-parameter-golf-single-h100-bringup.sh\" --dataset-root \"$PSION_INPUT_PACKAGE_ROOT/parameter-golf/data/datasets/fineweb10B_sp1024\" --tokenizer-path \"$PSION_INPUT_PACKAGE_ROOT/parameter-golf/data/tokenizers/fineweb_1024_bpe.model\" --report \"$PSION_SCRATCH_DIR/parameter_golf_single_h100_bringup.json\" && cargo build --release -p psionic-train --bin parameter_golf_single_h100_train",
+        "training_command": "\"$CARGO_TARGET_DIR/release/parameter_golf_single_h100_train\" \"$PSION_INPUT_PACKAGE_ROOT/parameter-golf/data/datasets/fineweb10B_sp1024\" \"$PSION_INPUT_PACKAGE_ROOT/parameter-golf/data/tokenizers/fineweb_1024_bpe.model\" \"$PSION_OUTPUT_DIR/parameter_golf_single_h100_training.json\" 1",
+        "post_training_restore_command": "__none__"
+      }
+    }
+  ]
+}

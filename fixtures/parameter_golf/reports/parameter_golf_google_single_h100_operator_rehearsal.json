@@ -1,0 +1,15 @@
+{
+  "schema_version": "parameter_golf.google_single_h100_operator_rehearsal.v1",
+  "runner": "scripts/check-parameter-golf-google-single-h100-lane.sh",
+  "profile_id": "a3_h100_single_node_parameter_golf",
+  "trainer_lane_id": "parameter_golf_single_h100",
+  "preflight_result": "ready",
+  "quota_preflight_result": "ready",
+  "machine_type": "a3-highgpu-1g",
+  "accelerator_type": "nvidia-h100-80gb",
+  "provisioning_model": "FLEX_START",
+  "input_package_descriptor_uri": "gs://openagentsgemini-psion-train-us-central1/manifests/parameter_golf_google_input_package_v1.json",
+  "training_command": "\"$CARGO_TARGET_DIR/release/parameter_golf_single_h100_train\" \"$PSION_INPUT_PACKAGE_ROOT/parameter-golf/data/datasets/fineweb10B_sp1024\" \"$PSION_INPUT_PACKAGE_ROOT/parameter-golf/data/tokenizers/fineweb_1024_bpe.model\" \"$PSION_OUTPUT_DIR/parameter_golf_single_h100_training.json\" 1",
+  "pre_training_command": "bash \"$PSION_REPO_DIR/scripts/parameter-golf-materialize-public-cache.sh\" --contract \"$PSION_INPUT_PACKAGE_ROOT/parameter_golf_google_input_contract_v1.json\" --target-root \"$PSION_INPUT_PACKAGE_ROOT/parameter-golf\" && bash \"$PSION_REPO_DIR/scripts/check-parameter-golf-single-h100-bringup.sh\" --dataset-root \"$PSION_INPUT_PACKAGE_ROOT/parameter-golf/data/datasets/fineweb10B_sp1024\" --tokenizer-path \"$PSION_INPUT_PACKAGE_ROOT/parameter-golf/data/tokenizers/fineweb_1024_bpe.model\" --report \"$PSION_SCRATCH_DIR/parameter_golf_single_h100_bringup.json\" && cargo build --release -p psionic-train --bin parameter_golf_single_h100_train",
+  "generated_package_matches_committed_truth": true
+}

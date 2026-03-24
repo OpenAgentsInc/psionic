@@ -3,9 +3,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-POLICY_FILE="${REPO_ROOT}/fixtures/psion/google/psion_google_operator_preflight_policy_v1.json"
-IDENTITY_PROFILE_FILE="${REPO_ROOT}/fixtures/psion/google/psion_google_training_identity_profile_v1.json"
-QUOTA_PREFLIGHT="${REPO_ROOT}/scripts/psion-google-quota-preflight.sh"
+POLICY_FILE="${POLICY_FILE:-${REPO_ROOT}/fixtures/psion/google/psion_google_operator_preflight_policy_v1.json}"
+IDENTITY_PROFILE_FILE="${IDENTITY_PROFILE_FILE:-${REPO_ROOT}/fixtures/psion/google/psion_google_training_identity_profile_v1.json}"
+QUOTA_PREFLIGHT="${QUOTA_PREFLIGHT:-${REPO_ROOT}/scripts/psion-google-quota-preflight.sh}"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "error: jq is required" >&2

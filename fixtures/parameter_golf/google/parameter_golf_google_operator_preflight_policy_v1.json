@@ -1,0 +1,23 @@
+{
+  "schema_version": "psion.google_operator_preflight_policy.v1",
+  "policy_id": "openagentsgemini-parameter-golf-google-operator-preflight-v1",
+  "project_id": "openagentsgemini",
+  "bucket_url": "gs://openagentsgemini-psion-train-us-central1",
+  "finops_dataset": "psion_training_finops",
+  "finops_price_profile_table": "single_node_price_profiles_v1",
+  "training_service_account": "psion-train-single-node@openagentsgemini.iam.gserviceaccount.com",
+  "minimum_tool_versions": {
+    "gcloud": "470.0.0",
+    "bq": "2.1.0"
+  },
+  "required_commands": [
+    "gcloud",
+    "bq",
+    "jq",
+    "git"
+  ],
+  "supported_profiles": [
+    "a3_h100_single_node_parameter_golf"
+  ],
+  "detail": "The Parameter Golf Google operator preflight must validate the same bucket, billing, and service-account seams as the bounded Psion lane while also refusing unsupported non-H100 launch profiles."
+}

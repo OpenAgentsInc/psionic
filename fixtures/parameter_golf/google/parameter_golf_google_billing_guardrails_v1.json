@@ -1,0 +1,82 @@
+{
+  "schema_version": "psion.google_training_billing_guardrails.v1",
+  "guardrail_id": "openagentsgemini-parameter-golf-google-billing-v1",
+  "project_id": "openagentsgemini",
+  "project_number": "157437760789",
+  "billing_account_id": "01D15C-64524A-1062EA",
+  "budget": {
+    "display_name": "Parameter Golf Google Single-H100 Lane",
+    "amount_usd": 150.0,
+    "calendar_period": "month",
+    "filter_projects": [
+      "projects/openagentsgemini"
+    ],
+    "threshold_rules": [
+      {
+        "basis": "current-spend",
+        "percent": 0.5
+      },
+      {
+        "basis": "current-spend",
+        "percent": 0.75
+      },
+      {
+        "basis": "current-spend",
+        "percent": 0.9
+      },
+      {
+        "basis": "forecasted-spend",
+        "percent": 1.0
+      }
+    ],
+    "pubsub_topic": "projects/openagentsgemini/topics/psion-google-budget-alerts",
+    "pull_subscription": "projects/openagentsgemini/subscriptions/psion-google-budget-alerts-pull"
+  },
+  "machine_queryable_cost_sink": {
+    "class": "bigquery_catalog_cost_profiles",
+    "dataset_id": "psion_training_finops",
+    "price_profiles_table": "single_node_price_profiles_v1",
+    "notes": [
+      "The Parameter Golf Google lane reuses the same BigQuery-backed cost sink as the bounded Psion operator substrate.",
+      "The declared run ceiling is a guardrail for the first single-H100 baseline lane, not a claim of price optimality."
+    ]
+  },
+  "quota_preflight": {
+    "region": "us-central1",
+    "instance_quota_metric": "INSTANCES",
+    "disk_quota_metric": "SSD_TOTAL_GB",
+    "profiles": [
+      {
+        "profile_id": "a3_h100_single_node_parameter_golf",
+        "trainer_lane_id": "parameter_golf_single_h100",
+        "expected_execution_backend": "cuda",
+        "machine_type": "a3-highgpu-1g",
+        "accelerator_type": "nvidia-h100-80gb",
+        "accelerator_count": 1,
+        "cpu_quota_metrics": [],
+        "gpu_quota_metrics": [
+          "PREEMPTIBLE_NVIDIA_H100_GPUS",
+          "GPU_FAMILY:NVIDIA_H100"
+        ],
+        "required_vcpus": 26,
+        "required_memory_mb": 239616,
+        "boot_disk_type": "pd-balanced",
+        "boot_disk_gb": 250,
+        "max_runtime_hours": 12.0,
+        "declared_run_cost_ceiling_usd": 150.0,
+        "max_launch_attempts": 3,
+        "zone_fallback_order": [
+          "us-central1-a",
+          "us-central1-b",
+          "us-central1-c"
+        ],
+        "capacity_failure_result": "launch_capacity_failure"
+      }
+    ],
+    "policy": [
+      "The committed Google single-H100 lane is A3 High `a3-highgpu-1g` with one `nvidia-h100-80gb` accelerator.",
+      "Google only allows `a3-highgpu-1g` through Spot or Flex-start provisioning, so the launch profile must keep that provisioning model explicit.",
+      "The H100 quota guardrail accepts either standard or preemptible H100 quota signals because the exact consumed pool can differ between Google allocation postures."
+    ]
+  }
+}
