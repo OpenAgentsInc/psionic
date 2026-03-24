@@ -4081,7 +4081,8 @@ impl AvailableCudaBackend {
                 ExecutionOp::Add => {
                     let left = step_input(step, &values, 0)?;
                     let right = step_input(step, &values, 1)?;
-                    let output = if step.spec.dtype() == DType::F32
+                    let output = if left.spec() == &step.spec
+                        && right.spec() == &step.spec
                         && left.spec().shape() == step.spec.shape()
                         && right.spec().shape() == step.spec.shape()
                         && left.spec().dtype() == DType::F32
@@ -4118,9 +4119,32 @@ impl AvailableCudaBackend {
                         submission.encoded_operations += 1;
                         output
                     } else {
-                        let (left, right) = binary_inputs(step, &values)?;
+                        execute_profiled_host_fallback(&mut host_fallback_profile, step, || {
+                            let left_values = self.read_float_buffer_to_f32(left)?;
+                            let right_values = self.read_float_buffer_to_f32(right)?;
+                            let values_out = broadcast_binary_float_values(
+                                &left_values,
+                                left.spec().shape().dims(),
+                                &right_values,
+                                right.spec().shape().dims(),
+                                step.spec.shape().dims(),
+                                |left, right| left + right,
+                            )?;
+                            self.materialize_host_view_step(step, &values_out)
+                        })?
+                    };
+                    values.insert(step.output, output);
+                }
+                ExecutionOp::Mul => {
+                    let left = step_input(step, &values, 0)?;
+                    let right = step_input(step, &values, 1)?;
+                    let output = if left.spec() == &step.spec
+                        && right.spec() == &step.spec
+                        && left.spec().dtype() == DType::F32
+                        && right.spec().dtype() == DType::F32
+                    {
                         let output = self.allocate(&step.spec)?;
-                        submission.platform.encode_add(
+                        submission.platform.encode_mul(
                             &left.platform,
                             &right.platform,
                             &output.platform,
@@ -4128,19 +4152,21 @@ impl AvailableCudaBackend {
                         )?;
                         submission.encoded_operations += 1;
                         output
+                    } else {
+                        execute_profiled_host_fallback(&mut host_fallback_profile, step, || {
+                            let left_values = self.read_float_buffer_to_f32(left)?;
+                            let right_values = self.read_float_buffer_to_f32(right)?;
+                            let values_out = broadcast_binary_float_values(
+                                &left_values,
+                                left.spec().shape().dims(),
+                                &right_values,
+                                right.spec().shape().dims(),
+                                step.spec.shape().dims(),
+                                |left, right| left * right,
+                            )?;
+                            self.materialize_host_view_step(step, &values_out)
+                        })?
                     };
-                    values.insert(step.output, output);
-                }
-                ExecutionOp::Mul => {
-                    let (left, right) = binary_inputs(step, &values)?;
-                    let output = self.allocate(&step.spec)?;
-                    submission.platform.encode_mul(
-                        &left.platform,
-                        &right.platform,
-                        &output.platform,
-                        step.spec.element_count(),
-                    )?;
-                    submission.encoded_operations += 1;
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Matmul => {
@@ -5336,6 +5362,34 @@ fn expand_contiguous_values(
     Ok(output)
 }
 
+fn broadcast_binary_float_values<F>(
+    left_values: &[f32],
+    left_shape: &[usize],
+    right_values: &[f32],
+    right_shape: &[usize],
+    output_shape: &[usize],
+    combine: F,
+) -> Result<Vec<f32>, RuntimeError>
+where
+    F: Fn(f32, f32) -> f32,
+{
+    let left = if left_shape == output_shape {
+        left_values.to_vec()
+    } else {
+        expand_contiguous_values(left_values, left_shape, output_shape)?
+    };
+    let right = if right_shape == output_shape {
+        right_values.to_vec()
+    } else {
+        expand_contiguous_values(right_values, right_shape, output_shape)?
+    };
+    Ok(left
+        .into_iter()
+        .zip(right)
+        .map(|(left, right)| combine(left, right))
+        .collect())
+}
+
 fn reduce_sum_contiguous_values(
     values: &[f32],
     input_shape: &[usize],
@@ -5968,12 +6022,6 @@ fn binary_inputs<'a>(
     let right = values
         .get(&right_id)
         .ok_or(RuntimeError::MissingInput(right_id))?;
-    if left.spec() != right.spec() && !matches!(step.op, ExecutionOp::Matmul) {
-        return Err(RuntimeError::Backend(format!(
-            "cuda {} requires matching input specs",
-            step.op.label()
-        )));
-    }
     Ok((left, right))
 }
 
@@ -12449,6 +12497,62 @@ mod tests {
                 .ok_or("missing expected add output")?
                 .as_f32_slice()
                 .ok_or("expected add output is not f32")?,
+            1e-5,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_mul_after_expand_materialization_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let expand_shape = Shape::new(vec![1, 1, 3]);
+        let dense_shape = Shape::new(vec![2, 4, 3]);
+        let expand_values = vec![1.0_f32, 2.0, 3.0];
+        let dense_values = (1..=24).map(|value| value as f32).collect::<Vec<_>>();
+
+        let mut builder = GraphBuilder::new(selected.device.clone());
+        let expand_input = builder.input("expand_input", expand_shape.clone(), DType::F32);
+        let dense_input = builder.input("dense_input", dense_shape.clone(), DType::F32);
+        let expanded = builder.expand(&expand_input, dense_shape.clone())?;
+        let product = builder.mul(&expanded, &dense_input)?;
+        let graph = builder.finish(vec![product.clone()]);
+
+        let inputs = std::collections::BTreeMap::from([
+            (
+                expand_input.id(),
+                backend.input_buffer(expand_shape, expand_values.clone())?,
+            ),
+            (
+                dense_input.id(),
+                backend.input_buffer(dense_shape, dense_values.clone())?,
+            ),
+        ]);
+        let result = backend.compile_and_execute(&graph, &inputs)?;
+        let expected = evaluate_graph(
+            &graph,
+            &std::collections::BTreeMap::from([
+                (expand_input.id(), TensorData::F32(expand_values)),
+                (dense_input.id(), TensorData::F32(dense_values)),
+            ]),
+        )?;
+
+        assert_close(
+            &result
+                .outputs
+                .get(&product.id())
+                .ok_or("missing mul output")?
+                .read_f32()?,
+            expected
+                .get(&product.id())
+                .ok_or("missing expected mul output")?
+                .as_f32_slice()
+                .ok_or("expected mul output is not f32")?,
             1e-5,
         );
         Ok(())

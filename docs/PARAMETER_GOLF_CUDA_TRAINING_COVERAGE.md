@@ -178,6 +178,11 @@ the same bounded public lane before the next H100 rerun:
   broadcasts directly on-device:
   - rank-3 `[1, 1, model_dim] -> [batch, seq, model_dim]`
   - rank-4 `[1, num_heads, 1, 1] -> [batch, num_heads, seq, head_dim]`
+- bounded PGOLF residual `add`/`mul` execution now preserves the IR broadcast
+  contract when exact CUDA input specs do not match:
+  - exact dense `f32` peers still encode directly on-device
+  - bounded broadcast or view-shaped peers now materialize through the profiled
+    host-fallback lane instead of aborting the trainer on a spec-mismatch
 - fresh local profiled permute and reduce-sum execution tests on the RTX 4080
   leave the fallback profile sink at `0` bytes, so those bounded shapes no
   longer touch the host-fallback surface at all
