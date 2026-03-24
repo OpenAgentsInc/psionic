@@ -150,7 +150,8 @@ pub const fn gradient_support_for_op(op: &OpKind) -> AutodiffGradientSupport {
             reason: AutodiffUnsupportedGradientReason::CastFamily,
         },
         OpKind::BackendExtension { op } => match op {
-            BackendExtensionOp::ReluSquared
+            BackendExtensionOp::ParameterGolfTokenEmbeddingLookup
+            | BackendExtensionOp::ReluSquared
             | BackendExtensionOp::Silu
             | BackendExtensionOp::ParameterGolfProjectionLoss { .. }
             | BackendExtensionOp::RmsNorm { .. }
@@ -2257,6 +2258,45 @@ impl AutodiffGraph {
                             )?;
                         }
                     }
+                    BackendExtensionOp::ParameterGolfTokenEmbeddingLookup => {
+                        let token_ids_id = node.inputs()[0];
+                        let token_embedding_id = node.inputs()[1];
+                        if self.requires_grad(token_ids_id) {
+                            return Err(AutodiffError::UnsupportedGradientOp {
+                                tensor_id: node.tensor().id(),
+                                op: String::from(
+                                    "parameter_golf_token_embedding_lookup_token_ids",
+                                ),
+                            });
+                        }
+                        if self.requires_grad(token_embedding_id) {
+                            let token_ids = primal_placeholder(
+                                &mut backward_builder,
+                                &mut primal_bindings,
+                                &self.graph,
+                                token_ids_id,
+                            )?;
+                            let token_embedding = primal_placeholder(
+                                &mut backward_builder,
+                                &mut primal_bindings,
+                                &self.graph,
+                                token_embedding_id,
+                            )?;
+                            let contribution = backward_builder
+                                .parameter_golf_token_embedding_lookup_backward(
+                                    &token_ids,
+                                    &token_embedding,
+                                    &current_gradient,
+                                )
+                                .map_err(map_graph_error)?;
+                            accumulate_gradient(
+                                &mut backward_builder,
+                                &mut gradients,
+                                token_embedding_id,
+                                contribution,
+                            )?;
+                        }
+                    }
                     BackendExtensionOp::ParameterGolfProjectionLoss { logit_softcap } => {
                         let logits_id = node.inputs()[0];
                         let target_ids_id = node.inputs()[1];
@@ -3791,6 +3831,35 @@ impl AutodiffGraphBuilder {
         Ok(self.wrap(tensor, requires_grad))
     }
 
+    /// Looks up Parameter Golf token embeddings from integer token ids.
+    pub fn parameter_golf_token_embedding_lookup(
+        &mut self,
+        token_ids: &AutodiffTensor,
+        token_embedding: &AutodiffTensor,
+    ) -> Result<AutodiffTensor, GraphError> {
+        let requires_grad = self.any_requires_grad(&[token_ids, token_embedding]);
+        let tensor = self
+            .builder
+            .parameter_golf_token_embedding_lookup(token_ids.tensor(), token_embedding.tensor())?;
+        Ok(self.wrap(tensor, requires_grad))
+    }
+
+    pub(crate) fn parameter_golf_token_embedding_lookup_backward(
+        &mut self,
+        token_ids: &AutodiffTensor,
+        token_embedding: &AutodiffTensor,
+        grad_output: &AutodiffTensor,
+    ) -> Result<AutodiffTensor, GraphError> {
+        let tensor = self
+            .builder
+            .parameter_golf_token_embedding_lookup_backward(
+                token_ids.tensor(),
+                token_embedding.tensor(),
+                grad_output.tensor(),
+            )?;
+        Ok(self.wrap(tensor, false))
+    }
+
     /// Applies the bounded Parameter Golf tanh-softcap next-token mean loss.
     pub fn parameter_golf_projection_loss(
         &mut self,
@@ -3995,15 +4064,23 @@ fn evaluate_graph_retaining(
             OpKind::Cast { dtype } => {
                 let input =
                     resolve_dense_input(graph, &values, node.inputs()[0], node.op().label())?;
-                TensorData::F32(
-                    input
-                        .iter()
-                        .map(|current| match dtype {
-                            DType::F32 | DType::F16 | DType::BF16 => *current,
-                            DType::I8 => current.round().clamp(i8::MIN as f32, i8::MAX as f32),
-                        })
-                        .collect(),
-                )
+                match dtype {
+                    DType::F32 | DType::F16 | DType::BF16 => TensorData::F32(input.to_vec()),
+                    DType::I32 => TensorData::I32(
+                        input
+                            .iter()
+                            .map(|current| {
+                                current.round().clamp(i32::MIN as f32, i32::MAX as f32) as i32
+                            })
+                            .collect(),
+                    ),
+                    DType::I8 => TensorData::F32(
+                        input
+                            .iter()
+                            .map(|current| current.round().clamp(i8::MIN as f32, i8::MAX as f32))
+                            .collect(),
+                    ),
+                }
             }
             OpKind::ReduceSum { axis } => {
                 let input_node = graph.node(node.inputs()[0]).ok_or(
@@ -4205,15 +4282,23 @@ pub fn evaluate_graph(
             OpKind::Cast { dtype } => {
                 let input =
                     resolve_dense_input(graph, &values, node.inputs()[0], node.op().label())?;
-                TensorData::F32(
-                    input
-                        .iter()
-                        .map(|current| match dtype {
-                            DType::F32 | DType::F16 | DType::BF16 => *current,
-                            DType::I8 => current.round().clamp(i8::MIN as f32, i8::MAX as f32),
-                        })
-                        .collect(),
-                )
+                match dtype {
+                    DType::F32 | DType::F16 | DType::BF16 => TensorData::F32(input.to_vec()),
+                    DType::I32 => TensorData::I32(
+                        input
+                            .iter()
+                            .map(|current| {
+                                current.round().clamp(i32::MIN as f32, i32::MAX as f32) as i32
+                            })
+                            .collect(),
+                    ),
+                    DType::I8 => TensorData::F32(
+                        input
+                            .iter()
+                            .map(|current| current.round().clamp(i8::MIN as f32, i8::MAX as f32))
+                            .collect(),
+                    ),
+                }
             }
             OpKind::ReduceSum { axis } => {
                 let input_node = graph.node(node.inputs()[0]).ok_or(
@@ -4269,10 +4354,76 @@ fn evaluate_backend_extension_reference(
                 resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
             Ok(TensorData::F32(silu_backward_values(input, grad_output)))
         }
+        BackendExtensionOp::ParameterGolfTokenEmbeddingLookup => {
+            let token_ids = resolve_i32_input(graph, values, node.inputs()[0], node.op().label())?;
+            let token_embedding =
+                resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            let token_ids_shape = graph
+                .node(node.inputs()[0])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[0],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            let token_embedding_shape = graph
+                .node(node.inputs()[1])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[1],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            Ok(TensorData::F32(
+                parameter_golf_token_embedding_lookup_forward_values(
+                    node.tensor().id(),
+                    token_ids,
+                    &token_ids_shape,
+                    token_embedding,
+                    &token_embedding_shape,
+                )?,
+            ))
+        }
+        BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward => {
+            let token_ids = resolve_i32_input(graph, values, node.inputs()[0], node.op().label())?;
+            let token_embedding =
+                resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            let grad_output =
+                resolve_dense_input(graph, values, node.inputs()[2], node.op().label())?;
+            let token_ids_shape = graph
+                .node(node.inputs()[0])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[0],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            let token_embedding_shape = graph
+                .node(node.inputs()[1])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[1],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            Ok(TensorData::F32(
+                parameter_golf_token_embedding_lookup_backward_values(
+                    node.tensor().id(),
+                    token_ids,
+                    &token_ids_shape,
+                    token_embedding,
+                    &token_embedding_shape,
+                    grad_output,
+                )?,
+            ))
+        }
         BackendExtensionOp::ParameterGolfProjectionLoss { logit_softcap } => {
             let logits = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
-            let target_ids =
-                resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            let target_ids = resolve_i32_input(graph, values, node.inputs()[1], node.op().label())?;
             let logits_shape = graph
                 .node(node.inputs()[0])
                 .ok_or(ReferenceEvaluationError::UnknownTensor {
@@ -4304,8 +4455,7 @@ fn evaluate_backend_extension_reference(
         }
         BackendExtensionOp::ParameterGolfProjectionLossBackward { logit_softcap } => {
             let logits = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
-            let target_ids =
-                resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            let target_ids = resolve_i32_input(graph, values, node.inputs()[1], node.op().label())?;
             let grad_output =
                 resolve_dense_input(graph, values, node.inputs()[2], node.op().label())?;
             let logits_shape = graph
@@ -4803,6 +4953,44 @@ fn resolve_dense_input<'a>(
     Ok(values)
 }
 
+fn resolve_i32_input<'a>(
+    graph: &Graph,
+    values: &'a BTreeMap<TensorId, TensorData>,
+    tensor_id: TensorId,
+    op: &str,
+) -> Result<&'a [i32], ReferenceEvaluationError> {
+    let tensor = graph
+        .node(tensor_id)
+        .ok_or(ReferenceEvaluationError::UnknownTensor { tensor_id })?
+        .tensor();
+    if tensor.spec().dtype() != DType::I32 {
+        return Err(ReferenceEvaluationError::UnsupportedDType {
+            tensor_id,
+            op: String::from(op),
+            dtype: tensor.spec().dtype(),
+        });
+    }
+    let value = values
+        .get(&tensor_id)
+        .ok_or(ReferenceEvaluationError::UnknownTensor { tensor_id })?;
+    let Some(values) = value.as_i32_slice() else {
+        return Err(ReferenceEvaluationError::UnsupportedDType {
+            tensor_id,
+            op: String::from(op),
+            dtype: tensor.spec().dtype(),
+        });
+    };
+    let expected_len = tensor.spec().shape().element_count();
+    if values.len() != expected_len {
+        return Err(ReferenceEvaluationError::PayloadLengthMismatch {
+            tensor_id,
+            expected_len,
+            actual_len: values.len(),
+        });
+    }
+    Ok(values)
+}
+
 fn validate_output_length(
     tensor: &Tensor,
     value: &TensorData,
@@ -4996,11 +5184,94 @@ fn silu_backward_values(input: &[f32], grad_output: &[f32]) -> Vec<f32> {
         .collect()
 }
 
+fn parameter_golf_token_embedding_lookup_forward_values(
+    tensor_id: TensorId,
+    token_ids: &[i32],
+    token_ids_shape: &Shape,
+    token_embedding: &[f32],
+    token_embedding_shape: &Shape,
+) -> Result<Vec<f32>, ReferenceEvaluationError> {
+    if token_ids_shape.dims().len() != 2 || token_embedding_shape.dims().len() != 2 {
+        return Err(ReferenceEvaluationError::UnsupportedOp {
+            tensor_id,
+            op: String::from("parameter_golf_token_embedding_lookup_shape"),
+        });
+    }
+    let batch = token_ids_shape.dims()[0];
+    let seq = token_ids_shape.dims()[1];
+    let vocab = token_embedding_shape.dims()[0];
+    let width = token_embedding_shape.dims()[1];
+    if token_ids.len() != batch * seq || token_embedding.len() != vocab * width {
+        return Err(ReferenceEvaluationError::UnsupportedOp {
+            tensor_id,
+            op: String::from("parameter_golf_token_embedding_lookup_payload"),
+        });
+    }
+    let mut output = vec![0.0_f32; batch * seq * width];
+    for (row_index, token_id) in token_ids.iter().copied().enumerate() {
+        if token_id < 0 || token_id as usize >= vocab {
+            return Err(ReferenceEvaluationError::UnsupportedOp {
+                tensor_id,
+                op: String::from("parameter_golf_token_embedding_lookup_token_value"),
+            });
+        }
+        let source_offset = token_id as usize * width;
+        let destination_offset = row_index * width;
+        output[destination_offset..destination_offset + width]
+            .copy_from_slice(&token_embedding[source_offset..source_offset + width]);
+    }
+    Ok(output)
+}
+
+fn parameter_golf_token_embedding_lookup_backward_values(
+    tensor_id: TensorId,
+    token_ids: &[i32],
+    token_ids_shape: &Shape,
+    token_embedding: &[f32],
+    token_embedding_shape: &Shape,
+    grad_output: &[f32],
+) -> Result<Vec<f32>, ReferenceEvaluationError> {
+    if token_ids_shape.dims().len() != 2 || token_embedding_shape.dims().len() != 2 {
+        return Err(ReferenceEvaluationError::UnsupportedOp {
+            tensor_id,
+            op: String::from("parameter_golf_token_embedding_lookup_backward_shape"),
+        });
+    }
+    let batch = token_ids_shape.dims()[0];
+    let seq = token_ids_shape.dims()[1];
+    let vocab = token_embedding_shape.dims()[0];
+    let width = token_embedding_shape.dims()[1];
+    if token_embedding.len() != vocab * width || grad_output.len() != batch * seq * width {
+        return Err(ReferenceEvaluationError::UnsupportedOp {
+            tensor_id,
+            op: String::from("parameter_golf_token_embedding_lookup_backward_payload"),
+        });
+    }
+    let mut output = vec![0.0_f32; vocab * width];
+    for (row_index, token_id) in token_ids.iter().copied().enumerate() {
+        if token_id < 0 || token_id as usize >= vocab {
+            return Err(ReferenceEvaluationError::UnsupportedOp {
+                tensor_id,
+                op: String::from("parameter_golf_token_embedding_lookup_backward_token_value"),
+            });
+        }
+        let source_offset = row_index * width;
+        let destination_offset = token_id as usize * width;
+        for (destination, gradient) in output[destination_offset..destination_offset + width]
+            .iter_mut()
+            .zip(grad_output[source_offset..source_offset + width].iter())
+        {
+            *destination += *gradient;
+        }
+    }
+    Ok(output)
+}
+
 fn parameter_golf_projection_loss_forward_value(
     tensor_id: TensorId,
     logits: &[f32],
     logits_shape: &Shape,
-    target_ids: &[f32],
+    target_ids: &[i32],
     target_shape: &Shape,
     logit_softcap: f32,
 ) -> Result<f32, ReferenceEvaluationError> {
@@ -5055,7 +5326,7 @@ fn parameter_golf_projection_loss_backward_values(
     tensor_id: TensorId,
     logits: &[f32],
     logits_shape: &Shape,
-    target_ids: &[f32],
+    target_ids: &[i32],
     target_shape: &Shape,
     grad_output: &[f32],
     logit_softcap: f32,
@@ -5122,7 +5393,7 @@ fn parameter_golf_projection_loss_backward_values(
 
 fn parameter_golf_projection_target_ids(
     tensor_id: TensorId,
-    target_ids: &[f32],
+    target_ids: &[i32],
     target_shape: &Shape,
     batch: usize,
     seq: usize,
@@ -5138,8 +5409,7 @@ fn parameter_golf_projection_target_ids(
     target_ids
         .iter()
         .map(|value| {
-            if !value.is_finite() || value.fract() != 0.0 || *value < 0.0 || *value >= vocab as f32
-            {
+            if *value < 0 || *value as usize >= vocab {
                 return Err(ReferenceEvaluationError::UnsupportedOp {
                     tensor_id,
                     op: String::from("parameter_golf_projection_loss_target_value"),
@@ -5887,17 +6157,17 @@ mod tests {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let logits = builder.input("logits", Shape::new(vec![1, 2, 3]), DType::F32, true);
-        let target_ids = builder.input("target_ids", Shape::new(vec![1, 2]), DType::F32, false);
+        let target_ids = builder.input("target_ids", Shape::new(vec![1, 2]), DType::I32, false);
         let loss = builder.parameter_golf_projection_loss(&logits, &target_ids, logit_softcap)?;
         let graph = builder.finish(vec![loss.clone()]);
 
         let logits_values = vec![1.25_f32, -0.5, 0.75, -0.25, 0.5, 1.5];
-        let target_values = vec![2.0_f32, 1.0];
+        let target_values = vec![2_i32, 1_i32];
         let values = evaluate_graph(
             graph.graph(),
             &BTreeMap::from([
                 (logits.id(), TensorData::F32(logits_values.clone())),
-                (target_ids.id(), TensorData::F32(target_values)),
+                (target_ids.id(), TensorData::I32(target_values)),
             ]),
         )?;
         let actual = dense_tensor(values.get(&loss.id()).expect("forward loss"));
@@ -5933,7 +6203,7 @@ mod tests {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let logits = builder.input("logits", Shape::new(vec![1, 2, 4]), DType::F32, true);
-        let target_ids = builder.input("target_ids", Shape::new(vec![1, 2]), DType::F32, false);
+        let target_ids = builder.input("target_ids", Shape::new(vec![1, 2]), DType::I32, false);
         let loss = builder.parameter_golf_projection_loss(&logits, &target_ids, logit_softcap)?;
         let graph = builder.finish(vec![loss.clone()]);
 
@@ -5952,10 +6222,10 @@ mod tests {
             )));
 
         let logits_values = vec![0.1_f32, -0.2, 0.3, 0.7, -0.4, 0.5, -0.1, 0.2];
-        let target_values = vec![3.0_f32, 1.0];
+        let target_values = vec![3_i32, 1_i32];
         let inputs = BTreeMap::from([
             (logits.id(), TensorData::F32(logits_values.clone())),
-            (target_ids.id(), TensorData::F32(target_values.clone())),
+            (target_ids.id(), TensorData::I32(target_values.clone())),
         ]);
         let result = graph.backward_materialized(loss.id(), &inputs)?;
         let analytical = dense_gradient(&result, logits.id());
@@ -5972,14 +6242,98 @@ mod tests {
                 loss.id(),
                 BTreeMap::from([
                     (logits.id(), TensorData::F32(plus)),
-                    (target_ids.id(), TensorData::F32(target_values.clone())),
+                    (target_ids.id(), TensorData::I32(target_values.clone())),
                 ]),
             )? - scalar_loss(
                 graph.graph(),
                 loss.id(),
                 BTreeMap::from([
                     (logits.id(), TensorData::F32(minus)),
-                    (target_ids.id(), TensorData::F32(target_values.clone())),
+                    (target_ids.id(), TensorData::I32(target_values.clone())),
+                ]),
+            )?) / (2.0 * delta);
+        }
+
+        assert_close_slice(&analytical, &finite, 2e-3);
+        Ok(())
+    }
+
+    #[test]
+    fn reference_evaluation_executes_parameter_golf_token_embedding_lookup_backend_extension(
+    ) -> Result<(), Box<dyn Error>> {
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let token_ids = builder.input("token_ids", Shape::new(vec![2, 2]), DType::I32, false);
+        let embeddings = builder.input("tok_emb", Shape::new(vec![5, 3]), DType::F32, true);
+        let looked_up = builder.parameter_golf_token_embedding_lookup(&token_ids, &embeddings)?;
+        let graph = builder.finish(vec![looked_up.clone()]);
+
+        let values = evaluate_graph(
+            graph.graph(),
+            &BTreeMap::from([
+                (token_ids.id(), TensorData::I32(vec![1, 4, 0, 2])),
+                (
+                    embeddings.id(),
+                    TensorData::F32(vec![
+                        0.0, 0.1, 0.2, 1.0, 1.1, 1.2, 2.0, 2.1, 2.2, 3.0, 3.1, 3.2, 4.0, 4.1, 4.2,
+                    ]),
+                ),
+            ]),
+        )?;
+        let actual = dense_tensor(values.get(&looked_up.id()).expect("embedding output"));
+        assert_close_slice(
+            &actual,
+            &[1.0, 1.1, 1.2, 4.0, 4.1, 4.2, 0.0, 0.1, 0.2, 2.0, 2.1, 2.2],
+            1e-6,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn reverse_mode_autodiff_materializes_parameter_golf_token_embedding_lookup_gradients_against_finite_difference(
+    ) -> Result<(), Box<dyn Error>> {
+        let mut builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let token_ids = builder.input("token_ids", Shape::new(vec![2, 2]), DType::I32, false);
+        let embeddings = builder.input("tok_emb", Shape::new(vec![4, 2]), DType::F32, true);
+        let looked_up = builder.parameter_golf_token_embedding_lookup(&token_ids, &embeddings)?;
+        let scale = builder.constant_f32(
+            Shape::new(vec![2, 2, 2]),
+            vec![1.0, 0.5, -1.0, 0.25, 0.75, -0.5, 0.5, 1.25],
+        )?;
+        let weighted = builder.mul(&looked_up, &scale)?;
+        let loss = builder.reduce_sum(&weighted);
+        let graph = builder.finish(vec![loss.clone()]);
+
+        let token_values = vec![1_i32, 3_i32, 0_i32, 1_i32];
+        let embedding_values = vec![0.5, -0.5, 1.0, 1.5, -1.0, 0.25, 2.0, -1.5];
+        let inputs = BTreeMap::from([
+            (token_ids.id(), TensorData::I32(token_values.clone())),
+            (embeddings.id(), TensorData::F32(embedding_values.clone())),
+        ]);
+        let backward = graph.backward_materialized(loss.id(), &inputs)?;
+        let analytical = dense_gradient(&backward, embeddings.id());
+
+        let delta = 1e-3_f32;
+        let mut finite = vec![0.0_f32; embedding_values.len()];
+        for index in 0..embedding_values.len() {
+            let mut plus = embedding_values.clone();
+            plus[index] += delta;
+            let mut minus = embedding_values.clone();
+            minus[index] -= delta;
+            finite[index] = (scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (token_ids.id(), TensorData::I32(token_values.clone())),
+                    (embeddings.id(), TensorData::F32(plus)),
+                ]),
+            )? - scalar_loss(
+                graph.graph(),
+                loss.id(),
+                BTreeMap::from([
+                    (token_ids.id(), TensorData::I32(token_values.clone())),
+                    (embeddings.id(), TensorData::F32(minus)),
                 ]),
             )?) / (2.0 * delta);
         }
@@ -6448,7 +6802,7 @@ mod tests {
         let logits =
             projection_builder.input("logits", Shape::new(vec![1, 2, 4]), DType::F32, true);
         let target_ids =
-            projection_builder.input("target_ids", Shape::new(vec![1, 2]), DType::F32, false);
+            projection_builder.input("target_ids", Shape::new(vec![1, 2]), DType::I32, false);
         let projection_loss = projection_builder
             .parameter_golf_projection_loss(&logits, &target_ids, 30.0)
             .expect("parameter_golf_projection_loss");

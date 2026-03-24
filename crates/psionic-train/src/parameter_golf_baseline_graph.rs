@@ -6,10 +6,9 @@ use psionic_ir::{
     GraphError, ReferenceEvaluationError,
 };
 use psionic_models::{
-    PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON, ParameterGolfConfig, ParameterGolfConfigError,
-    ParameterGolfExecutionError, ParameterGolfModelDescriptor, ParameterGolfModelError,
-    ParameterGolfReferenceModel, ParameterGolfTensor3, ParameterGolfTensorError,
-    ParameterGolfWeights,
+    ParameterGolfConfig, ParameterGolfConfigError, ParameterGolfExecutionError,
+    ParameterGolfModelDescriptor, ParameterGolfModelError, ParameterGolfReferenceModel,
+    ParameterGolfTensor3, ParameterGolfTensorError, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -21,11 +20,6 @@ use thiserror::Error;
 pub enum ParameterGolfBaselineGradientSource {
     /// The parameter is differentiated directly by the lowered graph.
     GraphOnly,
-    /// The parameter receives graph gradients plus host-scattered input-embedding
-    /// gradients.
-    GraphAndInputEmbeddingScatter,
-    /// The parameter receives host-scattered input-embedding gradients only.
-    InputEmbeddingScatterOnly,
 }
 
 /// Stable parameter binding for the lowered Parameter Golf baseline graph.
@@ -46,8 +40,8 @@ pub struct ParameterGolfBaselineGraphParameterBinding {
 pub struct ParameterGolfBaselineGraph {
     /// The lowered autodiff graph.
     pub graph: AutodiffGraph,
-    /// Non-trainable dense embedded-input tensor consumed by the graph.
-    pub embedded_input_tensor_id: TensorId,
+    /// Non-trainable integer token-id tensor consumed by the graph.
+    pub input_token_ids_tensor_id: TensorId,
     /// Final pre-softcap logits tensor emitted by the graph.
     pub pre_softcap_logits_tensor_id: TensorId,
     /// Parameter bindings in deterministic order.
@@ -73,9 +67,9 @@ impl ParameterGolfBaselineGraph {
 pub struct ParameterGolfBaselineTrainingGraph {
     /// The lowered autodiff graph.
     pub graph: AutodiffGraph,
-    /// Non-trainable dense embedded-input tensor consumed by the graph.
-    pub embedded_input_tensor_id: TensorId,
-    /// Dense `f32` target ids consumed by the projection-loss op.
+    /// Non-trainable integer token-id tensor consumed by the graph.
+    pub input_token_ids_tensor_id: TensorId,
+    /// Integer target ids consumed by the projection-loss op.
     pub target_ids_tensor_id: TensorId,
     /// Final scalar mean-loss tensor emitted by the graph.
     pub loss_tensor_id: TensorId,
@@ -154,14 +148,13 @@ pub enum ParameterGolfBaselineGraphError {
 }
 
 struct ParameterGolfBaselineGraphBuildState {
-    embedded_input: AutodiffTensor,
+    input_token_ids: AutodiffTensor,
     parameter_bindings: Vec<ParameterGolfBaselineGraphParameterBinding>,
     pre_softcap_logits: AutodiffTensor,
 }
 
 /// Builds one trainer-owned Parameter Golf baseline graph that emits pre-softcap
-/// logits from dense embedded inputs plus the explicit baseline parameter
-/// surface.
+/// logits from integer token ids plus the explicit baseline parameter surface.
 pub fn build_parameter_golf_baseline_graph(
     device: Device,
     descriptor: &ParameterGolfModelDescriptor,
@@ -173,7 +166,7 @@ pub fn build_parameter_golf_baseline_graph(
     let graph = builder.finish(vec![state.pre_softcap_logits.clone()]);
 
     Ok(ParameterGolfBaselineGraph {
-        embedded_input_tensor_id: state.embedded_input.id(),
+        input_token_ids_tensor_id: state.input_token_ids.id(),
         pre_softcap_logits_tensor_id: state.pre_softcap_logits.id(),
         graph,
         parameter_bindings: state.parameter_bindings,
@@ -181,8 +174,8 @@ pub fn build_parameter_golf_baseline_graph(
 }
 
 /// Builds one trainer-owned Parameter Golf baseline graph that emits the
-/// bounded on-device projection loss directly from dense embedded inputs,
-/// target ids, and the explicit baseline parameter surface.
+/// bounded on-device projection loss directly from integer token ids, target
+/// ids, and the explicit baseline parameter surface.
 pub fn build_parameter_golf_baseline_training_graph(
     device: Device,
     descriptor: &ParameterGolfModelDescriptor,
@@ -194,7 +187,7 @@ pub fn build_parameter_golf_baseline_training_graph(
     let target_ids = builder.input(
         "target_ids",
         Shape::new(vec![batch_size, sequence_length]),
-        DType::F32,
+        DType::I32,
         false,
     );
     let loss = builder.parameter_golf_projection_loss(
@@ -205,7 +198,7 @@ pub fn build_parameter_golf_baseline_training_graph(
     let graph = builder.finish(vec![loss.clone()]);
 
     Ok(ParameterGolfBaselineTrainingGraph {
-        embedded_input_tensor_id: state.embedded_input.id(),
+        input_token_ids_tensor_id: state.input_token_ids.id(),
         target_ids_tensor_id: target_ids.id(),
         loss_tensor_id: loss.id(),
         graph,
@@ -213,70 +206,45 @@ pub fn build_parameter_golf_baseline_training_graph(
     })
 }
 
-/// Gathers dense embedded inputs from the Parameter Golf token embedding table for
-/// one bounded token batch.
-pub fn gather_parameter_golf_embedded_inputs(
-    weights: &ParameterGolfWeights,
-    config: &ParameterGolfConfig,
-    input_ids: &[Vec<u32>],
-) -> Result<ParameterGolfTensor3, ParameterGolfBaselineGraphError> {
-    let (batch_size, sequence_length) = validate_token_batch(input_ids, config.vocab_size)?;
-    let mut values = vec![0.0_f32; batch_size * sequence_length * config.model_dim];
-    for (batch_index, row) in input_ids.iter().enumerate() {
-        for (position_index, &token_id) in row.iter().enumerate() {
-            let source_offset = token_id as usize * config.model_dim;
-            let destination_offset =
-                (batch_index * sequence_length + position_index) * config.model_dim;
-            values[destination_offset..destination_offset + config.model_dim].copy_from_slice(
-                &weights.token_embedding[source_offset..source_offset + config.model_dim],
-            );
-        }
-    }
-    Ok(ParameterGolfTensor3::new(
-        [batch_size, sequence_length, config.model_dim],
-        values,
-    )?)
-}
-
-/// Builds one dense input map for the lowered Parameter Golf baseline graph.
+/// Builds one token-id plus parameter input map for the lowered Parameter Golf
+/// baseline graph.
 pub fn bind_parameter_golf_baseline_graph_inputs(
     graph: &ParameterGolfBaselineGraph,
     model: &ParameterGolfReferenceModel,
-    embedded_inputs: &ParameterGolfTensor3,
+    input_ids: &[Vec<u32>],
 ) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
     bind_parameter_golf_graph_inputs(
-        graph.embedded_input_tensor_id,
+        graph.input_token_ids_tensor_id,
         graph.parameter_bindings.as_slice(),
         model,
-        embedded_inputs,
+        input_ids,
     )
 }
 
-/// Builds one dense input map for the lowered Parameter Golf baseline training graph.
+/// Builds one token-id plus parameter input map for the lowered Parameter Golf
+/// baseline training graph.
 pub fn bind_parameter_golf_baseline_training_graph_inputs(
     graph: &ParameterGolfBaselineTrainingGraph,
     model: &ParameterGolfReferenceModel,
-    embedded_inputs: &ParameterGolfTensor3,
+    input_ids: &[Vec<u32>],
     target_ids: &[Vec<u32>],
 ) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
     let mut inputs = bind_parameter_golf_graph_inputs(
-        graph.embedded_input_tensor_id,
+        graph.input_token_ids_tensor_id,
         graph.parameter_bindings.as_slice(),
         model,
-        embedded_inputs,
+        input_ids,
     )?;
-    validate_target_shape(
-        target_ids,
-        embedded_inputs.batch_size(),
-        embedded_inputs.sequence_length(),
-    )?;
+    let (batch_size, sequence_length) =
+        validate_token_batch(input_ids, model.descriptor().config.vocab_size)?;
+    validate_target_shape(target_ids, batch_size, sequence_length)?;
     validate_token_batch(target_ids, model.descriptor().config.vocab_size)?;
     inputs.insert(
         graph.target_ids_tensor_id,
-        TensorData::F32(
+        TensorData::I32(
             target_ids
                 .iter()
-                .flat_map(|row| row.iter().map(|token_id| *token_id as f32))
+                .flat_map(|row| row.iter().map(|token_id| *token_id as i32))
                 .collect(),
         ),
     );
@@ -284,31 +252,13 @@ pub fn bind_parameter_golf_baseline_training_graph_inputs(
 }
 
 fn bind_parameter_golf_graph_inputs(
-    embedded_input_tensor_id: TensorId,
+    input_token_ids_tensor_id: TensorId,
     parameter_bindings: &[ParameterGolfBaselineGraphParameterBinding],
     model: &ParameterGolfReferenceModel,
-    embedded_inputs: &ParameterGolfTensor3,
+    input_ids: &[Vec<u32>],
 ) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
     let config = &model.descriptor().config;
-    let expected_shape = [
-        embedded_inputs.batch_size(),
-        embedded_inputs.sequence_length(),
-        embedded_inputs.width(),
-    ];
-    if expected_shape[2] != config.model_dim {
-        return Err(ParameterGolfTensorError::InvalidValueCount {
-            shape: [
-                embedded_inputs.batch_size(),
-                embedded_inputs.sequence_length(),
-                config.model_dim,
-            ],
-            actual: embedded_inputs.values().len(),
-            expected: embedded_inputs.batch_size()
-                * embedded_inputs.sequence_length()
-                * config.model_dim,
-        }
-        .into());
-    }
+    validate_token_batch(input_ids, config.vocab_size)?;
 
     let parameter_vectors = model
         .weights()
@@ -318,8 +268,13 @@ fn bind_parameter_golf_graph_inputs(
         .collect::<BTreeMap<_, _>>();
     let mut inputs = BTreeMap::new();
     inputs.insert(
-        embedded_input_tensor_id,
-        TensorData::F32(embedded_inputs.values().to_vec()),
+        input_token_ids_tensor_id,
+        TensorData::I32(
+            input_ids
+                .iter()
+                .flat_map(|row| row.iter().map(|token_id| *token_id as i32))
+                .collect(),
+        ),
     );
     for binding in parameter_bindings {
         let parameter = parameter_vectors
@@ -404,7 +359,7 @@ pub fn parameter_golf_projection_seed(
 }
 
 /// Reconstructs stable Parameter Golf parameter gradients from one seeded
-/// backward replay, including the host-scattered token-embedding input gradient.
+/// backward replay.
 pub fn materialize_parameter_golf_baseline_gradients(
     graph: &ParameterGolfBaselineGraph,
     backward: &psionic_ir::AutodiffBackwardResult,
@@ -412,7 +367,6 @@ pub fn materialize_parameter_golf_baseline_gradients(
     input_ids: &[Vec<u32>],
 ) -> Result<ParameterGolfBaselineGradientBundle, ParameterGolfBaselineGraphError> {
     materialize_parameter_golf_gradients_from_bindings(
-        graph.embedded_input_tensor_id,
         graph.parameter_bindings.as_slice(),
         backward,
         config,
@@ -429,7 +383,6 @@ pub fn materialize_parameter_golf_baseline_training_gradients(
     input_ids: &[Vec<u32>],
 ) -> Result<ParameterGolfBaselineGradientBundle, ParameterGolfBaselineGraphError> {
     materialize_parameter_golf_gradients_from_bindings(
-        graph.embedded_input_tensor_id,
         graph.parameter_bindings.as_slice(),
         backward,
         config,
@@ -438,31 +391,11 @@ pub fn materialize_parameter_golf_baseline_training_gradients(
 }
 
 fn materialize_parameter_golf_gradients_from_bindings(
-    embedded_input_tensor_id: TensorId,
     parameter_bindings: &[ParameterGolfBaselineGraphParameterBinding],
     backward: &psionic_ir::AutodiffBackwardResult,
-    config: &ParameterGolfConfig,
-    input_ids: &[Vec<u32>],
+    _config: &ParameterGolfConfig,
+    _input_ids: &[Vec<u32>],
 ) -> Result<ParameterGolfBaselineGradientBundle, ParameterGolfBaselineGraphError> {
-    let scattered_embedding_gradient = scatter_input_embedding_gradient(
-        tensor3_from_dense_gradient(
-            backward.gradient(embedded_input_tensor_id).ok_or_else(|| {
-                ParameterGolfBaselineGraphError::MissingGradient {
-                    parameter_id: String::from("embedded_inputs"),
-                }
-            })?,
-            [
-                input_ids.len(),
-                input_ids.first().map(Vec::len).unwrap_or(0),
-                config.model_dim,
-            ],
-            String::from("embedded_inputs"),
-        )?,
-        input_ids,
-        config.vocab_size,
-        config.model_dim,
-    )?;
-
     let mut gradients = BTreeMap::new();
     for binding in parameter_bindings {
         let graph_gradient = backward.gradient(binding.graph_input_tensor_id);
@@ -473,33 +406,6 @@ fn materialize_parameter_golf_gradients_from_bindings(
                 })?,
                 binding.parameter_id.clone(),
             )?,
-            ParameterGolfBaselineGradientSource::InputEmbeddingScatterOnly => {
-                if binding.parameter_id == "tok_emb.weight" {
-                    scattered_embedding_gradient.clone()
-                } else {
-                    return Err(ParameterGolfBaselineGraphError::MissingGradient {
-                        parameter_id: binding.parameter_id.clone(),
-                    });
-                }
-            }
-            ParameterGolfBaselineGradientSource::GraphAndInputEmbeddingScatter => {
-                let mut values = dense_gradient_values(
-                    graph_gradient.ok_or_else(|| {
-                        ParameterGolfBaselineGraphError::MissingGradient {
-                            parameter_id: binding.parameter_id.clone(),
-                        }
-                    })?,
-                    binding.parameter_id.clone(),
-                )?;
-                if binding.parameter_id == "tok_emb.weight" {
-                    for (value, scattered) in
-                        values.iter_mut().zip(scattered_embedding_gradient.iter())
-                    {
-                        *value += *scattered;
-                    }
-                }
-                values
-            }
         };
         gradients.insert(binding.parameter_id.clone(), values);
     }
@@ -535,11 +441,11 @@ fn build_baseline_graph_state(
         });
     }
 
-    let embedded_input = builder.input(
-        "embedded_inputs",
-        Shape::new(vec![batch_size, sequence_length, config.model_dim]),
-        DType::F32,
-        true,
+    let input_token_ids = builder.input(
+        "input_token_ids",
+        Shape::new(vec![batch_size, sequence_length]),
+        DType::I32,
+        false,
     );
 
     let mut parameter_inputs = BTreeMap::new();
@@ -547,23 +453,24 @@ fn build_baseline_graph_state(
     for tensor in &descriptor.weights.tensors {
         let tensor_input =
             builder.input(tensor.name.clone(), tensor.shape.clone(), DType::F32, true);
-        let gradient_source = if tensor.name == "tok_emb.weight" {
-            if config.tie_embeddings {
-                ParameterGolfBaselineGradientSource::GraphAndInputEmbeddingScatter
-            } else {
-                ParameterGolfBaselineGradientSource::InputEmbeddingScatterOnly
-            }
-        } else {
-            ParameterGolfBaselineGradientSource::GraphOnly
-        };
         parameter_bindings.push(ParameterGolfBaselineGraphParameterBinding {
             parameter_id: tensor.name.clone(),
             shape: tensor.shape.clone(),
             graph_input_tensor_id: tensor_input.id(),
-            gradient_source,
+            gradient_source: ParameterGolfBaselineGradientSource::GraphOnly,
         });
         parameter_inputs.insert(tensor.name.clone(), tensor_input);
     }
+    let tok_emb = parameter_inputs
+        .get("tok_emb.weight")
+        .cloned()
+        .ok_or_else(
+            || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                parameter_id: String::from("tok_emb.weight"),
+            },
+        )?;
+    let embedded_input =
+        builder.parameter_golf_token_embedding_lookup(&input_token_ids, &tok_emb)?;
 
     let ones_model = builder.constant_f32(
         Shape::new(vec![config.model_dim]),
@@ -608,8 +515,12 @@ fn build_baseline_graph_state(
         )?;
     for decoder_index in 0..config.num_decoder_layers() {
         if let Some(skip) = skips.pop() {
-            let skip_scale =
-                select_parameter_row_graph(builder, &skip_weights, decoder_index, config.model_dim)?;
+            let skip_scale = select_parameter_row_graph(
+                builder,
+                &skip_weights,
+                decoder_index,
+                config.model_dim,
+            )?;
             x = add_scaled_graph(
                 builder,
                 &x,
@@ -644,7 +555,7 @@ fn build_baseline_graph_state(
     )?;
 
     Ok(ParameterGolfBaselineGraphBuildState {
-        embedded_input,
+        input_token_ids,
         parameter_bindings,
         pre_softcap_logits,
     })
@@ -1035,52 +946,47 @@ fn select_parameter_row_graph(
     row_index: usize,
     row_width: usize,
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
-    let row_count = *parameter
-        .spec()
-        .shape()
-        .dims()
-        .first()
-        .ok_or_else(|| ParameterGolfBaselineGraphError::Graph(GraphError::InvalidOperatorInputs {
+    let row_count = *parameter.spec().shape().dims().first().ok_or_else(|| {
+        ParameterGolfBaselineGraphError::Graph(GraphError::InvalidOperatorInputs {
             op: String::from("select_parameter_row_graph"),
             message: format!(
                 "expected rank-2 parameter [rows, width], found shape {:?}",
                 parameter.spec().shape().dims()
             ),
-        }))?;
-    let actual_row_width = *parameter
-        .spec()
-        .shape()
-        .dims()
-        .get(1)
-        .ok_or_else(|| ParameterGolfBaselineGraphError::Graph(GraphError::InvalidOperatorInputs {
+        })
+    })?;
+    let actual_row_width = *parameter.spec().shape().dims().get(1).ok_or_else(|| {
+        ParameterGolfBaselineGraphError::Graph(GraphError::InvalidOperatorInputs {
             op: String::from("select_parameter_row_graph"),
             message: format!(
                 "expected rank-2 parameter [rows, width], found shape {:?}",
                 parameter.spec().shape().dims()
             ),
-        }))?;
+        })
+    })?;
     if actual_row_width != row_width {
         return Err(ParameterGolfBaselineGraphError::Graph(
             GraphError::InvalidOperatorInputs {
                 op: String::from("select_parameter_row_graph"),
-                message: format!(
-                    "expected row width {row_width}, found {actual_row_width}"
-                ),
+                message: format!("expected row width {row_width}, found {actual_row_width}"),
             },
         ));
     }
     if row_index >= row_count {
-        return Err(ParameterGolfBaselineGraphError::Graph(GraphError::InvalidOperatorInputs {
-            op: String::from("select_parameter_row_graph"),
-            message: format!("row index {row_index} exceeds row count {row_count}"),
-        }));
+        return Err(ParameterGolfBaselineGraphError::Graph(
+            GraphError::InvalidOperatorInputs {
+                op: String::from("select_parameter_row_graph"),
+                message: format!("row index {row_index} exceeds row count {row_count}"),
+            },
+        ));
     }
     let mut selector = vec![0.0_f32; row_count];
     selector[row_index] = 1.0;
-    let selector =
-        builder.constant_f32(Shape::new(vec![1, row_count]), selector)?;
+    let selector = builder.constant_f32(Shape::new(vec![1, row_count]), selector)?;
     let selected = builder.matmul(&selector, parameter)?;
-    builder.reshape(&selected, Shape::new(vec![row_width])).map_err(Into::into)
+    builder
+        .reshape(&selected, Shape::new(vec![row_width]))
+        .map_err(Into::into)
 }
 
 fn rope_table_constants(
@@ -1156,15 +1062,6 @@ fn validate_target_shape(
     Ok(())
 }
 
-fn tensor3_from_dense_gradient(
-    data: &TensorData,
-    shape: [usize; 3],
-    context: String,
-) -> Result<ParameterGolfTensor3, ParameterGolfBaselineGraphError> {
-    let values = dense_gradient_values(data, context)?;
-    Ok(ParameterGolfTensor3::new(shape, values)?)
-}
-
 fn dense_gradient_values(
     data: &TensorData,
     context: String,
@@ -1173,27 +1070,6 @@ fn dense_gradient_values(
         return Err(ParameterGolfBaselineGraphError::NonDenseTensorData { context });
     };
     Ok(values.clone())
-}
-
-fn scatter_input_embedding_gradient(
-    input_gradient: ParameterGolfTensor3,
-    input_ids: &[Vec<u32>],
-    vocab_size: usize,
-    model_dim: usize,
-) -> Result<Vec<f32>, ParameterGolfBaselineGraphError> {
-    let mut scattered = vec![0.0_f32; vocab_size * model_dim];
-    for (batch_index, row) in input_ids.iter().enumerate() {
-        for (position_index, &token_id) in row.iter().enumerate() {
-            let token_offset = token_id as usize * model_dim;
-            let gradient_offset =
-                (batch_index * input_gradient.sequence_length() + position_index) * model_dim;
-            for feature in 0..model_dim {
-                scattered[token_offset + feature] +=
-                    input_gradient.values()[gradient_offset + feature];
-            }
-        }
-    }
-    Ok(scattered)
 }
 
 #[cfg(test)]
@@ -1254,9 +1130,20 @@ mod tests {
         Ok(updated_model.loss(input_ids, target_ids)?)
     }
 
+    fn output_tensor3(
+        data: &TensorData,
+        shape: [usize; 3],
+        context: &str,
+    ) -> Result<ParameterGolfTensor3, ParameterGolfBaselineGraphError> {
+        Ok(ParameterGolfTensor3::new(
+            shape,
+            dense_gradient_values(data, String::from(context))?,
+        )?)
+    }
+
     #[test]
-    fn parameter_golf_baseline_graph_matches_reference_logits_on_fixture_batch()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn parameter_golf_baseline_graph_matches_reference_logits_on_fixture_batch(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let fixture = load_baseline_fixture();
         let model = baseline_model()?;
         let graph = build_parameter_golf_baseline_graph(
@@ -1267,19 +1154,18 @@ mod tests {
         )?;
         compile_graph(graph.graph.graph())?;
 
-        let embedded_inputs = gather_parameter_golf_embedded_inputs(
-            model.weights(),
-            &model.descriptor().config,
+        let inputs = bind_parameter_golf_baseline_graph_inputs(
+            &graph,
+            &model,
             fixture.input_ids.as_slice(),
         )?;
-        let inputs = bind_parameter_golf_baseline_graph_inputs(&graph, &model, &embedded_inputs)?;
         let values = evaluate_graph(graph.graph.graph(), &inputs)?;
-        let pre_softcap_logits = tensor3_from_dense_gradient(
+        let pre_softcap_logits = output_tensor3(
             values
                 .get(&graph.pre_softcap_logits_tensor_id)
                 .ok_or("missing pre-softcap logits")?,
             [1, 4, model.descriptor().config.vocab_size],
-            String::from("pre_softcap_logits"),
+            "pre_softcap_logits",
         )?;
         let seeded = parameter_golf_projection_seed(
             &pre_softcap_logits,
@@ -1296,8 +1182,8 @@ mod tests {
     }
 
     #[test]
-    fn parameter_golf_baseline_graph_materializes_seeded_gradients_for_parameter_families()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn parameter_golf_baseline_graph_materializes_seeded_gradients_for_parameter_families(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let fixture = load_baseline_fixture();
         let model = baseline_model()?;
         let graph = build_parameter_golf_baseline_graph(
@@ -1307,19 +1193,18 @@ mod tests {
             fixture.input_ids[0].len(),
         )?;
 
-        let embedded_inputs = gather_parameter_golf_embedded_inputs(
-            model.weights(),
-            &model.descriptor().config,
+        let inputs = bind_parameter_golf_baseline_graph_inputs(
+            &graph,
+            &model,
             fixture.input_ids.as_slice(),
         )?;
-        let inputs = bind_parameter_golf_baseline_graph_inputs(&graph, &model, &embedded_inputs)?;
         let forward = evaluate_graph(graph.graph.graph(), &inputs)?;
-        let pre_softcap_logits = tensor3_from_dense_gradient(
+        let pre_softcap_logits = output_tensor3(
             forward
                 .get(&graph.pre_softcap_logits_tensor_id)
                 .ok_or("missing pre-softcap logits")?,
             [1, 4, model.descriptor().config.vocab_size],
-            String::from("pre_softcap_logits"),
+            "pre_softcap_logits",
         )?;
         let seeded = parameter_golf_projection_seed(
             &pre_softcap_logits,
@@ -1386,8 +1271,8 @@ mod tests {
     }
 
     #[test]
-    fn parameter_golf_baseline_training_graph_matches_reference_loss_and_gradients()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn parameter_golf_baseline_training_graph_matches_reference_loss_and_gradients(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let fixture = load_baseline_fixture();
         let model = baseline_model()?;
         let graph = build_parameter_golf_baseline_training_graph(
@@ -1397,15 +1282,10 @@ mod tests {
             fixture.input_ids[0].len(),
         )?;
 
-        let embedded_inputs = gather_parameter_golf_embedded_inputs(
-            model.weights(),
-            &model.descriptor().config,
-            fixture.input_ids.as_slice(),
-        )?;
         let inputs = bind_parameter_golf_baseline_training_graph_inputs(
             &graph,
             &model,
-            &embedded_inputs,
+            fixture.input_ids.as_slice(),
             fixture.target_ids.as_slice(),
         )?;
         let forward = evaluate_graph(graph.graph.graph(), &inputs)?;
@@ -1465,6 +1345,48 @@ mod tests {
                 "training-graph gradient drift for {parameter_id}[{flat_index}] exceeded tolerance: actual={actual} finite={finite}"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_baseline_training_graph_binds_token_ids_as_i32_tensors(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = load_baseline_fixture();
+        let model = baseline_model()?;
+        let graph = build_parameter_golf_baseline_training_graph(
+            Device::cpu(),
+            model.descriptor(),
+            fixture.input_ids.len(),
+            fixture.input_ids[0].len(),
+        )?;
+
+        let inputs = bind_parameter_golf_baseline_training_graph_inputs(
+            &graph,
+            &model,
+            fixture.input_ids.as_slice(),
+            fixture.target_ids.as_slice(),
+        )?;
+
+        assert!(matches!(
+            inputs.get(&graph.input_token_ids_tensor_id),
+            Some(TensorData::I32(values))
+                if values
+                    == &fixture
+                        .input_ids
+                        .iter()
+                        .flat_map(|row| row.iter().map(|token_id| *token_id as i32))
+                        .collect::<Vec<_>>()
+        ));
+        assert!(matches!(
+            inputs.get(&graph.target_ids_tensor_id),
+            Some(TensorData::I32(values))
+                if values
+                    == &fixture
+                        .target_ids
+                        .iter()
+                        .flat_map(|row| row.iter().map(|token_id| *token_id as i32))
+                        .collect::<Vec<_>>()
+        ));
         Ok(())
     }
 }

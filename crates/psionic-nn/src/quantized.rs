@@ -244,7 +244,7 @@ impl QuantizedModule {
                         modes.push(quantized.mode);
                     }
                 }
-                TensorData::F32(_) => preserved_dense_paths.push(path),
+                TensorData::F32(_) | TensorData::I32(_) => preserved_dense_paths.push(path),
             }
         }
 
@@ -391,6 +391,13 @@ impl QuantizedModule {
             };
             let values = match data {
                 TensorData::F32(values) => values,
+                TensorData::I32(_) => {
+                    return Err(QuantizationError::UnsupportedSourceTensor {
+                        path: String::from(path),
+                        dtype: spec.dtype(),
+                        device: spec.device().clone(),
+                    })
+                }
                 TensorData::QuantizedBlocks(_) => {
                     dequantize_tensor_data(path.as_str(), &spec, &data)?.into_owned()
                 }
@@ -785,6 +792,11 @@ fn quantize_parameter_payload(
                 values.as_slice(),
             ))))
         }
+        TensorData::I32(_) => Err(QuantizationError::UnsupportedSourceTensor {
+            path: String::from(path),
+            dtype: parameter.spec.dtype(),
+            device: parameter.spec.device().clone(),
+        }),
         TensorData::QuantizedBlocks(existing) => {
             if existing.mode == mode {
                 Ok(Some(TensorData::QuantizedBlocks(existing.clone())))
@@ -859,6 +871,11 @@ fn dequantize_tensor_data<'a>(
 ) -> Result<Cow<'a, [f32]>, QuantizationError> {
     match data {
         TensorData::F32(values) => Ok(Cow::Borrowed(values.as_slice())),
+        TensorData::I32(_) => Err(QuantizationError::UnsupportedSourceTensor {
+            path: String::from(path),
+            dtype: spec.dtype(),
+            device: spec.device().clone(),
+        }),
         TensorData::QuantizedBlocks(quantized) => {
             if spec.element_count() != quantized.layout.element_count() {
                 return Err(QuantizationError::InvalidQuantizedLayout {
@@ -1102,8 +1119,8 @@ mod tests {
     }
 
     #[test]
-    fn module_quantize_reports_quantized_and_dense_paths_and_freezes_eval_copy()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn module_quantize_reports_quantized_and_dense_paths_and_freezes_eval_copy(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let linear = aligned_linear()?;
         let quantized = linear.module().quantize(QuantizationMode::Int8Symmetric)?;
 
@@ -1137,8 +1154,8 @@ mod tests {
     }
 
     #[test]
-    fn strict_quantize_refuses_unsupported_weight_families()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn strict_quantize_refuses_unsupported_weight_families(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut norm = Module::new("norm0", "layer_norm")?;
         norm.insert_parameter(
             "weight",
@@ -1206,8 +1223,8 @@ mod tests {
     }
 
     #[test]
-    fn quantized_linear_roundtrips_through_module_state_load()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn quantized_linear_roundtrips_through_module_state_load(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let linear = aligned_linear()?;
         let quantized = linear.quantize(QuantizationMode::Int8Symmetric)?;
         let weights = quantized.module().save_weights();
@@ -1224,8 +1241,8 @@ mod tests {
     }
 
     #[test]
-    fn quantized_embedding_can_wrap_loaded_quantized_module()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn quantized_embedding_can_wrap_loaded_quantized_module(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let embedding = aligned_embedding()?;
         let quantized = embedding.quantize(QuantizationMode::Int8Symmetric)?;
         let rewrapped =

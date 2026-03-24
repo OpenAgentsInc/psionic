@@ -106,6 +106,8 @@ pub enum DType {
     F16,
     /// 16-bit bfloat values.
     BF16,
+    /// 32-bit signed integer values.
+    I32,
     /// 8-bit signed integer values.
     I8,
 }
@@ -117,6 +119,7 @@ impl DType {
         match self {
             Self::F32 => 4,
             Self::F16 | Self::BF16 => 2,
+            Self::I32 => 4,
             Self::I8 => 1,
         }
     }
@@ -129,11 +132,15 @@ impl DType {
             (Self::F32, Self::F32) => Some(Self::F32),
             (Self::F16, Self::F16) => Some(Self::F16),
             (Self::BF16, Self::BF16) => Some(Self::BF16),
+            (Self::I32, Self::I32) => Some(Self::I32),
             (Self::I8, Self::I8) => Some(Self::I8),
             (Self::F32, _) | (_, Self::F32) => Some(Self::F32),
             (Self::BF16, Self::F16) | (Self::F16, Self::BF16) => Some(Self::F32),
+            (Self::BF16, Self::I32) | (Self::I32, Self::BF16) => Some(Self::BF16),
             (Self::BF16, Self::I8) | (Self::I8, Self::BF16) => Some(Self::BF16),
+            (Self::F16, Self::I32) | (Self::I32, Self::F16) => Some(Self::F16),
             (Self::F16, Self::I8) | (Self::I8, Self::F16) => Some(Self::F16),
+            (Self::I32, Self::I8) | (Self::I8, Self::I32) => Some(Self::I32),
         }
     }
 
@@ -143,7 +150,7 @@ impl DType {
     pub const fn class(self) -> DTypeClass {
         match self {
             Self::F32 | Self::F16 | Self::BF16 => DTypeClass::FloatingPoint,
-            Self::I8 => DTypeClass::SignedInteger,
+            Self::I32 | Self::I8 => DTypeClass::SignedInteger,
         }
     }
 
@@ -249,6 +256,7 @@ impl ExtendedDType {
     /// `DType` subset used by current graph and runtime execution surfaces.
     pub fn try_into_core_dtype(self) -> Result<DType, PsionicRefusal> {
         match self {
+            Self::I32 => Ok(DType::I32),
             Self::I8 => Ok(DType::I8),
             Self::F16 => Ok(DType::F16),
             Self::BF16 => Ok(DType::BF16),
@@ -274,6 +282,7 @@ impl From<DType> for ExtendedDType {
             DType::F32 => Self::F32,
             DType::F16 => Self::F16,
             DType::BF16 => Self::BF16,
+            DType::I32 => Self::I32,
             DType::I8 => Self::I8,
         }
     }
@@ -1940,6 +1949,9 @@ impl StableF32 {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BackendExtensionKind {
+    /// Parameter Golf token-id embedding lookup over `[batch, seq]` ids and
+    /// the token embedding table.
+    ParameterGolfTokenEmbeddingLookup,
     /// ReLU-squared pointwise activation.
     ReluSquared,
     /// SiLU pointwise activation.
@@ -1964,6 +1976,7 @@ impl BackendExtensionKind {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
+            Self::ParameterGolfTokenEmbeddingLookup => "parameter_golf_token_embedding_lookup",
             Self::ReluSquared => "relu_squared",
             Self::Silu => "silu",
             Self::ParameterGolfProjectionLoss => "parameter_golf_projection_loss",
@@ -1980,6 +1993,10 @@ impl BackendExtensionKind {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum BackendExtensionOp {
+    /// Parameter Golf token-id embedding lookup against the token embedding table.
+    ParameterGolfTokenEmbeddingLookup,
+    /// Weight-gradient rule for Parameter Golf token-id embedding lookup.
+    ParameterGolfTokenEmbeddingLookupBackward,
     /// ReLU-squared pointwise activation.
     ReluSquared,
     /// Input-gradient rule for ReLU-squared pointwise activation.
@@ -1989,7 +2006,7 @@ pub enum BackendExtensionOp {
     /// Input-gradient rule for SiLU pointwise activation.
     SiluBackward,
     /// Parameter Golf tanh-softcap next-token mean loss over pre-softcap logits
-    /// plus target ids encoded as dense `f32` token indices.
+    /// plus target ids encoded as integer token indices.
     ParameterGolfProjectionLoss {
         /// Positive tanh softcap applied before cross-entropy.
         logit_softcap: StableF32,
@@ -2069,6 +2086,10 @@ impl BackendExtensionOp {
     #[must_use]
     pub const fn kind(&self) -> BackendExtensionKind {
         match self {
+            Self::ParameterGolfTokenEmbeddingLookup
+            | Self::ParameterGolfTokenEmbeddingLookupBackward => {
+                BackendExtensionKind::ParameterGolfTokenEmbeddingLookup
+            }
             Self::ReluSquared | Self::ReluSquaredBackward => BackendExtensionKind::ReluSquared,
             Self::Silu | Self::SiluBackward => BackendExtensionKind::Silu,
             Self::ParameterGolfProjectionLoss { .. }
@@ -2096,6 +2117,10 @@ impl BackendExtensionOp {
     #[must_use]
     pub const fn label(&self) -> &'static str {
         match self {
+            Self::ParameterGolfTokenEmbeddingLookup => "parameter_golf_token_embedding_lookup",
+            Self::ParameterGolfTokenEmbeddingLookupBackward => {
+                "parameter_golf_token_embedding_lookup_backward"
+            }
             Self::ReluSquared => "relu_squared",
             Self::ReluSquaredBackward => "relu_squared_backward",
             Self::Silu => "silu",
@@ -2674,6 +2699,8 @@ impl TensorSpec {
 pub enum TensorData {
     /// 32-bit floating point tensor payload.
     F32(Vec<f32>),
+    /// 32-bit signed integer tensor payload.
+    I32(Vec<i32>),
     /// Quantized GGML/GGUF block payload.
     QuantizedBlocks(QuantizedTensorData),
 }
@@ -2711,6 +2738,7 @@ impl TensorData {
     pub fn len(&self) -> usize {
         match self {
             Self::F32(values) => values.len(),
+            Self::I32(values) => values.len(),
             Self::QuantizedBlocks(data) => data.layout.element_count(),
         }
     }
@@ -2726,6 +2754,17 @@ impl TensorData {
     pub fn as_f32_slice(&self) -> Option<&[f32]> {
         match self {
             Self::F32(values) => Some(values.as_slice()),
+            Self::I32(_) => None,
+            Self::QuantizedBlocks(_) => None,
+        }
+    }
+
+    /// Returns the payload as an `i32` slice when the storage is dense.
+    #[must_use]
+    pub fn as_i32_slice(&self) -> Option<&[i32]> {
+        match self {
+            Self::F32(_) => None,
+            Self::I32(values) => Some(values.as_slice()),
             Self::QuantizedBlocks(_) => None,
         }
     }
@@ -2734,7 +2773,7 @@ impl TensorData {
     #[must_use]
     pub fn as_quantized_blocks(&self) -> Option<&QuantizedTensorData> {
         match self {
-            Self::F32(_) => None,
+            Self::F32(_) | Self::I32(_) => None,
             Self::QuantizedBlocks(data) => Some(data),
         }
     }

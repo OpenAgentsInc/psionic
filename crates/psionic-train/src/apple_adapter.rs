@@ -14,10 +14,10 @@ use psionic_environments::{
     AppleAdapterEnvironmentBundle, AppleAdapterEnvironmentError, EnvironmentWorkloadClass,
 };
 use psionic_eval::{
-    AppleAdapterBenchmarkError, AppleAdapterEvalHarness, AppleAdapterObservedSampleOutput,
-    AppleAdapterObservedToolCall, BenchmarkPackage, EvalExecutionStrategyFacts,
-    EvalFinalStateCapture, EvalTimerIntegrityFacts, EvalTokenAccountingFacts,
-    EvalVerificationFacts, run_curated_base_vs_adapter_benchmark,
+    run_curated_base_vs_adapter_benchmark, AppleAdapterBenchmarkError, AppleAdapterEvalHarness,
+    AppleAdapterObservedSampleOutput, AppleAdapterObservedToolCall, BenchmarkPackage,
+    EvalExecutionStrategyFacts, EvalFinalStateCapture, EvalTimerIntegrityFacts,
+    EvalTokenAccountingFacts, EvalVerificationFacts,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -2804,6 +2804,11 @@ fn draft_dense_values<'a>(
 ) -> Result<&'a [f32], AppleAdapterDraftDistillationError> {
     match &group.parameter.data {
         psionic_core::TensorData::F32(values) => Ok(values.as_slice()),
+        psionic_core::TensorData::I32(_) => {
+            Err(AppleAdapterDraftDistillationError::NonDenseDraftGroup {
+                group_id: String::from(group_id),
+            })
+        }
         psionic_core::TensorData::QuantizedBlocks(_) => {
             Err(AppleAdapterDraftDistillationError::NonDenseDraftGroup {
                 group_id: String::from(group_id),
@@ -3640,6 +3645,11 @@ fn dense_values<'a>(
 ) -> Result<&'a [f32], AppleAdapterTrainingExecutionError> {
     match &group.parameter.data {
         psionic_core::TensorData::F32(values) => Ok(values.as_slice()),
+        psionic_core::TensorData::I32(_) => {
+            Err(AppleAdapterTrainingExecutionError::NonDenseGroup {
+                group_id: String::from(group_id),
+            })
+        }
         psionic_core::TensorData::QuantizedBlocks(_) => {
             Err(AppleAdapterTrainingExecutionError::NonDenseGroup {
                 group_id: String::from(group_id),
@@ -4710,8 +4720,8 @@ mod tests {
     }
 
     #[test]
-    fn apple_adapter_backend_produces_repo_owned_gradients_and_fixed_budget_steps()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn apple_adapter_backend_produces_repo_owned_gradients_and_fixed_budget_steps(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let dataset = dataset();
         let backend = AppleAdapterTrainingExecutionBackend::new(
             config(),
@@ -4729,12 +4739,10 @@ mod tests {
         let (step_input, gradient_record) = backend.produce_step_input(&run, 0, 1_000, 1_040)?;
         assert!(!gradient_record.training_batch.gradients.is_empty());
         assert!(gradient_record.mean_loss > 0.0);
-        assert!(
-            gradient_record
-                .gradient_norms_l2
-                .values()
-                .all(|norm| *norm > 0.0)
-        );
+        assert!(gradient_record
+            .gradient_norms_l2
+            .values()
+            .all(|norm| *norm > 0.0));
 
         let receipt = run.apply_step(step_input)?;
         assert_eq!(
@@ -4751,6 +4759,7 @@ mod tests {
                 psionic_core::TensorData::F32(values) => {
                     values.iter().any(|value| value.abs() > 0.0)
                 }
+                psionic_core::TensorData::I32(_) => false,
                 psionic_core::TensorData::QuantizedBlocks(_) => false,
             })
             .count();
@@ -4777,8 +4786,8 @@ mod tests {
     }
 
     #[test]
-    fn apple_adapter_sft_lane_trains_and_exports_valid_fmadapter_package()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn apple_adapter_sft_lane_trains_and_exports_valid_fmadapter_package(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let dataset = dataset();
         let environment = environment_bundle();
         let backend = AppleAdapterTrainingExecutionBackend::new(
@@ -4800,12 +4809,10 @@ mod tests {
         };
         let outcome = run_apple_adapter_sft_export(&backend, &dataset, &environment, &request)?;
         assert_eq!(outcome.step_receipts.len(), 2);
-        assert!(
-            outcome
-                .gradient_records
-                .iter()
-                .all(|record| record.training_batch.gradients.is_empty())
-        );
+        assert!(outcome
+            .gradient_records
+            .iter()
+            .all(|record| record.training_batch.gradients.is_empty()));
         assert_eq!(outcome.summary.dataset_ref, request.dataset_ref);
         assert!(!outcome.adapter_delta.tensors.is_empty());
 
@@ -4875,8 +4882,8 @@ mod tests {
     }
 
     #[test]
-    fn apple_adapter_response_features_capture_posture_and_tool_cues()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn apple_adapter_response_features_capture_posture_and_tool_cues(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let dataset = AppleAdapterDatasetContract::from_jsonl_str(
             r#"[{"role":"system","content":"Use tools and refuse stale exact claims when needed."},{"role":"user","content":"What should I inspect first?"},{"role":"assistant","content":"No. Use lookup_doc and lookup_code, and say you would need retrieval for exact current runtime results."}]"#,
             dataset_metadata(),
@@ -4894,8 +4901,8 @@ mod tests {
     }
 
     #[test]
-    fn apple_adapter_target_alignment_signal_improves_correct_probability()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn apple_adapter_target_alignment_signal_improves_correct_probability(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let dataset = dataset();
         let environment = environment_bundle();
         let mut overfit_config = config();
@@ -4941,8 +4948,8 @@ mod tests {
     }
 
     #[test]
-    fn apple_adapter_backend_uses_runtime_base_output_features_when_present()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn apple_adapter_backend_uses_runtime_base_output_features_when_present(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let dataset = dataset();
         let environment = environment_bundle();
         let captures = captures(&dataset);
@@ -4995,8 +5002,8 @@ mod tests {
     }
 
     #[test]
-    fn apple_adapter_reference_overfit_clears_non_zero_gate()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn apple_adapter_reference_overfit_clears_non_zero_gate(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let manifest = architecture_explainer_manifest();
         let dataset = architecture_explainer_benchmark_dataset();
         let captures = dataset.derive_token_captures()?;
@@ -5049,19 +5056,17 @@ mod tests {
         assert!(report.benchmark.accepted);
         assert!(report.benchmark.aggregate_score_delta_bps > 0);
         assert!(report.benchmark.improved_case_count >= 1);
-        assert!(
-            report
-                .benchmark_report
-                .case_receipts
-                .iter()
-                .any(|case| case.improved)
-        );
+        assert!(report
+            .benchmark_report
+            .case_receipts
+            .iter()
+            .any(|case| case.improved));
         Ok(())
     }
 
     #[test]
-    fn apple_adapter_draft_lane_exports_valid_fmadapter_with_draft_payload()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn apple_adapter_draft_lane_exports_valid_fmadapter_with_draft_payload(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let dataset = dataset();
         let environment = environment_bundle();
         let backend = AppleAdapterTrainingExecutionBackend::new(

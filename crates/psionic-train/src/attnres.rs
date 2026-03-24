@@ -5,14 +5,14 @@ use psionic_datastream::{
     DatastreamCheckpointBinding, DatastreamEncoding, DatastreamManifestRef, DatastreamSubjectKind,
 };
 use psionic_eval::{
-    AttnResTrainingEvalError, AttnResTrainingEvalReport, evaluate_attnres_training_shift,
+    evaluate_attnres_training_shift, AttnResTrainingEvalError, AttnResTrainingEvalReport,
 };
 use psionic_models::{
     AttnResConfig, AttnResCpuReferenceModel, AttnResDiagnosticsSnapshot, AttnResExecutionError,
     AttnResModelError, AttnResNextTokenSample, AttnResParameterVector, TokenSequence,
 };
 use psionic_runtime::TrainingCheckpointReference;
-use safetensors::{Dtype as SafeTensorsDType, SafeTensors, serialize, tensor::TensorView};
+use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -70,8 +70,8 @@ impl AttnResTinyTrainingCorpus {
 pub type AttnResLocalReferenceTrainingCorpus = AttnResTinyTrainingCorpus;
 
 /// Returns the canonical local-reference AttnRes corpus.
-pub fn attnres_local_reference_training_corpus()
--> Result<AttnResLocalReferenceTrainingCorpus, AttnResTinyTrainingError> {
+pub fn attnres_local_reference_training_corpus(
+) -> Result<AttnResLocalReferenceTrainingCorpus, AttnResTinyTrainingError> {
     AttnResTinyTrainingCorpus::reference()
 }
 
@@ -149,8 +149,8 @@ impl AttnResTinyTrainingConfig {
 pub type AttnResLocalReferenceTrainingConfig = AttnResTinyTrainingConfig;
 
 /// Returns the canonical local-reference config used for the full AttnRes demo run.
-pub fn attnres_local_reference_training_config()
--> Result<AttnResLocalReferenceTrainingConfig, AttnResTinyTrainingError> {
+pub fn attnres_local_reference_training_config(
+) -> Result<AttnResLocalReferenceTrainingConfig, AttnResTinyTrainingError> {
     Ok(AttnResTinyTrainingConfig {
         model_id: String::from("attnres-local-reference"),
         model_revision: String::from("v1"),
@@ -1088,6 +1088,9 @@ fn dense_values<'a>(
 ) -> Result<&'a [f32], AttnResTinyTrainingError> {
     match &group.parameter.data {
         TensorData::F32(values) => Ok(values.as_slice()),
+        TensorData::I32(_) => Err(AttnResTinyTrainingError::NonDenseGroup {
+            group_id: String::from(group_id),
+        }),
         TensorData::QuantizedBlocks(_) => Err(AttnResTinyTrainingError::NonDenseGroup {
             group_id: String::from(group_id),
         }),
@@ -1306,10 +1309,9 @@ mod tests {
     use std::error::Error;
 
     use super::{
-        AttnResTinyTrainingConfig, AttnResTinyTrainingCorpus, AttnResTinyTrainingLifecycleStatus,
-        AttnResTinyTrainingRunner, attnres_local_reference_training_config,
-        attnres_local_reference_training_corpus, restore_attnres_tiny_checkpoint,
-        train_attnres_tiny_next_token,
+        attnres_local_reference_training_config, attnres_local_reference_training_corpus,
+        restore_attnres_tiny_checkpoint, train_attnres_tiny_next_token, AttnResTinyTrainingConfig,
+        AttnResTinyTrainingCorpus, AttnResTinyTrainingLifecycleStatus, AttnResTinyTrainingRunner,
     };
 
     #[test]

@@ -159,7 +159,9 @@ impl TassadarArticleTransformerWeightProductionConfig {
             )],
             base_model_id: String::from(TassadarArticleTransformer::TRACE_BOUND_MODEL_ID),
             base_model_revision: String::from("v0"),
-            base_descriptor_ref: String::from(TassadarArticleTransformer::TRACE_BOUND_DESCRIPTOR_REF),
+            base_descriptor_ref: String::from(
+                TassadarArticleTransformer::TRACE_BOUND_DESCRIPTOR_REF,
+            ),
             base_artifact_ref: String::from(TassadarArticleTransformer::TRACE_BOUND_ARTIFACT_REF),
             produced_descriptor_ref: String::from(
                 TassadarArticleTransformer::TRAINED_TRACE_BOUND_DESCRIPTOR_REF,
@@ -167,7 +169,9 @@ impl TassadarArticleTransformerWeightProductionConfig {
             produced_artifact_ref: String::from(
                 TassadarArticleTransformer::TRAINED_TRACE_BOUND_ARTIFACT_REF,
             ),
-            produced_model_id: String::from(TassadarArticleTransformer::TRAINED_TRACE_BOUND_MODEL_ID),
+            produced_model_id: String::from(
+                TassadarArticleTransformer::TRAINED_TRACE_BOUND_MODEL_ID,
+            ),
             produced_model_revision: String::from("v0"),
         })
     }
@@ -189,14 +193,10 @@ impl TassadarArticleTransformerWeightProductionConfig {
             return Err(TassadarArticleTransformerWeightProductionError::MissingBaseModelId);
         }
         if self.base_model_revision.trim().is_empty() {
-            return Err(
-                TassadarArticleTransformerWeightProductionError::MissingBaseModelRevision,
-            );
+            return Err(TassadarArticleTransformerWeightProductionError::MissingBaseModelRevision);
         }
         if self.base_descriptor_ref.trim().is_empty() {
-            return Err(
-                TassadarArticleTransformerWeightProductionError::MissingBaseDescriptorRef,
-            );
+            return Err(TassadarArticleTransformerWeightProductionError::MissingBaseDescriptorRef);
         }
         if self.base_artifact_ref.trim().is_empty() {
             return Err(TassadarArticleTransformerWeightProductionError::MissingBaseArtifactRef);
@@ -1343,6 +1343,11 @@ fn dense_values<'a>(
 ) -> Result<&'a [f32], TassadarArticleTransformerWeightProductionError> {
     match &group.parameter.data {
         TensorData::F32(values) => Ok(values.as_slice()),
+        TensorData::I32(_) => Err(
+            TassadarArticleTransformerWeightProductionError::NonDenseGroup {
+                group_id: String::from(group_id),
+            },
+        ),
         TensorData::QuantizedBlocks(_) => Err(
             TassadarArticleTransformerWeightProductionError::NonDenseGroup {
                 group_id: String::from(group_id),
@@ -1357,6 +1362,12 @@ fn dense_f32_values<'a>(
 ) -> Result<&'a [f32], TassadarArticleTransformerWeightProductionError> {
     match data {
         TensorData::F32(values) => Ok(values.as_slice()),
+        TensorData::I32(_) => Err(
+            TassadarArticleTransformerWeightProductionError::Serialization {
+                context,
+                message: String::from("expected dense f32 tensor data"),
+            },
+        ),
         TensorData::QuantizedBlocks(_) => Err(
             TassadarArticleTransformerWeightProductionError::Serialization {
                 context,

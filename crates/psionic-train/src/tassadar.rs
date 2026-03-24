@@ -2,16 +2,17 @@ use std::collections::BTreeMap;
 
 use psionic_core::{DType, Device, Shape, TensorData, TensorSpec};
 use psionic_eval::{
-    TASSADAR_BENCHMARK_ENVIRONMENT_REF, TASSADAR_REFERENCE_FIXTURE_BENCHMARK_REF,
-    TassadarBenchmarkError, TassadarBenchmarkReport, TassadarReferenceFixtureSuite,
     build_tassadar_reference_fixture_suite, run_tassadar_reference_fixture_benchmark,
+    TassadarBenchmarkError, TassadarBenchmarkReport, TassadarReferenceFixtureSuite,
+    TASSADAR_BENCHMARK_ENVIRONMENT_REF, TASSADAR_REFERENCE_FIXTURE_BENCHMARK_REF,
 };
 use psionic_models::TassadarExecutorFixture;
 use psionic_runtime::{
-    TassadarArithmeticOp, TassadarExecution, TassadarExecutionRefusal, TassadarExecutorDecodeMode,
-    TassadarFixtureRunner, TassadarHaltReason, TassadarInstruction, TassadarProgram,
-    TassadarTraceEvent, TassadarTraceStep, build_tassadar_execution_evidence_bundle,
-    tassadar_validation_corpus, tassadar_wasm_profile_for_id,
+    build_tassadar_execution_evidence_bundle, tassadar_validation_corpus,
+    tassadar_wasm_profile_for_id, TassadarArithmeticOp, TassadarExecution,
+    TassadarExecutionRefusal, TassadarExecutorDecodeMode, TassadarFixtureRunner,
+    TassadarHaltReason, TassadarInstruction, TassadarProgram, TassadarTraceEvent,
+    TassadarTraceStep,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -723,8 +724,8 @@ pub fn evaluate_tassadar_small_executor(
     })
 }
 
-fn collect_supervision_examples()
--> Result<ArithmeticSupervisionSet, TassadarSmallExecutorTrainingError> {
+fn collect_supervision_examples(
+) -> Result<ArithmeticSupervisionSet, TassadarSmallExecutorTrainingError> {
     let runner = TassadarFixtureRunner::new();
     let mut add = Vec::new();
     let mut sub = Vec::new();
@@ -938,6 +939,9 @@ fn current_group_weights(
         .clone()
     {
         TensorData::F32(values) => Ok(values),
+        TensorData::I32(_) => {
+            panic!("group `{group_id}` used unsupported i32 tensor data")
+        }
         TensorData::QuantizedBlocks(_) => {
             panic!("group `{group_id}` used unsupported quantized tensor data")
         }
@@ -1009,17 +1013,17 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        TASSADAR_BENCHMARK_ENVIRONMENT_REF, TASSADAR_REFERENCE_FIXTURE_BENCHMARK_REF,
-        TassadarSmallExecutorExactnessFailure, TassadarSmallExecutorTrainingConfig,
         evaluate_tassadar_small_executor, train_tassadar_small_executor,
+        TassadarSmallExecutorExactnessFailure, TassadarSmallExecutorTrainingConfig,
+        TASSADAR_BENCHMARK_ENVIRONMENT_REF, TASSADAR_REFERENCE_FIXTURE_BENCHMARK_REF,
     };
     use psionic_eval::{
         build_tassadar_reference_fixture_suite, run_tassadar_reference_fixture_benchmark,
     };
 
     #[test]
-    fn small_executor_training_runs_against_tassadar_benchmark_suite()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn small_executor_training_runs_against_tassadar_benchmark_suite(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let receipt =
             train_tassadar_small_executor(&TassadarSmallExecutorTrainingConfig::reference())?;
 
@@ -1041,8 +1045,8 @@ mod tests {
     }
 
     #[test]
-    fn trained_model_eval_surfaces_exactness_failures_explicitly()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn trained_model_eval_surfaces_exactness_failures_explicitly(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut receipt =
             train_tassadar_small_executor(&TassadarSmallExecutorTrainingConfig::reference())?;
         receipt.trained_model.add_kernel = vec![0.0, 0.0];
@@ -1055,16 +1059,12 @@ mod tests {
             .find(|case| case.case_id == "locals_add")
             .expect("locals_add report");
 
-        assert!(
-            locals_add
-                .exactness_failures
-                .contains(&TassadarSmallExecutorExactnessFailure::FinalOutputMismatch)
-        );
-        assert!(
-            locals_add
-                .exactness_failures
-                .contains(&TassadarSmallExecutorExactnessFailure::TraceMismatch)
-        );
+        assert!(locals_add
+            .exactness_failures
+            .contains(&TassadarSmallExecutorExactnessFailure::FinalOutputMismatch));
+        assert!(locals_add
+            .exactness_failures
+            .contains(&TassadarSmallExecutorExactnessFailure::TraceMismatch));
         Ok(())
     }
 }

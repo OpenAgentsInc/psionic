@@ -781,16 +781,13 @@ pub fn build_parameter_golf_single_h100_training_report(
         }
     }
 
-    let compressed_model_artifact = export_parameter_golf_int8_zlib_model_artifact(
-        &current_model,
-        &config.run_id,
-        step,
-    )?;
+    let compressed_model_artifact =
+        export_parameter_golf_int8_zlib_model_artifact(&current_model, &config.run_id, step)?;
 
     let finished_at_ms = unix_time_ms();
     let observed_wallclock_ms = finished_at_ms.saturating_sub(started_at_ms);
-    let realized_stop_reason = stop_reason
-        .unwrap_or(ParameterGolfSingleH100TrainingStopReason::StepBudgetReached);
+    let realized_stop_reason =
+        stop_reason.unwrap_or(ParameterGolfSingleH100TrainingStopReason::StepBudgetReached);
     let summary = format!(
         "The Rust-owned single-H100 trainer executed {} optimizer step(s) with challenge single-device geometry on CUDA, used the widened train_gpt.py-style warmup, validation, and wallclock-stop control loop, and stopped via {:?}.",
         step, realized_stop_reason
@@ -1127,17 +1124,8 @@ fn execute_training_step(
         step_profile.token_materialization_ms = step_profile
             .token_materialization_ms
             .saturating_add(duration_ms(tokens_started));
-        let (input_ids, target_ids) = training_batch_from_window_tokens(tokens.as_slice(), geometry)?;
-
-        let embed_started = Instant::now();
-        let embedded_inputs = crate::gather_parameter_golf_embedded_inputs(
-            current_model.weights(),
-            &current_model.descriptor().config,
-            input_ids.as_slice(),
-        )?;
-        step_profile.embedding_gather_ms = step_profile
-            .embedding_gather_ms
-            .saturating_add(duration_ms(embed_started));
+        let (input_ids, target_ids) =
+            training_batch_from_window_tokens(tokens.as_slice(), geometry)?;
 
         let batch_size = input_ids.len();
         let graph = training_graph_for_batch(
@@ -1150,18 +1138,14 @@ fn execute_training_step(
         let inputs = bind_parameter_golf_baseline_training_graph_inputs(
             graph,
             current_model,
-            &embedded_inputs,
+            input_ids.as_slice(),
             target_ids.as_slice(),
         )?;
         let backward_plan = graph.graph.backward_plan(graph.loss_tensor_id)?;
         let retained_graph = retained_forward_graph(graph, &backward_plan);
 
         let forward_started = Instant::now();
-        let forward_outputs = execute_cuda_graph_outputs(
-            cuda_backend,
-            &retained_graph,
-            input_pairs_from_tensors(&inputs)?.as_slice(),
-        )?;
+        let forward_outputs = execute_cuda_graph_outputs(cuda_backend, &retained_graph, &inputs)?;
         step_profile.forward_loss_cuda_ms = step_profile
             .forward_loss_cuda_ms
             .saturating_add(duration_ms(forward_started));
@@ -1170,7 +1154,10 @@ fn execute_training_step(
             .saturating_add(backward_plan.primal_bindings.len() as u32);
         step_profile.retained_binding_f32_count = step_profile
             .retained_binding_f32_count
-            .saturating_add(count_output_elements(&retained_graph, &backward_plan.primal_bindings)?);
+            .saturating_add(count_output_elements(
+                &retained_graph,
+                &backward_plan.primal_bindings,
+            )?);
 
         let loss = forward_outputs
             .iter()
@@ -1230,10 +1217,7 @@ fn execute_training_step(
         }
     }
 
-    clip_gradients(
-        accumulated_gradients.as_mut_slice(),
-        grad_clip_norm,
-    );
+    clip_gradients(accumulated_gradients.as_mut_slice(), grad_clip_norm);
     let optimizer_started = Instant::now();
     apply_gradients_to_state(
         trainer_state,
@@ -1325,22 +1309,13 @@ fn evaluate_validation_on_cuda(
             input_ids.len(),
             sequence_length,
         )?;
-        let embedded_inputs = crate::gather_parameter_golf_embedded_inputs(
-            model.weights(),
-            &model.descriptor().config,
-            input_ids.as_slice(),
-        )?;
         let inputs = bind_parameter_golf_baseline_training_graph_inputs(
             graph,
             model,
-            &embedded_inputs,
+            input_ids.as_slice(),
             target_ids.as_slice(),
         )?;
-        let outputs = execute_cuda_graph_outputs(
-            cuda_backend,
-            graph.graph.graph(),
-            input_pairs_from_tensors(&inputs)?.as_slice(),
-        )?;
+        let outputs = execute_cuda_graph_outputs(cuda_backend, graph.graph.graph(), &inputs)?;
         let batch_loss = outputs
             .iter()
             .find(|(tensor_id, _)| *tensor_id == graph.loss_tensor_id)
@@ -1452,13 +1427,16 @@ fn execute_backward_plan(
                 tensor_id: binding.primal_tensor,
             },
         )?;
-        inputs.push((binding.gradient_graph_input, values.clone()));
+        inputs.push((
+            binding.gradient_graph_input,
+            TensorData::F32(values.clone()),
+        ));
     }
-    inputs.push((backward_plan.seed_input, vec![1.0_f32]));
+    inputs.push((backward_plan.seed_input, TensorData::F32(vec![1.0_f32])));
     execute_cuda_graph_outputs(
         cuda_backend,
         &backward_plan.gradient_graph,
-        inputs.as_slice(),
+        &inputs.into_iter().collect(),
     )
 }
 
@@ -1489,23 +1467,31 @@ fn backward_result_from_outputs(
 fn execute_cuda_graph_outputs(
     cuda_backend: &mut CudaBackend,
     graph: &psionic_ir::Graph,
-    inputs: &[(TensorId, Vec<f32>)],
+    inputs: &BTreeMap<TensorId, TensorData>,
 ) -> Result<Vec<(TensorId, Vec<f32>)>, ParameterGolfSingleH100TrainingError> {
     let mut buffers = BTreeMap::new();
-    for (tensor_id, values) in inputs {
-        let shape = graph
+    for (tensor_id, data) in inputs {
+        let spec = graph
             .node(*tensor_id)
             .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphTensor {
                 tensor_id: *tensor_id,
             })?
             .tensor()
-            .spec()
-            .shape()
             .clone();
-        buffers.insert(
-            *tensor_id,
-            cuda_backend.input_buffer(shape, values.clone())?,
-        );
+        let buffer = match data {
+            TensorData::F32(values) => {
+                cuda_backend.input_buffer(spec.spec().shape().clone(), values.clone())?
+            }
+            TensorData::I32(values) => {
+                cuda_backend.input_i32_buffer(spec.spec().shape().clone(), values.clone())?
+            }
+            TensorData::QuantizedBlocks(_) => {
+                return Err(ParameterGolfSingleH100TrainingError::Serialization {
+                    message: format!("unsupported quantized input buffer for tensor {tensor_id}"),
+                })
+            }
+        };
+        buffers.insert(*tensor_id, buffer);
     }
     let result = cuda_backend.compile_and_execute(graph, &buffers)?;
     graph
@@ -1520,20 +1506,6 @@ fn execute_cuda_graph_outputs(
                 })?
                 .read_f32()?;
             Ok((*tensor_id, values))
-        })
-        .collect()
-}
-
-fn input_pairs_from_tensors(
-    inputs: &BTreeMap<TensorId, TensorData>,
-) -> Result<Vec<(TensorId, Vec<f32>)>, ParameterGolfSingleH100TrainingError> {
-    inputs
-        .iter()
-        .map(|(tensor_id, data)| match data {
-            TensorData::F32(values) => Ok((*tensor_id, values.clone())),
-            _ => Err(ParameterGolfSingleH100TrainingError::Serialization {
-                message: format!("expected dense f32 input buffer for tensor {tensor_id}"),
-            }),
         })
         .collect()
 }

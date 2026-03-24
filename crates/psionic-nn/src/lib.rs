@@ -1457,6 +1457,17 @@ fn validate_tensor_payload(
                 });
             }
         }
+        TensorData::I32(values) => {
+            let expected_len = spec.storage_size();
+            let actual_len = values.len();
+            if actual_len != expected_len {
+                return Err(ModuleStateError::DensePayloadLengthMismatch {
+                    owner: String::from(owner),
+                    expected_len,
+                    actual_len,
+                });
+            }
+        }
         TensorData::QuantizedBlocks(quantized) => {
             if !spec.dtype().supports_quantized_logical_storage() {
                 return Err(ModuleStateError::QuantizedPayloadUnsupportedDType {
@@ -1596,6 +1607,7 @@ fn stable_tensor_spec_digest(spec: &TensorSpec) -> String {
         DType::F32 => b"f32".as_slice(),
         DType::F16 => b"f16".as_slice(),
         DType::BF16 => b"bf16".as_slice(),
+        DType::I32 => b"i32".as_slice(),
         DType::I8 => b"i8".as_slice(),
     });
     hasher.update(b"|device_kind|");
@@ -1619,6 +1631,12 @@ fn stable_tensor_data_digest(data: &TensorData) -> String {
             hasher.update(b"f32");
             for value in values {
                 hasher.update(value.to_bits().to_le_bytes());
+            }
+        }
+        TensorData::I32(values) => {
+            hasher.update(b"i32");
+            for value in values {
+                hasher.update(value.to_le_bytes());
             }
         }
         TensorData::QuantizedBlocks(quantized) => {

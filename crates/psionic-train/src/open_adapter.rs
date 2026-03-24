@@ -9,7 +9,7 @@ use psionic_adapters::{
 };
 use psionic_core::{DType, Device, QuantizationMode, Shape, TensorSpec};
 use psionic_data::TokenizerDigest;
-use safetensors::{Dtype as SafeTensorsDType, serialize, tensor::TensorView};
+use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -1084,6 +1084,9 @@ fn dense_values<'a>(
 ) -> Result<&'a [f32], OpenAdapterTrainingExecutionError> {
     match &group.parameter.data {
         psionic_core::TensorData::F32(values) => Ok(values.as_slice()),
+        psionic_core::TensorData::I32(_) => Err(OpenAdapterTrainingExecutionError::NonDenseGroup {
+            group_id: group_id.to_string(),
+        }),
         psionic_core::TensorData::QuantizedBlocks(_) => {
             Err(OpenAdapterTrainingExecutionError::NonDenseGroup {
                 group_id: group_id.to_string(),
@@ -1469,8 +1472,8 @@ mod tests {
     }
 
     #[test]
-    fn open_adapter_backend_produces_repo_owned_gradients_and_steps()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn open_adapter_backend_produces_repo_owned_gradients_and_steps(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let backend = OpenAdapterTrainingExecutionBackend::new(config(), samples())?;
         assert_eq!(backend.batches().len(), 2);
         assert_eq!(
@@ -1482,12 +1485,10 @@ mod tests {
         let (step_input, gradient_record) = backend.produce_step_input(&run, 0, 1_000, 1_020)?;
         assert_eq!(gradient_record.training_batch.sample_count, 2);
         assert!(gradient_record.mean_loss > 0.0);
-        assert!(
-            gradient_record
-                .gradient_norms_l2
-                .values()
-                .all(|norm| *norm > 0.0)
-        );
+        assert!(gradient_record
+            .gradient_norms_l2
+            .values()
+            .all(|norm| *norm > 0.0));
 
         let receipt = run.apply_step(step_input)?;
         assert_eq!(
@@ -1499,8 +1500,8 @@ mod tests {
     }
 
     #[test]
-    fn open_adapter_sft_lane_exports_loadable_lm_head_lora_artifact()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn open_adapter_sft_lane_exports_loadable_lm_head_lora_artifact(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let backend = OpenAdapterTrainingExecutionBackend::new(config(), samples())?;
         let outcome = run_open_adapter_sft_export(
             &backend,
@@ -1539,8 +1540,8 @@ mod tests {
     }
 
     #[test]
-    fn open_adapter_backend_reuses_generic_cluster_window_planning()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn open_adapter_backend_reuses_generic_cluster_window_planning(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let backend = OpenAdapterTrainingExecutionBackend::new(config(), samples())?;
         let state = cluster_state(
             &[

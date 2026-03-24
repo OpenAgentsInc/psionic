@@ -1691,6 +1691,11 @@ fn validate_tensor_payload(
                 });
             }
         }
+        TensorData::I32(_) => {
+            return Err(ModelIoError::DenseF32Required {
+                state_key: String::from(state_key),
+            });
+        }
         TensorData::QuantizedBlocks(quantized) => {
             if spec.dtype() != DType::F32 {
                 return Err(ModelIoError::DenseF32Required {
@@ -1737,6 +1742,9 @@ fn dense_f32_values<'a>(
 ) -> Result<&'a [f32], ModelIoError> {
     match &entry.data {
         TensorData::F32(values) => Ok(values.as_slice()),
+        TensorData::I32(_) => Err(ModelIoError::DenseF32Required {
+            state_key: String::from(state_key),
+        }),
         TensorData::QuantizedBlocks(_) => Err(ModelIoError::DenseF32Required {
             state_key: String::from(state_key),
         }),
@@ -1749,6 +1757,9 @@ fn dense_f32_values_mut<'a>(
 ) -> Result<&'a mut [f32], ModelIoError> {
     match &mut entry.data {
         TensorData::F32(values) => Ok(values.as_mut_slice()),
+        TensorData::I32(_) => Err(ModelIoError::DenseF32Required {
+            state_key: String::from(state_key),
+        }),
         TensorData::QuantizedBlocks(_) => Err(ModelIoError::DenseF32Required {
             state_key: String::from(state_key),
         }),
@@ -1803,6 +1814,12 @@ fn tensor_payload_digest(data: &TensorData) -> String {
     match data {
         TensorData::F32(values) => {
             hasher.update(b"f32|");
+            for value in values {
+                hasher.update(value.to_le_bytes());
+            }
+        }
+        TensorData::I32(values) => {
+            hasher.update(b"i32|");
             for value in values {
                 hasher.update(value.to_le_bytes());
             }

@@ -3877,6 +3877,18 @@ const BUILTIN_OPERATOR_SCHEMAS: &[OperatorSchema] = &[
         OperatorMetaExecutionKind::BuiltinInference,
     ),
     OperatorSchema::new(
+        "parameter_golf_token_embedding_lookup",
+        OperatorArity::Fixed(2),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
+        "parameter_golf_token_embedding_lookup_backward",
+        OperatorArity::Fixed(3),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
         "parameter_golf_projection_loss",
         OperatorArity::Fixed(2),
         OperatorImplementationKind::BackendKernel,
@@ -4474,6 +4486,18 @@ fn meta_execute_backend_extension(
                 input.device().clone(),
             ))
         }
+        BackendExtensionOp::ParameterGolfTokenEmbeddingLookup => {
+            validate_parameter_golf_token_embedding_lookup_spec(
+                "parameter_golf_token_embedding_lookup",
+                inputs,
+            )
+        }
+        BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward => {
+            validate_parameter_golf_token_embedding_lookup_backward_spec(
+                "parameter_golf_token_embedding_lookup_backward",
+                inputs,
+            )
+        }
         BackendExtensionOp::ParameterGolfProjectionLoss { .. } => {
             validate_parameter_golf_projection_loss_spec("parameter_golf_projection_loss", inputs)
         }
@@ -4965,8 +4989,43 @@ impl GraphBuilder {
         Ok(self.register_backend_extension(op, vec![input.id(), grad_output.id()], spec))
     }
 
+    /// Looks up Parameter Golf token embeddings from integer token ids and the
+    /// token embedding table.
+    pub fn parameter_golf_token_embedding_lookup(
+        &mut self,
+        token_ids: &Tensor,
+        token_embedding: &Tensor,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::ParameterGolfTokenEmbeddingLookup;
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[token_ids, token_embedding],
+            None,
+        )?;
+        Ok(self.register_backend_extension(op, vec![token_ids.id(), token_embedding.id()], spec))
+    }
+
+    pub(crate) fn parameter_golf_token_embedding_lookup_backward(
+        &mut self,
+        token_ids: &Tensor,
+        token_embedding: &Tensor,
+        grad_output: &Tensor,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward;
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[token_ids, token_embedding, grad_output],
+            None,
+        )?;
+        Ok(self.register_backend_extension(
+            op,
+            vec![token_ids.id(), token_embedding.id(), grad_output.id()],
+            spec,
+        ))
+    }
+
     /// Applies the bounded Parameter Golf tanh-softcap next-token mean loss to
-    /// rank-3 pre-softcap logits and dense `f32` target ids.
+    /// rank-3 pre-softcap logits and integer target ids.
     pub fn parameter_golf_projection_loss(
         &mut self,
         pre_softcap_logits: &Tensor,
@@ -5482,7 +5541,9 @@ fn format_execution_payload(op: &ExecutionOp) -> String {
 
 fn format_backend_extension_payload(op: &BackendExtensionOp) -> String {
     match op {
-        BackendExtensionOp::ReluSquared
+        BackendExtensionOp::ParameterGolfTokenEmbeddingLookup
+        | BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward
+        | BackendExtensionOp::ReluSquared
         | BackendExtensionOp::ReluSquaredBackward
         | BackendExtensionOp::Silu
         | BackendExtensionOp::SiluBackward => String::new(),
@@ -5523,6 +5584,14 @@ fn format_tensor_data(data: &TensorData) -> String {
                 .collect::<Vec<_>>()
                 .join(",");
             format!("f32:{bits}")
+        }
+        TensorData::I32(values) => {
+            let bits = values
+                .iter()
+                .map(|value| format!("{:08x}", *value as u32))
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("i32:{bits}")
         }
         TensorData::QuantizedBlocks(data) => format!(
             "quantized:{:?}:blocks={}:bytes_per_block={}:bytes={}",
@@ -5807,11 +5876,11 @@ fn validate_parameter_golf_projection_loss_spec(
             format!("logits dtype must be F32, actual {:?}", logits.dtype()),
         ));
     }
-    if target_ids.dtype() != DType::F32 {
+    if target_ids.dtype() != DType::I32 {
         return Err(extension_error(
             label,
             format!(
-                "target_ids dtype must be F32 token indices, actual {:?}",
+                "target_ids dtype must be I32 token indices, actual {:?}",
                 target_ids.dtype()
             ),
         ));
@@ -5861,6 +5930,100 @@ fn validate_parameter_golf_projection_loss_spec(
         DType::F32,
         logits.device().clone(),
     ))
+}
+
+fn validate_parameter_golf_token_embedding_lookup_spec(
+    label: &str,
+    inputs: &[TensorSpec],
+) -> Result<TensorSpec, GraphError> {
+    if inputs.len() != 2 {
+        return Err(extension_error(
+            label,
+            format!("expected 2 inputs, received {}", inputs.len()),
+        ));
+    }
+    let token_ids = &inputs[0];
+    let token_embedding = &inputs[1];
+    if token_ids.dtype() != DType::I32 {
+        return Err(extension_error(
+            label,
+            format!(
+                "token_ids dtype must be I32 token indices, actual {:?}",
+                token_ids.dtype()
+            ),
+        ));
+    }
+    if token_embedding.dtype() != DType::F32 {
+        return Err(extension_error(
+            label,
+            format!(
+                "token_embedding dtype must be F32, actual {:?}",
+                token_embedding.dtype()
+            ),
+        ));
+    }
+    if token_ids.device() != token_embedding.device() {
+        return Err(extension_error(
+            label,
+            format!(
+                "token_ids device {} must match token_embedding device {}",
+                token_ids.device(),
+                token_embedding.device()
+            ),
+        ));
+    }
+    if token_ids.shape().dims().len() != 2 {
+        return Err(extension_error(
+            label,
+            format!(
+                "token_ids shape {} must be rank-2 [batch, seq]",
+                token_ids.shape()
+            ),
+        ));
+    }
+    if token_embedding.shape().dims().len() != 2 {
+        return Err(extension_error(
+            label,
+            format!(
+                "token_embedding shape {} must be rank-2 [vocab, model_dim]",
+                token_embedding.shape()
+            ),
+        ));
+    }
+    Ok(TensorSpec::new(
+        Shape::new(vec![
+            token_ids.shape().dims()[0],
+            token_ids.shape().dims()[1],
+            token_embedding.shape().dims()[1],
+        ]),
+        DType::F32,
+        token_ids.device().clone(),
+    ))
+}
+
+fn validate_parameter_golf_token_embedding_lookup_backward_spec(
+    label: &str,
+    inputs: &[TensorSpec],
+) -> Result<TensorSpec, GraphError> {
+    if inputs.len() != 3 {
+        return Err(extension_error(
+            label,
+            format!("expected 3 inputs, received {}", inputs.len()),
+        ));
+    }
+    let forward_spec = validate_parameter_golf_token_embedding_lookup_spec(label, &inputs[..2])?;
+    let grad_output = &inputs[2];
+    if grad_output != &forward_spec {
+        return Err(extension_error(
+            label,
+            format!(
+                "grad_output spec {} must match embedding output spec {}",
+                format_spec(grad_output),
+                format_spec(&forward_spec)
+            ),
+        ));
+    }
+    Ok(inputs[1].clone())
 }
 
 fn validate_parameter_golf_projection_loss_backward_spec(

@@ -387,6 +387,44 @@ int psionic_cuda_parameter_golf_projection_loss(
     return 1;
 }
 
+int psionic_cuda_parameter_golf_token_embedding_lookup(
+    const void *token_ids,
+    const void *token_embedding,
+    int row_count,
+    int vocab_size,
+    int width,
+    void *output,
+    void *stream
+) {
+    (void)token_ids;
+    (void)token_embedding;
+    (void)row_count;
+    (void)vocab_size;
+    (void)width;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
+int psionic_cuda_parameter_golf_token_embedding_lookup_backward(
+    const void *token_ids,
+    const void *grad_output,
+    int row_count,
+    int vocab_size,
+    int width,
+    void *output,
+    void *stream
+) {
+    (void)token_ids;
+    (void)grad_output;
+    (void)row_count;
+    (void)vocab_size;
+    (void)width;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
 int psionic_cuda_parameter_golf_projection_loss_backward(
     const void *logits,
     const void *target_ids,

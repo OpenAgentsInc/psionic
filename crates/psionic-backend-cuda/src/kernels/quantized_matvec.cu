@@ -1039,7 +1039,7 @@ __global__ void rms_norm_weight_backward_kernel(
 
 __global__ void parameter_golf_projection_loss_kernel(
     const float *logits,
-    const float *target_ids,
+    const int *target_ids,
     int row_count,
     int vocab_size,
     float logit_softcap,
@@ -1078,7 +1078,7 @@ __global__ void parameter_golf_projection_loss_kernel(
 
 __global__ void parameter_golf_projection_loss_backward_kernel(
     const float *logits,
-    const float *target_ids,
+    const int *target_ids,
     const float *grad_output,
     int row_count,
     int vocab_size,
@@ -1116,6 +1116,55 @@ __global__ void parameter_golf_projection_loss_backward_kernel(
         const float softcap_derivative = 1.0f - ratio * ratio;
         output[row_offset + column] =
             scale * (probability - delta) * softcap_derivative;
+    }
+}
+
+__global__ void parameter_golf_token_embedding_lookup_kernel(
+    const int *token_ids,
+    const float *token_embedding,
+    int row_count,
+    int vocab_size,
+    int width,
+    float *output
+) {
+    const int row = blockIdx.x;
+    if (row >= row_count) {
+        return;
+    }
+    const int token_id = token_ids[row];
+    if (token_id < 0 || token_id >= vocab_size) {
+        return;
+    }
+    const int source_offset = token_id * width;
+    const int destination_offset = row * width;
+    for (int column = threadIdx.x; column < width; column += blockDim.x) {
+        output[destination_offset + column] = token_embedding[source_offset + column];
+    }
+}
+
+__global__ void parameter_golf_token_embedding_lookup_backward_kernel(
+    const int *token_ids,
+    const float *grad_output,
+    int row_count,
+    int vocab_size,
+    int width,
+    float *output
+) {
+    const int row = blockIdx.x;
+    if (row >= row_count) {
+        return;
+    }
+    const int token_id = token_ids[row];
+    if (token_id < 0 || token_id >= vocab_size) {
+        return;
+    }
+    const int source_offset = row * width;
+    const int destination_offset = token_id * width;
+    for (int column = threadIdx.x; column < width; column += blockDim.x) {
+        atomicAdd(
+            &output[destination_offset + column],
+            grad_output[source_offset + column]
+        );
     }
 }
 
@@ -4424,7 +4473,7 @@ extern "C" int psionic_cuda_parameter_golf_projection_loss(
         static_cast<cudaStream_t>(stream)
     >>>(
         static_cast<const float *>(logits),
-        static_cast<const float *>(target_ids),
+        static_cast<const int *>(target_ids),
         row_count,
         vocab_size,
         logit_softcap,
@@ -4453,11 +4502,76 @@ extern "C" int psionic_cuda_parameter_golf_projection_loss_backward(
         static_cast<cudaStream_t>(stream)
     >>>(
         static_cast<const float *>(logits),
-        static_cast<const float *>(target_ids),
+        static_cast<const int *>(target_ids),
         static_cast<const float *>(grad_output),
         row_count,
         vocab_size,
         logit_softcap,
+        static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_parameter_golf_token_embedding_lookup(
+    const void *token_ids,
+    const void *token_embedding,
+    int row_count,
+    int vocab_size,
+    int width,
+    void *output,
+    void *stream
+) {
+    if (row_count <= 0 || vocab_size <= 0 || width <= 0) {
+        return static_cast<int>(cudaErrorInvalidValue);
+    }
+    parameter_golf_token_embedding_lookup_kernel<<<
+        row_count,
+        kBlockSize,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const int *>(token_ids),
+        static_cast<const float *>(token_embedding),
+        row_count,
+        vocab_size,
+        width,
+        static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_parameter_golf_token_embedding_lookup_backward(
+    const void *token_ids,
+    const void *grad_output,
+    int row_count,
+    int vocab_size,
+    int width,
+    void *output,
+    void *stream
+) {
+    if (row_count <= 0 || vocab_size <= 0 || width <= 0) {
+        return static_cast<int>(cudaErrorInvalidValue);
+    }
+    cudaError_t status = cudaMemsetAsync(
+        output,
+        0,
+        static_cast<size_t>(vocab_size) * static_cast<size_t>(width) * sizeof(float),
+        static_cast<cudaStream_t>(stream)
+    );
+    if (status != cudaSuccess) {
+        return static_cast<int>(status);
+    }
+    parameter_golf_token_embedding_lookup_backward_kernel<<<
+        row_count,
+        kBlockSize,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const int *>(token_ids),
+        static_cast<const float *>(grad_output),
+        row_count,
+        vocab_size,
+        width,
         static_cast<float *>(output)
     );
     return static_cast<int>(cudaGetLastError());

@@ -2746,6 +2746,9 @@ impl AvailableMetalBackend {
                 buffer.write_f32(values.as_slice())?;
                 Ok(buffer)
             }
+            TensorData::I32(_) => Err(RuntimeError::Backend(String::from(
+                "metal constant storage does not yet support dense i32 payloads",
+            ))),
             TensorData::QuantizedBlocks(data) => {
                 validate_quantized_storage(spec, data)?;
                 let storage_mode = self.platform.storage_mode();
@@ -3716,6 +3719,12 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                         step.output
                     )));
                 }
+            }
+            TensorData::I32(_) => {
+                return Err(RuntimeError::Backend(format!(
+                    "metal constant {} does not support dense i32 payloads",
+                    step.output
+                )));
             }
             TensorData::QuantizedBlocks(data) => {
                 validate_quantized_storage(&step.spec, data)?;
@@ -4846,10 +4855,9 @@ mod platform {
     };
 
     use super::{
-        DeviceSupportTier, FLASH_ATTENTION_FEATURE_FLAG, FamilySupport, LEGACY_FAMILY_FLAG,
-        MODERN_FAMILY_FLAG, MetalBuffer, MetalCommandStatus, MetalCommandWait,
-        MetalDiscoveryReport, MetalKernelCache, MetalStorageMode, classify_support,
-        quantized_row_stride,
+        classify_support, quantized_row_stride, DeviceSupportTier, FamilySupport, MetalBuffer,
+        MetalCommandStatus, MetalCommandWait, MetalDiscoveryReport, MetalKernelCache,
+        MetalStorageMode, FLASH_ATTENTION_FEATURE_FLAG, LEGACY_FAMILY_FLAG, MODERN_FAMILY_FLAG,
     };
 
     #[derive(Clone)]
@@ -6626,10 +6634,10 @@ mod tests {
     };
 
     use super::{
-        DeviceSupportTier, EMBEDDINGS_SUPPORTED_OPS, FamilySupport, MetalAttentionGraphReserve,
-        MetalBackend, MetalGraphReserveKind, MetalPromptResidencyMetrics,
-        MetalSharedPrefixCompatibility, MetalSharedPrefixStore, TEXT_GENERATION_SUPPORTED_OPS,
-        classify_support, validate_quantized_storage, validate_supported_plan,
+        classify_support, validate_quantized_storage, validate_supported_plan, DeviceSupportTier,
+        FamilySupport, MetalAttentionGraphReserve, MetalBackend, MetalGraphReserveKind,
+        MetalPromptResidencyMetrics, MetalSharedPrefixCompatibility, MetalSharedPrefixStore,
+        EMBEDDINGS_SUPPORTED_OPS, TEXT_GENERATION_SUPPORTED_OPS,
     };
 
     fn sample_repeated_mxfp4_rows(rows: usize) -> Vec<u8> {
@@ -6879,8 +6887,8 @@ mod tests {
 
     #[cfg(not(target_os = "macos"))]
     #[test]
-    fn metal_backend_reports_offline_on_unsupported_platform()
-    -> Result<(), psionic_runtime::RuntimeError> {
+    fn metal_backend_reports_offline_on_unsupported_platform(
+    ) -> Result<(), psionic_runtime::RuntimeError> {
         let backend = MetalBackend::new();
         let report = backend.discovery_report()?;
         assert!(report.devices.is_empty());
@@ -6895,8 +6903,8 @@ mod tests {
 
     #[cfg(not(target_os = "macos"))]
     #[test]
-    fn metal_backend_fallback_selection_reports_explicit_cpu_fallback()
-    -> Result<(), psionic_runtime::RuntimeError> {
+    fn metal_backend_fallback_selection_reports_explicit_cpu_fallback(
+    ) -> Result<(), psionic_runtime::RuntimeError> {
         let backend = MetalBackend::new();
         let cpu = CpuBackend::new();
         let selection = backend.fallback_selection(&cpu, EMBEDDINGS_SUPPORTED_OPS)?;
@@ -6930,8 +6938,8 @@ mod tests {
 
     #[cfg(not(target_os = "macos"))]
     #[test]
-    fn metal_text_generation_fallback_selection_reports_explicit_cpu_fallback()
-    -> Result<(), psionic_runtime::RuntimeError> {
+    fn metal_text_generation_fallback_selection_reports_explicit_cpu_fallback(
+    ) -> Result<(), psionic_runtime::RuntimeError> {
         let backend = MetalBackend::new();
         let cpu = CpuBackend::new();
         let selection = backend.fallback_selection(&cpu, TEXT_GENERATION_SUPPORTED_OPS)?;
@@ -7030,8 +7038,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_selection_reports_ready_metal_or_explicit_cpu_fallback()
-    -> Result<(), psionic_runtime::RuntimeError> {
+    fn metal_backend_selection_reports_ready_metal_or_explicit_cpu_fallback(
+    ) -> Result<(), psionic_runtime::RuntimeError> {
         let backend = MetalBackend::new();
         let cpu = CpuBackend::new();
         match backend.backend_selection(EMBEDDINGS_SUPPORTED_OPS) {
@@ -7091,8 +7099,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_allocates_and_submits_copy_on_supported_hardware()
-    -> Result<(), psionic_runtime::RuntimeError> {
+    fn metal_backend_allocates_and_submits_copy_on_supported_hardware(
+    ) -> Result<(), psionic_runtime::RuntimeError> {
         use super::{MetalCommandStatus, MetalCommandWait};
 
         let mut backend = MetalBackend::new();
@@ -7118,8 +7126,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_selection_supports_text_generation_surface()
-    -> Result<(), psionic_runtime::RuntimeError> {
+    fn metal_backend_selection_supports_text_generation_surface(
+    ) -> Result<(), psionic_runtime::RuntimeError> {
         let backend = MetalBackend::new();
         let cpu = CpuBackend::new();
         match backend.backend_selection(TEXT_GENERATION_SUPPORTED_OPS) {
@@ -7173,8 +7181,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_configures_text_generation_runtime_policy_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_configures_text_generation_runtime_policy_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7213,8 +7221,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_reports_memory_refusal_when_text_generation_policy_exceeds_budget_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_reports_memory_refusal_when_text_generation_policy_exceeds_budget_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7236,8 +7244,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_reports_quantized_weight_upload_support()
-    -> Result<(), psionic_runtime::RuntimeError> {
+    fn metal_backend_reports_quantized_weight_upload_support(
+    ) -> Result<(), psionic_runtime::RuntimeError> {
         let backend = MetalBackend::new();
         let Some(selected) = backend.selected_device() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7269,8 +7277,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_executes_embedding_surface_on_supported_hardware()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_backend_executes_embedding_surface_on_supported_hardware(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = MetalBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7302,8 +7310,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_executes_rms_norm_extension_on_supported_hardware()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_backend_executes_rms_norm_extension_on_supported_hardware(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = MetalBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7337,8 +7345,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_executes_rotary_embedding_extension_on_supported_hardware()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_backend_executes_rotary_embedding_extension_on_supported_hardware(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = MetalBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7369,8 +7377,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_executes_text_generation_dense_surface_on_supported_hardware()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_backend_executes_text_generation_dense_surface_on_supported_hardware(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = MetalBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7470,8 +7478,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_selects_greedy_token_with_bounded_output_mode_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_selects_greedy_token_with_bounded_output_mode_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7499,8 +7507,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_bounds_top_k_candidate_output_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_bounds_top_k_candidate_output_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7534,8 +7542,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_materializes_raw_logits_only_when_requested_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_materializes_raw_logits_only_when_requested_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7563,8 +7571,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_executes_scaled_dot_product_attention_extension_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_executes_scaled_dot_product_attention_extension_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7609,8 +7617,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_decode_attention_uses_device_kv_and_flash_path_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_decode_attention_uses_device_kv_and_flash_path_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7692,8 +7700,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_attention_graph_runtime_reports_reserve_reuse_and_rebuild_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_attention_graph_runtime_reports_reserve_reuse_and_rebuild_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7756,8 +7764,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_decode_attention_reuses_reserved_runtime_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_decode_attention_reuses_reserved_runtime_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7825,8 +7833,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_executes_q8_0_quantized_matvec_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_executes_q8_0_quantized_matvec_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7846,8 +7854,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_mul_mv_id_matches_grouped_q8_0_reference_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_mul_mv_id_matches_grouped_q8_0_reference_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7910,8 +7918,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_mul_mv_id_matches_grouped_mxfp4_reference_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_mul_mv_id_matches_grouped_mxfp4_reference_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -7967,8 +7975,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_expert_matvec_f32_ids_matches_grouped_q8_0_reference_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_expert_matvec_f32_ids_matches_grouped_q8_0_reference_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -8035,8 +8043,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_backend_expert_matvec_f32_ids_matches_grouped_mxfp4_reference_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_backend_expert_matvec_f32_ids_matches_grouped_mxfp4_reference_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -8096,8 +8104,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_kv_cache_mirror_appends_and_reads_entries_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_kv_cache_mirror_appends_and_reads_entries_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -8147,8 +8155,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_shared_prefix_store_reuses_device_resident_prefix_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_shared_prefix_store_reuses_device_resident_prefix_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);
@@ -8203,8 +8211,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_shared_prefix_store_rebuilds_stale_entries_on_supported_hardware()
-    -> Result<(), RuntimeError> {
+    fn metal_shared_prefix_store_rebuilds_stale_entries_on_supported_hardware(
+    ) -> Result<(), RuntimeError> {
         let mut backend = MetalBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_ne!(backend.health().status, HealthStatus::Ready);

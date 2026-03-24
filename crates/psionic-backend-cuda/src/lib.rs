@@ -74,6 +74,8 @@ pub const SUPPORTED_OPS: &[&str] = &[
     "relu_squared_backward",
     "silu",
     "silu_backward",
+    "parameter_golf_token_embedding_lookup",
+    "parameter_golf_token_embedding_lookup_backward",
     "parameter_golf_projection_loss",
     "parameter_golf_projection_loss_backward",
     "rms_norm",
@@ -389,6 +391,28 @@ impl CudaBuffer {
         self.write_bytes(&bytes)
     }
 
+    /// Writes contiguous `i32` values into an `i32` buffer.
+    pub fn write_i32(&mut self, values: &[i32]) -> Result<(), RuntimeError> {
+        if self.spec.dtype() != DType::I32 {
+            return Err(RuntimeError::Backend(format!(
+                "write_i32 requires I32 buffer, actual {:?}",
+                self.spec.dtype()
+            )));
+        }
+        if values.len() != self.spec.storage_size() {
+            return Err(RuntimeError::Backend(format!(
+                "cuda buffer write length mismatch: expected {} values, actual {}",
+                self.spec.storage_size(),
+                values.len()
+            )));
+        }
+        let mut bytes = Vec::with_capacity(self.byte_len);
+        for value in values {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+        self.write_bytes(&bytes)
+    }
+
     /// Writes contiguous `f32` values into a region of an `f32` buffer.
     pub fn write_f32_at_offset(
         &mut self,
@@ -454,6 +478,22 @@ impl CudaBuffer {
         let mut values = Vec::with_capacity(bytes.len() / size_of_dtype(self.spec.dtype()));
         for chunk in bytes.chunks_exact(size_of_dtype(self.spec.dtype())) {
             values.push(f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
+        }
+        Ok(values)
+    }
+
+    /// Reads contiguous `i32` values from an `i32` buffer.
+    pub fn read_i32(&self) -> Result<Vec<i32>, RuntimeError> {
+        if self.spec.dtype() != DType::I32 {
+            return Err(RuntimeError::Backend(format!(
+                "read_i32 requires I32 buffer, actual {:?}",
+                self.spec.dtype()
+            )));
+        }
+        let bytes = self.read_bytes()?;
+        let mut values = Vec::with_capacity(bytes.len() / size_of_dtype(self.spec.dtype()));
+        for chunk in bytes.chunks_exact(size_of_dtype(self.spec.dtype())) {
+            values.push(i32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
         }
         Ok(values)
     }
@@ -2100,6 +2140,25 @@ impl CudaBackend {
         Ok(buffer)
     }
 
+    /// Creates a dense `i32` input buffer on the selected CUDA device.
+    pub fn input_i32_buffer(
+        &mut self,
+        shape: Shape,
+        values: impl Into<Vec<i32>>,
+    ) -> Result<CudaBuffer, RuntimeError> {
+        let Some(device) = self
+            .selected_device()
+            .map(|descriptor| descriptor.device.clone())
+        else {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda backend unavailable: no selected execution device",
+            )));
+        };
+        let mut buffer = self.allocate(&TensorSpec::new(shape, DType::I32, device))?;
+        buffer.write_i32(values.into().as_slice())?;
+        Ok(buffer)
+    }
+
     /// Allocates an uninitialized dense `f32` buffer on the selected CUDA device.
     pub fn f32_buffer(&mut self, len: usize) -> Result<CudaBuffer, RuntimeError> {
         let Some(device) = self
@@ -2532,6 +2591,9 @@ impl DeviceDiscovery for CudaBackend {
 
     fn extension_support(&self) -> Vec<BackendExtensionSupport> {
         vec![
+            BackendExtensionSupport::backend_specialized(
+                BackendExtensionKind::ParameterGolfTokenEmbeddingLookup,
+            ),
             BackendExtensionSupport::backend_specialized(BackendExtensionKind::ReluSquared),
             BackendExtensionSupport::backend_specialized(BackendExtensionKind::Silu),
             BackendExtensionSupport::backend_specialized(
@@ -2743,18 +2805,21 @@ impl AvailableCudaBackend {
         spec: &TensorSpec,
         data: &TensorData,
     ) -> Result<CudaBuffer, RuntimeError> {
-        let Some(values) = data.as_f32_slice() else {
-            return Err(RuntimeError::Backend(String::from(
-                "cuda constant storage must use dense f32 payloads",
-            )));
-        };
-        if values.len() != spec.storage_size() {
+        if data.len() != spec.storage_size() {
             return Err(RuntimeError::Backend(String::from(
                 "cuda constant payload length mismatch",
             )));
         }
         let mut buffer = self.allocate(spec)?;
-        buffer.write_f32(values)?;
+        match data {
+            TensorData::F32(values) => buffer.write_f32(values)?,
+            TensorData::I32(values) => buffer.write_i32(values)?,
+            TensorData::QuantizedBlocks(_) => {
+                return Err(RuntimeError::Backend(String::from(
+                    "cuda constant storage must use dense f32 or i32 payloads",
+                )))
+            }
+        }
         Ok(buffer)
     }
 
@@ -2903,6 +2968,98 @@ impl AvailableCudaBackend {
         self.buffer_from_tensor_data(&step.spec, &TensorData::F32(output_values))
     }
 
+    fn execute_parameter_golf_token_embedding_lookup_step(
+        &self,
+        submission: &mut CudaSubmission,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CudaBuffer>,
+    ) -> Result<CudaBuffer, RuntimeError> {
+        let token_ids = step_input(step, values, 0)?;
+        let token_embedding = step_input(step, values, 1)?;
+        let token_id_dims = token_ids.spec().shape().dims();
+        let token_embedding_dims = token_embedding.spec().shape().dims();
+        if token_ids.spec().dtype() != DType::I32 {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_token_embedding_lookup requires I32 token ids",
+            )));
+        }
+        if token_embedding.spec().dtype() != DType::F32 {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_token_embedding_lookup requires F32 token embedding weights",
+            )));
+        }
+        if token_id_dims.len() != 2 || token_embedding_dims.len() != 2 {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_token_embedding_lookup requires rank-2 token ids and token embedding tensors",
+            )));
+        }
+        let row_count = token_id_dims[0].saturating_mul(token_id_dims[1]);
+        let vocab_size = token_embedding_dims[0];
+        let width = token_embedding_dims[1];
+        let output = self.allocate(&step.spec)?;
+        submission
+            .platform
+            .encode_parameter_golf_token_embedding_lookup(
+                &token_ids.platform,
+                &token_embedding.platform,
+                row_count,
+                vocab_size,
+                width,
+                &output.platform,
+            )?;
+        submission.encoded_operations += 1;
+        Ok(output)
+    }
+
+    fn execute_parameter_golf_token_embedding_lookup_backward_step(
+        &self,
+        submission: &mut CudaSubmission,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CudaBuffer>,
+    ) -> Result<CudaBuffer, RuntimeError> {
+        let token_ids = step_input(step, values, 0)?;
+        let token_embedding = step_input(step, values, 1)?;
+        let grad_output = step_input(step, values, 2)?;
+        let token_id_dims = token_ids.spec().shape().dims();
+        let token_embedding_dims = token_embedding.spec().shape().dims();
+        let grad_output_dims = grad_output.spec().shape().dims();
+        if token_ids.spec().dtype() != DType::I32 {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_token_embedding_lookup_backward requires I32 token ids",
+            )));
+        }
+        if token_embedding.spec().dtype() != DType::F32 || grad_output.spec().dtype() != DType::F32
+        {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_token_embedding_lookup_backward requires F32 embedding weights and grad_output",
+            )));
+        }
+        if token_id_dims.len() != 2
+            || token_embedding_dims.len() != 2
+            || grad_output_dims.len() != 3
+        {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_token_embedding_lookup_backward requires rank-2 token ids and token embedding tensors plus rank-3 grad_output",
+            )));
+        }
+        let row_count = token_id_dims[0].saturating_mul(token_id_dims[1]);
+        let vocab_size = token_embedding_dims[0];
+        let width = token_embedding_dims[1];
+        let output = self.allocate(&step.spec)?;
+        submission
+            .platform
+            .encode_parameter_golf_token_embedding_lookup_backward(
+                &token_ids.platform,
+                &grad_output.platform,
+                row_count,
+                vocab_size,
+                width,
+                &output.platform,
+            )?;
+        submission.encoded_operations += 1;
+        Ok(output)
+    }
+
     fn execute_parameter_golf_projection_loss_step(
         &self,
         submission: &mut CudaSubmission,
@@ -2914,6 +3071,11 @@ impl AvailableCudaBackend {
         let target_ids = step_input(step, values, 1)?;
         let logits_dims = logits.spec().shape().dims();
         let target_dims = target_ids.spec().shape().dims();
+        if target_ids.spec().dtype() != DType::I32 {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_projection_loss requires I32 target_ids",
+            )));
+        }
         if logits_dims.len() != 3 {
             return Err(RuntimeError::Backend(String::from(
                 "cuda parameter_golf_projection_loss requires rank-3 logits [batch, seq, vocab]",
@@ -2956,6 +3118,11 @@ impl AvailableCudaBackend {
         let grad_output = step_input(step, values, 2)?;
         let logits_dims = logits.spec().shape().dims();
         let target_dims = target_ids.spec().shape().dims();
+        if target_ids.spec().dtype() != DType::I32 {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_projection_loss_backward requires I32 target_ids",
+            )));
+        }
         if logits_dims.len() != 3 {
             return Err(RuntimeError::Backend(String::from(
                 "cuda parameter_golf_projection_loss_backward requires rank-3 logits [batch, seq, vocab]",
@@ -3521,6 +3688,23 @@ impl AvailableCudaBackend {
                     values.insert(step.output, output);
                 }
                 ExecutionOp::BackendExtension { op } => match op {
+                    BackendExtensionOp::ParameterGolfTokenEmbeddingLookup => {
+                        let output = self.execute_parameter_golf_token_embedding_lookup_step(
+                            &mut submission,
+                            step,
+                            &values,
+                        )?;
+                        values.insert(step.output, output);
+                    }
+                    BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward => {
+                        let output = self
+                            .execute_parameter_golf_token_embedding_lookup_backward_step(
+                                &mut submission,
+                                step,
+                                &values,
+                            )?;
+                        values.insert(step.output, output);
+                    }
                     BackendExtensionOp::ReluSquared => {
                         values.insert(step.output, self.execute_relu_squared_step(step, &values)?);
                     }
@@ -4040,6 +4224,22 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
             }
         }
         ExecutionOp::BackendExtension { op } => match op {
+            BackendExtensionOp::ParameterGolfTokenEmbeddingLookup => {
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda parameter_golf_token_embedding_lookup step {} requires two inputs",
+                        step.output
+                    )));
+                }
+            }
+            BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward => {
+                if step.inputs.len() != 3 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda parameter_golf_token_embedding_lookup_backward step {} requires three inputs",
+                        step.output
+                    )));
+                }
+            }
             BackendExtensionOp::ReluSquared => {
                 if step.inputs.len() != 1 {
                     return Err(RuntimeError::Backend(format!(
@@ -5575,6 +5775,24 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_parameter_golf_token_embedding_lookup(
+            token_ids: *const c_void,
+            token_embedding: *const c_void,
+            row_count: c_int,
+            vocab_size: c_int,
+            width: c_int,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_parameter_golf_token_embedding_lookup_backward(
+            token_ids: *const c_void,
+            grad_output: *const c_void,
+            row_count: c_int,
+            vocab_size: c_int,
+            width: c_int,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_parameter_golf_projection_loss(
             logits: *const c_void,
             target_ids: *const c_void,
@@ -7036,6 +7254,88 @@ mod platform {
                     )
                 },
                 "psionic_cuda_parameter_golf_projection_loss",
+            )
+        }
+
+        pub(super) fn encode_parameter_golf_token_embedding_lookup(
+            &mut self,
+            token_ids: &PlatformBuffer,
+            token_embedding: &PlatformBuffer,
+            row_count: usize,
+            vocab_size: usize,
+            width: usize,
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let row_count = c_int::try_from(row_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda parameter_golf_token_embedding_lookup row count exceeds c_int",
+                ))
+            })?;
+            let vocab_size = c_int::try_from(vocab_size).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda parameter_golf_token_embedding_lookup vocab size exceeds c_int",
+                ))
+            })?;
+            let width = c_int::try_from(width).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda parameter_golf_token_embedding_lookup width exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_parameter_golf_token_embedding_lookup(
+                        token_ids.inner.device_ptr.cast(),
+                        token_embedding.inner.device_ptr.cast(),
+                        row_count,
+                        vocab_size,
+                        width,
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_parameter_golf_token_embedding_lookup",
+            )
+        }
+
+        pub(super) fn encode_parameter_golf_token_embedding_lookup_backward(
+            &mut self,
+            token_ids: &PlatformBuffer,
+            grad_output: &PlatformBuffer,
+            row_count: usize,
+            vocab_size: usize,
+            width: usize,
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let row_count = c_int::try_from(row_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda parameter_golf_token_embedding_lookup_backward row count exceeds c_int",
+                ))
+            })?;
+            let vocab_size = c_int::try_from(vocab_size).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda parameter_golf_token_embedding_lookup_backward vocab size exceeds c_int",
+                ))
+            })?;
+            let width = c_int::try_from(width).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda parameter_golf_token_embedding_lookup_backward width exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_parameter_golf_token_embedding_lookup_backward(
+                        token_ids.inner.device_ptr.cast(),
+                        grad_output.inner.device_ptr.cast(),
+                        row_count,
+                        vocab_size,
+                        width,
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_parameter_golf_token_embedding_lookup_backward",
             )
         }
 

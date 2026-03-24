@@ -9,9 +9,9 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    FixedBudgetTrainingRun, OptimizerStateResidency, TrainingGradientBatch, TrainingParameterClass,
-    TrainingParameterGroupState, TrainingStepInput, TrainingStepReceipt,
-    core_loop::TrainingCoreError,
+    core_loop::TrainingCoreError, FixedBudgetTrainingRun, OptimizerStateResidency,
+    TrainingGradientBatch, TrainingParameterClass, TrainingParameterGroupState, TrainingStepInput,
+    TrainingStepReceipt,
 };
 
 /// Distributed optimizer family owned by the train runtime.
@@ -1238,7 +1238,11 @@ fn distribute_master_weight_bytes(
 fn optimizer_state_multiplier(kind: TrainingOptimizerConfigKind, momentum: Option<f32>) -> u64 {
     match kind {
         TrainingOptimizerConfigKind::Sgd | TrainingOptimizerConfigKind::Lars => {
-            if momentum.is_some() { 1 } else { 0 }
+            if momentum.is_some() {
+                1
+            } else {
+                0
+            }
         }
         TrainingOptimizerConfigKind::Adam
         | TrainingOptimizerConfigKind::AdamW
@@ -1323,6 +1327,12 @@ fn tensor_values(
 ) -> Result<Vec<f32>, DistributedOptimizerError> {
     match &tensor.data {
         TensorData::F32(values) => Ok(values.clone()),
+        TensorData::I32(_) => Err(DistributedOptimizerError::TrainingCore(
+            TrainingCoreError::UnsupportedTensorDType {
+                group_id: String::from(group_id),
+                dtype: tensor.spec.dtype(),
+            },
+        )),
         TensorData::QuantizedBlocks(_) => Err(DistributedOptimizerError::TrainingCore(
             TrainingCoreError::UnsupportedTensorDType {
                 group_id: String::from(group_id),
@@ -1763,8 +1773,8 @@ mod tests {
     }
 
     #[test]
-    fn distributed_optimizer_contract_surfaces_precision_and_memory_truth()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn distributed_optimizer_contract_surfaces_precision_and_memory_truth(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let contract = contract()?;
         let memory_plan = super::build_memory_plan(parameter_groups()?.as_slice(), &contract);
 
@@ -1786,8 +1796,8 @@ mod tests {
     }
 
     #[test]
-    fn distributed_optimizer_run_accumulates_microbatches_and_flushes_step()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn distributed_optimizer_run_accumulates_microbatches_and_flushes_step(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut run = DistributedOptimizerRun::new(
             "distributed-run",
             "train.weather.agent",

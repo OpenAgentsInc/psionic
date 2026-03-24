@@ -90,6 +90,11 @@ The command is explicit about what it treats as trainer truth. It binds:
 - the public single-device batch geometry from
   `ParameterGolfBatchGeometry::challenge_single_device_defaults()`
 - the public baseline `9x512` model contract and optimizer-plan digest
+- integer token ids directly into the lowered graph, where token embedding
+  lookup now happens on-device rather than through a host-owned embedded-input
+  `Vec<f32>` gather before each train or validation batch
+- integer target ids directly into the on-device projection-loss path rather
+  than routing them through dense `f32` target tensors
 - the same single-device warmup-and-restore, repeated-step, periodic
   validation, train-log, and wallclock-stop control-loop shape the public
   `train_gpt.py` path uses

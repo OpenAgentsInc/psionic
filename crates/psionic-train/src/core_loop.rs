@@ -411,9 +411,7 @@ impl TrainingSchedulerConfig {
             Self::Constant => TrainingSchedulerKind::Constant,
             Self::StepLr { .. } => TrainingSchedulerKind::StepLr,
             Self::LinearWarmup { .. } => TrainingSchedulerKind::LinearWarmup,
-            Self::InverseSquareRootWarmup { .. } => {
-                TrainingSchedulerKind::InverseSquareRootWarmup
-            }
+            Self::InverseSquareRootWarmup { .. } => TrainingSchedulerKind::InverseSquareRootWarmup,
             Self::CosineAnnealing { .. } => TrainingSchedulerKind::CosineAnnealing,
         }
     }
@@ -577,6 +575,10 @@ impl TrainingTensorBuffer {
     fn as_f32_slice(&self, group_id: &str) -> Result<&[f32], TrainingCoreError> {
         match &self.data {
             TensorData::F32(values) => Ok(values.as_slice()),
+            TensorData::I32(_) => Err(TrainingCoreError::UnsupportedTensorDType {
+                group_id: String::from(group_id),
+                dtype: self.spec.dtype(),
+            }),
             TensorData::QuantizedBlocks(_) => Err(TrainingCoreError::UnsupportedTensorDType {
                 group_id: String::from(group_id),
                 dtype: self.spec.dtype(),
@@ -587,6 +589,10 @@ impl TrainingTensorBuffer {
     fn as_f32_slice_mut(&mut self, group_id: &str) -> Result<&mut [f32], TrainingCoreError> {
         match &mut self.data {
             TensorData::F32(values) => Ok(values.as_mut_slice()),
+            TensorData::I32(_) => Err(TrainingCoreError::UnsupportedTensorDType {
+                group_id: String::from(group_id),
+                dtype: self.spec.dtype(),
+            }),
             TensorData::QuantizedBlocks(_) => Err(TrainingCoreError::UnsupportedTensorDType {
                 group_id: String::from(group_id),
                 dtype: self.spec.dtype(),
@@ -1730,6 +1736,7 @@ mod tests {
             .expect("loss value should materialize")
         {
             TensorData::F32(values) => values[0],
+            TensorData::I32(_) => panic!("expected dense loss value"),
             TensorData::QuantizedBlocks(_) => panic!("expected dense loss value"),
         };
 

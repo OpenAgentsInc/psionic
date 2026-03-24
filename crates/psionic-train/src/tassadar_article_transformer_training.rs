@@ -955,6 +955,9 @@ fn dense_values<'a>(
 ) -> Result<&'a [f32], TassadarArticleTransformerTrainingError> {
     match &group.parameter.data {
         TensorData::F32(values) => Ok(values.as_slice()),
+        TensorData::I32(_) => Err(TassadarArticleTransformerTrainingError::NonDenseGroup {
+            group_id: String::from(group_id),
+        }),
         TensorData::QuantizedBlocks(_) => {
             Err(TassadarArticleTransformerTrainingError::NonDenseGroup {
                 group_id: String::from(group_id),
@@ -969,6 +972,10 @@ fn dense_f32_values<'a>(
 ) -> Result<&'a [f32], TassadarArticleTransformerTrainingError> {
     match data {
         TensorData::F32(values) => Ok(values.as_slice()),
+        TensorData::I32(_) => Err(TassadarArticleTransformerTrainingError::Serialization {
+            context,
+            message: String::from("expected dense f32 tensor data"),
+        }),
         TensorData::QuantizedBlocks(_) => {
             Err(TassadarArticleTransformerTrainingError::Serialization {
                 context,

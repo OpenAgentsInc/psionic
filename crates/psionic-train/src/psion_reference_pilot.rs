@@ -34,39 +34,36 @@ use thiserror::Error;
 
 use crate::{
     record_psion_pilot_held_out_loss, record_psion_pilot_pretraining_run,
-    record_psion_pilot_route_probe, record_psion_refusal_calibration_receipt,
-    record_psion_route_class_evaluation_receipt,
-    record_psion_pretrain_run_observability, run_psion_pretrain_stage,
-    run_psion_pretrain_stage_with_execution, ArtifactArchiveClass, ArtifactColdRestoreReceipt,
-    ArtifactRetentionProfile, ArtifactStorageSweepReceipt, CheckpointDurabilityPosture,
-    CheckpointManifest, CheckpointPointer, CheckpointScopeBinding, CheckpointRecoveryError,
-    CheckpointScopeKind, CheckpointShardManifest, CheckpointStoreReadOptions,
-    FixedBudgetTrainingRun, InMemoryCheckpointStore,
-    PsionAcceptanceMatrix,
-    PsionAcceptanceMatrixError, PsionBenchmarkCatalog, PsionBenchmarkEvidenceReceipt,
-    PsionBenchmarkFamily, PsionBenchmarkPackageContract, PsionBenchmarkPackageError,
-    PsionBenchmarkTaskContract, PsionCapabilityMatrixView, PsionCheckpointRecoveryReceipt,
-    PsionContaminationReviewDisposition, PsionContaminationReviewReceipt, PsionMetricKind,
-    PsionObservedMetric, PsionPhaseGate, PsionPilotHeldOutLossFamily,
-    PsionPilotHeldOutLossRow, PsionPilotPretrainingRunBundle, PsionPilotPretrainingRunError,
-    PsionPilotRouteProbeKind, PsionPilotRouteProbeRow, PsionPretrainCheckpointArtifactReceipt,
-    PsionPretrainCheckpointLineageReceipt, PsionPretrainHardwareTopologyReceipt,
-    PsionPretrainLossNormalization, PsionPretrainObjectiveConfig,
-    PsionPretrainObjectiveKind, PsionPretrainReplayReceipt, PsionPretrainRunCostBasis,
-    PsionPretrainRunCostReceipt, PsionPretrainRunObservabilityError,
+    record_psion_pilot_route_probe, record_psion_pretrain_run_observability,
+    record_psion_refusal_calibration_receipt, record_psion_route_class_evaluation_receipt,
+    run_psion_pretrain_stage, run_psion_pretrain_stage_with_execution, ArtifactArchiveClass,
+    ArtifactColdRestoreReceipt, ArtifactRetentionProfile, ArtifactStorageSweepReceipt,
+    CheckpointDurabilityPosture, CheckpointManifest, CheckpointPointer, CheckpointRecoveryError,
+    CheckpointScopeBinding, CheckpointScopeKind, CheckpointShardManifest,
+    CheckpointStoreReadOptions, FixedBudgetTrainingRun, InMemoryCheckpointStore,
+    PsionAcceptanceMatrix, PsionAcceptanceMatrixError, PsionBenchmarkCatalog,
+    PsionBenchmarkEvidenceReceipt, PsionBenchmarkFamily, PsionBenchmarkPackageContract,
+    PsionBenchmarkPackageError, PsionBenchmarkTaskContract, PsionCapabilityMatrixView,
+    PsionCheckpointRecoveryReceipt, PsionContaminationReviewDisposition,
+    PsionContaminationReviewReceipt, PsionMetricKind, PsionObservedMetric, PsionPhaseGate,
+    PsionPilotHeldOutLossFamily, PsionPilotHeldOutLossRow, PsionPilotPretrainingRunBundle,
+    PsionPilotPretrainingRunError, PsionPilotRouteProbeKind, PsionPilotRouteProbeRow,
+    PsionPretrainCheckpointArtifactReceipt, PsionPretrainCheckpointLineageReceipt,
+    PsionPretrainHardwareTopologyReceipt, PsionPretrainLossNormalization,
+    PsionPretrainObjectiveConfig, PsionPretrainObjectiveKind, PsionPretrainReplayReceipt,
+    PsionPretrainRunCostBasis, PsionPretrainRunCostReceipt, PsionPretrainRunObservabilityError,
     PsionPretrainRunObservabilityReceipt, PsionPretrainRunScaleProfile,
     PsionPretrainRunThroughputReceipt, PsionPretrainSourceFamilyReportRow,
-    PsionPretrainStageAcceleratorReceipt, PsionPretrainStageConfig,
-    PsionPretrainStageError, PsionPretrainStageRunReceipt,
-    PsionPromotionDecisionDisposition, PsionPromotionDecisionReceipt,
-    PsionRepetitiveRegionControl, PsionSamplingContentClass, PsionSamplingPolicyError,
-    PsionSamplingPolicyManifest, PsionSamplingRegressionKind, PsionSamplingRegressionThreshold,
+    PsionPretrainStageAcceleratorReceipt, PsionPretrainStageConfig, PsionPretrainStageError,
+    PsionPretrainStageRunReceipt, PsionPromotionDecisionDisposition, PsionPromotionDecisionReceipt,
     PsionRefusalCalibrationError, PsionRefusalCalibrationReceipt, PsionRefusalCalibrationRow,
-    PsionReplayEvidenceReceipt, PsionRouteCalibrationReceipt, PsionRouteClass,
-    PsionRouteClassEvaluationError, PsionRouteClassEvaluationReceipt,
-    PsionRouteClassEvaluationRow, PsionRouteKind, PsionSourceContributionCap,
-    PsionSourceFamilySamplingWeight, TrainArtifactClass, TrainArtifactStorageController,
-    TrainArtifactStorageError, TrainingCoreError, TrainingLoopBudget, TrainingOptimizerConfig,
+    PsionRepetitiveRegionControl, PsionReplayEvidenceReceipt, PsionRouteCalibrationReceipt,
+    PsionRouteClass, PsionRouteClassEvaluationError, PsionRouteClassEvaluationReceipt,
+    PsionRouteClassEvaluationRow, PsionRouteKind, PsionSamplingContentClass,
+    PsionSamplingPolicyError, PsionSamplingPolicyManifest, PsionSamplingRegressionKind,
+    PsionSamplingRegressionThreshold, PsionSourceContributionCap, PsionSourceFamilySamplingWeight,
+    TrainArtifactClass, TrainArtifactStorageController, TrainArtifactStorageError,
+    TrainingCoreError, TrainingLoopBudget, TrainingOptimizerConfig,
     TrainingOptimizerResidencyPolicy, TrainingParameterClass, TrainingParameterGroupState,
     TrainingRecoveryMode, TrainingRunSummary, TrainingSessionState, TrainingStepInput,
     TrainingStepReceipt, TrainingTensorBuffer,
@@ -222,15 +219,21 @@ impl PsionReferencePilotRun {
         output_dir: &Path,
         prefix: &str,
     ) -> Result<(), PsionReferencePilotError> {
-        fs::create_dir_all(output_dir).map_err(|error| PsionReferencePilotError::Serialization {
-            message: error.to_string(),
+        fs::create_dir_all(output_dir).map_err(|error| {
+            PsionReferencePilotError::Serialization {
+                message: error.to_string(),
+            }
         })?;
         write_json(
-            output_dir.join(format!("{prefix}_stage_config.json")).as_path(),
+            output_dir
+                .join(format!("{prefix}_stage_config.json"))
+                .as_path(),
             &self.stage_config,
         )?;
         write_json(
-            output_dir.join(format!("{prefix}_stage_receipt.json")).as_path(),
+            output_dir
+                .join(format!("{prefix}_stage_receipt.json"))
+                .as_path(),
             &self.stage_receipt,
         )?;
         write_json(
@@ -408,7 +411,9 @@ pub enum PsionReferencePilotError {
     CudaBackendUnavailable { detail: String },
     #[error("reference pilot checkpoint serialization failed: {message}")]
     Serialization { message: String },
-    #[error("reference pilot parameter-state digest mismatch: expected `{expected}`, found `{actual}`")]
+    #[error(
+        "reference pilot parameter-state digest mismatch: expected `{expected}`, found `{actual}`"
+    )]
     ParameterStateDigestMismatch { expected: String, actual: String },
     #[error("reference pilot is missing parameter group `{group_id}`")]
     MissingParameterGroup { group_id: String },
@@ -488,7 +493,8 @@ pub fn run_psion_reference_pilot(
             .started_at_ms
             .saturating_add(step_index.saturating_mul(config.step_duration_ms));
         let finished_at_ms = started_at_ms.saturating_add(config.step_duration_ms);
-        let receipt = run.apply_step(TrainingStepInput::new(batch, started_at_ms, finished_at_ms))?;
+        let receipt =
+            run.apply_step(TrainingStepInput::new(batch, started_at_ms, finished_at_ms))?;
         current_model = materialize_model(&model_descriptor, &run)?;
         step_receipts.push(receipt);
     }
@@ -501,9 +507,15 @@ pub fn run_psion_reference_pilot(
         &validation_examples,
         config,
         &model_descriptor,
-        config.started_at_ms.saturating_add(config.budget.max_steps.saturating_mul(config.step_duration_ms)),
+        config.started_at_ms.saturating_add(
+            config
+                .budget
+                .max_steps
+                .saturating_mul(config.step_duration_ms),
+        ),
     )?;
-    let optimizer_state_artifact = build_optimizer_state_artifact(&run, &checkpoint_artifact, config)?;
+    let optimizer_state_artifact =
+        build_optimizer_state_artifact(&run, &checkpoint_artifact, config)?;
 
     let stage_config = PsionPretrainStageConfig::new(
         config.run_id.clone(),
@@ -628,7 +640,8 @@ pub fn run_psion_accelerated_reference_pilot(
             .started_at_ms
             .saturating_add(step_index.saturating_mul(config.step_duration_ms));
         let finished_at_ms = started_at_ms.saturating_add(config.step_duration_ms);
-        let receipt = run.apply_step(TrainingStepInput::new(batch, started_at_ms, finished_at_ms))?;
+        let receipt =
+            run.apply_step(TrainingStepInput::new(batch, started_at_ms, finished_at_ms))?;
         current_model = materialize_model(&model_descriptor, &run)?;
         step_receipts.push(receipt);
     }
@@ -641,9 +654,15 @@ pub fn run_psion_accelerated_reference_pilot(
         &validation_examples,
         config,
         &model_descriptor,
-        config.started_at_ms.saturating_add(config.budget.max_steps.saturating_mul(config.step_duration_ms)),
+        config.started_at_ms.saturating_add(
+            config
+                .budget
+                .max_steps
+                .saturating_mul(config.step_duration_ms),
+        ),
     )?;
-    let optimizer_state_artifact = build_optimizer_state_artifact(&run, &checkpoint_artifact, config)?;
+    let optimizer_state_artifact =
+        build_optimizer_state_artifact(&run, &checkpoint_artifact, config)?;
 
     let stage_config = PsionPretrainStageConfig::new(
         config.run_id.clone(),
@@ -722,8 +741,11 @@ pub fn probe_psion_reference_pilot_resume(
     repo_root: &Path,
     checkpoint_dir: &Path,
 ) -> Result<PsionReferencePilotResumeProbe, PsionReferencePilotError> {
-    let stage_receipt: PsionPretrainStageRunReceipt =
-        read_json_artifact(checkpoint_dir.join("psion_reference_pilot_stage_receipt.json").as_path())?;
+    let stage_receipt: PsionPretrainStageRunReceipt = read_json_artifact(
+        checkpoint_dir
+            .join("psion_reference_pilot_stage_receipt.json")
+            .as_path(),
+    )?;
     let observability_receipt: PsionPretrainRunObservabilityReceipt = read_json_artifact(
         checkpoint_dir
             .join("psion_reference_pilot_observability_receipt.json")
@@ -808,8 +830,11 @@ pub fn probe_psion_reference_pilot_resume(
         checkpoint_manifest.manifest_digest.clone(),
         promoted_checkpoint.durable_at_ms.unwrap_or(0),
     )?;
-    let (checkpoint_storage_artifact_id, checkpoint_storage_sweep_receipts, checkpoint_cold_restore_receipts) =
-        checkpoint_storage_rehearsal_receipts(&dense_manifest_ref, &promoted_checkpoint)?;
+    let (
+        checkpoint_storage_artifact_id,
+        checkpoint_storage_sweep_receipts,
+        checkpoint_cold_restore_receipts,
+    ) = checkpoint_storage_rehearsal_receipts(&dense_manifest_ref, &promoted_checkpoint)?;
     let restore_receipt = restore_receipt(
         checkpoint_manifest.clone(),
         checkpoint_pointer.clone(),
@@ -821,8 +846,10 @@ pub fn probe_psion_reference_pilot_resume(
         optimizer_state_artifact.parameter_groups.as_slice(),
     )?;
     let train_examples = split_examples(&corpus_bundle, DatasetSplitKind::Train);
-    let mut session =
-        TrainingSessionState::new("psion-google-single-node", promoted_checkpoint.checkpoint_family.clone());
+    let mut session = TrainingSessionState::new(
+        "psion-google-single-node",
+        promoted_checkpoint.checkpoint_family.clone(),
+    );
     session.latest_durable_checkpoint = Some(promoted_checkpoint.clone());
     session.latest_durable_manifest = Some(dense_manifest_ref);
     let mut resumed_run = session.restore_fixed_budget_run(
@@ -830,7 +857,10 @@ pub fn probe_psion_reference_pilot_resume(
         TrainingLoopBudget::new(1, 1, 1)?,
         optimizer_state_artifact.parameter_groups.clone(),
     )?;
-    let started_at_ms = promoted_checkpoint.durable_at_ms.unwrap_or(0).saturating_add(1_000);
+    let started_at_ms = promoted_checkpoint
+        .durable_at_ms
+        .unwrap_or(0)
+        .saturating_add(1_000);
     let resumed_step_receipt = resumed_run.apply_step(TrainingStepInput::new(
         build_gradient_batch(&resume_model, &train_examples)?,
         started_at_ms,
@@ -913,10 +943,8 @@ pub fn run_psion_reference_pilot_evidence_bundle(
         &benchmark_catalog,
         "psion_architecture_reasoning_benchmark_v1",
     )?;
-    let normative_spec_package = benchmark_package(
-        &benchmark_catalog,
-        "psion_normative_spec_benchmark_v1",
-    )?;
+    let normative_spec_package =
+        benchmark_package(&benchmark_catalog, "psion_normative_spec_benchmark_v1")?;
     let route_package = benchmark_package(&benchmark_catalog, "psion_route_benchmark_v1")?;
     let refusal_package = benchmark_package(
         &benchmark_catalog,
@@ -931,11 +959,8 @@ pub fn run_psion_reference_pilot_evidence_bundle(
     let held_out_benchmark = evaluate_held_out_benchmark(&held_out_loss_receipt);
     let route_class_evaluation_receipt =
         build_route_class_evaluation_receipt(route_package, &artifact_lineage)?;
-    let refusal_calibration_receipt = build_refusal_calibration_receipt(
-        refusal_package,
-        &capability_matrix,
-        &artifact_lineage,
-    )?;
+    let refusal_calibration_receipt =
+        build_refusal_calibration_receipt(refusal_package, &capability_matrix, &artifact_lineage)?;
     let route_probe_receipt = build_route_probe_receipt(
         &run,
         &route_class_evaluation_receipt,
@@ -1149,7 +1174,11 @@ fn build_reference_model_descriptor(
                 .tokenizer
                 .special_tokens_digest
                 .clone(),
-            template_digest: corpus_bundle.tokenizer_bundle.tokenizer.template_digest.clone(),
+            template_digest: corpus_bundle
+                .tokenizer_bundle
+                .tokenizer
+                .template_digest
+                .clone(),
         },
     )?)
 }
@@ -1163,8 +1192,10 @@ fn load_json_fixture<T: DeserializeOwned>(
             message: error.to_string(),
         }
     })?;
-    serde_json::from_str(&payload).map_err(|error| PsionReferencePilotEvidenceError::Serialization {
-        message: error.to_string(),
+    serde_json::from_str(&payload).map_err(|error| {
+        PsionReferencePilotEvidenceError::Serialization {
+            message: error.to_string(),
+        }
     })
 }
 
@@ -1176,9 +1207,11 @@ fn benchmark_package<'a>(
         .packages
         .iter()
         .find(|package| package.package_id == package_id)
-        .ok_or_else(|| PsionReferencePilotEvidenceError::MissingBenchmarkPackage {
-            package_id: String::from(package_id),
-        })
+        .ok_or_else(
+            || PsionReferencePilotEvidenceError::MissingBenchmarkPackage {
+                package_id: String::from(package_id),
+            },
+        )
 }
 
 fn frozen_seed_baseline_model(
@@ -1770,7 +1803,8 @@ fn best_sequence_match(
                 return None;
             }
             let sequence_embedding = mean_token_embedding(model, sequence.token_ids.as_slice())?;
-            let cosine = cosine_similarity(query_embedding.as_slice(), sequence_embedding.as_slice());
+            let cosine =
+                cosine_similarity(query_embedding.as_slice(), sequence_embedding.as_slice());
             Some(ReferenceSequenceMatch {
                 sequence_id: sequence.sequence_id.clone(),
                 source_id: sequence.source_id.clone(),
@@ -1880,9 +1914,16 @@ impl PsionCompactDecoderReferencePilotModel {
         let hidden_size = descriptor.config.hidden_size;
         let vocab_size = descriptor.config.vocab_size;
         let max_context = descriptor.config.max_context;
-        let token_embeddings = seeded_values("psion.reference.token_embeddings", vocab_size * hidden_size, 0.02);
-        let position_embeddings =
-            seeded_values("psion.reference.position_embeddings", max_context * hidden_size, 0.01);
+        let token_embeddings = seeded_values(
+            "psion.reference.token_embeddings",
+            vocab_size * hidden_size,
+            0.02,
+        );
+        let position_embeddings = seeded_values(
+            "psion.reference.position_embeddings",
+            max_context * hidden_size,
+            0.01,
+        );
         let lm_head_bias = vec![0.0; vocab_size];
         Self {
             descriptor,
@@ -1896,11 +1937,17 @@ impl PsionCompactDecoderReferencePilotModel {
         BTreeMap::from([
             (
                 String::from(TOKEN_EMBEDDING_GROUP_ID),
-                vec![self.descriptor.config.vocab_size, self.descriptor.config.hidden_size],
+                vec![
+                    self.descriptor.config.vocab_size,
+                    self.descriptor.config.hidden_size,
+                ],
             ),
             (
                 String::from(POSITION_EMBEDDING_GROUP_ID),
-                vec![self.descriptor.config.max_context, self.descriptor.config.hidden_size],
+                vec![
+                    self.descriptor.config.max_context,
+                    self.descriptor.config.hidden_size,
+                ],
             ),
             (
                 String::from(LM_HEAD_BIAS_GROUP_ID),
@@ -1911,28 +1958,49 @@ impl PsionCompactDecoderReferencePilotModel {
 
     fn parameter_values(&self) -> BTreeMap<String, Vec<f32>> {
         BTreeMap::from([
-            (String::from(TOKEN_EMBEDDING_GROUP_ID), self.token_embeddings.clone()),
+            (
+                String::from(TOKEN_EMBEDDING_GROUP_ID),
+                self.token_embeddings.clone(),
+            ),
             (
                 String::from(POSITION_EMBEDDING_GROUP_ID),
                 self.position_embeddings.clone(),
             ),
-            (String::from(LM_HEAD_BIAS_GROUP_ID), self.lm_head_bias.clone()),
+            (
+                String::from(LM_HEAD_BIAS_GROUP_ID),
+                self.lm_head_bias.clone(),
+            ),
         ])
     }
 
-    fn with_parameter_overrides(&self, overrides: &BTreeMap<String, Vec<f32>>) -> Result<Self, PsionReferencePilotError> {
+    fn with_parameter_overrides(
+        &self,
+        overrides: &BTreeMap<String, Vec<f32>>,
+    ) -> Result<Self, PsionReferencePilotError> {
         let shapes = self.parameter_shapes();
         let mut next = self.clone();
         if let Some(values) = overrides.get(TOKEN_EMBEDDING_GROUP_ID) {
-            require_len(values, element_count(shapes.get(TOKEN_EMBEDDING_GROUP_ID).expect("shape")), TOKEN_EMBEDDING_GROUP_ID)?;
+            require_len(
+                values,
+                element_count(shapes.get(TOKEN_EMBEDDING_GROUP_ID).expect("shape")),
+                TOKEN_EMBEDDING_GROUP_ID,
+            )?;
             next.token_embeddings = values.clone();
         }
         if let Some(values) = overrides.get(POSITION_EMBEDDING_GROUP_ID) {
-            require_len(values, element_count(shapes.get(POSITION_EMBEDDING_GROUP_ID).expect("shape")), POSITION_EMBEDDING_GROUP_ID)?;
+            require_len(
+                values,
+                element_count(shapes.get(POSITION_EMBEDDING_GROUP_ID).expect("shape")),
+                POSITION_EMBEDDING_GROUP_ID,
+            )?;
             next.position_embeddings = values.clone();
         }
         if let Some(values) = overrides.get(LM_HEAD_BIAS_GROUP_ID) {
-            require_len(values, element_count(shapes.get(LM_HEAD_BIAS_GROUP_ID).expect("shape")), LM_HEAD_BIAS_GROUP_ID)?;
+            require_len(
+                values,
+                element_count(shapes.get(LM_HEAD_BIAS_GROUP_ID).expect("shape")),
+                LM_HEAD_BIAS_GROUP_ID,
+            )?;
             next.lm_head_bias = values.clone();
         }
         Ok(next)
@@ -1962,7 +2030,10 @@ impl PsionCompactDecoderReferencePilotModel {
         let mut logits = self.lm_head_bias.clone();
         for token_index in 0..vocab_size {
             let token_offset = token_index * hidden_size;
-            logits[token_index] += dot(&self.token_embeddings[token_offset..token_offset + hidden_size], &hidden);
+            logits[token_index] += dot(
+                &self.token_embeddings[token_offset..token_offset + hidden_size],
+                &hidden,
+            );
         }
         logits
     }
@@ -1978,9 +2049,18 @@ impl PsionCompactDecoderReferencePilotModel {
         let mut bias_gradients = vec![0.0; self.lm_head_bias.len()];
         let mut total_loss = 0.0;
         for example in examples {
-            let context_len = example.context_token_ids.len().min(self.descriptor.config.max_context).max(1);
+            let context_len = example
+                .context_token_ids
+                .len()
+                .min(self.descriptor.config.max_context)
+                .max(1);
             let mut hidden = vec![0.0; hidden_size];
-            for (position, token_id) in example.context_token_ids.iter().take(context_len).enumerate() {
+            for (position, token_id) in example
+                .context_token_ids
+                .iter()
+                .take(context_len)
+                .enumerate()
+            {
                 let token_index = (*token_id as usize).min(vocab_size.saturating_sub(1));
                 let token_offset = token_index * hidden_size;
                 let position_offset = position * hidden_size;
@@ -2011,11 +2091,17 @@ impl PsionCompactDecoderReferencePilotModel {
             for token_index in 0..vocab_size {
                 let token_offset = token_index * hidden_size;
                 for index in 0..hidden_size {
-                    hidden_grad[index] += dlogits[token_index] * self.token_embeddings[token_offset + index];
+                    hidden_grad[index] +=
+                        dlogits[token_index] * self.token_embeddings[token_offset + index];
                 }
             }
             let input_scale = 1.0 / context_len as f32;
-            for (position, token_id) in example.context_token_ids.iter().take(context_len).enumerate() {
+            for (position, token_id) in example
+                .context_token_ids
+                .iter()
+                .take(context_len)
+                .enumerate()
+            {
                 let token_index = (*token_id as usize).min(vocab_size.saturating_sub(1));
                 let token_offset = token_index * hidden_size;
                 let position_offset = position * hidden_size;
@@ -2033,7 +2119,10 @@ impl PsionCompactDecoderReferencePilotModel {
             total_loss * example_scale,
             BTreeMap::from([
                 (String::from(TOKEN_EMBEDDING_GROUP_ID), token_gradients),
-                (String::from(POSITION_EMBEDDING_GROUP_ID), position_gradients),
+                (
+                    String::from(POSITION_EMBEDDING_GROUP_ID),
+                    position_gradients,
+                ),
                 (String::from(LM_HEAD_BIAS_GROUP_ID), bias_gradients),
             ]),
         )
@@ -2084,7 +2173,9 @@ fn build_parameter_groups_for_execution(
             .expect("parameter values should cover every shape")
             .clone();
         let class = match group_id.as_str() {
-            TOKEN_EMBEDDING_GROUP_ID | POSITION_EMBEDDING_GROUP_ID => TrainingParameterClass::Embedding,
+            TOKEN_EMBEDDING_GROUP_ID | POSITION_EMBEDDING_GROUP_ID => {
+                TrainingParameterClass::Embedding
+            }
             LM_HEAD_BIAS_GROUP_ID => TrainingParameterClass::Bias,
             _ => TrainingParameterClass::Matrix,
         };
@@ -2118,7 +2209,10 @@ fn materialize_model(
     })
 }
 
-fn group_values(run: &FixedBudgetTrainingRun, group_id: &str) -> Result<Vec<f32>, PsionReferencePilotError> {
+fn group_values(
+    run: &FixedBudgetTrainingRun,
+    group_id: &str,
+) -> Result<Vec<f32>, PsionReferencePilotError> {
     let group = run.parameter_group(group_id).ok_or_else(|| {
         PsionReferencePilotError::MissingParameterGroup {
             group_id: String::from(group_id),
@@ -2139,7 +2233,10 @@ fn split_examples(
     let Some(shard) = corpus_bundle.shard(split_kind) else {
         return Vec::new();
     };
-    build_examples_from_sequences(shard.sequences.as_slice(), PSION_REFERENCE_MAX_SEQUENCE_TOKENS as usize)
+    build_examples_from_sequences(
+        shard.sequences.as_slice(),
+        PSION_REFERENCE_MAX_SEQUENCE_TOKENS as usize,
+    )
 }
 
 fn build_examples_from_sequences(
@@ -2188,7 +2285,8 @@ fn build_accelerated_gradient_program(
 ) -> Result<PsionAcceleratedGradientProgram, PsionReferencePilotError> {
     let hidden_size = descriptor.config.hidden_size;
     let vocab_size = descriptor.config.vocab_size;
-    let mut logits_builder = AutodiffGraphBuilder::with_context(device.clone(), AutodiffContext::training());
+    let mut logits_builder =
+        AutodiffGraphBuilder::with_context(device.clone(), AutodiffContext::training());
     let hidden_inputs = logits_builder.input(
         "psion_accelerated_hidden_inputs",
         Shape::new(vec![batch_size, hidden_size]),
@@ -2218,7 +2316,8 @@ fn build_accelerated_gradient_program(
         DType::F32,
         false,
     );
-    let weight_gradient = weight_gradient_builder.matmul(&hidden_inputs_transposed, &logits_seed)?;
+    let weight_gradient =
+        weight_gradient_builder.matmul(&hidden_inputs_transposed, &logits_seed)?;
     let weight_gradient_graph = weight_gradient_builder.finish(vec![weight_gradient.clone()]);
 
     let mut hidden_gradient_builder =
@@ -2318,7 +2417,10 @@ fn build_accelerated_gradient_batch(
         cuda_backend,
         program.hidden_gradient_graph.graph(),
         [
-            (program.hidden_gradient_logits_seed_tensor_id, logits_seed.clone()),
+            (
+                program.hidden_gradient_logits_seed_tensor_id,
+                logits_seed.clone(),
+            ),
             (
                 program.hidden_gradient_token_embeddings_vh_tensor_id,
                 model.token_embeddings.clone(),
@@ -2346,7 +2448,10 @@ fn build_accelerated_gradient_batch(
         TrainingTensorBuffer::from_f32(
             String::from(TOKEN_EMBEDDING_GROUP_ID),
             TensorSpec::new(
-                Shape::new(vec![model.descriptor.config.vocab_size, model.descriptor.config.hidden_size]),
+                Shape::new(vec![
+                    model.descriptor.config.vocab_size,
+                    model.descriptor.config.hidden_size,
+                ]),
                 DType::F32,
                 device.clone(),
             ),
@@ -2358,7 +2463,10 @@ fn build_accelerated_gradient_batch(
         TrainingTensorBuffer::from_f32(
             String::from(POSITION_EMBEDDING_GROUP_ID),
             TensorSpec::new(
-                Shape::new(vec![model.descriptor.config.max_context, model.descriptor.config.hidden_size]),
+                Shape::new(vec![
+                    model.descriptor.config.max_context,
+                    model.descriptor.config.hidden_size,
+                ]),
                 DType::F32,
                 device.clone(),
             ),
@@ -2399,7 +2507,12 @@ fn build_accelerated_hidden_inputs(
             .min(model.descriptor.config.max_context)
             .max(1);
         let mut hidden = vec![0.0; hidden_size];
-        for (position, token_id) in example.context_token_ids.iter().take(context_len).enumerate() {
+        for (position, token_id) in example
+            .context_token_ids
+            .iter()
+            .take(context_len)
+            .enumerate()
+        {
             let token_index = (*token_id as usize).min(vocab_size.saturating_sub(1));
             let token_offset = token_index * hidden_size;
             let position_offset = position * hidden_size;
@@ -2433,7 +2546,12 @@ fn scatter_accelerated_hidden_input_gradients(
         let row_offset = example_index * hidden_size;
         let hidden_grad = &hidden_input_gradients[row_offset..row_offset + hidden_size];
         let input_scale = 1.0 / context_len as f32;
-        for (position, token_id) in example.context_token_ids.iter().take(context_len).enumerate() {
+        for (position, token_id) in example
+            .context_token_ids
+            .iter()
+            .take(context_len)
+            .enumerate()
+        {
             let token_index = (*token_id as usize).min(vocab_size.saturating_sub(1));
             let token_offset = token_index * hidden_size;
             let position_offset = position * hidden_size;
@@ -2448,6 +2566,9 @@ fn scatter_accelerated_hidden_input_gradients(
 fn dense_values(data: &TensorData, context: &str) -> Result<Vec<f32>, PsionReferencePilotError> {
     match data {
         TensorData::F32(values) => Ok(values.clone()),
+        TensorData::I32(_) => Err(PsionReferencePilotError::Serialization {
+            message: format!("{context} must be dense f32"),
+        }),
         TensorData::QuantizedBlocks(_) => Err(PsionReferencePilotError::Serialization {
             message: format!("{context} must be dense f32"),
         }),
@@ -2581,21 +2702,25 @@ fn execute_cuda_graph(
         let shape = graph
             .node(*tensor_id)
             .ok_or_else(|| PsionReferencePilotError::Serialization {
-                message: format!("accelerated CUDA graph is missing input tensor {}", tensor_id),
+                message: format!(
+                    "accelerated CUDA graph is missing input tensor {}",
+                    tensor_id
+                ),
             })?
             .tensor()
             .spec()
             .shape()
             .clone();
-        buffers.insert(*tensor_id, cuda_backend.input_buffer(shape, values.clone())?);
+        buffers.insert(
+            *tensor_id,
+            cuda_backend.input_buffer(shape, values.clone())?,
+        );
     }
-    let output_tensor_id = graph
-        .outputs()
-        .first()
-        .copied()
-        .ok_or_else(|| PsionReferencePilotError::Serialization {
+    let output_tensor_id = graph.outputs().first().copied().ok_or_else(|| {
+        PsionReferencePilotError::Serialization {
             message: String::from("accelerated CUDA graph is missing an output tensor"),
-        })?;
+        }
+    })?;
     let result = cuda_backend.compile_and_execute(graph, &buffers)?;
     result
         .outputs
@@ -2627,10 +2752,16 @@ fn build_gradient_batch_for_device(
     for (group_id, values) in gradients {
         let shape = match group_id.as_str() {
             TOKEN_EMBEDDING_GROUP_ID => {
-                vec![model.descriptor.config.vocab_size, model.descriptor.config.hidden_size]
+                vec![
+                    model.descriptor.config.vocab_size,
+                    model.descriptor.config.hidden_size,
+                ]
             }
             POSITION_EMBEDDING_GROUP_ID => {
-                vec![model.descriptor.config.max_context, model.descriptor.config.hidden_size]
+                vec![
+                    model.descriptor.config.max_context,
+                    model.descriptor.config.hidden_size,
+                ]
             }
             LM_HEAD_BIAS_GROUP_ID => vec![model.descriptor.config.vocab_size],
             _ => vec![values.len()],
@@ -2741,10 +2872,14 @@ fn build_source_family_reports(
                 map
             },
         );
-        let sequence_counts = shard.sequences.iter().fold(BTreeMap::<String, usize>::new(), |mut map, sequence| {
-            *map.entry(sequence.source_family_id.clone()).or_insert(0) += 1;
-            map
-        });
+        let sequence_counts =
+            shard
+                .sequences
+                .iter()
+                .fold(BTreeMap::<String, usize>::new(), |mut map, sequence| {
+                    *map.entry(sequence.source_family_id.clone()).or_insert(0) += 1;
+                    map
+                });
         let total_tokens = examples
             .iter()
             .map(|example| example.context_token_ids.len().saturating_add(1))
@@ -2828,12 +2963,10 @@ fn build_source_family_reports(
     rows
 }
 
-fn accelerated_delivered_execution(selected_device: &DeviceDescriptor) -> DeliveredExecutionContext {
-    DeliveredExecutionContext::new(
-        "cuda",
-        None,
-        vec![selected_device.inventory_qualifiers()],
-    )
+fn accelerated_delivered_execution(
+    selected_device: &DeviceDescriptor,
+) -> DeliveredExecutionContext {
+    DeliveredExecutionContext::new("cuda", None, vec![selected_device.inventory_qualifiers()])
 }
 
 fn build_accelerated_observability_receipt(
@@ -2851,7 +2984,8 @@ fn build_accelerated_observability_receipt(
         .budget
         .max_steps
         .saturating_mul(config.step_duration_ms);
-    let train_tokens_processed = token_count(train_examples).saturating_mul(config.budget.max_steps);
+    let train_tokens_processed =
+        token_count(train_examples).saturating_mul(config.budget.max_steps);
     let validation_tokens_processed = token_count(validation_examples);
     let held_out_tokens_scored = token_count(held_out_examples);
     let total_tokens_processed = train_tokens_processed
@@ -2859,12 +2993,16 @@ fn build_accelerated_observability_receipt(
         .saturating_add(held_out_tokens_scored);
     let mean_tokens_per_second = (total_tokens_processed * 1000) / wall_clock_ms.max(1);
     let checkpoint_size_bytes = checkpoint_artifact.weights_bytes.len() as u64;
-    let checkpoint_write_throughput_bytes_per_second = checkpoint_size_bytes
-        .saturating_mul(1000)
-        / config.step_duration_ms.max(1);
+    let checkpoint_write_throughput_bytes_per_second =
+        checkpoint_size_bytes.saturating_mul(1000) / config.step_duration_ms.max(1);
     let max_gradient_norm_l2 = step_receipts
         .iter()
-        .flat_map(|receipt| receipt.group_telemetry.iter().map(|group| group.gradient_norm_l2))
+        .flat_map(|receipt| {
+            receipt
+                .group_telemetry
+                .iter()
+                .map(|group| group.gradient_norm_l2)
+        })
         .fold(0.0, f32::max);
     let mean_clipping_ratio = {
         let ratios = step_receipts
@@ -2971,26 +3109,35 @@ fn build_observability_receipt(
         .budget
         .max_steps
         .saturating_mul(config.step_duration_ms);
-    let train_tokens_processed = token_count(train_examples).saturating_mul(config.budget.max_steps);
+    let train_tokens_processed =
+        token_count(train_examples).saturating_mul(config.budget.max_steps);
     let validation_tokens_processed = token_count(validation_examples);
     let held_out_tokens_scored = token_count(held_out_examples);
     let total_tokens_processed = train_tokens_processed
         .saturating_add(validation_tokens_processed)
         .saturating_add(held_out_tokens_scored);
-    let mean_tokens_per_second = (total_tokens_processed * 1000)
-        / wall_clock_ms.max(1);
+    let mean_tokens_per_second = (total_tokens_processed * 1000) / wall_clock_ms.max(1);
     let checkpoint_size_bytes = checkpoint_artifact.weights_bytes.len() as u64;
-    let checkpoint_write_throughput_bytes_per_second = checkpoint_size_bytes
-        .saturating_mul(1000)
-        / config.step_duration_ms.max(1);
+    let checkpoint_write_throughput_bytes_per_second =
+        checkpoint_size_bytes.saturating_mul(1000) / config.step_duration_ms.max(1);
     let max_gradient_norm_l2 = step_receipts
         .iter()
-        .flat_map(|receipt| receipt.group_telemetry.iter().map(|group| group.gradient_norm_l2))
+        .flat_map(|receipt| {
+            receipt
+                .group_telemetry
+                .iter()
+                .map(|group| group.gradient_norm_l2)
+        })
         .fold(0.0, f32::max);
     let mean_clipping_ratio = {
         let ratios = step_receipts
             .iter()
-            .flat_map(|receipt| receipt.group_telemetry.iter().filter_map(|group| group.clipping_ratio))
+            .flat_map(|receipt| {
+                receipt
+                    .group_telemetry
+                    .iter()
+                    .filter_map(|group| group.clipping_ratio)
+            })
             .collect::<Vec<_>>();
         if ratios.is_empty() {
             None
@@ -3134,7 +3281,10 @@ fn export_checkpoint(
             String::from(POSITION_EMBEDDING_GROUP_ID),
             String::from(LM_HEAD_BIAS_GROUP_ID),
         ],
-        parameter_state_digest: stable_digest(b"psion_reference_pilot_parameter_state|", &parameter_values),
+        parameter_state_digest: stable_digest(
+            b"psion_reference_pilot_parameter_state|",
+            &parameter_values,
+        ),
     };
     let manifest_digest = manifest.stable_digest();
     let object_digest = stable_digest(b"psion_reference_pilot_checkpoint_bytes|", &weights_bytes);
@@ -3241,12 +3391,11 @@ fn materialize_model_from_parameter_groups(
             .ok_or_else(|| PsionReferencePilotError::MissingParameterGroup {
                 group_id: String::from(POSITION_EMBEDDING_GROUP_ID),
             })?,
-        lm_head_bias: values
-            .get(LM_HEAD_BIAS_GROUP_ID)
-            .cloned()
-            .ok_or_else(|| PsionReferencePilotError::MissingParameterGroup {
+        lm_head_bias: values.get(LM_HEAD_BIAS_GROUP_ID).cloned().ok_or_else(|| {
+            PsionReferencePilotError::MissingParameterGroup {
                 group_id: String::from(LM_HEAD_BIAS_GROUP_ID),
-            })?,
+            }
+        })?,
     })
 }
 
@@ -3328,7 +3477,11 @@ fn checkpoint_storage_rehearsal_receipts(
     let archived = controller.sweep(40_000)?;
     let requested = controller.request_cold_restore(artifact_id.as_str(), 42_000)?;
     let completed = controller.complete_cold_restore(artifact_id.as_str(), 60_000)?;
-    Ok((artifact_id, vec![warm, archived], vec![requested, completed]))
+    Ok((
+        artifact_id,
+        vec![warm, archived],
+        vec![requested, completed],
+    ))
 }
 
 fn restore_receipt(
@@ -3349,10 +3502,11 @@ fn restore_receipt(
 }
 
 fn write_json(path: &Path, value: &impl Serialize) -> Result<(), PsionReferencePilotError> {
-    let payload =
-        serde_json::to_vec_pretty(value).map_err(|error| PsionReferencePilotError::Serialization {
+    let payload = serde_json::to_vec_pretty(value).map_err(|error| {
+        PsionReferencePilotError::Serialization {
             message: error.to_string(),
-        })?;
+        }
+    })?;
     fs::write(path, payload).map_err(|error| PsionReferencePilotError::Serialization {
         message: error.to_string(),
     })
@@ -3372,7 +3526,11 @@ fn export_checkpoint_weights(
 ) -> Result<Vec<u8>, PsionReferencePilotError> {
     let mut raw_buffers = Vec::with_capacity(parameters.len());
     for (parameter_id, values, shape) in parameters {
-        raw_buffers.push((String::from(*parameter_id), encode_f32_bytes(values), shape.clone()));
+        raw_buffers.push((
+            String::from(*parameter_id),
+            encode_f32_bytes(values),
+            shape.clone(),
+        ));
     }
     let mut views = Vec::with_capacity(raw_buffers.len());
     for (parameter_id, bytes, shape) in &raw_buffers {
@@ -3439,10 +3597,7 @@ fn seeded_values(label: &str, len: usize, scale: f32) -> Vec<f32> {
 }
 
 fn softmax(logits: &[f32]) -> Vec<f32> {
-    let max_logit = logits
-        .iter()
-        .copied()
-        .fold(f32::NEG_INFINITY, f32::max);
+    let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let exps = logits
         .iter()
         .map(|logit| (*logit - max_logit).exp())
@@ -3461,7 +3616,11 @@ fn scale_in_place(values: &mut [f32], scale: f32) {
     }
 }
 
-fn require_len(values: &[f32], expected: usize, group_id: &str) -> Result<(), PsionReferencePilotError> {
+fn require_len(
+    values: &[f32],
+    expected: usize,
+    group_id: &str,
+) -> Result<(), PsionReferencePilotError> {
     if values.len() != expected {
         return Err(PsionReferencePilotError::Serialization {
             message: format!(
@@ -3485,7 +3644,10 @@ fn encode_f32_bytes(values: &[f32]) -> Vec<u8> {
     bytes
 }
 
-fn decode_f32_bytes(parameter_id: &str, bytes: &[u8]) -> Result<Vec<f32>, PsionReferencePilotError> {
+fn decode_f32_bytes(
+    parameter_id: &str,
+    bytes: &[u8],
+) -> Result<Vec<f32>, PsionReferencePilotError> {
     if !bytes.len().is_multiple_of(4) {
         return Err(PsionReferencePilotError::Serialization {
             message: format!(
@@ -3541,8 +3703,7 @@ mod tests {
             "pilot should apply at least one non-zero parameter update"
         );
         assert_ne!(
-            run.initial_validation_loss_milli_by_family,
-            run.final_validation_loss_milli_by_family,
+            run.initial_validation_loss_milli_by_family, run.final_validation_loss_milli_by_family,
             "validation losses should reflect the executed optimizer steps"
         );
         let restored = restore_psion_reference_pilot_checkpoint(
@@ -3629,8 +3790,7 @@ mod tests {
             repo_root().as_path(),
             "fixtures/psion/lifecycle/psion_artifact_lineage_manifest_v1.json",
         )?;
-        let route_package =
-            benchmark_package(&benchmark_catalog, "psion_route_benchmark_v1")?;
+        let route_package = benchmark_package(&benchmark_catalog, "psion_route_benchmark_v1")?;
         let refusal_package = benchmark_package(
             &benchmark_catalog,
             "psion_unsupported_request_refusal_benchmark_v1",
@@ -3646,9 +3806,17 @@ mod tests {
                 &capability_matrix,
                 &artifact_lineage,
             )?;
-        bundle.pilot_bundle.validate_against_matrix(&acceptance_matrix)?;
-        assert_eq!(bundle.architecture_benchmark.aggregate_pass_rate_bps, 10_000);
-        assert_eq!(bundle.normative_spec_benchmark.aggregate_pass_rate_bps, 10_000);
+        bundle
+            .pilot_bundle
+            .validate_against_matrix(&acceptance_matrix)?;
+        assert_eq!(
+            bundle.architecture_benchmark.aggregate_pass_rate_bps,
+            10_000
+        );
+        assert_eq!(
+            bundle.normative_spec_benchmark.aggregate_pass_rate_bps,
+            10_000
+        );
         assert_eq!(bundle.held_out_benchmark.aggregate_pass_rate_bps, 10_000);
         Ok(())
     }

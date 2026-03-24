@@ -35,11 +35,11 @@ use psionic_core::{
     TensorId, TensorSpec, ViewSemantics,
 };
 use psionic_ir::{
-    BUILTIN_OPERATOR_SCHEMA_VERSION, ExecutionOp, ExecutionPlan, ExecutionStep,
-    ExportableGraphContract, Graph, GraphBuilder, GraphError, GraphExportContractError,
-    MetaCapabilityProfile, MetaTensor, MetaTensorFamily, OperatorArity, OperatorImplementationKind,
-    OperatorMetaExecutionKind, OperatorRegistry, RegisteredOperatorSchema, RegistryExtensionError,
-    SparseMetaContract, SparseMetaLayout, StorageAwareMetaContract,
+    ExecutionOp, ExecutionPlan, ExecutionStep, ExportableGraphContract, Graph, GraphBuilder,
+    GraphError, GraphExportContractError, MetaCapabilityProfile, MetaTensor, MetaTensorFamily,
+    OperatorArity, OperatorImplementationKind, OperatorMetaExecutionKind, OperatorRegistry,
+    RegisteredOperatorSchema, RegistryExtensionError, SparseMetaContract, SparseMetaLayout,
+    StorageAwareMetaContract, BUILTIN_OPERATOR_SCHEMA_VERSION,
 };
 use psionic_runtime::{
     BackendSelection, CacheAction, CacheInvalidationTrigger, CacheKind, CacheObservation,
@@ -242,8 +242,8 @@ impl PlanBuilder {
 
 /// Returns the seeded symbolic-shape, fake-tensor, and compiler-hygiene parity
 /// matrix for the current built-in Psionic surface.
-pub fn builtin_compiler_hygiene_parity_matrix_report()
--> Result<CompilerHygieneParityMatrixReport, CompilerHygieneParityError> {
+pub fn builtin_compiler_hygiene_parity_matrix_report(
+) -> Result<CompilerHygieneParityMatrixReport, CompilerHygieneParityError> {
     let cases = vec![
         run_compiler_hygiene_supported_case(
             "pytorch.fake_tensor.graph_plan_shape_parity",
@@ -2602,6 +2602,14 @@ fn constant_payload_digest(data: &TensorData) -> String {
             }
             format!("{:x}", hasher.finalize())
         }
+        TensorData::I32(values) => {
+            let mut hasher = Sha256::new();
+            hasher.update(b"i32");
+            for value in values {
+                hasher.update(value.to_le_bytes());
+            }
+            format!("{:x}", hasher.finalize())
+        }
         TensorData::QuantizedBlocks(data) => digest_lines(vec![
             String::from("quantized_blocks"),
             format!("mode={:?}", data.mode),
@@ -2807,8 +2815,8 @@ pub fn compile_graph_artifacts_for_selection(
 
 /// Returns the seeded export/deployment artifact semantics report for the current
 /// bounded Psionic surface.
-pub fn builtin_export_deployment_artifact_semantics_report()
--> Result<ExportDeploymentArtifactSemanticsReport, ExportDeploymentArtifactSemanticsError> {
+pub fn builtin_export_deployment_artifact_semantics_report(
+) -> Result<ExportDeploymentArtifactSemanticsReport, ExportDeploymentArtifactSemanticsError> {
     let export_safe = seeded_export_safe_compiler_graph()?;
     let export_contract = export_safe.exportable_graph_contract("main")?;
     let execution_plan_bundle = compile_graph_artifacts(&export_safe)?;
@@ -3703,15 +3711,15 @@ mod tests {
     };
 
     use super::{
-        CompileError, CompileShapeMode, CompileTransformBypassReason, CompileTransformCacheControl,
-        CompileTransformConfig, CompileTransformDebugMode, CompileTransformDisposition,
-        CompileTransformPurity, CompileTransformTraceMode, CompilerContract,
-        CompilerHygieneParityStatus, CompilerPlanCache, DeploymentArtifactFormat,
-        ExportDeploymentArtifactStatus, FusionMode, MemoryStorageClass,
         builtin_compiler_hygiene_parity_matrix_report,
         builtin_export_deployment_artifact_semantics_report, compile_graph,
         compile_graph_artifacts_with_topology, compile_graph_for_selection,
-        compile_graph_with_topology, compile_transform,
+        compile_graph_with_topology, compile_transform, CompileError, CompileShapeMode,
+        CompileTransformBypassReason, CompileTransformCacheControl, CompileTransformConfig,
+        CompileTransformDebugMode, CompileTransformDisposition, CompileTransformPurity,
+        CompileTransformTraceMode, CompilerContract, CompilerHygieneParityStatus,
+        CompilerPlanCache, DeploymentArtifactFormat, ExportDeploymentArtifactStatus, FusionMode,
+        MemoryStorageClass,
     };
 
     #[test]
@@ -3963,8 +3971,8 @@ mod tests {
     }
 
     #[test]
-    fn deployment_artifact_contract_tracks_export_graph_digest_and_topology_attachment()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn deployment_artifact_contract_tracks_export_graph_digest_and_topology_attachment(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let graph = super::seeded_export_safe_compiler_graph()?;
         let export_contract = graph.exportable_graph_contract("main")?;
 
@@ -4168,11 +4176,10 @@ mod tests {
                 .map(|path| path.execution_plan_cache.action),
             Some(CacheAction::Rebuild)
         );
-        assert!(
-            cold.plan_debug
-                .as_ref()
-                .is_some_and(|debug| debug.contains("matmul"))
-        );
+        assert!(cold
+            .plan_debug
+            .as_ref()
+            .is_some_and(|debug| debug.contains("matmul")));
         assert!(!cold.trace.lines.is_empty());
         assert_eq!(transform.cache_len(), 1);
 
@@ -4308,22 +4315,18 @@ mod tests {
                 .map(|identity| identity.shape_mode),
             Some(CompileShapeMode::ShapelessTraceFamily)
         );
-        assert!(
-            result_a
-                .trace
-                .lines
+        assert!(result_a
+            .trace
+            .lines
+            .iter()
+            .any(|line| line == "shape_mode|shapeless_trace_family"));
+        assert!(result_a
+            .trace_family_identity
+            .as_ref()
+            .is_some_and(|identity| identity
+                .constraints
                 .iter()
-                .any(|line| line == "shape_mode|shapeless_trace_family")
-        );
-        assert!(
-            result_a
-                .trace_family_identity
-                .as_ref()
-                .is_some_and(|identity| identity
-                    .constraints
-                    .iter()
-                    .any(|line| line.ends_with("input.t1.d0")))
-        );
+                .any(|line| line.ends_with("input.t1.d0"))));
     }
 
     #[test]
@@ -4360,20 +4363,18 @@ mod tests {
     }
 
     #[test]
-    fn compiler_hygiene_parity_matrix_tracks_seeded_supported_and_refusal_cases()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn compiler_hygiene_parity_matrix_tracks_seeded_supported_and_refusal_cases(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let report = builtin_compiler_hygiene_parity_matrix_report()?;
         assert_eq!(report.schema_version, 1);
         assert_eq!(
             report.oracle_family_window,
             "pytorch_compiler_hygiene_seed_v1"
         );
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("matrix_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("matrix_digest=")));
 
         for case in report
             .cases
@@ -4432,20 +4433,18 @@ mod tests {
     }
 
     #[test]
-    fn export_deployment_artifact_semantics_report_tracks_seeded_supported_and_refused_cases()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn export_deployment_artifact_semantics_report_tracks_seeded_supported_and_refused_cases(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let report = builtin_export_deployment_artifact_semantics_report()?;
         assert_eq!(report.schema_version, 1);
         assert_eq!(
             report.current_scope_window,
             "psionic_export_deployment_artifact_v1"
         );
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("report_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("report_digest=")));
 
         let plan_bundle = report
             .cases

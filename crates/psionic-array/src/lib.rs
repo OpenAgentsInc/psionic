@@ -18,31 +18,31 @@ use std::{
 use psionic_backend_cuda::CudaBackend;
 use psionic_backend_metal::MetalBackend;
 use psionic_compiler::{
-    CompileTransformConfig, CompileTransformDebugMode, CompileTransformError,
-    CompileTransformResult, CompileTransformTraceMode, compile_transform,
+    compile_transform, CompileTransformConfig, CompileTransformDebugMode, CompileTransformError,
+    CompileTransformResult, CompileTransformTraceMode,
 };
 use psionic_core::{
     DType, Device, DeviceKind, LazyOp, PsionicRefusal, PsionicRefusalCode, PsionicRefusalScope,
     Shape, Tensor, TensorData, TensorId, TensorSpec,
 };
 use psionic_ir::{
-    BackendPluginExtensionContract, CustomKernelExtensionContract, CustomOpExtensionContract,
-    ExtensibleOperatorRegistry, ExtensionContractKind, ExtensionContractSemanticsReport, Graph,
-    GraphBuilder, GraphError, KernelRegistration, MetaTensor, OpKind, OperatorDispatchContract,
+    builtin_extension_contract_semantics_report, BackendPluginExtensionContract,
+    CustomKernelExtensionContract, CustomOpExtensionContract, ExtensibleOperatorRegistry,
+    ExtensionContractKind, ExtensionContractSemanticsReport, Graph, GraphBuilder, GraphError,
+    KernelRegistration, MetaTensor, OpKind, OperatorDispatchContract,
     QuantizerPluginExtensionContract, RegisteredOperatorSchema, RegistryExtensionError,
-    builtin_extension_contract_semantics_report,
 };
 use psionic_runtime::{
-    AllocatorPoolPolicy, AllocatorPoolReport, AllocatorPoolState, BackendHealthTracker,
-    BackendProbeState, BackendRuntimeResources, BackendToolchainIdentity, CacheInvalidationPolicy,
-    DeterminismContractError, DeviceDescriptor, DeviceDiscovery, DeviceInventoryQualifiers,
-    DeviceMemoryBudget, DeviceMemoryClass, ExecutionCapabilityProfile, ExecutionPlanCachePolicy,
-    ExecutionPlanCacheReport, ExecutionPlanCacheState, GeneratorState, HealthStatus,
-    IsolationResetScope, KernelCachePolicy, KernelCacheReport, KernelCacheState,
-    LocalRuntimeObservability, LocalServingIsolationPolicy, MemoryResidencySnapshot,
-    RuntimeDeterminismContract, RuntimeHealth, default_cache_invalidation_policy,
+    default_cache_invalidation_policy, AllocatorPoolPolicy, AllocatorPoolReport,
+    AllocatorPoolState, BackendHealthTracker, BackendProbeState, BackendRuntimeResources,
+    BackendToolchainIdentity, CacheInvalidationPolicy, DeterminismContractError, DeviceDescriptor,
+    DeviceDiscovery, DeviceInventoryQualifiers, DeviceMemoryBudget, DeviceMemoryClass,
+    ExecutionCapabilityProfile, ExecutionPlanCachePolicy, ExecutionPlanCacheReport,
+    ExecutionPlanCacheState, GeneratorState, HealthStatus, IsolationResetScope, KernelCachePolicy,
+    KernelCacheReport, KernelCacheState, LocalRuntimeObservability, LocalServingIsolationPolicy,
+    MemoryResidencySnapshot, RuntimeDeterminismContract, RuntimeHealth,
 };
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -551,7 +551,9 @@ pub enum ArrayError {
         shape: Shape,
     },
     /// One stream belongs to a different device than the owning context.
-    #[error("stream {stream_id} belongs to device `{stream_device}` instead of `{context_device}`")]
+    #[error(
+        "stream {stream_id} belongs to device `{stream_device}` instead of `{context_device}`"
+    )]
     StreamDeviceMismatch {
         /// Stream identifier.
         stream_id: u32,
@@ -1564,6 +1566,8 @@ impl EvaluatedArray {
 pub enum HostArrayStorage {
     /// Host-visible `f32` values used for logical `f32`, `f16`, and `bf16`.
     F32(Vec<f32>),
+    /// Host-visible `i32` values for logical `i32`.
+    I32(Vec<i32>),
     /// Host-visible `i8` values for logical `i8`.
     I8(Vec<i8>),
 }
@@ -1591,6 +1595,7 @@ impl HostArrayData {
     pub fn len(&self) -> usize {
         match &self.values {
             HostArrayStorage::F32(values) => values.len(),
+            HostArrayStorage::I32(values) => values.len(),
             HostArrayStorage::I8(values) => values.len(),
         }
     }
@@ -1606,6 +1611,17 @@ impl HostArrayData {
     pub fn as_f32_slice(&self) -> Option<&[f32]> {
         match &self.values {
             HostArrayStorage::F32(values) => Some(values.as_slice()),
+            HostArrayStorage::I32(_) => None,
+            HostArrayStorage::I8(_) => None,
+        }
+    }
+
+    /// Returns the host payload as `i32` values when that family applies.
+    #[must_use]
+    pub fn as_i32_slice(&self) -> Option<&[i32]> {
+        match &self.values {
+            HostArrayStorage::F32(_) => None,
+            HostArrayStorage::I32(values) => Some(values.as_slice()),
             HostArrayStorage::I8(_) => None,
         }
     }
@@ -1615,6 +1631,7 @@ impl HostArrayData {
     pub fn as_i8_slice(&self) -> Option<&[i8]> {
         match &self.values {
             HostArrayStorage::F32(_) => None,
+            HostArrayStorage::I32(_) => None,
             HostArrayStorage::I8(values) => Some(values.as_slice()),
         }
     }
@@ -1625,6 +1642,8 @@ impl HostArrayData {
 pub enum HostScalarValue {
     /// Floating-point scalar used for logical `f32`, `f16`, and `bf16`.
     F32(f32),
+    /// Integer scalar used for logical `i32`.
+    I32(i32),
     /// Integer scalar used for logical `i8`.
     I8(i8),
 }
@@ -1652,6 +1671,17 @@ impl ArrayScalar {
     pub fn as_f32(&self) -> Option<f32> {
         match self.value {
             HostScalarValue::F32(value) => Some(value),
+            HostScalarValue::I32(_) => None,
+            HostScalarValue::I8(_) => None,
+        }
+    }
+
+    /// Returns the scalar as `i32` when the logical dtype is integer.
+    #[must_use]
+    pub fn as_i32(&self) -> Option<i32> {
+        match self.value {
+            HostScalarValue::F32(_) => None,
+            HostScalarValue::I32(value) => Some(value),
             HostScalarValue::I8(_) => None,
         }
     }
@@ -1661,6 +1691,7 @@ impl ArrayScalar {
     pub fn as_i8(&self) -> Option<i8> {
         match self.value {
             HostScalarValue::F32(_) => None,
+            HostScalarValue::I32(_) => None,
             HostScalarValue::I8(value) => Some(value),
         }
     }
@@ -3310,8 +3341,8 @@ fn coverage_invariant(case_id: &str, detail: impl Into<String>) -> ArrayError {
 
 /// Builds the canonical bounded MLX CPU-reference coverage report for the
 /// imported basic parity families.
-pub fn builtin_mlx_cpu_reference_coverage_report()
--> Result<MlxCpuReferenceCoverageReport, ArrayError> {
+pub fn builtin_mlx_cpu_reference_coverage_report(
+) -> Result<MlxCpuReferenceCoverageReport, ArrayError> {
     let schema_path = "docs/mlx_cpu_reference_coverage_report.schema.json";
     let runner = "scripts/release/check-psionic-mlx-cpu-reference-coverage.sh";
     let oracle_window = "ml-explore/mlx:v0.31.0..v0.31.1:cpu_reference_seed_v1";
@@ -4185,6 +4216,12 @@ fn host_array_data_from_evaluated(
     };
     let host_values = match dtype {
         DType::F32 | DType::F16 | DType::BF16 => HostArrayStorage::F32(values.to_vec()),
+        DType::I32 => HostArrayStorage::I32(
+            values
+                .iter()
+                .map(|value| value.round().clamp(i32::MIN as f32, i32::MAX as f32) as i32)
+                .collect(),
+        ),
         DType::I8 => HostArrayStorage::I8(
             values
                 .iter()
@@ -4215,6 +4252,12 @@ fn scalar_from_evaluated(
             };
             HostScalarValue::F32(*value)
         }
+        HostArrayStorage::I32(values) => {
+            let Some(value) = values.first() else {
+                unreachable!("singleton check should guarantee one i32 value")
+            };
+            HostScalarValue::I32(*value)
+        }
         HostArrayStorage::I8(values) => {
             let Some(value) = values.first() else {
                 unreachable!("singleton check should guarantee one i8 value")
@@ -4228,6 +4271,7 @@ fn scalar_from_evaluated(
 fn dense_constant_values(tensor: TensorId, data: &TensorData) -> Result<Vec<f32>, ArrayError> {
     match data {
         TensorData::F32(values) => Ok(values.clone()),
+        TensorData::I32(values) => Ok(values.iter().map(|value| *value as f32).collect()),
         TensorData::QuantizedBlocks(_) => Err(ArrayError::MaterializationRefusal {
             tensor,
             op: String::from("constant"),
@@ -4607,6 +4651,7 @@ fn cast_dense_value(
         .iter()
         .map(|current| match dtype {
             DType::F32 | DType::F16 | DType::BF16 => *current,
+            DType::I32 => current.round().clamp(i32::MIN as f32, i32::MAX as f32),
             DType::I8 => current.round().clamp(i8::MIN as f32, i8::MAX as f32),
         })
         .collect::<Vec<_>>();
@@ -4731,13 +4776,13 @@ mod tests {
     #![allow(clippy::expect_used, clippy::panic, clippy::panic_in_result_fn)]
 
     use super::{
-        Array, ArrayBackendCaptureArtifact, ArrayBackendCaptureArtifactRequest,
-        ArrayBackendCaptureConfig, ArrayBackendCaptureFormat, ArrayBackendDebugLane,
-        ArrayBackendLogKind, ArrayCacheLimitControl, ArrayCacheResetScope, ArrayContext,
-        ArrayError, ArrayScalar, AsyncEvalStatus, ImplicitMaterializationPolicy,
-        MaterializationTrigger, MlxCpuReferenceCoverageStatus, ReplayBoundary,
-        StreamDependencyPolicy, StreamKind, Tree, TreeError, TreeSpec, UnifiedMemoryCapability,
-        builtin_mlx_cpu_reference_coverage_report, current_time_millis,
+        builtin_mlx_cpu_reference_coverage_report, current_time_millis, Array,
+        ArrayBackendCaptureArtifact, ArrayBackendCaptureArtifactRequest, ArrayBackendCaptureConfig,
+        ArrayBackendCaptureFormat, ArrayBackendDebugLane, ArrayBackendLogKind,
+        ArrayCacheLimitControl, ArrayCacheResetScope, ArrayContext, ArrayError, ArrayScalar,
+        AsyncEvalStatus, ImplicitMaterializationPolicy, MaterializationTrigger,
+        MlxCpuReferenceCoverageStatus, ReplayBoundary, StreamDependencyPolicy, StreamKind, Tree,
+        TreeError, TreeSpec, UnifiedMemoryCapability,
     };
     use psionic_compiler::{
         CompileTransformConfig, CompileTransformDebugMode, CompileTransformTraceMode,
@@ -4900,8 +4945,8 @@ mod tests {
     }
 
     #[test]
-    fn public_lazy_array_runtime_resource_report_tracks_active_peak_and_cache_counters()
-    -> Result<(), ArrayError> {
+    fn public_lazy_array_runtime_resource_report_tracks_active_peak_and_cache_counters(
+    ) -> Result<(), ArrayError> {
         let context = ArrayContext::cpu();
         let left = context.ones_f32(Shape::new(vec![2, 2]))?;
         let right = context.full_f32(Shape::new(vec![2, 2]), 2.0)?;
@@ -4990,8 +5035,8 @@ mod tests {
     }
 
     #[test]
-    fn public_lazy_array_cache_limit_controls_clamp_and_reset_runtime_resources()
-    -> Result<(), ArrayError> {
+    fn public_lazy_array_cache_limit_controls_clamp_and_reset_runtime_resources(
+    ) -> Result<(), ArrayError> {
         let context = ArrayContext::cpu();
         let _ = context.configure_cache_limits(ArrayCacheLimitControl {
             execution_plan_cache: ExecutionPlanCachePolicy::bounded(1, Some(512)),
@@ -5177,8 +5222,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn public_lazy_array_metal_eval_executes_bounded_dense_surface_when_hardware_available()
-    -> Result<(), ArrayError> {
+    fn public_lazy_array_metal_eval_executes_bounded_dense_surface_when_hardware_available(
+    ) -> Result<(), ArrayError> {
         let context = match ArrayContext::metal() {
             Ok(context) => context,
             Err(ArrayError::BackendUnavailable { .. }) => return Ok(()),
@@ -5208,8 +5253,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn public_lazy_array_metal_eval_refuses_ops_outside_bounded_surface_when_hardware_available()
-    -> Result<(), ArrayError> {
+    fn public_lazy_array_metal_eval_refuses_ops_outside_bounded_surface_when_hardware_available(
+    ) -> Result<(), ArrayError> {
         let context = match ArrayContext::metal() {
             Ok(context) => context,
             Err(ArrayError::BackendUnavailable { .. }) => return Ok(()),
@@ -5231,8 +5276,8 @@ mod tests {
     }
 
     #[test]
-    fn public_lazy_array_cuda_eval_executes_bounded_dense_surface_when_hardware_available()
-    -> Result<(), ArrayError> {
+    fn public_lazy_array_cuda_eval_executes_bounded_dense_surface_when_hardware_available(
+    ) -> Result<(), ArrayError> {
         let context = match ArrayContext::cuda() {
             Ok(context) => context,
             Err(ArrayError::BackendUnavailable { .. }) => return Ok(()),
@@ -5261,8 +5306,8 @@ mod tests {
     }
 
     #[test]
-    fn public_lazy_array_cuda_eval_refuses_ops_outside_bounded_surface_when_hardware_available()
-    -> Result<(), ArrayError> {
+    fn public_lazy_array_cuda_eval_refuses_ops_outside_bounded_surface_when_hardware_available(
+    ) -> Result<(), ArrayError> {
         let context = match ArrayContext::cuda() {
             Ok(context) => context,
             Err(ArrayError::BackendUnavailable { .. }) => return Ok(()),
@@ -5337,8 +5382,8 @@ mod tests {
     }
 
     #[test]
-    fn public_lazy_array_random_cast_and_common_creation_families_stay_seeded()
-    -> Result<(), ArrayError> {
+    fn public_lazy_array_random_cast_and_common_creation_families_stay_seeded(
+    ) -> Result<(), ArrayError> {
         let left = ArrayContext::cpu_seeded(7)?;
         let right = ArrayContext::cpu_seeded(7)?;
         let initial_generator = left
@@ -5638,8 +5683,8 @@ mod tests {
     }
 
     #[test]
-    fn public_lazy_array_backend_debug_capture_emits_receipt_logs_and_artifact()
-    -> Result<(), ArrayError> {
+    fn public_lazy_array_backend_debug_capture_emits_receipt_logs_and_artifact(
+    ) -> Result<(), ArrayError> {
         let context = ArrayContext::cpu();
         let left = context.constant_f32(Shape::new(vec![2, 2]), vec![1.0, 2.0, 3.0, 4.0])?;
         let right = context.constant_f32(Shape::new(vec![2, 2]), vec![4.0, 3.0, 2.0, 1.0])?;
@@ -5727,8 +5772,8 @@ mod tests {
     }
 
     #[test]
-    fn public_lazy_array_extension_authoring_surface_registers_custom_ops_and_kernels()
-    -> Result<(), ArrayError> {
+    fn public_lazy_array_extension_authoring_surface_registers_custom_ops_and_kernels(
+    ) -> Result<(), ArrayError> {
         let context = ArrayContext::cpu();
         let schema = RegisteredOperatorSchema::custom(
             "x.example.masked_scale",
@@ -5784,12 +5829,10 @@ mod tests {
         let resolved = context.resolve_extension_dispatch("x.example.masked_scale")?;
         assert_eq!(resolved.dispatch_kind, KernelDispatchKind::BackendSpecific);
         let snapshot = context.extension_registry_snapshot();
-        assert!(
-            snapshot
-                .schemas
-                .iter()
-                .any(|registered| registered.name == "x.example.masked_scale")
-        );
+        assert!(snapshot
+            .schemas
+            .iter()
+            .any(|registered| registered.name == "x.example.masked_scale"));
         assert!(snapshot.kernel_registrations.iter().any(|registration| {
             registration.name == "x.example.masked_scale"
                 && registration.kernel_symbol == "masked_scale_cpu"
@@ -5803,8 +5846,8 @@ mod tests {
     }
 
     #[test]
-    fn public_lazy_array_extension_authoring_surface_registers_plugins_and_refuses_duplicates()
-    -> Result<(), ArrayError> {
+    fn public_lazy_array_extension_authoring_surface_registers_plugins_and_refuses_duplicates(
+    ) -> Result<(), ArrayError> {
         let context = ArrayContext::from_device_descriptor(DeviceDescriptor {
             backend: String::from("cuda"),
             device: Device::new(DeviceKind::Cuda, 0, Some(String::from("cuda:0"))),
@@ -5878,8 +5921,8 @@ mod tests {
     }
 
     #[test]
-    fn public_lazy_array_tree_utilities_preserve_structure_and_refuse_bad_unflatten()
-    -> Result<(), ArrayError> {
+    fn public_lazy_array_tree_utilities_preserve_structure_and_refuse_bad_unflatten(
+    ) -> Result<(), ArrayError> {
         let context = ArrayContext::cpu();
         let left = context.scalar_f32(1.0)?;
         let right = context.scalar_f32(2.0)?.cast(DType::I8)?;
@@ -5970,8 +6013,8 @@ mod tests {
     }
 
     #[test]
-    fn mlx_cpu_reference_coverage_report_tracks_seeded_supported_and_refused_cases()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn mlx_cpu_reference_coverage_report_tracks_seeded_supported_and_refused_cases(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let report = builtin_mlx_cpu_reference_coverage_report()?;
         assert_eq!(report.schema_version, 1);
         assert_eq!(
@@ -5987,12 +6030,10 @@ mod tests {
             "ml-explore/mlx:v0.31.0..v0.31.1:cpu_reference_seed_v1"
         );
         assert_eq!(report.current_scope_window, "psionic_mlx_cpu_reference_v1");
-        assert!(
-            report
-                .stable_signature_lines()
-                .iter()
-                .any(|line| line.starts_with("report_digest="))
-        );
+        assert!(report
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("report_digest=")));
 
         let array_supported = report
             .cases
@@ -6078,12 +6119,10 @@ mod tests {
             filtered.selected_families,
             vec![String::from("array_core"), String::from("ops_numeric")]
         );
-        assert!(
-            filtered
-                .cases
-                .iter()
-                .all(|case| case.family_id == "array_core" || case.family_id == "ops_numeric")
-        );
+        assert!(filtered
+            .cases
+            .iter()
+            .all(|case| case.family_id == "array_core" || case.family_id == "ops_numeric"));
 
         let error = report
             .filter_to_families(&[String::from("not-a-real-family")])
