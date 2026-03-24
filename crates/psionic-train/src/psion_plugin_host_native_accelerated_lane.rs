@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
+    time::Instant,
 };
 
 use psionic_backend_cuda::CudaBackend;
@@ -18,8 +19,10 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    FixedBudgetTrainingRun, PsionPluginArgumentConstructionBenchmarkBundle,
-    PsionPluginBenchmarkFamily, PsionPluginBenchmarkItem, PsionPluginBenchmarkTaskContract,
+    FixedBudgetTrainingRun, PsionGoogleSingleNodeLiveVisualizationWriter,
+    PsionGoogleSingleNodeStepTelemetry, PsionGoogleSingleNodeVisualizationError,
+    PsionPluginArgumentConstructionBenchmarkBundle, PsionPluginBenchmarkFamily,
+    PsionPluginBenchmarkItem, PsionPluginBenchmarkTaskContract,
     PsionPluginConditionedBenchmarkBinding, PsionPluginConditionedCompactDecoderError,
     PsionPluginConditionedCompactDecoderReferenceConfig, PsionPluginConditionedEvalHook,
     PsionPluginConditionedEvalHookKind, PsionPluginConditionedEvalTrigger,
@@ -255,6 +258,26 @@ struct PsionAcceleratedGradientProgram {
 
 pub fn run_psion_plugin_host_native_accelerated_lane()
 -> Result<PsionPluginHostNativeAcceleratedRunBundle, PsionPluginHostNativeAcceleratedLaneError> {
+    run_psion_plugin_host_native_accelerated_lane_with_live_visualization(None)
+}
+
+pub fn run_psion_plugin_host_native_accelerated_lane_with_live_visualization(
+    live_visualization_writer: Option<&mut PsionGoogleSingleNodeLiveVisualizationWriter>,
+) -> Result<PsionPluginHostNativeAcceleratedRunBundle, PsionPluginHostNativeAcceleratedLaneError> {
+    let mut live_visualization_writer = live_visualization_writer;
+    if let Some(writer) = live_visualization_writer.as_mut() {
+        writer.record_phase(
+            "dataset_staging",
+            Some(String::from("plugin_conditioned_dataset")),
+            "The plugin-conditioned Google lane is materializing the canonical dataset and stage program.",
+            vec![
+                String::from("plugin_dataset"),
+                String::from("stage_program"),
+            ],
+            None,
+            true,
+        )?;
+    }
     let dataset_bundle = build_psion_plugin_conditioned_dataset_bundle()?;
     let benchmark_suite = benchmark_suite()?;
     let training_records = build_training_records(&dataset_bundle)?;
@@ -284,7 +307,18 @@ pub fn run_psion_plugin_host_native_accelerated_lane()
         &stage_bundle,
         &model_config,
         train_examples.as_slice(),
+        live_visualization_writer.as_deref_mut(),
     )?;
+    if let Some(writer) = live_visualization_writer.as_mut() {
+        writer.record_phase(
+            "evaluation",
+            Some(String::from("route_tool_projection")),
+            "The plugin-conditioned Google lane is projecting learned route and tool rows from the trained compact decoder.",
+            vec![String::from("model_projection"), String::from("benchmark_eval")],
+            None,
+            true,
+        )?;
+    }
     let model_artifact = record_model_artifact(
         &stage_bundle,
         &model_config,
@@ -298,6 +332,21 @@ pub fn run_psion_plugin_host_native_accelerated_lane()
         &model_artifact,
         &benchmark_suite,
     );
+    if let Some(writer) = live_visualization_writer.as_mut() {
+        writer.record_phase(
+            "artifact_seal",
+            Some(String::from("receipt_materialization")),
+            "The plugin-conditioned Google lane sealed its stage, observability, model, and evaluation artifacts for finalization upload.",
+            vec![
+                String::from("stage_receipt"),
+                String::from("observability_receipt"),
+                String::from("model_artifact"),
+                String::from("evaluation_receipt"),
+            ],
+            None,
+            true,
+        )?;
+    }
     let mut bundle = PsionPluginHostNativeAcceleratedRunBundle {
         schema_version: String::from("psionic.psion.plugin_host_native_accelerated_run_bundle.v1"),
         bundle_id: String::from("bundle.psion.plugin_host_native_accelerated.v1"),
@@ -601,7 +650,9 @@ fn run_accelerated_training(
     stage_bundle: &PsionPluginConditionedSftRunBundle,
     model_config: &PsionPluginConditionedCompactDecoderReferenceConfig,
     train_examples: &[HostNativeProbeExample],
+    live_visualization_writer: Option<&mut PsionGoogleSingleNodeLiveVisualizationWriter>,
 ) -> Result<AcceleratedTrainerOutput, PsionPluginHostNativeAcceleratedLaneError> {
+    let mut live_visualization_writer = live_visualization_writer;
     let mut cuda_backend = CudaBackend::new();
     let Some(selected_device) = cuda_backend.selected_device().cloned() else {
         let detail = cuda_backend
@@ -618,6 +669,7 @@ fn run_accelerated_training(
         &model_config.descriptor,
         train_examples.len(),
     )?;
+    let tokens_per_step = token_count(train_examples);
     let parameter_groups = build_parameter_groups_for_execution(
         &initial_model,
         &model_config.descriptor,
@@ -634,6 +686,24 @@ fn run_accelerated_training(
     let mut current_model = initial_model.clone();
     let mut step_receipts = Vec::new();
     for step_index in 0..config.budget.max_steps {
+        let global_step = step_index.saturating_add(1);
+        if let Some(writer) = live_visualization_writer.as_mut() {
+            writer.record_phase(
+                "training",
+                Some(String::from("optimizer_step")),
+                format!(
+                    "The plugin-conditioned Google lane is executing CUDA optimizer step {global_step}."
+                ),
+                vec![
+                    String::from("cuda_graph"),
+                    String::from("route_tool_probe_batch"),
+                    String::from("optimizer_step"),
+                ],
+                Some(global_step),
+                false,
+            )?;
+        }
+        let batch_started_at = Instant::now();
         let batch = build_accelerated_gradient_batch(
             &mut cuda_backend,
             &gradient_program,
@@ -641,13 +711,28 @@ fn run_accelerated_training(
             train_examples,
             &training_device,
         )?;
+        let batch_elapsed_ms = batch_started_at.elapsed().as_millis() as u64;
         let started_at_ms = config
             .started_at_ms
             .saturating_add(step_index.saturating_mul(config.step_duration_ms));
         let finished_at_ms = started_at_ms.saturating_add(config.step_duration_ms);
+        let optimizer_started_at = Instant::now();
         let receipt =
             run.apply_step(TrainingStepInput::new(batch, started_at_ms, finished_at_ms))?;
+        let optimizer_elapsed_ms = optimizer_started_at.elapsed().as_millis() as u64;
+        let materialize_started_at = Instant::now();
         current_model = materialize_model(&model_config.descriptor, &run)?;
+        let materialize_elapsed_ms = materialize_started_at.elapsed().as_millis() as u64;
+        if let Some(writer) = live_visualization_writer.as_mut() {
+            writer.record_step(build_plugin_live_step_telemetry(
+                &receipt,
+                tokens_per_step,
+                batch_elapsed_ms,
+                optimizer_elapsed_ms,
+                materialize_elapsed_ms,
+                train_examples.len(),
+            ))?;
+        }
         step_receipts.push(receipt);
     }
 
@@ -714,6 +799,100 @@ fn build_stage_receipt(
         &receipt_without_digest(&receipt),
     );
     receipt
+}
+
+fn build_plugin_live_step_telemetry(
+    receipt: &crate::TrainingStepReceipt,
+    tokens_per_step: u64,
+    gradient_batch_ms: u64,
+    optimizer_ms: u64,
+    model_materialization_ms: u64,
+    train_example_count: usize,
+) -> PsionGoogleSingleNodeStepTelemetry {
+    let learning_rate = mean_f32(
+        receipt
+            .group_telemetry
+            .iter()
+            .map(|group| group.effective_learning_rate),
+    );
+    let gradient_norm = receipt
+        .group_telemetry
+        .iter()
+        .map(|group| group.gradient_norm_l2)
+        .max_by(|left, right| left.total_cmp(right));
+    let parameter_norm = receipt
+        .group_telemetry
+        .iter()
+        .map(|group| group.parameter_norm_l2)
+        .max_by(|left, right| left.total_cmp(right));
+    let update_norm = receipt
+        .group_telemetry
+        .iter()
+        .map(|group| group.update_norm_l2)
+        .max_by(|left, right| left.total_cmp(right));
+    let clipping_ratios = receipt
+        .group_telemetry
+        .iter()
+        .filter_map(|group| group.clipping_ratio)
+        .collect::<Vec<_>>();
+    let clip_fraction = (!clipping_ratios.is_empty())
+        .then_some(clipping_ratios.iter().sum::<f32>() / clipping_ratios.len() as f32);
+    let clip_event_count = clip_fraction.map(|_| {
+        receipt
+            .group_telemetry
+            .iter()
+            .filter(|group| group.clipping_ratio.is_some())
+            .count() as u32
+    });
+    let observed_step_ms = gradient_batch_ms
+        .saturating_add(optimizer_ms)
+        .saturating_add(model_materialization_ms)
+        .max(1);
+    let tokens_per_second = Some(tokens_per_step.saturating_mul(1000) / observed_step_ms.max(1));
+    let samples_per_second_milli = Some(
+        (((u64::from(receipt.sample_count)) * 1_000 * 1_000) / observed_step_ms.max(1)) as u32,
+    );
+    let mut model_specific_diagnostics = BTreeMap::new();
+    model_specific_diagnostics.insert(
+        String::from("train_example_count"),
+        train_example_count as f32,
+    );
+    model_specific_diagnostics.insert(
+        String::from("model_materialization_ms"),
+        model_materialization_ms as f32,
+    );
+    PsionGoogleSingleNodeStepTelemetry {
+        global_step: receipt.schedule.global_step,
+        train_loss: Some(receipt.loss),
+        learning_rate,
+        gradient_norm,
+        parameter_norm,
+        update_norm,
+        clip_fraction,
+        clip_event_count,
+        non_finite_count: 0,
+        model_specific_diagnostics,
+        data_wait_ms: None,
+        forward_ms: Some(gradient_batch_ms),
+        optimizer_ms: Some(optimizer_ms),
+        tokens_per_second,
+        samples_per_second_milli,
+        active_subsystems: vec![
+            String::from("route_tool_probe_batch"),
+            String::from("optimizer_step"),
+            String::from("model_materialization"),
+        ],
+        summary_detail: format!(
+            "The plugin-conditioned Google lane completed optimizer step {} and retained live route-probe telemetry.",
+            receipt.schedule.global_step
+        ),
+        ..PsionGoogleSingleNodeStepTelemetry::default()
+    }
+}
+
+fn mean_f32(values: impl Iterator<Item = f32>) -> Option<f32> {
+    let values = values.collect::<Vec<_>>();
+    (!values.is_empty()).then_some(values.iter().sum::<f32>() / values.len() as f32)
 }
 
 fn build_observability_receipt(
@@ -2096,4 +2275,6 @@ pub enum PsionPluginHostNativeAcceleratedLaneError {
     Graph(#[from] psionic_ir::GraphError),
     #[error(transparent)]
     Observability(#[from] PsionPretrainRunObservabilityError),
+    #[error(transparent)]
+    Visualization(#[from] PsionGoogleSingleNodeVisualizationError),
 }

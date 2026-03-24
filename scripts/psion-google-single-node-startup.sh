@@ -517,6 +517,14 @@ main() {
 
   export PSION_RUN_ID="${run_id}"
   export PSION_BUCKET_URL="${bucket_url}"
+  export PSIONIC_REMOTE_TRAINING_PROVIDER="google_cloud"
+  export PSIONIC_REMOTE_TRAINING_PROFILE_ID="$(
+    jq -r '.profile_id // "unknown_profile"' "${LAUNCH_MANIFEST_FILE}"
+  )"
+  export PSIONIC_REMOTE_TRAINING_LANE_ID="$(
+    jq -r '.trainer_lane_id // .training.trainer_lane_id // "unknown_trainer_lane"' "${LAUNCH_MANIFEST_FILE}"
+  )"
+  export PSIONIC_REMOTE_TRAINING_REPO_REVISION="workspace@${git_revision}"
 
   RUN_ROOT="${workspace_root}/runs/${run_id}"
   output_dir="${RUN_ROOT}/${output_subdir}"

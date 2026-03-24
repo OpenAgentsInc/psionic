@@ -18,6 +18,8 @@ Autopilot owns rendering, refresh loops, and pane behavior.
   regenerates the canonical example fixtures.
 - `fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v1.json`
   is the canonical summary-only example bundle.
+- `fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json`
+  is the canonical always-live Google single-node example bundle.
 - `fixtures/training_visualization/parameter_golf_live_remote_training_visualization_bundle_v1.json`
   is the canonical full always-live example bundle.
 - `fixtures/training_visualization/remote_training_run_index_v1.json` is the
@@ -100,3 +102,27 @@ That lane now preserves:
 
 The Google and RunPod single-H100 finalizers now re-materialize the same typed
 bundle and run index at closeout instead of inventing provider-specific JSON.
+
+## Google Single-Node Psion
+
+The accelerated Google single-node Psion lanes now write their own provider-neutral
+live bundle under the run output directory while the trainer is active.
+
+The retained path is:
+
+- `training_visualization/psion_google_single_node_remote_training_visualization_bundle_v1.json`
+- `training_visualization/remote_training_run_index_v1.json`
+- `training_visualization/snapshots/*.json`
+
+The accelerated reference lane and the plugin-conditioned accelerated lane now
+retain:
+
+- one-second heartbeats while the trainer is active
+- per-step train-loss samples plus retained validation checkpoints
+- bounded optimizer math derived from the trainer step receipts
+- runtime timings derived from the real CUDA batch, optimizer, and model materialization path
+- local GPU samples from the training host when `nvidia-smi` is available
+- checkpoint refs plus receipt and artifact provenance after the lane seals
+
+The summary-only Google example fixture still exists because non-accelerated or
+historical lanes may lack chartable series.

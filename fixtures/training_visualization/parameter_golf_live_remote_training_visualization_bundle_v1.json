@@ -14,7 +14,6 @@
     "heartbeat_seq": 5
   },
   "series_status": "available",
-  "series_unavailable_reason": null,
   "timeline": [
     {
       "observed_at_ms": 1742846395000,
@@ -93,15 +92,13 @@
       "global_step": 1,
       "elapsed_ms": 1000,
       "train_loss": 4.181,
-      "ema_loss": 4.181,
-      "validation_loss": null
+      "ema_loss": 4.181
     },
     {
       "global_step": 2,
       "elapsed_ms": 2000,
       "train_loss": 4.024,
-      "ema_loss": 4.102,
-      "validation_loss": null
+      "ema_loss": 4.102
     },
     {
       "global_step": 3,
@@ -119,9 +116,9 @@
       "gradient_norm": 1.41,
       "parameter_norm": 73.4,
       "update_norm": 0.84,
-      "clip_fraction": 0,
+      "clip_fraction": 0.0,
       "clip_event_count": 0,
-      "loss_scale": 1024,
+      "loss_scale": 1024.0,
       "non_finite_count": 0,
       "model_specific_diagnostics": {
         "attention_entropy": 2.81,
@@ -135,9 +132,9 @@
       "gradient_norm": 1.35,
       "parameter_norm": 73.5,
       "update_norm": 0.81,
-      "clip_fraction": 0,
+      "clip_fraction": 0.0,
       "clip_event_count": 0,
-      "loss_scale": 1024,
+      "loss_scale": 1024.0,
       "non_finite_count": 0,
       "model_specific_diagnostics": {
         "attention_entropy": 2.77,
@@ -151,9 +148,9 @@
       "gradient_norm": 1.29,
       "parameter_norm": 73.6,
       "update_norm": 0.79,
-      "clip_fraction": 0,
+      "clip_fraction": 0.0,
       "clip_event_count": 0,
-      "loss_scale": 1024,
+      "loss_scale": 1024.0,
       "non_finite_count": 0,
       "model_specific_diagnostics": {
         "attention_entropy": 2.72,
@@ -168,8 +165,6 @@
       "forward_ms": 318,
       "backward_ms": 374,
       "optimizer_ms": 118,
-      "checkpoint_ms": null,
-      "evaluation_ms": null,
       "tokens_per_second": 141824,
       "samples_per_second_milli": 138
     },
@@ -179,8 +174,6 @@
       "forward_ms": 311,
       "backward_ms": 365,
       "optimizer_ms": 116,
-      "checkpoint_ms": null,
-      "evaluation_ms": null,
       "tokens_per_second": 142976,
       "samples_per_second_milli": 139
     },
@@ -253,7 +246,6 @@
     {
       "artifact_role": "live_bundle",
       "artifact_uri": "local-mirror://parameter-golf/runpod-single-h100/remote_training_visualization_bundle.json",
-      "artifact_digest": null,
       "source_kind": "local_mirror",
       "authoritative": true,
       "source_receipt_ids": [
@@ -278,9 +270,8 @@
       "artifact_digest": "f72e7c98f98d1aa627399831d4ab90c3fc42f8aaad719996257053b956f95bbb",
       "source_kind": "provider_generated",
       "authoritative": true,
-      "source_receipt_ids": [],
       "detail": "Provider GPU samples remain the authoritative device source for the lane."
     }
   ],
-  "bundle_digest": "492892d0779295b04fbf5f905a5fed0dcb4017ad61fb5b83632d9e9737021633"
+  "bundle_digest": "5586dcce60890fc6e8c34dbcfc37df0d45da6d192a6a5c1c7446429ef48a3796"
 }

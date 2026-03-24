@@ -1,7 +1,11 @@
 use std::{collections::BTreeSet, error::Error, fs, path::Path, path::PathBuf};
 
 use psionic_runtime::TrainingCheckpointReference;
-use psionic_train::{TrainingStageProgramState, run_psion_plugin_host_native_accelerated_lane};
+use psionic_train::{
+    PsionGoogleSingleNodeLiveVisualizationWriter, RemoteTrainingArtifactSourceKind,
+    TrainingStageProgramState,
+    run_psion_plugin_host_native_accelerated_lane_with_live_visualization,
+};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -85,7 +89,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             repo_root.join("target/psion_google_plugin_host_native_accelerated_run")
         });
 
-    let bundle = run_psion_plugin_host_native_accelerated_lane()?;
+    let mut live_visualization_writer = PsionGoogleSingleNodeLiveVisualizationWriter::try_start(
+        output_dir.as_path(),
+        "run-psion-plugin-host-native-accelerated",
+        "The Google plugin-conditioned accelerated lane started and is emitting live visualization bundles.",
+    )?;
+    let bundle = match run_psion_plugin_host_native_accelerated_lane_with_live_visualization(
+        live_visualization_writer.as_mut(),
+    ) {
+        Ok(bundle) => bundle,
+        Err(error) => {
+            if let Some(writer) = live_visualization_writer.as_mut() {
+                let _ = writer.finish_failure(format!(
+                    "The Google plugin-conditioned accelerated lane failed before sealing its final artifacts: {error}"
+                ));
+            }
+            return Err(Box::new(error));
+        }
+    };
     let refs = checkpoint_refs(&bundle.stage_bundle.stage_program);
     let latest_checkpoint = refs
         .last()
@@ -113,7 +134,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         checkpoint_family: bundle.stage_bundle.checkpoint_family.clone(),
         checkpoint_ref_count: refs.len() as u32,
         checkpoint_refs,
-        latest_checkpoint_ref,
+        latest_checkpoint_ref: latest_checkpoint_ref.clone(),
         latest_checkpoint_step,
         stage_receipt_digest: bundle.stage_receipt.receipt_digest.clone(),
         plugin_stage_receipt_digest: bundle.stage_bundle.stage_receipt.receipt_digest.clone(),
@@ -197,6 +218,60 @@ fn main() -> Result<(), Box<dyn Error>> {
         "psion_plugin_host_native_accelerated_run_summary.json",
         &run_summary,
     )?;
+    if let Some(writer) = live_visualization_writer.as_mut() {
+        writer.record_source_artifact(
+            "plugin_stage_receipt",
+            "psion_plugin_host_native_accelerated_stage_receipt.json",
+            Some(bundle.stage_receipt.receipt_digest.clone()),
+            RemoteTrainingArtifactSourceKind::RuntimeOwned,
+            true,
+            vec![String::from(
+                "receipt.psion.plugin_host_native_accelerated.cuda_stage.v1",
+            )],
+            "The plugin-conditioned accelerated stage receipt remains authoritative for delivered execution and optimizer-step posture.",
+        )?;
+        writer.record_source_artifact(
+            "plugin_observability_receipt",
+            "psion_plugin_host_native_accelerated_observability_receipt.json",
+            Some(bundle.observability_receipt.observability_digest.clone()),
+            RemoteTrainingArtifactSourceKind::RuntimeOwned,
+            true,
+            vec![String::from(
+                "receipt.psion.plugin_host_native_accelerated.cuda_observability.v1",
+            )],
+            "The plugin-conditioned accelerated observability receipt remains authoritative for throughput and topology summary facts.",
+        )?;
+        writer.record_source_artifact(
+            "plugin_model_artifact",
+            "psion_plugin_host_native_accelerated_model_artifact.json",
+            Some(bundle.model_artifact.artifact_digest.clone()),
+            RemoteTrainingArtifactSourceKind::RuntimeOwned,
+            true,
+            vec![String::from("artifact.psion.plugin_host_native_accelerated.model.v1")],
+            "The plugin-conditioned accelerated model artifact remains authoritative for learned route and tool rows.",
+        )?;
+        writer.record_source_artifact(
+            "plugin_evaluation_receipt",
+            "psion_plugin_host_native_accelerated_evaluation_receipt.json",
+            Some(bundle.evaluation_receipt.receipt_digest.clone()),
+            RemoteTrainingArtifactSourceKind::RuntimeOwned,
+            true,
+            vec![String::from(
+                "receipt.psion.plugin_host_native_accelerated.evaluation.v1",
+            )],
+            "The plugin-conditioned accelerated evaluation receipt remains authoritative for benchmark deltas over the learned route and tool rows.",
+        )?;
+        writer.record_checkpoint_ref(
+            latest_checkpoint_ref.clone(),
+            None,
+            "The plugin-conditioned accelerated lane retained its latest logical checkpoint ref for the live viewer.",
+        )?;
+        writer.finish_success(format!(
+            "The Google plugin-conditioned accelerated lane completed {} optimizer steps and sealed checkpoint `{}` for the live viewer.",
+            bundle.stage_receipt.accelerator_execution.optimizer_steps_completed,
+            latest_checkpoint_ref
+        ))?;
+    }
 
     println!(
         "psion host-native accelerated lane completed: backend={} output={}",

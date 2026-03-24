@@ -235,6 +235,39 @@ first_matching_file() {
   find "${search_root}" -type f -name "${pattern}" | sort | head -n 1 || true
 }
 
+capture_remote_training_visualization_metadata() {
+  local bundle_path="$1"
+  local run_index_path="$2"
+  if [[ -f "${bundle_path}" ]]; then
+    remote_training_visualization_bundle_sha256="$(
+      compute_sha256 "${bundle_path}"
+    )"
+    remote_training_visualization_bundle_digest="$(
+      jq -r '.bundle_digest // empty' "${bundle_path}"
+    )"
+    remote_training_visualization_result="$(
+      jq -r '.result_classification // empty' "${bundle_path}"
+    )"
+    remote_training_visualization_series_status="$(
+      jq -r '.series_status // empty' "${bundle_path}"
+    )"
+    remote_training_visualization_last_heartbeat_at_ms="$(
+      jq -r '.refresh_contract.last_heartbeat_at_ms // empty' "${bundle_path}"
+    )"
+    remote_training_visualization_heartbeat_seq="$(
+      jq -r '.refresh_contract.heartbeat_seq // empty' "${bundle_path}"
+    )"
+  fi
+  if [[ -f "${run_index_path}" ]]; then
+    remote_training_visualization_run_index_sha256="$(
+      compute_sha256 "${run_index_path}"
+    )"
+    remote_training_visualization_run_index_digest="$(
+      jq -r '.index_digest // empty' "${run_index_path}"
+    )"
+  fi
+}
+
 bucket_url="$(jq -r '.bucket_url' "${POLICY_FILE}")"
 host_prefix_name="$(jq -r '.artifact_paths.host_prefix' "${POLICY_FILE}")"
 logs_prefix_name="$(jq -r '.artifact_paths.logs_prefix' "${POLICY_FILE}")"
@@ -821,34 +854,17 @@ if [[ "${trainer_lane_id}" == "parameter_golf_single_h100" ]]; then
   remote_training_visualization_bundle_remote_uri="${receipts_prefix}/training_visualization/parameter_golf_single_h100_remote_training_visualization_bundle_v1.json"
   remote_training_visualization_run_index_path="${output_dir}/training_visualization/remote_training_run_index_v1.json"
   remote_training_visualization_run_index_remote_uri="${receipts_prefix}/training_visualization/remote_training_run_index_v1.json"
-  if [[ -f "${remote_training_visualization_bundle_path}" ]]; then
-    remote_training_visualization_bundle_sha256="$(
-      compute_sha256 "${remote_training_visualization_bundle_path}"
-    )"
-    remote_training_visualization_bundle_digest="$(
-      jq -r '.bundle_digest // empty' "${remote_training_visualization_bundle_path}"
-    )"
-    remote_training_visualization_result="$(
-      jq -r '.result_classification // empty' "${remote_training_visualization_bundle_path}"
-    )"
-    remote_training_visualization_series_status="$(
-      jq -r '.series_status // empty' "${remote_training_visualization_bundle_path}"
-    )"
-    remote_training_visualization_last_heartbeat_at_ms="$(
-      jq -r '.refresh_contract.last_heartbeat_at_ms // empty' "${remote_training_visualization_bundle_path}"
-    )"
-    remote_training_visualization_heartbeat_seq="$(
-      jq -r '.refresh_contract.heartbeat_seq // empty' "${remote_training_visualization_bundle_path}"
-    )"
-  fi
-  if [[ -f "${remote_training_visualization_run_index_path}" ]]; then
-    remote_training_visualization_run_index_sha256="$(
-      compute_sha256 "${remote_training_visualization_run_index_path}"
-    )"
-    remote_training_visualization_run_index_digest="$(
-      jq -r '.index_digest // empty' "${remote_training_visualization_run_index_path}"
-    )"
-  fi
+  capture_remote_training_visualization_metadata \
+    "${remote_training_visualization_bundle_path}" \
+    "${remote_training_visualization_run_index_path}"
+elif [[ "${trainer_lane_id}" == "psion_accelerated_reference_pilot" || "${trainer_lane_id}" == "psion_plugin_host_native_accelerated" ]]; then
+  remote_training_visualization_bundle_path="${output_dir}/training_visualization/psion_google_single_node_remote_training_visualization_bundle_v1.json"
+  remote_training_visualization_bundle_remote_uri="${receipts_prefix}/training_visualization/psion_google_single_node_remote_training_visualization_bundle_v1.json"
+  remote_training_visualization_run_index_path="${output_dir}/training_visualization/remote_training_run_index_v1.json"
+  remote_training_visualization_run_index_remote_uri="${receipts_prefix}/training_visualization/remote_training_run_index_v1.json"
+  capture_remote_training_visualization_metadata \
+    "${remote_training_visualization_bundle_path}" \
+    "${remote_training_visualization_run_index_path}"
 fi
 
 jq -n \

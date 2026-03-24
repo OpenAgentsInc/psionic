@@ -1034,8 +1034,8 @@ pub fn build_remote_training_run_index(
 
 /// Returns a canonical full-series sample bundle for the PGOLF single-H100
 /// lane.
-pub fn sample_parameter_golf_live_visualization_bundle(
-) -> Result<RemoteTrainingVisualizationBundle, RemoteTrainingVisualizationError> {
+pub fn sample_parameter_golf_live_visualization_bundle()
+-> Result<RemoteTrainingVisualizationBundle, RemoteTrainingVisualizationError> {
     record_remote_training_visualization_bundle(RemoteTrainingVisualizationBundle {
         schema_version: String::new(),
         bundle_id: String::from("parameter-golf-runpod-single-h100-live-sample-v1"),
@@ -1356,8 +1356,8 @@ pub fn sample_parameter_golf_live_visualization_bundle(
 
 /// Returns a canonical summary-only sample bundle for the existing Google
 /// single-node Psion lane.
-pub fn sample_google_summary_only_visualization_bundle(
-) -> Result<RemoteTrainingVisualizationBundle, RemoteTrainingVisualizationError> {
+pub fn sample_google_summary_only_visualization_bundle()
+-> Result<RemoteTrainingVisualizationBundle, RemoteTrainingVisualizationError> {
     record_remote_training_visualization_bundle(RemoteTrainingVisualizationBundle {
         schema_version: String::new(),
         bundle_id: String::from("psion-google-summary-only-sample-v1"),
@@ -1461,7 +1461,9 @@ pub fn sample_google_summary_only_visualization_bundle(
                 observed_at_ms: 1_742_760_430_000,
                 severity: RemoteTrainingEventSeverity::Info,
                 event_kind: String::from("gpu_samples_uploaded"),
-                detail: String::from("The Google lane retained GPU samples in the output directory."),
+                detail: String::from(
+                    "The Google lane retained GPU samples in the output directory.",
+                ),
             },
             RemoteTrainingEventSample {
                 observed_at_ms: 1_742_760_920_000,
@@ -1538,10 +1540,321 @@ pub fn sample_google_summary_only_visualization_bundle(
     })
 }
 
+/// Returns a canonical always-live sample bundle for the accelerated Google
+/// single-node Psion lane.
+pub fn sample_google_live_visualization_bundle()
+-> Result<RemoteTrainingVisualizationBundle, RemoteTrainingVisualizationError> {
+    record_remote_training_visualization_bundle(RemoteTrainingVisualizationBundle {
+        schema_version: String::new(),
+        bundle_id: String::from("psion-google-live-sample-v1"),
+        provider: RemoteTrainingProvider::GoogleCloud,
+        profile_id: String::from("g2_l4_single_node_accelerated"),
+        lane_id: String::from("psion_accelerated_reference_pilot"),
+        run_id: String::from("psion-google-live-sample"),
+        repo_revision: String::from("main@979af617"),
+        result_classification: RemoteTrainingResultClassification::Active,
+        refresh_contract: RemoteTrainingRefreshContract {
+            target_ui_update_interval_ms: REMOTE_TRAINING_TARGET_UI_UPDATE_INTERVAL_MS,
+            emission_mode: RemoteTrainingEmissionMode::AppendOnlySnapshots,
+            last_heartbeat_at_ms: Some(1_742_846_404_900),
+            heartbeat_seq: 4,
+        },
+        series_status: RemoteTrainingSeriesStatus::Available,
+        series_unavailable_reason: None,
+        timeline: vec![
+            RemoteTrainingTimelineEntry {
+                observed_at_ms: 1_742_846_400_000,
+                phase: String::from("dataset_staging"),
+                subphase: Some(String::from("reference_corpus_build")),
+                detail: String::from(
+                    "The accelerated Google single-node Psion lane materialized the repo-owned reference corpus.",
+                ),
+            },
+            RemoteTrainingTimelineEntry {
+                observed_at_ms: 1_742_846_401_000,
+                phase: String::from("evaluation"),
+                subphase: Some(String::from("initial_validation")),
+                detail: String::from(
+                    "The accelerated lane scored its initial validation posture before CUDA optimizer steps.",
+                ),
+            },
+            RemoteTrainingTimelineEntry {
+                observed_at_ms: 1_742_846_402_000,
+                phase: String::from("training"),
+                subphase: Some(String::from("optimizer_step")),
+                detail: String::from(
+                    "The accelerated lane entered measured CUDA optimizer steps and began emitting one-second heartbeats.",
+                ),
+            },
+        ],
+        summary: RemoteTrainingVisualizationSummary {
+            total_steps_completed: 2,
+            latest_global_step: Some(2),
+            latest_train_loss: Some(2.182),
+            latest_ema_loss: None,
+            latest_validation_loss: Some(2.041),
+            latest_tokens_per_second: Some(51_200),
+            latest_samples_per_second_milli: Some(8_000),
+            accumulated_cost_microusd: None,
+            latest_checkpoint_ref: Some(String::from("checkpoint://psion/reference_pilot/step-2")),
+            detail: String::from(
+                "The accelerated Google single-node Psion lane is active and retaining live loss, math, runtime, and GPU telemetry every second.",
+            ),
+        },
+        heartbeat_series: vec![
+            RemoteTrainingHeartbeatSample {
+                observed_at_ms: 1_742_846_401_000,
+                phase: String::from("evaluation"),
+                subphase: Some(String::from("initial_validation")),
+                step_in_progress: None,
+                microbatch_in_progress: None,
+                active_subsystems: vec![String::from("validation"), String::from("held_out_eval")],
+                stale_after_ms: 2_500,
+            },
+            RemoteTrainingHeartbeatSample {
+                observed_at_ms: 1_742_846_402_000,
+                phase: String::from("training"),
+                subphase: Some(String::from("optimizer_step")),
+                step_in_progress: Some(1),
+                microbatch_in_progress: None,
+                active_subsystems: vec![
+                    String::from("cuda_graph"),
+                    String::from("gradient_batch"),
+                    String::from("optimizer_step"),
+                ],
+                stale_after_ms: 2_500,
+            },
+            RemoteTrainingHeartbeatSample {
+                observed_at_ms: 1_742_846_403_000,
+                phase: String::from("training"),
+                subphase: Some(String::from("optimizer_step")),
+                step_in_progress: Some(2),
+                microbatch_in_progress: None,
+                active_subsystems: vec![
+                    String::from("cuda_graph"),
+                    String::from("gradient_batch"),
+                    String::from("optimizer_step"),
+                ],
+                stale_after_ms: 2_500,
+            },
+            RemoteTrainingHeartbeatSample {
+                observed_at_ms: 1_742_846_404_900,
+                phase: String::from("checkpointing"),
+                subphase: Some(String::from("export_checkpoint")),
+                step_in_progress: None,
+                microbatch_in_progress: None,
+                active_subsystems: vec![
+                    String::from("checkpoint_export"),
+                    String::from("optimizer_state"),
+                ],
+                stale_after_ms: 2_500,
+            },
+        ],
+        loss_series: vec![
+            RemoteTrainingLossSample {
+                global_step: Some(0),
+                elapsed_ms: 1_000,
+                train_loss: None,
+                ema_loss: None,
+                validation_loss: Some(2.411),
+            },
+            RemoteTrainingLossSample {
+                global_step: Some(1),
+                elapsed_ms: 2_000,
+                train_loss: Some(2.304),
+                ema_loss: None,
+                validation_loss: None,
+            },
+            RemoteTrainingLossSample {
+                global_step: Some(2),
+                elapsed_ms: 3_000,
+                train_loss: Some(2.182),
+                ema_loss: None,
+                validation_loss: Some(2.041),
+            },
+        ],
+        math_series: vec![
+            RemoteTrainingMathSample {
+                observed_at_ms: 1_742_846_402_000,
+                global_step: Some(1),
+                learning_rate: Some(0.0005),
+                gradient_norm: Some(1.42),
+                parameter_norm: Some(9.81),
+                update_norm: Some(0.22),
+                clip_fraction: Some(0.21),
+                clip_event_count: Some(3),
+                loss_scale: None,
+                non_finite_count: 0,
+                model_specific_diagnostics: BTreeMap::from([
+                    (String::from("model_materialization_ms"), 41.0),
+                    (String::from("parameter_group_count"), 3.0),
+                ]),
+            },
+            RemoteTrainingMathSample {
+                observed_at_ms: 1_742_846_403_000,
+                global_step: Some(2),
+                learning_rate: Some(0.0005),
+                gradient_norm: Some(1.21),
+                parameter_norm: Some(9.92),
+                update_norm: Some(0.18),
+                clip_fraction: Some(0.18),
+                clip_event_count: Some(3),
+                loss_scale: None,
+                non_finite_count: 0,
+                model_specific_diagnostics: BTreeMap::from([
+                    (String::from("model_materialization_ms"), 39.0),
+                    (String::from("parameter_group_count"), 3.0),
+                ]),
+            },
+        ],
+        runtime_series: vec![
+            RemoteTrainingRuntimeSample {
+                observed_at_ms: 1_742_846_402_000,
+                data_wait_ms: None,
+                forward_ms: Some(811),
+                backward_ms: None,
+                optimizer_ms: Some(201),
+                checkpoint_ms: None,
+                evaluation_ms: None,
+                tokens_per_second: Some(50_200),
+                samples_per_second_milli: Some(7_800),
+            },
+            RemoteTrainingRuntimeSample {
+                observed_at_ms: 1_742_846_403_000,
+                data_wait_ms: None,
+                forward_ms: Some(789),
+                backward_ms: None,
+                optimizer_ms: Some(198),
+                checkpoint_ms: None,
+                evaluation_ms: None,
+                tokens_per_second: Some(51_200),
+                samples_per_second_milli: Some(8_000),
+            },
+            RemoteTrainingRuntimeSample {
+                observed_at_ms: 1_742_846_404_900,
+                data_wait_ms: None,
+                forward_ms: None,
+                backward_ms: None,
+                optimizer_ms: None,
+                checkpoint_ms: Some(144),
+                evaluation_ms: Some(320),
+                tokens_per_second: None,
+                samples_per_second_milli: None,
+            },
+        ],
+        gpu_series: vec![
+            RemoteTrainingGpuSample {
+                observed_at_ms: 1_742_846_402_000,
+                device_id: String::from("cuda:0"),
+                device_label: String::from("NVIDIA L4"),
+                utilization_bps: 8_400,
+                memory_used_bytes: 11 * 1024 * 1024 * 1024,
+                memory_total_bytes: 24 * 1024 * 1024 * 1024,
+                temperature_celsius: Some(58),
+                power_watts: Some(152),
+            },
+            RemoteTrainingGpuSample {
+                observed_at_ms: 1_742_846_403_000,
+                device_id: String::from("cuda:0"),
+                device_label: String::from("NVIDIA L4"),
+                utilization_bps: 8_650,
+                memory_used_bytes: 11 * 1024 * 1024 * 1024 + 268_435_456,
+                memory_total_bytes: 24 * 1024 * 1024 * 1024,
+                temperature_celsius: Some(59),
+                power_watts: Some(156),
+            },
+        ],
+        distributed_series: Vec::new(),
+        event_series: vec![
+            RemoteTrainingEventSample {
+                observed_at_ms: 1_742_846_400_000,
+                severity: RemoteTrainingEventSeverity::Info,
+                event_kind: String::from("trainer_started"),
+                detail: String::from(
+                    "The accelerated Google single-node lane created its provider-neutral live visualization bundle.",
+                ),
+            },
+            RemoteTrainingEventSample {
+                observed_at_ms: 1_742_846_404_900,
+                severity: RemoteTrainingEventSeverity::Info,
+                event_kind: String::from("checkpoint_written"),
+                detail: String::from(
+                    "The accelerated lane retained its promoted checkpoint ref and checkpoint timing in the live bundle.",
+                ),
+            },
+        ],
+        source_artifacts: vec![
+            RemoteTrainingSourceArtifact {
+                artifact_role: String::from("live_bundle"),
+                artifact_uri: String::from(
+                    "training_visualization/psion_google_single_node_remote_training_visualization_bundle_v1.json",
+                ),
+                artifact_digest: None,
+                source_kind: RemoteTrainingArtifactSourceKind::LocalMirror,
+                authoritative: true,
+                source_receipt_ids: vec![String::from(
+                    "psion.google_single_node.remote_training_live_bundle.v1",
+                )],
+                detail: String::from(
+                    "The provider-neutral local mirror is the app-facing source for the accelerated Google lane.",
+                ),
+            },
+            RemoteTrainingSourceArtifact {
+                artifact_role: String::from("stage_receipt"),
+                artifact_uri: String::from("psion_accelerated_reference_pilot_stage_receipt.json"),
+                artifact_digest: Some(String::from(
+                    "14304ef8c38407f9f057f7c2665a02de862c7f3fd1d70b330ebc0f245f88d96e",
+                )),
+                source_kind: RemoteTrainingArtifactSourceKind::RuntimeOwned,
+                authoritative: true,
+                source_receipt_ids: vec![String::from("receipt.psion.pretrain_stage.v1")],
+                detail: String::from(
+                    "The accelerated stage receipt remains authoritative for delivered execution and accelerator posture.",
+                ),
+            },
+            RemoteTrainingSourceArtifact {
+                artifact_role: String::from("observability_receipt"),
+                artifact_uri: String::from(
+                    "psion_accelerated_reference_pilot_observability_receipt.json",
+                ),
+                artifact_digest: Some(String::from(
+                    "d4cc8c23d2676cb7c8f2cda42c574bb99d1da69853672f159f5130cffcb2d9b9",
+                )),
+                source_kind: RemoteTrainingArtifactSourceKind::RuntimeOwned,
+                authoritative: true,
+                source_receipt_ids: vec![String::from(
+                    "psion.pretrain_run_observability_receipt.v1",
+                )],
+                detail: String::from(
+                    "The observability receipt remains authoritative for throughput and topology summary facts.",
+                ),
+            },
+            RemoteTrainingSourceArtifact {
+                artifact_role: String::from("checkpoint_manifest"),
+                artifact_uri: String::from(
+                    "psion_accelerated_reference_pilot_checkpoint_manifest.json",
+                ),
+                artifact_digest: Some(String::from(
+                    "51b4e6e91f5f09662cb4481933d2924f9cdf730b071b607d5bbf39919c7d5dd8",
+                )),
+                source_kind: RemoteTrainingArtifactSourceKind::RuntimeOwned,
+                authoritative: true,
+                source_receipt_ids: vec![String::from(
+                    "psion_reference_pilot_checkpoint_manifest.v1",
+                )],
+                detail: String::from(
+                    "The checkpoint manifest remains authoritative for the promoted checkpoint identity surfaced in the live viewer.",
+                ),
+            },
+        ],
+        bundle_digest: String::new(),
+    })
+}
+
 /// Returns a canonical run index that enumerates both a full-series lane and a
 /// summary-only lane with the same top-level shape.
-pub fn sample_remote_training_run_index(
-) -> Result<RemoteTrainingRunIndex, RemoteTrainingVisualizationError> {
+pub fn sample_remote_training_run_index()
+-> Result<RemoteTrainingRunIndex, RemoteTrainingVisualizationError> {
     let google = sample_google_summary_only_visualization_bundle()?;
     let parameter_golf = sample_parameter_golf_live_visualization_bundle()?;
     build_remote_training_run_index(RemoteTrainingRunIndex {
@@ -1797,6 +2110,13 @@ mod tests {
         .expect("live sample bundle should parse")
     }
 
+    fn sample_google_live_bundle() -> RemoteTrainingVisualizationBundle {
+        serde_json::from_str(include_str!(
+            "../../../fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json"
+        ))
+        .expect("google live sample bundle should parse")
+    }
+
     fn sample_index() -> RemoteTrainingRunIndex {
         serde_json::from_str(include_str!(
             "../../../fixtures/training_visualization/remote_training_run_index_v1.json"
@@ -1813,6 +2133,12 @@ mod tests {
     #[test]
     fn live_sample_bundle_stays_valid() -> Result<(), RemoteTrainingVisualizationError> {
         let bundle = sample_parameter_golf_bundle();
+        bundle.validate()
+    }
+
+    #[test]
+    fn google_live_sample_bundle_stays_valid() -> Result<(), RemoteTrainingVisualizationError> {
+        let bundle = sample_google_live_bundle();
         bundle.validate()
     }
 

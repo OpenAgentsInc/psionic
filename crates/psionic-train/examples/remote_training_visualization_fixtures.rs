@@ -1,7 +1,7 @@
 use std::{error::Error, fs, path::PathBuf};
 
 use psionic_train::{
-    sample_google_summary_only_visualization_bundle,
+    sample_google_live_visualization_bundle, sample_google_summary_only_visualization_bundle,
     sample_parameter_golf_live_visualization_bundle, sample_remote_training_run_index,
 };
 
@@ -11,12 +11,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(&fixtures_dir)?;
 
     let google_summary_only = sample_google_summary_only_visualization_bundle()?;
+    let google_live = sample_google_live_visualization_bundle()?;
     let parameter_golf_live = sample_parameter_golf_live_visualization_bundle()?;
     let run_index = sample_remote_training_run_index()?;
 
     fs::write(
         fixtures_dir.join("psion_google_summary_only_remote_training_visualization_bundle_v1.json"),
         format!("{}\n", serde_json::to_string_pretty(&google_summary_only)?),
+    )?;
+    fs::write(
+        fixtures_dir.join("psion_google_live_remote_training_visualization_bundle_v1.json"),
+        format!("{}\n", serde_json::to_string_pretty(&google_live)?),
     )?;
     fs::write(
         fixtures_dir.join("parameter_golf_live_remote_training_visualization_bundle_v1.json"),

@@ -2,22 +2,23 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::Path,
+    time::Instant,
 };
 
 use psionic_backend_cuda::CudaBackend;
 use psionic_cluster::NodeId;
 use psionic_core::{DType, Device, Shape, TensorData, TensorId, TensorSpec};
 use psionic_data::{
-    build_psion_reference_corpus, DatasetSplitKind, PsionArtifactLineageManifest,
-    PsionReferenceCorpusBundle, PsionReferenceCorpusError, PsionReferenceEncodedSequence,
-    PSION_REFERENCE_DATASET_IDENTITY, PSION_REFERENCE_MAX_SEQUENCE_TOKENS,
+    DatasetSplitKind, PSION_REFERENCE_DATASET_IDENTITY, PSION_REFERENCE_MAX_SEQUENCE_TOKENS,
+    PsionArtifactLineageManifest, PsionReferenceCorpusBundle, PsionReferenceCorpusError,
+    PsionReferenceEncodedSequence, build_psion_reference_corpus,
 };
 use psionic_datastream::{
     DatastreamCheckpointBinding, DatastreamEncoding, DatastreamManifestRef, DatastreamSubjectKind,
 };
 use psionic_ir::{
-    evaluate_graph, AutodiffBackwardPlan, AutodiffContext, AutodiffError, AutodiffGraph,
-    AutodiffGraphBuilder, GraphError, ReferenceEvaluationError,
+    AutodiffContext, AutodiffError, AutodiffGraph, AutodiffGraphBuilder, GraphError,
+    ReferenceEvaluationError,
 };
 use psionic_models::{
     PsionCompactDecoderDescriptor, PsionCompactDecoderError, PsionCompactDecoderSizeAnchor,
@@ -27,46 +28,48 @@ use psionic_runtime::{
     DeliveredExecutionContext, DeviceDescriptor, DeviceInventoryQualifiers, DeviceMemoryClass,
     DevicePerformanceClass, RuntimeError, TrainingCheckpointReference,
 };
-use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use safetensors::{Dtype as SafeTensorsDType, SafeTensors, serialize, tensor::TensorView};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    record_psion_pilot_held_out_loss, record_psion_pilot_pretraining_run,
-    record_psion_pilot_route_probe, record_psion_pretrain_run_observability,
-    record_psion_refusal_calibration_receipt, record_psion_route_class_evaluation_receipt,
-    run_psion_pretrain_stage, run_psion_pretrain_stage_with_execution, ArtifactArchiveClass,
-    ArtifactColdRestoreReceipt, ArtifactRetentionProfile, ArtifactStorageSweepReceipt,
-    CheckpointDurabilityPosture, CheckpointManifest, CheckpointPointer, CheckpointRecoveryError,
-    CheckpointScopeBinding, CheckpointScopeKind, CheckpointShardManifest,
-    CheckpointStoreReadOptions, FixedBudgetTrainingRun, InMemoryCheckpointStore,
-    PsionAcceptanceMatrix, PsionAcceptanceMatrixError, PsionBenchmarkCatalog,
-    PsionBenchmarkEvidenceReceipt, PsionBenchmarkFamily, PsionBenchmarkPackageContract,
-    PsionBenchmarkPackageError, PsionBenchmarkTaskContract, PsionCapabilityMatrixView,
-    PsionCheckpointRecoveryReceipt, PsionContaminationReviewDisposition,
-    PsionContaminationReviewReceipt, PsionMetricKind, PsionObservedMetric, PsionPhaseGate,
-    PsionPilotHeldOutLossFamily, PsionPilotHeldOutLossRow, PsionPilotPretrainingRunBundle,
-    PsionPilotPretrainingRunError, PsionPilotRouteProbeKind, PsionPilotRouteProbeRow,
-    PsionPretrainCheckpointArtifactReceipt, PsionPretrainCheckpointLineageReceipt,
-    PsionPretrainHardwareTopologyReceipt, PsionPretrainLossNormalization,
-    PsionPretrainObjectiveConfig, PsionPretrainObjectiveKind, PsionPretrainReplayReceipt,
-    PsionPretrainRunCostBasis, PsionPretrainRunCostReceipt, PsionPretrainRunObservabilityError,
-    PsionPretrainRunObservabilityReceipt, PsionPretrainRunScaleProfile,
-    PsionPretrainRunThroughputReceipt, PsionPretrainSourceFamilyReportRow,
-    PsionPretrainStageAcceleratorReceipt, PsionPretrainStageConfig, PsionPretrainStageError,
-    PsionPretrainStageRunReceipt, PsionPromotionDecisionDisposition, PsionPromotionDecisionReceipt,
-    PsionRefusalCalibrationError, PsionRefusalCalibrationReceipt, PsionRefusalCalibrationRow,
-    PsionRepetitiveRegionControl, PsionReplayEvidenceReceipt, PsionRouteCalibrationReceipt,
-    PsionRouteClass, PsionRouteClassEvaluationError, PsionRouteClassEvaluationReceipt,
-    PsionRouteClassEvaluationRow, PsionRouteKind, PsionSamplingContentClass,
-    PsionSamplingPolicyError, PsionSamplingPolicyManifest, PsionSamplingRegressionKind,
-    PsionSamplingRegressionThreshold, PsionSourceContributionCap, PsionSourceFamilySamplingWeight,
-    TrainArtifactClass, TrainArtifactStorageController, TrainArtifactStorageError,
-    TrainingCoreError, TrainingLoopBudget, TrainingOptimizerConfig,
-    TrainingOptimizerResidencyPolicy, TrainingParameterClass, TrainingParameterGroupState,
-    TrainingRecoveryMode, TrainingRunSummary, TrainingSessionState, TrainingStepInput,
-    TrainingStepReceipt, TrainingTensorBuffer,
+    ArtifactArchiveClass, ArtifactColdRestoreReceipt, ArtifactRetentionProfile,
+    ArtifactStorageSweepReceipt, CheckpointDurabilityPosture, CheckpointManifest,
+    CheckpointPointer, CheckpointRecoveryError, CheckpointScopeBinding, CheckpointScopeKind,
+    CheckpointShardManifest, CheckpointStoreReadOptions, FixedBudgetTrainingRun,
+    InMemoryCheckpointStore, PsionAcceptanceMatrix, PsionAcceptanceMatrixError,
+    PsionBenchmarkCatalog, PsionBenchmarkEvidenceReceipt, PsionBenchmarkFamily,
+    PsionBenchmarkPackageContract, PsionBenchmarkPackageError, PsionBenchmarkTaskContract,
+    PsionCapabilityMatrixView, PsionCheckpointRecoveryReceipt, PsionContaminationReviewDisposition,
+    PsionContaminationReviewReceipt, PsionGoogleSingleNodeLiveVisualizationWriter,
+    PsionGoogleSingleNodeStepTelemetry, PsionGoogleSingleNodeVisualizationError, PsionMetricKind,
+    PsionObservedMetric, PsionPhaseGate, PsionPilotHeldOutLossFamily, PsionPilotHeldOutLossRow,
+    PsionPilotPretrainingRunBundle, PsionPilotPretrainingRunError, PsionPilotRouteProbeKind,
+    PsionPilotRouteProbeRow, PsionPretrainCheckpointArtifactReceipt,
+    PsionPretrainCheckpointLineageReceipt, PsionPretrainHardwareTopologyReceipt,
+    PsionPretrainLossNormalization, PsionPretrainObjectiveConfig, PsionPretrainObjectiveKind,
+    PsionPretrainReplayReceipt, PsionPretrainRunCostBasis, PsionPretrainRunCostReceipt,
+    PsionPretrainRunObservabilityError, PsionPretrainRunObservabilityReceipt,
+    PsionPretrainRunScaleProfile, PsionPretrainRunThroughputReceipt,
+    PsionPretrainSourceFamilyReportRow, PsionPretrainStageAcceleratorReceipt,
+    PsionPretrainStageConfig, PsionPretrainStageError, PsionPretrainStageRunReceipt,
+    PsionPromotionDecisionDisposition, PsionPromotionDecisionReceipt, PsionRefusalCalibrationError,
+    PsionRefusalCalibrationReceipt, PsionRefusalCalibrationRow, PsionRepetitiveRegionControl,
+    PsionReplayEvidenceReceipt, PsionRouteCalibrationReceipt, PsionRouteClass,
+    PsionRouteClassEvaluationError, PsionRouteClassEvaluationReceipt, PsionRouteClassEvaluationRow,
+    PsionRouteKind, PsionSamplingContentClass, PsionSamplingPolicyError,
+    PsionSamplingPolicyManifest, PsionSamplingRegressionKind, PsionSamplingRegressionThreshold,
+    PsionSourceContributionCap, PsionSourceFamilySamplingWeight, TrainArtifactClass,
+    TrainArtifactStorageController, TrainArtifactStorageError, TrainingCoreError,
+    TrainingLoopBudget, TrainingOptimizerConfig, TrainingOptimizerResidencyPolicy,
+    TrainingParameterClass, TrainingParameterGroupState, TrainingRecoveryMode,
+    TrainingRunSummary, TrainingSessionState, TrainingStepInput, TrainingStepReceipt,
+    TrainingTensorBuffer, record_psion_pilot_held_out_loss,
+    record_psion_pilot_pretraining_run, record_psion_pilot_route_probe,
+    record_psion_pretrain_run_observability, record_psion_refusal_calibration_receipt,
+    record_psion_route_class_evaluation_receipt, run_psion_pretrain_stage,
+    run_psion_pretrain_stage_with_execution,
 };
 
 const TOKEN_EMBEDDING_GROUP_ID: &str = "decoder.embed_tokens.weight";
@@ -407,6 +410,8 @@ pub enum PsionReferencePilotError {
     ReferenceEvaluation(#[from] ReferenceEvaluationError),
     #[error(transparent)]
     Runtime(#[from] RuntimeError),
+    #[error(transparent)]
+    Visualization(#[from] PsionGoogleSingleNodeVisualizationError),
     #[error("accelerated reference pilot requires a visible CUDA device: {detail}")]
     CudaBackendUnavailable { detail: String },
     #[error("reference pilot checkpoint serialization failed: {message}")]
@@ -583,6 +588,28 @@ pub fn run_psion_accelerated_reference_pilot(
     repo_root: &Path,
     config: &PsionReferencePilotConfig,
 ) -> Result<PsionReferencePilotRun, PsionReferencePilotError> {
+    run_psion_accelerated_reference_pilot_with_live_visualization(repo_root, config, None)
+}
+
+pub fn run_psion_accelerated_reference_pilot_with_live_visualization(
+    repo_root: &Path,
+    config: &PsionReferencePilotConfig,
+    live_visualization_writer: Option<&mut PsionGoogleSingleNodeLiveVisualizationWriter>,
+) -> Result<PsionReferencePilotRun, PsionReferencePilotError> {
+    let mut live_visualization_writer = live_visualization_writer;
+    if let Some(writer) = live_visualization_writer.as_mut() {
+        writer.record_phase(
+            "dataset_staging",
+            Some(String::from("reference_corpus_build")),
+            "The accelerated Psion reference lane is materializing the repo-owned reference corpus.",
+            vec![
+                String::from("reference_corpus"),
+                String::from("dataset_tokenization"),
+            ],
+            None,
+            true,
+        )?;
+    }
     let corpus_bundle = build_psion_reference_corpus(repo_root)?;
     let sampling_policy = build_reference_sampling_policy(&corpus_bundle)?;
     let model_descriptor = build_reference_model_descriptor(&corpus_bundle)?;
@@ -590,8 +617,25 @@ pub fn run_psion_accelerated_reference_pilot(
     let train_examples = split_examples(&corpus_bundle, DatasetSplitKind::Train);
     let validation_examples = split_examples(&corpus_bundle, DatasetSplitKind::Validation);
     let held_out_examples = split_examples(&corpus_bundle, DatasetSplitKind::HeldOut);
+    if let Some(writer) = live_visualization_writer.as_mut() {
+        writer.record_phase(
+            "evaluation",
+            Some(String::from("initial_validation")),
+            "The accelerated Psion reference lane is scoring its initial validation and held-out posture before CUDA optimizer steps begin.",
+            vec![String::from("validation"), String::from("held_out_eval")],
+            None,
+            true,
+        )?;
+    }
     let initial_validation_summary = evaluate_examples(&initial_model, &validation_examples);
     let initial_held_out_summary = evaluate_examples(&initial_model, &held_out_examples);
+    if let Some(writer) = live_visualization_writer.as_mut() {
+        writer.record_validation_loss(
+            Some(0),
+            initial_validation_summary.mean_loss,
+            "The accelerated Psion reference lane retained its initial validation loss before the first optimizer step.",
+        )?;
+    }
 
     let mut cuda_backend = CudaBackend::new();
     let Some(selected_device) = cuda_backend.selected_device().cloned() else {
@@ -612,6 +656,7 @@ pub fn run_psion_accelerated_reference_pilot(
         &model_descriptor,
         accelerated_train_examples.len(),
     )?;
+    let tokens_per_step = token_count(accelerated_train_examples.as_slice());
 
     let parameter_groups = build_parameter_groups_for_execution(
         &initial_model,
@@ -629,6 +674,24 @@ pub fn run_psion_accelerated_reference_pilot(
     let mut current_model = initial_model.clone();
     let mut step_receipts = Vec::new();
     for step_index in 0..config.budget.max_steps {
+        let global_step = step_index.saturating_add(1);
+        if let Some(writer) = live_visualization_writer.as_mut() {
+            writer.record_phase(
+                "training",
+                Some(String::from("optimizer_step")),
+                format!(
+                    "The accelerated Psion reference lane is executing CUDA optimizer step {global_step}."
+                ),
+                vec![
+                    String::from("cuda_graph"),
+                    String::from("gradient_batch"),
+                    String::from("optimizer_step"),
+                ],
+                Some(global_step),
+                false,
+            )?;
+        }
+        let batch_started_at = Instant::now();
         let batch = build_accelerated_gradient_batch(
             &mut cuda_backend,
             &accelerated_gradient_program,
@@ -636,18 +699,57 @@ pub fn run_psion_accelerated_reference_pilot(
             accelerated_train_examples.as_slice(),
             &training_device,
         )?;
+        let batch_elapsed_ms = batch_started_at.elapsed().as_millis() as u64;
         let started_at_ms = config
             .started_at_ms
             .saturating_add(step_index.saturating_mul(config.step_duration_ms));
         let finished_at_ms = started_at_ms.saturating_add(config.step_duration_ms);
+        let optimizer_started_at = Instant::now();
         let receipt =
             run.apply_step(TrainingStepInput::new(batch, started_at_ms, finished_at_ms))?;
+        let optimizer_elapsed_ms = optimizer_started_at.elapsed().as_millis() as u64;
+        let materialize_started_at = Instant::now();
         current_model = materialize_model(&model_descriptor, &run)?;
+        let materialize_elapsed_ms = materialize_started_at.elapsed().as_millis() as u64;
+        if let Some(writer) = live_visualization_writer.as_mut() {
+            writer.record_step(build_reference_live_step_telemetry(
+                &receipt,
+                tokens_per_step,
+                batch_elapsed_ms,
+                optimizer_elapsed_ms,
+                materialize_elapsed_ms,
+            ))?;
+        }
         step_receipts.push(receipt);
     }
 
+    if let Some(writer) = live_visualization_writer.as_mut() {
+        writer.record_phase(
+            "evaluation",
+            Some(String::from("final_validation")),
+            "The accelerated Psion reference lane is scoring final validation and held-out loss after the CUDA optimizer loop.",
+            vec![String::from("validation"), String::from("held_out_eval")],
+            None,
+            true,
+        )?;
+    }
     let final_validation_summary = evaluate_examples(&current_model, &validation_examples);
     let final_held_out_summary = evaluate_examples(&current_model, &held_out_examples);
+    if let Some(writer) = live_visualization_writer.as_mut() {
+        writer.record_validation_loss(
+            Some(config.budget.max_steps),
+            final_validation_summary.mean_loss,
+            "The accelerated Psion reference lane retained its final validation loss after the last optimizer step.",
+        )?;
+        writer.record_phase(
+            "checkpointing",
+            Some(String::from("export_checkpoint")),
+            "The accelerated Psion reference lane is exporting its checkpoint and optimizer-state artifacts.",
+            vec![String::from("checkpoint_export"), String::from("optimizer_state")],
+            None,
+            true,
+        )?;
+    }
     let checkpoint_artifact = export_checkpoint(
         &current_model,
         &train_examples,
@@ -661,6 +763,13 @@ pub fn run_psion_accelerated_reference_pilot(
                 .saturating_mul(config.step_duration_ms),
         ),
     )?;
+    if let Some(writer) = live_visualization_writer.as_mut() {
+        writer.record_checkpoint_ref(
+            checkpoint_artifact.manifest.checkpoint_ref.clone(),
+            None,
+            "The accelerated Psion reference lane retained its promoted checkpoint ref for the live viewer.",
+        )?;
+    }
     let optimizer_state_artifact =
         build_optimizer_state_artifact(&run, &checkpoint_artifact, config)?;
 
@@ -719,6 +828,16 @@ pub fn run_psion_accelerated_reference_pilot(
         &selected_device,
         delivered_execution,
     )?;
+    if let Some(writer) = live_visualization_writer.as_mut() {
+        writer.record_phase(
+            "artifact_seal",
+            Some(String::from("receipt_materialization")),
+            "The accelerated Psion reference lane sealed its stage and observability receipts for finalization upload.",
+            vec![String::from("stage_receipt"), String::from("observability_receipt")],
+            None,
+            true,
+        )?;
+    }
 
     Ok(PsionReferencePilotRun {
         corpus_bundle,
@@ -1672,7 +1791,11 @@ fn build_promotion_decision_receipt(
         },
         contamination_review_receipt: PsionContaminationReviewReceipt {
             receipt_id: String::from("psion-reference-pilot-contamination-review"),
-            benchmark_isolation_schema_version: run.corpus_bundle.exclusion_manifest.schema_version.clone(),
+            benchmark_isolation_schema_version: run
+                .corpus_bundle
+                .exclusion_manifest
+                .schema_version
+                .clone(),
             exclusion_manifest_digest: stable_digest(
                 b"psion_reference_exclusion_manifest|",
                 &run.corpus_bundle.exclusion_manifest,
@@ -1692,7 +1815,8 @@ fn build_promotion_decision_receipt(
                 PsionRouteKind::ExactExecutorHandoff,
                 PsionRouteKind::Refusal,
             ],
-            route_selection_accuracy_bps: route_probe_receipt.aggregate_route_selection_accuracy_bps,
+            route_selection_accuracy_bps: route_probe_receipt
+                .aggregate_route_selection_accuracy_bps,
             route_regression_bps: 0,
             summary: String::from(
                 "Reference pilot route calibration is derived from the executed route-probe receipt.",
@@ -1761,7 +1885,9 @@ fn benchmark_row_from_match(
                 None,
                 0,
                 false,
-                format!("Reference benchmark could not retrieve any candidate sequence for `{item_id}`."),
+                format!(
+                    "Reference benchmark could not retrieve any candidate sequence for `{item_id}`."
+                ),
             )
         };
     PsionReferencePilotBenchmarkRow {
@@ -3053,9 +3179,11 @@ fn build_accelerated_observability_receipt(
             wall_clock_ms,
             mean_tokens_per_second,
             peak_tokens_per_second: mean_tokens_per_second.saturating_add(64),
-            mean_sequences_per_second_milli:
-                (((train_examples.len() as u64 * config.budget.max_steps) * 1000 * 1000)
-                    / wall_clock_ms.max(1)) as u32,
+            mean_sequences_per_second_milli: (((train_examples.len() as u64
+                * config.budget.max_steps)
+                * 1000
+                * 1000)
+                / wall_clock_ms.max(1)) as u32,
             mean_step_latency_ms: config.step_duration_ms,
             checkpoint_write_throughput_bytes_per_second,
         },
@@ -3065,7 +3193,8 @@ fn build_accelerated_observability_receipt(
             checkpoint_object_digest: checkpoint_artifact.checkpoint.object_digest.clone(),
             checkpoint_size_bytes,
             optimizer_state_size_bytes: 2_560,
-            ancillary_artifact_size_bytes: checkpoint_artifact.manifest.stable_digest().len() as u64,
+            ancillary_artifact_size_bytes: checkpoint_artifact.manifest.stable_digest().len()
+                as u64,
             total_artifact_size_bytes: checkpoint_size_bytes
                 .saturating_add(2_560)
                 .saturating_add(checkpoint_artifact.manifest.stable_digest().len() as u64),
@@ -3094,6 +3223,99 @@ fn build_accelerated_observability_receipt(
         ),
         stage_receipt,
     )?)
+}
+
+fn build_reference_live_step_telemetry(
+    receipt: &TrainingStepReceipt,
+    tokens_per_step: u64,
+    gradient_batch_ms: u64,
+    optimizer_ms: u64,
+    model_materialization_ms: u64,
+) -> PsionGoogleSingleNodeStepTelemetry {
+    let learning_rate = mean_f32(
+        receipt
+            .group_telemetry
+            .iter()
+            .map(|group| group.effective_learning_rate),
+    );
+    let gradient_norm = receipt
+        .group_telemetry
+        .iter()
+        .map(|group| group.gradient_norm_l2)
+        .max_by(|left, right| left.total_cmp(right));
+    let parameter_norm = receipt
+        .group_telemetry
+        .iter()
+        .map(|group| group.parameter_norm_l2)
+        .max_by(|left, right| left.total_cmp(right));
+    let update_norm = receipt
+        .group_telemetry
+        .iter()
+        .map(|group| group.update_norm_l2)
+        .max_by(|left, right| left.total_cmp(right));
+    let clipping_ratios = receipt
+        .group_telemetry
+        .iter()
+        .filter_map(|group| group.clipping_ratio)
+        .collect::<Vec<_>>();
+    let clip_fraction = (!clipping_ratios.is_empty())
+        .then_some(clipping_ratios.iter().sum::<f32>() / clipping_ratios.len() as f32);
+    let clip_event_count = clip_fraction.map(|_| {
+        receipt
+            .group_telemetry
+            .iter()
+            .filter(|group| group.clipping_ratio.is_some())
+            .count() as u32
+    });
+    let observed_step_ms = gradient_batch_ms
+        .saturating_add(optimizer_ms)
+        .saturating_add(model_materialization_ms)
+        .max(1);
+    let tokens_per_second = Some(tokens_per_step.saturating_mul(1000) / observed_step_ms.max(1));
+    let samples_per_second_milli = Some(
+        (((u64::from(receipt.sample_count)) * 1_000 * 1_000) / observed_step_ms.max(1)) as u32,
+    );
+    let mut model_specific_diagnostics = BTreeMap::new();
+    model_specific_diagnostics.insert(
+        String::from("model_materialization_ms"),
+        model_materialization_ms as f32,
+    );
+    model_specific_diagnostics.insert(
+        String::from("parameter_group_count"),
+        receipt.group_telemetry.len() as f32,
+    );
+    PsionGoogleSingleNodeStepTelemetry {
+        global_step: receipt.schedule.global_step,
+        train_loss: Some(receipt.loss),
+        learning_rate,
+        gradient_norm,
+        parameter_norm,
+        update_norm,
+        clip_fraction,
+        clip_event_count,
+        non_finite_count: 0,
+        model_specific_diagnostics,
+        data_wait_ms: None,
+        forward_ms: Some(gradient_batch_ms),
+        optimizer_ms: Some(optimizer_ms),
+        tokens_per_second,
+        samples_per_second_milli,
+        active_subsystems: vec![
+            String::from("gradient_batch"),
+            String::from("optimizer_step"),
+            String::from("model_materialization"),
+        ],
+        summary_detail: format!(
+            "The accelerated Psion reference lane completed optimizer step {} and retained live loss, math, and runtime telemetry.",
+            receipt.schedule.global_step
+        ),
+        ..PsionGoogleSingleNodeStepTelemetry::default()
+    }
+}
+
+fn mean_f32(values: impl Iterator<Item = f32>) -> Option<f32> {
+    let values = values.collect::<Vec<_>>();
+    (!values.is_empty()).then_some(values.iter().sum::<f32>() / values.len() as f32)
 }
 
 fn build_observability_receipt(
@@ -3183,7 +3405,10 @@ fn build_observability_receipt(
             wall_clock_ms,
             mean_tokens_per_second,
             peak_tokens_per_second: mean_tokens_per_second.saturating_add(32),
-            mean_sequences_per_second_milli: (((train_examples.len() as u64 * config.budget.max_steps) * 1000 * 1000)
+            mean_sequences_per_second_milli: (((train_examples.len() as u64
+                * config.budget.max_steps)
+                * 1000
+                * 1000)
                 / wall_clock_ms.max(1)) as u32,
             mean_step_latency_ms: config.step_duration_ms,
             checkpoint_write_throughput_bytes_per_second,
@@ -3194,7 +3419,8 @@ fn build_observability_receipt(
             checkpoint_object_digest: checkpoint_artifact.checkpoint.object_digest.clone(),
             checkpoint_size_bytes,
             optimizer_state_size_bytes: 2_048,
-            ancillary_artifact_size_bytes: checkpoint_artifact.manifest.stable_digest().len() as u64,
+            ancillary_artifact_size_bytes: checkpoint_artifact.manifest.stable_digest().len()
+                as u64,
             total_artifact_size_bytes: checkpoint_size_bytes
                 .saturating_add(2_048)
                 .saturating_add(checkpoint_artifact.manifest.stable_digest().len() as u64),
@@ -3770,8 +3996,8 @@ mod tests {
     }
 
     #[test]
-    fn reference_pilot_evidence_bundle_validates_against_matrix_and_benchmark_contracts(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn reference_pilot_evidence_bundle_validates_against_matrix_and_benchmark_contracts()
+    -> Result<(), Box<dyn std::error::Error>> {
         let config = PsionReferencePilotConfig::reference()?;
         let bundle = run_psion_reference_pilot_evidence_bundle(repo_root().as_path(), &config)?;
         let acceptance_matrix: PsionAcceptanceMatrix = load_json_fixture(

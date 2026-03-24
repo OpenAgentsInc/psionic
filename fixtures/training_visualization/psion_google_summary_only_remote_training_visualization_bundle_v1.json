@@ -38,9 +38,6 @@
   "summary": {
     "total_steps_completed": 2048,
     "latest_global_step": 2048,
-    "latest_train_loss": null,
-    "latest_ema_loss": null,
-    "latest_validation_loss": null,
     "latest_tokens_per_second": 52105,
     "latest_samples_per_second_milli": 12750,
     "accumulated_cost_microusd": 18950000,
@@ -127,18 +124,15 @@
       "artifact_digest": "88df41e4b67d246d088cc661c7b04588f1c955d02252be97e53d2553fc5980d1",
       "source_kind": "provider_generated",
       "authoritative": true,
-      "source_receipt_ids": [],
       "detail": "GPU samples stay authoritative for device activity even when the lane lacks a loss series."
     },
     {
       "artifact_role": "local_mirror_bundle",
       "artifact_uri": "local-mirror://psion/google-single-node/remote_training_visualization_bundle.json",
-      "artifact_digest": null,
       "source_kind": "local_mirror",
       "authoritative": false,
-      "source_receipt_ids": [],
       "detail": "The app should prefer the normalized local mirror over raw provider objects when one exists."
     }
   ],
-  "bundle_digest": "fc789b0d3606acad92d7896abc43a96cfa046ad5effe51950faca2450af3d42f"
+  "bundle_digest": "d0d64a6b00cb395f762b8b31073dd7c8921382dbfe690cfd82b650a23668a3c5"
 }
