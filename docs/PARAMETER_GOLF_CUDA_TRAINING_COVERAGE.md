@@ -138,8 +138,7 @@ reduced:
 The fresh narrowed blocker list is now:
 
 - backward replay: `permute`, `reduce_sum`,
-  `scaled_dot_product_attention_{query,key,value}_backward`,
-  `rotary_embedding_backward`
+  `scaled_dot_product_attention_{query,key,value}_backward`
 
 Forward `expand` and `permute` still exist on the fallback surface, but they no
 longer dominate at the same order of magnitude after the parallel layout path
@@ -149,8 +148,11 @@ measured fallback cost after the zero-copy alias path landed for those ops.
 A local 2026-03-24 follow-on validation slice on an RTX 4080 also tightened
 the same bounded public lane before the next H100 rerun:
 
-- `rotary_embedding_backward` host replay now parallelizes across independent
-  batch or head lanes instead of staying serialized
+- `rotary_embedding_backward` now runs through one bounded CUDA kernel instead
+  of forcing a full host readback and replay path
+- a fresh local profiled decoder-backward run on the RTX 4080 now reports only
+  `scaled_dot_product_attention_{query,key,value}_backward` on the fallback
+  surface; `rotary_embedding_backward` is absent from the receipt
 - `scaled_dot_product_attention_{query,key,value}_backward` host replay now
   reuses per-position gradient-weight scratch instead of recomputing the same
   inner products twice
@@ -186,8 +188,10 @@ Today it keeps these truths separate:
   - bounded dense `f32` decoder reverse-mode graph semantics are real on the
     reference path for non-interleaved RoPE plus causal grouped-query
     attention
-  - one bounded host-orchestrated CUDA decoder backward path is real on the
-    public lane for `rotary_embedding_backward` plus
+  - one bounded CUDA decoder backward kernel is real on the public lane for
+    `rotary_embedding_backward`
+  - one bounded host-orchestrated CUDA decoder backward path is still real on
+    the public lane for
     `scaled_dot_product_attention_{query,key,value}_backward`
   - one bounded host-orchestrated CUDA BF16 master-weight optimizer step over
     BF16 train-visible parameter and gradient buffers with FP32 master weights

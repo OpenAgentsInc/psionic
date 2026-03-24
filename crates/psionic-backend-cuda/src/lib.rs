@@ -1256,6 +1256,35 @@ impl CudaSubmission {
         Ok(())
     }
 
+    /// Applies the bounded NEOX-style RoPE backward transform to one rank-4
+    /// gradient buffer on CUDA.
+    pub fn rotary_embedding_backward(
+        &mut self,
+        grad_output: &CudaBuffer,
+        cos: &CudaBuffer,
+        sin: &CudaBuffer,
+        batch_size: usize,
+        head_count: usize,
+        sequence_length: usize,
+        head_dim: usize,
+        batched_tables: bool,
+        grad_input: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_rotary_embedding_backward(
+            &grad_output.platform,
+            &cos.platform,
+            &sin.platform,
+            batch_size,
+            head_count,
+            sequence_length,
+            head_dim,
+            batched_tables,
+            &grad_input.platform,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
     /// Applies GPT-OSS NEOX-style RoPE, writes the current KV entry, and runs
     /// decode attention in one CUDA kernel.
     #[allow(clippy::too_many_arguments)]
@@ -2936,7 +2965,8 @@ impl AvailableCudaBackend {
         let sequence_length = dims[2];
         let head_dim = dims[3];
         let half_dim = head_dim / 2;
-        validate_standard_neox_rope_tables(cos, sin, batch_size, sequence_length, half_dim)?;
+        let _ =
+            validate_standard_neox_rope_tables(cos, sin, batch_size, sequence_length, half_dim)?;
 
         let output = self.allocate(&step.spec)?;
         let scratch_spec = TensorSpec::new(
@@ -3415,6 +3445,7 @@ impl AvailableCudaBackend {
 
     fn execute_rotary_embedding_backward_step(
         &self,
+        submission: &mut CudaSubmission,
         step: &ExecutionStep,
         values: &BTreeMap<TensorId, CudaBuffer>,
         interleaved: bool,
@@ -3434,21 +3465,25 @@ impl AvailableCudaBackend {
             )));
         }
         let batch_size = grad_dims[0];
+        let head_count = grad_dims[1];
         let sequence_length = grad_dims[2];
         let head_dim = grad_dims[3];
         let half_dim = head_dim / 2;
-        validate_standard_neox_rope_tables(cos, sin, batch_size, sequence_length, half_dim)?;
-        let grad_output_values = grad_output.read_f32()?;
-        let cos_values = cos.read_f32()?;
-        let sin_values = sin.read_f32()?;
-        let grad_input = rotary_embedding_backward_host_values(
-            &grad_output_values,
-            grad_dims,
-            &cos_values,
-            &sin_values,
-            cos.spec().shape().dims(),
+        let batched_tables =
+            validate_standard_neox_rope_tables(cos, sin, batch_size, sequence_length, half_dim)?;
+        let output = self.allocate(&step.spec)?;
+        submission.rotary_embedding_backward(
+            grad_output,
+            cos,
+            sin,
+            batch_size,
+            head_count,
+            sequence_length,
+            head_dim,
+            batched_tables,
+            &output,
         )?;
-        self.buffer_from_tensor_data(&step.spec, &TensorData::F32(grad_input))
+        Ok(output)
     }
 
     fn execute_scaled_dot_product_attention_backward_step(
@@ -3974,16 +4009,11 @@ impl AvailableCudaBackend {
                         values.insert(step.output, output);
                     }
                     BackendExtensionOp::RotaryEmbeddingBackward { interleaved } => {
-                        let output = execute_profiled_host_fallback(
-                            &mut host_fallback_profile,
+                        let output = self.execute_rotary_embedding_backward_step(
+                            &mut submission,
                             step,
-                            || {
-                                self.execute_rotary_embedding_backward_step(
-                                    step,
-                                    &values,
-                                    *interleaved,
-                                )
-                            },
+                            &values,
+                            *interleaved,
                         )?;
                         values.insert(step.output, output);
                     }
@@ -5325,7 +5355,7 @@ fn validate_standard_neox_rope_tables(
     batch_size: usize,
     sequence_length: usize,
     half_dim: usize,
-) -> Result<(), RuntimeError> {
+) -> Result<bool, RuntimeError> {
     let cos_dims = cos.spec().shape().dims();
     let sin_dims = sin.spec().shape().dims();
     if cos_dims != sin_dims {
@@ -5377,74 +5407,13 @@ fn validate_standard_neox_rope_tables(
             }
         }
     }
-    Ok(())
+    Ok(batched)
 }
 
 struct ScaledDotProductAttentionBackwardHostValues {
     query: Vec<f32>,
     key: Vec<f32>,
     value: Vec<f32>,
-}
-
-fn rotary_embedding_backward_host_values(
-    grad_output: &[f32],
-    grad_dims: &[usize],
-    cos: &[f32],
-    sin: &[f32],
-    cos_dims: &[usize],
-) -> Result<Vec<f32>, RuntimeError> {
-    let batch_size = grad_dims[0];
-    let head_count = grad_dims[1];
-    let sequence_length = grad_dims[2];
-    let head_dim = grad_dims[3];
-    let half_dim = head_dim / 2;
-    let batched_tables = cos_dims.len() == 3;
-    let head_span = sequence_length.checked_mul(head_dim).ok_or_else(|| {
-        RuntimeError::Backend(String::from(
-            "cuda rotary_embedding_backward head span overflow on bounded public lane",
-        ))
-    })?;
-    let total_heads = batch_size.checked_mul(head_count).ok_or_else(|| {
-        RuntimeError::Backend(String::from(
-            "cuda rotary_embedding_backward total head count overflow on bounded public lane",
-        ))
-    })?;
-    let mut grad_input = vec![0.0_f32; grad_output.len()];
-    grad_input
-        .par_chunks_mut(head_span)
-        .enumerate()
-        .try_for_each(|(chunk_index, grad_input_head)| {
-            if chunk_index >= total_heads {
-                return Ok(());
-            }
-            let batch_index = chunk_index / head_count;
-            let head_base = chunk_index.checked_mul(head_span).ok_or_else(|| {
-                RuntimeError::Backend(String::from(
-                    "cuda rotary_embedding_backward chunk offset overflow on bounded public lane",
-                ))
-            })?;
-            let grad_output_head = &grad_output[head_base..head_base + head_span];
-            for position in 0..sequence_length {
-                let position_base = position * head_dim;
-                for pair in 0..half_dim {
-                    let table_index = if batched_tables {
-                        (batch_index * sequence_length + position) * half_dim + pair
-                    } else {
-                        position * half_dim + pair
-                    };
-                    let cosine = cos[table_index];
-                    let sine = sin[table_index];
-                    let left_index = position_base + pair;
-                    let right_index = position_base + half_dim + pair;
-                    let grad_left = grad_output_head[left_index];
-                    let grad_right = grad_output_head[right_index];
-                    grad_input_head[left_index] = grad_left * cosine - grad_right * sine;
-                    grad_input_head[right_index] = grad_left * sine + grad_right * cosine;
-                }
-            }
-            Ok::<(), RuntimeError>(())
-        })?;
-    Ok(grad_input)
 }
 
 fn scaled_dot_product_attention_backward_host_values(
@@ -6326,6 +6295,18 @@ mod platform {
             corr_low: f32,
             corr_high: f32,
             theta_scale: f32,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_rotary_embedding_backward(
+            grad_output: *const c_void,
+            cos: *const c_void,
+            sin: *const c_void,
+            batch_size: c_int,
+            head_count: c_int,
+            sequence_length: c_int,
+            head_dim: c_int,
+            batched_tables: c_int,
+            grad_input: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
         fn psionic_cuda_attention_decode(
@@ -8242,6 +8223,58 @@ mod platform {
                     )
                 },
                 "psionic_cuda_rope_neox_in_place",
+            )
+        }
+
+        pub(super) fn encode_rotary_embedding_backward(
+            &mut self,
+            grad_output: &PlatformBuffer,
+            cos: &PlatformBuffer,
+            sin: &PlatformBuffer,
+            batch_size: usize,
+            head_count: usize,
+            sequence_length: usize,
+            head_dim: usize,
+            batched_tables: bool,
+            grad_input: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let batch_size = c_int::try_from(batch_size).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda rotary_embedding_backward batch size exceeds c_int",
+                ))
+            })?;
+            let head_count = c_int::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda rotary_embedding_backward head count exceeds c_int",
+                ))
+            })?;
+            let sequence_length = c_int::try_from(sequence_length).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda rotary_embedding_backward sequence length exceeds c_int",
+                ))
+            })?;
+            let head_dim = c_int::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda rotary_embedding_backward head dim exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_rotary_embedding_backward(
+                        grad_output.inner.device_ptr.cast(),
+                        cos.inner.device_ptr.cast(),
+                        sin.inner.device_ptr.cast(),
+                        batch_size,
+                        head_count,
+                        sequence_length,
+                        head_dim,
+                        if batched_tables { 1 } else { 0 },
+                        grad_input.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_rotary_embedding_backward",
             )
         }
 
@@ -10365,6 +10398,23 @@ mod platform {
             )))
         }
 
+        pub(super) fn encode_rotary_embedding_backward(
+            &mut self,
+            _grad_output: &PlatformBuffer,
+            _cos: &PlatformBuffer,
+            _sin: &PlatformBuffer,
+            _batch_size: usize,
+            _head_count: usize,
+            _sequence_length: usize,
+            _head_dim: usize,
+            _batched_tables: bool,
+            _grad_input: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
         #[allow(clippy::too_many_arguments)]
         pub(super) fn encode_attention_decode_rope_cache(
             &mut self,
@@ -11502,6 +11552,117 @@ mod tests {
             .logical_values()?;
 
         assert_close(&actual, &expected, 1e-4);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_rotary_embedding_backward_graph_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let batch_size = 1usize;
+        let head_count = 4usize;
+        let sequence_length = 4usize;
+        let head_dim = 8usize;
+        let input_shape = Shape::new(vec![batch_size, head_count, sequence_length, head_dim]);
+        let cos_shape = Shape::new(vec![sequence_length, head_dim / 2]);
+        let (cos_values, sin_values) = standard_rope_tables(sequence_length, head_dim / 2);
+
+        let mut builder = AutodiffGraphBuilder::with_context(
+            selected.device.clone(),
+            AutodiffContext::training(),
+        );
+        let input = builder.input("input", input_shape.clone(), DType::F32, true);
+        let cos = builder.constant_f32(cos_shape.clone(), cos_values)?;
+        let sin = builder.constant_f32(cos_shape, sin_values)?;
+        let roped = builder.rope(&input, &cos, &sin, false)?;
+        let graph = builder.finish(vec![roped.clone()]);
+
+        let backward_plan = graph.backward_plan(roped.id())?;
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                psionic_ir::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::RotaryEmbeddingBackward { .. }
+                }
+            )));
+
+        let input_values = (0..batch_size * head_count * sequence_length * head_dim)
+            .map(|index| (index as f32 - 32.0) * 0.0375)
+            .collect::<Vec<_>>();
+        let primal_inputs =
+            std::collections::BTreeMap::from([(input.id(), TensorData::F32(input_values))]);
+        let upstream_seed = (0..batch_size * head_count * sequence_length * head_dim)
+            .map(|index| ((index * 13 % 29) as f32 - 14.0) * 0.03125)
+            .collect::<Vec<_>>();
+        let forward_values = evaluate_graph(graph.graph(), &primal_inputs)?;
+        let expected = graph.backward_materialized_with_seed(
+            roped.id(),
+            &primal_inputs,
+            Some(TensorData::F32(upstream_seed.clone())),
+        )?;
+
+        let plan = compile_graph(&backward_plan.gradient_graph)?;
+        validate_supported_plan(&plan)?;
+
+        let mut backward_inputs = std::collections::BTreeMap::new();
+        for binding in &backward_plan.primal_bindings {
+            let value = forward_values
+                .get(&binding.primal_tensor)
+                .ok_or("missing forward value for backward binding")?;
+            let spec = backward_plan
+                .gradient_graph
+                .node(binding.gradient_graph_input)
+                .ok_or("missing backward graph input node")?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            backward_inputs.insert(
+                binding.gradient_graph_input,
+                backend.input_buffer(spec, value.as_f32_slice().ok_or("non-f32 forward value")?)?,
+            );
+        }
+        let seed_shape = backward_plan
+            .gradient_graph
+            .node(backward_plan.seed_input)
+            .ok_or("missing backward seed node")?
+            .tensor()
+            .spec()
+            .shape()
+            .clone();
+        backward_inputs.insert(
+            backward_plan.seed_input,
+            backend.input_buffer(seed_shape, upstream_seed)?,
+        );
+
+        let result =
+            backend.compile_and_execute(&backward_plan.gradient_graph, &backward_inputs)?;
+        let gradient = result
+            .outputs
+            .get(
+                &backward_plan
+                    .gradient_for(input.id())
+                    .ok_or("missing input gradient id")?,
+            )
+            .ok_or("missing cuda rope input gradient output")?;
+
+        assert_close(
+            &gradient.read_f32()?,
+            expected
+                .gradient(input.id())
+                .ok_or("missing expected input gradient")?
+                .as_f32_slice()
+                .ok_or("expected input gradient is not f32")?,
+            1e-5,
+        );
         Ok(())
     }
 

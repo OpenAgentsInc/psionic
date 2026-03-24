@@ -610,6 +610,31 @@ int psionic_cuda_rope_neox_in_place(
     return 1;
 }
 
+int psionic_cuda_rotary_embedding_backward(
+    const void *grad_output,
+    const void *cos,
+    const void *sin,
+    int batch_size,
+    int head_count,
+    int sequence_length,
+    int head_dim,
+    int batched_tables,
+    void *grad_input,
+    void *stream
+) {
+    (void)grad_output;
+    (void)cos;
+    (void)sin;
+    (void)batch_size;
+    (void)head_count;
+    (void)sequence_length;
+    (void)head_dim;
+    (void)batched_tables;
+    (void)grad_input;
+    (void)stream;
+    return 1;
+}
+
 int psionic_cuda_attention_decode_rope_cache(
     const void *qkv,
     int query_offset,

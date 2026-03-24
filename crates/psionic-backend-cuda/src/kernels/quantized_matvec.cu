@@ -1575,6 +1575,42 @@ __global__ void rope_neox_in_place_kernel(
     }
 }
 
+__global__ void rotary_embedding_backward_kernel(
+    const float *grad_output,
+    const float *cos,
+    const float *sin,
+    int batch_size,
+    int head_count,
+    int sequence_length,
+    int head_dim,
+    int batched_tables,
+    float *grad_input
+) {
+    const int batch_head_index = blockIdx.x;
+    const int position = blockIdx.y;
+    const int total_heads = batch_size * head_count;
+    if (batch_head_index >= total_heads || position >= sequence_length) {
+        return;
+    }
+    const int half_dim = head_dim / 2;
+    const int batch_index = batch_head_index / head_count;
+    const int token_base =
+        ((batch_head_index * sequence_length) + position) * head_dim;
+    const int table_base = batched_tables
+        ? ((batch_index * sequence_length) + position) * half_dim
+        : position * half_dim;
+    for (int pair = threadIdx.x; pair < half_dim; pair += blockDim.x) {
+        const int left_index = token_base + pair;
+        const int right_index = left_index + half_dim;
+        const float cosine = cos[table_base + pair];
+        const float sine = sin[table_base + pair];
+        const float grad_left = grad_output[left_index];
+        const float grad_right = grad_output[right_index];
+        grad_input[left_index] = grad_left * cosine - grad_right * sine;
+        grad_input[right_index] = grad_left * sine + grad_right * cosine;
+    }
+}
+
 __device__ __forceinline__ float rope_neox_component(
     const float *values,
     int dim,
@@ -4908,6 +4944,42 @@ extern "C" int psionic_cuda_rope_neox_in_place(
         corr_low,
         corr_high,
         theta_scale
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_rotary_embedding_backward(
+    const void *grad_output,
+    const void *cos,
+    const void *sin,
+    int batch_size,
+    int head_count,
+    int sequence_length,
+    int head_dim,
+    int batched_tables,
+    void *grad_input,
+    void *stream
+) {
+    dim3 grid(
+        static_cast<unsigned int>(batch_size * head_count),
+        static_cast<unsigned int>(sequence_length),
+        1
+    );
+    rotary_embedding_backward_kernel<<<
+        grid,
+        kBlockSize,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const float *>(grad_output),
+        static_cast<const float *>(cos),
+        static_cast<const float *>(sin),
+        batch_size,
+        head_count,
+        sequence_length,
+        head_dim,
+        batched_tables,
+        static_cast<float *>(grad_input)
     );
     return static_cast<int>(cudaGetLastError());
 }
