@@ -60,6 +60,15 @@ Adapter methods reuse the existing open adapter lane:
 - adapter format:
   `safetensors`
 
+The first mixed-hardware swarm lane now also has one explicit MLX-backed
+backend label for Mac contributors:
+
+- `open_adapter_backend.mlx.metal.gpt_oss_lm_head`
+
+That label is consumed by `psionic-train` runtime truth. It does not change the
+planner boundary here: `psionic-mlx-recipes` still selects and parameterizes
+the existing open-adapter lane instead of introducing a second trainer runtime.
+
 `qlora` keeps quantization explicit in the adapter execution plan.
 
 ## RL Methods

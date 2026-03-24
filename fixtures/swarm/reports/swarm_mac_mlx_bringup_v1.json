@@ -47,26 +47,37 @@
     "eval_receipt_digest": "099382fb32f89db515c66f3c18cae22d1a01a14d24d875ec99d9a68a215572eb",
     "out_of_slice_refusal": "cannot materialize tensor t6 for op `reshape`: bounded Metal eval currently materializes only constant, add, matmul graphs on the public array surface"
   },
-  "training_backend_posture": "missing_open_adapter_backend",
-  "training_backend_blocker": "the shared MLX-backed Metal open-adapter backend is not implemented yet, so the Mac node can prove bounded Metal runtime health but cannot yet contribute a real swarm adapter delta",
-  "disposition": "refused_training_backend_blocker",
-  "refusal": {
-    "code": "unsupported_backend_capability",
-    "scope": "runtime",
-    "subject": "first_swarm_mac_mlx_training_backend",
-    "detail": "the shared MLX-backed Metal open-adapter backend is not implemented yet, so the Mac node can prove bounded Metal runtime health but cannot yet contribute a real swarm adapter delta"
+  "training_backend_posture": "ready",
+  "overfit_gate": {
+    "run_id": "swarm-mac-mlx-overfit",
+    "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+    "logical_device_kind": "metal",
+    "logical_device_label": "metal:0",
+    "adapter_family": "gpt_oss.decoder_lm_head_lora",
+    "precision_policy": "f32_reference",
+    "executed_steps": 12,
+    "batch_count": 2,
+    "final_mean_loss": 5.364421e-7,
+    "adapter_artifact_digest": "3721f640ae1cccdd90a9266ac52dc10df6ddd194baa178d4c3e9e3ed74ccadbf",
+    "adapter_identity_digest": "97fa4aec69b62866b035f84e245ea538f96bd0c49701f5b376f40fb2c6bf15df",
+    "execution_provenance_digest": "be502b5a9df9483b6fc559e059dc21e001daa35d27bfbcb0dcd4998f3999e140",
+    "final_state_dict_digest": "41da59536abb36b188cc3c26eeeb909e05d1f842db74e02080cbdb45ca836354",
+    "probe_top_token_id": 2,
+    "unsupported_precision_refusal": "open adapter backend does not yet support precision policy `Bf16Mixed`",
+    "gate_digest": "7e2017b86f285a12c6dfa0d25f7dd4168d3c6ce5792ac37d61f9ee63cef1ed69"
   },
+  "disposition": "ready_to_attempt",
   "psionic_entrypoint": "cargo run -q -p psionic-train --bin swarm_mac_mlx_bringup -- fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json",
-  "claim_boundary": "This report proves one exact local Mac host identity, one bounded Metal eval slice through psionic-array, the first conservative sequence, microbatch, rank, and precision bounds for the swarm lane, and the explicit current training-backend blocker. It does not claim the Mac host already has a finished MLX open-adapter training backend or any general MLX distributed-training parity.",
+  "claim_boundary": "This report proves one exact local Mac host identity, one bounded Metal eval slice through psionic-array, the first conservative sequence, microbatch, rank, and precision bounds for the swarm lane, and, when the gate succeeds, one bounded local open-adapter run that emits a real adapter artifact under the MLX Metal backend label. It does not claim blanket MLX training closure, mixed-backend distributed execution, or general MLX parity outside this bounded swarm lane.",
   "drift_notes": [
     "The current MLX or Metal admission truth remains bounded to the public dense-f32 ArrayContext metal slice rather than blanket MLX training closure.",
-    "This report is refusal-proof: it records real local host and bounded Metal runtime facts first, then states the missing training backend explicitly.",
+    "This report is refusal-proof: it records real local host and bounded Metal runtime facts first, then records whether the bounded open-adapter gate produced a real adapter delta on this host.",
     "Observed Metal-family support `spdisplays_metal4` on chip `Apple M2 Pro`.",
-    "Current swarm blocker: the shared MLX-backed Metal open-adapter backend is not implemented yet, so the Mac node can prove bounded Metal runtime health but cannot yet contribute a real swarm adapter delta",
+    "The bounded MLX open-adapter gate completed 12 steps on logical device `metal:0` and emitted adapter digest `3721f640ae1cccdd90a9266ac52dc10df6ddd194baa178d4c3e9e3ed74ccadbf`.",
     "The bounded Metal eval probe executed through device `metal:0` stream `1` and kept explicit refusal for reshape-backed flatten outside the admitted slice."
   ],
-  "started_at_ms": 1774393368086,
-  "finished_at_ms": 1774393368680,
-  "observed_wallclock_ms": 593,
-  "report_digest": "06a5973f1fd3c215b138fa9bb47bd8960cf0dd7b2acd80ec0350bc652e891940"
+  "started_at_ms": 1774394440306,
+  "finished_at_ms": 1774394440552,
+  "observed_wallclock_ms": 245,
+  "report_digest": "2c0996d32027d2130861b704bb7ac3e32f8201fcfc40a348088506303b2e8aef"
 }

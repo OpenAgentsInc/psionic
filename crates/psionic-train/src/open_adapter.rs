@@ -7,7 +7,8 @@ use psionic_adapters::{
     AdapterArtifactFormat, AdapterArtifactIdentity, AdapterArtifactKind, AdapterTargetFamily,
     LmHeadLoraAdapterArtifact, LmHeadLoraLoadError,
 };
-use psionic_core::{DType, Device, QuantizationMode, Shape, TensorSpec};
+use psionic_array::{ArrayContext, ArrayError};
+use psionic_core::{DType, Device, DeviceKind, QuantizationMode, Shape, TensorSpec};
 use psionic_data::TokenizerDigest;
 use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType};
 use serde::{Deserialize, Serialize};
@@ -27,6 +28,9 @@ use crate::{
 /// first concrete NVIDIA/CUDA participant in the mixed Apple-plus-NVIDIA
 /// cluster experiment.
 pub const OPEN_ADAPTER_CUDA_BACKEND_LABEL: &str = "open_adapter_backend.cuda.gpt_oss_lm_head";
+/// Canonical backend label for the first Mac MLX + Metal open-adapter contributor.
+pub const OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL: &str =
+    "open_adapter_backend.mlx.metal.gpt_oss_lm_head";
 /// Canonical adapter family for the first non-Apple decentralized adapter lane.
 pub const OPEN_ADAPTER_REFERENCE_ADAPTER_FAMILY: &str = "gpt_oss.decoder_lm_head_lora";
 /// Canonical adapter format for the first non-Apple decentralized adapter lane.
@@ -289,6 +293,10 @@ pub struct OpenAdapterExecutionProvenance {
     pub tokenizer_digest: String,
     /// Stable tokenizer contract digest carried by portable bundle lineage.
     pub tokenizer_contract_digest: String,
+    /// Logical device kind surfaced by the backend profile.
+    pub logical_device_kind: DeviceKind,
+    /// Logical device label surfaced by the backend profile.
+    pub logical_device_label: String,
     /// Supervision sample count frozen into the backend.
     pub sample_count: usize,
 }
@@ -310,6 +318,10 @@ impl OpenAdapterExecutionProvenance {
         hasher.update(self.tokenizer_digest.as_bytes());
         hasher.update(b"|");
         hasher.update(self.tokenizer_contract_digest.as_bytes());
+        hasher.update(b"|");
+        hasher.update(self.logical_device_kind.to_string().as_bytes());
+        hasher.update(b"|");
+        hasher.update(self.logical_device_label.as_bytes());
         hasher.update(b"|");
         hasher.update(self.sample_count.to_string().as_bytes());
         hex::encode(hasher.finalize())
@@ -350,6 +362,10 @@ impl OpenAdapterTrainingExecutionBackend {
         samples: Vec<OpenAdapterHiddenStateSample>,
     ) -> Result<Self, OpenAdapterTrainingExecutionError> {
         config.validate()?;
+        let logical_device = open_adapter_logical_device(config.execution_backend_label.as_str())?;
+        if config.execution_backend_label == OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL {
+            validate_open_adapter_mlx_metal_backend()?;
+        }
         if samples.is_empty() {
             return Err(OpenAdapterTrainingExecutionError::EmptySamples);
         }
@@ -398,6 +414,8 @@ impl OpenAdapterTrainingExecutionBackend {
                 adapter_format: config.admissible_model_family.adapter_format().to_string(),
                 tokenizer_digest: config.model.tokenizer.tokenizer_digest.clone(),
                 tokenizer_contract_digest: tokenizer.contract_digest(),
+                logical_device_kind: logical_device.kind(),
+                logical_device_label: logical_device.to_string(),
                 sample_count: batches.iter().map(|batch| batch.samples.len()).sum(),
             },
             config,
@@ -1101,7 +1119,7 @@ fn lora_a_spec(rank: usize, hidden_size: usize) -> TensorSpec {
     TensorSpec::new(
         Shape::new(vec![rank, hidden_size]),
         DType::F32,
-        Device::cpu(),
+        host_training_device(),
     )
 }
 
@@ -1109,8 +1127,113 @@ fn lora_b_spec(vocab_size: usize, rank: usize) -> TensorSpec {
     TensorSpec::new(
         Shape::new(vec![vocab_size, rank]),
         DType::F32,
-        Device::cpu(),
+        host_training_device(),
     )
+}
+
+fn host_training_device() -> Device {
+    Device::new(DeviceKind::Cpu, 0, Some(String::from("cpu:0")))
+}
+
+fn open_adapter_logical_device(
+    execution_backend_label: &str,
+) -> Result<Device, OpenAdapterTrainingExecutionError> {
+    match execution_backend_label {
+        OPEN_ADAPTER_CUDA_BACKEND_LABEL => Ok(Device::new(
+            DeviceKind::Cuda,
+            0,
+            Some(String::from("cuda:0")),
+        )),
+        OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL => Ok(Device::new(
+            DeviceKind::Metal,
+            0,
+            Some(String::from("metal:0")),
+        )),
+        unsupported => Err(
+            OpenAdapterTrainingExecutionError::UnsupportedExecutionBackendLabel {
+                label: unsupported.to_string(),
+            },
+        ),
+    }
+}
+
+fn validate_open_adapter_mlx_metal_backend() -> Result<(), OpenAdapterTrainingExecutionError> {
+    let context = ArrayContext::metal().map_err(|error| match error {
+        ArrayError::BackendUnavailable { detail, .. } => {
+            OpenAdapterTrainingExecutionError::MlxMetalBackendUnavailable { detail }
+        }
+        other => OpenAdapterTrainingExecutionError::MlxMetalBackendUnavailable {
+            detail: other.to_string(),
+        },
+    })?;
+    let stream_context = context.with_stream(context.new_stream()).map_err(|error| {
+        OpenAdapterTrainingExecutionError::MlxMetalBackendUnavailable {
+            detail: error.to_string(),
+        }
+    })?;
+    let input = stream_context
+        .constant_f32(Shape::new(vec![1, 2]), vec![1.0, 0.0])
+        .map_err(
+            |error| OpenAdapterTrainingExecutionError::MlxMetalBackendUnavailable {
+                detail: error.to_string(),
+            },
+        )?;
+    let weights = stream_context
+        .constant_f32(Shape::new(vec![2, 2]), vec![1.0, 2.0, 3.0, 4.0])
+        .map_err(
+            |error| OpenAdapterTrainingExecutionError::MlxMetalBackendUnavailable {
+                detail: error.to_string(),
+            },
+        )?;
+    let bias = stream_context
+        .constant_f32(Shape::new(vec![1, 2]), vec![0.5, 0.5])
+        .map_err(
+            |error| OpenAdapterTrainingExecutionError::MlxMetalBackendUnavailable {
+                detail: error.to_string(),
+            },
+        )?;
+    let projected = input.matmul(&weights).map_err(|error| {
+        OpenAdapterTrainingExecutionError::MlxMetalBackendUnavailable {
+            detail: error.to_string(),
+        }
+    })?;
+    let shifted = projected.add(&bias).map_err(|error| {
+        OpenAdapterTrainingExecutionError::MlxMetalBackendUnavailable {
+            detail: error.to_string(),
+        }
+    })?;
+    shifted.eval().map_err(|error| {
+        OpenAdapterTrainingExecutionError::MlxMetalBackendUnavailable {
+            detail: error.to_string(),
+        }
+    })?;
+    let matrix = stream_context
+        .ones_f32(Shape::new(vec![2, 2]))
+        .map_err(
+            |error| OpenAdapterTrainingExecutionError::MlxMetalBackendUnavailable {
+                detail: error.to_string(),
+            },
+        )?;
+    let flatten_error = matrix
+        .flatten()
+        .map_err(
+            |error| OpenAdapterTrainingExecutionError::MlxMetalBackendUnavailable {
+                detail: error.to_string(),
+            },
+        )?
+        .eval()
+        .expect_err("bounded Metal surface should refuse flatten today");
+    if !flatten_error
+        .to_string()
+        .contains("bounded Metal eval currently materializes only constant, add, matmul graphs")
+    {
+        return Err(
+            OpenAdapterTrainingExecutionError::MlxMetalBoundedEvalRefusalMismatch {
+                detail: flatten_error.to_string(),
+            },
+        );
+    }
+    Ok(())
 }
 
 fn mat_vec(matrix: &[f32], rows: usize, cols: usize, vector: &[f32]) -> Vec<f32> {
@@ -1249,12 +1372,20 @@ pub enum OpenAdapterTrainingExecutionError {
     MissingCheckpointFamily,
     #[error("open adapter execution config is missing `execution_backend_label`")]
     MissingExecutionBackendLabel,
+    #[error("open adapter execution backend `{label}` is unsupported")]
+    UnsupportedExecutionBackendLabel { label: String },
     #[error("open adapter execution config requires `batch_size > 0`")]
     InvalidBatchSize,
     #[error("open adapter execution config requires `budget.max_steps > 0`")]
     InvalidBudget,
     #[error("open adapter backend does not yet support precision policy `{0:?}`")]
     UnsupportedPrecisionPolicy(OpenAdapterPrecisionPolicy),
+    #[error("open adapter MLX Metal backend is unavailable: {detail}")]
+    MlxMetalBackendUnavailable { detail: String },
+    #[error(
+        "open adapter MLX Metal backend did not preserve the bounded refusal contract: {detail}"
+    )]
+    MlxMetalBoundedEvalRefusalMismatch { detail: String },
     #[error("open adapter model is missing `base_model_id`")]
     MissingBaseModelId,
     #[error("open adapter model is missing `base_model_revision`")]
@@ -1482,6 +1613,7 @@ mod tests {
             backend.provenance().adapter_family,
             OPEN_ADAPTER_REFERENCE_ADAPTER_FAMILY
         );
+        assert_eq!(backend.provenance().logical_device_kind, DeviceKind::Cuda);
 
         let mut run = backend.initialize_run()?;
         let (step_input, gradient_record) = backend.produce_step_input(&run, 0, 1_000, 1_020)?;
@@ -1537,6 +1669,10 @@ mod tests {
         assert_eq!(
             outcome.summary.execution_provenance.adapter_format,
             OPEN_ADAPTER_REFERENCE_ADAPTER_FORMAT
+        );
+        assert_eq!(
+            outcome.summary.execution_provenance.logical_device_kind,
+            DeviceKind::Cuda
         );
         Ok(())
     }
@@ -1638,6 +1774,18 @@ mod tests {
             window.plan.adapter_target.adapter_format,
             OPEN_ADAPTER_REFERENCE_ADAPTER_FORMAT
         );
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn mlx_metal_open_adapter_backend_uses_metal_logical_device_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut config = config();
+        config.execution_backend_label = OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL.to_string();
+        let backend = OpenAdapterTrainingExecutionBackend::new(config, samples())?;
+        assert_eq!(backend.provenance().logical_device_kind, DeviceKind::Metal);
+        assert_eq!(backend.provenance().logical_device_label, "metal:0");
         Ok(())
     }
 }

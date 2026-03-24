@@ -70,8 +70,12 @@ The Mac node now also has a dedicated bring-up report seam in
 `swarm_mac_mlx_bringup`, the verification runner
 `scripts/check-swarm-mac-mlx-bringup.sh`, and the committed report
 `fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json`. That report records
-real local Mac identity plus the bounded Metal array surface while keeping the
-missing MLX open-adapter training backend explicit.
+real local Mac identity plus the bounded Metal array surface and one bounded
+same-node open-adapter overfit gate under the backend label
+`open_adapter_backend.mlx.metal.gpt_oss_lm_head`. The gate keeps the fixed-
+budget trainer host-owned, but it emits backend-tagged execution provenance,
+artifact identity, and explicit unsupported-precision refusal for the Mac
+swarm contributor lane.
 
 The Linux node now also has a dedicated RTX 4080 bring-up seam in
 `crates/psionic-train/src/swarm_cuda_bringup.rs`, the binary

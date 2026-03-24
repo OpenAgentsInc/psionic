@@ -6,20 +6,15 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    OPEN_ADAPTER_CUDA_BACKEND_LABEL, OPEN_ADAPTER_REFERENCE_ADAPTER_FAMILY,
-    OPEN_ADAPTER_REFERENCE_ADAPTER_FORMAT,
+    OPEN_ADAPTER_CUDA_BACKEND_LABEL, OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL,
+    OPEN_ADAPTER_REFERENCE_ADAPTER_FAMILY, OPEN_ADAPTER_REFERENCE_ADAPTER_FORMAT,
 };
-
-/// Canonical backend label for the first Mac MLX + Metal swarm contributor.
-pub const OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL: &str =
-    "open_adapter_backend.mlx.metal.gpt_oss_lm_head";
 /// Stable contract identifier for the first local mixed-hardware swarm lane.
 pub const SWARM_FIRST_RUN_CONTRACT_ID: &str = "swarm.local_open_adapter_contract.v1";
 /// Stable scope window for the first local mixed-hardware swarm lane.
 pub const SWARM_FIRST_RUN_SCOPE_WINDOW: &str = "swarm_local_open_adapter_contract_v1";
 /// Stable run family identifier for the first local mixed-hardware swarm lane.
-pub const SWARM_FIRST_RUN_FAMILY_ID: &str =
-    "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1";
+pub const SWARM_FIRST_RUN_FAMILY_ID: &str = "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1";
 /// Stable cluster namespace for the first local mixed-hardware swarm lane.
 pub const SWARM_FIRST_RUN_CLUSTER_NAMESPACE: &str = "cluster.swarm.local.trusted_lan";
 /// Stable admission posture for the first local mixed-hardware swarm lane.
@@ -43,15 +38,9 @@ pub const SWARM_FIRST_RUN_PUBLISH_POSTURE: &str = "no_served_promotion";
 #[derive(Debug, Error)]
 pub enum FirstSwarmContractError {
     #[error("failed to create `{path}`: {error}")]
-    CreateDir {
-        path: String,
-        error: std::io::Error,
-    },
+    CreateDir { path: String, error: std::io::Error },
     #[error("failed to write `{path}`: {error}")]
-    Write {
-        path: String,
-        error: std::io::Error,
-    },
+    Write { path: String, error: std::io::Error },
     #[error("failed to encode the first swarm contract: {0}")]
     Serialize(#[from] serde_json::Error),
 }
@@ -194,10 +183,7 @@ pub fn first_swarm_tokenizer_digest() -> TokenizerDigest {
 /// Returns the canonical dataset contract for the first local mixed-hardware swarm lane.
 #[must_use]
 pub fn first_swarm_dataset_contract() -> FirstSwarmDatasetContract {
-    let dataset_key = DatasetKey::new(
-        SWARM_FIRST_RUN_DATASET_REF,
-        SWARM_FIRST_RUN_DATASET_VERSION,
-    );
+    let dataset_key = DatasetKey::new(SWARM_FIRST_RUN_DATASET_REF, SWARM_FIRST_RUN_DATASET_VERSION);
     let splits = vec![
         FirstSwarmDatasetSplitContract {
             split_name: String::from("train"),
@@ -222,10 +208,7 @@ pub fn first_swarm_dataset_contract() -> FirstSwarmDatasetContract {
         FirstSwarmDatasetSplitContract {
             split_name: String::from("validation"),
             split_kind: DatasetSplitKind::Validation,
-            sample_ids: vec![
-                String::from("swarm-val-001"),
-                String::from("swarm-val-002"),
-            ],
+            sample_ids: vec![String::from("swarm-val-001"), String::from("swarm-val-002")],
             split_digest: stable_split_digest(
                 dataset_key.storage_key().as_str(),
                 "validation",
@@ -396,9 +379,18 @@ mod tests {
     fn first_swarm_contract_freezes_expected_backend_and_adapter_truth() {
         let contract = first_swarm_run_contract();
         assert_eq!(contract.run_family_id, SWARM_FIRST_RUN_FAMILY_ID);
-        assert_eq!(contract.adapter_family, OPEN_ADAPTER_REFERENCE_ADAPTER_FAMILY);
-        assert_eq!(contract.adapter_format, OPEN_ADAPTER_REFERENCE_ADAPTER_FORMAT);
-        assert_eq!(contract.dataset.dataset_key.dataset_ref, SWARM_FIRST_RUN_DATASET_REF);
+        assert_eq!(
+            contract.adapter_family,
+            OPEN_ADAPTER_REFERENCE_ADAPTER_FAMILY
+        );
+        assert_eq!(
+            contract.adapter_format,
+            OPEN_ADAPTER_REFERENCE_ADAPTER_FORMAT
+        );
+        assert_eq!(
+            contract.dataset.dataset_key.dataset_ref,
+            SWARM_FIRST_RUN_DATASET_REF
+        );
         assert_eq!(contract.dataset.splits.len(), 2);
         assert!(contract
             .node_roles

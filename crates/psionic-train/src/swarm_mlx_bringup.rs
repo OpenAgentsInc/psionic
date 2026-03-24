@@ -12,7 +12,12 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL, SWARM_FIRST_RUN_FAMILY_ID, first_swarm_run_contract,
+    first_swarm_run_contract, first_swarm_tokenizer_digest, run_open_adapter_sft_export,
+    OpenAdapterAdmissibleModelFamily, OpenAdapterExecutionConfig, OpenAdapterHiddenStateSample,
+    OpenAdapterLmHeadTarget, OpenAdapterPrecisionPolicy, OpenAdapterReferenceModel,
+    OpenAdapterSftRunRequest, OpenAdapterTrainingExecutionBackend, TrainingLoopBudget,
+    TrainingOptimizerConfig, TrainingOptimizerResidencyPolicy,
+    OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL, SWARM_FIRST_RUN_FAMILY_ID,
 };
 
 /// Stable scope window for the first Mac MLX swarm bring-up report.
@@ -31,9 +36,9 @@ pub const SWARM_MAC_SAFE_ADAPTER_RANK: u32 = 16;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FirstSwarmMlxTrainingBackendPosture {
-    /// The MLX-backed open-adapter backend is still missing.
+    /// The current host could not instantiate or complete the bounded MLX gate.
     MissingOpenAdapterBackend,
-    /// The MLX-backed open-adapter backend exists and may contribute.
+    /// The current host instantiated the MLX-backed open-adapter backend and may contribute.
     Ready,
 }
 
@@ -43,7 +48,7 @@ pub enum FirstSwarmMlxTrainingBackendPosture {
 pub enum FirstSwarmMacMlxBringupDisposition {
     /// The current machine does not satisfy the Mac MLX contract.
     RefusedMachineContract,
-    /// The current machine is healthy, but the shared MLX open-adapter backend is still missing.
+    /// The current machine is healthy, but the bounded MLX open-adapter gate still failed.
     RefusedTrainingBackendBlocker,
     /// The machine and backend are both ready for the first swarm lane.
     ReadyToAttempt,
@@ -129,6 +134,43 @@ pub struct FirstSwarmMacMetalEvalProbe {
     pub out_of_slice_refusal: String,
 }
 
+/// Deterministic same-node overfit gate for the Mac MLX contributor lane.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FirstSwarmMacMlxOverfitGate {
+    /// Stable run identifier.
+    pub run_id: String,
+    /// Stable backend label.
+    pub execution_backend_label: String,
+    /// Stable logical-device kind observed by the backend.
+    pub logical_device_kind: String,
+    /// Stable logical-device label observed by the backend.
+    pub logical_device_label: String,
+    /// Stable adapter family emitted by the gate.
+    pub adapter_family: String,
+    /// Precision policy used by the gate.
+    pub precision_policy: String,
+    /// Step count executed by the fixed-budget core.
+    pub executed_steps: usize,
+    /// Packed batch count used by the gate.
+    pub batch_count: usize,
+    /// Final mean loss from the last gradient batch.
+    pub final_mean_loss: f32,
+    /// Stable adapter artifact digest emitted by the gate.
+    pub adapter_artifact_digest: String,
+    /// Stable adapter identity digest emitted by the gate.
+    pub adapter_identity_digest: String,
+    /// Stable execution-provenance digest emitted by the gate.
+    pub execution_provenance_digest: String,
+    /// Stable final state-dict digest emitted by the gate.
+    pub final_state_dict_digest: String,
+    /// Stable predicted token for one deterministic probe.
+    pub probe_top_token_id: usize,
+    /// Explicit precision refusal for unsupported later postures.
+    pub unsupported_precision_refusal: String,
+    /// Stable gate digest.
+    pub gate_digest: String,
+}
+
 /// Machine-readable Mac MLX swarm bring-up report.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FirstSwarmMacMlxBringupReport {
@@ -153,7 +195,10 @@ pub struct FirstSwarmMacMlxBringupReport {
     pub metal_eval_probe: Option<FirstSwarmMacMetalEvalProbe>,
     /// Current training-backend posture.
     pub training_backend_posture: FirstSwarmMlxTrainingBackendPosture,
-    /// Explicit training-backend blocker when the backend is still missing.
+    /// Deterministic same-node overfit gate when the backend completed locally.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overfit_gate: Option<FirstSwarmMacMlxOverfitGate>,
+    /// Explicit training-backend blocker when the local MLX gate still fails.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub training_backend_blocker: Option<String>,
     /// Final disposition for the bring-up.
@@ -181,15 +226,9 @@ pub struct FirstSwarmMacMlxBringupReport {
 #[derive(Debug, Error)]
 pub enum FirstSwarmMacMlxBringupError {
     #[error("failed to create `{path}`: {error}")]
-    CreateDir {
-        path: String,
-        error: std::io::Error,
-    },
+    CreateDir { path: String, error: std::io::Error },
     #[error("failed to write `{path}`: {error}")]
-    Write {
-        path: String,
-        error: std::io::Error,
-    },
+    Write { path: String, error: std::io::Error },
     #[error("failed to encode the Mac MLX bring-up report: {0}")]
     Serialize(#[from] serde_json::Error),
 }
@@ -215,7 +254,10 @@ struct SystemProfilerDisplayGpu {
 /// Returns the current MLX-backed open-adapter backend posture.
 #[must_use]
 pub fn current_first_swarm_mlx_training_backend_posture() -> FirstSwarmMlxTrainingBackendPosture {
-    FirstSwarmMlxTrainingBackendPosture::MissingOpenAdapterBackend
+    match run_first_swarm_mac_mlx_overfit_gate() {
+        Ok(_) => FirstSwarmMlxTrainingBackendPosture::Ready,
+        Err(_) => FirstSwarmMlxTrainingBackendPosture::MissingOpenAdapterBackend,
+    }
 }
 
 /// Builds the current Mac MLX swarm bring-up report.
@@ -232,9 +274,23 @@ pub fn build_first_swarm_mac_mlx_bringup_report(
     } else {
         None
     };
-    let training_backend_posture = current_first_swarm_mlx_training_backend_posture();
-    let training_backend_blocker =
-        training_backend_blocker_detail(training_backend_posture).map(String::from);
+    let (training_backend_posture, overfit_gate, training_backend_blocker) =
+        if machine_refusal.is_none() {
+            match run_first_swarm_mac_mlx_overfit_gate() {
+                Ok(gate) => (FirstSwarmMlxTrainingBackendPosture::Ready, Some(gate), None),
+                Err(detail) => (
+                    FirstSwarmMlxTrainingBackendPosture::MissingOpenAdapterBackend,
+                    None,
+                    Some(detail),
+                ),
+            }
+        } else {
+            (
+                current_first_swarm_mlx_training_backend_posture(),
+                None,
+                None,
+            )
+        };
     let refusal = machine_refusal.clone().or_else(|| {
         training_backend_blocker.as_ref().map(|detail| {
             PsionicRefusal::new(
@@ -265,7 +321,7 @@ pub fn build_first_swarm_mac_mlx_bringup_report(
             "The current MLX or Metal admission truth remains bounded to the public dense-f32 ArrayContext metal slice rather than blanket MLX training closure.",
         ),
         String::from(
-            "This report is refusal-proof: it records real local host and bounded Metal runtime facts first, then states the missing training backend explicitly.",
+            "This report is refusal-proof: it records real local host and bounded Metal runtime facts first, then records whether the bounded open-adapter gate produced a real adapter delta on this host.",
         ),
     ];
     if let Some(metal_family) = &host.metal_family_support {
@@ -275,8 +331,12 @@ pub fn build_first_swarm_mac_mlx_bringup_report(
         ));
     }
     if let Some(blocker) = &training_backend_blocker {
+        drift_notes.push(format!("Current swarm blocker: {blocker}"));
+    }
+    if let Some(gate) = &overfit_gate {
         drift_notes.push(format!(
-            "Current swarm blocker: {blocker}"
+            "The bounded MLX open-adapter gate completed {} steps on logical device `{}` and emitted adapter digest `{}`.",
+            gate.executed_steps, gate.logical_device_label, gate.adapter_artifact_digest
         ));
     }
     if let Some(probe) = &metal_eval_probe {
@@ -286,7 +346,7 @@ pub fn build_first_swarm_mac_mlx_bringup_report(
         ));
     }
     let claim_boundary = String::from(
-        "This report proves one exact local Mac host identity, one bounded Metal eval slice through psionic-array, the first conservative sequence, microbatch, rank, and precision bounds for the swarm lane, and the explicit current training-backend blocker. It does not claim the Mac host already has a finished MLX open-adapter training backend or any general MLX distributed-training parity.",
+        "This report proves one exact local Mac host identity, one bounded Metal eval slice through psionic-array, the first conservative sequence, microbatch, rank, and precision bounds for the swarm lane, and, when the gate succeeds, one bounded local open-adapter run that emits a real adapter artifact under the MLX Metal backend label. It does not claim blanket MLX training closure, mixed-backend distributed execution, or general MLX parity outside this bounded swarm lane.",
     );
     let mut report = FirstSwarmMacMlxBringupReport {
         schema_version: 1,
@@ -299,6 +359,7 @@ pub fn build_first_swarm_mac_mlx_bringup_report(
         admitted_metal_slice,
         metal_eval_probe,
         training_backend_posture,
+        overfit_gate,
         training_backend_blocker,
         disposition,
         refusal,
@@ -340,24 +401,22 @@ pub fn write_first_swarm_mac_mlx_bringup_report(
 }
 
 fn observe_mac_host_identity() -> FirstSwarmMacHostIdentity {
-    let os_name = command_stdout("sw_vers", &["-productName"]).unwrap_or_else(|| String::from("unknown"));
+    let os_name =
+        command_stdout("sw_vers", &["-productName"]).unwrap_or_else(|| String::from("unknown"));
     let os_version =
         command_stdout("sw_vers", &["-productVersion"]).unwrap_or_else(|| String::from("unknown"));
     let os_build_version =
         command_stdout("sw_vers", &["-buildVersion"]).unwrap_or_else(|| String::from("unknown"));
     let architecture =
         command_stdout("uname", &["-m"]).unwrap_or_else(|| std::env::consts::ARCH.to_string());
-    let hostname =
-        command_stdout("hostname", &[]).unwrap_or_else(|| String::from("unknown-host"));
+    let hostname = command_stdout("hostname", &[]).unwrap_or_else(|| String::from("unknown-host"));
     let hardware_model =
         command_stdout("sysctl", &["-n", "hw.model"]).unwrap_or_else(|| String::from("unknown"));
     let unified_memory_bytes = command_stdout("sysctl", &["-n", "hw.memsize"])
         .and_then(|value| value.parse::<u64>().ok())
         .unwrap_or_default();
     let (chip_name, metal_family_support, gpu_core_count) =
-        system_profiler_gpu_summary().unwrap_or_else(|| {
-            (String::from("unknown"), None, None)
-        });
+        system_profiler_gpu_summary().unwrap_or_else(|| (String::from("unknown"), None, None));
     FirstSwarmMacHostIdentity {
         hostname,
         os_name: os_name.to_lowercase(),
@@ -486,12 +545,114 @@ fn run_bounded_metal_eval_probe() -> Option<FirstSwarmMacMetalEvalProbe> {
     })
 }
 
+fn run_first_swarm_mac_mlx_overfit_gate() -> Result<FirstSwarmMacMlxOverfitGate, String> {
+    let config = OpenAdapterExecutionConfig {
+        run_id: String::from("swarm-mac-mlx-overfit"),
+        checkpoint_family: String::from("swarm.open_adapter.mlx.same_node"),
+        execution_backend_label: String::from(OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL),
+        admissible_model_family: OpenAdapterAdmissibleModelFamily::GptOssDecoderLmHeadLora,
+        budget: TrainingLoopBudget::new(12, 1, 1).map_err(|error| error.to_string())?,
+        batch_size: 2,
+        precision_policy: OpenAdapterPrecisionPolicy::F32Reference,
+        model: OpenAdapterReferenceModel {
+            base_model_id: String::from("gpt-oss-20b"),
+            base_model_revision: String::from("swarm-local-v1"),
+            base_served_artifact_digest: String::from("sha256:swarm-open-adapter-base"),
+            tokenizer: first_swarm_tokenizer_digest(),
+            hidden_size: 4,
+            vocab_size: 4,
+            target: OpenAdapterLmHeadTarget {
+                target_id: String::from("lm_head"),
+                lora_rank: 2,
+                lora_alpha: 8.0,
+                optimizer: TrainingOptimizerConfig::adamw(0.2, 0.9, 0.99, 1e-8)
+                    .with_gradient_clip_norm(1.0),
+                optimizer_residency_policy: TrainingOptimizerResidencyPolicy::host_only(),
+            },
+        },
+    };
+    let samples = vec![
+        OpenAdapterHiddenStateSample::new("swarm-mlx-a", vec![1.0, 0.0, 0.0, 0.0], 2, 16)
+            .map_err(|error| error.to_string())?,
+        OpenAdapterHiddenStateSample::new("swarm-mlx-b", vec![0.0, 1.0, 0.0, 0.0], 3, 15)
+            .map_err(|error| error.to_string())?,
+        OpenAdapterHiddenStateSample::new("swarm-mlx-c", vec![1.0, 0.0, 0.0, 0.0], 2, 14)
+            .map_err(|error| error.to_string())?,
+        OpenAdapterHiddenStateSample::new("swarm-mlx-d", vec![0.0, 1.0, 0.0, 0.0], 3, 13)
+            .map_err(|error| error.to_string())?,
+    ];
+    let backend = OpenAdapterTrainingExecutionBackend::new(config, samples)
+        .map_err(|error| error.to_string())?;
+    let outcome = run_open_adapter_sft_export(
+        &backend,
+        &OpenAdapterSftRunRequest {
+            dataset_ref: String::from("dataset://openagents/swarm/open_adapter_sft@2026.03.24"),
+            validator_policy_ref: String::from("validator.open_adapter.reference"),
+            adapter_id: String::from("swarm-mac-mlx"),
+            adapter_revision: String::from("r1"),
+            started_at_ms: 1_774_393_600_000,
+            step_duration_ms: 25,
+        },
+    )
+    .map_err(|error| error.to_string())?;
+    let unsupported_precision_refusal = OpenAdapterTrainingExecutionBackend::new(
+        OpenAdapterExecutionConfig {
+            precision_policy: OpenAdapterPrecisionPolicy::Bf16Mixed,
+            ..backend.config().clone()
+        },
+        vec![
+            OpenAdapterHiddenStateSample::new("unsupported", vec![1.0, 0.0, 0.0, 0.0], 2, 1)
+                .map_err(|error| error.to_string())?,
+        ],
+    )
+    .expect_err("bf16 should stay unsupported")
+    .to_string();
+    let adapter = outcome
+        .load_lm_head_lora_artifact()
+        .map_err(|error| error.to_string())?;
+    let mut logits = vec![0.0_f32; backend.config().model.vocab_size];
+    adapter
+        .apply_to_logits(&[1.0, 0.0, 0.0, 0.0], logits.as_mut_slice())
+        .map_err(|error| error.to_string())?;
+    let probe_top_token_id = logits
+        .iter()
+        .enumerate()
+        .max_by(|left, right| left.1.partial_cmp(right.1).expect("finite logits"))
+        .map(|(index, _)| index)
+        .unwrap_or_default();
+    let mut gate = FirstSwarmMacMlxOverfitGate {
+        run_id: backend.config().run_id.clone(),
+        execution_backend_label: String::from(OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL),
+        logical_device_kind: backend.provenance().logical_device_kind.to_string(),
+        logical_device_label: backend.provenance().logical_device_label.clone(),
+        adapter_family: backend.provenance().adapter_family.clone(),
+        precision_policy: String::from("f32_reference"),
+        executed_steps: outcome.step_receipts.len(),
+        batch_count: backend.batches().len(),
+        final_mean_loss: outcome
+            .gradient_records
+            .last()
+            .map(|record| record.mean_loss)
+            .unwrap_or_default(),
+        adapter_artifact_digest: outcome.summary.adapter_artifact_digest.clone(),
+        adapter_identity_digest: outcome.summary.adapter_identity_digest.clone(),
+        execution_provenance_digest: outcome.summary.execution_provenance.stable_digest(),
+        final_state_dict_digest: outcome.summary.final_state_dict_digest.clone(),
+        probe_top_token_id,
+        unsupported_precision_refusal,
+        gate_digest: String::new(),
+    };
+    gate.gate_digest = stable_digest(b"psionic_first_swarm_mac_mlx_overfit_gate|", &gate);
+    Ok(gate)
+}
+
+#[cfg(test)]
 fn training_backend_blocker_detail(
     posture: FirstSwarmMlxTrainingBackendPosture,
 ) -> Option<&'static str> {
     match posture {
         FirstSwarmMlxTrainingBackendPosture::MissingOpenAdapterBackend => Some(
-            "the shared MLX-backed Metal open-adapter backend is not implemented yet, so the Mac node can prove bounded Metal runtime health but cannot yet contribute a real swarm adapter delta",
+            "the current host could not instantiate and complete the bounded MLX-backed Metal open-adapter gate, so the Mac node cannot yet contribute a real swarm adapter delta",
         ),
         FirstSwarmMlxTrainingBackendPosture::Ready => None,
     }
@@ -506,7 +667,10 @@ fn system_profiler_gpu_summary() -> Option<(String, Option<String>, Option<u32>)
         .clone()
         .or_else(|| gpu.name.clone())
         .unwrap_or_else(|| String::from("unknown"));
-    let gpu_core_count = gpu.cores.as_deref().and_then(|value| value.parse::<u32>().ok());
+    let gpu_core_count = gpu
+        .cores
+        .as_deref()
+        .and_then(|value| value.parse::<u32>().ok());
     Some((chip_name, gpu.metal_family_support.clone(), gpu_core_count))
 }
 
@@ -540,15 +704,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn current_mac_mlx_bringup_keeps_missing_backend_blocker_explicit() {
-        assert_eq!(
-            current_first_swarm_mlx_training_backend_posture(),
-            FirstSwarmMlxTrainingBackendPosture::MissingOpenAdapterBackend
-        );
+    fn missing_posture_keeps_generic_blocker_explicit() {
         assert!(training_backend_blocker_detail(
-            current_first_swarm_mlx_training_backend_posture()
+            FirstSwarmMlxTrainingBackendPosture::MissingOpenAdapterBackend
         )
         .is_some());
+        assert!(
+            training_backend_blocker_detail(FirstSwarmMlxTrainingBackendPosture::Ready).is_none()
+        );
     }
 
     #[test]
@@ -589,8 +752,29 @@ mod tests {
             metal_family_support: Some(String::from("spdisplays_metal4")),
             gpu_core_count: Some(10),
         };
-        let refusal = evaluate_machine_contract(&host, &thresholds)
-            .expect("non-macos host should refuse");
+        let refusal =
+            evaluate_machine_contract(&host, &thresholds).expect("non-macos host should refuse");
         assert!(refusal.detail.contains("requires os"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn mac_mlx_overfit_gate_emits_real_adapter_delta() {
+        let gate = run_first_swarm_mac_mlx_overfit_gate()
+            .expect("local mac should complete the bounded MLX overfit gate");
+        assert_eq!(
+            gate.execution_backend_label,
+            OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL
+        );
+        assert_eq!(gate.logical_device_kind, "metal");
+        assert_eq!(gate.logical_device_label, "metal:0");
+        assert_eq!(gate.adapter_family, "gpt_oss.decoder_lm_head_lora");
+        assert_eq!(gate.probe_top_token_id, 2);
+        assert!(gate.final_mean_loss > 0.0);
+        assert!(gate
+            .unsupported_precision_refusal
+            .contains("does not yet support precision policy"));
+        assert!(!gate.adapter_artifact_digest.is_empty());
+        assert!(!gate.gate_digest.is_empty());
     }
 }
