@@ -81,6 +81,15 @@ cargo run -p psionic-train --example parameter_golf_submission_run_evidence \
   /tmp/parameter_golf_submission_run_evidence.json
 ```
 
+Bind the same exported folder to the RunPod `8xH100` operator posture:
+
+```bash
+cargo run -p psionic-train --example parameter_golf_submission_run_evidence \
+  /tmp/records/track_non_record_16mb/<submission_id> \
+  /tmp/parameter_golf_submission_run_evidence.json \
+  --posture runpod_8xh100
+```
+
 ## Current Honest Boundary
 
 These reports close exported-folder evidence and replay verification only.
@@ -93,7 +102,8 @@ They do not claim:
 - that the current non-record folder is record-ready
 
 The current committed challenge receipt is still a refusal on the local
-single-`RTX 4080` review host. That is intentional: the point of this layer is
-to make the folder-facing evidence and refusal posture explicit rather than
-implied. The repo never reached true exported-folder `8xH100` evidence before
-the lane stopped.
+single-`RTX 4080` review host. The later RunPod `8xH100` posture now binds the
+same exported folder to challenge-matching inventory, but it still records a
+measurements-missing refusal until real distributed timing and memory evidence
+lands. That is intentional: the point of this layer is to make the folder-
+facing evidence and refusal posture explicit rather than implied.

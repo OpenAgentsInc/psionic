@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd -- "${script_dir}/.." && pwd)"
+
 run_root=""
 submission_dir=""
 output_path=""
@@ -70,6 +73,10 @@ entrypoint_path="${submission_dir}/train_gpt.py"
 manifest_path="${submission_dir}/submission.json"
 run_evidence_path="${submission_dir}/psionic_parameter_golf_submission_run_evidence.json"
 
+cargo run -q -p psionic-train --example parameter_golf_submission_run_evidence \
+  --manifest-path "${repo_root}/crates/psionic-train/Cargo.toml" \
+  -- "${submission_dir}" "${run_evidence_path}" --posture runpod_8xh100
+
 python3 - "${run_root}" "${submission_dir}" "${output_path}" "${inventory_file}" "${topology_file}" "${entrypoint_path}" "${manifest_path}" "${run_evidence_path}" <<'PY'
 import json
 import subprocess
@@ -113,7 +120,7 @@ report = {
       "submission_run_evidence_path": str(run_evidence_path) if run_evidence_path.exists() else None,
       "submission_run_evidence_sha256": sha256(run_evidence_path),
     },
-    "claim_boundary": "This finalizer preserves the machine inventory, topology, and exported-folder digest surface for the RunPod 8xH100 lane. It does not by itself claim that the later real 8xH100 execution cleared the challenge bar."
+    "claim_boundary": "This finalizer preserves the machine inventory, topology, exported-folder digests, and the RunPod 8xH100-bound submission run evidence surface. It does not by itself claim that the later real 8xH100 execution cleared the challenge bar."
 }
 output_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 print(json.dumps(report, indent=2))

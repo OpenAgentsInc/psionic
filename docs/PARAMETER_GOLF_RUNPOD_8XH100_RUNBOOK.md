@@ -63,9 +63,10 @@ The committed manifest is explicit about three separate operator phases:
 - execution entrypoint:
   run the exported folder under the public `WORLD_SIZE=8` posture
 - finalization:
-  capture `nvidia-smi` inventory, `nvidia-smi topo -m`, exported-folder
-  digests, and the later distributed evidence paths under one machine-readable
-  finalizer report
+  generate the exported-folder submission run evidence under the RunPod
+  `8xH100` posture, then capture `nvidia-smi` inventory, `nvidia-smi topo -m`,
+  exported-folder digests, and the later distributed evidence paths under one
+  machine-readable finalizer report
 
 This is intentional. `#460` closes the RunPod lane definition and rehearsal,
 not the later real `8xH100` evidence bundle.

@@ -139,6 +139,67 @@ impl ParameterGolfSubmissionChallengeExecutionPosture {
                 ),
         }
     }
+
+    /// Returns the canonical RunPod single-node `8xH100` posture used for real exported-folder evidence.
+    #[must_use]
+    pub fn runpod_8xh100_defaults() -> Self {
+        Self {
+            posture_id: String::from("runpod_single_node_8xh100"),
+            detail: String::from(
+                "single-node RunPod 8xH100 posture; this binds exported-folder evidence to challenge-matching inventory, but the exported entrypoint replay still needs separate distributed timing and memory receipts before it can claim a measured 8xH100 training result",
+            ),
+            devices: (0..8).map(sample_h100_device).collect(),
+            capability_profile: ClusterExecutionCapabilityProfile::new("cuda")
+                .with_supported_communication_classes(vec![
+                    ClusterCommunicationClass::TensorCollectiveMesh,
+                ])
+                .with_detail(
+                    "single-node RunPod H100 mesh advertises the same backend family and collective vocabulary as the intended challenge lane",
+                ),
+        }
+    }
+}
+
+fn sample_h100_device(ordinal: usize) -> DeviceDescriptor {
+    DeviceDescriptor {
+        backend: String::from("cuda"),
+        device: Device::new(
+            DeviceKind::Cuda,
+            ordinal as u16,
+            Some(format!("cuda:{ordinal}")),
+        ),
+        device_name: Some(String::from("NVIDIA H100 80GB HBM3")),
+        supported_dtypes: vec![DType::F32, DType::BF16],
+        supported_quantization: Vec::new(),
+        memory_capacity_bytes: Some(80 * 1024 * 1024 * 1024),
+        unified_memory: Some(false),
+        feature_flags: vec![String::from("cuda_architecture_surface")],
+        amd_metadata: None,
+        nvidia_metadata: Some(NvidiaDeviceMetadata {
+            topology: NvidiaTopologyInfo {
+                architecture: Some(String::from("hopper")),
+                compute_capability: Some(String::from("9.0")),
+                pci_bdf: Some(format!("00000000:{:02x}:00.0", ordinal + 1)),
+                sm_count: Some(132),
+                vram_bytes: Some(80 * 1024 * 1024 * 1024),
+                mig_profile: None,
+            },
+            risk: NvidiaRiskProfile {
+                level: NvidiaRiskLevel::Standard,
+                display_attached: Some(false),
+                mig_partitioned: false,
+                warnings: Vec::new(),
+            },
+            recovery: NvidiaRecoveryProfile {
+                supports_gpu_reset: Some(true),
+                expected_actions: vec![
+                    NvidiaRecoveryAction::ProcessRestart,
+                    NvidiaRecoveryAction::GpuReset,
+                    NvidiaRecoveryAction::RebootHost,
+                ],
+            },
+        }),
+    }
 }
 
 /// One observed file inside a generated submission folder.
@@ -576,6 +637,15 @@ pub fn build_parameter_golf_submission_run_evidence_report(
         }
     })?;
     let distributed_receipt = build_exported_submission_distributed_receipt(&loaded, posture)?;
+    let claim_boundary = if posture.posture_id == "runpod_single_node_8xh100" {
+        String::from(
+            "This report binds the exact exported submission folder to one real folder-local entrypoint replay on challenge-matching RunPod 8xH100 inventory, the preserved bounded wallclock/memory/artifact receipts, and one explicit 8xH100 challenge receipt. The exported entrypoint replay still lacks distributed timing and memory measurements, so the challenge receipt remains a measurements-missing refusal rather than true 8xH100 training success.",
+        )
+    } else {
+        String::from(
+            "This report binds the exact exported submission folder to one real folder-local entrypoint replay, the preserved bounded wallclock/memory/artifact receipts, and one measured-or-refused 8xH100 challenge receipt. The committed evidence is still a local review-host refusal rather than true 8xH100 success.",
+        )
+    };
     let mut report = ParameterGolfSubmissionRunEvidenceReport {
         schema_version: 1,
         report_id: String::from("parameter_golf.submission_run_evidence.v1"),
@@ -624,7 +694,11 @@ pub fn build_parameter_golf_submission_run_evidence_report(
         )?,
         run_bundle: observed_file(
             submission_dir,
-            format!("{}/benchmark/run_bundle.json", loaded.submission_manifest.run_id).as_str(),
+            format!(
+                "{}/benchmark/run_bundle.json",
+                loaded.submission_manifest.run_id
+            )
+            .as_str(),
         )?,
         runtime_receipt: observed_file(
             submission_dir,
@@ -639,9 +713,7 @@ pub fn build_parameter_golf_submission_run_evidence_report(
         benchmark_memory_receipt: loaded.benchmark_receipt.memory_receipt.clone(),
         benchmark_artifact_size_receipt: loaded.benchmark_receipt.artifact_size_receipt.clone(),
         distributed_challenge_receipt: distributed_receipt,
-        claim_boundary: String::from(
-            "This report binds the exact exported submission folder to one real folder-local entrypoint replay, the preserved bounded wallclock/memory/artifact receipts, and one measured-or-refused 8xH100 challenge receipt. The committed evidence is still a local review-host refusal rather than true 8xH100 success.",
-        ),
+        claim_boundary,
         report_digest: String::new(),
     };
     let _ = runtime_receipt;
@@ -1031,30 +1103,59 @@ fn build_exported_submission_distributed_receipt(
     let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
     let hyperparameters = crate::ParameterGolfTrainingHyperparameters::baseline_defaults();
     let thresholds = ParameterGolfDistributedChallengeThresholds::challenge_8xh100();
-    let rejection_reason = if posture.capability_profile.runtime_backend
-        != thresholds.required_backend
-    {
-        format!(
-            "cluster capability profile targets backend `{}` instead of required `{}`",
-            posture.capability_profile.runtime_backend, thresholds.required_backend
-        )
-    } else if !posture
+    let backend_matches = posture.capability_profile.runtime_backend == thresholds.required_backend;
+    let communication_matches = posture
         .capability_profile
-        .supports_communication_class(ClusterCommunicationClass::TensorCollectiveMesh)
-    {
-        String::from(
-            "cluster capability profile does not advertise tensor_collective_mesh support required for NCCL-style all-reduce",
+        .supports_communication_class(ClusterCommunicationClass::TensorCollectiveMesh);
+    let device_count_matches = posture.devices.len() == thresholds.required_world_size;
+    let all_devices_match_required_model = posture.devices.iter().all(|device| {
+        device
+            .device_name
+            .as_deref()
+            .is_some_and(|name| name.contains(thresholds.required_device_name.as_str()))
+            && device
+                .nvidia_metadata
+                .as_ref()
+                .is_some_and(|metadata| metadata.topology.mig_profile.is_none())
+    });
+    let (refusal_kind, rejection_reason) = if !backend_matches {
+        (
+            ParameterGolfDistributedLaneRefusalKind::CapabilityMismatch,
+            format!(
+                "cluster capability profile targets backend `{}` instead of required `{}`",
+                posture.capability_profile.runtime_backend, thresholds.required_backend
+            ),
         )
-    } else if posture.devices.len() != thresholds.required_world_size {
-        format!(
-            "expected exactly {} devices for the 8xH100 lane, found {}",
-            thresholds.required_world_size,
-            posture.devices.len()
+    } else if !communication_matches {
+        (
+            ParameterGolfDistributedLaneRefusalKind::CapabilityMismatch,
+            String::from(
+                "cluster capability profile does not advertise tensor_collective_mesh support required for NCCL-style all-reduce",
+            ),
+        )
+    } else if !device_count_matches {
+        (
+            ParameterGolfDistributedLaneRefusalKind::DeviceInventoryMismatch,
+            format!(
+                "expected exactly {} devices for the 8xH100 lane, found {}",
+                thresholds.required_world_size,
+                posture.devices.len()
+            ),
+        )
+    } else if !all_devices_match_required_model {
+        (
+            ParameterGolfDistributedLaneRefusalKind::DeviceInventoryMismatch,
+            format!(
+                "selected inventory is not an exact `{}` CUDA posture with non-MIG devices",
+                thresholds.required_device_name
+            ),
         )
     } else {
-        format!(
-            "selected inventory is not an exact `{}` CUDA posture with non-MIG devices",
-            thresholds.required_device_name
+        (
+            ParameterGolfDistributedLaneRefusalKind::MeasurementsMissing,
+            String::from(
+                "challenge-matching 8xH100 inventory is present, but the exported entrypoint replay does not by itself produce distributed timing or memory receipts for the true 8xH100 training path",
+            ),
         )
     };
     let topology = ExecutionTopologyPlan::replicated(
@@ -1076,9 +1177,17 @@ fn build_exported_submission_distributed_receipt(
     .with_selected_devices(posture.devices.clone())
     .with_execution_topology(Some(topology.clone()));
     let coverage_report = builtin_parameter_golf_cuda_training_capability_report()?;
-    let mut boundary_notes = vec![String::from(
-        "The current exported-folder evidence is bound to a local review host rather than challenge-matching 8xH100 inventory, so the challenge receipt remains an explicit refusal.",
-    )];
+    let mut boundary_notes = vec![if refusal_kind
+        == ParameterGolfDistributedLaneRefusalKind::MeasurementsMissing
+    {
+        String::from(
+            "The current exported-folder evidence is bound to challenge-matching RunPod 8xH100 inventory, but it still lacks distributed timing and memory receipts for the true 8xH100 training path, so the challenge receipt remains an explicit refusal.",
+        )
+    } else {
+        String::from(
+            "The current exported-folder evidence is bound to a local review host rather than challenge-matching 8xH100 inventory, so the challenge receipt remains an explicit refusal.",
+        )
+    }];
     boundary_notes.extend(coverage_report.boundary_notes());
     Ok(ParameterGolfDistributedThroughputReceipt {
         benchmark_ref: String::from(PARAMETER_GOLF_DISTRIBUTED_8XH100_BENCHMARK_REF),
@@ -1102,7 +1211,7 @@ fn build_exported_submission_distributed_receipt(
                         .unwrap_or_else(|| String::from("unknown"))
                 })
                 .collect(),
-            all_devices_match_required_model: false,
+            all_devices_match_required_model,
         },
         communication: ParameterGolfDistributedCommunicationReceipt {
             communication_class: ClusterCommunicationClass::TensorCollectiveMesh,
@@ -1117,7 +1226,7 @@ fn build_exported_submission_distributed_receipt(
         timing: None,
         memory: None,
         refusal: Some(ParameterGolfDistributedLaneRefusal {
-            refusal_kind: ParameterGolfDistributedLaneRefusalKind::DeviceInventoryMismatch,
+            refusal_kind,
             reason: rejection_reason,
             fallback_benchmark_ref: String::from(PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF),
         }),
@@ -1694,9 +1803,10 @@ mod tests {
         write_parameter_golf_final_pr_bundle_report,
         write_parameter_golf_local_clone_dry_run_report,
         write_parameter_golf_record_folder_replay_verification_report,
-        write_parameter_golf_submission_run_evidence_report, ParameterGolfFinalPrBundleReport,
-        ParameterGolfLocalCloneDryRunReport, ParameterGolfLocalCloneDryRunVerdict,
-        ParameterGolfRecordFolderReplayVerificationReport,
+        write_parameter_golf_submission_run_evidence_report,
+        ParameterGolfDistributedLaneDisposition, ParameterGolfDistributedLaneRefusalKind,
+        ParameterGolfFinalPrBundleReport, ParameterGolfLocalCloneDryRunReport,
+        ParameterGolfLocalCloneDryRunVerdict, ParameterGolfRecordFolderReplayVerificationReport,
         ParameterGolfRecordFolderReplayVerificationVerdict,
         ParameterGolfSubmissionChallengeExecutionPosture, ParameterGolfSubmissionRunEvidenceReport,
         PARAMETER_GOLF_FINAL_PR_BUNDLE_OUTPUT_FILE, PARAMETER_GOLF_FINAL_PR_BUNDLE_REPORT_REF,
@@ -1717,6 +1827,43 @@ mod tests {
         let committed: ParameterGolfSubmissionRunEvidenceReport =
             read_repo_json(PARAMETER_GOLF_SUBMISSION_RUN_EVIDENCE_REPORT_REF)?;
         assert_eq!(generated, committed);
+        Ok(())
+    }
+
+    #[test]
+    fn runpod_8xh100_posture_keeps_exported_submission_evidence_explicitly_blocked(
+    ) -> Result<(), Box<dyn Error>> {
+        let temp_dir = tempfile::tempdir()?;
+        let submission_dir = write_canonical_submission_folder(temp_dir.path())?;
+        let generated = build_parameter_golf_submission_run_evidence_report(
+            &submission_dir,
+            &ParameterGolfSubmissionChallengeExecutionPosture::runpod_8xh100_defaults(),
+        )?;
+        assert_eq!(
+            generated.challenge_execution_posture.posture_id,
+            "runpod_single_node_8xh100"
+        );
+        assert_eq!(
+            generated.distributed_challenge_receipt.disposition,
+            ParameterGolfDistributedLaneDisposition::Refused
+        );
+        assert_eq!(
+            generated
+                .distributed_challenge_receipt
+                .refusal
+                .as_ref()
+                .map(|refusal| refusal.refusal_kind),
+            Some(ParameterGolfDistributedLaneRefusalKind::MeasurementsMissing)
+        );
+        assert!(
+            generated
+                .distributed_challenge_receipt
+                .topology
+                .all_devices_match_required_model
+        );
+        assert!(generated
+            .claim_boundary
+            .contains("challenge-matching RunPod 8xH100 inventory"));
         Ok(())
     }
 
