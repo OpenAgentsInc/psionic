@@ -159,6 +159,13 @@ the same bounded public lane before the next H100 rerun:
   `reduce_sum`) that the runtime already executes on the bounded lane
 - the CUDA dense allocator now truly admits `I32` buffers, so the PGOLF token
   id and target id path is real instead of only implied by helper names
+- the remaining host-fallback layout helpers now take the two hottest PGOLF
+  shapes through dedicated fast paths instead of only the generic
+  coordinate-replay loop:
+  - `permute` now fast-paths rank-2 transpose and the decoder-attention
+    `[0, 2, 1, 3]` layout swap
+  - `reduce_sum` now fast-paths full reduction plus first-axis and last-axis
+    reduction without the generic coordinate walk
 
 That 4080 slice is not an H100 benchmark receipt and does not close `#470` by
 itself, but it does mean the next H100 profile will measure the narrowed

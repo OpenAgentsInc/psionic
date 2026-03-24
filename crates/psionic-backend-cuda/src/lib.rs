@@ -4468,6 +4468,19 @@ fn permute_contiguous_values(
         .iter()
         .map(|&axis| input_shape[axis])
         .collect::<Vec<_>>();
+    if axes
+        .iter()
+        .enumerate()
+        .all(|(output_axis, &input_axis)| output_axis == input_axis)
+    {
+        return Ok(values.to_vec());
+    }
+    if let Some(output) = permute_rank2_transpose_fast_path(values, input_shape, axes) {
+        return Ok(output);
+    }
+    if let Some(output) = permute_rank4_swap_middle_axes_fast_path(values, input_shape, axes) {
+        return Ok(output);
+    }
     let input_strides = contiguous_strides(input_shape);
     let output_strides = contiguous_strides(&output_shape);
     let mut output = vec![0.0_f32; output_shape.iter().product()];
@@ -4506,6 +4519,90 @@ fn permute_contiguous_values(
         }
     }
     Ok(output)
+}
+
+fn permute_rank2_transpose_fast_path(
+    values: &[f32],
+    input_shape: &[usize],
+    axes: &[usize],
+) -> Option<Vec<f32>> {
+    if input_shape.len() != 2 || axes != [1, 0] {
+        return None;
+    }
+    let rows = input_shape[0];
+    let cols = input_shape[1];
+    let mut output = vec![0.0_f32; values.len()];
+    if rows == 0 || cols == 0 {
+        return Some(output);
+    }
+    if output.len() >= HOST_FALLBACK_PARALLEL_MIN_ELEMENTS {
+        output
+            .par_chunks_mut(rows)
+            .enumerate()
+            .for_each(|(col, output_row)| {
+                for row in 0..rows {
+                    output_row[row] = values[row.saturating_mul(cols).saturating_add(col)];
+                }
+            });
+    } else {
+        for (col, output_row) in output.chunks_mut(rows).enumerate() {
+            for row in 0..rows {
+                output_row[row] = values[row.saturating_mul(cols).saturating_add(col)];
+            }
+        }
+    }
+    Some(output)
+}
+
+fn permute_rank4_swap_middle_axes_fast_path(
+    values: &[f32],
+    input_shape: &[usize],
+    axes: &[usize],
+) -> Option<Vec<f32>> {
+    if input_shape.len() != 4 || axes != [0, 2, 1, 3] {
+        return None;
+    }
+    let outer = input_shape[0];
+    let left = input_shape[1];
+    let middle = input_shape[2];
+    let inner = input_shape[3];
+    let output_chunk_len = left.saturating_mul(inner);
+    let mut output = vec![0.0_f32; values.len()];
+    if output_chunk_len == 0 {
+        return Some(output);
+    }
+    let fill_chunk = |chunk_index: usize, chunk: &mut [f32]| {
+        let outer_index = chunk_index / middle;
+        let middle_index = chunk_index % middle;
+        for left_index in 0..left {
+            let input_offset = (((outer_index * left + left_index) * middle + middle_index)
+                * inner)
+                .min(values.len());
+            let output_offset = left_index * inner;
+            let copy_len = inner
+                .min(values.len().saturating_sub(input_offset))
+                .min(chunk.len().saturating_sub(output_offset));
+            chunk[output_offset..output_offset + copy_len]
+                .copy_from_slice(&values[input_offset..input_offset + copy_len]);
+        }
+    };
+    let chunk_count = outer.saturating_mul(middle);
+    if output.len() >= HOST_FALLBACK_PARALLEL_MIN_ELEMENTS {
+        output
+            .par_chunks_mut(output_chunk_len)
+            .take(chunk_count)
+            .enumerate()
+            .for_each(|(chunk_index, chunk)| fill_chunk(chunk_index, chunk));
+    } else {
+        for (chunk_index, chunk) in output
+            .chunks_mut(output_chunk_len)
+            .take(chunk_count)
+            .enumerate()
+        {
+            fill_chunk(chunk_index, chunk);
+        }
+    }
+    Some(output)
 }
 
 fn slice_contiguous_values(
@@ -4690,12 +4787,18 @@ fn reduce_sum_contiguous_values(
     axis: Option<usize>,
 ) -> Result<Vec<f32>, RuntimeError> {
     let Some(axis) = axis else {
-        return Ok(vec![values.iter().copied().sum()]);
+        return Ok(vec![parallel_sum_f32(values)]);
     };
     if axis >= input_shape.len() {
         return Err(RuntimeError::Backend(format!(
             "invalid reduce_sum axis={axis} for shape {input_shape:?}"
         )));
+    }
+    if axis + 1 == input_shape.len() {
+        return Ok(reduce_sum_last_axis_fast_path(values, input_shape));
+    }
+    if axis == 0 {
+        return Ok(reduce_sum_first_axis_fast_path(values, input_shape));
     }
     let mut output_shape = input_shape.to_vec();
     output_shape.remove(axis);
@@ -4750,6 +4853,78 @@ fn reduce_sum_contiguous_values(
         }
     }
     Ok(output)
+}
+
+fn parallel_sum_f32(values: &[f32]) -> f32 {
+    if values.len() >= HOST_FALLBACK_PARALLEL_MIN_ELEMENTS {
+        values
+            .par_chunks(host_fallback_chunk_len(values.len()))
+            .map(|chunk| chunk.iter().copied().sum::<f32>())
+            .sum()
+    } else {
+        values.iter().copied().sum()
+    }
+}
+
+fn reduce_sum_last_axis_fast_path(values: &[f32], input_shape: &[usize]) -> Vec<f32> {
+    let reduction_len = input_shape.last().copied().unwrap_or(1);
+    let output_len = input_shape[..input_shape.len().saturating_sub(1)]
+        .iter()
+        .product::<usize>()
+        .max(1);
+    let mut output = vec![0.0_f32; output_len];
+    if reduction_len == 0 {
+        return output;
+    }
+    if output_len >= HOST_FALLBACK_PARALLEL_MIN_ELEMENTS {
+        output
+            .par_iter_mut()
+            .enumerate()
+            .for_each(|(output_index, sum)| {
+                let start = output_index.saturating_mul(reduction_len);
+                *sum = values[start..start + reduction_len].iter().copied().sum();
+            });
+    } else {
+        for (output_index, sum) in output.iter_mut().enumerate() {
+            let start = output_index.saturating_mul(reduction_len);
+            *sum = values[start..start + reduction_len].iter().copied().sum();
+        }
+    }
+    output
+}
+
+fn reduce_sum_first_axis_fast_path(values: &[f32], input_shape: &[usize]) -> Vec<f32> {
+    let reduction_len = input_shape[0];
+    let output_len = input_shape[1..].iter().product::<usize>().max(1);
+    let mut output = vec![0.0_f32; output_len];
+    if reduction_len == 0 {
+        return output;
+    }
+    if output_len >= HOST_FALLBACK_PARALLEL_MIN_ELEMENTS {
+        output
+            .par_iter_mut()
+            .enumerate()
+            .for_each(|(output_index, sum)| {
+                let mut total = 0.0_f32;
+                for reduced_index in 0..reduction_len {
+                    total += values[reduced_index
+                        .saturating_mul(output_len)
+                        .saturating_add(output_index)];
+                }
+                *sum = total;
+            });
+    } else {
+        for (output_index, sum) in output.iter_mut().enumerate() {
+            let mut total = 0.0_f32;
+            for reduced_index in 0..reduction_len {
+                total += values[reduced_index
+                    .saturating_mul(output_len)
+                    .saturating_add(output_index)];
+            }
+            *sum = total;
+        }
+    }
+    output
 }
 
 fn contiguous_strides(shape: &[usize]) -> Vec<usize> {
@@ -10461,6 +10636,18 @@ mod tests {
     }
 
     #[test]
+    fn permute_contiguous_values_matches_attention_layout_swap(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let values = (0..12).map(|value| value as f32).collect::<Vec<_>>();
+        let permuted = super::permute_contiguous_values(&values, &[1, 2, 3, 2], &[0, 2, 1, 3])?;
+        assert_eq!(
+            permuted,
+            vec![0.0, 1.0, 6.0, 7.0, 2.0, 3.0, 8.0, 9.0, 4.0, 5.0, 10.0, 11.0]
+        );
+        Ok(())
+    }
+
+    #[test]
     fn expand_contiguous_values_repeats_broadcast_dimensions(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let values = vec![10.0_f32, 20.0];
@@ -10478,6 +10665,21 @@ mod tests {
         assert_eq!(
             super::reduce_sum_contiguous_values(&values, &[2, 3], None)?,
             vec![21.0]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn reduce_sum_contiguous_values_reduces_first_and_last_axis_fast_paths(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let values = vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0];
+        assert_eq!(
+            super::reduce_sum_contiguous_values(&values, &[2, 3], Some(0))?,
+            vec![5.0, 7.0, 9.0]
+        );
+        assert_eq!(
+            super::reduce_sum_contiguous_values(&values, &[2, 3], Some(1))?,
+            vec![6.0, 15.0]
         );
         Ok(())
     }
