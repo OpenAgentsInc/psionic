@@ -66,6 +66,7 @@ timestamp_utc() {
 run_id="$(basename -- "${run_root}")"
 created_at_utc="$(timestamp_utc)"
 distributed_receipt_path="${run_root}/parameter_golf_distributed_8xh100_receipt.json"
+distributed_measurements_path="${run_root}/parameter_golf_distributed_8xh100_measurements.json"
 visualization_bundle_path="${run_root}/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json"
 visualization_run_index_path="${run_root}/training_visualization/remote_training_run_index_v1.json"
 repo_revision="$(git -C "${repo_root}" rev-parse HEAD 2>/dev/null || true)"
@@ -84,6 +85,13 @@ nvidia-smi \
   --query-gpu=index,name,memory.total,memory.used,utilization.gpu \
   --format=csv,noheader > "${inventory_file}"
 nvidia-smi topo -m > "${topology_file}"
+
+if [[ ! -f "${distributed_receipt_path}" && -f "${distributed_measurements_path}" ]]; then
+  bash "${repo_root}/scripts/parameter-golf-runpod-build-8xh100-receipt.sh" \
+    --run-root "${run_root}" \
+    --measurements "${distributed_measurements_path}" \
+    --output "${distributed_receipt_path}"
+fi
 
 entrypoint_path="${submission_dir}/train_gpt.py"
 manifest_path="${submission_dir}/submission.json"
@@ -125,7 +133,7 @@ distributed_receipt_path.write_text(
 )
 PY
 
-python3 - "${run_root}" "${submission_dir}" "${output_path}" "${inventory_file}" "${topology_file}" "${entrypoint_path}" "${manifest_path}" "${run_evidence_path}" "${distributed_receipt_path}" "${created_at_utc}" "${run_id}" "${profile_id}" "${trainer_lane_id}" <<'PY'
+python3 - "${run_root}" "${submission_dir}" "${output_path}" "${inventory_file}" "${topology_file}" "${entrypoint_path}" "${manifest_path}" "${run_evidence_path}" "${distributed_receipt_path}" "${distributed_measurements_path}" "${created_at_utc}" "${run_id}" "${profile_id}" "${trainer_lane_id}" <<'PY'
 import json
 import sys
 from hashlib import sha256 as sha256_hash
@@ -140,10 +148,11 @@ entrypoint_path = Path(sys.argv[6])
 manifest_path = Path(sys.argv[7])
 run_evidence_path = Path(sys.argv[8])
 distributed_receipt_path = Path(sys.argv[9])
-created_at_utc = sys.argv[10]
-run_id = sys.argv[11]
-profile_id = sys.argv[12]
-trainer_lane_id = sys.argv[13]
+distributed_measurements_path = Path(sys.argv[10])
+created_at_utc = sys.argv[11]
+run_id = sys.argv[12]
+profile_id = sys.argv[13]
+trainer_lane_id = sys.argv[14]
 
 def sha256(path: Path) -> str | None:
     if not path.is_file():
@@ -175,6 +184,8 @@ report = {
       "submission_run_evidence_sha256": sha256(run_evidence_path),
       "distributed_receipt_path": str(distributed_receipt_path) if distributed_receipt_path.exists() else None,
       "distributed_receipt_sha256": sha256(distributed_receipt_path),
+      "distributed_measurements_path": str(distributed_measurements_path) if distributed_measurements_path.exists() else None,
+      "distributed_measurements_sha256": sha256(distributed_measurements_path),
     },
     "claim_boundary": "This finalizer preserves the machine inventory, topology, exported-folder digests, and the RunPod 8xH100-bound submission run evidence surface. It does not by itself claim that the later real 8xH100 execution cleared the challenge bar."
 }

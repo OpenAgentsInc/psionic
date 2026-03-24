@@ -39,6 +39,10 @@ use crate::{
 
 /// Stable version identifier for the distributed `8xH100` receipt lane.
 pub const PARAMETER_GOLF_DISTRIBUTED_8XH100_VERSION: &str = "2026.03.18.distributed_8xh100.v1";
+/// Stable version identifier for the RunPod operator-measurement bridge that
+/// feeds the distributed `8xH100` receipt lane.
+pub const PARAMETER_GOLF_RUNPOD_8XH100_MEASUREMENTS_VERSION: &str =
+    "2026.03.24.runpod_8xh100_measurements.v1";
 
 const PARAMETER_GOLF_DISTRIBUTED_CHECKPOINT_FAMILY: &str =
     "train.parameter_golf.distributed_8xh100";
@@ -164,6 +168,60 @@ impl ParameterGolfDistributed8xH100Config {
     }
 }
 
+/// Minimal operator-collected measurements that can be lifted from one RunPod
+/// `8xH100` run root into the typed distributed receipt lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterGolfRunPod8xH100Measurements {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Optional stable run identifier override. When omitted, the caller-owned
+    /// run-root identifier is used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<String>,
+    /// Optional mesh identifier override.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mesh_id: Option<String>,
+    /// Ordered measured step observations.
+    #[serde(default)]
+    pub step_observations: Vec<ParameterGolfDistributedStepObservation>,
+    /// Observed distributed validation duration.
+    pub validation_observed_ms: u64,
+    /// Observed distributed export or roundtrip duration.
+    pub export_observed_ms: u64,
+    /// Observed runtime memory posture when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_observation: Option<ParameterGolfDistributedMemoryObservation>,
+}
+
+impl ParameterGolfRunPod8xH100Measurements {
+    /// Returns the canonical RunPod `8xH100` measurement skeleton.
+    #[must_use]
+    pub fn challenge_defaults() -> Self {
+        Self {
+            schema_version: String::from(PARAMETER_GOLF_RUNPOD_8XH100_MEASUREMENTS_VERSION),
+            run_id: None,
+            mesh_id: None,
+            step_observations: Vec::new(),
+            validation_observed_ms: 0,
+            export_observed_ms: 0,
+            memory_observation: None,
+        }
+    }
+
+    fn into_config(self, fallback_run_id: &str) -> ParameterGolfDistributed8xH100Config {
+        let mut config = ParameterGolfDistributed8xH100Config::challenge_defaults();
+        config.run_id = self.run_id.unwrap_or_else(|| String::from(fallback_run_id));
+        config.mesh_id = self
+            .mesh_id
+            .unwrap_or_else(|| String::from("mesh.parameter_golf.runpod_8xh100"));
+        config.step_observations = self.step_observations;
+        config.validation_observed_ms = self.validation_observed_ms;
+        config.export_observed_ms = self.export_observed_ms;
+        config.memory_observation = self.memory_observation;
+        config
+    }
+}
+
 /// Failure while building the distributed `8xH100` Parameter Golf lane.
 #[derive(Debug, Error)]
 pub enum ParameterGolfDistributedLaneError {
@@ -171,6 +229,8 @@ pub enum ParameterGolfDistributedLaneError {
     MissingRunId,
     #[error("distributed parameter golf config is invalid: {message}")]
     InvalidConfig { message: String },
+    #[error("distributed parameter golf inventory is invalid: {message}")]
+    InvalidInventory { message: String },
     #[error("distributed parameter golf step observation is invalid: {message}")]
     InvalidStepObservation { message: String },
     #[error(transparent)]
@@ -183,6 +243,122 @@ pub enum ParameterGolfDistributedLaneError {
     TrainingCore(#[from] crate::TrainingCoreError),
     #[error(transparent)]
     Train(#[from] ParameterGolfTrainError),
+}
+
+/// Returns the canonical RunPod `8xH100` cluster capability profile used by
+/// the Parameter Golf distributed receipt lane.
+#[must_use]
+pub fn parameter_golf_runpod_8xh100_capability_profile() -> ClusterExecutionCapabilityProfile {
+    ClusterExecutionCapabilityProfile::new("cuda")
+        .with_supported_communication_classes(vec![ClusterCommunicationClass::TensorCollectiveMesh])
+        .with_detail(
+            "single-pod RunPod H100 mesh advertises the same tensor_collective_mesh vocabulary as the intended WORLD_SIZE=8 challenge lane",
+        )
+}
+
+/// Parses the exact `nvidia-smi --query-gpu=index,name,memory.total,memory.used,utilization.gpu --format=csv,noheader`
+/// surface emitted by the RunPod finalizer into typed CUDA device descriptors.
+pub fn parse_parameter_golf_runpod_8xh100_inventory(
+    inventory_csv: &str,
+) -> Result<Vec<DeviceDescriptor>, ParameterGolfDistributedLaneError> {
+    let mut devices = Vec::new();
+    for raw_line in inventory_csv.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let fields = line.split(',').map(str::trim).collect::<Vec<_>>();
+        if fields.len() != 5 {
+            return Err(ParameterGolfDistributedLaneError::InvalidInventory {
+                message: format!(
+                    "expected 5 csv columns in nvidia-smi inventory line, found {} in `{line}`",
+                    fields.len()
+                ),
+            });
+        }
+        let ordinal = fields[0].parse::<u16>().map_err(|error| {
+            ParameterGolfDistributedLaneError::InvalidInventory {
+                message: format!("failed to parse GPU index `{}`: {error}", fields[0]),
+            }
+        })?;
+        let device_name = fields[1];
+        let total_mib = parse_inventory_quantity(fields[2], "MiB")?;
+        let used_mib = parse_inventory_quantity(fields[3], "MiB")?;
+        let utilization_percent = parse_inventory_quantity(fields[4], "%")?;
+        let reported_memory_capacity_bytes = total_mib.saturating_mul(1024 * 1024);
+        let mut warnings = Vec::new();
+        warnings.push(format!(
+            "inventory_snapshot.memory_used_mib={used_mib}; inventory_snapshot.utilization_percent={utilization_percent}"
+        ));
+        let is_h100 = device_name.contains("H100");
+        let canonical_h100_memory_bytes = 80_u64 * 1024 * 1024 * 1024;
+        let memory_capacity_bytes = if is_h100 {
+            reported_memory_capacity_bytes.max(canonical_h100_memory_bytes)
+        } else {
+            reported_memory_capacity_bytes
+        };
+        devices.push(DeviceDescriptor {
+            backend: String::from("cuda"),
+            device: Device::new(DeviceKind::Cuda, ordinal, Some(format!("cuda:{ordinal}"))),
+            device_name: Some(String::from(device_name)),
+            supported_dtypes: vec![DType::F32, DType::BF16],
+            supported_quantization: Vec::new(),
+            memory_capacity_bytes: Some(memory_capacity_bytes),
+            unified_memory: Some(false),
+            feature_flags: vec![String::from("cuda_architecture_surface")],
+            amd_metadata: None,
+            nvidia_metadata: Some(psionic_runtime::NvidiaDeviceMetadata {
+                topology: psionic_runtime::NvidiaTopologyInfo {
+                    architecture: is_h100.then(|| String::from("hopper")),
+                    compute_capability: is_h100.then(|| String::from("9.0")),
+                    pci_bdf: None,
+                    sm_count: is_h100.then_some(132),
+                    vram_bytes: Some(memory_capacity_bytes),
+                    mig_profile: None,
+                },
+                risk: psionic_runtime::NvidiaRiskProfile {
+                    level: psionic_runtime::NvidiaRiskLevel::Standard,
+                    display_attached: Some(false),
+                    mig_partitioned: false,
+                    warnings,
+                },
+                recovery: psionic_runtime::NvidiaRecoveryProfile {
+                    supports_gpu_reset: Some(true),
+                    expected_actions: vec![
+                        psionic_runtime::NvidiaRecoveryAction::ProcessRestart,
+                        psionic_runtime::NvidiaRecoveryAction::GpuReset,
+                        psionic_runtime::NvidiaRecoveryAction::RebootHost,
+                    ],
+                },
+            }),
+        });
+    }
+    if devices.is_empty() {
+        return Err(ParameterGolfDistributedLaneError::InvalidInventory {
+            message: String::from("the RunPod nvidia-smi inventory was empty"),
+        });
+    }
+    Ok(devices)
+}
+
+/// Builds the typed distributed receipt directly from a RunPod `8xH100`
+/// inventory snapshot plus the minimal operator-collected timing or memory
+/// measurements.
+pub fn benchmark_parameter_golf_runpod_8xh100_from_measurements(
+    descriptor: &ParameterGolfModelDescriptor,
+    hyperparameters: &ParameterGolfTrainingHyperparameters,
+    run_root_id: &str,
+    inventory_csv: &str,
+    measurements: ParameterGolfRunPod8xH100Measurements,
+) -> Result<ParameterGolfDistributedThroughputReceipt, ParameterGolfDistributedLaneError> {
+    let devices = parse_parameter_golf_runpod_8xh100_inventory(inventory_csv)?;
+    benchmark_parameter_golf_distributed_8xh100(
+        descriptor,
+        hyperparameters,
+        devices.as_slice(),
+        &parameter_golf_runpod_8xh100_capability_profile(),
+        &measurements.into_config(run_root_id),
+    )
 }
 
 /// Builds the distributed `8xH100` Parameter Golf throughput receipt.
@@ -478,6 +654,24 @@ fn distributed_backend_selection(
         fallback_benchmark_ref: String::from(PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF),
     });
     (selection, all_devices_match_required_model, refusal)
+}
+
+fn parse_inventory_quantity(
+    raw_value: &str,
+    expected_suffix: &str,
+) -> Result<u64, ParameterGolfDistributedLaneError> {
+    let trimmed = raw_value.trim();
+    let value = trimmed
+        .strip_suffix(expected_suffix)
+        .ok_or_else(|| ParameterGolfDistributedLaneError::InvalidInventory {
+            message: format!("expected `{trimmed}` to end with the suffix `{expected_suffix}`"),
+        })?
+        .trim();
+    value.parse::<u64>().map_err(
+        |error| ParameterGolfDistributedLaneError::InvalidInventory {
+            message: format!("failed to parse inventory quantity `{trimmed}`: {error}"),
+        },
+    )
 }
 
 fn device_matches_h100(
@@ -863,16 +1057,21 @@ mod tests {
         ParameterGolfReferenceModel, ParameterGolfWeights,
     };
     use psionic_runtime::{
-        BackendSelectionState, ClusterCommunicationClass, ClusterExecutionCapabilityProfile,
-        DeviceDescriptor, NvidiaDeviceMetadata, NvidiaRecoveryAction, NvidiaRecoveryProfile,
-        NvidiaRiskLevel, NvidiaRiskProfile, NvidiaTopologyInfo,
+        BackendSelectionState, ClusterExecutionCapabilityProfile, DeviceDescriptor,
+        NvidiaDeviceMetadata, NvidiaRecoveryAction, NvidiaRecoveryProfile, NvidiaRiskLevel,
+        NvidiaRiskProfile, NvidiaTopologyInfo,
     };
 
     use crate::{
-        benchmark_parameter_golf_distributed_8xh100, ParameterGolfBatchGeometry,
+        benchmark_parameter_golf_distributed_8xh100,
+        benchmark_parameter_golf_runpod_8xh100_from_measurements,
+        parameter_golf_runpod_8xh100_capability_profile,
+        parse_parameter_golf_runpod_8xh100_inventory, ParameterGolfBatchGeometry,
         ParameterGolfDistributed8xH100Config, ParameterGolfDistributedLaneError,
         ParameterGolfDistributedMemoryObservation, ParameterGolfDistributedStepObservation,
-        ParameterGolfTrainingHyperparameters, PARAMETER_GOLF_DISTRIBUTED_8XH100_VERSION,
+        ParameterGolfRunPod8xH100Measurements, ParameterGolfTrainingHyperparameters,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_VERSION,
+        PARAMETER_GOLF_RUNPOD_8XH100_MEASUREMENTS_VERSION,
     };
     use psionic_eval::{
         ParameterGolfDistributedLaneDisposition, ParameterGolfDistributedLaneRefusalKind,
@@ -958,11 +1157,7 @@ mod tests {
     }
 
     fn capability_profile() -> ClusterExecutionCapabilityProfile {
-        ClusterExecutionCapabilityProfile::new("cuda")
-            .with_supported_communication_classes(vec![
-                ClusterCommunicationClass::TensorCollectiveMesh,
-            ])
-            .with_detail("single-node nccl-style all-reduce mesh")
+        parameter_golf_runpod_8xh100_capability_profile()
     }
 
     fn measured_config() -> ParameterGolfDistributed8xH100Config {
@@ -1175,6 +1370,81 @@ mod tests {
             error,
             ParameterGolfDistributedLaneError::InvalidConfig { .. }
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn runpod_8xh100_inventory_parser_builds_cuda_h100_devices() -> Result<(), Box<dyn Error>> {
+        let inventory = "\
+0, NVIDIA H100 80GB HBM3, 81443 MiB, 1024 MiB, 99 %\n\
+1, NVIDIA H100 80GB HBM3, 81443 MiB, 2048 MiB, 31 %\n";
+        let devices = parse_parameter_golf_runpod_8xh100_inventory(inventory)?;
+        assert_eq!(devices.len(), 2);
+        assert_eq!(
+            devices[0].device_name.as_deref(),
+            Some("NVIDIA H100 80GB HBM3")
+        );
+        assert_eq!(
+            devices[0].memory_capacity_bytes,
+            Some(80 * 1024 * 1024 * 1024)
+        );
+        assert_eq!(devices[0].device.label(), Some("cuda:0"));
+        assert_eq!(
+            devices[0]
+                .nvidia_metadata
+                .as_ref()
+                .expect("nvidia metadata")
+                .topology
+                .compute_capability
+                .as_deref(),
+            Some("9.0")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn runpod_8xh100_measurement_bridge_builds_measured_receipt() -> Result<(), Box<dyn Error>> {
+        let model = sample_model()?;
+        let inventory = (0..8)
+            .map(|ordinal| format!("{ordinal}, NVIDIA H100 80GB HBM3, 81443 MiB, 1024 MiB, 99 %"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut measurements = ParameterGolfRunPod8xH100Measurements::challenge_defaults();
+        measurements.schema_version =
+            String::from(PARAMETER_GOLF_RUNPOD_8XH100_MEASUREMENTS_VERSION);
+        measurements.step_observations = vec![
+            ParameterGolfDistributedStepObservation::new(1, 0, 40, 128),
+            ParameterGolfDistributedStepObservation::new(2, 40, 80, 128),
+        ];
+        measurements.validation_observed_ms = 10;
+        measurements.export_observed_ms = 5;
+        measurements.memory_observation = Some(ParameterGolfDistributedMemoryObservation {
+            peak_device_bytes_per_worker: 70 * 1024 * 1024 * 1024,
+            peak_host_bytes_per_worker: 8 * 1024 * 1024 * 1024,
+            source: String::from("runpod operator measurement"),
+        });
+        let receipt = benchmark_parameter_golf_runpod_8xh100_from_measurements(
+            model.descriptor(),
+            &ParameterGolfTrainingHyperparameters::baseline_defaults(),
+            "parameter-golf-runpod-test",
+            &inventory,
+            measurements,
+        )?;
+        assert_eq!(
+            receipt.disposition,
+            ParameterGolfDistributedLaneDisposition::Measured
+        );
+        assert!(receipt.refusal.is_none());
+        assert_eq!(receipt.topology.selected_device_names.len(), 8);
+        assert_eq!(
+            receipt.topology.selected_device_names[0],
+            "NVIDIA H100 80GB HBM3"
+        );
+        assert!(receipt
+            .memory
+            .as_ref()
+            .is_some_and(|memory| memory.measurement_posture
+                == "observed_runtime_peak_plus_analytic_state_breakdown"));
         Ok(())
     }
 }

@@ -24,6 +24,8 @@ record-track claim.
   `scripts/parameter-golf-runpod-launch-8xh100.sh`
 - distributed-evidence finalizer:
   `scripts/parameter-golf-runpod-finalize-8xh100.sh`
+- distributed receipt builder from a real RunPod run root:
+  `scripts/parameter-golf-runpod-build-8xh100-receipt.sh`
 - app-facing visualization contract:
   `docs/REMOTE_TRAINING_VISUALIZATION.md`
 - local rehearsal:
@@ -74,6 +76,17 @@ The committed manifest is explicit about three separate operator phases:
 When a real distributed receipt already exists in the run root, the finalizer
 now passes that exact receipt into the exported-folder evidence generator rather
 than regenerating a synthetic `MeasurementsMissing` refusal from posture alone.
+
+When a real distributed receipt does not exist yet but the run root contains
+`parameter_golf_distributed_8xh100_measurements.json`, the finalizer now asks
+Psionic to build the typed receipt directly from:
+
+- `nvidia_smi_inventory.txt`
+- the canonical RunPod `tensor_collective_mesh` capability posture
+- the operator-collected distributed timing or memory measurements JSON
+
+This removes the old manual `devices.json` / capability JSON / config JSON
+assembly step from the first real RunPod `8xH100` evidence path.
 
 This is intentional. `#460` closes the RunPod lane definition and rehearsal,
 not the later real `8xH100` evidence bundle.

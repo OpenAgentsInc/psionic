@@ -36,6 +36,13 @@ Psionic now encodes that exact posture explicitly instead of treating
   so later pod runs can bind JSON-collected device inventory, clustered
   capability profile, and observed timing or memory telemetry directly into the
   typed receipt without another schema pass
+- `psionic-train` now also ships
+  `ParameterGolfRunPod8xH100Measurements`,
+  `benchmark_parameter_golf_runpod_8xh100_from_measurements(...)`, and the
+  example `crates/psionic-train/examples/parameter_golf_runpod_8xh100_receipt.rs`
+  so a real RunPod run root can be lifted directly from
+  `nvidia_smi_inventory.txt` plus one minimal operator-measurement JSON into
+  the typed distributed receipt without hand-written intermediate JSON
 - `psionic-eval` now exposes
   `ParameterGolfDistributedThroughputReceipt` plus the supporting topology,
   communication, timing, memory, threshold, and refusal types
@@ -107,6 +114,31 @@ cargo run -p psionic-train --example parameter_golf_distributed_8xh100_receipt -
   /tmp/parameter_golf_distributed_8xh100_config.json \
   /tmp/parameter_golf_distributed_8xh100_receipt.json
 ```
+
+For the later real RunPod lane, the repo now also owns a one-command
+run-root bridge:
+
+```bash
+bash scripts/parameter-golf-runpod-build-8xh100-receipt.sh \
+  --run-root /workspace/parameter-golf-runpod-8xh100-20260324T000000Z
+```
+
+That command expects:
+
+- `/workspace/.../nvidia_smi_inventory.txt`
+- `/workspace/.../parameter_golf_distributed_8xh100_measurements.json`
+
+The measurements JSON preserves only the runtime facts that are not already in
+the finalizer-owned run root:
+
+- ordered `step_observations`
+- `validation_observed_ms`
+- `export_observed_ms`
+- optional `memory_observation`
+
+The device inventory and capability profile are derived by Psionic itself from
+the run-root inventory contract plus the canonical RunPod `8xH100` lane
+assumptions.
 
 ## Refusal Posture
 
