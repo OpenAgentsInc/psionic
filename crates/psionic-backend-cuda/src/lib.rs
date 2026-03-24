@@ -1401,6 +1401,44 @@ impl CudaSubmission {
         Ok(())
     }
 
+    /// Expands one rank-3 contiguous `f32` tensor through bounded broadcast on
+    /// CUDA.
+    pub fn expand_rank3_f32(
+        &mut self,
+        input: &CudaBuffer,
+        output: &CudaBuffer,
+        input_dims: [usize; 3],
+        output_dims: [usize; 3],
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_expand_rank3_f32(
+            &input.platform,
+            input_dims,
+            output_dims,
+            &output.platform,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Expands one rank-4 contiguous `f32` tensor through bounded broadcast on
+    /// CUDA.
+    pub fn expand_rank4_f32(
+        &mut self,
+        input: &CudaBuffer,
+        output: &CudaBuffer,
+        input_dims: [usize; 4],
+        output_dims: [usize; 4],
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_expand_rank4_f32(
+            &input.platform,
+            input_dims,
+            output_dims,
+            &output.platform,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
     /// Applies GPT-OSS NEOX-style RoPE, writes the current KV entry, and runs
     /// decode attention in one CUDA kernel.
     #[allow(clippy::too_many_arguments)]
@@ -3884,7 +3922,49 @@ impl AvailableCudaBackend {
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Expand { shape } => {
-                    let output =
+                    let input = step_input(step, &values, 0)?;
+                    let output = if input.spec().dtype() == DType::F32
+                        && step.spec.dtype() == DType::F32
+                        && supports_cuda_rank3_expand_f32(input.spec().shape().dims(), shape.dims())
+                    {
+                        let dims = input.spec().shape().dims();
+                        let contiguous = TensorSpec::new(
+                            step.spec.shape().clone(),
+                            step.spec.dtype(),
+                            step.spec.device().clone(),
+                        );
+                        let output = self.allocate(&contiguous)?;
+                        submission.expand_rank3_f32(
+                            input,
+                            &output,
+                            [dims[0], dims[1], dims[2]],
+                            [shape.dims()[0], shape.dims()[1], shape.dims()[2]],
+                        )?;
+                        output
+                    } else if input.spec().dtype() == DType::F32
+                        && step.spec.dtype() == DType::F32
+                        && supports_cuda_rank4_expand_f32(input.spec().shape().dims(), shape.dims())
+                    {
+                        let dims = input.spec().shape().dims();
+                        let contiguous = TensorSpec::new(
+                            step.spec.shape().clone(),
+                            step.spec.dtype(),
+                            step.spec.device().clone(),
+                        );
+                        let output = self.allocate(&contiguous)?;
+                        submission.expand_rank4_f32(
+                            input,
+                            &output,
+                            [dims[0], dims[1], dims[2], dims[3]],
+                            [
+                                shape.dims()[0],
+                                shape.dims()[1],
+                                shape.dims()[2],
+                                shape.dims()[3],
+                            ],
+                        )?;
+                        output
+                    } else {
                         execute_profiled_host_fallback(&mut host_fallback_profile, step, || {
                             let input = step_input(step, &values, 0)?;
                             let input_values = self.read_float_buffer_to_f32(input)?;
@@ -3894,7 +3974,8 @@ impl AvailableCudaBackend {
                                 shape.dims(),
                             )?;
                             self.materialize_host_view_step(step, &values_out)
-                        })?;
+                        })?
+                    };
                     values.insert(step.output, output);
                 }
                 ExecutionOp::Cast { dtype } => {
@@ -5876,6 +5957,24 @@ fn supports_cuda_rank4_swap_middle_axes(input_shape: &[usize], axes: &[usize]) -
     input_shape.len() == 4 && axes == [0, 2, 1, 3]
 }
 
+fn supports_cuda_rank3_expand_f32(input_shape: &[usize], output_shape: &[usize]) -> bool {
+    input_shape.len() == 3
+        && output_shape.len() == 3
+        && input_shape
+            .iter()
+            .zip(output_shape)
+            .all(|(&input_dim, &output_dim)| input_dim == output_dim || input_dim == 1)
+}
+
+fn supports_cuda_rank4_expand_f32(input_shape: &[usize], output_shape: &[usize]) -> bool {
+    input_shape.len() == 4
+        && output_shape.len() == 4
+        && input_shape
+            .iter()
+            .zip(output_shape)
+            .all(|(&input_dim, &output_dim)| input_dim == output_dim || input_dim == 1)
+}
+
 fn reduce_sum_cuda_strategy(
     input_shape: &[usize],
     axis: Option<usize>,
@@ -6642,6 +6741,30 @@ mod platform {
             input: *const c_void,
             axis0_extent: c_int,
             row_width: c_int,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_expand_rank3_f32(
+            input: *const c_void,
+            input_dim0: c_int,
+            input_dim1: c_int,
+            input_dim2: c_int,
+            output_dim0: c_int,
+            output_dim1: c_int,
+            output_dim2: c_int,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_expand_rank4_f32(
+            input: *const c_void,
+            input_dim0: c_int,
+            input_dim1: c_int,
+            input_dim2: c_int,
+            input_dim3: c_int,
+            output_dim0: c_int,
+            output_dim1: c_int,
+            output_dim2: c_int,
+            output_dim3: c_int,
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
@@ -8739,6 +8862,102 @@ mod platform {
                     )
                 },
                 "psionic_cuda_reduce_sum_axis0_f32",
+            )
+        }
+
+        pub(super) fn encode_expand_rank3_f32(
+            &mut self,
+            input: &PlatformBuffer,
+            input_dims: [usize; 3],
+            output_dims: [usize; 3],
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let input_dim0 = c_int::try_from(input_dims[0]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-3 input dim0 exceeds c_int"))
+            })?;
+            let input_dim1 = c_int::try_from(input_dims[1]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-3 input dim1 exceeds c_int"))
+            })?;
+            let input_dim2 = c_int::try_from(input_dims[2]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-3 input dim2 exceeds c_int"))
+            })?;
+            let output_dim0 = c_int::try_from(output_dims[0]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-3 output dim0 exceeds c_int"))
+            })?;
+            let output_dim1 = c_int::try_from(output_dims[1]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-3 output dim1 exceeds c_int"))
+            })?;
+            let output_dim2 = c_int::try_from(output_dims[2]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-3 output dim2 exceeds c_int"))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_expand_rank3_f32(
+                        input.inner.device_ptr.cast(),
+                        input_dim0,
+                        input_dim1,
+                        input_dim2,
+                        output_dim0,
+                        output_dim1,
+                        output_dim2,
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_expand_rank3_f32",
+            )
+        }
+
+        pub(super) fn encode_expand_rank4_f32(
+            &mut self,
+            input: &PlatformBuffer,
+            input_dims: [usize; 4],
+            output_dims: [usize; 4],
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let input_dim0 = c_int::try_from(input_dims[0]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-4 input dim0 exceeds c_int"))
+            })?;
+            let input_dim1 = c_int::try_from(input_dims[1]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-4 input dim1 exceeds c_int"))
+            })?;
+            let input_dim2 = c_int::try_from(input_dims[2]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-4 input dim2 exceeds c_int"))
+            })?;
+            let input_dim3 = c_int::try_from(input_dims[3]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-4 input dim3 exceeds c_int"))
+            })?;
+            let output_dim0 = c_int::try_from(output_dims[0]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-4 output dim0 exceeds c_int"))
+            })?;
+            let output_dim1 = c_int::try_from(output_dims[1]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-4 output dim1 exceeds c_int"))
+            })?;
+            let output_dim2 = c_int::try_from(output_dims[2]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-4 output dim2 exceeds c_int"))
+            })?;
+            let output_dim3 = c_int::try_from(output_dims[3]).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda expand rank-4 output dim3 exceeds c_int"))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_expand_rank4_f32(
+                        input.inner.device_ptr.cast(),
+                        input_dim0,
+                        input_dim1,
+                        input_dim2,
+                        input_dim3,
+                        output_dim0,
+                        output_dim1,
+                        output_dim2,
+                        output_dim3,
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_expand_rank4_f32",
             )
         }
 
@@ -10929,6 +11148,30 @@ mod platform {
             )))
         }
 
+        pub(super) fn encode_expand_rank3_f32(
+            &mut self,
+            _input: &PlatformBuffer,
+            _input_dims: [usize; 3],
+            _output_dims: [usize; 3],
+            _output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        pub(super) fn encode_expand_rank4_f32(
+            &mut self,
+            _input: &PlatformBuffer,
+            _input_dims: [usize; 4],
+            _output_dims: [usize; 4],
+            _output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
         #[allow(clippy::too_many_arguments)]
         pub(super) fn encode_attention_decode_rope_cache(
             &mut self,
@@ -12026,6 +12269,64 @@ mod tests {
                     .ok_or("missing expected reduce_sum output")?
                     .as_f32_slice()
                     .ok_or("expected reduce_sum output is not f32")?,
+                1e-5,
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_bounded_expand_graphs_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let rank3_shape = Shape::new(vec![1, 1, 3]);
+        let rank4_shape = Shape::new(vec![1, 2, 1, 1]);
+        let rank3_values = vec![1.0_f32, 2.0, 3.0];
+        let rank4_values = vec![0.5_f32, 1.5];
+
+        let mut builder = GraphBuilder::new(selected.device.clone());
+        let rank3 = builder.input("rank3", rank3_shape.clone(), DType::F32);
+        let rank4 = builder.input("rank4", rank4_shape.clone(), DType::F32);
+        let expanded_rank3 = builder.expand(&rank3, Shape::new(vec![2, 4, 3]))?;
+        let expanded_rank4 = builder.expand(&rank4, Shape::new(vec![2, 2, 3, 4]))?;
+        let graph = builder.finish(vec![expanded_rank3.clone(), expanded_rank4.clone()]);
+
+        let inputs = std::collections::BTreeMap::from([
+            (
+                rank3.id(),
+                backend.input_buffer(rank3_shape, rank3_values.clone())?,
+            ),
+            (
+                rank4.id(),
+                backend.input_buffer(rank4_shape, rank4_values.clone())?,
+            ),
+        ]);
+        let result = backend.compile_and_execute(&graph, &inputs)?;
+        let expected = evaluate_graph(
+            &graph,
+            &std::collections::BTreeMap::from([
+                (rank3.id(), TensorData::F32(rank3_values)),
+                (rank4.id(), TensorData::F32(rank4_values)),
+            ]),
+        )?;
+
+        for tensor in [&expanded_rank3, &expanded_rank4] {
+            assert_close(
+                &result
+                    .outputs
+                    .get(&tensor.id())
+                    .ok_or("missing expand output")?
+                    .read_f32()?,
+                expected
+                    .get(&tensor.id())
+                    .ok_or("missing expected expand output")?
+                    .as_f32_slice()
+                    .ok_or("expected expand output is not f32")?,
                 1e-5,
             );
         }

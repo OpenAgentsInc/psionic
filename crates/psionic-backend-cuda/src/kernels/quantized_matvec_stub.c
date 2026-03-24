@@ -699,6 +699,56 @@ int psionic_cuda_reduce_sum_axis0_f32(
     return 1;
 }
 
+int psionic_cuda_expand_rank3_f32(
+    const void *input,
+    int input_dim0,
+    int input_dim1,
+    int input_dim2,
+    int output_dim0,
+    int output_dim1,
+    int output_dim2,
+    void *output,
+    void *stream
+) {
+    (void)input;
+    (void)input_dim0;
+    (void)input_dim1;
+    (void)input_dim2;
+    (void)output_dim0;
+    (void)output_dim1;
+    (void)output_dim2;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
+int psionic_cuda_expand_rank4_f32(
+    const void *input,
+    int input_dim0,
+    int input_dim1,
+    int input_dim2,
+    int input_dim3,
+    int output_dim0,
+    int output_dim1,
+    int output_dim2,
+    int output_dim3,
+    void *output,
+    void *stream
+) {
+    (void)input;
+    (void)input_dim0;
+    (void)input_dim1;
+    (void)input_dim2;
+    (void)input_dim3;
+    (void)output_dim0;
+    (void)output_dim1;
+    (void)output_dim2;
+    (void)output_dim3;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
 int psionic_cuda_attention_decode_rope_cache(
     const void *qkv,
     int query_offset,

@@ -1695,6 +1695,67 @@ __global__ void reduce_sum_axis0_f32_kernel(
     output[index] = sum;
 }
 
+__global__ void expand_rank3_f32_kernel(
+    const float *input,
+    int input_dim0,
+    int input_dim1,
+    int input_dim2,
+    int output_dim0,
+    int output_dim1,
+    int output_dim2,
+    float *output
+) {
+    const int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const int total = output_dim0 * output_dim1 * output_dim2;
+    if (index >= total) {
+        return;
+    }
+    int remaining = index;
+    const int i2 = remaining % output_dim2;
+    remaining /= output_dim2;
+    const int i1 = remaining % output_dim1;
+    const int i0 = remaining / output_dim1;
+    const int input_i0 = input_dim0 == 1 ? 0 : i0;
+    const int input_i1 = input_dim1 == 1 ? 0 : i1;
+    const int input_i2 = input_dim2 == 1 ? 0 : i2;
+    const int input_index = (input_i0 * input_dim1 + input_i1) * input_dim2 + input_i2;
+    output[index] = input[input_index];
+}
+
+__global__ void expand_rank4_f32_kernel(
+    const float *input,
+    int input_dim0,
+    int input_dim1,
+    int input_dim2,
+    int input_dim3,
+    int output_dim0,
+    int output_dim1,
+    int output_dim2,
+    int output_dim3,
+    float *output
+) {
+    const int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const int total = output_dim0 * output_dim1 * output_dim2 * output_dim3;
+    if (index >= total) {
+        return;
+    }
+    int remaining = index;
+    const int i3 = remaining % output_dim3;
+    remaining /= output_dim3;
+    const int i2 = remaining % output_dim2;
+    remaining /= output_dim2;
+    const int i1 = remaining % output_dim1;
+    remaining /= output_dim1;
+    const int i0 = remaining;
+    const int input_i0 = input_dim0 == 1 ? 0 : i0;
+    const int input_i1 = input_dim1 == 1 ? 0 : i1;
+    const int input_i2 = input_dim2 == 1 ? 0 : i2;
+    const int input_i3 = input_dim3 == 1 ? 0 : i3;
+    const int input_index =
+        ((input_i0 * input_dim1 + input_i1) * input_dim2 + input_i2) * input_dim3 + input_i3;
+    output[index] = input[input_index];
+}
+
 __device__ __forceinline__ float rope_neox_component(
     const float *values,
     int dim,
@@ -5160,6 +5221,72 @@ extern "C" int psionic_cuda_reduce_sum_axis0_f32(
         static_cast<const float *>(input),
         axis0_extent,
         row_width,
+        static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_expand_rank3_f32(
+    const void *input,
+    int input_dim0,
+    int input_dim1,
+    int input_dim2,
+    int output_dim0,
+    int output_dim1,
+    int output_dim2,
+    void *output,
+    void *stream
+) {
+    const int total = output_dim0 * output_dim1 * output_dim2;
+    const int blocks = (total + kBlockSize - 1) / kBlockSize;
+    expand_rank3_f32_kernel<<<
+        blocks,
+        kBlockSize,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const float *>(input),
+        input_dim0,
+        input_dim1,
+        input_dim2,
+        output_dim0,
+        output_dim1,
+        output_dim2,
+        static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_expand_rank4_f32(
+    const void *input,
+    int input_dim0,
+    int input_dim1,
+    int input_dim2,
+    int input_dim3,
+    int output_dim0,
+    int output_dim1,
+    int output_dim2,
+    int output_dim3,
+    void *output,
+    void *stream
+) {
+    const int total = output_dim0 * output_dim1 * output_dim2 * output_dim3;
+    const int blocks = (total + kBlockSize - 1) / kBlockSize;
+    expand_rank4_f32_kernel<<<
+        blocks,
+        kBlockSize,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const float *>(input),
+        input_dim0,
+        input_dim1,
+        input_dim2,
+        input_dim3,
+        output_dim0,
+        output_dim1,
+        output_dim2,
+        output_dim3,
         static_cast<float *>(output)
     );
     return static_cast<int>(cudaGetLastError());

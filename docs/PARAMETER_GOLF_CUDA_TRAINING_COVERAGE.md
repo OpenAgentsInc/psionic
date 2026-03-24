@@ -174,6 +174,10 @@ the same bounded public lane before the next H100 rerun:
   - full reduction
   - first-axis reduction
   - last-axis reduction
+- bounded CUDA kernels now also execute the dominant PGOLF contiguous `expand`
+  broadcasts directly on-device:
+  - rank-3 `[1, 1, model_dim] -> [batch, seq, model_dim]`
+  - rank-4 `[1, num_heads, 1, 1] -> [batch, num_heads, seq, head_dim]`
 - fresh local profiled permute and reduce-sum execution tests on the RTX 4080
   leave the fallback profile sink at `0` bytes, so those bounded shapes no
   longer touch the host-fallback surface at all
