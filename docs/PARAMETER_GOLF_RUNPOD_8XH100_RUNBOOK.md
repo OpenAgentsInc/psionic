@@ -69,7 +69,8 @@ The committed launcher is explicit about four separate operator phases:
   validate the workspace contract, bind the immutable PGOLF input descriptor,
   and stage the exported submission folder directly into the retained
   `records/track_non_record_16mb/<submission_id>` root that later execution
-  and finalization consume
+  and finalization consume, after first fast-forwarding the remote checkout to
+  the requested Git ref
 - execution entrypoint:
   run the exported folder under the public `WORLD_SIZE=8` posture while
   forcing the explicit exported-folder execution mode

@@ -34,7 +34,7 @@
         "python3",
         "nvidia-smi"
       ],
-      "pre_training_command": "mkdir -p \"$PGOLF_RUN_ROOT\" \"$(dirname \"$PGOLF_SUBMISSION_DIR\")\" && git fetch origin \"${PGOLF_BRANCH:-main}\" && git checkout \"${PGOLF_BRANCH:-main}\" && cargo run -q -p psionic-train --example parameter_golf_non_record_submission_bundle -- \"$PGOLF_SUBMISSION_DIR\"",
+      "pre_training_command": "mkdir -p \"$PGOLF_RUN_ROOT\" \"$(dirname \"$PGOLF_SUBMISSION_DIR\")\" && git fetch origin \"${PGOLF_BRANCH:-main}\" && git checkout \"${PGOLF_BRANCH:-main}\" && git pull --ff-only origin \"${PGOLF_BRANCH:-main}\" && cargo run -q -p psionic-train --example parameter_golf_non_record_submission_bundle -- \"$PGOLF_SUBMISSION_DIR\"",
       "execution_entrypoint_command": "cd \"$PGOLF_SUBMISSION_DIR\" && PSIONIC_PARAMETER_GOLF_EXECUTION_MODE=distributed_8xh100_train WORLD_SIZE=8 NCCL_DEBUG=WARN python3 train_gpt.py",
       "finalizer_command": "bash \"$PGOLF_REPO_DIR/scripts/parameter-golf-runpod-finalize-8xh100.sh\" --run-root \"$PGOLF_RUN_ROOT\" --submission-dir \"$PGOLF_SUBMISSION_DIR\" --output \"$PGOLF_RUN_ROOT/parameter_golf_runpod_8xh100_finalizer_report.json\"",
       "expected_receipt_paths": [
