@@ -4,6 +4,16 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/.." && pwd)"
+
+if ! command -v cargo >/dev/null 2>&1; then
+  if [[ -d "${HOME}/.cargo/bin" ]]; then
+    export PATH="${HOME}/.cargo/bin:${PATH}"
+  fi
+fi
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "error: cargo is required but was not found in PATH or \${HOME}/.cargo/bin" >&2
+  exit 1
+fi
 profile_id="runpod_8xh100_parameter_golf"
 trainer_lane_id="parameter_golf_distributed_8xh100"
 
