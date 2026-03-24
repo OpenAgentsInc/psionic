@@ -1,0 +1,13 @@
+{
+  "schema_version": "parameter_golf.runpod_cost_guardrails.v1",
+  "guardrail_id": "parameter-golf-runpod-8xh100-cost-v1",
+  "provider": "runpod",
+  "profile_id": "runpod_8xh100_parameter_golf",
+  "declared_run_cost_ceiling_usd": 500.0,
+  "max_runtime_hours": 4.0,
+  "policy": [
+    "Treat the first RunPod 8xH100 lane as a bounded evidence run rather than an open-ended tuning budget.",
+    "The operator lane must refuse weaker inventories or missing H100 topology rather than silently spending against a non-matching pod.",
+    "The declared cost ceiling is an operator guardrail for the first real exported-folder evidence bundle, not a price-optimality claim."
+  ]
+}

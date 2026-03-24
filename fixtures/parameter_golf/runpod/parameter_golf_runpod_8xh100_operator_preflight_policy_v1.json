@@ -1,0 +1,21 @@
+{
+  "schema_version": "parameter_golf.runpod_operator_preflight_policy.v1",
+  "policy_id": "parameter-golf-runpod-8xh100-operator-preflight-v1",
+  "provider": "runpod",
+  "required_commands": [
+    "bash",
+    "git",
+    "jq",
+    "python3"
+  ],
+  "required_local_artifacts": [
+    "fixtures/parameter_golf/runpod/parameter_golf_runpod_8xh100_launch_profiles_v1.json",
+    "fixtures/parameter_golf/runpod/parameter_golf_runpod_8xh100_cost_guardrails_v1.json",
+    "fixtures/parameter_golf/google/parameter_golf_google_input_package_descriptor_v1.json",
+    "scripts/parameter-golf-runpod-finalize-8xh100.sh"
+  ],
+  "supported_profiles": [
+    "runpod_8xh100_parameter_golf"
+  ],
+  "detail": "The Parameter Golf RunPod operator preflight validates the committed 8xH100 launch profile, local artifact authority, and the explicit WORLD_SIZE=8 or grad_accum_steps=1 contract before any real pod run is attempted."
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "parameter_golf.runpod_8xh100_operator_rehearsal.v1",
+  "runner": "scripts/check-parameter-golf-runpod-8xh100-lane.sh",
+  "profile_id": "runpod_8xh100_parameter_golf",
+  "trainer_lane_id": "parameter_golf_distributed_8xh100",
+  "preflight_result": "ready",
+  "accelerator_type": "nvidia-h100-80gb",
+  "accelerator_count": 8,
+  "world_size": 8,
+  "grad_accum_steps": 1,
+  "input_package_descriptor_uri": "gs://openagentsgemini-psion-train-us-central1/manifests/parameter_golf_google_input_package_v1.json",
+  "execution_entrypoint_command": "cd \"$PGOLF_SUBMISSION_DIR\" && WORLD_SIZE=8 NCCL_DEBUG=WARN python3 train_gpt.py",
+  "finalizer_command": "bash \"$PGOLF_REPO_DIR/scripts/parameter-golf-runpod-finalize-8xh100.sh\" --run-root \"$PGOLF_RUN_ROOT\" --submission-dir \"$PGOLF_SUBMISSION_DIR\" --output \"$PGOLF_RUN_ROOT/parameter_golf_runpod_8xh100_finalizer_report.json\"",
+  "manifest_only_launch_supported": true
+}

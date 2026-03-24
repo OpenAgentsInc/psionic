@@ -1,0 +1,48 @@
+{
+  "schema_version": "parameter_golf.runpod_launch_profiles.v1",
+  "launch_bundle_id": "parameter-golf-runpod-8xh100-launch-v1",
+  "provider": "runpod",
+  "lane_label": "parameter-golf",
+  "repo_clone_url": "https://github.com/OpenAgentsInc/psionic.git",
+  "default_branch": "codex/pgolf-google-1-single-h100",
+  "workspace_root": "/workspace",
+  "default_input_package_descriptor_uri": "gs://openagentsgemini-psion-train-us-central1/manifests/parameter_golf_google_input_package_v1.json",
+  "default_input_package_descriptor_artifact_ref": "fixtures/parameter_golf/google/parameter_golf_google_input_package_descriptor_v1.json",
+  "profiles": [
+    {
+      "profile_id": "runpod_8xh100_parameter_golf",
+      "profile_label": "runpod-8xh100-parameter-golf",
+      "trainer_lane_id": "parameter_golf_distributed_8xh100",
+      "expected_execution_backend": "cuda",
+      "pod_shape": "single_runpod_pod_with_exactly_8_non_mig_h100_devices",
+      "runtime_image_posture": "user_provided_cuda_capable_ubuntu_image",
+      "workspace_mount_posture": "persistent_workspace_rooted_at_/workspace",
+      "accelerator_type": "nvidia-h100-80gb",
+      "accelerator_name_substrings": [
+        "H100"
+      ],
+      "accelerator_count": 8,
+      "require_non_mig": true,
+      "world_size": 8,
+      "grad_accum_steps": 1,
+      "declared_run_cost_ceiling_usd": 500.0,
+      "max_runtime_hours": 4.0,
+      "expected_remote_commands": [
+        "bash",
+        "git",
+        "cargo",
+        "python3",
+        "nvidia-smi"
+      ],
+      "pre_training_command": "mkdir -p \"$PGOLF_RUN_ROOT\" \"$PGOLF_RUN_ROOT/exported_submission\" && git fetch origin \"${PGOLF_BRANCH:-codex/pgolf-google-1-single-h100}\" && git checkout \"${PGOLF_BRANCH:-codex/pgolf-google-1-single-h100}\" && cargo run -q -p psionic-train --example parameter_golf_non_record_submission_bundle -- \"$PGOLF_RUN_ROOT/exported_submission\"",
+      "execution_entrypoint_command": "cd \"$PGOLF_SUBMISSION_DIR\" && WORLD_SIZE=8 NCCL_DEBUG=WARN python3 train_gpt.py",
+      "finalizer_command": "bash \"$PGOLF_REPO_DIR/scripts/parameter-golf-runpod-finalize-8xh100.sh\" --run-root \"$PGOLF_RUN_ROOT\" --submission-dir \"$PGOLF_SUBMISSION_DIR\" --output \"$PGOLF_RUN_ROOT/parameter_golf_runpod_8xh100_finalizer_report.json\"",
+      "expected_receipt_paths": [
+        "$PGOLF_RUN_ROOT/nvidia_smi_inventory.txt",
+        "$PGOLF_RUN_ROOT/nvidia_smi_topology.txt",
+        "$PGOLF_RUN_ROOT/parameter_golf_runpod_8xh100_finalizer_report.json",
+        "$PGOLF_RUN_ROOT/exported_submission/records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/psionic_parameter_golf_submission_run_evidence.json"
+      ]
+    }
+  ]
+}
