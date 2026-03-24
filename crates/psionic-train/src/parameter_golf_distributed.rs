@@ -8,6 +8,8 @@ use psionic_eval::{
     ParameterGolfDistributedLaneRefusal, ParameterGolfDistributedLaneRefusalKind,
     ParameterGolfDistributedMemoryReceipt, ParameterGolfDistributedThroughputReceipt,
     ParameterGolfDistributedTimingReceipt, ParameterGolfDistributedTopologyReceipt,
+    ParameterGolfDistributedValidationAggregationReceipt,
+    ParameterGolfDistributedValidationShardReceipt,
     PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF, PARAMETER_GOLF_DISTRIBUTED_8XH100_BENCHMARK_REF,
     PARAMETER_GOLF_DISTRIBUTED_8XH100_CLAIM_BOUNDARY,
 };
@@ -94,8 +96,27 @@ pub struct ParameterGolfDistributedMemoryObservation {
     pub source: String,
 }
 
+/// One observed rank-local validation shard for the distributed receipt lane.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfDistributedValidationShardObservation {
+    /// Zero-based rank identifier.
+    pub rank: usize,
+    /// Zero-based global validation-sequence offset owned by this rank.
+    pub sequence_start: u64,
+    /// Number of validation sequences owned by this rank.
+    pub sequence_count: u64,
+    /// Rank-local summed loss over the shard.
+    pub loss_sum: f64,
+    /// Rank-local evaluated token count.
+    pub token_count: u64,
+    /// Rank-local evaluated byte count.
+    pub byte_count: u64,
+    /// Rank-local observed validation wallclock.
+    pub observed_ms: u64,
+}
+
 /// Config for the distributed `8xH100` Parameter Golf receipt lane.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfDistributed8xH100Config {
     /// Stable run identifier.
     pub run_id: String,
@@ -113,6 +134,13 @@ pub struct ParameterGolfDistributed8xH100Config {
     pub memory_observation: Option<ParameterGolfDistributedMemoryObservation>,
     /// Observed validation duration.
     pub validation_observed_ms: u64,
+    /// Total validation sequence count across all ranks when distributed
+    /// validation sharding facts are available.
+    #[serde(default)]
+    pub validation_total_sequence_count: u64,
+    /// Ordered rank-local validation shard observations.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub validation_shard_observations: Vec<ParameterGolfDistributedValidationShardObservation>,
     /// Observed export or roundtrip duration.
     pub export_observed_ms: u64,
 }
@@ -129,6 +157,8 @@ impl ParameterGolfDistributed8xH100Config {
             step_observations: Vec::new(),
             memory_observation: None,
             validation_observed_ms: 0,
+            validation_total_sequence_count: 0,
+            validation_shard_observations: Vec::new(),
             export_observed_ms: 0,
         }
     }
@@ -164,13 +194,57 @@ impl ParameterGolfDistributed8xH100Config {
                 });
             }
         }
+        if !self.validation_shard_observations.is_empty() {
+            if self.validation_total_sequence_count == 0 {
+                return Err(ParameterGolfDistributedLaneError::InvalidConfig {
+                    message: String::from(
+                        "validation_total_sequence_count must be positive when distributed validation shard observations are supplied",
+                    ),
+                });
+            }
+            let shard_plan = build_validation_shard_plan(
+                self.validation_total_sequence_count,
+                self.geometry.world_size,
+            )?;
+            if self.validation_shard_observations.len() != shard_plan.len() {
+                return Err(ParameterGolfDistributedLaneError::InvalidConfig {
+                    message: format!(
+                        "distributed validation shard observations must cover exactly {} ranks, found {}",
+                        shard_plan.len(),
+                        self.validation_shard_observations.len()
+                    ),
+                });
+            }
+            for (expected, observed) in shard_plan
+                .iter()
+                .zip(self.validation_shard_observations.iter())
+            {
+                if observed.rank != expected.rank
+                    || observed.sequence_start != expected.sequence_start
+                    || observed.sequence_count != expected.sequence_count
+                {
+                    return Err(ParameterGolfDistributedLaneError::InvalidConfig {
+                        message: format!(
+                            "validation shard observation for rank {} does not match the expected shard layout start={} count={}",
+                            observed.rank, expected.sequence_start, expected.sequence_count
+                        ),
+                    });
+                }
+            }
+        } else if self.validation_total_sequence_count != 0 {
+            return Err(ParameterGolfDistributedLaneError::InvalidConfig {
+                message: String::from(
+                    "validation_total_sequence_count cannot be set without distributed validation shard observations",
+                ),
+            });
+        }
         Ok(())
     }
 }
 
 /// Minimal operator-collected measurements that can be lifted from one RunPod
 /// `8xH100` run root into the typed distributed receipt lane.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfRunPod8xH100Measurements {
     /// Stable schema version.
     pub schema_version: String,
@@ -186,6 +260,13 @@ pub struct ParameterGolfRunPod8xH100Measurements {
     pub step_observations: Vec<ParameterGolfDistributedStepObservation>,
     /// Observed distributed validation duration.
     pub validation_observed_ms: u64,
+    /// Total validation sequence count across all ranks when distributed
+    /// validation sharding facts are available.
+    #[serde(default)]
+    pub validation_total_sequence_count: u64,
+    /// Ordered rank-local validation shard observations.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub validation_shard_observations: Vec<ParameterGolfDistributedValidationShardObservation>,
     /// Observed distributed export or roundtrip duration.
     pub export_observed_ms: u64,
     /// Observed runtime memory posture when available.
@@ -203,6 +284,8 @@ impl ParameterGolfRunPod8xH100Measurements {
             mesh_id: None,
             step_observations: Vec::new(),
             validation_observed_ms: 0,
+            validation_total_sequence_count: 0,
+            validation_shard_observations: Vec::new(),
             export_observed_ms: 0,
             memory_observation: None,
         }
@@ -216,6 +299,8 @@ impl ParameterGolfRunPod8xH100Measurements {
             .unwrap_or_else(|| String::from("mesh.parameter_golf.runpod_8xh100"));
         config.step_observations = self.step_observations;
         config.validation_observed_ms = self.validation_observed_ms;
+        config.validation_total_sequence_count = self.validation_total_sequence_count;
+        config.validation_shard_observations = self.validation_shard_observations;
         config.export_observed_ms = self.export_observed_ms;
         config.memory_observation = self.memory_observation;
         config
@@ -425,6 +510,7 @@ pub fn benchmark_parameter_golf_distributed_8xh100(
         muon_update_payload_bytes,
         validation_payload_bytes,
     )?;
+    let validation_aggregation = build_validation_aggregation_receipt(config)?;
     let memory = build_memory_receipt(
         descriptor,
         hyperparameters,
@@ -446,6 +532,17 @@ pub fn benchmark_parameter_golf_distributed_8xh100(
     } else {
         boundary_notes.push(String::from(
             "The memory receipt is an analytic upper bound over the distributed optimizer contract; it is not a direct CUDA allocator trace.",
+        ));
+    }
+    if let Some(validation_aggregation) = validation_aggregation.as_ref() {
+        boundary_notes.push(format!(
+            "Distributed validation now preserves {} rank-local shard receipts over {} total sequences, aggregates loss_sum/token_count/byte_count across the full mesh, and reports one honest validation wallclock as the slowest participating rank.",
+            validation_aggregation.shards.len(),
+            validation_aggregation.total_sequence_count,
+        ));
+    } else {
+        boundary_notes.push(String::from(
+            "The distributed receipt still lacks typed rank-local validation shard observations, so validation sharding and aggregation remain narrative rather than execution-backed.",
         ));
     }
 
@@ -512,6 +609,7 @@ pub fn benchmark_parameter_golf_distributed_8xh100(
             ParameterGolfDistributedLaneDisposition::Measured
         },
         timing,
+        validation_aggregation,
         memory: Some(memory),
         refusal,
         boundary_notes,
@@ -1143,6 +1241,104 @@ fn build_timing_receipt(
     })
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ValidationShardPlan {
+    rank: usize,
+    sequence_start: u64,
+    sequence_count: u64,
+}
+
+fn build_validation_shard_plan(
+    total_sequence_count: u64,
+    world_size: usize,
+) -> Result<Vec<ValidationShardPlan>, ParameterGolfDistributedLaneError> {
+    if world_size == 0 {
+        return Err(ParameterGolfDistributedLaneError::InvalidConfig {
+            message: String::from("distributed validation requires world_size > 0"),
+        });
+    }
+    let world_size_u64 = world_size as u64;
+    let base = total_sequence_count / world_size_u64;
+    let remainder = total_sequence_count % world_size_u64;
+    let mut sequence_start = 0_u64;
+    let mut plan = Vec::with_capacity(world_size);
+    for rank in 0..world_size {
+        let sequence_count = base + u64::from((rank as u64) < remainder);
+        plan.push(ValidationShardPlan {
+            rank,
+            sequence_start,
+            sequence_count,
+        });
+        sequence_start = sequence_start.saturating_add(sequence_count);
+    }
+    Ok(plan)
+}
+
+fn build_validation_aggregation_receipt(
+    config: &ParameterGolfDistributed8xH100Config,
+) -> Result<Option<ParameterGolfDistributedValidationAggregationReceipt>, ParameterGolfDistributedLaneError> {
+    if config.validation_shard_observations.is_empty() {
+        return Ok(None);
+    }
+    let shard_plan =
+        build_validation_shard_plan(config.validation_total_sequence_count, config.geometry.world_size)?;
+    let local_batch_sequences = config.geometry.local_validation_batch_sequences() as u64;
+    let mut aggregated_loss_sum = 0.0_f64;
+    let mut aggregated_token_count = 0_u64;
+    let mut aggregated_byte_count = 0_u64;
+    let mut observed_ms = 0_u64;
+    let mut shards = Vec::with_capacity(config.validation_shard_observations.len());
+
+    for (expected, observed) in shard_plan
+        .iter()
+        .zip(config.validation_shard_observations.iter())
+    {
+        if observed.rank != expected.rank
+            || observed.sequence_start != expected.sequence_start
+            || observed.sequence_count != expected.sequence_count
+        {
+            return Err(ParameterGolfDistributedLaneError::InvalidConfig {
+                message: format!(
+                    "validation shard observation for rank {} does not match the expected shard layout start={} count={}",
+                    observed.rank, expected.sequence_start, expected.sequence_count
+                ),
+            });
+        }
+        aggregated_loss_sum += observed.loss_sum;
+        aggregated_token_count = aggregated_token_count.saturating_add(observed.token_count);
+        aggregated_byte_count = aggregated_byte_count.saturating_add(observed.byte_count);
+        observed_ms = observed_ms.max(observed.observed_ms);
+        shards.push(ParameterGolfDistributedValidationShardReceipt {
+            rank: observed.rank,
+            sequence_start: observed.sequence_start,
+            sequence_count: observed.sequence_count,
+            local_batch_sequences,
+            loss_sum: observed.loss_sum,
+            token_count: observed.token_count,
+            byte_count: observed.byte_count,
+            observed_ms: observed.observed_ms,
+        });
+    }
+
+    let mean_loss = aggregated_loss_sum / aggregated_token_count.max(1) as f64;
+    let bits_per_byte = (mean_loss / std::f64::consts::LN_2)
+        * (aggregated_token_count as f64 / aggregated_byte_count.max(1) as f64);
+
+    Ok(Some(ParameterGolfDistributedValidationAggregationReceipt {
+        measurement_posture: String::from("rank_local_validation_shards_plus_metric_all_reduce"),
+        world_size: config.geometry.world_size,
+        total_sequence_count: config.validation_total_sequence_count,
+        local_batch_sequences,
+        aggregated_loss_sum,
+        aggregated_token_count,
+        aggregated_byte_count,
+        mean_loss,
+        bits_per_byte,
+        observed_ms,
+        shards,
+    }))
+}
+
 fn stable_digest<T>(prefix: &[u8], value: &T) -> String
 where
     T: Serialize,
@@ -1194,6 +1390,7 @@ mod tests {
         parse_parameter_golf_runpod_8xh100_inventory, ParameterGolfBatchGeometry,
         ParameterGolfDistributed8xH100Config, ParameterGolfDistributedLaneError,
         ParameterGolfDistributedMemoryObservation, ParameterGolfDistributedStepObservation,
+        ParameterGolfDistributedValidationShardObservation,
         ParameterGolfRunPod8xH100Measurements, ParameterGolfTrainingHyperparameters,
         PARAMETER_GOLF_DISTRIBUTED_8XH100_VERSION,
         PARAMETER_GOLF_RUNPOD_8XH100_MEASUREMENTS_VERSION,
@@ -1306,6 +1503,18 @@ mod tests {
         ];
         config.memory_observation = None;
         config.validation_observed_ms = 10;
+        config.validation_total_sequence_count = 32;
+        config.validation_shard_observations = (0..8)
+            .map(|rank| ParameterGolfDistributedValidationShardObservation {
+                rank,
+                sequence_start: (rank * 4) as u64,
+                sequence_count: 4,
+                loss_sum: 8.0 + rank as f64,
+                token_count: 16,
+                byte_count: 12,
+                observed_ms: 9 + rank as u64,
+            })
+            .collect();
         config.export_observed_ms = 5;
         config
     }
@@ -1353,6 +1562,16 @@ mod tests {
             .timing
             .as_ref()
             .is_some_and(|timing| timing.within_wallclock_cap));
+        let validation = receipt
+            .validation_aggregation
+            .as_ref()
+            .expect("validation aggregation should be present");
+        assert_eq!(validation.world_size, 8);
+        assert_eq!(validation.total_sequence_count, 32);
+        assert_eq!(validation.local_batch_sequences, 4);
+        assert_eq!(validation.shards.len(), 8);
+        assert_eq!(validation.shards[0].sequence_start, 0);
+        assert_eq!(validation.shards[7].sequence_start, 28);
         assert!(receipt
             .memory
             .as_ref()
@@ -1499,6 +1718,28 @@ mod tests {
     }
 
     #[test]
+    fn parameter_golf_distributed_8xh100_lane_rejects_invalid_validation_shard_layout(
+    ) -> Result<(), Box<dyn Error>> {
+        let model = sample_model()?;
+        let devices = (0..8).map(sample_h100_device).collect::<Vec<_>>();
+        let mut config = measured_config();
+        config.validation_shard_observations[0].sequence_count = 5;
+        let error = benchmark_parameter_golf_distributed_8xh100(
+            model.descriptor(),
+            &ParameterGolfTrainingHyperparameters::baseline_defaults(),
+            devices.as_slice(),
+            &capability_profile(),
+            &config,
+        )
+        .expect_err("invalid validation shard layout should be rejected");
+        assert!(matches!(
+            error,
+            ParameterGolfDistributedLaneError::InvalidConfig { .. }
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn runpod_8xh100_inventory_parser_builds_cuda_h100_devices() -> Result<(), Box<dyn Error>> {
         let inventory = "\
 0, NVIDIA H100 80GB HBM3, 81443 MiB, 1024 MiB, 99 %\n\
@@ -1542,6 +1783,18 @@ mod tests {
             ParameterGolfDistributedStepObservation::new(2, 40, 80, 128),
         ];
         measurements.validation_observed_ms = 10;
+        measurements.validation_total_sequence_count = 32;
+        measurements.validation_shard_observations = (0..8)
+            .map(|rank| ParameterGolfDistributedValidationShardObservation {
+                rank,
+                sequence_start: (rank * 4) as u64,
+                sequence_count: 4,
+                loss_sum: 8.0 + rank as f64,
+                token_count: 16,
+                byte_count: 12,
+                observed_ms: 9 + rank as u64,
+            })
+            .collect();
         measurements.export_observed_ms = 5;
         measurements.memory_observation = Some(ParameterGolfDistributedMemoryObservation {
             peak_device_bytes_per_worker: 70 * 1024 * 1024 * 1024,
@@ -1565,6 +1818,7 @@ mod tests {
             receipt.topology.selected_device_names[0],
             "NVIDIA H100 80GB HBM3"
         );
+        assert!(receipt.validation_aggregation.is_some());
         assert!(receipt
             .memory
             .as_ref()
@@ -1605,6 +1859,8 @@ final_int8_zlib_roundtrip val_loss:7.8000 val_bpb:1.2100 eval_time:1530ms\n";
             ParameterGolfDistributedStepObservation::new(3, 110, 170, 524_288)
         );
         assert_eq!(measurements.validation_observed_ms, 35);
+        assert_eq!(measurements.validation_total_sequence_count, 0);
+        assert!(measurements.validation_shard_observations.is_empty());
         assert_eq!(measurements.export_observed_ms, 1_530);
         assert_eq!(
             measurements

@@ -806,6 +806,7 @@ mod tests {
                 wallclock_cap_ms: 600_000,
                 within_wallclock_cap: true,
             }),
+            validation_aggregation: None,
             memory: None,
             refusal: None,
             boundary_notes: vec![String::from("boundary")],

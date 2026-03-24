@@ -52,6 +52,10 @@ Psionic now encodes that exact posture explicitly instead of treating
   RunPod `execution.log` can be lifted directly into
   `parameter_golf_distributed_8xh100_measurements.json` before the typed
   receipt builder runs
+- `psionic-train` now also ships typed distributed validation shard inputs via
+  `ParameterGolfDistributedValidationShardObservation`, and the receipt now
+  preserves a typed `validation_aggregation` section when rank-local shard
+  facts are available
 - `psionic-eval` now exposes
   `ParameterGolfDistributedThroughputReceipt` plus the supporting topology,
   communication, timing, memory, threshold, and refusal types
@@ -98,6 +102,8 @@ The lane now preserves:
 
 - observed per-step timings
 - observed validation duration
+- optional typed rank-local validation shard receipts plus aggregated
+  `loss_sum`, `token_count`, and `byte_count`
 - observed export or roundtrip duration
 - total wallclock versus the declared challenge cap
 - either:
@@ -112,6 +118,15 @@ which parts remain analytic:
 - runtime peaks can now be observed directly
 - logical parameter, gradient, optimizer-state, master-weight, and activation
   accounting still come from the distributed optimizer contract
+
+When the runtime preserves rank-local validation shard facts, the receipt now
+also records:
+
+- one contiguous shard layout across the full validation sequence space
+- per-rank `sequence_start`, `sequence_count`, `loss_sum`, `token_count`,
+  `byte_count`, and `observed_ms`
+- one aggregated `mean_loss` and `bits_per_byte`
+- one honest distributed validation wallclock as the slowest participating rank
 
 You can now build one distributed receipt directly from JSON-collected runtime
 facts:

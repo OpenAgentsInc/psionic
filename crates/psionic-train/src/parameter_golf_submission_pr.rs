@@ -1256,6 +1256,7 @@ fn build_exported_submission_distributed_receipt(
         challenge_kernel_blockers: coverage_report.challenge_kernel_blockers().to_vec(),
         disposition: ParameterGolfDistributedLaneDisposition::Refused,
         timing: None,
+        validation_aggregation: None,
         memory: None,
         refusal: Some(ParameterGolfDistributedLaneRefusal {
             refusal_kind,

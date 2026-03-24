@@ -148,6 +148,54 @@ pub struct ParameterGolfDistributedTimingReceipt {
     pub within_wallclock_cap: bool,
 }
 
+/// One rank-local validation shard in the distributed Parameter Golf lane.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfDistributedValidationShardReceipt {
+    /// Zero-based rank identifier.
+    pub rank: usize,
+    /// Zero-based global validation-sequence offset owned by this rank.
+    pub sequence_start: u64,
+    /// Number of validation sequences owned by this rank.
+    pub sequence_count: u64,
+    /// Expected local batch size in sequences for this rank.
+    pub local_batch_sequences: u64,
+    /// Rank-local summed loss over the shard.
+    pub loss_sum: f64,
+    /// Rank-local evaluated token count.
+    pub token_count: u64,
+    /// Rank-local evaluated byte count.
+    pub byte_count: u64,
+    /// Rank-local observed validation wallclock.
+    pub observed_ms: u64,
+}
+
+/// Aggregated distributed validation facts for one Parameter Golf lane.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfDistributedValidationAggregationReceipt {
+    /// Stable description of how the validation facts were collected.
+    pub measurement_posture: String,
+    /// World size used by the distributed validation lane.
+    pub world_size: usize,
+    /// Total validation sequence count across all ranks.
+    pub total_sequence_count: u64,
+    /// Expected local batch size in sequences for each rank.
+    pub local_batch_sequences: u64,
+    /// Aggregated loss sum reduced across ranks.
+    pub aggregated_loss_sum: f64,
+    /// Aggregated evaluated token count reduced across ranks.
+    pub aggregated_token_count: u64,
+    /// Aggregated evaluated byte count reduced across ranks.
+    pub aggregated_byte_count: u64,
+    /// Final aggregated validation mean loss.
+    pub mean_loss: f64,
+    /// Final aggregated validation bits-per-byte.
+    pub bits_per_byte: f64,
+    /// Honest end-to-end validation wallclock for the lane.
+    pub observed_ms: u64,
+    /// Ordered rank-local shard receipts.
+    pub shards: Vec<ParameterGolfDistributedValidationShardReceipt>,
+}
+
 /// Memory facts for one distributed Parameter Golf lane.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ParameterGolfDistributedMemoryReceipt {
@@ -221,6 +269,9 @@ pub struct ParameterGolfDistributedThroughputReceipt {
     /// Timing facts when they exist.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timing: Option<ParameterGolfDistributedTimingReceipt>,
+    /// Distributed validation shard and aggregation facts when they exist.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validation_aggregation: Option<ParameterGolfDistributedValidationAggregationReceipt>,
     /// Memory facts when they exist.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memory: Option<ParameterGolfDistributedMemoryReceipt>,
@@ -298,6 +349,8 @@ mod tests {
         ParameterGolfDistributedCommunicationStageReceipt, ParameterGolfDistributedLaneDisposition,
         ParameterGolfDistributedMemoryReceipt, ParameterGolfDistributedThroughputReceipt,
         ParameterGolfDistributedTimingReceipt, ParameterGolfDistributedTopologyReceipt,
+        ParameterGolfDistributedValidationAggregationReceipt,
+        ParameterGolfDistributedValidationShardReceipt,
         PARAMETER_GOLF_DISTRIBUTED_8XH100_BENCHMARK_REF,
         PARAMETER_GOLF_DISTRIBUTED_8XH100_CLAIM_BOUNDARY,
     };
@@ -367,6 +420,42 @@ mod tests {
                 train_tokens_per_second: 1_872_457,
                 wallclock_cap_ms: 600_000,
                 within_wallclock_cap: true,
+            }),
+            validation_aggregation: Some(ParameterGolfDistributedValidationAggregationReceipt {
+                measurement_posture: String::from(
+                    "rank_local_validation_shards_plus_metric_all_reduce",
+                ),
+                world_size: 8,
+                total_sequence_count: 512,
+                local_batch_sequences: 64,
+                aggregated_loss_sum: 96.0,
+                aggregated_token_count: 131_072,
+                aggregated_byte_count: 104_857,
+                mean_loss: 96.0 / 131_072.0,
+                bits_per_byte: 1.271828,
+                observed_ms: 20,
+                shards: vec![
+                    ParameterGolfDistributedValidationShardReceipt {
+                        rank: 0,
+                        sequence_start: 0,
+                        sequence_count: 64,
+                        local_batch_sequences: 64,
+                        loss_sum: 12.0,
+                        token_count: 16_384,
+                        byte_count: 13_107,
+                        observed_ms: 19,
+                    },
+                    ParameterGolfDistributedValidationShardReceipt {
+                        rank: 1,
+                        sequence_start: 64,
+                        sequence_count: 64,
+                        local_batch_sequences: 64,
+                        loss_sum: 12.0,
+                        token_count: 16_384,
+                        byte_count: 13_107,
+                        observed_ms: 20,
+                    },
+                ],
             }),
             memory: Some(ParameterGolfDistributedMemoryReceipt {
                 measurement_posture: String::from("analytic_optimizer_contract_upper_bound"),
