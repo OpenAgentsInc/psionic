@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "contract_id": "swarm.local_open_adapter_contract.v1",
+  "scope_window": "swarm_local_open_adapter_contract_v1",
+  "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+  "cluster_namespace": "cluster.swarm.local.trusted_lan",
+  "cluster_admission_posture": "trusted_lan.shared_secret",
+  "dataset": {
+    "dataset_key": {
+      "dataset_ref": "dataset://openagents/swarm/open_adapter_sft",
+      "version": "2026.03.24"
+    },
+    "tokenizer": {
+      "family": "byte_pair_encoding",
+      "tokenizer_digest": "swarm-open-adapter-tokenizer-v1",
+      "vocab_size": 32,
+      "special_tokens_digest": "swarm-open-adapter-specials-v1",
+      "template_digest": "swarm-open-adapter-template-v1"
+    },
+    "dataset_storage_key": "dataset://openagents/swarm/open_adapter_sft@2026.03.24",
+    "splits": [
+      {
+        "split_name": "train",
+        "split_kind": "train",
+        "sample_ids": [
+          "swarm-train-001",
+          "swarm-train-002",
+          "swarm-train-003",
+          "swarm-train-004"
+        ],
+        "split_digest": "4379279765e0423aabda33ca972eb8cf5812ca2325014637e628c404c2cb7ba9"
+      },
+      {
+        "split_name": "validation",
+        "split_kind": "validation",
+        "sample_ids": [
+          "swarm-val-001",
+          "swarm-val-002"
+        ],
+        "split_digest": "6bca19609471fff4b31d86d6fd7bf3cac4182e945532130300eef82fc9eb99a0"
+      }
+    ],
+    "dataset_manifest_digest": "82b74a2b1cb7d53ecb1da68c12b3ce990937c29d28c54aa1ba7053ae0892884c"
+  },
+  "adapter_family": "gpt_oss.decoder_lm_head_lora",
+  "adapter_format": "safetensors",
+  "node_roles": [
+    {
+      "role_id": "swarm.mac.mlx.coordinator_validator_contributor",
+      "role_kind": "mac_coordinator_validator_contributor",
+      "platform": "macos_apple_silicon",
+      "backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+      "contributor_eligible": true,
+      "validator_eligible": true,
+      "aggregation_eligible": true,
+      "minimum_free_memory_bytes": 12884901888,
+      "notes": [
+        "The Mac node owns the MLX-backed Metal contributor role plus validator and aggregation duties for the first swarm lane.",
+        "This node may publish only a local snapshot when the validator accepts both contributors and replay receipts stay intact."
+      ]
+    },
+    {
+      "role_id": "swarm.linux.cuda.rtx4080.contributor",
+      "role_kind": "linux_cuda_contributor",
+      "platform": "linux_nvidia_rtx_4080",
+      "backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+      "contributor_eligible": true,
+      "validator_eligible": false,
+      "aggregation_eligible": false,
+      "minimum_free_memory_bytes": 10737418240,
+      "notes": [
+        "The Linux desktop node contributes one CUDA adapter delta on display-attached RTX 4080 hardware.",
+        "This node is not treated as validator or aggregation authority in the first swarm lane."
+      ]
+    }
+  ],
+  "governance": {
+    "validator_policy_id": "validator.open_adapter.reference",
+    "aggregation_policy_id": "aggregation.open_adapter.mean_delta",
+    "replay_policy_id": "replay.open_adapter.strict",
+    "promotion_posture": "local_snapshot_only",
+    "publish_posture": "no_served_promotion",
+    "replay_required_per_contribution": true,
+    "require_all_contributor_roles": true
+  },
+  "non_goals": [
+    "full-model mixed-backend all-reduce or FSDP training",
+    "Apple FM package promotion",
+    "a second trainer architecture outside psionic-train",
+    "implicit publication to serving without validator and replay proof"
+  ],
+  "claim_boundary": "This contract freezes one bounded decentralized open-adapter delta lane across one Mac MLX Metal contributor and one Linux RTX 4080 CUDA contributor under trusted-LAN admission, explicit validator and replay gates, and local-snapshot-only publication posture. It does not claim one coherent mixed-backend full-model optimizer, full-model gradient exchange, or automatic served promotion.",
+  "contract_digest": "203e652752f0cfc350b59d3ad9d3c17ae65b6012106c5ebbd9191ba44aaa39f0"
+}

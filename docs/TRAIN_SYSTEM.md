@@ -58,6 +58,13 @@ fixtures under `fixtures/training_visualization/`. Autopilot consumes that
 truth through its own cache, projection, and pane code instead of moving
 renderer semantics into this repo.
 
+The first local mixed-hardware swarm lane now also has a canonical machine-
+legible contract in `crates/psionic-train/src/swarm_open_adapter.rs` plus the
+committed fixture `fixtures/swarm/first_swarm_run_contract_v1.json`. That
+contract freezes the first Mac MLX Metal plus Linux RTX 4080 CUDA lane as one
+decentralized open-adapter delta program with explicit validator, replay,
+local-snapshot-only publication, and no-full-model-overclaim posture.
+
 Apple-specific adapter work is no longer only later-family planning. The repo
 now owns a canonical spec-and-fixture baseline for it in:
 
