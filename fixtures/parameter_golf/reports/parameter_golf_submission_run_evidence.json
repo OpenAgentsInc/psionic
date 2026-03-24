@@ -66,8 +66,8 @@
   },
   "entrypoint": {
     "relative_path": "train_gpt.py",
-    "size_bytes": 390,
-    "sha256_digest": "018c98cebca044ae72c38eed3799b60de46926dff4f6c787d92d2d366562bd39"
+    "size_bytes": 2066,
+    "sha256_digest": "44f151617a77e464691d684fed014ee7170625cfbb908317573bf5d4a98271d1"
   },
   "runtime_payload": {
     "relative_path": "runtime/parameter_golf_submission_runtime",
@@ -76,8 +76,8 @@
   },
   "runtime_manifest": {
     "relative_path": "runtime/parameter_golf_submission_runtime.json",
-    "size_bytes": 1428,
-    "sha256_digest": "66c8d3ec51a45d0b79773c0eeb2e7dd7e3b79159570245003cea6aff4c6c3130"
+    "size_bytes": 2729,
+    "sha256_digest": "8e5e6ea1166ee598ba3a0bca8da0e99400004472c0afc20c2fd4be01f34380f6"
   },
   "train_log": {
     "relative_path": "train.log",
@@ -91,8 +91,8 @@
   },
   "accounting_receipt": {
     "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_accounting.json",
-    "size_bytes": 1991,
-    "sha256_digest": "9177d05a5f80bbd8231c873d3eaa3b341375aaa060fd33c9ea398e51173ab8a4"
+    "size_bytes": 2125,
+    "sha256_digest": "8ee45093b9f0bbce9605b030187705366fd68f3ffb9f24163a63706de6b08423"
   },
   "benchmark_receipt": {
     "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_challenge_benchmark_receipt.json",
@@ -106,8 +106,8 @@
   },
   "runtime_receipt": {
     "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_runtime_receipt.json",
-    "size_bytes": 1419,
-    "sha256_digest": "9ade0e84447db43aab97480ff102dba82eb22114bcf6d1364cfecb6b25c66943"
+    "size_bytes": 1548,
+    "sha256_digest": "326605729147de645539e3ac15cbfeaf771eaec9cb1aa3588b6a7c1677cb6f06"
   },
   "entrypoint_dry_run_command": [
     "python3",
@@ -382,5 +382,5 @@
     "receipt_digest": "5e019c3a263a0e3adf0f09d1050c59dfbf4e0ad7c8270af7e664aad7faded21b"
   },
   "claim_boundary": "This report binds the exact exported submission folder to one real folder-local entrypoint replay, the preserved bounded wallclock/memory/artifact receipts, and one measured-or-refused 8xH100 challenge receipt. The committed evidence is still a local review-host refusal rather than true 8xH100 success.",
-  "report_digest": "0d1fe2a5ce5574e23a67870865ba03c1287a4f51cc499194294b1ac71827fdbb"
+  "report_digest": "f65656fd3747ab65da841b42cfc9aa7433416ee6680b99f000b3ca4ab622f23f"
 }

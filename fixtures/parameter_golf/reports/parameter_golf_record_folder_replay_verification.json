@@ -25,25 +25,25 @@
   "submission_manifest_wallclock_seconds": 25.779,
   "benchmark_training_wallclock_seconds": 25.779,
   "submission_manifest_bytes": {
-    "total_bytes": 956676,
-    "code_bytes": 877718,
+    "total_bytes": 4494208,
+    "code_bytes": 4415250,
     "model_bytes": 78958
   },
   "accounting_receipt_bytes": {
-    "total_bytes": 956676,
-    "code_bytes": 877718,
+    "total_bytes": 4494208,
+    "code_bytes": 4415250,
     "model_bytes": 78958
   },
   "actual_shipped_bytes": {
-    "total_bytes": 956676,
-    "code_bytes": 877718,
+    "total_bytes": 4494208,
+    "code_bytes": 4415250,
     "model_bytes": 78958
   },
   "accounting_component_verifications": [
     {
       "component_id": "entrypoint_code_bytes",
-      "declared_size_bytes": 390,
-      "actual_size_bytes": 390,
+      "declared_size_bytes": 2066,
+      "actual_size_bytes": 2066,
       "matches_actual_size": true,
       "detail": "the package ships one Python train_gpt.py launcher at the submission root that execs the shipped Psionic runtime payload"
     },
@@ -56,10 +56,10 @@
     },
     {
       "component_id": "shipped_runtime_code_bytes",
-      "declared_size_bytes": 877328,
-      "actual_size_bytes": 877328,
+      "declared_size_bytes": 4413184,
+      "actual_size_bytes": 4413184,
       "matches_actual_size": true,
-      "detail": "the package ships one prebuilt Psionic runtime payload that restores the included int8+zlib artifact and replays the bounded local-reference validation path"
+      "detail": "the package ships two prebuilt Psionic runtime payloads: one lightweight local-reference replay binary for the default challenge-clone dry run, plus the real single-H100 trainer binary used by the exported-folder remote execution path"
     },
     {
       "component_id": "shipped_wrapper_code_bytes",
@@ -84,5 +84,5 @@
   "matches_benchmark_artifact_bytes": true,
   "verdict": "verified",
   "claim_boundary": "This verifier confirms only the current exported-folder replay path: offline entrypoint execution, final int8+zlib metrics, bounded wallclock facts, and counted-byte facts. It does not by itself turn the bounded non-record replay into a record-track claim.",
-  "report_digest": "66dc80376e4c447a8dc74b9eeacfd6aaecb9b49ab0515e157370b7801e9e37fd"
+  "report_digest": "7d207c7a3782f11ca2e6e4bf2311a5c80848b5f22553a7c1a27ccca82f1288ea"
 }

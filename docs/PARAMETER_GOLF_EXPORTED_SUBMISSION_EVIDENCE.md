@@ -1,7 +1,7 @@
 # Psionic Parameter Golf Exported Submission Evidence
 
 > Status: canonical `PGOLF-603` / `#190` exported-folder evidence and
-> replay-verification contract, updated 2026-03-18 after landing
+> replay-verification contract, updated 2026-03-24 after landing
 > `crates/psionic-train/src/parameter_golf_submission_pr.rs`.
 
 This document records the challenge-facing evidence Psionic now preserves from
@@ -34,6 +34,12 @@ The run-evidence report now binds one exported folder to:
 - one real folder-local entrypoint execution
 - the preserved bounded wallclock, memory, and artifact-size receipts
 - one measured-or-refused `8xH100` challenge receipt for the same folder
+
+The exported folder now also carries the real single-H100 trainer payload, the
+real-execution contract, and the immutable PGOLF input-package descriptor. The
+current replay verifier still exercises only the default bounded local-
+reference mode; later remote evidence binds those extra shipped bytes to the
+same exported-folder surface rather than introducing a second package shape.
 
 That closes the earlier gap where these facts existed only on the internal
 benchmark path instead of on the exported folder surface itself.

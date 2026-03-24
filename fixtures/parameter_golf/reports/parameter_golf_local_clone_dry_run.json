@@ -6,10 +6,10 @@
   "record_folder_relpath": "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2",
   "clone_status_before": "## main...origin/main\n",
   "clone_status_after": "## main...origin/main\n",
-  "final_pr_bundle_report_digest": "b73c2630eab5002976631969fc554edf59249cc9c57ebb8717c0b87c655afb6c",
+  "final_pr_bundle_report_digest": "1c4ad7c7f4626d7b21b0249740489dbcd41c175832008a802870c27669bd124e",
   "compatibility_verification": {
     "runner": "scripts/check-parameter-golf-record-folder-compatibility.sh",
-    "compatibility_report_digest": "5e1c61255ec8d1595cf0cca15728f4f8377e28e946813957c66a7d5d83d4dfc3",
+    "compatibility_report_digest": "e35cfbc05557cf65afb5dd28731c763278c03c5edf3e24723b47e5e6620083e9",
     "track_id": "non_record_16mb",
     "records_relpath": "records/track_non_record_16mb",
     "required_top_level_files": [
@@ -32,13 +32,16 @@
       "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_runtime_receipt.json",
       "parameter-golf-local-reference-run/benchmark/run_bundle.json",
       "parameter-golf-local-reference-run/step-00002/final_model.int8.ptz",
+      "runtime/parameter_golf_google_input_package_descriptor_v1.json",
       "runtime/parameter_golf_local_reference_fixture.json",
+      "runtime/parameter_golf_real_execution_contract.json",
+      "runtime/parameter_golf_single_h100_train",
       "runtime/parameter_golf_submission_runtime",
       "runtime/parameter_golf_submission_runtime.json"
     ],
     "entrypoint_dry_run_exit_code": 0,
     "verdict": "compatible",
-    "report_digest": "6b0997cb375b5ee319ec590e74706c61fe549b656931f9a9a7ba1c959e257297"
+    "report_digest": "21cb54f8d65b669160a80b136b95a1ac5906ae940f60655db519cb6eb64ec167"
   },
   "replay_verification": {
     "schema_version": 1,
@@ -67,25 +70,25 @@
     "submission_manifest_wallclock_seconds": 25.779,
     "benchmark_training_wallclock_seconds": 25.779,
     "submission_manifest_bytes": {
-      "total_bytes": 956676,
-      "code_bytes": 877718,
+      "total_bytes": 4494208,
+      "code_bytes": 4415250,
       "model_bytes": 78958
     },
     "accounting_receipt_bytes": {
-      "total_bytes": 956676,
-      "code_bytes": 877718,
+      "total_bytes": 4494208,
+      "code_bytes": 4415250,
       "model_bytes": 78958
     },
     "actual_shipped_bytes": {
-      "total_bytes": 956676,
-      "code_bytes": 877718,
+      "total_bytes": 4494208,
+      "code_bytes": 4415250,
       "model_bytes": 78958
     },
     "accounting_component_verifications": [
       {
         "component_id": "entrypoint_code_bytes",
-        "declared_size_bytes": 390,
-        "actual_size_bytes": 390,
+        "declared_size_bytes": 2066,
+        "actual_size_bytes": 2066,
         "matches_actual_size": true,
         "detail": "the package ships one Python train_gpt.py launcher at the submission root that execs the shipped Psionic runtime payload"
       },
@@ -98,10 +101,10 @@
       },
       {
         "component_id": "shipped_runtime_code_bytes",
-        "declared_size_bytes": 877328,
-        "actual_size_bytes": 877328,
+        "declared_size_bytes": 4413184,
+        "actual_size_bytes": 4413184,
         "matches_actual_size": true,
-        "detail": "the package ships one prebuilt Psionic runtime payload that restores the included int8+zlib artifact and replays the bounded local-reference validation path"
+        "detail": "the package ships two prebuilt Psionic runtime payloads: one lightweight local-reference replay binary for the default challenge-clone dry run, plus the real single-H100 trainer binary used by the exported-folder remote execution path"
       },
       {
         "component_id": "shipped_wrapper_code_bytes",
@@ -126,9 +129,9 @@
     "matches_benchmark_artifact_bytes": true,
     "verdict": "verified",
     "claim_boundary": "This verifier confirms only the current exported-folder replay path: offline entrypoint execution, final int8+zlib metrics, bounded wallclock facts, and counted-byte facts. It does not by itself turn the bounded non-record replay into a record-track claim.",
-    "report_digest": "66dc80376e4c447a8dc74b9eeacfd6aaecb9b49ab0515e157370b7801e9e37fd"
+    "report_digest": "7d207c7a3782f11ca2e6e4bf2311a5c80848b5f22553a7c1a27ccca82f1288ea"
   },
   "verdict": "clean_pass",
   "claim_boundary": "This dry run proves that the current generated folder can be staged into a live local parameter-golf clone, reverified there, and cleaned back out without drift. It does not by itself upgrade the bounded non-record lane into record-track readiness.",
-  "report_digest": "88e1c943c320de75c5a592fd7ead9cd008b34d27f478ef8eafe2214ff1ffc1bf"
+  "report_digest": "94810fb1ff0787dba24df5b52237cb7b6160e3ba987fc89403dea6c33538832e"
 }

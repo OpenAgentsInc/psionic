@@ -12,6 +12,7 @@ use thiserror::Error;
 use crate::{
     restore_parameter_golf_model_from_int8_zlib, ParameterGolfLocalReferenceFixture,
     ParameterGolfNonRecordSubmissionManifest, ParameterGolfSubmissionAccountingReceipt,
+    ParameterGolfSubmissionRealExecutionContract,
 };
 
 /// Machine-readable runtime manifest shipped with the submission folder.
@@ -47,6 +48,12 @@ pub struct ParameterGolfSubmissionRuntimeManifest {
     pub expected_val_loss: f64,
     /// Expected final roundtrip validation bits-per-byte from `submission.json`.
     pub expected_val_bpb: f64,
+    /// Default exported-folder execution mode.
+    #[serde(default = "default_local_reference_execution_mode")]
+    pub default_execution_mode: String,
+    /// Additional explicit real execution contracts shipped with the folder.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub real_execution_contracts: Vec<ParameterGolfSubmissionRealExecutionContract>,
     /// Explicit runtime posture for the package.
     pub runtime_posture: String,
     /// Explicit claim boundary for the runtime.
@@ -66,6 +73,10 @@ impl ParameterGolfSubmissionRuntimeManifest {
             &digestible,
         )
     }
+}
+
+fn default_local_reference_execution_mode() -> String {
+    String::from("local_reference_validation")
 }
 
 /// Runtime receipt emitted by the shipped submission payload.

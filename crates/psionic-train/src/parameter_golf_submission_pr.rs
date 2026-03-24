@@ -1261,7 +1261,15 @@ fn actual_accounting_component_size(
             &loaded.submission_root,
             loaded.runtime_manifest.runtime_payload_path.as_str(),
         )?
-        .size_bytes),
+        .size_bytes
+            + observed_file(
+                &loaded.submission_root,
+                loaded
+                    .submission_manifest
+                    .real_runtime_payload_artifact_ref
+                    .as_str(),
+            )?
+            .size_bytes),
         PARAMETER_GOLF_ACCOUNTING_COMPONENT_WRAPPER => Ok(0),
         PARAMETER_GOLF_ACCOUNTING_COMPONENT_BUILD_DEPS => Ok(0),
         _ => Err(ParameterGolfSubmissionPrError::UnknownAccountingComponent {

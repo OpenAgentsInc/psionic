@@ -43,7 +43,7 @@
       "role": "readme",
       "must_live_at_folder_root": true,
       "must_be_regular_file": true,
-      "current_psionic_size_bytes": 3387,
+      "current_psionic_size_bytes": 4537,
       "detail": "human-readable folder overview required by the public README"
     },
     {
@@ -51,7 +51,7 @@
       "role": "submission_manifest",
       "must_live_at_folder_root": true,
       "must_be_regular_file": true,
-      "current_psionic_size_bytes": 2266,
+      "current_psionic_size_bytes": 3011,
       "detail": "machine-readable submission metadata required by the public README"
     },
     {
@@ -67,7 +67,7 @@
       "role": "entrypoint",
       "must_live_at_folder_root": true,
       "must_be_regular_file": true,
-      "current_psionic_size_bytes": 390,
+      "current_psionic_size_bytes": 2066,
       "detail": "top-level entrypoint required by the public README and used by the compatibility verifier dry-run"
     }
   ],
@@ -81,12 +81,15 @@
     "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_accounting.json",
     "parameter-golf-local-reference-run/benchmark/run_bundle.json",
     "parameter-golf-local-reference-run/step-00002/final_model.int8.ptz",
+    "runtime/parameter_golf_google_input_package_descriptor_v1.json",
     "runtime/parameter_golf_local_reference_fixture.json",
+    "runtime/parameter_golf_real_execution_contract.json",
+    "runtime/parameter_golf_single_h100_train",
     "runtime/parameter_golf_submission_runtime",
     "runtime/parameter_golf_submission_runtime.json"
   ],
   "verifier_runner": "scripts/check-parameter-golf-record-folder-compatibility.sh",
   "verifier_example_command": "scripts/check-parameter-golf-record-folder-compatibility.sh --parameter-golf-root ~/code/parameter-golf --submission-dir /tmp/records/track_non_record_16mb/<submission_id>",
   "claim_boundary": "This report closes challenge-repo folder compatibility only. It confirms that the current non-record folder carries a real folder-local train_gpt.py launcher plus a shipped Psionic runtime payload, but it does not promote the bounded local-reference replay path into a record-track runtime claim and it does not close counted-runtime or build-dependency posture for stronger future payloads.",
-  "report_digest": "5e1c61255ec8d1595cf0cca15728f4f8377e28e946813957c66a7d5d83d4dfc3"
+  "report_digest": "e35cfbc05557cf65afb5dd28731c763278c03c5edf3e24723b47e5e6620083e9"
 }

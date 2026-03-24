@@ -1,7 +1,7 @@
 use std::{
     fmt::Write,
     fs,
-    path::{Component, Path},
+    path::{Component, Path, PathBuf},
 };
 
 use psionic_eval::PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF;
@@ -28,22 +28,66 @@ pub const PARAMETER_GOLF_SUBMISSION_ARTIFACT_CAP_BYTES: u64 = 16_000_000;
 
 /// Explicit claim boundary for the first non-record submission package.
 pub const PARAMETER_GOLF_NON_RECORD_SUBMISSION_CLAIM_BOUNDARY: &str =
-    "current honest non-record submission package only; the shipped train_gpt.py launches a shipped Psionic runtime payload that restores the included int8+zlib artifact and re-runs the bounded local-reference validation path on the shipped fixture, not a record-track runtime claim";
+    "current honest non-record submission package only; the shipped train_gpt.py defaults to a bounded local-reference replay path, but the same exported folder now also ships a real single-H100 trainer payload plus the immutable PGOLF input-package descriptor for later remote execution, still without claiming record-track readiness";
 
 const PARAMETER_GOLF_NON_RECORD_RECORDS_DIR: &str = "records/track_non_record_16mb";
 const PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF: &str =
     "runtime/parameter_golf_submission_runtime";
+const PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF: &str =
+    "runtime/parameter_golf_single_h100_train";
 const PARAMETER_GOLF_RUNTIME_MANIFEST_ARTIFACT_REF: &str =
     "runtime/parameter_golf_submission_runtime.json";
+const PARAMETER_GOLF_REAL_RUNTIME_CONTRACT_ARTIFACT_REF: &str =
+    "runtime/parameter_golf_real_execution_contract.json";
 const PARAMETER_GOLF_RUNTIME_FIXTURE_ARTIFACT_REF: &str =
     "runtime/parameter_golf_local_reference_fixture.json";
+const PARAMETER_GOLF_RUNTIME_INPUT_PACKAGE_DESCRIPTOR_ARTIFACT_REF: &str =
+    "runtime/parameter_golf_google_input_package_descriptor_v1.json";
 pub const PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF: &str =
     "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_runtime_receipt.json";
+pub const PARAMETER_GOLF_REAL_RUNTIME_REPORT_ARTIFACT_REF: &str =
+    "parameter-golf-single-h100-run/benchmark/parameter_golf_single_h100_training.json";
 pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_ENTRYPOINT: &str = "entrypoint_code_bytes";
 pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_MODEL: &str = "compressed_model_bytes";
 pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_RUNTIME: &str = "shipped_runtime_code_bytes";
 pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_WRAPPER: &str = "shipped_wrapper_code_bytes";
 pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_BUILD_DEPS: &str = "required_build_dependency_bytes";
+const PARAMETER_GOLF_EXECUTION_MODE_ENV_VAR: &str = "PSIONIC_PARAMETER_GOLF_EXECUTION_MODE";
+const PARAMETER_GOLF_SINGLE_H100_DATASET_ROOT_ENV_VAR: &str =
+    "PSIONIC_PARAMETER_GOLF_DATASET_ROOT";
+const PARAMETER_GOLF_SINGLE_H100_TOKENIZER_PATH_ENV_VAR: &str =
+    "PSIONIC_PARAMETER_GOLF_TOKENIZER_PATH";
+const PARAMETER_GOLF_SINGLE_H100_OUTPUT_REPORT_ENV_VAR: &str =
+    "PSIONIC_PARAMETER_GOLF_OUTPUT_REPORT";
+const PARAMETER_GOLF_SINGLE_H100_MAX_STEPS_ENV_VAR: &str =
+    "PSIONIC_PARAMETER_GOLF_MAX_STEPS";
+
+/// Machine-readable real execution contract shipped with the exported folder.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterGolfSubmissionRealExecutionContract {
+    /// Stable schema version.
+    pub schema_version: u32,
+    /// Execution mode selected through the top-level entrypoint.
+    pub execution_mode: String,
+    /// Real trainer payload relative path.
+    pub trainer_payload_path: String,
+    /// Immutable input-package descriptor path shipped with the folder.
+    pub input_package_descriptor_path: String,
+    /// Environment variable that must point at a materialized dataset root.
+    pub dataset_root_env_var: String,
+    /// Environment variable that must point at the tokenizer file.
+    pub tokenizer_path_env_var: String,
+    /// Environment variable that can override the runtime report path.
+    pub output_report_env_var: String,
+    /// Default relative report path for the real trainer output.
+    pub default_output_report_path: String,
+    /// Environment variable that can override the trainer step cap.
+    pub max_steps_env_var: String,
+    /// Default bounded trainer step cap.
+    pub default_max_steps: u64,
+    /// Honest claim boundary for this mode.
+    pub claim_boundary: String,
+}
 
 /// Human-facing identity fields for one submission package.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -279,6 +323,18 @@ pub struct ParameterGolfNonRecordSubmissionManifest {
     pub runtime_payload_artifact_ref: String,
     /// Runtime payload artifact digest.
     pub runtime_payload_artifact_digest: String,
+    /// Real single-H100 trainer payload artifact path.
+    pub real_runtime_payload_artifact_ref: String,
+    /// Real single-H100 trainer payload artifact digest.
+    pub real_runtime_payload_artifact_digest: String,
+    /// Real execution contract artifact path.
+    pub real_execution_contract_artifact_ref: String,
+    /// Real execution contract artifact digest.
+    pub real_execution_contract_artifact_digest: String,
+    /// Immutable input-package descriptor path shipped with the exported folder.
+    pub runtime_input_package_descriptor_artifact_ref: String,
+    /// Immutable input-package descriptor digest.
+    pub runtime_input_package_descriptor_artifact_digest: String,
     /// Runtime receipt path written by the shipped payload.
     pub runtime_receipt_artifact_ref: String,
 }
@@ -292,8 +348,11 @@ pub enum ParameterGolfSubmissionFileRole {
     TrainLog,
     Entrypoint,
     RuntimePayload,
+    RealRuntimePayload,
     RuntimeManifest,
+    RealExecutionContract,
     RuntimeFixture,
+    RuntimeInputPackageDescriptor,
     CompressedModel,
     BenchmarkPackage,
     ChallengeScoreReport,
@@ -490,19 +549,55 @@ pub fn build_parameter_golf_non_record_submission_bundle(
     )?;
     validate_relative_path(benchmark_bundle.run_bundle_artifact.artifact_ref.as_str())?;
     validate_relative_path(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF)?;
+    validate_relative_path(PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF)?;
     validate_relative_path(PARAMETER_GOLF_RUNTIME_MANIFEST_ARTIFACT_REF)?;
+    validate_relative_path(PARAMETER_GOLF_REAL_RUNTIME_CONTRACT_ARTIFACT_REF)?;
     validate_relative_path(PARAMETER_GOLF_RUNTIME_FIXTURE_ARTIFACT_REF)?;
+    validate_relative_path(PARAMETER_GOLF_RUNTIME_INPUT_PACKAGE_DESCRIPTOR_ARTIFACT_REF)?;
     validate_relative_path(PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF)?;
+    validate_relative_path(PARAMETER_GOLF_REAL_RUNTIME_REPORT_ARTIFACT_REF)?;
 
     let runtime_payload_artifact = ParameterGolfTrainingArtifact::new(
         "parameter_golf_submission_runtime_payload",
         String::from(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF),
         fs::read(parameter_golf_submission_runtime_payload_fixture_path())?,
     );
+    let real_runtime_payload_artifact = ParameterGolfTrainingArtifact::new(
+        "parameter_golf_single_h100_runtime_payload",
+        String::from(PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF),
+        fs::read(parameter_golf_single_h100_runtime_payload_fixture_path())?,
+    );
     let runtime_fixture_artifact = json_artifact(
         "parameter_golf_local_reference_fixture",
         String::from(PARAMETER_GOLF_RUNTIME_FIXTURE_ARTIFACT_REF),
         &fixture,
+    )?;
+    let runtime_input_package_descriptor_artifact = ParameterGolfTrainingArtifact::new(
+        "parameter_golf_google_input_package_descriptor",
+        String::from(PARAMETER_GOLF_RUNTIME_INPUT_PACKAGE_DESCRIPTOR_ARTIFACT_REF),
+        fs::read(parameter_golf_google_input_package_descriptor_fixture_path())?,
+    );
+    let real_execution_contract = ParameterGolfSubmissionRealExecutionContract {
+        schema_version: 1,
+        execution_mode: String::from("single_h100_train"),
+        trainer_payload_path: String::from(PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF),
+        input_package_descriptor_path: String::from(
+            PARAMETER_GOLF_RUNTIME_INPUT_PACKAGE_DESCRIPTOR_ARTIFACT_REF,
+        ),
+        dataset_root_env_var: String::from(PARAMETER_GOLF_SINGLE_H100_DATASET_ROOT_ENV_VAR),
+        tokenizer_path_env_var: String::from(PARAMETER_GOLF_SINGLE_H100_TOKENIZER_PATH_ENV_VAR),
+        output_report_env_var: String::from(PARAMETER_GOLF_SINGLE_H100_OUTPUT_REPORT_ENV_VAR),
+        default_output_report_path: String::from(PARAMETER_GOLF_REAL_RUNTIME_REPORT_ARTIFACT_REF),
+        max_steps_env_var: String::from(PARAMETER_GOLF_SINGLE_H100_MAX_STEPS_ENV_VAR),
+        default_max_steps: 1,
+        claim_boundary: String::from(
+            "This exported folder now ships the real single-H100 trainer payload and the immutable PGOLF input-package descriptor. When the explicit environment contract is supplied, train_gpt.py can invoke the actual bounded Rust-owned single-H100 trainer path and preserve its machine-readable report inside the folder.",
+        ),
+    };
+    let real_execution_contract_artifact = json_artifact(
+        "parameter_golf_real_execution_contract",
+        String::from(PARAMETER_GOLF_REAL_RUNTIME_CONTRACT_ARTIFACT_REF),
+        &real_execution_contract,
     )?;
     let mut runtime_manifest = ParameterGolfSubmissionRuntimeManifest {
         schema_version: 1,
@@ -526,8 +621,10 @@ pub fn build_parameter_golf_non_record_submission_bundle(
             .challenge_score_report
             .int8_zlib_roundtrip_validation
             .bits_per_byte,
+        default_execution_mode: String::from("local_reference_validation"),
+        real_execution_contracts: vec![real_execution_contract.clone()],
         runtime_posture: String::from(
-            "shipped_binary_restores_int8_zlib_artifact_and_replays_bounded_local_reference_validation",
+            "shipped_folder_defaults to bounded local-reference replay through one prebuilt runtime payload, while also carrying the real single-H100 trainer payload plus input-package descriptor for explicit later remote execution",
         ),
         claim_boundary: String::from(PARAMETER_GOLF_NON_RECORD_SUBMISSION_CLAIM_BOUNDARY),
         manifest_digest: String::new(),
@@ -545,6 +642,7 @@ pub fn build_parameter_golf_non_record_submission_bundle(
         render_entrypoint_launcher(
             runtime_payload_artifact.artifact_ref.as_str(),
             runtime_manifest_artifact.artifact_ref.as_str(),
+            real_execution_contract_artifact.artifact_ref.as_str(),
         ),
     );
 
@@ -568,9 +666,10 @@ pub fn build_parameter_golf_non_record_submission_bundle(
             },
             ParameterGolfSubmissionAccountingComponent {
                 component_id: String::from(PARAMETER_GOLF_ACCOUNTING_COMPONENT_RUNTIME),
-                size_bytes: runtime_payload_artifact.bytes.len() as u64,
+                size_bytes: runtime_payload_artifact.bytes.len() as u64
+                    + real_runtime_payload_artifact.bytes.len() as u64,
                 detail: String::from(
-                    "the package ships one prebuilt Psionic runtime payload that restores the included int8+zlib artifact and replays the bounded local-reference validation path",
+                    "the package ships two prebuilt Psionic runtime payloads: one lightweight local-reference replay binary for the default challenge-clone dry run, plus the real single-H100 trainer binary used by the exported-folder remote execution path",
                 ),
             },
             ParameterGolfSubmissionAccountingComponent {
@@ -607,7 +706,7 @@ pub fn build_parameter_golf_non_record_submission_bundle(
         / 1_000.0;
     let blurb = config.identity.blurb.clone().unwrap_or_else(|| {
         format!(
-            "Psionic non-record submission package for the bounded local-reference lane; it preserves benchmark and accounting receipts, ships a train_gpt.py launcher plus a prebuilt Psionic runtime payload, and replays the final int8+zlib roundtrip score under the same oracle and counted-byte rules."
+            "Psionic non-record submission package for the bounded local-reference lane; it preserves benchmark and accounting receipts, ships a train_gpt.py launcher plus both the lightweight replay runtime and the real single-H100 trainer payload, and binds the later remote execution path to the committed immutable PGOLF input-package descriptor."
         )
     });
     let submission_manifest = ParameterGolfNonRecordSubmissionManifest {
@@ -657,6 +756,22 @@ pub fn build_parameter_golf_non_record_submission_bundle(
         runtime_manifest_artifact_digest: runtime_manifest_artifact.artifact_digest.clone(),
         runtime_payload_artifact_ref: runtime_payload_artifact.artifact_ref.clone(),
         runtime_payload_artifact_digest: runtime_payload_artifact.artifact_digest.clone(),
+        real_runtime_payload_artifact_ref: real_runtime_payload_artifact.artifact_ref.clone(),
+        real_runtime_payload_artifact_digest: real_runtime_payload_artifact
+            .artifact_digest
+            .clone(),
+        real_execution_contract_artifact_ref: real_execution_contract_artifact
+            .artifact_ref
+            .clone(),
+        real_execution_contract_artifact_digest: real_execution_contract_artifact
+            .artifact_digest
+            .clone(),
+        runtime_input_package_descriptor_artifact_ref: runtime_input_package_descriptor_artifact
+            .artifact_ref
+            .clone(),
+        runtime_input_package_descriptor_artifact_digest: runtime_input_package_descriptor_artifact
+            .artifact_digest
+            .clone(),
         runtime_receipt_artifact_ref: String::from(PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF),
     };
     let submission_manifest_artifact = json_artifact(
@@ -686,8 +801,11 @@ pub fn build_parameter_golf_non_record_submission_bundle(
         train_log_artifact,
         entrypoint_artifact,
         runtime_payload_artifact,
+        real_runtime_payload_artifact,
         runtime_manifest_artifact,
+        real_execution_contract_artifact,
         runtime_fixture_artifact,
+        runtime_input_package_descriptor_artifact,
         model_artifact,
         benchmark_bundle.benchmark_package_artifact.clone(),
         benchmark_bundle.challenge_score_report_artifact.clone(),
@@ -766,7 +884,9 @@ fn maybe_make_executable(
     {
         if matches!(
             relative_path,
-            "train_gpt.py" | PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF
+            "train_gpt.py"
+                | PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF
+                | PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF
         ) {
             use std::os::unix::fs::PermissionsExt;
 
@@ -805,14 +925,21 @@ fn submission_role_and_detail(
             ParameterGolfSubmissionFileRole::Entrypoint,
             true,
             String::from(
-                "top-level Python launcher that execs the shipped Psionic runtime payload",
+                "top-level Python launcher that defaults to the lightweight replay runtime and can also dispatch to the shipped single-H100 trainer payload through an explicit execution-mode environment contract",
             ),
         ),
         PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF => (
             ParameterGolfSubmissionFileRole::RuntimePayload,
             true,
             String::from(
-                "shipped Psionic runtime payload used by the top-level train_gpt.py entrypoint",
+                "shipped Psionic runtime payload used by the default local-reference replay path",
+            ),
+        ),
+        PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF => (
+            ParameterGolfSubmissionFileRole::RealRuntimePayload,
+            true,
+            String::from(
+                "shipped Psionic single-H100 trainer payload used when the exported folder is run in explicit real-execution mode",
             ),
         ),
         PARAMETER_GOLF_RUNTIME_MANIFEST_ARTIFACT_REF => (
@@ -822,11 +949,25 @@ fn submission_role_and_detail(
                 "machine-readable runtime manifest consumed by the shipped Psionic payload",
             ),
         ),
+        PARAMETER_GOLF_REAL_RUNTIME_CONTRACT_ARTIFACT_REF => (
+            ParameterGolfSubmissionFileRole::RealExecutionContract,
+            false,
+            String::from(
+                "machine-readable contract that binds the exported folder to the real single-H100 trainer payload and the required execution-mode environment variables",
+            ),
+        ),
         PARAMETER_GOLF_RUNTIME_FIXTURE_ARTIFACT_REF => (
             ParameterGolfSubmissionFileRole::RuntimeFixture,
             false,
             String::from(
                 "shipped bounded local-reference fixture reused by the runtime replay path",
+            ),
+        ),
+        PARAMETER_GOLF_RUNTIME_INPUT_PACKAGE_DESCRIPTOR_ARTIFACT_REF => (
+            ParameterGolfSubmissionFileRole::RuntimeInputPackageDescriptor,
+            false,
+            String::from(
+                "immutable PGOLF input-package descriptor shipped with the folder so later remote runs stay bound to the same dataset and tokenizer contract",
             ),
         ),
         _ if relative_path.ends_with("final_model.int8.ptz") => (
@@ -862,22 +1003,71 @@ fn submission_role_and_detail(
     }
 }
 
-fn render_entrypoint_launcher(runtime_payload_ref: &str, runtime_manifest_ref: &str) -> String {
+fn render_entrypoint_launcher(
+    runtime_payload_ref: &str,
+    runtime_manifest_ref: &str,
+    real_execution_contract_ref: &str,
+) -> String {
     format!(
         r#"#!/usr/bin/env python3
 from pathlib import Path
+import json
+import os
 import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parent
 RUNTIME_PAYLOAD = ROOT / "{runtime_payload_ref}"
 RUNTIME_MANIFEST = ROOT / "{runtime_manifest_ref}"
+REAL_EXECUTION_CONTRACT = ROOT / "{real_execution_contract_ref}"
+EXECUTION_MODE = os.environ.get("{execution_mode_env_var}", "local_reference_validation")
 
-completed = subprocess.run([str(RUNTIME_PAYLOAD), str(RUNTIME_MANIFEST)], cwd=ROOT, check=False)
-sys.exit(completed.returncode)
+if EXECUTION_MODE == "local_reference_validation":
+    completed = subprocess.run([str(RUNTIME_PAYLOAD), str(RUNTIME_MANIFEST)], cwd=ROOT, check=False)
+    sys.exit(completed.returncode)
+
+if EXECUTION_MODE == "single_h100_train":
+    contract = json.loads(REAL_EXECUTION_CONTRACT.read_text(encoding="utf-8"))
+    dataset_root = os.environ.get(contract["dataset_root_env_var"])
+    tokenizer_path = os.environ.get(contract["tokenizer_path_env_var"])
+    missing = []
+    if not dataset_root:
+        missing.append(contract["dataset_root_env_var"])
+    if not tokenizer_path:
+        missing.append(contract["tokenizer_path_env_var"])
+    if missing:
+        print(
+            "parameter golf submission runtime missing required environment variable(s) for real execution mode: "
+            + ", ".join(missing),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    output_value = os.environ.get(
+        contract["output_report_env_var"],
+        contract["default_output_report_path"],
+    )
+    output_path = Path(output_value)
+    if not output_path.is_absolute():
+        output_path = ROOT / output_path
+    max_steps = os.environ.get(
+        contract["max_steps_env_var"],
+        str(contract["default_max_steps"]),
+    )
+    trainer_payload = ROOT / contract["trainer_payload_path"]
+    completed = subprocess.run(
+        [str(trainer_payload), dataset_root, tokenizer_path, str(output_path), max_steps],
+        cwd=ROOT,
+        check=False,
+    )
+    sys.exit(completed.returncode)
+
+print(f"unsupported execution mode: {{EXECUTION_MODE}}", file=sys.stderr)
+sys.exit(1)
 "#,
         runtime_payload_ref = runtime_payload_ref,
         runtime_manifest_ref = runtime_manifest_ref,
+        real_execution_contract_ref = real_execution_contract_ref,
+        execution_mode_env_var = PARAMETER_GOLF_EXECUTION_MODE_ENV_VAR,
     )
 }
 
@@ -943,7 +1133,7 @@ fn render_readme(
     );
     let _ = writeln!(
         readme,
-        "This package is intentionally **not** a record-track runtime claim. The shipped `train_gpt.py` now launches a prebuilt Psionic runtime payload that restores the included int8+zlib model artifact and re-runs the bounded local-reference validation path on the shipped fixture, writing its own runtime receipt inside the folder.\n"
+        "This package is intentionally **not** a record-track runtime claim. The shipped `train_gpt.py` still defaults to a prebuilt Psionic runtime payload that restores the included int8+zlib model artifact and re-runs the bounded local-reference validation path on the shipped fixture, but the same folder now also carries the real single-H100 trainer payload plus the immutable PGOLF input-package descriptor for explicit remote execution.\n"
     );
     let _ = writeln!(readme, "Configuration:");
     let _ = writeln!(readme, "- Track: `{}`", submission_manifest.track);
@@ -970,8 +1160,23 @@ fn render_readme(
     );
     let _ = writeln!(
         readme,
+        "- Real trainer payload: `{}`",
+        submission_manifest.real_runtime_payload_artifact_ref
+    );
+    let _ = writeln!(
+        readme,
         "- Runtime manifest: `{}`",
         submission_manifest.runtime_manifest_artifact_ref
+    );
+    let _ = writeln!(
+        readme,
+        "- Real execution contract: `{}`",
+        submission_manifest.real_execution_contract_artifact_ref
+    );
+    let _ = writeln!(
+        readme,
+        "- Input-package descriptor: `{}`",
+        submission_manifest.runtime_input_package_descriptor_artifact_ref
     );
     let _ = writeln!(
         readme,
@@ -1044,7 +1249,22 @@ fn render_readme(
     let _ = writeln!(
         readme,
         "- `{}`",
+        submission_manifest.real_execution_contract_artifact_ref
+    );
+    let _ = writeln!(
+        readme,
+        "- `{}`",
         PARAMETER_GOLF_RUNTIME_FIXTURE_ARTIFACT_REF
+    );
+    let _ = writeln!(
+        readme,
+        "- `{}`",
+        submission_manifest.runtime_input_package_descriptor_artifact_ref
+    );
+    let _ = writeln!(
+        readme,
+        "- `{}`",
+        submission_manifest.real_runtime_payload_artifact_ref
     );
     let _ = writeln!(
         readme,
@@ -1086,12 +1306,48 @@ fn render_readme(
         "- `{}`\n",
         benchmark_bundle.run_bundle_artifact.artifact_ref
     );
+    let _ = writeln!(readme, "\nReal execution mode:");
+    let _ = writeln!(
+        readme,
+        "- Set `{}` to `single_h100_train` to dispatch the top-level `train_gpt.py` entrypoint to the shipped single-H100 trainer payload.",
+        PARAMETER_GOLF_EXECUTION_MODE_ENV_VAR
+    );
+    let _ = writeln!(
+        readme,
+        "- Set `{}` and `{}` to the materialized FineWeb SP1024 dataset root and tokenizer path.",
+        PARAMETER_GOLF_SINGLE_H100_DATASET_ROOT_ENV_VAR,
+        PARAMETER_GOLF_SINGLE_H100_TOKENIZER_PATH_ENV_VAR
+    );
+    let _ = writeln!(
+        readme,
+        "- Optional overrides: `{}` for the trainer report path and `{}` for the trainer step cap.\n",
+        PARAMETER_GOLF_SINGLE_H100_OUTPUT_REPORT_ENV_VAR,
+        PARAMETER_GOLF_SINGLE_H100_MAX_STEPS_ENV_VAR
+    );
     let _ = writeln!(
         readme,
         "The package root for challenge-repo publication is `{}/{}`.",
         PARAMETER_GOLF_NON_RECORD_RECORDS_DIR, submission_id
     );
     readme
+}
+
+fn parameter_golf_single_h100_runtime_payload_fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .expect("repo root should resolve from psionic-train crate dir")
+        .join("fixtures/parameter_golf/runtime/parameter_golf_single_h100_train.x86_64-unknown-linux-gnu")
+}
+
+fn parameter_golf_google_input_package_descriptor_fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .expect("repo root should resolve from psionic-train crate dir")
+        .join("fixtures/parameter_golf/google/parameter_golf_google_input_package_descriptor_v1.json")
 }
 
 fn text_artifact(
@@ -1172,6 +1428,9 @@ mod tests {
         PARAMETER_GOLF_ACCOUNTING_COMPONENT_ENTRYPOINT, PARAMETER_GOLF_ACCOUNTING_COMPONENT_MODEL,
         PARAMETER_GOLF_ACCOUNTING_COMPONENT_RUNTIME, PARAMETER_GOLF_ACCOUNTING_COMPONENT_WRAPPER,
         PARAMETER_GOLF_NON_RECORD_SUBMISSION_VERSION, PARAMETER_GOLF_NON_RECORD_TRACK_ID,
+        PARAMETER_GOLF_REAL_RUNTIME_CONTRACT_ARTIFACT_REF,
+        PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF,
+        PARAMETER_GOLF_RUNTIME_INPUT_PACKAGE_DESCRIPTOR_ARTIFACT_REF,
         PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF, PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF,
     };
     use crate::{
@@ -1223,6 +1482,15 @@ mod tests {
         assert!(submission_bundle
             .artifact(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF)
             .is_some_and(|artifact| !artifact.bytes.is_empty()));
+        assert!(submission_bundle
+            .artifact(PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF)
+            .is_some_and(|artifact| !artifact.bytes.is_empty()));
+        assert!(submission_bundle
+            .artifact(PARAMETER_GOLF_REAL_RUNTIME_CONTRACT_ARTIFACT_REF)
+            .is_some_and(|artifact| !artifact.bytes.is_empty()));
+        assert!(submission_bundle
+            .artifact(PARAMETER_GOLF_RUNTIME_INPUT_PACKAGE_DESCRIPTOR_ARTIFACT_REF)
+            .is_some_and(|artifact| !artifact.bytes.is_empty()));
         assert!(submission_bundle.package.files.iter().any(|file| {
             file.relative_path.ends_with("final_model.int8.ptz") && file.counts_toward_artifact_cap
         }));
@@ -1236,6 +1504,18 @@ mod tests {
         assert!(temp_dir
             .path()
             .join(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF)
+            .is_file());
+        assert!(temp_dir
+            .path()
+            .join(PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF)
+            .is_file());
+        assert!(temp_dir
+            .path()
+            .join(PARAMETER_GOLF_REAL_RUNTIME_CONTRACT_ARTIFACT_REF)
+            .is_file());
+        assert!(temp_dir
+            .path()
+            .join(PARAMETER_GOLF_RUNTIME_INPUT_PACKAGE_DESCRIPTOR_ARTIFACT_REF)
             .is_file());
         assert!(temp_dir
             .path()
@@ -1301,6 +1581,11 @@ mod tests {
             .expect("runtime payload artifact should exist")
             .bytes
             .len() as u64;
+        let real_runtime_payload_size = submission_bundle
+            .artifact(PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF)
+            .expect("real runtime payload artifact should exist")
+            .bytes
+            .len() as u64;
         let entrypoint_size = submission_bundle
             .artifact("train_gpt.py")
             .expect("entrypoint artifact should exist")
@@ -1328,7 +1613,7 @@ mod tests {
         );
         assert_eq!(
             component_size(PARAMETER_GOLF_ACCOUNTING_COMPONENT_RUNTIME),
-            runtime_payload_size
+            runtime_payload_size + real_runtime_payload_size
         );
         assert_eq!(
             component_size(PARAMETER_GOLF_ACCOUNTING_COMPONENT_MODEL),
@@ -1344,7 +1629,7 @@ mod tests {
         );
         assert_eq!(
             receipt.total_counted_bytes,
-            entrypoint_size + runtime_payload_size + model_size
+            entrypoint_size + runtime_payload_size + real_runtime_payload_size + model_size
         );
         assert!(receipt.within_artifact_cap);
         Ok(())

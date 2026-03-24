@@ -1,7 +1,7 @@
 # Psionic Parameter Golf Non-Record Submission Package
 
 > Status: canonical `PGOLF-401` / `#172` plus `PGOLF-502` / `#185`
-> non-record submission contract, updated 2026-03-18 after landing the real
+> non-record submission contract, updated 2026-03-24 after landing the real
 > shipped submission runtime path in
 > `crates/psionic-train/src/parameter_golf_submission.rs` and
 > `crates/psionic-train/src/parameter_golf_submission_runtime.rs`.
@@ -30,8 +30,11 @@ The generated package now includes:
 - `train.log`
 - `train_gpt.py`
 - `runtime/parameter_golf_submission_runtime`
+- `runtime/parameter_golf_single_h100_train`
 - `runtime/parameter_golf_submission_runtime.json`
+- `runtime/parameter_golf_real_execution_contract.json`
 - `runtime/parameter_golf_local_reference_fixture.json`
+- `runtime/parameter_golf_google_input_package_descriptor_v1.json`
 - the counted int8+zlib model artifact
 - preserved benchmark-package, score-report, benchmark-receipt, accounting, and
   run-bundle JSON artifacts
@@ -100,11 +103,13 @@ The shipped `train_gpt.py` is now deliberately small rather than review-only.
 
 It is a Python-stdlib launcher that:
 
-- launches the shipped `runtime/parameter_golf_submission_runtime` payload
-- passes the shipped runtime manifest
+- defaults to the shipped `runtime/parameter_golf_submission_runtime` payload
+- passes the shipped runtime manifest for the bounded local-reference replay path
+- can also dispatch to the shipped `runtime/parameter_golf_single_h100_train`
+  payload when the explicit execution-mode environment contract is supplied
 - keeps the folder self-contained and root-local
 
-The shipped runtime payload then:
+The default shipped runtime payload then:
 
 - restores the included int8+zlib model artifact
 - re-runs the bounded local-reference validation path on the shipped fixture
@@ -112,9 +117,23 @@ The shipped runtime payload then:
   receipt
 - writes `parameter_golf_submission_runtime_receipt.json` inside the folder
 
-That means the package now owns a real Psionic execution path inside the
-exported folder, but it still does **not** pretend that Psionic has already
-closed the record-track counted-runtime story.
+The same exported folder now also ships:
+
+- one machine-readable real-execution contract
+- the immutable PGOLF input-package descriptor used by the later Google and
+  RunPod operator lanes
+- one prebuilt single-H100 trainer payload that `train_gpt.py` can invoke in
+  `single_h100_train` mode when the dataset and tokenizer environment contract
+  is provided
+
+That means the package now owns both:
+
+- a bounded local-reference replay path for challenge-clone dry runs
+- a real exported-folder single-H100 trainer entry surface for later remote
+  evidence
+
+It still does **not** pretend that Psionic has already closed the record-track
+counted-runtime story.
 
 ## Artifact Accounting
 
@@ -130,8 +149,9 @@ For the first landed package:
 
 - the counted entrypoint is the generated top-level `train_gpt.py`
 - the counted model is the int8+zlib artifact from the local-reference lane
-- the counted runtime is the shipped prebuilt
-  `runtime/parameter_golf_submission_runtime` payload
+- the counted runtime is the shipped prebuilt pair
+  `runtime/parameter_golf_submission_runtime` plus
+  `runtime/parameter_golf_single_h100_train`
 - extra wrapper bytes are `0` because no additional launcher layer is shipped
 - build-dependency bytes are `0` because the folder ships a prebuilt payload
   and requires no in-folder build tree
@@ -146,8 +166,9 @@ This issue closes the non-record packaging lane only.
 It does not claim:
 
 - record-track runtime closure
-- true training-time execution inside the exported non-record folder
 - a defended counted-runtime story for an `8xH100` submission
 - a green record-track readiness category
 
-Those remain explicit follow-on work.
+The exported folder can now invoke the real single-H100 trainer surface, but
+record-track accounting and distributed `8xH100` evidence remain explicit
+follow-on work.
