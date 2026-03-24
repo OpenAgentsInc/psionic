@@ -55,6 +55,13 @@ be preserved for diagnosis, but the contest-facing final `val_loss` and
 `val_bpb` are bound to the exported compressed artifact plus its digest and
 roundtrip eval time.
 
+The repo now also preserves one explicit export-surface judgment alongside
+those evidence receipts. That report answers a different question than replay:
+whether the current shipped folder is literally faithful to the README
+`train_gpt.py` surface, or whether it instead asks maintainers to review an
+explicit launcher-plus-runtime equivalence argument tied to exact shipped
+bytes.
+
 ## Replay Verification
 
 The replay verifier now checks the exported folder directly:

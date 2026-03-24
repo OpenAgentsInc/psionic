@@ -88,6 +88,7 @@ deterministic without pretending it is challenge-speed timing evidence.
 The exported folder now also has explicit follow-on evidence and PR helpers:
 
 - `docs/PARAMETER_GOLF_EXPORTED_SUBMISSION_EVIDENCE.md`
+- `fixtures/parameter_golf/reports/parameter_golf_record_export_surface_contract.json`
 - `docs/PARAMETER_GOLF_PR_SUBMISSION_FLOW.md`
 - `scripts/check-parameter-golf-record-folder-replay.sh`
 - `cargo run -p psionic-train --example parameter_golf_final_pr_bundle`
@@ -131,6 +132,12 @@ That means the package now owns both:
 - a bounded local-reference replay path for challenge-clone dry runs
 - a real exported-folder single-H100 trainer entry surface for later remote
   evidence
+
+The repo now also preserves one explicit export-surface judgment for this
+folder. The current answer is not “literally README-faithful train_gpt.py-only
+code”; instead it is a maintainer-facing equivalence argument bound to the
+exact launcher, runtime payload, real trainer payload, runtime manifest, and
+real-execution-contract digests shipped in the folder.
 
 It now closes the current shipped counted-runtime and build-dependency story
 for the exported payload, but it still does **not** pretend that the lane is
@@ -176,3 +183,8 @@ It does not claim:
 The exported folder can now invoke the real single-H100 trainer surface, but
 distributed `8xH100` evidence and record-track promotion remain explicit
 follow-on work.
+
+The current export surface also remains deliberately stronger than the public
+README’s literal `train_gpt.py`-only counted-code shape. That difference is now
+machine-readable instead of implicit, but the current non-record bundle still
+does not claim a literal record-track-faithful runtime surface.

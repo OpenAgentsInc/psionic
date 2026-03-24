@@ -21,12 +21,18 @@ The committed machine-readable report now lives at:
 
 - `fixtures/parameter_golf/reports/parameter_golf_record_track_contract.json`
 
+The coupled export-surface judgment now also lives at:
+
+- `fixtures/parameter_golf/reports/parameter_golf_record_export_surface_contract.json`
+
 ## Current Contract
 
 The record-track contract now binds together:
 
 - the canonical acceptance report
 - the landed non-record submission package surface
+- the explicit record export-surface contract judgment against the README
+  `train_gpt.py` surface
 - the exported-folder evidence and replay-verification reports
 - the promotion receipt plus final PR-bundle and local challenge-clone dry-run reports
 - the committed post-parity research harness
@@ -42,6 +48,7 @@ The current contract now keeps these satisfied surfaces explicit:
 - challenge-oracle parity is landed
 - reproducible record-folder output exists for the non-record lane
 - counted-byte vocabulary is explicit and machine-readable
+- the current export surface judgment is explicit and machine-readable
 - folder-local replay verification is landed
 - maintainer-facing promotion receipt and PR bundle generation are landed
 - local challenge-clone dry run is landed
@@ -54,9 +61,12 @@ The report now keeps one blocker explicit today:
 
 The shipped runtime-byte and build-dependency story is now explicit for the
 current exported payload through the non-record accounting receipt and the
-coupled research or record-track reports. The contract remains useful because
-it still does **not** let the repo pretend that packaging explicitness equals
-real hardware closure.
+coupled research, export-surface, or record-track reports. The current export
+surface is also no longer implicit: the repo now says directly that the folder
+is not literally README-faithful `train_gpt.py`-only code, and instead binds a
+maintainer-facing launcher-plus-runtime equivalence argument to exact shipped
+bytes. The contract remains useful because it still does **not** let the repo
+pretend that packaging explicitness equals real hardware closure.
 
 ## Current Honest Boundary
 

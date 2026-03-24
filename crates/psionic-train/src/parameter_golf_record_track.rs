@@ -85,6 +85,8 @@ pub struct ParameterGolfRecordTrackContractReport {
     pub baseline_accounting_receipt_digest: String,
     /// Stable digest of the exported submission run-evidence report.
     pub baseline_submission_run_evidence_report_digest: String,
+    /// Stable digest of the export-surface contract report.
+    pub baseline_export_surface_contract_report_digest: String,
     /// Stable digest of the exported folder replay-verification report.
     pub baseline_record_folder_replay_verification_report_digest: String,
     /// Stable digest of the final PR-bundle report.
@@ -113,6 +115,7 @@ impl ParameterGolfRecordTrackContractReport {
         baseline_model_artifact_digest: impl Into<String>,
         baseline_accounting_receipt_digest: impl Into<String>,
         baseline_submission_run_evidence_report_digest: impl Into<String>,
+        baseline_export_surface_contract_report_digest: impl Into<String>,
         baseline_record_folder_replay_verification_report_digest: impl Into<String>,
         baseline_final_pr_bundle_report_digest: impl Into<String>,
         baseline_local_clone_dry_run_report_digest: impl Into<String>,
@@ -142,6 +145,8 @@ impl ParameterGolfRecordTrackContractReport {
             baseline_accounting_receipt_digest: baseline_accounting_receipt_digest.into(),
             baseline_submission_run_evidence_report_digest:
                 baseline_submission_run_evidence_report_digest.into(),
+            baseline_export_surface_contract_report_digest:
+                baseline_export_surface_contract_report_digest.into(),
             baseline_record_folder_replay_verification_report_digest:
                 baseline_record_folder_replay_verification_report_digest.into(),
             baseline_final_pr_bundle_report_digest:
@@ -219,6 +224,12 @@ struct SubmissionRunEvidenceFixture {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+struct ExportSurfaceContractFixture {
+    report_digest: String,
+    judgment: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 struct ReplayVerificationFixture {
     report_digest: String,
 }
@@ -249,6 +260,10 @@ pub fn build_parameter_golf_record_track_contract_report() -> ParameterGolfRecor
         "../../../fixtures/parameter_golf/reports/parameter_golf_submission_run_evidence.json"
     ))
     .expect("submission run evidence fixture should decode");
+    let export_surface_contract: ExportSurfaceContractFixture = serde_json::from_str(include_str!(
+        "../../../fixtures/parameter_golf/reports/parameter_golf_record_export_surface_contract.json"
+    ))
+    .expect("export surface contract fixture should decode");
     let replay_verification: ReplayVerificationFixture = serde_json::from_str(include_str!(
         "../../../fixtures/parameter_golf/reports/parameter_golf_record_folder_replay_verification.json"
     ))
@@ -318,6 +333,19 @@ pub fn build_parameter_golf_record_track_contract_report() -> ParameterGolfRecor
             evidence_refs: vec![
                 String::from("docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md"),
                 String::from("docs/PARAMETER_GOLF_RECORD_FOLDER_COMPATIBILITY.md"),
+            ],
+        },
+        ParameterGolfRecordTrackRequiredSurface {
+            surface_id: String::from("record_export_surface_contract"),
+            status: ParameterGolfRecordTrackSurfaceStatus::Satisfied,
+            detail: format!(
+                "The repo now preserves one explicit export-surface judgment against the README train_gpt.py contract. Current judgment=`{}`: the folder is not literally train_gpt.py-only, but the launcher-plus-runtime equivalence argument is machine-readable and bound to exact shipped bytes.",
+                export_surface_contract.judgment
+            ),
+            evidence_refs: vec![
+                String::from("docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md"),
+                String::from("docs/PARAMETER_GOLF_EXPORTED_SUBMISSION_EVIDENCE.md"),
+                String::from("fixtures/parameter_golf/reports/parameter_golf_record_export_surface_contract.json"),
             ],
         },
         ParameterGolfRecordTrackRequiredSurface {
@@ -403,6 +431,7 @@ pub fn build_parameter_golf_record_track_contract_report() -> ParameterGolfRecor
             .comparison_surface
             .baseline_accounting_receipt_digest,
         submission_run_evidence.report_digest,
+        export_surface_contract.report_digest,
         replay_verification.report_digest,
         final_pr_bundle.report_digest,
         local_clone_dry_run.report_digest,
@@ -510,6 +539,10 @@ mod tests {
         }));
         assert!(report.required_surfaces.iter().any(|surface| {
             surface.surface_id == "counted_runtime_story_for_record_track"
+                && surface.status == ParameterGolfRecordTrackSurfaceStatus::Satisfied
+        }));
+        assert!(report.required_surfaces.iter().any(|surface| {
+            surface.surface_id == "record_export_surface_contract"
                 && surface.status == ParameterGolfRecordTrackSurfaceStatus::Satisfied
         }));
         assert!(report

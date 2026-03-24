@@ -13,6 +13,7 @@
   "baseline_model_artifact_digest": "efe272503950104f1557f5c73cad69ce717e60d9b75f05e48d17ffbeb6940af1",
   "baseline_accounting_receipt_digest": "0463d3ed56b7aba39a92aa2c3608a71eb1696722292ffef592980dc2ebf8260c",
   "baseline_submission_run_evidence_report_digest": "f65656fd3747ab65da841b42cfc9aa7433416ee6680b99f000b3ca4ab622f23f",
+  "baseline_export_surface_contract_report_digest": "5366f2aa092f2d0079adb54bce1c0dea366ca4fc4f4a4fabf92154c0f07f46eb",
   "baseline_record_folder_replay_verification_report_digest": "7d207c7a3782f11ca2e6e4bf2311a5c80848b5f22553a7c1a27ccca82f1288ea",
   "baseline_final_pr_bundle_report_digest": "1c4ad7c7f4626d7b21b0249740489dbcd41c175832008a802870c27669bd124e",
   "baseline_local_clone_dry_run_report_digest": "94810fb1ff0787dba24df5b52237cb7b6160e3ba987fc89403dea6c33538832e",
@@ -57,6 +58,16 @@
       "evidence_refs": [
         "docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md",
         "docs/PARAMETER_GOLF_RECORD_FOLDER_COMPATIBILITY.md"
+      ]
+    },
+    {
+      "surface_id": "record_export_surface_contract",
+      "status": "satisfied",
+      "detail": "The repo now preserves one explicit export-surface judgment against the README train_gpt.py contract. Current judgment=`maintainer_equivalence_argument`: the folder is not literally train_gpt.py-only, but the launcher-plus-runtime equivalence argument is machine-readable and bound to exact shipped bytes.",
+      "evidence_refs": [
+        "docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md",
+        "docs/PARAMETER_GOLF_EXPORTED_SUBMISSION_EVIDENCE.md",
+        "fixtures/parameter_golf/reports/parameter_golf_record_export_surface_contract.json"
       ]
     },
     {
@@ -116,5 +127,5 @@
     }
   ],
   "claim_boundary": "record-track contract is now explicit, the shipped runtime-byte contract is defended, and the current lane remains blocked on reproducible 8xH100 challenge-speed execution",
-  "report_digest": "8396bbe2e9b3433ac95b37208414d8346d44107225f8968429ca5f41f0197fb8"
+  "report_digest": "f154990f08102fd7937b079c454783691cbda2cf9c212d7802fc1ddabeaeb56d"
 }
