@@ -11,11 +11,11 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    OPEN_ADAPTER_CUDA_BACKEND_LABEL, OpenAdapterAdmissibleModelFamily, OpenAdapterExecutionConfig,
-    OpenAdapterHiddenStateSample, OpenAdapterLmHeadTarget, OpenAdapterPrecisionPolicy,
-    OpenAdapterReferenceModel, OpenAdapterSftRunRequest, OpenAdapterTrainingExecutionBackend,
-    ParameterGolfSingleH100BringupReport, TrainingLoopBudget, TrainingOptimizerConfig,
-    TrainingOptimizerResidencyPolicy, first_swarm_run_contract, first_swarm_tokenizer_digest,
+    build_first_swarm_open_adapter_contributor_receipt, first_swarm_open_adapter_samples,
+    first_swarm_open_adapter_sft_request, first_swarm_open_adapter_training_config,
+    first_swarm_run_contract, FirstSwarmOpenAdapterContributorReceipt, OpenAdapterPrecisionPolicy,
+    OpenAdapterTrainingExecutionBackend, ParameterGolfSingleH100BringupReport,
+    OPEN_ADAPTER_CUDA_BACKEND_LABEL,
 };
 
 /// Stable retained inventory source for the first Linux RTX 4080 swarm report.
@@ -106,6 +106,8 @@ pub struct FirstSwarmLinuxCudaParityHarnessReport {
     pub probe_top_token_id: usize,
     /// Explicit precision refusal for unsupported later postures.
     pub unsupported_precision_refusal: String,
+    /// Shared comparable contributor receipt for the first swarm lane.
+    pub contributor_receipt: FirstSwarmOpenAdapterContributorReceipt,
     /// Stable harness digest.
     pub harness_digest: String,
 }
@@ -162,25 +164,16 @@ pub struct FirstSwarmLinuxCudaBringupReport {
 #[derive(Debug, Error)]
 pub enum FirstSwarmLinuxCudaBringupError {
     #[error("failed to read `{path}`: {error}")]
-    Read {
-        path: String,
-        error: std::io::Error,
-    },
+    Read { path: String, error: std::io::Error },
     #[error("failed to decode inventory report `{path}`: {error}")]
     Deserialize {
         path: String,
         error: serde_json::Error,
     },
     #[error("failed to create `{path}`: {error}")]
-    CreateDir {
-        path: String,
-        error: std::io::Error,
-    },
+    CreateDir { path: String, error: std::io::Error },
     #[error("failed to write `{path}`: {error}")]
-    Write {
-        path: String,
-        error: std::io::Error,
-    },
+    Write { path: String, error: std::io::Error },
     #[error(transparent)]
     Serialize(#[from] serde_json::Error),
     #[error(transparent)]
@@ -205,12 +198,10 @@ pub fn build_first_swarm_linux_cuda_bringup_report(
             path: inventory_report_path.display().to_string(),
             error,
         })?;
-    let inventory: ParameterGolfSingleH100BringupReport =
-        serde_json::from_slice(&inventory_bytes).map_err(|error| {
-            FirstSwarmLinuxCudaBringupError::Deserialize {
-                path: inventory_report_path.display().to_string(),
-                error,
-            }
+    let inventory: ParameterGolfSingleH100BringupReport = serde_json::from_slice(&inventory_bytes)
+        .map_err(|error| FirstSwarmLinuxCudaBringupError::Deserialize {
+            path: inventory_report_path.display().to_string(),
+            error,
         })?;
     let source_inventory_report_digest = hex::encode(Sha256::digest(inventory_bytes.as_slice()));
     let machine_thresholds = FirstSwarmLinuxCudaMachineThresholds::canonical();
@@ -219,8 +210,8 @@ pub fn build_first_swarm_linux_cuda_bringup_report(
         .iter()
         .filter(|device| device_matches_rtx4080(device, &machine_thresholds))
         .count();
-    let machine_contract_satisfied = matching_rtx4080_device_count
-        >= machine_thresholds.minimum_matching_device_count;
+    let machine_contract_satisfied =
+        matching_rtx4080_device_count >= machine_thresholds.minimum_matching_device_count;
     let refusal = (!machine_contract_satisfied).then(|| {
         PsionicRefusal::new(
             PsionicRefusalCode::UnsupportedBackendCapability,
@@ -282,8 +273,7 @@ pub fn build_first_swarm_linux_cuda_bringup_report(
         refusal,
         psionic_entrypoint: format!(
             "cargo run -q -p psionic-train --bin swarm_linux_cuda_bringup -- {} {}",
-            SWARM_LINUX_4080_SOURCE_INVENTORY_REPORT_PATH,
-            SWARM_LINUX_4080_BRINGUP_FIXTURE_PATH
+            SWARM_LINUX_4080_SOURCE_INVENTORY_REPORT_PATH, SWARM_LINUX_4080_BRINGUP_FIXTURE_PATH
         ),
         claim_boundary,
         drift_notes,
@@ -292,10 +282,8 @@ pub fn build_first_swarm_linux_cuda_bringup_report(
         observed_wallclock_ms,
         report_digest: String::new(),
     };
-    report.report_digest = stable_digest(
-        b"psionic_first_swarm_linux_cuda_bringup_report|",
-        &report,
-    );
+    report.report_digest =
+        stable_digest(b"psionic_first_swarm_linux_cuda_bringup_report|", &report);
     Ok(report)
 }
 
@@ -324,57 +312,32 @@ pub fn write_first_swarm_linux_cuda_bringup_report(
 
 fn run_first_swarm_linux_cuda_parity_harness(
 ) -> Result<FirstSwarmLinuxCudaParityHarnessReport, FirstSwarmLinuxCudaBringupError> {
-    let config = OpenAdapterExecutionConfig {
-        run_id: String::from("swarm-linux-cuda-parity"),
-        checkpoint_family: String::from("swarm.open_adapter.cuda.same_node"),
-        execution_backend_label: String::from(OPEN_ADAPTER_CUDA_BACKEND_LABEL),
-        admissible_model_family: OpenAdapterAdmissibleModelFamily::GptOssDecoderLmHeadLora,
-        budget: TrainingLoopBudget::new(12, 1, 1)?,
-        batch_size: 2,
-        precision_policy: OpenAdapterPrecisionPolicy::F32Reference,
-        model: OpenAdapterReferenceModel {
-            base_model_id: String::from("gpt-oss-20b"),
-            base_model_revision: String::from("swarm-local-v1"),
-            base_served_artifact_digest: String::from("sha256:swarm-open-adapter-base"),
-            tokenizer: first_swarm_tokenizer_digest(),
-            hidden_size: 4,
-            vocab_size: 4,
-            target: OpenAdapterLmHeadTarget {
-                target_id: String::from("lm_head"),
-                lora_rank: 2,
-                lora_alpha: 8.0,
-                optimizer: TrainingOptimizerConfig::adamw(0.2, 0.9, 0.99, 1e-8)
-                    .with_gradient_clip_norm(1.0),
-                optimizer_residency_policy: TrainingOptimizerResidencyPolicy::host_only(),
-            },
-        },
-    };
-    let samples = vec![
-        OpenAdapterHiddenStateSample::new("swarm-cuda-a", vec![1.0, 0.0, 0.0, 0.0], 2, 16)?,
-        OpenAdapterHiddenStateSample::new("swarm-cuda-b", vec![0.0, 1.0, 0.0, 0.0], 3, 15)?,
-        OpenAdapterHiddenStateSample::new("swarm-cuda-c", vec![1.0, 0.0, 0.0, 0.0], 2, 14)?,
-        OpenAdapterHiddenStateSample::new("swarm-cuda-d", vec![0.0, 1.0, 0.0, 0.0], 3, 13)?,
-    ];
+    let config = first_swarm_open_adapter_training_config(
+        "swarm-linux-cuda-parity",
+        "swarm.open_adapter.cuda.same_node",
+        OPEN_ADAPTER_CUDA_BACKEND_LABEL,
+    );
+    let samples = first_swarm_open_adapter_samples("swarm-cuda").map_err(|error| {
+        FirstSwarmLinuxCudaBringupError::ParityRuntime {
+            detail: error.to_string(),
+        }
+    })?;
     let backend = OpenAdapterTrainingExecutionBackend::new(config, samples)?;
     let outcome = crate::run_open_adapter_sft_export(
         &backend,
-        &OpenAdapterSftRunRequest {
-            dataset_ref: String::from("dataset://openagents/swarm/open_adapter_sft@2026.03.24"),
-            validator_policy_ref: String::from("validator.open_adapter.reference"),
-            adapter_id: String::from("swarm-linux-cuda"),
-            adapter_revision: String::from("r1"),
-            started_at_ms: 1_774_393_600_000,
-            step_duration_ms: 25,
-        },
+        &first_swarm_open_adapter_sft_request("swarm-linux-cuda", "r1", 1_774_393_600_000, 25),
     )?;
     let unsupported_precision_refusal = OpenAdapterTrainingExecutionBackend::new(
-        OpenAdapterExecutionConfig {
+        crate::OpenAdapterExecutionConfig {
             precision_policy: OpenAdapterPrecisionPolicy::Bf16Mixed,
             ..backend.config().clone()
         },
-        vec![
-            OpenAdapterHiddenStateSample::new("unsupported", vec![1.0, 0.0, 0.0, 0.0], 2, 1)?,
-        ],
+        vec![crate::OpenAdapterHiddenStateSample::new(
+            "unsupported",
+            vec![1.0, 0.0, 0.0, 0.0],
+            2,
+            1,
+        )?],
     )
     .expect_err("bf16 should stay unsupported")
     .to_string();
@@ -396,6 +359,16 @@ fn run_first_swarm_linux_cuda_parity_harness(
         .max_by(|left, right| left.1.partial_cmp(right.1).expect("finite logits"))
         .map(|(index, _)| index)
         .unwrap_or_default();
+    let contributor_receipt = build_first_swarm_open_adapter_contributor_receipt(
+        "swarm.linux.cuda.rtx4080.contributor",
+        &backend,
+        &outcome,
+        probe_top_token_id,
+        unsupported_precision_refusal.clone(),
+    )
+    .map_err(|error| FirstSwarmLinuxCudaBringupError::ParityRuntime {
+        detail: error.to_string(),
+    })?;
     let mut report = FirstSwarmLinuxCudaParityHarnessReport {
         run_id: backend.config().run_id.clone(),
         execution_backend_label: String::from(OPEN_ADAPTER_CUDA_BACKEND_LABEL),
@@ -408,6 +381,7 @@ fn run_first_swarm_linux_cuda_parity_harness(
         adapter_identity_digest: outcome.summary.adapter_identity_digest.clone(),
         probe_top_token_id,
         unsupported_precision_refusal,
+        contributor_receipt,
         harness_digest: String::new(),
     };
     report.harness_digest =
@@ -445,7 +419,8 @@ fn now_ms() -> u64 {
 
 #[cfg(test)]
 fn inventory_fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/parameter_golf/reports/parameter_golf_single_h100_bringup.json")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/parameter_golf/reports/parameter_golf_single_h100_bringup.json")
 }
 
 #[cfg(test)]
@@ -455,7 +430,7 @@ mod tests {
     #[test]
     fn retained_parameter_golf_inventory_still_exposes_rtx4080_contract() {
         let report = build_first_swarm_linux_cuda_bringup_report(inventory_fixture_path())
-        .expect("retained inventory should parse");
+            .expect("retained inventory should parse");
         assert!(report.machine_contract_satisfied);
         assert_eq!(report.matching_rtx4080_device_count, 1);
         assert_eq!(
@@ -466,13 +441,18 @@ mod tests {
 
     #[test]
     fn linux_cuda_parity_harness_is_deterministic_and_refuses_bf16() {
-        let harness = run_first_swarm_linux_cuda_parity_harness()
-            .expect("parity harness should execute");
-        assert_eq!(harness.execution_backend_label, OPEN_ADAPTER_CUDA_BACKEND_LABEL);
+        let harness =
+            run_first_swarm_linux_cuda_parity_harness().expect("parity harness should execute");
+        assert_eq!(
+            harness.execution_backend_label,
+            OPEN_ADAPTER_CUDA_BACKEND_LABEL
+        );
         assert_eq!(harness.adapter_family, "gpt_oss.decoder_lm_head_lora");
         assert_eq!(harness.precision_policy, "f32_reference");
         assert!(harness.executed_steps > 0);
         assert!(harness.final_mean_loss > 0.0);
-        assert!(harness.unsupported_precision_refusal.contains("does not yet support precision policy"));
+        assert!(harness
+            .unsupported_precision_refusal
+            .contains("does not yet support precision policy"));
     }
 }

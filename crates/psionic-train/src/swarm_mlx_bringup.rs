@@ -12,11 +12,10 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    first_swarm_run_contract, first_swarm_tokenizer_digest, run_open_adapter_sft_export,
-    OpenAdapterAdmissibleModelFamily, OpenAdapterExecutionConfig, OpenAdapterHiddenStateSample,
-    OpenAdapterLmHeadTarget, OpenAdapterPrecisionPolicy, OpenAdapterReferenceModel,
-    OpenAdapterSftRunRequest, OpenAdapterTrainingExecutionBackend, TrainingLoopBudget,
-    TrainingOptimizerConfig, TrainingOptimizerResidencyPolicy,
+    build_first_swarm_open_adapter_contributor_receipt, first_swarm_open_adapter_samples,
+    first_swarm_open_adapter_sft_request, first_swarm_open_adapter_training_config,
+    first_swarm_run_contract, run_open_adapter_sft_export, FirstSwarmOpenAdapterContributorReceipt,
+    OpenAdapterPrecisionPolicy, OpenAdapterTrainingExecutionBackend,
     OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL, SWARM_FIRST_RUN_FAMILY_ID,
 };
 
@@ -167,6 +166,8 @@ pub struct FirstSwarmMacMlxOverfitGate {
     pub probe_top_token_id: usize,
     /// Explicit precision refusal for unsupported later postures.
     pub unsupported_precision_refusal: String,
+    /// Shared comparable contributor receipt for the first swarm lane.
+    pub contributor_receipt: FirstSwarmOpenAdapterContributorReceipt,
     /// Stable gate digest.
     pub gate_digest: String,
 }
@@ -546,64 +547,32 @@ fn run_bounded_metal_eval_probe() -> Option<FirstSwarmMacMetalEvalProbe> {
 }
 
 fn run_first_swarm_mac_mlx_overfit_gate() -> Result<FirstSwarmMacMlxOverfitGate, String> {
-    let config = OpenAdapterExecutionConfig {
-        run_id: String::from("swarm-mac-mlx-overfit"),
-        checkpoint_family: String::from("swarm.open_adapter.mlx.same_node"),
-        execution_backend_label: String::from(OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL),
-        admissible_model_family: OpenAdapterAdmissibleModelFamily::GptOssDecoderLmHeadLora,
-        budget: TrainingLoopBudget::new(12, 1, 1).map_err(|error| error.to_string())?,
-        batch_size: 2,
-        precision_policy: OpenAdapterPrecisionPolicy::F32Reference,
-        model: OpenAdapterReferenceModel {
-            base_model_id: String::from("gpt-oss-20b"),
-            base_model_revision: String::from("swarm-local-v1"),
-            base_served_artifact_digest: String::from("sha256:swarm-open-adapter-base"),
-            tokenizer: first_swarm_tokenizer_digest(),
-            hidden_size: 4,
-            vocab_size: 4,
-            target: OpenAdapterLmHeadTarget {
-                target_id: String::from("lm_head"),
-                lora_rank: 2,
-                lora_alpha: 8.0,
-                optimizer: TrainingOptimizerConfig::adamw(0.2, 0.9, 0.99, 1e-8)
-                    .with_gradient_clip_norm(1.0),
-                optimizer_residency_policy: TrainingOptimizerResidencyPolicy::host_only(),
-            },
-        },
-    };
-    let samples = vec![
-        OpenAdapterHiddenStateSample::new("swarm-mlx-a", vec![1.0, 0.0, 0.0, 0.0], 2, 16)
-            .map_err(|error| error.to_string())?,
-        OpenAdapterHiddenStateSample::new("swarm-mlx-b", vec![0.0, 1.0, 0.0, 0.0], 3, 15)
-            .map_err(|error| error.to_string())?,
-        OpenAdapterHiddenStateSample::new("swarm-mlx-c", vec![1.0, 0.0, 0.0, 0.0], 2, 14)
-            .map_err(|error| error.to_string())?,
-        OpenAdapterHiddenStateSample::new("swarm-mlx-d", vec![0.0, 1.0, 0.0, 0.0], 3, 13)
-            .map_err(|error| error.to_string())?,
-    ];
+    let config = first_swarm_open_adapter_training_config(
+        "swarm-mac-mlx-overfit",
+        "swarm.open_adapter.mlx.same_node",
+        OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL,
+    );
+    let samples =
+        first_swarm_open_adapter_samples("swarm-mlx").map_err(|error| error.to_string())?;
     let backend = OpenAdapterTrainingExecutionBackend::new(config, samples)
         .map_err(|error| error.to_string())?;
     let outcome = run_open_adapter_sft_export(
         &backend,
-        &OpenAdapterSftRunRequest {
-            dataset_ref: String::from("dataset://openagents/swarm/open_adapter_sft@2026.03.24"),
-            validator_policy_ref: String::from("validator.open_adapter.reference"),
-            adapter_id: String::from("swarm-mac-mlx"),
-            adapter_revision: String::from("r1"),
-            started_at_ms: 1_774_393_600_000,
-            step_duration_ms: 25,
-        },
+        &first_swarm_open_adapter_sft_request("swarm-mac-mlx", "r1", 1_774_393_600_000, 25),
     )
     .map_err(|error| error.to_string())?;
     let unsupported_precision_refusal = OpenAdapterTrainingExecutionBackend::new(
-        OpenAdapterExecutionConfig {
+        crate::OpenAdapterExecutionConfig {
             precision_policy: OpenAdapterPrecisionPolicy::Bf16Mixed,
             ..backend.config().clone()
         },
-        vec![
-            OpenAdapterHiddenStateSample::new("unsupported", vec![1.0, 0.0, 0.0, 0.0], 2, 1)
-                .map_err(|error| error.to_string())?,
-        ],
+        vec![crate::OpenAdapterHiddenStateSample::new(
+            "unsupported",
+            vec![1.0, 0.0, 0.0, 0.0],
+            2,
+            1,
+        )
+        .map_err(|error| error.to_string())?],
     )
     .expect_err("bf16 should stay unsupported")
     .to_string();
@@ -620,6 +589,14 @@ fn run_first_swarm_mac_mlx_overfit_gate() -> Result<FirstSwarmMacMlxOverfitGate,
         .max_by(|left, right| left.1.partial_cmp(right.1).expect("finite logits"))
         .map(|(index, _)| index)
         .unwrap_or_default();
+    let contributor_receipt = build_first_swarm_open_adapter_contributor_receipt(
+        "swarm.mac.mlx.coordinator_validator_contributor",
+        &backend,
+        &outcome,
+        probe_top_token_id,
+        unsupported_precision_refusal.clone(),
+    )
+    .map_err(|error| error.to_string())?;
     let mut gate = FirstSwarmMacMlxOverfitGate {
         run_id: backend.config().run_id.clone(),
         execution_backend_label: String::from(OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL),
@@ -640,6 +617,7 @@ fn run_first_swarm_mac_mlx_overfit_gate() -> Result<FirstSwarmMacMlxOverfitGate,
         final_state_dict_digest: outcome.summary.final_state_dict_digest.clone(),
         probe_top_token_id,
         unsupported_precision_refusal,
+        contributor_receipt,
         gate_digest: String::new(),
     };
     gate.gate_digest = stable_digest(b"psionic_first_swarm_mac_mlx_overfit_gate|", &gate);

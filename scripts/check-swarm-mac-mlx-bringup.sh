@@ -130,6 +130,7 @@ for key in [
     "final_state_dict_digest",
     "probe_top_token_id",
     "unsupported_precision_refusal",
+    "contributor_receipt",
     "gate_digest",
 ]:
     if key not in overfit_gate:
@@ -152,6 +153,76 @@ if overfit_gate["probe_top_token_id"] != 2:
     fail("swarm mac mlx bring-up error: deterministic probe must target token 2")
 if "does not yet support precision policy" not in overfit_gate["unsupported_precision_refusal"]:
     fail("swarm mac mlx bring-up error: overfit gate must retain explicit unsupported precision refusal")
+contributor_receipt = overfit_gate["contributor_receipt"]
+for key in [
+    "schema_version",
+    "manifest",
+    "run_id",
+    "checkpoint_family",
+    "executed_steps",
+    "batch_count",
+    "final_mean_loss",
+    "adapter_artifact_digest",
+    "adapter_identity_digest",
+    "initial_state_dict_digest",
+    "final_state_dict_digest",
+    "execution_provenance_digest",
+    "deterministic_probe_top_token_id",
+    "unsupported_precision_refusal",
+    "receipt_digest",
+]:
+    if key not in contributor_receipt:
+        fail(f"swarm mac mlx bring-up error: missing contributor_receipt field `{key}`")
+manifest = contributor_receipt["manifest"]
+for key in [
+    "receipt_contract_digest",
+    "run_family_id",
+    "swarm_contract_digest",
+    "dataset_ref",
+    "dataset_manifest_digest",
+    "validator_policy_id",
+    "aggregation_policy_id",
+    "replay_policy_id",
+    "contributor_role_id",
+    "execution_backend_label",
+    "logical_device_kind",
+    "logical_device_label",
+    "admissible_model_family",
+    "adapter_family",
+    "adapter_format",
+    "precision_policy",
+    "base_model_id",
+    "base_model_revision",
+    "base_served_artifact_digest",
+    "tokenizer_digest",
+    "tokenizer_contract_digest",
+    "hidden_size",
+    "vocab_size",
+    "lora_rank",
+    "lora_alpha",
+    "batch_size",
+    "sample_count",
+    "shared_replay_identity_digest",
+    "manifest_digest",
+]:
+    if key not in manifest:
+        fail(f"swarm mac mlx bring-up error: missing contributor_receipt.manifest field `{key}`")
+if contributor_receipt["schema_version"] != "swarm.open_adapter.contributor_receipt.v1":
+    fail("swarm mac mlx bring-up error: contributor receipt schema version drifted")
+if manifest["contributor_role_id"] != "swarm.mac.mlx.coordinator_validator_contributor":
+    fail("swarm mac mlx bring-up error: contributor receipt role drifted")
+if manifest["execution_backend_label"] != overfit_gate["execution_backend_label"]:
+    fail("swarm mac mlx bring-up error: contributor receipt backend label must match overfit gate backend label")
+if manifest["logical_device_kind"] != "metal" or manifest["logical_device_label"] != "metal:0":
+    fail("swarm mac mlx bring-up error: contributor receipt must preserve the Metal logical-device identity")
+if manifest["adapter_family"] != "gpt_oss.decoder_lm_head_lora" or manifest["adapter_format"] != "safetensors":
+    fail("swarm mac mlx bring-up error: contributor receipt adapter identity drifted")
+if manifest["precision_policy"] != "f32_reference":
+    fail("swarm mac mlx bring-up error: contributor receipt precision policy must stay f32_reference")
+if contributor_receipt["deterministic_probe_top_token_id"] != overfit_gate["probe_top_token_id"]:
+    fail("swarm mac mlx bring-up error: contributor receipt probe token must match the overfit gate probe token")
+if contributor_receipt["unsupported_precision_refusal"] != overfit_gate["unsupported_precision_refusal"]:
+    fail("swarm mac mlx bring-up error: contributor receipt unsupported precision refusal must match the overfit gate refusal")
 if "dense_f32.matmul" not in report["admitted_metal_slice"]:
     fail("swarm mac mlx bring-up error: admitted_metal_slice must include dense_f32.matmul")
 if report["finished_at_ms"] < report["started_at_ms"]:
@@ -169,6 +240,7 @@ summary = {
     "training_backend_posture": report["training_backend_posture"],
     "overfit_gate_run_id": overfit_gate["run_id"],
     "probe_top_token_id": overfit_gate["probe_top_token_id"],
+    "receipt_contract_digest": manifest["receipt_contract_digest"],
     "chip_name": host["chip_name"],
     "metal_family_support": host.get("metal_family_support"),
     "machine_contract_satisfied": report["machine_contract_satisfied"],

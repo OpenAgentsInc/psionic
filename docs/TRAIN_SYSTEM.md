@@ -65,6 +65,14 @@ contract freezes the first Mac MLX Metal plus Linux RTX 4080 CUDA lane as one
 decentralized open-adapter delta program with explicit validator, replay,
 local-snapshot-only publication, and no-full-model-overclaim posture.
 
+That lane now also has one shared comparable receipt contract in
+`crates/psionic-train/src/swarm_open_adapter_receipt.rs` plus the committed
+fixture `fixtures/swarm/first_swarm_open_adapter_receipt_contract_v1.json`.
+That contract freezes the first swarm lane to one `f32`-only open-adapter
+receipt language with explicit backend label, logical-device identity, replay
+identity, adapter family and format, tokenizer and base-model identity, and
+hidden-state geometry truth before aggregation may accept both contributors.
+
 The Mac node now also has a dedicated bring-up report seam in
 `crates/psionic-train/src/swarm_mlx_bringup.rs`, the binary
 `swarm_mac_mlx_bringup`, the verification runner
@@ -74,8 +82,8 @@ real local Mac identity plus the bounded Metal array surface and one bounded
 same-node open-adapter overfit gate under the backend label
 `open_adapter_backend.mlx.metal.gpt_oss_lm_head`. The gate keeps the fixed-
 budget trainer host-owned, but it emits backend-tagged execution provenance,
-artifact identity, and explicit unsupported-precision refusal for the Mac
-swarm contributor lane.
+artifact identity, explicit unsupported-precision refusal, and the shared first
+swarm contributor receipt for the Mac swarm contributor lane.
 
 The Linux node now also has a dedicated RTX 4080 bring-up seam in
 `crates/psionic-train/src/swarm_cuda_bringup.rs`, the binary
@@ -83,7 +91,8 @@ The Linux node now also has a dedicated RTX 4080 bring-up seam in
 `scripts/check-swarm-linux-4080-bringup.sh`, and the committed report
 `fixtures/swarm/reports/swarm_linux_rtx4080_bringup_v1.json`. That report
 binds the lane to retained RTX 4080 CUDA inventory truth plus a deterministic
-open-adapter same-node harness with explicit unsupported-precision refusal.
+open-adapter same-node harness with explicit unsupported-precision refusal and
+the same comparable contributor receipt contract used by the Mac lane.
 
 Apple-specific adapter work is no longer only later-family planning. The repo
 now owns a canonical spec-and-fixture baseline for it in:
