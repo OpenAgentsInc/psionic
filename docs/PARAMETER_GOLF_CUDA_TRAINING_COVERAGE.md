@@ -140,8 +140,7 @@ reduced:
 
 The fresh narrowed blocker list is now:
 
-- backward replay: `permute`, `reduce_sum`,
-  `scaled_dot_product_attention_{query,key,value}_backward`
+- backward replay: `scaled_dot_product_attention_{query,key,value}_backward`
 
 Forward `expand` and `permute` still exist on the fallback surface, but they no
 longer dominate at the same order of magnitude after the parallel layout path
@@ -160,6 +159,12 @@ the same bounded public lane before the next H100 rerun:
 - `scaled_dot_product_attention_{query,key,value}_backward` host replay now
   reuses per-position gradient-weight scratch instead of recomputing the same
   inner products twice
+- one bounded CUDA causal full-sequence attention-backward kernel now writes
+  the query, key, and value gradients for the admitted `f32` PGOLF shapes
+  directly on-device
+- a fresh local profiled decoder-backward run on the RTX 4080 now leaves the
+  fallback profile sink empty, so the bounded decoder backward path no longer
+  touches host fallback at all on that lane
 - CUDA plan validation now admits the host-fallback or alias view family
   (`reshape`, `detach`, `permute`, `slice`, `select`, `concat`, `expand`,
   `reduce_sum`) that the runtime already executes on the bounded lane
@@ -234,9 +239,9 @@ Today it keeps these truths separate:
     shapes
   - one bounded CUDA decoder backward kernel is real on the public lane for
     `rotary_embedding_backward`
-  - one bounded host-orchestrated CUDA decoder backward path is still real on
-    the public lane for
-    `scaled_dot_product_attention_{query,key,value}_backward`
+  - one bounded CUDA decoder backward kernel is also real on the public lane
+    for `scaled_dot_product_attention_{query,key,value}_backward` on admitted
+    `f32` Parameter Golf shapes
   - one bounded host-orchestrated CUDA BF16 master-weight optimizer step over
     BF16 train-visible parameter and gradient buffers with FP32 master weights
     and FP32 optimizer state is real on the public lane

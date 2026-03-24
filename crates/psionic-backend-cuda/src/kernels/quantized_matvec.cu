@@ -1937,6 +1937,119 @@ __global__ void attention_causal_sequence_kernel(
     }
 }
 
+__global__ void attention_causal_sequence_backward_f32_kernel(
+    const float *query,
+    const float *key,
+    const float *value,
+    const float *grad_output,
+    int batch_size,
+    int head_count,
+    int kv_head_count,
+    int sequence_length,
+    int head_dim,
+    float *query_gradient,
+    float *key_gradient,
+    float *value_gradient
+) {
+    const int head_index = static_cast<int>(blockIdx.x);
+    const int position = static_cast<int>(blockIdx.y);
+    const int batch_index = static_cast<int>(blockIdx.z);
+    if (batch_index >= batch_size || head_index >= head_count || position >= sequence_length) {
+        return;
+    }
+
+    __shared__ float logits[kAttentionMaxPositions];
+    __shared__ float weights[kAttentionMaxPositions];
+    __shared__ float grad_scores[kAttentionMaxPositions];
+    __shared__ float reduction_scratch[kAttentionBlockSize];
+
+    const int group_size = max(head_count / max(kv_head_count, 1), 1);
+    const int kv_head = min(head_index / group_size, kv_head_count - 1);
+    const float scale = rsqrtf(static_cast<float>(head_dim));
+    const int query_row_offset =
+        ((batch_index * head_count + head_index) * sequence_length + position) * head_dim;
+    const float *query_row = query + query_row_offset;
+    const float *grad_output_row = grad_output + query_row_offset;
+
+    for (int token_index = static_cast<int>(threadIdx.x); token_index <= position;
+         token_index += blockDim.x) {
+        const int key_row_offset =
+            ((batch_index * kv_head_count + kv_head) * sequence_length + token_index) * head_dim;
+        const float *key_row = key + key_row_offset;
+        float dot = 0.0f;
+        for (int dim = 0; dim < head_dim; ++dim) {
+            dot += query_row[dim] * key_row[dim];
+        }
+        logits[token_index] = dot * scale;
+    }
+    __syncthreads();
+
+    float local_max = -INFINITY;
+    for (int token_index = static_cast<int>(threadIdx.x); token_index <= position;
+         token_index += blockDim.x) {
+        local_max = fmaxf(local_max, logits[token_index]);
+    }
+    const float max_value = reduce_block_max(local_max, reduction_scratch);
+
+    float local_denom = 0.0f;
+    for (int token_index = static_cast<int>(threadIdx.x); token_index <= position;
+         token_index += blockDim.x) {
+        const float weight = expf(logits[token_index] - max_value);
+        weights[token_index] = weight;
+        local_denom += weight;
+    }
+    const float denom = fmaxf(reduce_block_sum(local_denom, reduction_scratch), 1e-20f);
+    for (int token_index = static_cast<int>(threadIdx.x); token_index <= position;
+         token_index += blockDim.x) {
+        weights[token_index] /= denom;
+    }
+    __syncthreads();
+
+    float local_weighted_grad_sum = 0.0f;
+    for (int token_index = static_cast<int>(threadIdx.x); token_index <= position;
+         token_index += blockDim.x) {
+        const int value_row_offset =
+            ((batch_index * kv_head_count + kv_head) * sequence_length + token_index) * head_dim;
+        const float *value_row = value + value_row_offset;
+        float grad_weight = 0.0f;
+        for (int dim = 0; dim < head_dim; ++dim) {
+            grad_weight += grad_output_row[dim] * value_row[dim];
+        }
+        logits[token_index] = grad_weight;
+        local_weighted_grad_sum += weights[token_index] * grad_weight;
+    }
+    const float weighted_grad_sum =
+        reduce_block_sum(local_weighted_grad_sum, reduction_scratch);
+    for (int token_index = static_cast<int>(threadIdx.x); token_index <= position;
+         token_index += blockDim.x) {
+        grad_scores[token_index] =
+            weights[token_index] * (logits[token_index] - weighted_grad_sum);
+    }
+    __syncthreads();
+
+    for (int dim = static_cast<int>(threadIdx.x); dim < head_dim; dim += blockDim.x) {
+        float query_grad_value = 0.0f;
+        for (int token_index = 0; token_index <= position; ++token_index) {
+            const int key_row_offset =
+                ((batch_index * kv_head_count + kv_head) * sequence_length + token_index) *
+                head_dim;
+            query_grad_value += grad_scores[token_index] * scale * key[key_row_offset + dim];
+        }
+        query_gradient[query_row_offset + dim] = query_grad_value;
+    }
+
+    for (int token_index = 0; token_index <= position; ++token_index) {
+        const int kv_row_offset =
+            ((batch_index * kv_head_count + kv_head) * sequence_length + token_index) * head_dim;
+        const float key_scale = grad_scores[token_index] * scale;
+        const float value_scale = weights[token_index];
+        for (int dim = static_cast<int>(threadIdx.x); dim < head_dim; dim += blockDim.x) {
+            atomicAdd(&key_gradient[kv_row_offset + dim], key_scale * query_row[dim]);
+            atomicAdd(&value_gradient[kv_row_offset + dim], value_scale * grad_output_row[dim]);
+        }
+    }
+}
+
 __global__ void attention_decode_kernel(
     const float *query,
     int query_offset,
@@ -5964,6 +6077,48 @@ extern "C" int psionic_cuda_moe_gate_up_swiglu(
         static_cast<const float *>(gate_bias),
         static_cast<const float *>(up_bias),
         static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_attention_causal_sequence_backward_f32(
+    const void *query,
+    const void *key,
+    const void *value,
+    const void *grad_output,
+    int batch_size,
+    int head_count,
+    int kv_head_count,
+    int sequence_length,
+    int head_dim,
+    void *query_gradient,
+    void *key_gradient,
+    void *value_gradient,
+    void *stream
+) {
+    const dim3 grid(
+        static_cast<unsigned int>(head_count),
+        static_cast<unsigned int>(sequence_length),
+        static_cast<unsigned int>(batch_size)
+    );
+    attention_causal_sequence_backward_f32_kernel<<<
+        grid,
+        kAttentionBlockSize,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const float *>(query),
+        static_cast<const float *>(key),
+        static_cast<const float *>(value),
+        static_cast<const float *>(grad_output),
+        batch_size,
+        head_count,
+        kv_head_count,
+        sequence_length,
+        head_dim,
+        static_cast<float *>(query_gradient),
+        static_cast<float *>(key_gradient),
+        static_cast<float *>(value_gradient)
     );
     return static_cast<int>(cudaGetLastError());
 }

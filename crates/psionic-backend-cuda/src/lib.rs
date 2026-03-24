@@ -1522,6 +1522,42 @@ impl CudaSubmission {
         Ok(())
     }
 
+    /// Applies one bounded full-sequence causal grouped-query attention
+    /// backward pass on contiguous `f32` rank-4 tensors and writes all three
+    /// gradient surfaces on device.
+    pub fn attention_causal_sequence_backward_f32(
+        &mut self,
+        query: &CudaBuffer,
+        key: &CudaBuffer,
+        value: &CudaBuffer,
+        grad_output: &CudaBuffer,
+        batch_size: usize,
+        head_count: usize,
+        kv_head_count: usize,
+        sequence_length: usize,
+        head_dim: usize,
+        query_gradient: &CudaBuffer,
+        key_gradient: &CudaBuffer,
+        value_gradient: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_attention_causal_sequence_backward_f32(
+            &query.platform,
+            &key.platform,
+            &value.platform,
+            &grad_output.platform,
+            batch_size,
+            head_count,
+            kv_head_count,
+            sequence_length,
+            head_dim,
+            &query_gradient.platform,
+            &key_gradient.platform,
+            &value_gradient.platform,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
     /// Applies GPT-OSS NEOX-style RoPE, writes the current KV entry, and runs
     /// decode attention in one CUDA kernel.
     #[allow(clippy::too_many_arguments)]
@@ -3790,6 +3826,7 @@ impl AvailableCudaBackend {
 
     fn execute_scaled_dot_product_attention_backward_step(
         &self,
+        submission: &mut CudaSubmission,
         step: &ExecutionStep,
         values: &BTreeMap<TensorId, CudaBuffer>,
         attention_backward_cache: &mut BTreeMap<
@@ -3877,24 +3914,57 @@ impl AvailableCudaBackend {
             )));
         }
 
-        let query_values = query.read_f32()?;
-        let key_values = key.read_f32()?;
-        let value_values = value.read_f32()?;
-        let grad_output_values = grad_output.read_f32()?;
-        let gradients = scaled_dot_product_attention_backward_host_values(
-            &query_values,
-            query_dims,
-            &key_values,
-            key_dims,
-            &value_values,
-            value_dims,
-            &grad_output_values,
-            scale,
-        )?;
-        let cached = ScaledDotProductAttentionBackwardCachedOutputs {
-            query: self.buffer_from_tensor_data(query.spec(), &TensorData::F32(gradients.query))?,
-            key: self.buffer_from_tensor_data(key.spec(), &TensorData::F32(gradients.key))?,
-            value: self.buffer_from_tensor_data(value.spec(), &TensorData::F32(gradients.value))?,
+        let cached = if query.spec().dtype() == DType::F32
+            && key.spec().dtype() == DType::F32
+            && value.spec().dtype() == DType::F32
+            && grad_output.spec().dtype() == DType::F32
+        {
+            let query_gradient = self.allocate(query.spec())?;
+            let key_gradient = self.allocate(key.spec())?;
+            let value_gradient = self.allocate(value.spec())?;
+            submission.fill_buffer(&key_gradient, 0)?;
+            submission.fill_buffer(&value_gradient, 0)?;
+            submission.attention_causal_sequence_backward_f32(
+                query,
+                key,
+                value,
+                grad_output,
+                batch_size,
+                query_heads,
+                kv_heads,
+                sequence_length,
+                head_dim,
+                &query_gradient,
+                &key_gradient,
+                &value_gradient,
+            )?;
+            ScaledDotProductAttentionBackwardCachedOutputs {
+                query: query_gradient,
+                key: key_gradient,
+                value: value_gradient,
+            }
+        } else {
+            let query_values = query.read_f32()?;
+            let key_values = key.read_f32()?;
+            let value_values = value.read_f32()?;
+            let grad_output_values = grad_output.read_f32()?;
+            let gradients = scaled_dot_product_attention_backward_host_values(
+                &query_values,
+                query_dims,
+                &key_values,
+                key_dims,
+                &value_values,
+                value_dims,
+                &grad_output_values,
+                scale,
+            )?;
+            ScaledDotProductAttentionBackwardCachedOutputs {
+                query: self
+                    .buffer_from_tensor_data(query.spec(), &TensorData::F32(gradients.query))?,
+                key: self.buffer_from_tensor_data(key.spec(), &TensorData::F32(gradients.key))?,
+                value: self
+                    .buffer_from_tensor_data(value.spec(), &TensorData::F32(gradients.value))?,
+            }
         };
         let output = cached.output(target);
         attention_backward_cache.insert(cache_key, cached);
@@ -4537,15 +4607,30 @@ impl AvailableCudaBackend {
                         let scale = scale.to_f32();
                         let cache_key =
                             scaled_dot_product_attention_backward_cache_key(step, scale, *causal)?;
+                        let use_device_path =
+                            supports_cuda_scaled_dot_product_attention_backward_f32(
+                                step, &values,
+                            )?;
                         let output = if let Some(cached) = attention_backward_cache.get(&cache_key)
                         {
                             cached.output(ScaledDotProductAttentionBackwardTarget::Query)
+                        } else if use_device_path {
+                            self.execute_scaled_dot_product_attention_backward_step(
+                                &mut submission,
+                                step,
+                                &values,
+                                &mut attention_backward_cache,
+                                scale,
+                                *causal,
+                                ScaledDotProductAttentionBackwardTarget::Query,
+                            )?
                         } else {
                             execute_profiled_host_fallback(
                                 &mut host_fallback_profile,
                                 step,
                                 || {
                                     self.execute_scaled_dot_product_attention_backward_step(
+                                        &mut submission,
                                         step,
                                         &values,
                                         &mut attention_backward_cache,
@@ -4562,15 +4647,30 @@ impl AvailableCudaBackend {
                         let scale = scale.to_f32();
                         let cache_key =
                             scaled_dot_product_attention_backward_cache_key(step, scale, *causal)?;
+                        let use_device_path =
+                            supports_cuda_scaled_dot_product_attention_backward_f32(
+                                step, &values,
+                            )?;
                         let output = if let Some(cached) = attention_backward_cache.get(&cache_key)
                         {
                             cached.output(ScaledDotProductAttentionBackwardTarget::Key)
+                        } else if use_device_path {
+                            self.execute_scaled_dot_product_attention_backward_step(
+                                &mut submission,
+                                step,
+                                &values,
+                                &mut attention_backward_cache,
+                                scale,
+                                *causal,
+                                ScaledDotProductAttentionBackwardTarget::Key,
+                            )?
                         } else {
                             execute_profiled_host_fallback(
                                 &mut host_fallback_profile,
                                 step,
                                 || {
                                     self.execute_scaled_dot_product_attention_backward_step(
+                                        &mut submission,
                                         step,
                                         &values,
                                         &mut attention_backward_cache,
@@ -4590,15 +4690,30 @@ impl AvailableCudaBackend {
                         let scale = scale.to_f32();
                         let cache_key =
                             scaled_dot_product_attention_backward_cache_key(step, scale, *causal)?;
+                        let use_device_path =
+                            supports_cuda_scaled_dot_product_attention_backward_f32(
+                                step, &values,
+                            )?;
                         let output = if let Some(cached) = attention_backward_cache.get(&cache_key)
                         {
                             cached.output(ScaledDotProductAttentionBackwardTarget::Value)
+                        } else if use_device_path {
+                            self.execute_scaled_dot_product_attention_backward_step(
+                                &mut submission,
+                                step,
+                                &values,
+                                &mut attention_backward_cache,
+                                scale,
+                                *causal,
+                                ScaledDotProductAttentionBackwardTarget::Value,
+                            )?
                         } else {
                             execute_profiled_host_fallback(
                                 &mut host_fallback_profile,
                                 step,
                                 || {
                                     self.execute_scaled_dot_product_attention_backward_step(
+                                        &mut submission,
                                         step,
                                         &values,
                                         &mut attention_backward_cache,
@@ -6171,6 +6286,22 @@ fn scaled_dot_product_attention_backward_cache_key(
     })
 }
 
+fn supports_cuda_scaled_dot_product_attention_backward_f32(
+    step: &ExecutionStep,
+    values: &BTreeMap<TensorId, CudaBuffer>,
+) -> Result<bool, RuntimeError> {
+    let query = step_input(step, values, 0)?;
+    let key = step_input(step, values, 1)?;
+    let value = step_input(step, values, 2)?;
+    let grad_output = step_input(step, values, 3)?;
+    Ok(
+        query.spec().dtype() == DType::F32
+            && key.spec().dtype() == DType::F32
+            && value.spec().dtype() == DType::F32
+            && grad_output.spec().dtype() == DType::F32,
+    )
+}
+
 fn supports_cuda_rank2_transpose(input_shape: &[usize], axes: &[usize]) -> bool {
     input_shape.len() == 2 && axes == [1, 0]
 }
@@ -7045,6 +7176,21 @@ mod platform {
             sequence_length: c_int,
             head_dim: c_int,
             output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_attention_causal_sequence_backward_f32(
+            query: *const c_void,
+            key: *const c_void,
+            value: *const c_void,
+            grad_output: *const c_void,
+            batch_size: c_int,
+            head_count: c_int,
+            kv_head_count: c_int,
+            sequence_length: c_int,
+            head_dim: c_int,
+            query_gradient: *mut c_void,
+            key_gradient: *mut c_void,
+            value_gradient: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
         fn psionic_cuda_attention_decode_rope_cache(
@@ -10019,6 +10165,70 @@ mod platform {
         }
 
         #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_causal_sequence_backward_f32(
+            &mut self,
+            query: &PlatformBuffer,
+            key: &PlatformBuffer,
+            value: &PlatformBuffer,
+            grad_output: &PlatformBuffer,
+            batch_size: usize,
+            head_count: usize,
+            kv_head_count: usize,
+            sequence_length: usize,
+            head_dim: usize,
+            query_gradient: &PlatformBuffer,
+            key_gradient: &PlatformBuffer,
+            value_gradient: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let batch_size = c_int::try_from(batch_size).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention backward batch size exceeds c_int",
+                ))
+            })?;
+            let head_count = c_int::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention backward head count exceeds c_int",
+                ))
+            })?;
+            let kv_head_count = c_int::try_from(kv_head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention backward kv head count exceeds c_int",
+                ))
+            })?;
+            let sequence_length = c_int::try_from(sequence_length).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention backward sequence length exceeds c_int",
+                ))
+            })?;
+            let head_dim = c_int::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention backward head dim exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_attention_causal_sequence_backward_f32(
+                        query.inner.device_ptr.cast(),
+                        key.inner.device_ptr.cast(),
+                        value.inner.device_ptr.cast(),
+                        grad_output.inner.device_ptr.cast(),
+                        batch_size,
+                        head_count,
+                        kv_head_count,
+                        sequence_length,
+                        head_dim,
+                        query_gradient.inner.device_ptr.cast(),
+                        key_gradient.inner.device_ptr.cast(),
+                        value_gradient.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_attention_causal_sequence_backward_f32",
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
         pub(super) fn encode_router_topk_softmax(
             &mut self,
             weights: &PlatformBuffer,
@@ -11831,6 +12041,27 @@ mod platform {
             _sequence_length: usize,
             _head_dim: usize,
             _output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_causal_sequence_backward_f32(
+            &mut self,
+            _query: &PlatformBuffer,
+            _key: &PlatformBuffer,
+            _value: &PlatformBuffer,
+            _grad_output: &PlatformBuffer,
+            _batch_size: usize,
+            _head_count: usize,
+            _kv_head_count: usize,
+            _sequence_length: usize,
+            _head_dim: usize,
+            _query_gradient: &PlatformBuffer,
+            _key_gradient: &PlatformBuffer,
+            _value_gradient: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "cuda quantized text-generation kernels require Linux CUDA support",
