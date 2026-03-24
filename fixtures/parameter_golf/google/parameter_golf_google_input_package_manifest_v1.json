@@ -2,7 +2,7 @@
   "schema_version": "psion.google_training_input_package_manifest.v1",
   "package_id": "parameter-golf-google-inputs-sp1024-v1",
   "created_at_utc": "2026-03-23T00:00:00Z",
-  "git_revision": "1fded3cfa89d4b7f7796035944445a5cb4a34b72",
+  "git_revision": "5a15b6e7df1364ed48faa0e06cebc7c72aff30b8",
   "repo_clone_url": "https://github.com/OpenAgentsInc/psionic.git",
   "materialization": {
     "mode": "materialize_public_parameter_golf_cache_to_local_disk",
@@ -24,7 +24,7 @@
     "dataset_manifest_sha256": "e83387a68b96075c410061b62f7c82bdc86449f8b6d9890bb6fd1a61210396d4",
     "tokenizer_sha256": "4f5e8adb109c66b4886963bc75a7befd73bda36d27fd7102df8e9e66503b0e2a",
     "validation_identity_sha256": "4c59b04b911aca4ca8547155156cc1d708351408dcb36a7d8c77e67a48e34474",
-    "input_contract_sha256": "80dfb2c5bd0fa37791c6274f0d21c92a97a78760037302f50ada04439e5d73f2",
+    "input_contract_sha256": "9d5bf4be8a6eb96171b8ce87414a16b004fee9393dad6680a1426d1401d8e697",
     "parameter_golf_single_h100_bringup_report_sha256": "84ce4a7927b6110519f8b49933c76f9c06c638bf47a78d53066e177a455d0a1c",
     "dataset_ref": "dataset://parameter-golf/fineweb-sp1024",
     "dataset_version": "2026.03.18",
@@ -39,7 +39,7 @@
       "kind": "parameter_golf_input_contract",
       "package_path": "parameter_golf_google_input_contract_v1.json",
       "overlay_target": null,
-      "sha256": "80dfb2c5bd0fa37791c6274f0d21c92a97a78760037302f50ada04439e5d73f2"
+      "sha256": "9d5bf4be8a6eb96171b8ce87414a16b004fee9393dad6680a1426d1401d8e697"
     }
   ]
 }

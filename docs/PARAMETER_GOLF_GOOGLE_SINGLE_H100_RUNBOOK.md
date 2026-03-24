@@ -28,6 +28,8 @@ RunPod lane, and narrower than a record-track claim.
   `fixtures/parameter_golf/google/parameter_golf_google_input_package_descriptor_v1.json`
 - committed input package archive:
   `fixtures/parameter_golf/google/parameter_golf_google_input_package_v1.tar.gz`
+- first real bucket-upload receipt:
+  `fixtures/parameter_golf/reports/parameter_golf_google_input_package_upload_v1.json`
 - public-cache materializer:
   `scripts/parameter-golf-materialize-public-cache.sh`
 - local package builder:
@@ -89,6 +91,16 @@ the raw training shards themselves. The Google pre-training command uses that
 contract to clone the public `parameter-golf` repo and materialize the public
 challenge cache onto the VM before the Rust trainer runs.
 
+The first real bucket materialization for this contract now exists in:
+
+- `gs://openagentsgemini-psion-train-us-central1/manifests/parameter_golf_google_input_package_v1.json`
+- `gs://openagentsgemini-psion-train-us-central1/runs/staging/input_packages/parameter_golf_google_input_package_v1.tar.gz`
+
+The committed receipt that records the observed object generations, retention,
+and local artifact digests is:
+
+- `fixtures/parameter_golf/reports/parameter_golf_google_input_package_upload_v1.json`
+
 ## Local Rehearsal
 
 The repo-owned local rehearsal is:
@@ -115,10 +127,10 @@ The committed first rehearsal report is:
 This runbook does not claim:
 
 - a successful live Google single-H100 run
-- uploaded descriptor and archive truth in the real Google bucket
 - final `val_loss`, `val_bpb`, or compressed-model bytes from Google
 - `8xH100` distributed closure
 - record-track readiness
 
-Live Google execution stays blocked until the immutable input package is
-materialized to the real bucket authority and one real launch is audited.
+The immutable input package is now materialized to the real bucket authority.
+Live Google execution is still blocked until the project has usable H100 quota
+and one real launch is audited.

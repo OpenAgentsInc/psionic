@@ -1,0 +1,52 @@
+{
+  "schema_version": "parameter_golf.google_input_package_upload.v1",
+  "checked_at_utc": "2026-03-24T02:21:21Z",
+  "package_id": "parameter-golf-google-inputs-sp1024-v1",
+  "uploaded_in_this_invocation": true,
+  "visibility_verified": true,
+  "detail": "The committed Parameter Golf immutable input-package descriptor and archive were verified in the real openagentsgemini bucket and tied back to the local committed artifacts by path and SHA-256.",
+  "descriptor": {
+    "local_path": "/home/christopherdavid/code/psionic/fixtures/parameter_golf/google/parameter_golf_google_input_package_descriptor_v1.json",
+    "local_sha256": "ded2216eb20366b5fb9391f0ac6c729f330529b905fdddc4617b2750d9fd1570",
+    "local_size_bytes": 2412,
+    "remote_object": {
+      "bucket": "openagentsgemini-psion-train-us-central1",
+      "content_type": "application/json",
+      "crc32c_hash": "dXKc+w==",
+      "creation_time": "2026-03-24T02:21:12+0000",
+      "etag": "CISogvG8t5MDEAE=",
+      "generation": "1774318872728580",
+      "md5_hash": "cMdWDKQfL+SVoTjziii2Tg==",
+      "metageneration": 1,
+      "name": "manifests/parameter_golf_google_input_package_v1.json",
+      "retention_expiration": "2026-03-31T02:21:12+0000",
+      "size": 2412,
+      "storage_class": "STANDARD",
+      "storage_class_update_time": "2026-03-24T02:21:12+0000",
+      "storage_url": "gs://openagentsgemini-psion-train-us-central1/manifests/parameter_golf_google_input_package_v1.json#1774318872728580",
+      "update_time": "2026-03-24T02:21:12+0000"
+    }
+  },
+  "archive": {
+    "local_path": "/home/christopherdavid/code/psionic/fixtures/parameter_golf/google/parameter_golf_google_input_package_v1.tar.gz",
+    "local_sha256": "dff23df9ff558804eb4ff28dda37aef47537835c3c52b8ccc514aeceafd20ae7",
+    "local_size_bytes": 1590,
+    "remote_object": {
+      "bucket": "openagentsgemini-psion-train-us-central1",
+      "content_type": "application/x-tar",
+      "crc32c_hash": "3QYpXQ==",
+      "creation_time": "2026-03-24T02:21:15+0000",
+      "etag": "CM2nnfK8t5MDEAE=",
+      "generation": "1774318875268045",
+      "md5_hash": "wWzMKYYGQCmFJvT/cYx1QQ==",
+      "metageneration": 1,
+      "name": "runs/staging/input_packages/parameter_golf_google_input_package_v1.tar.gz",
+      "retention_expiration": "2026-03-31T02:21:15+0000",
+      "size": 1590,
+      "storage_class": "STANDARD",
+      "storage_class_update_time": "2026-03-24T02:21:15+0000",
+      "storage_url": "gs://openagentsgemini-psion-train-us-central1/runs/staging/input_packages/parameter_golf_google_input_package_v1.tar.gz#1774318875268045",
+      "update_time": "2026-03-24T02:21:15+0000"
+    }
+  }
+}

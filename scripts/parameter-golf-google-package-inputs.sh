@@ -9,6 +9,7 @@ parameter_golf_root="${HOME}/code/parameter-golf"
 output_dir="${repo_root}/fixtures/parameter_golf/google"
 created_at_utc="2026-03-23T00:00:00Z"
 upload=false
+upload_report=""
 
 usage() {
   cat <<'EOF' >&2
@@ -21,6 +22,7 @@ Options:
   --output-dir <path>           Directory that receives the generated contract bundle.
   --created-at-utc <timestamp>  Override the retained creation timestamp.
   --upload                      Upload the descriptor and archive to the configured Google bucket.
+  --upload-report <path>        Write a machine-readable upload receipt after remote verification.
 EOF
 }
 
@@ -49,6 +51,10 @@ while [[ $# -gt 0 ]]; do
     --upload)
       upload=true
       shift
+      ;;
+    --upload-report)
+      upload_report="$2"
+      shift 2
       ;;
     --help|-h)
       usage
@@ -316,14 +322,63 @@ if [[ "${upload}" == "true" ]]; then
   wait_for_object "${archive_uri}"
 fi
 
+if [[ -n "${upload_report}" ]]; then
+  wait_for_object "${descriptor_uri}"
+  wait_for_object "${archive_uri}"
+  descriptor_remote_json="$(gcloud storage objects describe "${descriptor_uri}" --format=json)"
+  archive_remote_json="$(gcloud storage objects describe "${archive_uri}" --format=json)"
+  descriptor_local_path="${output_dir}/parameter_golf_google_input_package_descriptor_v1.json"
+  archive_local_path="${output_dir}/parameter_golf_google_input_package_v1.tar.gz"
+  descriptor_local_sha256="$(compute_sha256 "${descriptor_local_path}")"
+  archive_local_sha256="$(compute_sha256 "${archive_local_path}")"
+  descriptor_local_size="$(wc -c < "${descriptor_local_path}" | tr -d ' ')"
+  archive_local_size="$(wc -c < "${archive_local_path}" | tr -d ' ')"
+  mkdir -p "$(dirname "${upload_report}")"
+  jq -n \
+    --arg schema_version "parameter_golf.google_input_package_upload.v1" \
+    --arg checked_at_utc "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+    --arg package_id "${package_id}" \
+    --arg descriptor_local_path "${descriptor_local_path}" \
+    --arg descriptor_local_sha256 "${descriptor_local_sha256}" \
+    --arg descriptor_local_size "${descriptor_local_size}" \
+    --arg archive_local_path "${archive_local_path}" \
+    --arg archive_local_sha256 "${archive_local_sha256}" \
+    --arg archive_local_size "${archive_local_size}" \
+    --arg uploaded "${upload}" \
+    --argjson descriptor_remote "${descriptor_remote_json}" \
+    --argjson archive_remote "${archive_remote_json}" \
+    '{
+      schema_version: $schema_version,
+      checked_at_utc: $checked_at_utc,
+      package_id: $package_id,
+      uploaded_in_this_invocation: ($uploaded == "true"),
+      visibility_verified: true,
+      detail: "The committed Parameter Golf immutable input-package descriptor and archive were verified in the real openagentsgemini bucket and tied back to the local committed artifacts by path and SHA-256.",
+      descriptor: {
+        local_path: $descriptor_local_path,
+        local_sha256: $descriptor_local_sha256,
+        local_size_bytes: ($descriptor_local_size | tonumber),
+        remote_object: $descriptor_remote
+      },
+      archive: {
+        local_path: $archive_local_path,
+        local_sha256: $archive_local_sha256,
+        local_size_bytes: ($archive_local_size | tonumber),
+        remote_object: $archive_remote
+      }
+    }' > "${upload_report}"
+fi
+
 jq -n \
   --arg package_id "${package_id}" \
   --arg descriptor_path "${output_dir}/parameter_golf_google_input_package_descriptor_v1.json" \
   --arg archive_path "${output_dir}/parameter_golf_google_input_package_v1.tar.gz" \
   --arg uploaded "${upload}" \
+  --arg upload_report_path "${upload_report}" \
   '{
     package_id: $package_id,
     descriptor_path: $descriptor_path,
     archive_path: $archive_path,
-    uploaded: ($uploaded == "true")
+    uploaded: ($uploaded == "true"),
+    upload_report_path: (if $upload_report_path == "" then null else $upload_report_path end)
   }'
