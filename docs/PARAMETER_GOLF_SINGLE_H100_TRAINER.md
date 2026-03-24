@@ -112,6 +112,10 @@ The command is explicit about what it treats as trainer truth. It binds:
 - the local cached FineWeb `sp1024` shard directory into a versioned
   `DatasetManifest`
 - the local tokenizer file into a machine-readable `TokenizerDigest`
+- the sibling `fineweb_1024_bpe.vocab` surface beside that tokenizer model
+  into the validation byte-accounting LUTs, so reported `val_bpb` is derived
+  from the real challenge tokenizer vocabulary instead of the tiny oracle
+  parity fixture
 - the local CUDA inventory into explicit single-H100 machine-admission truth
   using the repo-owned CUDA discovery substrate
 - the public single-device batch geometry from

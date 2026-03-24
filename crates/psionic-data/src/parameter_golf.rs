@@ -622,6 +622,53 @@ impl ParameterGolfSentencePieceByteLuts {
     }
 }
 
+/// Builds the canonical Parameter Golf SentencePiece byte-accounting LUTs from
+/// one explicit `.vocab` artifact emitted beside the challenge tokenizer
+/// model.
+pub fn parameter_golf_sentencepiece_byte_luts_from_vocab_path(
+    vocab_path: impl AsRef<Path>,
+) -> Result<ParameterGolfSentencePieceByteLuts, ParameterGolfDataError> {
+    let vocab_path = vocab_path.as_ref();
+    let vocab_text = fs::read_to_string(vocab_path).map_err(|error| ParameterGolfDataError::Io {
+        path: vocab_path.display().to_string(),
+        detail: error.to_string(),
+    })?;
+    let mut entries = Vec::new();
+    for (line_index, line) in vocab_text.lines().enumerate() {
+        let piece = line
+            .split_once('\t')
+            .map(|(piece, _)| piece)
+            .or_else(|| (!line.trim().is_empty()).then_some(line))
+            .ok_or_else(|| ParameterGolfDataError::SentencePieceVocabDecode {
+                path: vocab_path.display().to_string(),
+                detail: format!("line {} is empty", line_index + 1),
+            })?;
+        entries.push(ParameterGolfSentencePieceTokenEntry::new(
+            line_index as u32,
+            piece,
+            sentencepiece_token_kind_from_vocab_piece(piece),
+        ));
+    }
+    ParameterGolfSentencePieceByteLuts::build(entries.len(), entries.as_slice())
+}
+
+/// Builds the canonical Parameter Golf SentencePiece byte-accounting LUTs from
+/// the sibling `.vocab` artifact beside one tokenizer `.model` path.
+pub fn parameter_golf_sentencepiece_byte_luts_from_tokenizer_path(
+    tokenizer_path: impl AsRef<Path>,
+) -> Result<ParameterGolfSentencePieceByteLuts, ParameterGolfDataError> {
+    let tokenizer_path = tokenizer_path.as_ref();
+    let mut vocab_path = tokenizer_path.to_path_buf();
+    vocab_path.set_extension("vocab");
+    if !vocab_path.is_file() {
+        return Err(ParameterGolfDataError::MissingTokenizerVocab {
+            tokenizer_path: tokenizer_path.display().to_string(),
+            vocab_path: vocab_path.display().to_string(),
+        });
+    }
+    parameter_golf_sentencepiece_byte_luts_from_vocab_path(vocab_path)
+}
+
 #[derive(Deserialize)]
 struct BuiltinParameterGolfOracleParityFixture {
     sentencepiece_entries: Vec<BuiltinParameterGolfSentencePieceEntry>,
@@ -673,6 +720,29 @@ fn builtin_sentencepiece_token_kind(
             detail: format!("unknown sentencepiece token kind `{other}`"),
         }),
     }
+}
+
+fn sentencepiece_token_kind_from_vocab_piece(piece: &str) -> ParameterGolfSentencePieceTokenKind {
+    match piece {
+        "<unk>" => ParameterGolfSentencePieceTokenKind::Unknown,
+        "<pad>" | "<s>" | "</s>" => ParameterGolfSentencePieceTokenKind::Control,
+        _ if piece.starts_with("<unused") && piece.ends_with('>') => {
+            ParameterGolfSentencePieceTokenKind::Unused
+        }
+        _ if sentencepiece_piece_is_byte(piece) => ParameterGolfSentencePieceTokenKind::Byte,
+        _ => ParameterGolfSentencePieceTokenKind::Normal,
+    }
+}
+
+fn sentencepiece_piece_is_byte(piece: &str) -> bool {
+    if piece.len() != 6 || !piece.starts_with("<0x") || !piece.ends_with('>') {
+        return false;
+    }
+    piece
+        .trim_start_matches("<0x")
+        .trim_end_matches('>')
+        .chars()
+        .all(|ch| ch.is_ascii_hexdigit())
 }
 
 /// Loads and validates one current-format Parameter Golf shard as a `u16` token vector.
@@ -1055,6 +1125,15 @@ pub enum ParameterGolfDataError {
     InvalidTokenWindowSize,
     #[error("parameter golf builtin oracle fixture decode failed: {detail}")]
     BuiltinOracleFixtureDecode { detail: String },
+    #[error(
+        "parameter golf tokenizer `{tokenizer_path}` requires sibling vocab artifact `{vocab_path}` for byte accounting"
+    )]
+    MissingTokenizerVocab {
+        tokenizer_path: String,
+        vocab_path: String,
+    },
+    #[error("parameter golf SentencePiece vocab decode failed for `{path}`: {detail}")]
+    SentencePieceVocabDecode { path: String, detail: String },
     #[error("parameter golf SentencePiece token id `{token_id}` is duplicated")]
     DuplicateSentencePieceTokenId { token_id: u32 },
     #[error(
@@ -1799,5 +1878,45 @@ mod tests {
                 oracle.luts.is_boundary_token_lut.as_slice()
             );
         }
+    }
+
+    #[test]
+    fn sentencepiece_byte_luts_from_vocab_path_tracks_real_vocab_rows() {
+        let temp = TempDirGuard::new("sentencepiece-vocab");
+        let vocab_path = temp.path.join("fineweb_1024_bpe.vocab");
+        fs::write(
+            &vocab_path,
+            "<pad>\t0\n<s>\t0\n</s>\t0\n<unk>\t0\n<0x41>\t0\n▁hello\t-1\nworld\t-2\n<unused0>\t-3\n",
+        )
+        .expect("fixture vocab should write");
+
+        let luts = parameter_golf_sentencepiece_byte_luts_from_vocab_path(&vocab_path)
+            .expect("vocab-derived byte luts should load");
+
+        assert_eq!(luts.table_size(), 8);
+        assert!(luts.is_boundary_token_lut[0]);
+        assert!(luts.is_boundary_token_lut[1]);
+        assert!(luts.is_boundary_token_lut[2]);
+        assert!(luts.is_boundary_token_lut[3]);
+        assert_eq!(luts.base_bytes_lut[4], 1);
+        assert!(!luts.is_boundary_token_lut[4]);
+        assert_eq!(luts.base_bytes_lut[5], 5);
+        assert!(luts.has_leading_space_lut[5]);
+        assert_eq!(luts.base_bytes_lut[6], 5);
+        assert!(luts.is_boundary_token_lut[7]);
+    }
+
+    #[test]
+    fn sentencepiece_byte_luts_from_tokenizer_path_requires_sibling_vocab() {
+        let temp = TempDirGuard::new("sentencepiece-model");
+        let tokenizer_path = temp.path.join("fineweb_1024_bpe.model");
+        fs::write(&tokenizer_path, b"model").expect("fixture model should write");
+
+        let error = parameter_golf_sentencepiece_byte_luts_from_tokenizer_path(&tokenizer_path)
+            .expect_err("missing vocab should refuse");
+        assert!(matches!(
+            error,
+            ParameterGolfDataError::MissingTokenizerVocab { .. }
+        ));
     }
 }

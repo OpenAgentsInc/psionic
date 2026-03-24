@@ -10,9 +10,9 @@ use psionic_core::{
     DType, PsionicRefusal, PsionicRefusalCode, PsionicRefusalScope, Shape, TensorData, TensorId,
 };
 use psionic_data::{
-    builtin_parameter_golf_sentencepiece_byte_luts,
     load_parameter_golf_validation_tokens_from_paths, materialize_parameter_golf_token_window,
     parameter_golf_dataset_bundle_from_local_dir, DatasetIterationMode, DatasetKey,
+    parameter_golf_sentencepiece_byte_luts_from_tokenizer_path,
     ParameterGolfDataError, ParameterGolfDatasetBundle, ParameterGolfSentencePieceByteLuts,
     ParameterGolfTokenStreamContract, ParameterGolfTokenStreamCursor,
     PARAMETER_GOLF_TRAIN_SPLIT_NAME,
@@ -881,7 +881,9 @@ pub fn build_parameter_golf_single_h100_validation_runtime_comparison_receipt(
         .saturating_mul(config.sequence_length)
         .saturating_add(1);
     let selected_validation_tokens = &validation_tokens[..selected_token_end];
-    let byte_luts = builtin_parameter_golf_sentencepiece_byte_luts()?;
+    let byte_luts = parameter_golf_sentencepiece_byte_luts_from_tokenizer_path(
+        &config.tokenizer_path,
+    )?;
     let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
     let machine_observation = inspect_local_single_h100_machine();
     let mut legacy_graph_cache = BTreeMap::new();
@@ -1112,7 +1114,9 @@ fn build_parameter_golf_single_h100_training_report_inner(
         )?;
     }
 
-    let byte_luts = builtin_parameter_golf_sentencepiece_byte_luts()?;
+    let byte_luts = parameter_golf_sentencepiece_byte_luts_from_tokenizer_path(
+        &config.tokenizer_path,
+    )?;
     let validation_tokens = load_parameter_golf_validation_tokens_from_paths(
         &bundle
             .validation_shards
