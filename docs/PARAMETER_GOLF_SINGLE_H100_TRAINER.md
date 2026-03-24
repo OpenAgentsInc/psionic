@@ -95,6 +95,9 @@ The command is explicit about what it treats as trainer truth. It binds:
   `Vec<f32>` gather before each train or validation batch
 - integer target ids directly into the on-device projection-loss path rather
   than routing them through dense `f32` target tensors
+- the upstream mixed-precision optimizer split at the trainer-state boundary:
+  BF16 train-visible embeddings and matrix weights, FP32 control tensors, and
+  FP32 master weights for the Adam-managed embedding/head groups
 - the same single-device warmup-and-restore, repeated-step, periodic
   validation, train-log, and wallclock-stop control-loop shape the public
   `train_gpt.py` path uses
@@ -125,6 +128,10 @@ Today the single-H100 trainer doc does **not** claim:
 - `8xH100` distributed closure
 - leaderboard-speed runtime closure
 - record-track accounting closure
+- full BF16 graph-kernel closure yet; the current report now records the mixed
+  train-visible parameter split explicitly, but the lowered single-H100 graph
+  still uploads those train-visible values as dense `f32` tensors until the
+  BF16 graph-runtime slice lands
 
 Instead, it gives the repo one narrower but important thing:
 

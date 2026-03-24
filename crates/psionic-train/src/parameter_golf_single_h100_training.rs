@@ -4,6 +4,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use half::bf16;
 use psionic_backend_cuda::CudaBackend;
 use psionic_core::{PsionicRefusal, PsionicRefusalCode, PsionicRefusalScope, TensorData, TensorId};
 use psionic_data::{
@@ -26,17 +27,19 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    apply_parameter_golf_cuda_bf16_master_weight_optimizer_step,
     apply_parameter_golf_cuda_muon_step, bind_parameter_golf_baseline_training_graph_inputs,
     build_parameter_golf_baseline_training_graph, build_tokenizer_digest,
     builtin_parameter_golf_cuda_training_capability_report, device_matches_single_h100,
     export_parameter_golf_int8_zlib_model_artifact, inspect_local_single_h100_machine,
     materialize_parameter_golf_baseline_training_gradients, parameter_golf_optimizer_plan,
     training_batch_from_window_tokens, ParameterGolfBaselineTrainingGraph,
-    ParameterGolfBatchGeometry, ParameterGolfOptimizerExecution,
+    ParameterGolfBatchGeometry, ParameterGolfBf16MasterWeightStepReceipt,
+    ParameterGolfOptimizerExecution, ParameterGolfOptimizerGroupKind, ParameterGolfOptimizerPlan,
     ParameterGolfReferenceTrainingError, ParameterGolfSingleH100BringupError,
     ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100MachineObservation,
     ParameterGolfTrainError, ParameterGolfTrainingHyperparameters, TrainingOptimizerConfig,
-    TrainingOptimizerState, PARAMETER_GOLF_SINGLE_H100_DATASET_REF,
+    TrainingOptimizerState, TrainingPrecisionMode, PARAMETER_GOLF_SINGLE_H100_DATASET_REF,
     PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION, PARAMETER_GOLF_SINGLE_H100_VARIANT,
 };
 
@@ -277,6 +280,25 @@ pub enum ParameterGolfSingleH100TrainingStopReason {
     WallclockCapReached,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfSingleH100GroupPrecisionReceipt {
+    pub group_id: String,
+    pub parameter_precision: TrainingPrecisionMode,
+    pub gradient_precision: TrainingPrecisionMode,
+    pub optimizer_state_precision: TrainingPrecisionMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub master_weight_precision: Option<TrainingPrecisionMode>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfSingleH100PrecisionReceipt {
+    pub graph_parameter_upload_precision: TrainingPrecisionMode,
+    pub graph_execution_precision: TrainingPrecisionMode,
+    pub retained_activation_precision: TrainingPrecisionMode,
+    pub group_receipts: Vec<ParameterGolfSingleH100GroupPrecisionReceipt>,
+    pub notes: Vec<String>,
+}
+
 /// End-to-end machine-readable trainer report for the bounded single-H100 lane.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfSingleH100TrainingReport {
@@ -313,6 +335,7 @@ pub struct ParameterGolfSingleH100TrainingReport {
     pub baseline_model_revision: String,
     pub baseline_model_descriptor_digest: String,
     pub optimizer_plan_digest: String,
+    pub precision_receipt: ParameterGolfSingleH100PrecisionReceipt,
     pub cuda_training_capability_report_digest: String,
     pub challenge_kernel_blockers: Vec<String>,
     pub validation_checkpoints: Vec<ParameterGolfSingleH100ValidationCheckpoint>,
@@ -352,13 +375,21 @@ struct ParameterGolfSingleH100TrainerState {
 
 #[derive(Clone, Debug)]
 enum ParameterGolfParameterState {
-    Adam {
+    AdamBf16Master {
+        shape: Vec<usize>,
+        train_visible_values: Vec<f32>,
+        master_weight_values: Vec<f32>,
+        optimizer: TrainingOptimizerConfig,
+        optimizer_state: TrainingOptimizerState,
+        last_step_receipt: Option<ParameterGolfBf16MasterWeightStepReceipt>,
+    },
+    AdamFp32 {
         shape: Vec<usize>,
         values: Vec<f32>,
         optimizer: TrainingOptimizerConfig,
         optimizer_state: TrainingOptimizerState,
     },
-    Muon {
+    MuonBf16 {
         shape: Vec<usize>,
         values: Vec<f32>,
         optimizer: crate::ParameterGolfMuonConfig,
@@ -369,13 +400,45 @@ enum ParameterGolfParameterState {
 impl ParameterGolfParameterState {
     fn values(&self) -> &[f32] {
         match self {
-            Self::Adam { values, .. } | Self::Muon { values, .. } => values.as_slice(),
+            Self::AdamBf16Master {
+                train_visible_values,
+                ..
+            } => train_visible_values.as_slice(),
+            Self::AdamFp32 { values, .. } | Self::MuonBf16 { values, .. } => values.as_slice(),
         }
     }
 
     fn shape(&self) -> &[usize] {
         match self {
-            Self::Adam { shape, .. } | Self::Muon { shape, .. } => shape.as_slice(),
+            Self::AdamBf16Master { shape, .. }
+            | Self::AdamFp32 { shape, .. }
+            | Self::MuonBf16 { shape, .. } => shape.as_slice(),
+        }
+    }
+
+    fn precision_receipt(&self, group_id: String) -> ParameterGolfSingleH100GroupPrecisionReceipt {
+        match self {
+            Self::AdamBf16Master { .. } => ParameterGolfSingleH100GroupPrecisionReceipt {
+                group_id,
+                parameter_precision: TrainingPrecisionMode::Bf16,
+                gradient_precision: TrainingPrecisionMode::Bf16,
+                optimizer_state_precision: TrainingPrecisionMode::Fp32,
+                master_weight_precision: Some(TrainingPrecisionMode::Fp32),
+            },
+            Self::AdamFp32 { .. } => ParameterGolfSingleH100GroupPrecisionReceipt {
+                group_id,
+                parameter_precision: TrainingPrecisionMode::Fp32,
+                gradient_precision: TrainingPrecisionMode::Fp32,
+                optimizer_state_precision: TrainingPrecisionMode::Fp32,
+                master_weight_precision: None,
+            },
+            Self::MuonBf16 { .. } => ParameterGolfSingleH100GroupPrecisionReceipt {
+                group_id,
+                parameter_precision: TrainingPrecisionMode::Bf16,
+                gradient_precision: TrainingPrecisionMode::Fp32,
+                optimizer_state_precision: TrainingPrecisionMode::Fp32,
+                master_weight_precision: None,
+            },
         }
     }
 
@@ -387,7 +450,28 @@ impl ParameterGolfParameterState {
         step_number: u64,
     ) -> Result<(), ParameterGolfSingleH100TrainingError> {
         match self {
-            Self::Adam {
+            Self::AdamBf16Master {
+                train_visible_values,
+                master_weight_values,
+                optimizer,
+                optimizer_state,
+                last_step_receipt,
+                ..
+            } => {
+                let mut optimizer = optimizer.clone();
+                optimizer.learning_rate *= learning_rate_multiplier;
+                let receipt = apply_parameter_golf_cuda_bf16_master_weight_optimizer_step(
+                    train_visible_values.as_mut_slice(),
+                    master_weight_values.as_mut_slice(),
+                    gradients,
+                    &optimizer,
+                    optimizer_state,
+                    step_number,
+                )?;
+                *last_step_receipt = Some(receipt);
+                Ok(())
+            }
+            Self::AdamFp32 {
                 values,
                 optimizer,
                 optimizer_state,
@@ -403,7 +487,7 @@ impl ParameterGolfParameterState {
                 )?;
                 Ok(())
             }
-            Self::Muon {
+            Self::MuonBf16 {
                 shape,
                 values,
                 optimizer,
@@ -419,6 +503,7 @@ impl ParameterGolfParameterState {
                     &optimizer,
                     optimizer_state,
                 )?;
+                round_values_to_bf16(values.as_mut_slice());
                 Ok(())
             }
         }
@@ -505,6 +590,7 @@ pub fn build_parameter_golf_single_h100_training_report(
         parameter_golf_optimizer_plan(initial_model.descriptor(), &config.hyperparameters)?;
     let optimizer_plan_digest =
         stable_digest(b"psionic_parameter_golf_optimizer_plan|", &optimizer_plan);
+    let precision_receipt = precision_receipt_from_optimizer_plan(&optimizer_plan);
     let capability_report = builtin_parameter_golf_cuda_training_capability_report()?;
     let started_at_ms = unix_time_ms();
 
@@ -516,6 +602,7 @@ pub fn build_parameter_golf_single_h100_training_report(
             &machine_observation,
             &initial_model,
             optimizer_plan_digest,
+            precision_receipt.clone(),
             capability_report.report_digest.clone(),
             capability_report.challenge_kernel_blockers().to_vec(),
             ParameterGolfSingleH100TrainingDisposition::RefusedMachineContract,
@@ -534,6 +621,7 @@ pub fn build_parameter_golf_single_h100_training_report(
             &machine_observation,
             &initial_model,
             optimizer_plan_digest,
+            precision_receipt.clone(),
             capability_report.report_digest.clone(),
             capability_report.challenge_kernel_blockers().to_vec(),
             ParameterGolfSingleH100TrainingDisposition::RefusedCudaBlockers,
@@ -827,6 +915,7 @@ pub fn build_parameter_golf_single_h100_training_report(
         baseline_model_revision: String::from(PARAMETER_GOLF_BASELINE_REVISION),
         baseline_model_descriptor_digest: current_model.descriptor().stable_digest(),
         optimizer_plan_digest,
+        precision_receipt: precision_receipt_from_trainer_state(&trainer_state),
         cuda_training_capability_report_digest: capability_report.report_digest.clone(),
         challenge_kernel_blockers: capability_report.challenge_kernel_blockers().to_vec(),
         validation_checkpoints,
@@ -866,6 +955,7 @@ fn refusal_report(
     machine_observation: &ParameterGolfSingleH100MachineObservation,
     initial_model: &ParameterGolfReferenceModel,
     optimizer_plan_digest: String,
+    precision_receipt: ParameterGolfSingleH100PrecisionReceipt,
     capability_report_digest: String,
     challenge_kernel_blockers: Vec<String>,
     disposition: ParameterGolfSingleH100TrainingDisposition,
@@ -908,6 +998,7 @@ fn refusal_report(
         baseline_model_revision: String::from(PARAMETER_GOLF_BASELINE_REVISION),
         baseline_model_descriptor_digest: initial_model.descriptor().stable_digest(),
         optimizer_plan_digest,
+        precision_receipt,
         cuda_training_capability_report_digest: capability_report_digest,
         challenge_kernel_blockers,
         validation_checkpoints: Vec::new(),
@@ -959,20 +1050,45 @@ fn seed_parameter_states(
                 }
             })?;
             let state = match &group.execution {
-                ParameterGolfOptimizerExecution::Adam { optimizer } => {
-                    ParameterGolfParameterState::Adam {
-                        shape: vector.shape.dims().to_vec(),
-                        values: vector.values.clone(),
-                        optimizer: optimizer.clone(),
-                        optimizer_state: optimizer.initialize_state(vector.values.len()),
+                ParameterGolfOptimizerExecution::Adam { optimizer } => match group.kind {
+                    ParameterGolfOptimizerGroupKind::TokenEmbeddingAdam
+                    | ParameterGolfOptimizerGroupKind::UntiedLmHeadAdam => {
+                        let mut train_visible_values = vector.values.clone();
+                        round_values_to_bf16(train_visible_values.as_mut_slice());
+                        ParameterGolfParameterState::AdamBf16Master {
+                            shape: vector.shape.dims().to_vec(),
+                            train_visible_values,
+                            master_weight_values: vector.values.clone(),
+                            optimizer: optimizer.clone(),
+                            optimizer_state: optimizer.initialize_state(vector.values.len()),
+                            last_step_receipt: None,
+                        }
                     }
-                }
+                    ParameterGolfOptimizerGroupKind::ScalarControlAdam => {
+                        ParameterGolfParameterState::AdamFp32 {
+                            shape: vector.shape.dims().to_vec(),
+                            values: vector.values.clone(),
+                            optimizer: optimizer.clone(),
+                            optimizer_state: optimizer.initialize_state(vector.values.len()),
+                        }
+                    }
+                    ParameterGolfOptimizerGroupKind::MatrixMuon => {
+                        return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                            message: format!(
+                                "optimizer group `{}` declared Adam execution for matrix Muon posture",
+                                group.group_id
+                            ),
+                        });
+                    }
+                },
                 ParameterGolfOptimizerExecution::Muon { optimizer } => {
                     let rows = vector.shape.dims().first().copied().unwrap_or(0);
                     let cols = vector.shape.dims().get(1).copied().unwrap_or(0);
-                    ParameterGolfParameterState::Muon {
+                    let mut values = vector.values.clone();
+                    round_values_to_bf16(values.as_mut_slice());
+                    ParameterGolfParameterState::MuonBf16 {
                         shape: vector.shape.dims().to_vec(),
-                        values: vector.values.clone(),
+                        values,
                         optimizer: optimizer.clone(),
                         optimizer_state: crate::ParameterGolfMuonState::zeros(rows, cols),
                     }
@@ -982,6 +1098,77 @@ fn seed_parameter_states(
         }
     }
     Ok(ParameterGolfSingleH100TrainerState { parameter_states })
+}
+
+fn precision_receipt_from_optimizer_plan(
+    optimizer_plan: &ParameterGolfOptimizerPlan,
+) -> ParameterGolfSingleH100PrecisionReceipt {
+    ParameterGolfSingleH100PrecisionReceipt {
+        graph_parameter_upload_precision: TrainingPrecisionMode::Fp32,
+        graph_execution_precision: TrainingPrecisionMode::Fp32,
+        retained_activation_precision: TrainingPrecisionMode::Fp32,
+        group_receipts: optimizer_plan
+            .groups
+            .iter()
+            .map(|group| match group.kind {
+                ParameterGolfOptimizerGroupKind::TokenEmbeddingAdam
+                | ParameterGolfOptimizerGroupKind::UntiedLmHeadAdam => {
+                    ParameterGolfSingleH100GroupPrecisionReceipt {
+                        group_id: group.group_id.clone(),
+                        parameter_precision: TrainingPrecisionMode::Bf16,
+                        gradient_precision: TrainingPrecisionMode::Bf16,
+                        optimizer_state_precision: TrainingPrecisionMode::Fp32,
+                        master_weight_precision: Some(TrainingPrecisionMode::Fp32),
+                    }
+                }
+                ParameterGolfOptimizerGroupKind::MatrixMuon => {
+                    ParameterGolfSingleH100GroupPrecisionReceipt {
+                        group_id: group.group_id.clone(),
+                        parameter_precision: TrainingPrecisionMode::Bf16,
+                        gradient_precision: TrainingPrecisionMode::Fp32,
+                        optimizer_state_precision: TrainingPrecisionMode::Fp32,
+                        master_weight_precision: None,
+                    }
+                }
+                ParameterGolfOptimizerGroupKind::ScalarControlAdam => {
+                    ParameterGolfSingleH100GroupPrecisionReceipt {
+                        group_id: group.group_id.clone(),
+                        parameter_precision: TrainingPrecisionMode::Fp32,
+                        gradient_precision: TrainingPrecisionMode::Fp32,
+                        optimizer_state_precision: TrainingPrecisionMode::Fp32,
+                        master_weight_precision: None,
+                    }
+                }
+            })
+            .collect(),
+        notes: vec![String::from(
+            "train-visible Parameter Golf weights now follow the upstream mixed-precision optimizer split, but the lowered single-H100 graph still uploads those train-visible values as dense f32 tensors until BF16 graph kernels land",
+        )],
+    }
+}
+
+fn precision_receipt_from_trainer_state(
+    state: &ParameterGolfSingleH100TrainerState,
+) -> ParameterGolfSingleH100PrecisionReceipt {
+    ParameterGolfSingleH100PrecisionReceipt {
+        graph_parameter_upload_precision: TrainingPrecisionMode::Fp32,
+        graph_execution_precision: TrainingPrecisionMode::Fp32,
+        retained_activation_precision: TrainingPrecisionMode::Fp32,
+        group_receipts: state
+            .parameter_states
+            .iter()
+            .map(|(parameter_id, state)| state.precision_receipt(parameter_id.clone()))
+            .collect(),
+        notes: vec![String::from(
+            "train-visible Parameter Golf weights now follow the upstream mixed-precision optimizer split, but the lowered single-H100 graph still uploads those train-visible values as dense f32 tensors until BF16 graph kernels land",
+        )],
+    }
+}
+
+fn round_values_to_bf16(values: &mut [f32]) {
+    for value in values {
+        *value = bf16::from_f32(*value).to_f32();
+    }
 }
 
 fn zero_gradients(state: &ParameterGolfSingleH100TrainerState) -> Vec<(String, Vec<f32>)> {
@@ -1574,6 +1761,7 @@ fn clip_gradients(gradients: &mut [(String, Vec<f32>)], max_norm: f32) {
 mod tests {
     use psionic_core::{DType, Device, Shape};
     use psionic_ir::{AutodiffContext, AutodiffGraphBuilder};
+    use psionic_models::ParameterGolfReferenceModel;
 
     use super::*;
 
@@ -1629,6 +1817,69 @@ mod tests {
         assert_eq!(config.validation_loss_every, 0);
         assert_eq!(config.train_log_every, 1);
         assert_eq!(config.hyperparameters.max_wallclock_seconds, None);
+    }
+
+    #[test]
+    fn seed_parameter_states_matches_upstream_precision_split(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+        let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
+        let optimizer_plan = parameter_golf_optimizer_plan(model.descriptor(), &hyperparameters)?;
+        let trainer_state = seed_parameter_states(&model, &optimizer_plan)?;
+
+        let token_embedding = trainer_state
+            .parameter_states
+            .get("tok_emb.weight")
+            .ok_or("missing tok_emb.weight state")?;
+        let token_embedding_source = model
+            .weights()
+            .parameter_vector(&model.descriptor().config, "tok_emb.weight")
+            .ok_or("missing tok_emb.weight source vector")?;
+        match token_embedding {
+            ParameterGolfParameterState::AdamBf16Master {
+                train_visible_values,
+                master_weight_values,
+                ..
+            } => {
+                for (source, rounded) in token_embedding_source
+                    .values
+                    .iter()
+                    .zip(train_visible_values.iter())
+                {
+                    assert_eq!(*rounded, bf16::from_f32(*source).to_f32());
+                }
+                assert_eq!(
+                    master_weight_values.as_slice(),
+                    token_embedding_source.values
+                );
+            }
+            _ => return Err("expected AdamBf16Master token embedding state".into()),
+        }
+
+        let matrix = trainer_state
+            .parameter_states
+            .get("blocks.0.attn.c_q.weight")
+            .ok_or("missing matrix state")?;
+        assert!(matches!(
+            matrix,
+            ParameterGolfParameterState::MuonBf16 { .. }
+        ));
+
+        let control = trainer_state
+            .parameter_states
+            .get("blocks.0.attn_scale")
+            .ok_or("missing control state")?;
+        assert!(matches!(
+            control,
+            ParameterGolfParameterState::AdamFp32 { .. }
+        ));
+        let control_source = model
+            .weights()
+            .parameter_vector(&model.descriptor().config, "blocks.0.attn_scale")
+            .ok_or("missing blocks.0.attn_scale source vector")?;
+        assert_eq!(control.values(), control_source.values.as_slice());
+
+        Ok(())
     }
 }
 
