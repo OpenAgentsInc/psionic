@@ -493,6 +493,92 @@ This phase turns Mac from authority-only into real clustered training compute.
 
 This phase is the real closure step for one coherent Apple-plus-NVIDIA trainer.
 
+## Proposed First Swarm Issue Spine
+
+The issue spine for the first swarm run should copy the PGOLF discipline, not
+the PGOLF workload.
+
+That means:
+
+- start with bring-up contracts and refusal-proof hardware reports
+- freeze one narrow lane before asking for a real run
+- add same-node parity and rehearsal evidence before the first real mixed run
+- retain one full evidence bundle and one after-action audit after the first
+  real run
+
+It should not copy the full-model H100 benchmark shape.
+
+The current codebase does not justify that for the Mac-plus-4080 target.
+
+The repo facts that matter are:
+
+- `#3647` already generalized decentralized adapter execution to one open
+  adapter backend, but the only concrete backend label today is
+  `open_adapter_backend.cuda.gpt_oss_lm_head`
+- `#3661` and `#3662` already froze the truthful mixed Apple-plus-NVIDIA
+  cluster posture as a mixed-role rehearsal path, not a symmetric live trainer
+- `PMLX-706` / `#19` and `PMLX-707` / `#20` already give us MLX recipe and
+  workflow planning, but `docs/MLX_RECIPE_PACKAGE.md` and
+  `docs/MLX_WORKFLOW_PACKAGE.md` are explicit that these packages are not a
+  second training runtime
+- `PMLX-602` / `#3867` and `PMLX-603` / `#3868` only close bounded MLX Metal
+  and CUDA backend slices; `docs/MLX_ACCEPTANCE_MATRIX.md` still keeps
+  `backend-closure` at `planned`
+- `docs/MLX_COMPATIBILITY_MATRIX.md` is explicit that the public MLX
+  distributed surface is bounded and reference-emulated, not proof of a live
+  vendor-transport-backed trainer
+- local repo evidence already shows the Linux desktop RTX 4080 is a real useful
+  CUDA validation and profiling node, even though it is not challenge-matching
+  H100 hardware
+
+That means the first honest swarm lane is:
+
+- one trusted-LAN two-node clustered run
+- one Mac node through a new MLX-backed open-adapter execution backend
+- one Linux desktop node through the existing CUDA open-adapter lane
+- one shared `gpt_oss.decoder_lm_head_lora` adapter family
+- one shared decentralized adapter window and contribution flow
+- not one full-model all-reduce or FSDP claim
+
+These issue titles are proposed backlog items. They are not filed on GitHub
+yet.
+
+| Proposed issue | Why it exists | Depends on |
+| --- | --- | --- |
+| `SWARM-0: Ship the first local mixed-hardware swarm training run on one Mac MLX node plus one Linux RTX 4080 node` | Master task for the whole local swarm lane. Done only when one real two-node run, one retained evidence bundle, and one audit exist. | none |
+| `SWARM-1: Freeze the first swarm run contract as one decentralized open-adapter delta lane` | The first swarm run needs one honest lane definition before any execution work. It should freeze dataset identity, tokenizer digest, adapter family `gpt_oss.decoder_lm_head_lora`, cluster namespace, acceptance gate, replay posture, and explicit non-goals. | `SWARM-0` |
+| `SWARM-2: Add a Mac MLX swarm bring-up report and refusal-proof machine contract` | This should be the Mac equivalent of the PGOLF bring-up report: what exact MLX-capable Metal hardware exists, what backend slice is actually admitted, what run geometry is safe, and where the current lane still refuses. | `SWARM-1` |
+| `SWARM-3: Add a Linux RTX 4080 swarm bring-up report and same-node parity harness` | The 4080 needs a swarm-specific report, not only PGOLF-specific receipts. This should freeze the exact CUDA inventory, admitted precision posture, local batch limits, and current same-node execution evidence for the chosen open-adapter lane. | `SWARM-1` |
+| `SWARM-4: Implement the first MLX-backed open-adapter execution backend on Metal` | Today the MLX lane has planning and bounded backend execution, but no live train backend for the open-adapter family. This issue should add a concrete backend label such as `open_adapter_backend.mlx.metal.gpt_oss_lm_head` and make the Mac node a real contributor instead of only a planner. | `SWARM-2` |
+| `SWARM-5: Make open-adapter manifests, receipts, and precision policy comparable across MLX/Metal and CUDA` | The swarm run needs one shared artifact and receipt language across both nodes. This should freeze comparable backend-tagged receipts, supported dtypes, quantization posture, hidden-state shape assumptions, and replay identity across the Mac MLX and Linux CUDA backends. | `SWARM-3`, `SWARM-4` |
+| `SWARM-6: Bind MLX recipe and workflow plans into live adapter-cluster contributor selection and window planning` | The current MLX packages stop at planning. The first swarm run needs those plans wired into `adapter_cluster.rs`, contributor capability policy, assignment seeds, dataset-slice plans, and upload expectations without inventing a parallel trainer. | `SWARM-1`, `SWARM-4`, `SWARM-5` |
+| `SWARM-7: Add the first trusted-LAN Mac-plus-4080 swarm topology contract, launch scripts, and failure drills` | This is the cluster bring-up issue for the exact local hardware pair. It should freeze node roles, network assumptions, artifact staging, replay identity, stale-worker handling, and the exact launch sequence for the two-node swarm. | `SWARM-3`, `SWARM-6` |
+| `SWARM-8: Run the first simulated mixed-hardware swarm rehearsal and bottleneck report` | We already know from `#3660` that a rehearsal stage is useful. This issue should produce a measured dry run that separates cluster-control truth from optimistic speedup stories and surfaces the remaining serial phases before the first live attempt. | `SWARM-7` |
+| `SWARM-9: Run and retain the first real two-node Mac-MLX plus RTX-4080 swarm training evidence bundle` | This is the first real run. It should retain contributor receipts, upload manifests, validator dispositions, promotion or no-promotion truth, timing, replay receipts, and cluster topology evidence in one committed bundle. | `SWARM-8` |
+| `SWARM-10: Merge the accepted swarm artifacts, publish the local snapshot, and write the after-action audit` | The first swarm run is not done at “the processes exited.” This issue should verify merge or no-merge truth, export the resulting local snapshot through the existing MLX workflow or model-IO surface where valid, and publish one audit that says exactly what the run proved and what it still did not prove. | `SWARM-9` |
+
+The right execution order is:
+
+1. `SWARM-1`
+2. `SWARM-2`
+3. `SWARM-3`
+4. `SWARM-4`
+5. `SWARM-5`
+6. `SWARM-6`
+7. `SWARM-7`
+8. `SWARM-8`
+9. `SWARM-9`
+10. `SWARM-10`
+
+This keeps the first swarm run honest in three ways:
+
+- it uses the existing decentralized adapter cluster substrate instead of
+  overclaiming the current MLX distributed helpers
+- it makes the Mac node a real MLX-backed contributor only after a backend
+  exists for that lane
+- it treats the Linux RTX 4080 as a truthful local CUDA worker with its own
+  explicit contract, not as a fake H100 stand-in
+
 ## Current Validation That Already Exists
 
 The repo already has useful gates for the parts that are real today:
