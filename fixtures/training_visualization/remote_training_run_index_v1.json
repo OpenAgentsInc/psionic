@@ -31,8 +31,23 @@
       "bundle_digest": "5586dcce60890fc6e8c34dbcfc37df0d45da6d192a6a5c1c7446429ef48a3796",
       "summary_label": "RunPod single-H100 PGOLF live sample",
       "detail": "This entry proves the same index can list a full always-live lane with optimizer-step telemetry."
+    },
+    {
+      "provider": "run_pod",
+      "profile_id": "runpod_8xh100_parameter_golf",
+      "lane_id": "parameter_golf_distributed_8xh100",
+      "run_id": "parameter-golf-runpod-8xh100-sample",
+      "repo_revision": "main@36c4ffde",
+      "result_classification": "refused",
+      "series_status": "unavailable",
+      "series_unavailable_reason": "the RunPod 8xH100 lane retained topology, GPU, and provenance evidence, but it still did not retain a coordinator-owned loss curve or one-second distributed runtime stream",
+      "last_heartbeat_at_ms": 1742846510000,
+      "bundle_artifact_uri": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
+      "bundle_digest": "8fbcbce902c4631197e2746666357f49466e0c405166d0d3254ac2b17cf44821",
+      "summary_label": "RunPod 8xH100 PGOLF distributed post-run sample",
+      "detail": "This entry proves the same index can list a post-run distributed lane that preserves topology and refusal provenance without inventing a live loss curve."
     }
   ],
-  "detail": "The run index keeps summary-only and full-series lanes in one provider-neutral discovery surface without forcing the app to walk provider roots.",
-  "index_digest": "cd9864be6096b97983d45407e98a1fde45ff9c8c2d435a01f243eeedfdb7bd8f"
+  "detail": "The run index keeps summary-only, always-live, and post-run distributed lanes in one provider-neutral discovery surface without forcing the app to walk provider roots.",
+  "index_digest": "707ba8e020c1438f3992b0d80fbe99bfeac303f5e737391e153ec2beac684a1a"
 }

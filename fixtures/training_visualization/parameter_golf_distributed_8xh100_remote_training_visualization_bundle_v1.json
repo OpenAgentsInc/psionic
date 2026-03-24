@@ -1,0 +1,201 @@
+{
+  "schema_version": "psionic.remote_training_visualization_bundle.v1",
+  "bundle_id": "parameter-golf-runpod-distributed-8xh100-sample-v1",
+  "provider": "run_pod",
+  "profile_id": "runpod_8xh100_parameter_golf",
+  "lane_id": "parameter_golf_distributed_8xh100",
+  "run_id": "parameter-golf-runpod-8xh100-sample",
+  "repo_revision": "main@36c4ffde",
+  "result_classification": "refused",
+  "refresh_contract": {
+    "target_ui_update_interval_ms": 1000,
+    "emission_mode": "post_run_only",
+    "last_heartbeat_at_ms": 1742846510000,
+    "heartbeat_seq": 1
+  },
+  "series_status": "unavailable",
+  "series_unavailable_reason": "the RunPod 8xH100 lane retained topology, GPU, and provenance evidence, but it still did not retain a coordinator-owned loss curve or one-second distributed runtime stream",
+  "timeline": [
+    {
+      "observed_at_ms": 1742846509000,
+      "phase": "training",
+      "subphase": "distributed_runpod_8xh100",
+      "detail": "The RunPod 8xH100 lane retained its exported-folder challenge evidence and operator-owned inventory capture."
+    },
+    {
+      "observed_at_ms": 1742846510000,
+      "phase": "complete",
+      "subphase": "finalizer_sealed",
+      "detail": "The RunPod 8xH100 finalizer sealed the provider-neutral visualization bundle and run index."
+    }
+  ],
+  "summary": {
+    "total_steps_completed": 0,
+    "detail": "The current RunPod 8xH100 lane can surface retained topology, GPU, and refusal provenance now, while remaining explicit that no coordinator-owned live loss or distributed runtime series was retained."
+  },
+  "heartbeat_series": [
+    {
+      "observed_at_ms": 1742846510000,
+      "phase": "complete",
+      "subphase": "finalizer_sealed",
+      "active_subsystems": [
+        "finalizer",
+        "topology_capture",
+        "visualization_seal"
+      ],
+      "stale_after_ms": 2500
+    }
+  ],
+  "loss_series": [],
+  "math_series": [],
+  "runtime_series": [],
+  "gpu_series": [
+    {
+      "observed_at_ms": 1742846509500,
+      "device_id": "cuda:0",
+      "device_label": "NVIDIA H100 80GB HBM3",
+      "utilization_bps": 6800,
+      "memory_used_bytes": 10737418240,
+      "memory_total_bytes": 85899345920
+    },
+    {
+      "observed_at_ms": 1742846509525,
+      "device_id": "cuda:1",
+      "device_label": "NVIDIA H100 80GB HBM3",
+      "utilization_bps": 6840,
+      "memory_used_bytes": 11811160064,
+      "memory_total_bytes": 85899345920
+    },
+    {
+      "observed_at_ms": 1742846509550,
+      "device_id": "cuda:2",
+      "device_label": "NVIDIA H100 80GB HBM3",
+      "utilization_bps": 6880,
+      "memory_used_bytes": 12884901888,
+      "memory_total_bytes": 85899345920
+    },
+    {
+      "observed_at_ms": 1742846509575,
+      "device_id": "cuda:3",
+      "device_label": "NVIDIA H100 80GB HBM3",
+      "utilization_bps": 6920,
+      "memory_used_bytes": 13958643712,
+      "memory_total_bytes": 85899345920
+    },
+    {
+      "observed_at_ms": 1742846509600,
+      "device_id": "cuda:4",
+      "device_label": "NVIDIA H100 80GB HBM3",
+      "utilization_bps": 6960,
+      "memory_used_bytes": 15032385536,
+      "memory_total_bytes": 85899345920
+    },
+    {
+      "observed_at_ms": 1742846509625,
+      "device_id": "cuda:5",
+      "device_label": "NVIDIA H100 80GB HBM3",
+      "utilization_bps": 7000,
+      "memory_used_bytes": 16106127360,
+      "memory_total_bytes": 85899345920
+    },
+    {
+      "observed_at_ms": 1742846509650,
+      "device_id": "cuda:6",
+      "device_label": "NVIDIA H100 80GB HBM3",
+      "utilization_bps": 7040,
+      "memory_used_bytes": 17179869184,
+      "memory_total_bytes": 85899345920
+    },
+    {
+      "observed_at_ms": 1742846509675,
+      "device_id": "cuda:7",
+      "device_label": "NVIDIA H100 80GB HBM3",
+      "utilization_bps": 7080,
+      "memory_used_bytes": 18253611008,
+      "memory_total_bytes": 85899345920
+    }
+  ],
+  "distributed_series": [],
+  "event_series": [
+    {
+      "observed_at_ms": 1742846510000,
+      "severity": "warning",
+      "event_kind": "series_unavailable",
+      "detail": "The lane preserved the operator finalizer and challenge-refusal evidence, but no live loss or rank-skew stream was retained."
+    },
+    {
+      "observed_at_ms": 1742846510000,
+      "severity": "error",
+      "event_kind": "distributed_lane_refused",
+      "detail": "The retained distributed challenge receipt is still a measurements-missing or inventory-mismatch refusal rather than a true live 8xH100 runtime receipt."
+    },
+    {
+      "observed_at_ms": 1742846510000,
+      "severity": "info",
+      "event_kind": "finalizer_report_sealed",
+      "detail": "The RunPod 8xH100 finalizer sealed the provider-neutral bundle and run index."
+    }
+  ],
+  "source_artifacts": [
+    {
+      "artifact_role": "live_bundle",
+      "artifact_uri": "training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
+      "source_kind": "local_mirror",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "parameter_golf_distributed_8xh100.remote_training_bundle.v1"
+      ],
+      "detail": "The provider-neutral local mirror is the app-facing source for the RunPod distributed 8xH100 lane."
+    },
+    {
+      "artifact_role": "finalizer_report",
+      "artifact_uri": "parameter_golf_runpod_8xh100_finalizer_report.json",
+      "artifact_digest": "6c1f7eccc7808ae0bfd1c7c8ea91ad8ccbc5b8895865170ca3c493ba9f6b3e5d",
+      "source_kind": "finalizer_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "parameter_golf.runpod_8xh100_finalizer.v1"
+      ],
+      "detail": "The finalizer report remains authoritative for exported-folder, topology, and visualization provenance."
+    },
+    {
+      "artifact_role": "gpu_inventory",
+      "artifact_uri": "nvidia_smi_inventory.txt",
+      "artifact_digest": "6f5ea71f3769b8db836099112654587d8b7885bbc26b2f0e63de6155772e55a8",
+      "source_kind": "provider_generated",
+      "authoritative": true,
+      "detail": "The `nvidia-smi` inventory snapshot remains authoritative for the retained per-device GPU state."
+    },
+    {
+      "artifact_role": "gpu_topology",
+      "artifact_uri": "nvidia_smi_topology.txt",
+      "artifact_digest": "f7c7f6c5d41468deeb6f9880b95dd8ed8d57ae00b6ae3a1e8143550bd1ea7a84",
+      "source_kind": "provider_generated",
+      "authoritative": true,
+      "detail": "The `nvidia-smi topo -m` capture remains authoritative for the retained fabric topology snapshot."
+    },
+    {
+      "artifact_role": "submission_run_evidence",
+      "artifact_uri": "exported_submission/psionic_parameter_golf_submission_run_evidence.json",
+      "artifact_digest": "f65656fd3747ab65da841b42cfc9aa7433416ee6680b99f000b3ca4ab622f23f",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "parameter_golf.submission_run_evidence.v1"
+      ],
+      "detail": "The submission run evidence report remains authoritative for the exported-folder replay posture and embedded distributed challenge receipt."
+    },
+    {
+      "artifact_role": "distributed_receipt",
+      "artifact_uri": "parameter_golf_distributed_8xh100_receipt.json",
+      "artifact_digest": "5e019c3a263a0e3adf0f09d1050c59dfbf4e0ad7c8270af7e664aad7faded21b",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "parameter_golf_distributed_throughput_receipt"
+      ],
+      "detail": "The distributed challenge receipt remains authoritative for refusal posture and any retained topology or timing facts."
+    }
+  ],
+  "bundle_digest": "8fbcbce902c4631197e2746666357f49466e0c405166d0d3254ac2b17cf44821"
+}

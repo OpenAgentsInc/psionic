@@ -39,6 +39,8 @@ stage-level observability receipts:
   is the canonical summary-only example.
 - `fixtures/training_visualization/parameter_golf_live_remote_training_visualization_bundle_v1.json`
   is the canonical full-series always-live example.
+- `fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json`
+  is the canonical distributed post-run example.
 - `fixtures/training_visualization/remote_training_run_index_v1.json` is the
   canonical run-index example.
 

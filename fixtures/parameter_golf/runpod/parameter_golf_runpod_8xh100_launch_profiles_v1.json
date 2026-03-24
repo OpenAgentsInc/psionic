@@ -40,8 +40,11 @@
       "expected_receipt_paths": [
         "$PGOLF_RUN_ROOT/nvidia_smi_inventory.txt",
         "$PGOLF_RUN_ROOT/nvidia_smi_topology.txt",
+        "$PGOLF_RUN_ROOT/parameter_golf_distributed_8xh100_receipt.json",
         "$PGOLF_RUN_ROOT/parameter_golf_runpod_8xh100_finalizer_report.json",
-        "$PGOLF_RUN_ROOT/exported_submission/records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/psionic_parameter_golf_submission_run_evidence.json"
+        "$PGOLF_RUN_ROOT/exported_submission/records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/psionic_parameter_golf_submission_run_evidence.json",
+        "$PGOLF_RUN_ROOT/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
+        "$PGOLF_RUN_ROOT/training_visualization/remote_training_run_index_v1.json"
       ]
     }
   ]

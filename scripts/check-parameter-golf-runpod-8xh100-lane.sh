@@ -96,8 +96,14 @@ if "parameter-golf-runpod-finalize-8xh100.sh" not in (commands.get("finalizer_co
 receipts = manifest.get("expected_receipt_paths") or []
 if not any("nvidia_smi_inventory.txt" in path for path in receipts):
     fail("launch manifest no longer preserves GPU inventory evidence")
+if not any("parameter_golf_distributed_8xh100_receipt.json" in path for path in receipts):
+    fail("launch manifest no longer preserves the distributed challenge receipt mirror")
 if not any("psionic_parameter_golf_submission_run_evidence.json" in path for path in receipts):
     fail("launch manifest no longer preserves exported-folder run evidence")
+if not any("parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json" in path for path in receipts):
+    fail("launch manifest no longer preserves the provider-neutral distributed visualization bundle")
+if not any("training_visualization/remote_training_run_index_v1.json" in path for path in receipts):
+    fail("launch manifest no longer preserves the provider-neutral visualization run index")
 
 report = {
     "schema_version": "parameter_golf.runpod_8xh100_operator_rehearsal.v1",

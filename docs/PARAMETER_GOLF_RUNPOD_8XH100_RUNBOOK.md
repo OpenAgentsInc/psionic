@@ -24,6 +24,8 @@ record-track claim.
   `scripts/parameter-golf-runpod-launch-8xh100.sh`
 - distributed-evidence finalizer:
   `scripts/parameter-golf-runpod-finalize-8xh100.sh`
+- app-facing visualization contract:
+  `docs/REMOTE_TRAINING_VISUALIZATION.md`
 - local rehearsal:
   `scripts/check-parameter-golf-runpod-8xh100-lane.sh`
 - committed local rehearsal report:
@@ -64,9 +66,10 @@ The committed manifest is explicit about three separate operator phases:
   run the exported folder under the public `WORLD_SIZE=8` posture
 - finalization:
   generate the exported-folder submission run evidence under the RunPod
-  `8xH100` posture, then capture `nvidia-smi` inventory, `nvidia-smi topo -m`,
-  exported-folder digests, and the later distributed evidence paths under one
-  machine-readable finalizer report
+  `8xH100` posture, mirror the retained distributed challenge receipt into the
+  run root, capture `nvidia-smi` inventory and `nvidia-smi topo -m`, then seal
+  the provider-neutral remote-training visualization bundle and run index under
+  one machine-readable finalizer report
 
 This is intentional. `#460` closes the RunPod lane definition and rehearsal,
 not the later real `8xH100` evidence bundle.
@@ -101,6 +104,6 @@ This runbook does not claim:
 It closes one narrower but important thing:
 
 - the repo now owns one explicit RunPod `8xH100` operator lane with a
-  committed profile, preflight, manifest-only launcher, and finalizer contract
-  that later real hardware runs can reuse without redefining the operator
-  surface from scratch
+  committed profile, preflight, manifest-only launcher, finalizer contract,
+  and app-facing visualization bundle family that later real hardware runs can
+  reuse without redefining the operator surface from scratch

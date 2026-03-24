@@ -22,6 +22,8 @@ Autopilot owns rendering, refresh loops, and pane behavior.
   is the canonical always-live Google single-node example bundle.
 - `fixtures/training_visualization/parameter_golf_live_remote_training_visualization_bundle_v1.json`
   is the canonical full always-live example bundle.
+- `fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json`
+  is the canonical RunPod distributed post-run example bundle.
 - `fixtures/training_visualization/remote_training_run_index_v1.json` is the
   canonical run-index example.
 
@@ -126,3 +128,27 @@ retain:
 
 The summary-only Google example fixture still exists because non-accelerated or
 historical lanes may lack chartable series.
+
+## RunPod Parameter Golf Distributed 8xH100
+
+The RunPod `8xH100` Parameter Golf lane now seals the same provider-neutral
+bundle family under the run root when the operator finalizer closes.
+
+The retained paths are:
+
+- `training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json`
+- `training_visualization/remote_training_run_index_v1.json`
+- `training_visualization/snapshots/finalized_bundle.json`
+
+The current lane is still explicit about its boundary:
+
+- the finalizer mirrors the retained `distributed_challenge_receipt` into the
+  run root when one is only embedded inside the submission evidence report
+- the bundle preserves GPU inventory, topology capture, exported-folder
+  provenance, and any retained distributed receipt facts
+- the bundle stays `post_run_only` today because this lane still lacks a
+  coordinator-owned one-second live writer
+- `series_status` remains `unavailable` until the lane retains a real loss
+  curve or equivalent primary training series
+- refusal posture stays explicit when the retained receipt is still a
+  measurements-missing or inventory-mismatch refusal
