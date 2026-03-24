@@ -74,7 +74,9 @@ impl ParameterGolfTrainGptReferenceRunReceipt {
             geometry: config.geometry.clone(),
             train_step_observed_ms: parsed.train_step_observed_ms,
             final_validation_observed_ms: config.final_validation_observed_ms,
-            final_roundtrip_eval_ms: config.final_roundtrip_eval_ms,
+            final_roundtrip_eval_ms: parsed
+                .final_roundtrip_eval_ms
+                .or(config.final_roundtrip_eval_ms),
             peak_memory_allocated_mib: parsed
                 .peak_memory_allocated_mib
                 .or(config.peak_memory_allocated_mib),
@@ -198,6 +200,7 @@ impl ParameterGolfSameNodeParityReport {
 #[derive(Clone, Debug, Default, PartialEq)]
 struct ParsedTrainGptLogMetrics {
     train_step_observed_ms: Option<u64>,
+    final_roundtrip_eval_ms: Option<u64>,
     peak_memory_allocated_mib: Option<u64>,
     peak_memory_reserved_mib: Option<u64>,
     final_validation_loss: Option<f64>,
@@ -501,6 +504,9 @@ fn parse_train_gpt_log(
             parsed.compressed_model_bytes =
                 extract_u64_after(line, "Serialized model int8+zlib:", "bytes");
         }
+        if line.starts_with("final_int8_zlib_roundtrip ") {
+            parsed.final_roundtrip_eval_ms = extract_u64_after(line, "eval_time:", "ms");
+        }
         if line.starts_with("final_int8_zlib_roundtrip_exact") {
             parsed.final_roundtrip_val_loss = extract_f64_after(line, "val_loss:", " ");
             parsed.final_roundtrip_val_bpb = extract_f64_after(line, "val_bpb:", "");
@@ -674,6 +680,7 @@ mod tests {
              step:1/20000 val_loss:8.4321 val_bpb:9.8765 train_time:456ms step_avg:456.00ms\n\
              peak memory allocated: 22345 MiB reserved: 22784 MiB\n\
              Serialized model int8+zlib: 78958 bytes (payload:123 raw_torch:456 payload_ratio:7.89x)\n\
+             final_int8_zlib_roundtrip val_loss:8.4000 val_bpb:9.8000 eval_time:6432ms\n\
              final_int8_zlib_roundtrip_exact val_loss:8.40000000 val_bpb:9.80000000\n",
         )?;
         let config = ParameterGolfTrainGptReferenceRunConfig {
@@ -684,7 +691,7 @@ mod tests {
             tokenizer_digest: String::from("tokenizer-digest"),
             geometry: sample_geometry(),
             final_validation_observed_ms: Some(12_345),
-            final_roundtrip_eval_ms: Some(6_789),
+            final_roundtrip_eval_ms: None,
             peak_memory_allocated_mib: None,
             peak_memory_reserved_mib: None,
         };
@@ -695,6 +702,7 @@ mod tests {
         assert_eq!(receipt.final_validation_bpb, Some(9.8765));
         assert_eq!(receipt.final_roundtrip_val_loss, Some(8.4));
         assert_eq!(receipt.final_roundtrip_val_bpb, Some(9.8));
+        assert_eq!(receipt.final_roundtrip_eval_ms, Some(6_432));
         assert_eq!(receipt.peak_memory_allocated_mib, Some(22_345));
         assert_eq!(receipt.compressed_model_bytes, Some(78_958));
         Ok(())

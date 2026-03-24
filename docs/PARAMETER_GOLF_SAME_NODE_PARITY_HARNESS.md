@@ -18,6 +18,10 @@ the issue itself.
   `crates/psionic-train/examples/parameter_golf_same_node_parity_report.rs`
 - typed report logic:
   `crates/psionic-train/src/parameter_golf_same_node_parity.rs`
+- RunPod upstream operator wrapper:
+  `scripts/parameter-golf-runpod-run-train-gpt-reference.sh`
+- same-node parity build wrapper:
+  `scripts/parameter-golf-build-same-node-parity.sh`
 
 ## What Landed
 
@@ -69,6 +73,15 @@ cargo run -q -p psionic-train --example parameter_golf_train_gpt_reference_run_r
   --grad-accum-steps 8
 ```
 
+Run the upstream single-H100 PyTorch baseline on a RunPod node and preserve the
+raw log:
+
+```bash
+bash scripts/parameter-golf-runpod-run-train-gpt-reference.sh \
+  --repo-root /workspace/parameter-golf \
+  --log /workspace/parameter_golf_train_gpt_reference.log
+```
+
 Build one parity report:
 
 ```bash
@@ -76,6 +89,16 @@ cargo run -q -p psionic-train --example parameter_golf_same_node_parity_report -
   <psionic-single-h100-report.json> \
   <upstream-train-gpt-receipt.json> \
   <same-node-parity-report.json>
+```
+
+Or use the repo-owned wrapper to derive the upstream identity fields from the
+completed Psionic report and emit both artifacts in one step:
+
+```bash
+bash scripts/parameter-golf-build-same-node-parity.sh \
+  --psionic-report <psionic-single-h100-report.json> \
+  --upstream-log /workspace/parameter_golf_train_gpt_reference.log \
+  --output-dir <same-node-parity-artifacts-dir>
 ```
 
 ## Honest Boundary
@@ -91,5 +114,6 @@ It closes one narrower but important thing:
 
 - the repo now has one typed fail-closed comparison surface ready to consume a
   real Psionic single-H100 receipt plus a real normalized `train_gpt.py`
-  receipt, so the later H100 run only needs evidence rather than fresh schema
-  or parser work
+  receipt, and the repo now also ships explicit RunPod wrappers for producing
+  those inputs, so the later H100 run only needs evidence rather than fresh
+  schema, parser, or operator glue work
