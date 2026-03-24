@@ -189,6 +189,13 @@ the same bounded public lane before the next H100 rerun:
   `fixtures/parameter_golf/reports/parameter_golf_validation_runtime_comparison.json`
   down to `3253.50 ms` in
   `fixtures/parameter_golf/reports/parameter_golf_validation_runtime_comparison_sequence_attention.json`
+- a fresh same-node H100 validation receipt now also records the admitted
+  forward lane on the real single-H100 pod in
+  `fixtures/parameter_golf/reports/parameter_golf_validation_runtime_comparison_sequence_attention_h100.json`:
+  - legacy average batch time: `9219.00 ms`
+  - device-resident eval-graph average batch time: `9048.00 ms`
+  - runtime receipt: `path=device_resident_cuda_eval_graph_v1`,
+    `graph_surface=parameter_golf_baseline_eval_graph_v1`
 - bounded PGOLF residual `add`/`mul` execution now preserves the IR broadcast
   contract when exact CUDA input specs do not match:
   - exact dense `f32` peers still encode directly on-device

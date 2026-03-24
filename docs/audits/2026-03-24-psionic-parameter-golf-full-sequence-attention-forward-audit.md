@@ -77,15 +77,39 @@ change, not to receipt noise.
   before a new H100 rerun
 - the eval-stack work that follows now has a cleaner substrate to build on
 
-## What It Does Not Prove
+## Fresh H100 Evidence
 
-This audit does not close the H100-facing acceptance bar by itself.
+The next same-node H100 rerun is now committed too.
 
-It does not prove:
+The bounded H100 validation comparison in
+`fixtures/parameter_golf/reports/parameter_golf_validation_runtime_comparison_sequence_attention_h100.json`
+records:
 
-- the exact H100 improvement for `#482`
+- legacy average batch time: `9219.00 ms`
+- device-resident eval-graph average batch time: `9048.00 ms`
+- runtime receipt:
+  - `path=device_resident_cuda_eval_graph_v1`
+  - `graph_surface=parameter_golf_baseline_eval_graph_v1`
+
+That H100 receipt is narrower than the full end-to-end trainer run, but it
+does prove the admitted validation forward path is now executing the eval graph
+through the real full-sequence attention kernel on the current single-H100
+lane.
+
+The live profiled H100 trainer rerun on current `main` also moved the first
+real microstep forward wallclock from `126979 ms` down to `101823 ms` while
+keeping forward host fallback to a non-dominant `159 ms` `permute` receipt on
+the same bounded lane.
+
+## What This Still Does Not Prove
+
+This audit still does not prove:
+
 - the final single-H100 validation wallclock after all validation-structure
   work lands
-- anything about the remaining backward replay cost
+- that the remaining train-path blocker is gone, because
+  `scaled_dot_product_attention_query_backward` still dominates the backward
+  host-fallback receipt
+- anything about the later distributed `8xH100` lane
 
-Those still require fresh H100 receipts.
+Those stay with `#470`, `#454`, `#458`, and `#473`.

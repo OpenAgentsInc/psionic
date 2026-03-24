@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "scope_window": "parameter_golf_validation_runtime_comparison_v1",
+  "run_id": "parameter-golf-validation-runtime-comparison",
+  "dataset_root": "/workspace/parameter-golf/data/datasets/fineweb10B_sp1024",
+  "tokenizer_path": "/workspace/parameter-golf/data/tokenizers/fineweb_1024_bpe.model",
+  "dataset_key": {
+    "dataset_ref": "dataset://parameter-golf/fineweb-sp1024",
+    "version": "2026.03.18"
+  },
+  "variant": "sp1024",
+  "tokenizer_digest": {
+    "family": "sentence_piece",
+    "tokenizer_digest": "4f5e8adb109c66b4886963bc75a7befd73bda36d27fd7102df8e9e66503b0e2a",
+    "vocab_size": 1024
+  },
+  "dataset_manifest_digest": "30a69f97f378808c8c557bbaf1f275358d90ecfa41f2b56c787b9da3c86817d6",
+  "batch_sequences": 8,
+  "sequence_length": 1024,
+  "batch_limit": 2,
+  "observed_cuda_health": {
+    "status": "Ready",
+    "message": "cuda ready on 1 NVIDIA device(s)"
+  },
+  "observed_cuda_devices": [
+    {
+      "backend": "cuda",
+      "device": {
+        "kind": "Cuda",
+        "ordinal": 0,
+        "label": "cuda:0"
+      },
+      "device_name": "NVIDIA H100 80GB HBM3",
+      "supported_dtypes": [
+        "F32"
+      ],
+      "supported_quantization": [],
+      "memory_capacity_bytes": 85520809984,
+      "unified_memory": false,
+      "feature_flags": [
+        "cuda_architecture_surface",
+        "persistence_mode_enabled",
+        "addressing_mode_hmm"
+      ],
+      "nvidia_metadata": {
+        "topology": {
+          "architecture": "hopper",
+          "compute_capability": "9.0",
+          "pci_bdf": "00000000:DB:00.0",
+          "sm_count": null,
+          "vram_bytes": 85520809984,
+          "mig_profile": null
+        },
+        "risk": {
+          "level": "standard",
+          "display_attached": null,
+          "mig_partitioned": false,
+          "warnings": []
+        },
+        "recovery": {
+          "supports_gpu_reset": true,
+          "expected_actions": [
+            "process_restart",
+            "gpu_reset",
+            "reboot_host"
+          ]
+        }
+      }
+    }
+  ],
+  "legacy": {
+    "mean_loss": 8.266813278198242,
+    "bits_per_byte": 195403.62068642428,
+    "observed_ms": 18438,
+    "average_batch_ms": 9219.0
+  },
+  "device_resident": {
+    "mean_loss": 8.266727447509766,
+    "bits_per_byte": 195401.59189652305,
+    "observed_ms": 18096,
+    "average_batch_ms": 9048.0,
+    "runtime_receipt": {
+      "path": "device_resident_cuda_eval_graph_v1",
+      "graph_surface": "parameter_golf_baseline_eval_graph_v1",
+      "session_count": 1,
+      "total_batches": 2,
+      "persistent_parameter_buffer_count": 92,
+      "persistent_parameter_value_count": 17059912,
+      "resident_parameter_upload_us": 87745,
+      "per_batch_stable_parameter_buffer_allocations": 0,
+      "reusable_input_token_buffer": true,
+      "reusable_target_token_buffer": true,
+      "total_input_token_write_us": 2247,
+      "total_target_token_write_us": 3206,
+      "byte_accounting_mode": "precomputed_batch_target_bytes",
+      "total_byte_accounting_us": 48
+    }
+  },
+  "summary": "Compared the legacy host-rebind validation path against the device-resident eval-graph path on a single H100 over 2 batch(es) of 8 sequence(s); average batch time moved from 9219.00ms to 9048.00ms.",
+  "receipt_digest": "468433c2574eee5ca13437ea16c0d5d1ec2d93f8ee40ccbcf6c20ae780b49e2d"
+}
