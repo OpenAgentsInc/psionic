@@ -38,6 +38,12 @@ It compiles MLX-style recipe choices into existing Psionic train primitives:
 
 That keeps one training architecture in the repo.
 
+The first swarm lane now also consumes the emitted recipe plan directly inside
+`psionic-mlx-workflows::plan_first_swarm_live_adapter_cluster`. The recipe
+package still does not own a second trainer runtime. It now provides the plan
+digest, adapter geometry, and stage truth that seed one real mixed-backend
+adapter-cluster window through `psionic-train`.
+
 ## Stage Mapping
 
 The current bounded stage mapping is:

@@ -40,7 +40,6 @@ use crate::{
     CheckpointRecoveryError, CheckpointScopeBinding, CheckpointScopeKind,
     OPEN_ADAPTER_CUDA_BACKEND_LABEL, OPEN_ADAPTER_REFERENCE_ADAPTER_FAMILY,
     OPEN_ADAPTER_REFERENCE_ADAPTER_FORMAT, PolicyRevision, TrainingRunGraphError,
-    TrainingWindowStatus,
 };
 
 const APPLE_ADAPTER_BACKEND_LABEL: &str = "apple.foundation_models.adapter_train";
@@ -513,6 +512,7 @@ fn family_config(
                 minimum_free_memory_bytes: 12 * GIB_BYTES,
                 require_accelerator: true,
                 allow_degraded_backend: false,
+                additional_backend_capabilities: Vec::new(),
                 allow_flaky_nodes: false,
             },
             validator_policy: AdapterContributionValidatorPolicy {
@@ -534,6 +534,7 @@ fn family_config(
                 minimum_free_memory_bytes: 10 * GIB_BYTES,
                 require_accelerator: true,
                 allow_degraded_backend: false,
+                additional_backend_capabilities: Vec::new(),
                 allow_flaky_nodes: false,
             },
             validator_policy: AdapterContributionValidatorPolicy {
@@ -971,6 +972,7 @@ fn contribution_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::TrainingWindowStatus;
 
     #[test]
     fn decentralized_adapter_reference_program_runs_for_apple_family()

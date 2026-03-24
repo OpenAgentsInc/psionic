@@ -15,6 +15,8 @@ It owns:
 - reward-model and judge-model helper plans above the existing MLX recipe lane
 - adapter merge/export workflows above the portable model-IO surface
 - a local Hugging Face-style publish snapshot over existing safetensors export
+- the first swarm live planning bridge from MLX recipe, dataset, and publish
+  artifacts into the existing `psionic-train` adapter-cluster window planner
 - lineage-bound dataset, merge, and publish manifests instead of notebook-only
   side effects
 
@@ -38,6 +40,17 @@ It reuses the existing Psionic substrate:
 
 That keeps synthetic data, supervision helpers, adapter merge, and publish
 flows tied to the same machine-legible truth as the rest of the repo.
+
+The package now also owns one bounded live bridge for the first swarm lane. It
+consumes:
+
+- one MLX recipe plan
+- one workflow dataset artifact
+- one local publish config
+
+and projects them into `AdapterTrainingClusterCoordinator` instead of stopping
+at workflow-only planning. The retained fixture for that bridge is
+`fixtures/swarm/first_swarm_live_workflow_plan_v1.json`.
 
 ## Synthetic Data
 

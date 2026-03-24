@@ -382,6 +382,7 @@ fn rl_method(method: MlxRecipeMethod) -> bool {
 
 fn stage_label(kind: TrainingStageKind) -> &'static str {
     match kind {
+        TrainingStageKind::Pretrain => "pretrain",
         TrainingStageKind::GeneralSft => "general_sft",
         TrainingStageKind::AgenticSft => "agentic_sft",
         TrainingStageKind::Rl => "rl",

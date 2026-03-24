@@ -46,6 +46,16 @@ pub enum AdapterClusterCoordinationError {
     /// The dataset-slice plan was empty.
     #[error("adapter-cluster window planning requires at least one dataset slice")]
     EmptyDatasetSlicePlan,
+    /// Explicit contributor selection named more contributors than available dataset slices.
+    #[error(
+        "adapter-cluster explicit contributor selection requires at least {required_dataset_slices} dataset slices but only {provided_dataset_slices} were provided"
+    )]
+    InsufficientDatasetSlices {
+        /// Dataset slices required by the selected contributor count.
+        required_dataset_slices: usize,
+        /// Dataset slices provided by the caller.
+        provided_dataset_slices: usize,
+    },
     /// The coordinator has no current window.
     #[error("adapter-cluster coordinator has no current window")]
     MissingCurrentWindow,
@@ -71,6 +81,37 @@ pub enum AdapterClusterCoordinationError {
 
 /// Capability and readiness contract for one adapter-training contributor.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdapterContributorBackendCapability {
+    /// Backend label that must be ready in cluster telemetry.
+    pub backend_label: String,
+    /// Minimum free memory required for one contributor selection.
+    pub minimum_free_memory_bytes: u64,
+    /// Whether a visible accelerator is mandatory.
+    pub require_accelerator: bool,
+    /// Whether degraded backend readiness may still contribute.
+    pub allow_degraded_backend: bool,
+}
+
+impl AdapterContributorBackendCapability {
+    /// Creates a backend-scoped contributor capability contract.
+    #[must_use]
+    pub fn new(
+        backend_label: impl Into<String>,
+        minimum_free_memory_bytes: u64,
+        require_accelerator: bool,
+        allow_degraded_backend: bool,
+    ) -> Self {
+        Self {
+            backend_label: backend_label.into(),
+            minimum_free_memory_bytes,
+            require_accelerator,
+            allow_degraded_backend,
+        }
+    }
+}
+
+/// Capability and readiness contract for one adapter-training contributor.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdapterContributorCapabilityPolicy {
     /// Backend label that must be ready in cluster telemetry.
     pub backend_label: String,
@@ -80,6 +121,9 @@ pub struct AdapterContributorCapabilityPolicy {
     pub require_accelerator: bool,
     /// Whether degraded backend readiness may still contribute.
     pub allow_degraded_backend: bool,
+    /// Additional backend-specific contributor contracts admitted by the same coordinator.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_backend_capabilities: Vec<AdapterContributorBackendCapability>,
     /// Whether flaky nodes may still contribute.
     pub allow_flaky_nodes: bool,
 }
@@ -91,8 +135,23 @@ impl Default for AdapterContributorCapabilityPolicy {
             minimum_free_memory_bytes: 8 * GIB_BYTES,
             require_accelerator: true,
             allow_degraded_backend: false,
+            additional_backend_capabilities: Vec::new(),
             allow_flaky_nodes: false,
         }
+    }
+}
+
+impl AdapterContributorCapabilityPolicy {
+    fn backend_capabilities(&self) -> Vec<AdapterContributorBackendCapability> {
+        let mut capabilities = Vec::with_capacity(self.additional_backend_capabilities.len() + 1);
+        capabilities.push(AdapterContributorBackendCapability::new(
+            self.backend_label.clone(),
+            self.minimum_free_memory_bytes,
+            self.require_accelerator,
+            self.allow_degraded_backend,
+        ));
+        capabilities.extend(self.additional_backend_capabilities.clone());
+        capabilities
     }
 }
 
@@ -133,6 +192,9 @@ pub struct AdapterClusterContributorStatus {
     /// Membership posture when visible.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub membership_status: Option<ClusterMembershipStatus>,
+    /// Backend label matched against the contributor capability policy, when one existed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matched_backend_label: Option<String>,
     /// Backend readiness for the required backend label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub backend_readiness: Option<ClusterBackendReadinessStatus>,
@@ -347,6 +409,7 @@ impl AdapterTrainingClusterCoordinator {
                 node_id: String::from(participant.node_id.as_str()),
                 role: membership.map(|record| record.identity.role),
                 membership_status: membership.map(|record| record.status),
+                matched_backend_label: evaluation.matched_backend_label,
                 backend_readiness: evaluation.backend_readiness,
                 stability: evaluation.stability,
                 free_memory_bytes: evaluation.free_memory_bytes,
@@ -434,12 +497,61 @@ impl AdapterTrainingClusterCoordinator {
             .run
             .select_contributors(contributor_target, planned_at_ms)?
             .clone();
+        self.plan_window_from_contributor_set(
+            dataset_slices,
+            contributor_set_revision,
+            planned_at_ms,
+        )
+    }
+
+    /// Plans one adapter window from an explicit selected contributor set.
+    pub fn plan_next_window_with_selected_nodes(
+        &mut self,
+        dataset_slices: Vec<AdapterDatasetSliceIdentity>,
+        selected_node_ids: Vec<String>,
+        planned_at_ms: u64,
+    ) -> Result<AdapterClusterWindowRecord, AdapterClusterCoordinationError> {
+        if let Some(current_window_id) = &self.current_window_id {
+            let status = self.window_record(current_window_id)?.window.status;
+            if status != TrainingWindowStatus::Reconciled {
+                return Err(AdapterClusterCoordinationError::CurrentWindowOpen {
+                    window_id: current_window_id.clone(),
+                    status: training_window_status_label(status).to_string(),
+                });
+            }
+        }
+        if dataset_slices.is_empty() {
+            return Err(AdapterClusterCoordinationError::EmptyDatasetSlicePlan);
+        }
+        if dataset_slices.len() < selected_node_ids.len() {
+            return Err(AdapterClusterCoordinationError::InsufficientDatasetSlices {
+                required_dataset_slices: selected_node_ids.len(),
+                provided_dataset_slices: dataset_slices.len(),
+            });
+        }
+        let contributor_set_revision = self
+            .run
+            .select_explicit_contributors(selected_node_ids, planned_at_ms)?
+            .clone();
+        self.plan_window_from_contributor_set(
+            dataset_slices,
+            contributor_set_revision,
+            planned_at_ms,
+        )
+    }
+
+    fn plan_window_from_contributor_set(
+        &mut self,
+        dataset_slices: Vec<AdapterDatasetSliceIdentity>,
+        contributor_set_revision: crate::TrainingContributorSetRevision,
+        planned_at_ms: u64,
+    ) -> Result<AdapterClusterWindowRecord, AdapterClusterCoordinationError> {
         let generic_window = self
             .run
             .plan_window(
                 Some(self.current_policy_revision.revision_id.clone()),
                 TrainingWindowAssignmentRule::RoundRobinByPriority {
-                    batch_slice_count: contributor_target as u32,
+                    batch_slice_count: contributor_set_revision.contributor_node_ids.len() as u32,
                     eval_slice_count: 0,
                 },
                 planned_at_ms,
@@ -645,9 +757,10 @@ impl AdapterTrainingClusterCoordinator {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct ContributorEvaluation {
     eligibility: AdapterContributorEligibility,
+    matched_backend_label: Option<String>,
     backend_readiness: Option<ClusterBackendReadinessStatus>,
     stability: Option<ClusterStabilityPosture>,
     free_memory_bytes: Option<u64>,
@@ -665,6 +778,7 @@ fn evaluate_contributor(
     let Some(membership) = membership else {
         return ContributorEvaluation {
             eligibility: AdapterContributorEligibility::MissingFromSnapshot,
+            matched_backend_label: None,
             backend_readiness: None,
             stability: None,
             free_memory_bytes: None,
@@ -676,6 +790,7 @@ fn evaluate_contributor(
     if membership.status != ClusterMembershipStatus::Ready {
         return ContributorEvaluation {
             eligibility: AdapterContributorEligibility::MembershipNotReady,
+            matched_backend_label: None,
             backend_readiness: None,
             stability: None,
             free_memory_bytes: None,
@@ -687,6 +802,7 @@ fn evaluate_contributor(
     if membership.identity.role == NodeRole::CoordinatorOnly {
         return ContributorEvaluation {
             eligibility: AdapterContributorEligibility::RoleNotContributor,
+            matched_backend_label: None,
             backend_readiness: None,
             stability: None,
             free_memory_bytes: None,
@@ -698,6 +814,7 @@ fn evaluate_contributor(
     let Some(telemetry) = telemetry else {
         return ContributorEvaluation {
             eligibility: AdapterContributorEligibility::TelemetryMissing,
+            matched_backend_label: None,
             backend_readiness: None,
             stability: None,
             free_memory_bytes: None,
@@ -706,65 +823,121 @@ fn evaluate_contributor(
             reliability_bps: 0,
         };
     };
-    let backend_readiness = telemetry
-        .backend_readiness
-        .get(&policy.backend_label)
-        .copied()
-        .unwrap_or(ClusterBackendReadinessStatus::Unknown);
     let free_memory_bytes = telemetry.free_memory_bytes;
     let accelerator_count = telemetry.accelerator_count;
     let stability = Some(telemetry.stability);
-    let eligibility = match backend_readiness {
-        ClusterBackendReadinessStatus::Ready => {
-            if !policy.allow_flaky_nodes && telemetry.stability == ClusterStabilityPosture::Flaky {
-                AdapterContributorEligibility::NodeUnstable
-            } else if telemetry.stability == ClusterStabilityPosture::Unstable {
-                AdapterContributorEligibility::NodeUnstable
-            } else if policy.require_accelerator
-                && telemetry.accelerator_count.unwrap_or_default() == 0
-            {
-                AdapterContributorEligibility::AcceleratorRequired
-            } else if telemetry.free_memory_bytes.unwrap_or_default()
-                < policy.minimum_free_memory_bytes
-            {
-                AdapterContributorEligibility::InsufficientFreeMemory
-            } else {
-                AdapterContributorEligibility::Eligible
-            }
-        }
-        ClusterBackendReadinessStatus::Degraded if policy.allow_degraded_backend => {
-            if policy.require_accelerator && telemetry.accelerator_count.unwrap_or_default() == 0 {
-                AdapterContributorEligibility::AcceleratorRequired
-            } else if telemetry.free_memory_bytes.unwrap_or_default()
-                < policy.minimum_free_memory_bytes
-            {
-                AdapterContributorEligibility::InsufficientFreeMemory
-            } else {
-                AdapterContributorEligibility::Eligible
-            }
-        }
-        ClusterBackendReadinessStatus::Degraded => AdapterContributorEligibility::BackendDegraded,
-        ClusterBackendReadinessStatus::Refused | ClusterBackendReadinessStatus::Unknown => {
-            AdapterContributorEligibility::BackendUnavailable
-        }
-    };
+    let backend_evaluation = policy
+        .backend_capabilities()
+        .into_iter()
+        .enumerate()
+        .map(|(index, capability)| {
+            (
+                index,
+                evaluate_backend_capability(telemetry, policy, &capability),
+            )
+        })
+        .max_by_key(|(index, evaluation)| {
+            (
+                backend_evaluation_rank(evaluation.eligibility),
+                usize::MAX.saturating_sub(*index),
+            )
+        })
+        .map(|(_, evaluation)| evaluation)
+        .expect("adapter contributor capability policy must expose at least one backend");
+    let eligibility = backend_evaluation.eligibility;
+    let backend_readiness = backend_evaluation.backend_readiness;
     let (priority_bps, reliability_bps) = if eligibility == AdapterContributorEligibility::Eligible
     {
         (
             contributor_priority_bps(telemetry, membership.identity.role, node_id),
-            contributor_reliability_bps(telemetry, backend_readiness),
+            contributor_reliability_bps(
+                telemetry,
+                backend_readiness.expect("eligible backend must surface readiness"),
+            ),
         )
     } else {
         (0, 0)
     };
     ContributorEvaluation {
         eligibility,
-        backend_readiness: Some(backend_readiness),
+        matched_backend_label: backend_evaluation.matched_backend_label,
+        backend_readiness,
         stability,
         free_memory_bytes,
         accelerator_count,
         priority_bps,
         reliability_bps,
+    }
+}
+
+#[derive(Clone)]
+struct BackendEvaluation {
+    matched_backend_label: Option<String>,
+    backend_readiness: Option<ClusterBackendReadinessStatus>,
+    eligibility: AdapterContributorEligibility,
+}
+
+fn evaluate_backend_capability(
+    telemetry: &ClusterNodeTelemetry,
+    policy: &AdapterContributorCapabilityPolicy,
+    capability: &AdapterContributorBackendCapability,
+) -> BackendEvaluation {
+    let backend_readiness = telemetry
+        .backend_readiness
+        .get(&capability.backend_label)
+        .copied()
+        .unwrap_or(ClusterBackendReadinessStatus::Unknown);
+    let eligibility = match backend_readiness {
+        ClusterBackendReadinessStatus::Ready => {
+            evaluate_ready_backend(telemetry, policy, capability)
+        }
+        ClusterBackendReadinessStatus::Degraded if capability.allow_degraded_backend => {
+            evaluate_ready_backend(telemetry, policy, capability)
+        }
+        ClusterBackendReadinessStatus::Degraded => AdapterContributorEligibility::BackendDegraded,
+        ClusterBackendReadinessStatus::Refused | ClusterBackendReadinessStatus::Unknown => {
+            AdapterContributorEligibility::BackendUnavailable
+        }
+    };
+    BackendEvaluation {
+        matched_backend_label: Some(capability.backend_label.clone()),
+        backend_readiness: Some(backend_readiness),
+        eligibility,
+    }
+}
+
+fn evaluate_ready_backend(
+    telemetry: &ClusterNodeTelemetry,
+    policy: &AdapterContributorCapabilityPolicy,
+    capability: &AdapterContributorBackendCapability,
+) -> AdapterContributorEligibility {
+    if !policy.allow_flaky_nodes && telemetry.stability == ClusterStabilityPosture::Flaky {
+        AdapterContributorEligibility::NodeUnstable
+    } else if telemetry.stability == ClusterStabilityPosture::Unstable {
+        AdapterContributorEligibility::NodeUnstable
+    } else if capability.require_accelerator && telemetry.accelerator_count.unwrap_or_default() == 0
+    {
+        AdapterContributorEligibility::AcceleratorRequired
+    } else if telemetry.free_memory_bytes.unwrap_or_default() < capability.minimum_free_memory_bytes
+    {
+        AdapterContributorEligibility::InsufficientFreeMemory
+    } else {
+        AdapterContributorEligibility::Eligible
+    }
+}
+
+fn backend_evaluation_rank(eligibility: AdapterContributorEligibility) -> u8 {
+    match eligibility {
+        AdapterContributorEligibility::Eligible => 5,
+        AdapterContributorEligibility::InsufficientFreeMemory
+        | AdapterContributorEligibility::AcceleratorRequired
+        | AdapterContributorEligibility::NodeUnstable => 4,
+        AdapterContributorEligibility::BackendDegraded => 3,
+        AdapterContributorEligibility::BackendUnavailable => 2,
+        AdapterContributorEligibility::TelemetryMissing
+        | AdapterContributorEligibility::RoleNotContributor
+        | AdapterContributorEligibility::MembershipNotReady
+        | AdapterContributorEligibility::MissingFromSnapshot => 1,
     }
 }
 
@@ -865,6 +1038,7 @@ fn stable_membership_receipt_digest(
     for status in contributor_statuses {
         for part in [
             status.node_id.as_str(),
+            status.matched_backend_label.as_deref().unwrap_or("-"),
             adapter_contributor_eligibility_label(status.eligibility),
             training_contribution_state_label(status.contribution_state),
         ] {
@@ -1326,9 +1500,14 @@ fn harness_checkpoint_reference(
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::BTreeMap,
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+    };
+
     use super::{
-        AdapterContributorCapabilityPolicy, AdapterTrainingClusterCoordinator,
-        run_adapter_cluster_membership_harness,
+        AdapterContributorBackendCapability, AdapterContributorCapabilityPolicy,
+        AdapterTrainingClusterCoordinator, run_adapter_cluster_membership_harness,
     };
     use crate::{
         AdapterDatasetSliceIdentity, AdapterTargetIdentity, CheckpointPointer,
@@ -1492,6 +1671,175 @@ mod tests {
             vec!["worker-d", "worker-a"]
         );
         assert!(!receipt.receipt_digest.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn adapter_cluster_supports_mixed_backend_policy_and_explicit_selection()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cluster_id = psionic_cluster::ClusterId::new(
+            &psionic_cluster::ClusterNamespace::new("adapter-cluster-mixed"),
+            &psionic_cluster::AdmissionToken::new("shared-secret"),
+        );
+        let mut snapshot = psionic_cluster::ClusterSnapshot::new(cluster_id.clone());
+        snapshot.memberships = BTreeMap::from([
+            (
+                psionic_cluster::NodeId::new("mac-a"),
+                psionic_cluster::ClusterMembershipRecord::new(
+                    psionic_cluster::ClusterNodeIdentity {
+                        cluster_id: cluster_id.clone(),
+                        node_id: psionic_cluster::NodeId::new("mac-a"),
+                        node_epoch: psionic_cluster::NodeEpoch::initial(),
+                        role: psionic_cluster::NodeRole::Mixed,
+                        auth_public_key: String::from("mac-a-pk"),
+                        attestation: None,
+                    },
+                    Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 31_000)),
+                    psionic_cluster::ClusterMembershipStatus::Ready,
+                ),
+            ),
+            (
+                psionic_cluster::NodeId::new("linux-a"),
+                psionic_cluster::ClusterMembershipRecord::new(
+                    psionic_cluster::ClusterNodeIdentity {
+                        cluster_id: cluster_id.clone(),
+                        node_id: psionic_cluster::NodeId::new("linux-a"),
+                        node_epoch: psionic_cluster::NodeEpoch::initial(),
+                        role: psionic_cluster::NodeRole::ExecutorOnly,
+                        auth_public_key: String::from("linux-a-pk"),
+                        attestation: None,
+                    },
+                    Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 31_001)),
+                    psionic_cluster::ClusterMembershipStatus::Ready,
+                ),
+            ),
+            (
+                psionic_cluster::NodeId::new("linux-b"),
+                psionic_cluster::ClusterMembershipRecord::new(
+                    psionic_cluster::ClusterNodeIdentity {
+                        cluster_id: cluster_id.clone(),
+                        node_id: psionic_cluster::NodeId::new("linux-b"),
+                        node_epoch: psionic_cluster::NodeEpoch::initial(),
+                        role: psionic_cluster::NodeRole::ExecutorOnly,
+                        auth_public_key: String::from("linux-b-pk"),
+                        attestation: None,
+                    },
+                    Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 31_002)),
+                    psionic_cluster::ClusterMembershipStatus::Ready,
+                ),
+            ),
+        ]);
+        snapshot.telemetry = BTreeMap::from([
+            (
+                psionic_cluster::NodeId::new("mac-a"),
+                psionic_cluster::ClusterNodeTelemetry::new(psionic_cluster::NodeId::new("mac-a"))
+                    .with_memory(Some(24 * super::GIB_BYTES), Some(24 * super::GIB_BYTES))
+                    .with_accelerator_count(1)
+                    .with_backend_readiness(
+                        String::from("open_adapter_backend.mlx.metal.gpt_oss_lm_head"),
+                        psionic_cluster::ClusterBackendReadinessStatus::Ready,
+                    )
+                    .with_stability_posture(psionic_cluster::ClusterStabilityPosture::Stable),
+            ),
+            (
+                psionic_cluster::NodeId::new("linux-a"),
+                psionic_cluster::ClusterNodeTelemetry::new(psionic_cluster::NodeId::new("linux-a"))
+                    .with_memory(Some(20 * super::GIB_BYTES), Some(20 * super::GIB_BYTES))
+                    .with_accelerator_count(1)
+                    .with_backend_readiness(
+                        String::from("open_adapter_backend.cuda.gpt_oss_lm_head"),
+                        psionic_cluster::ClusterBackendReadinessStatus::Ready,
+                    )
+                    .with_stability_posture(psionic_cluster::ClusterStabilityPosture::Stable),
+            ),
+            (
+                psionic_cluster::NodeId::new("linux-b"),
+                psionic_cluster::ClusterNodeTelemetry::new(psionic_cluster::NodeId::new("linux-b"))
+                    .with_memory(Some(18 * super::GIB_BYTES), Some(18 * super::GIB_BYTES))
+                    .with_accelerator_count(1)
+                    .with_backend_readiness(
+                        String::from("open_adapter_backend.cuda.gpt_oss_lm_head"),
+                        psionic_cluster::ClusterBackendReadinessStatus::Ready,
+                    )
+                    .with_stability_posture(psionic_cluster::ClusterStabilityPosture::Stable),
+            ),
+        ]);
+        let state = psionic_cluster::ClusterState::from_snapshot(snapshot);
+        let run = crate::TrainingRunState::new(
+            "adapter-run-mixed",
+            "adapter-sft",
+            state.cluster_id().as_str(),
+            "swarm.open_adapter",
+            psionic_environments::EnvironmentPackageKey::new("oa.swarm.adapter", "2026.03"),
+        )?;
+        let mut coordinator = AdapterTrainingClusterCoordinator::new(
+            run,
+            AdapterTargetIdentity::new(
+                "swarm.adapter",
+                "gpt_oss.decoder_lm_head_lora",
+                "model://gpt-oss/swarm-local-v1",
+                "safetensors",
+            )?,
+            PolicyRevision::new("swarm.open_adapter", "policy-r1", "policy-digest-r1", 1_000),
+            CheckpointPointer::new(
+                CheckpointScopeBinding::new(CheckpointScopeKind::Window, "swarm-window-1"),
+                "swarm.open_adapter",
+                super::harness_checkpoint_reference("checkpoint/swarm/r1", 1_000),
+                "manifest-digest-r1",
+                1_001,
+            )?,
+            AdapterContributorCapabilityPolicy {
+                backend_label: String::from("open_adapter_backend.mlx.metal.gpt_oss_lm_head"),
+                minimum_free_memory_bytes: 12 * super::GIB_BYTES,
+                require_accelerator: true,
+                allow_degraded_backend: false,
+                additional_backend_capabilities: vec![AdapterContributorBackendCapability::new(
+                    "open_adapter_backend.cuda.gpt_oss_lm_head",
+                    10 * super::GIB_BYTES,
+                    true,
+                    false,
+                )],
+                allow_flaky_nodes: false,
+            },
+        );
+        let receipt = coordinator.observe_cluster_state(&state, 1_010)?.clone();
+        assert_eq!(
+            receipt
+                .contributor_statuses
+                .iter()
+                .find(|status| status.node_id == "mac-a")
+                .and_then(|status| status.matched_backend_label.as_deref()),
+            Some("open_adapter_backend.mlx.metal.gpt_oss_lm_head")
+        );
+        assert_eq!(
+            receipt
+                .contributor_statuses
+                .iter()
+                .find(|status| status.node_id == "linux-a")
+                .and_then(|status| status.matched_backend_label.as_deref()),
+            Some("open_adapter_backend.cuda.gpt_oss_lm_head")
+        );
+
+        let window = coordinator.plan_next_window_with_selected_nodes(
+            vec![
+                AdapterDatasetSliceIdentity::new(
+                    "dataset.swarm",
+                    "train",
+                    "slice-mac",
+                    "slice-digest-mac",
+                )?,
+                AdapterDatasetSliceIdentity::new(
+                    "dataset.swarm",
+                    "train",
+                    "slice-linux",
+                    "slice-digest-linux",
+                )?,
+            ],
+            vec![String::from("mac-a"), String::from("linux-a")],
+            1_020,
+        )?;
+        assert_eq!(window.plan.selected_node_ids, vec!["mac-a", "linux-a"]);
+        assert_eq!(window.plan.standby_node_ids, vec![String::from("linux-b")]);
         Ok(())
     }
 }

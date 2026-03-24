@@ -4364,11 +4364,13 @@ dependencies = [
 name = "psionic-mlx-workflows"
 version = "0.1.1"
 dependencies = [
+ "psionic-cluster",
  "psionic-core",
  "psionic-data",
  "psionic-datastream",
  "psionic-environments",
  "psionic-mlx-recipes",
+ "psionic-runtime",
  "psionic-train",
  "serde",
  "serde_json",

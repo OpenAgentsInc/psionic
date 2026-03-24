@@ -94,6 +94,17 @@ binds the lane to retained RTX 4080 CUDA inventory truth plus a deterministic
 open-adapter same-node harness with explicit unsupported-precision refusal and
 the same comparable contributor receipt contract used by the Mac lane.
 
+MLX planning for that lane no longer stops at package-local artifacts. The repo
+now also owns a first swarm live planning bridge in
+`crates/psionic-mlx-workflows/src/swarm_live_plan.rs`, the binary
+`first_swarm_live_workflow_plan`, and the committed fixture
+`fixtures/swarm/first_swarm_live_workflow_plan_v1.json`. That bridge consumes
+one MLX recipe plan, one synthetic dataset artifact, and one local publish
+config and feeds them into `AdapterTrainingClusterCoordinator` through explicit
+mixed-backend contributor selection plus one shared capability policy that
+admits both the Mac MLX Metal and Linux CUDA lanes without introducing a second
+trainer or notebook side control plane.
+
 Apple-specific adapter work is no longer only later-family planning. The repo
 now owns a canonical spec-and-fixture baseline for it in:
 

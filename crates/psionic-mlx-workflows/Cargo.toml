@@ -14,11 +14,13 @@ workspace = true
 path = "src/lib.rs"
 
 [dependencies]
+psionic-cluster = { path = "../psionic-cluster" }
 psionic-core = { path = "../psionic-core" }
 psionic-data = { path = "../psionic-data" }
 psionic-datastream = { path = "../psionic-datastream" }
 psionic-environments = { path = "../psionic-environments" }
 psionic-mlx-recipes = { path = "../psionic-mlx-recipes" }
+psionic-runtime = { path = "../psionic-runtime" }
 psionic-train = { path = "../psionic-train" }
 serde = { workspace = true }
 serde_json = { workspace = true }

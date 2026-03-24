@@ -27,6 +27,10 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+mod swarm_live_plan;
+
+pub use swarm_live_plan::*;
+
 /// Human-readable crate ownership summary.
 pub const CRATE_ROLE: &str =
     "bounded MLX-style synthetic-data, supervision-helper, adapter-merge, and publish workflows";
@@ -483,6 +487,12 @@ pub enum MlxWorkflowError {
         /// Local path that failed.
         path: String,
         /// Human-readable reason.
+        message: String,
+    },
+    /// The first live swarm planner refused the provided contract or inputs.
+    #[error("first swarm live planner refused: {message}")]
+    FirstSwarmPlan {
+        /// Human-readable refusal reason.
         message: String,
     },
     /// JSON serialization or parsing failed.

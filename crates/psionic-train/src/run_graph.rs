@@ -389,6 +389,23 @@ pub enum TrainingRunGraphError {
     /// Contributor selection has no ready admitted participants.
     #[error("training run has no ready admitted participants eligible for contributor selection")]
     NoReadyParticipants,
+    /// Explicit contributor selection did not include any contributors.
+    #[error("training run explicit contributor selection requires at least one node id")]
+    EmptyExplicitContributorSelection,
+    /// Explicit contributor selection repeated a node id.
+    #[error("training run explicit contributor selection repeated node `{node_id}`")]
+    DuplicateExplicitContributorSelection {
+        /// Repeated node id.
+        node_id: String,
+    },
+    /// Explicit contributor selection named a node that is not currently selectable.
+    #[error(
+        "training run explicit contributor selection cannot use node `{node_id}` because it is not admitted-ready and unsuspended"
+    )]
+    ExplicitContributorUnavailable {
+        /// Unavailable node id.
+        node_id: String,
+    },
     /// Contributor selection revision missing.
     #[error("training run has no contributor-set revision to use for window planning")]
     MissingContributorSetRevision,
@@ -750,6 +767,65 @@ impl TrainingRunState {
         max_contributors: usize,
         selected_at_ms: u64,
     ) -> Result<&TrainingContributorSetRevision, TrainingRunGraphError> {
+        let candidates = self.selectable_contributor_candidates();
+        if candidates.is_empty() {
+            return Err(TrainingRunGraphError::NoReadyParticipants);
+        }
+        let contributor_count = max_contributors.max(1).min(candidates.len());
+        let contributor_node_ids = candidates
+            .iter()
+            .take(contributor_count)
+            .map(|participant| String::from(participant.node_id.as_str()))
+            .collect::<Vec<_>>();
+        let standby_node_ids = candidates
+            .iter()
+            .skip(contributor_count)
+            .map(|participant| String::from(participant.node_id.as_str()))
+            .collect::<Vec<_>>();
+        self.record_contributor_selection(contributor_node_ids, standby_node_ids, selected_at_ms)
+    }
+
+    /// Selects an explicit contributor set from the current admitted-ready population.
+    pub fn select_explicit_contributors(
+        &mut self,
+        contributor_node_ids: Vec<String>,
+        selected_at_ms: u64,
+    ) -> Result<&TrainingContributorSetRevision, TrainingRunGraphError> {
+        if contributor_node_ids.is_empty() {
+            return Err(TrainingRunGraphError::EmptyExplicitContributorSelection);
+        }
+        let candidates = self.selectable_contributor_candidates();
+        if candidates.is_empty() {
+            return Err(TrainingRunGraphError::NoReadyParticipants);
+        }
+        let candidate_node_ids = candidates
+            .iter()
+            .map(|participant| String::from(participant.node_id.as_str()))
+            .collect::<BTreeSet<_>>();
+        let mut selected = BTreeSet::new();
+        for node_id in &contributor_node_ids {
+            if !selected.insert(node_id.clone()) {
+                return Err(
+                    TrainingRunGraphError::DuplicateExplicitContributorSelection {
+                        node_id: node_id.clone(),
+                    },
+                );
+            }
+            if !candidate_node_ids.contains(node_id) {
+                return Err(TrainingRunGraphError::ExplicitContributorUnavailable {
+                    node_id: node_id.clone(),
+                });
+            }
+        }
+        let standby_node_ids = candidates
+            .iter()
+            .filter(|participant| !selected.contains(participant.node_id.as_str()))
+            .map(|participant| String::from(participant.node_id.as_str()))
+            .collect::<Vec<_>>();
+        self.record_contributor_selection(contributor_node_ids, standby_node_ids, selected_at_ms)
+    }
+
+    fn selectable_contributor_candidates(&self) -> Vec<&TrainingParticipantRecord> {
         let mut candidates = self
             .participants
             .iter()
@@ -759,9 +835,6 @@ impl TrainingRunState {
                     && participant.contributor_suspension_reason.is_none()
             })
             .collect::<Vec<_>>();
-        if candidates.is_empty() {
-            return Err(TrainingRunGraphError::NoReadyParticipants);
-        }
         candidates.sort_by(|left, right| {
             right
                 .priority_bps
@@ -769,19 +842,17 @@ impl TrainingRunState {
                 .then_with(|| right.reliability_bps.cmp(&left.reliability_bps))
                 .then_with(|| left.node_id.as_str().cmp(right.node_id.as_str()))
         });
-        let contributor_count = max_contributors.max(1).min(candidates.len());
-        let contributor_node_ids = candidates
-            .iter()
-            .take(contributor_count)
-            .map(|participant| String::from(participant.node_id.as_str()))
-            .collect::<Vec<_>>();
+        candidates
+    }
+
+    fn record_contributor_selection(
+        &mut self,
+        contributor_node_ids: Vec<String>,
+        standby_node_ids: Vec<String>,
+        selected_at_ms: u64,
+    ) -> Result<&TrainingContributorSetRevision, TrainingRunGraphError> {
         let contributor_set: BTreeSet<&str> =
             contributor_node_ids.iter().map(String::as_str).collect();
-        let standby_node_ids = candidates
-            .iter()
-            .skip(contributor_count)
-            .map(|participant| String::from(participant.node_id.as_str()))
-            .collect::<Vec<_>>();
 
         for participant in &mut self.participants {
             if contributor_set.contains(participant.node_id.as_str()) {
@@ -1530,6 +1601,72 @@ mod tests {
         assert!(matches!(
             err,
             TrainingRunGraphError::InvalidWindowTransition { .. }
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_contributor_selection_preserves_requested_order()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let state = cluster_state();
+        let mut run = TrainingRunState::new(
+            "train-run-5",
+            "stage-1",
+            state.cluster_id().as_str(),
+            "train.decoder",
+            psionic_environments::EnvironmentPackageKey::new("env.train", "1"),
+        )?;
+        run.apply_cluster_membership_snapshot(&state, 1_000)?;
+        run.update_participant_priority(&NodeId::new("worker-b"), 9_000, 7_500, 1_010)?;
+        run.update_participant_priority(&NodeId::new("worker-a"), 8_500, 8_000, 1_011)?;
+
+        let contributor_set = run.select_explicit_contributors(
+            vec![String::from("worker-a"), String::from("worker-b")],
+            1_020,
+        )?;
+        assert_eq!(
+            contributor_set.contributor_node_ids,
+            vec![String::from("worker-a"), String::from("worker-b")]
+        );
+        assert_eq!(
+            contributor_set.standby_node_ids,
+            vec![String::from("trainer-a")]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_contributor_selection_refuses_unready_or_duplicate_nodes()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let state = cluster_state();
+        let mut run = TrainingRunState::new(
+            "train-run-6",
+            "stage-1",
+            state.cluster_id().as_str(),
+            "train.decoder",
+            psionic_environments::EnvironmentPackageKey::new("env.train", "1"),
+        )?;
+        run.apply_cluster_membership_snapshot(&state, 1_000)?;
+
+        let duplicate = run
+            .select_explicit_contributors(
+                vec![String::from("worker-a"), String::from("worker-a")],
+                1_010,
+            )
+            .expect_err("duplicate explicit selection should fail");
+        assert!(matches!(
+            duplicate,
+            TrainingRunGraphError::DuplicateExplicitContributorSelection { ref node_id }
+                if node_id == "worker-a"
+        ));
+
+        let unavailable = run
+            .select_explicit_contributors(vec![String::from("worker-c")], 1_020)
+            .expect_err("joining worker should not be selectable");
+        assert!(matches!(
+            unavailable,
+            TrainingRunGraphError::ExplicitContributorUnavailable { ref node_id }
+                if node_id == "worker-c"
         ));
         Ok(())
     }
