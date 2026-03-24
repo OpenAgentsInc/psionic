@@ -92,6 +92,8 @@ if launcher.get("manifest_only") is not True:
     fail("launch manifest lost manifest_only=true during rehearsal")
 
 commands = manifest.get("commands") or {}
+if "$PGOLF_SUBMISSION_DIR" not in (commands.get("pre_training_command") or ""):
+    fail("launch manifest pre_training no longer stages directly into the retained submission root")
 if "python3 train_gpt.py" not in (commands.get("execution_entrypoint_command") or ""):
     fail("launch manifest execution entrypoint no longer uses the exported folder surface")
 if "parameter-golf-runpod-finalize-8xh100.sh" not in (commands.get("finalizer_command") or ""):

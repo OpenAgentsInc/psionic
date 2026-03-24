@@ -67,7 +67,9 @@ The committed launcher is explicit about four separate operator phases:
 
 - pre-training:
   validate the workspace contract, bind the immutable PGOLF input descriptor,
-  and stage the exported submission folder
+  and stage the exported submission folder directly into the retained
+  `records/track_non_record_16mb/<submission_id>` root that later execution
+  and finalization consume
 - execution entrypoint:
   run the exported folder under the public `WORLD_SIZE=8` posture
 - finalization:
@@ -91,6 +93,13 @@ This means later real `8xH100` runs can retain not only the exported-folder
 evidence and finalizer outputs, but also the exact remote phase boundary,
 phase commands, and per-phase exit results from the launcher that drove the
 pod.
+
+The finalizer now also resolves the exported submission root explicitly. The
+canonical path is still the retained `records/track_non_record_16mb/<submission_id>`
+folder, but the finalizer will fail closed only after checking both the
+requested path and the retained `${run_root}/exported_submission` root for
+`submission.json`. This keeps the operator surface explicit while surviving the
+older pre-fix layout during rehearsal.
 
 When a real distributed receipt already exists in the run root, the finalizer
 now passes that exact receipt into the exported-folder evidence generator rather

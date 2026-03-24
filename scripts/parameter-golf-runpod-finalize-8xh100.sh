@@ -59,10 +59,29 @@ if [[ -z "${run_root}" || -z "${submission_dir}" || -z "${output_path}" ]]; then
   exit 1
 fi
 
+resolve_submission_dir() {
+  local requested_dir="$1"
+  local run_root="$2"
+  local candidate
+  local -a candidates=(
+    "${requested_dir}"
+    "${run_root}/exported_submission"
+  )
+  for candidate in "${candidates[@]}"; do
+    if [[ -f "${candidate}/submission.json" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+  echo "error: could not resolve exported submission root from \`${requested_dir}\` or \`${run_root}/exported_submission\`" >&2
+  exit 1
+}
+
 timestamp_utc() {
   date -u +%Y-%m-%dT%H:%M:%SZ
 }
 
+submission_dir="$(resolve_submission_dir "${submission_dir}" "${run_root}")"
 run_id="$(basename -- "${run_root}")"
 created_at_utc="$(timestamp_utc)"
 distributed_receipt_path="${run_root}/parameter_golf_distributed_8xh100_receipt.json"
