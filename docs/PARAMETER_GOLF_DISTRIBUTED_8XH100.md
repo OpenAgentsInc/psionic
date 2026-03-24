@@ -170,6 +170,9 @@ the finalizer-owned run root:
 - `validation_observed_ms`
 - `export_observed_ms`
 - optional `memory_observation`
+- optional ordered distributed validation shard observations lifted from
+  `distributed_validation_rank_complete ...` log lines when the runtime emits
+  them
 
 The device inventory and capability profile are derived by Psionic itself from
 the run-root inventory contract plus the canonical RunPod `8xH100` lane

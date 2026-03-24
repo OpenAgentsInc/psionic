@@ -637,6 +637,7 @@ pub fn build_parameter_golf_runpod_8xh100_measurements_from_train_log(
     let mut final_roundtrip_eval_ms = None;
     let mut peak_allocated_mib = None;
     let mut peak_reserved_mib = None;
+    let mut validation_shard_observations = Vec::new();
 
     for line in log_text.lines().map(str::trim) {
         if line.starts_with("step:") && line.contains(" train_loss:") {
@@ -657,6 +658,74 @@ pub fn build_parameter_golf_runpod_8xh100_measurements_from_train_log(
         } else if line.starts_with("peak memory allocated:") {
             peak_allocated_mib = extract_u64_after(line, "peak memory allocated:", "MiB");
             peak_reserved_mib = extract_u64_after(line, "reserved:", "MiB");
+        } else if line.starts_with("distributed_validation_rank_complete ")
+            && line.contains(" rank=")
+            && line.contains(" sequence_start=")
+            && line.contains(" sequence_count=")
+            && line.contains(" loss_sum=")
+            && line.contains(" token_count=")
+            && line.contains(" byte_count=")
+            && line.contains(" elapsed_ms=")
+        {
+            let rank =
+                extract_u64_after(line, "rank=", " ").ok_or_else(|| {
+                    ParameterGolfDistributedLaneError::InvalidMeasurements {
+                        message: format!(
+                            "failed to parse distributed validation rank from `{line}`"
+                        ),
+                    }
+                })? as usize;
+            let sequence_start = extract_u64_after(line, "sequence_start=", " ").ok_or_else(|| {
+                ParameterGolfDistributedLaneError::InvalidMeasurements {
+                    message: format!(
+                        "failed to parse distributed validation sequence_start from `{line}`"
+                    ),
+                }
+            })?;
+            let sequence_count = extract_u64_after(line, "sequence_count=", " ").ok_or_else(|| {
+                ParameterGolfDistributedLaneError::InvalidMeasurements {
+                    message: format!(
+                        "failed to parse distributed validation sequence_count from `{line}`"
+                    ),
+                }
+            })?;
+            let loss_sum = extract_f64_after(line, "loss_sum=", " ").ok_or_else(|| {
+                ParameterGolfDistributedLaneError::InvalidMeasurements {
+                    message: format!(
+                        "failed to parse distributed validation loss_sum from `{line}`"
+                    ),
+                }
+            })?;
+            let token_count = extract_u64_after(line, "token_count=", " ").ok_or_else(|| {
+                ParameterGolfDistributedLaneError::InvalidMeasurements {
+                    message: format!(
+                        "failed to parse distributed validation token_count from `{line}`"
+                    ),
+                }
+            })?;
+            let byte_count = extract_u64_after(line, "byte_count=", " ").ok_or_else(|| {
+                ParameterGolfDistributedLaneError::InvalidMeasurements {
+                    message: format!(
+                        "failed to parse distributed validation byte_count from `{line}`"
+                    ),
+                }
+            })?;
+            let observed_ms = extract_u64_after(line, "elapsed_ms=", "").ok_or_else(|| {
+                ParameterGolfDistributedLaneError::InvalidMeasurements {
+                    message: format!(
+                        "failed to parse distributed validation elapsed_ms from `{line}`"
+                    ),
+                }
+            })?;
+            validation_shard_observations.push(ParameterGolfDistributedValidationShardObservation {
+                rank,
+                sequence_start,
+                sequence_count,
+                loss_sum,
+                token_count,
+                byte_count,
+                observed_ms,
+            });
         } else if line.starts_with("final_") && line.contains("_roundtrip") && line.contains("eval_time:") {
             final_roundtrip_eval_ms = extract_u64_after(line, "eval_time:", "ms");
         }
@@ -716,6 +785,42 @@ pub fn build_parameter_golf_runpod_8xh100_measurements_from_train_log(
     measurements.step_observations = step_observations;
     measurements.validation_observed_ms =
         final_validation_observed_ms.map_or(0, |value| value.saturating_sub(previous_finish_ms));
+    if !validation_shard_observations.is_empty() {
+        validation_shard_observations.sort_by_key(|observation| observation.rank);
+        for pair in validation_shard_observations.windows(2) {
+            if pair[0].rank == pair[1].rank {
+                return Err(ParameterGolfDistributedLaneError::InvalidMeasurements {
+                    message: format!(
+                        "distributed validation observations contain duplicate rank {}",
+                        pair[0].rank
+                    ),
+                });
+            }
+        }
+        if validation_shard_observations
+            .iter()
+            .any(|observation| observation.rank >= geometry.world_size)
+        {
+            return Err(ParameterGolfDistributedLaneError::InvalidMeasurements {
+                message: format!(
+                    "distributed validation observations must use ranks inside the world_size={} posture",
+                    geometry.world_size
+                ),
+            });
+        }
+        measurements.validation_total_sequence_count = validation_shard_observations
+            .iter()
+            .map(|observation| observation.sequence_count)
+            .sum();
+        measurements.validation_observed_ms = measurements.validation_observed_ms.max(
+            validation_shard_observations
+                .iter()
+                .map(|observation| observation.observed_ms)
+                .max()
+                .unwrap_or(0),
+        );
+        measurements.validation_shard_observations = validation_shard_observations;
+    }
     measurements.export_observed_ms = final_roundtrip_eval_ms.unwrap_or(0);
     if let Some(peak_device_mib) = peak_reserved_mib.or(peak_allocated_mib) {
         measurements.memory_observation = Some(ParameterGolfDistributedMemoryObservation {
@@ -1357,6 +1462,10 @@ fn extract_u64_after(line: &str, prefix: &str, suffix: &str) -> Option<u64> {
     extract_token_after(line, prefix, suffix)?.parse().ok()
 }
 
+fn extract_f64_after(line: &str, prefix: &str, suffix: &str) -> Option<f64> {
+    extract_token_after(line, prefix, suffix)?.parse().ok()
+}
+
 fn extract_token_after<'a>(line: &'a str, prefix: &str, suffix: &str) -> Option<&'a str> {
     let start = line.find(prefix)? + prefix.len();
     let tail = line[start..].trim_start();
@@ -1833,6 +1942,14 @@ mod tests {
 step:1/20000 train_loss:8.2000 train_time:50ms step_avg:50.00ms\n\
 step:3/20000 train_loss:8.0000 train_time:170ms step_avg:56.67ms\n\
 step:3/20000 val_loss:7.9000 val_bpb:1.2345 train_time:205ms step_avg:68.33ms\n\
+distributed_validation_rank_complete rank=0 sequence_start=0 sequence_count=8 loss_sum=12.0000 token_count=8192 byte_count=6144 elapsed_ms=31\n\
+distributed_validation_rank_complete rank=1 sequence_start=8 sequence_count=8 loss_sum=12.5000 token_count=8192 byte_count=6144 elapsed_ms=33\n\
+distributed_validation_rank_complete rank=2 sequence_start=16 sequence_count=8 loss_sum=13.0000 token_count=8192 byte_count=6144 elapsed_ms=35\n\
+distributed_validation_rank_complete rank=3 sequence_start=24 sequence_count=8 loss_sum=13.5000 token_count=8192 byte_count=6144 elapsed_ms=37\n\
+distributed_validation_rank_complete rank=4 sequence_start=32 sequence_count=8 loss_sum=14.0000 token_count=8192 byte_count=6144 elapsed_ms=39\n\
+distributed_validation_rank_complete rank=5 sequence_start=40 sequence_count=8 loss_sum=14.5000 token_count=8192 byte_count=6144 elapsed_ms=41\n\
+distributed_validation_rank_complete rank=6 sequence_start=48 sequence_count=8 loss_sum=15.0000 token_count=8192 byte_count=6144 elapsed_ms=43\n\
+distributed_validation_rank_complete rank=7 sequence_start=56 sequence_count=8 loss_sum=15.5000 token_count=8192 byte_count=6144 elapsed_ms=45\n\
 peak memory allocated: 11273 MiB reserved: 11438 MiB\n\
 final_int8_zlib_roundtrip val_loss:7.8000 val_bpb:1.2100 eval_time:1530ms\n";
         let measurements = build_parameter_golf_runpod_8xh100_measurements_from_train_log(
@@ -1858,9 +1975,14 @@ final_int8_zlib_roundtrip val_loss:7.8000 val_bpb:1.2100 eval_time:1530ms\n";
             measurements.step_observations[2],
             ParameterGolfDistributedStepObservation::new(3, 110, 170, 524_288)
         );
-        assert_eq!(measurements.validation_observed_ms, 35);
-        assert_eq!(measurements.validation_total_sequence_count, 0);
-        assert!(measurements.validation_shard_observations.is_empty());
+        assert_eq!(measurements.validation_total_sequence_count, 64);
+        assert_eq!(measurements.validation_shard_observations.len(), 8);
+        assert_eq!(measurements.validation_shard_observations[0].rank, 0);
+        assert_eq!(
+            measurements.validation_shard_observations[7].sequence_start,
+            56
+        );
+        assert_eq!(measurements.validation_observed_ms, 45);
         assert_eq!(measurements.export_observed_ms, 1_530);
         assert_eq!(
             measurements
@@ -1871,6 +1993,25 @@ final_int8_zlib_roundtrip val_loss:7.8000 val_bpb:1.2100 eval_time:1530ms\n";
             11_438 * 1024 * 1024
         );
         Ok(())
+    }
+
+    #[test]
+    fn runpod_8xh100_measurement_builder_rejects_duplicate_validation_ranks() {
+        let log = "\
+step:1/1 train_loss:8.2000 train_time:50ms step_avg:50.00ms\n\
+distributed_validation_rank_complete rank=0 sequence_start=0 sequence_count=8 loss_sum=12.0000 token_count=8192 byte_count=6144 elapsed_ms=31\n\
+distributed_validation_rank_complete rank=0 sequence_start=8 sequence_count=8 loss_sum=12.5000 token_count=8192 byte_count=6144 elapsed_ms=33\n";
+        let error = build_parameter_golf_runpod_8xh100_measurements_from_train_log(
+            log,
+            None,
+            None,
+            None,
+        )
+        .expect_err("duplicate distributed validation ranks should be rejected");
+        assert!(matches!(
+            error,
+            ParameterGolfDistributedLaneError::InvalidMeasurements { .. }
+        ));
     }
 
     #[test]
