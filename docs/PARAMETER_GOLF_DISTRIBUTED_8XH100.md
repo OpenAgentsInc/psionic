@@ -43,6 +43,15 @@ Psionic now encodes that exact posture explicitly instead of treating
   so a real RunPod run root can be lifted directly from
   `nvidia_smi_inventory.txt` plus one minimal operator-measurement JSON into
   the typed distributed receipt without hand-written intermediate JSON
+- `psionic-train` now also ships
+  `build_parameter_golf_runpod_8xh100_measurements_from_train_log(...)`, the
+  example
+  `crates/psionic-train/examples/parameter_golf_runpod_8xh100_measurements_from_log.rs`,
+  and the wrapper
+  `scripts/parameter-golf-runpod-build-8xh100-measurements.sh` so a retained
+  RunPod `execution.log` can be lifted directly into
+  `parameter_golf_distributed_8xh100_measurements.json` before the typed
+  receipt builder runs
 - `psionic-eval` now exposes
   `ParameterGolfDistributedThroughputReceipt` plus the supporting topology,
   communication, timing, memory, threshold, and refusal types
@@ -116,14 +125,25 @@ cargo run -p psionic-train --example parameter_golf_distributed_8xh100_receipt -
 ```
 
 For the later real RunPod lane, the repo now also owns a one-command
-run-root bridge:
+run-root bridge for measurements plus the existing receipt bridge:
 
 ```bash
+bash scripts/parameter-golf-runpod-build-8xh100-measurements.sh \
+  --run-root /workspace/parameter-golf-runpod-8xh100-20260324T000000Z
+
 bash scripts/parameter-golf-runpod-build-8xh100-receipt.sh \
   --run-root /workspace/parameter-golf-runpod-8xh100-20260324T000000Z
 ```
 
-That command expects:
+The measurements builder expects:
+
+- `/workspace/.../execution.log`
+
+and emits:
+
+- `/workspace/.../parameter_golf_distributed_8xh100_measurements.json`
+
+The receipt builder then expects:
 
 - `/workspace/.../nvidia_smi_inventory.txt`
 - `/workspace/.../parameter_golf_distributed_8xh100_measurements.json`

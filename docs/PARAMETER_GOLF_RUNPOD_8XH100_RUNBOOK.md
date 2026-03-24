@@ -107,6 +107,12 @@ Psionic to build the typed receipt directly from:
 This removes the old manual `devices.json` / capability JSON / config JSON
 assembly step from the first real RunPod `8xH100` evidence path.
 
+When the measurements JSON is also absent but the run root still preserves
+`execution.log`, the finalizer now first asks Psionic to derive
+`parameter_golf_distributed_8xh100_measurements.json` from that retained log,
+then lifts the resulting measurements plus `nvidia_smi_inventory.txt` into the
+typed distributed receipt.
+
 This is intentional. `#460` closes the RunPod lane definition and rehearsal,
 not the later real `8xH100` evidence bundle.
 

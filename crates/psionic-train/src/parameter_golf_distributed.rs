@@ -229,6 +229,8 @@ pub enum ParameterGolfDistributedLaneError {
     MissingRunId,
     #[error("distributed parameter golf config is invalid: {message}")]
     InvalidConfig { message: String },
+    #[error("distributed parameter golf measurements are invalid: {message}")]
+    InvalidMeasurements { message: String },
     #[error("distributed parameter golf inventory is invalid: {message}")]
     InvalidInventory { message: String },
     #[error("distributed parameter golf step observation is invalid: {message}")]
@@ -517,6 +519,114 @@ pub fn benchmark_parameter_golf_distributed_8xh100(
         receipt_digest: String::new(),
     }
     .with_stable_digest())
+}
+
+/// Builds one RunPod `8xH100` measurements JSON payload directly from a
+/// retained execution log.
+///
+/// The builder currently accepts the upstream `train_gpt.py` train/validation
+/// line shape plus the final roundtrip and peak-memory lines that the later
+/// RunPod evidence lane already preserves in `execution.log`.
+pub fn build_parameter_golf_runpod_8xh100_measurements_from_train_log(
+    log_text: &str,
+    run_id: Option<&str>,
+    mesh_id: Option<&str>,
+    memory_source: Option<&str>,
+) -> Result<ParameterGolfRunPod8xH100Measurements, ParameterGolfDistributedLaneError> {
+    let geometry = ParameterGolfBatchGeometry::challenge_distributed_8xh100_defaults();
+    let mut checkpoints = Vec::<(u64, u64)>::new();
+    let mut final_validation_observed_ms = None;
+    let mut final_roundtrip_eval_ms = None;
+    let mut peak_allocated_mib = None;
+    let mut peak_reserved_mib = None;
+
+    for line in log_text.lines().map(str::trim) {
+        if line.starts_with("step:") && line.contains(" train_loss:") {
+            let global_step = extract_u64_after(line, "step:", "/").ok_or_else(|| {
+                ParameterGolfDistributedLaneError::InvalidMeasurements {
+                    message: format!("failed to parse train-step line `{line}`"),
+                }
+            })?;
+            let train_time_ms =
+                extract_u64_after(line, "train_time:", "ms").ok_or_else(|| {
+                    ParameterGolfDistributedLaneError::InvalidMeasurements {
+                        message: format!("failed to parse train_time from `{line}`"),
+                    }
+                })?;
+            checkpoints.push((global_step, train_time_ms));
+        } else if line.starts_with("step:") && line.contains(" val_loss:") {
+            final_validation_observed_ms = extract_u64_after(line, "train_time:", "ms");
+        } else if line.starts_with("peak memory allocated:") {
+            peak_allocated_mib = extract_u64_after(line, "peak memory allocated:", "MiB");
+            peak_reserved_mib = extract_u64_after(line, "reserved:", "MiB");
+        } else if line.starts_with("final_") && line.contains("_roundtrip") && line.contains("eval_time:") {
+            final_roundtrip_eval_ms = extract_u64_after(line, "eval_time:", "ms");
+        }
+    }
+
+    if checkpoints.is_empty() {
+        return Err(ParameterGolfDistributedLaneError::InvalidMeasurements {
+            message: String::from("missing any `step:... train_loss:... train_time:...` lines"),
+        });
+    }
+
+    let mut step_observations = Vec::new();
+    let mut previous_step = 0_u64;
+    let mut previous_finish_ms = 0_u64;
+    for (global_step, finished_at_ms) in checkpoints {
+        if global_step <= previous_step {
+            return Err(ParameterGolfDistributedLaneError::InvalidMeasurements {
+                message: format!(
+                    "train-step checkpoints must be strictly increasing, found step {} after {}",
+                    global_step, previous_step
+                ),
+            });
+        }
+        if finished_at_ms < previous_finish_ms {
+            return Err(ParameterGolfDistributedLaneError::InvalidMeasurements {
+                message: format!(
+                    "train-step cumulative time regressed from {}ms to {}ms at step {}",
+                    previous_finish_ms, finished_at_ms, global_step
+                ),
+            });
+        }
+
+        let delta_steps = global_step - previous_step;
+        let delta_ms = finished_at_ms - previous_finish_ms;
+        let base_step_ms = delta_ms / delta_steps;
+        let remainder_ms = delta_ms % delta_steps;
+        let mut cursor_ms = previous_finish_ms;
+        for offset in 0..delta_steps {
+            let step_duration_ms = base_step_ms + u64::from(offset < remainder_ms);
+            let step_start_ms = cursor_ms;
+            let step_finish_ms = step_start_ms.saturating_add(step_duration_ms);
+            cursor_ms = step_finish_ms;
+            step_observations.push(ParameterGolfDistributedStepObservation::new(
+                previous_step + offset + 1,
+                step_start_ms,
+                step_finish_ms,
+                geometry.train_batch_tokens as u64,
+            ));
+        }
+        previous_step = global_step;
+        previous_finish_ms = finished_at_ms;
+    }
+
+    let mut measurements = ParameterGolfRunPod8xH100Measurements::challenge_defaults();
+    measurements.run_id = run_id.map(String::from);
+    measurements.mesh_id = mesh_id.map(String::from);
+    measurements.step_observations = step_observations;
+    measurements.validation_observed_ms =
+        final_validation_observed_ms.map_or(0, |value| value.saturating_sub(previous_finish_ms));
+    measurements.export_observed_ms = final_roundtrip_eval_ms.unwrap_or(0);
+    if let Some(peak_device_mib) = peak_reserved_mib.or(peak_allocated_mib) {
+        measurements.memory_observation = Some(ParameterGolfDistributedMemoryObservation {
+            peak_device_bytes_per_worker: peak_device_mib.saturating_mul(1024 * 1024),
+            peak_host_bytes_per_worker: 0,
+            source: memory_source.unwrap_or("execution log peak memory").to_string(),
+        });
+    }
+    Ok(measurements)
 }
 
 fn validate_distributed_geometry(
@@ -1047,6 +1157,20 @@ where
     hex::encode(hasher.finalize())
 }
 
+fn extract_u64_after(line: &str, prefix: &str, suffix: &str) -> Option<u64> {
+    extract_token_after(line, prefix, suffix)?.parse().ok()
+}
+
+fn extract_token_after<'a>(line: &'a str, prefix: &str, suffix: &str) -> Option<&'a str> {
+    let start = line.find(prefix)? + prefix.len();
+    let tail = line[start..].trim_start();
+    if suffix.is_empty() {
+        return Some(tail.trim());
+    }
+    let end = tail.find(suffix)?;
+    Some(tail[..end].trim())
+}
+
 #[cfg(test)]
 mod tests {
     use std::error::Error;
@@ -1065,6 +1189,7 @@ mod tests {
     use crate::{
         benchmark_parameter_golf_distributed_8xh100,
         benchmark_parameter_golf_runpod_8xh100_from_measurements,
+        build_parameter_golf_runpod_8xh100_measurements_from_train_log,
         parameter_golf_runpod_8xh100_capability_profile,
         parse_parameter_golf_runpod_8xh100_inventory, ParameterGolfBatchGeometry,
         ParameterGolfDistributed8xH100Config, ParameterGolfDistributedLaneError,
@@ -1446,5 +1571,64 @@ mod tests {
             .is_some_and(|memory| memory.measurement_posture
                 == "observed_runtime_peak_plus_analytic_state_breakdown"));
         Ok(())
+    }
+
+    #[test]
+    fn runpod_8xh100_measurement_builder_parses_train_log() -> Result<(), Box<dyn Error>> {
+        let log = "\
+step:1/20000 train_loss:8.2000 train_time:50ms step_avg:50.00ms\n\
+step:3/20000 train_loss:8.0000 train_time:170ms step_avg:56.67ms\n\
+step:3/20000 val_loss:7.9000 val_bpb:1.2345 train_time:205ms step_avg:68.33ms\n\
+peak memory allocated: 11273 MiB reserved: 11438 MiB\n\
+final_int8_zlib_roundtrip val_loss:7.8000 val_bpb:1.2100 eval_time:1530ms\n";
+        let measurements = build_parameter_golf_runpod_8xh100_measurements_from_train_log(
+            log,
+            Some("parameter-golf-runpod-test"),
+            Some("mesh.parameter_golf.runpod_8xh100"),
+            Some("synthetic train_gpt.py peak memory"),
+        )?;
+        assert_eq!(
+            measurements.run_id.as_deref(),
+            Some("parameter-golf-runpod-test")
+        );
+        assert_eq!(measurements.step_observations.len(), 3);
+        assert_eq!(
+            measurements.step_observations[0],
+            ParameterGolfDistributedStepObservation::new(1, 0, 50, 524_288)
+        );
+        assert_eq!(
+            measurements.step_observations[1],
+            ParameterGolfDistributedStepObservation::new(2, 50, 110, 524_288)
+        );
+        assert_eq!(
+            measurements.step_observations[2],
+            ParameterGolfDistributedStepObservation::new(3, 110, 170, 524_288)
+        );
+        assert_eq!(measurements.validation_observed_ms, 35);
+        assert_eq!(measurements.export_observed_ms, 1_530);
+        assert_eq!(
+            measurements
+                .memory_observation
+                .as_ref()
+                .expect("memory observation")
+                .peak_device_bytes_per_worker,
+            11_438 * 1024 * 1024
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn runpod_8xh100_measurement_builder_rejects_logs_without_train_steps() {
+        let error = build_parameter_golf_runpod_8xh100_measurements_from_train_log(
+            "final_int8_zlib_roundtrip val_loss:7.8 val_bpb:1.21 eval_time:1530ms\n",
+            None,
+            None,
+            None,
+        )
+        .expect_err("log without train steps should be rejected");
+        assert!(matches!(
+            error,
+            ParameterGolfDistributedLaneError::InvalidMeasurements { .. }
+        ));
     }
 }

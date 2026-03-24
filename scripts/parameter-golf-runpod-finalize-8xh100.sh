@@ -93,6 +93,21 @@ if [[ ! -f "${distributed_receipt_path}" && -f "${distributed_measurements_path}
     --output "${distributed_receipt_path}"
 fi
 
+execution_log_path="${run_root}/execution.log"
+if [[ ! -f "${distributed_measurements_path}" && -f "${execution_log_path}" ]]; then
+  bash "${repo_root}/scripts/parameter-golf-runpod-build-8xh100-measurements.sh" \
+    --run-root "${run_root}" \
+    --log "${execution_log_path}" \
+    --output "${distributed_measurements_path}"
+fi
+
+if [[ ! -f "${distributed_receipt_path}" && -f "${distributed_measurements_path}" ]]; then
+  bash "${repo_root}/scripts/parameter-golf-runpod-build-8xh100-receipt.sh" \
+    --run-root "${run_root}" \
+    --measurements "${distributed_measurements_path}" \
+    --output "${distributed_receipt_path}"
+fi
+
 entrypoint_path="${submission_dir}/train_gpt.py"
 manifest_path="${submission_dir}/submission.json"
 run_evidence_path="${submission_dir}/psionic_parameter_golf_submission_run_evidence.json"
