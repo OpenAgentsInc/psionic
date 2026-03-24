@@ -72,6 +72,9 @@ the baseline mixed-precision lane:
 
 - dense BF16 buffer residency on the public CUDA dense surface
 - bounded row-major BF16xBF16-to-F32 matmul execution through cuBLAS
+- bounded Parameter Golf token-embedding forward and backward admission with
+  BF16 train-visible embedding tables while preserving the current F32
+  embedding-activation and grad-output posture
 
 That first BF16 runtime seam is now followed by one bounded public CUDA BF16
 master-weight optimizer step over train-visible BF16 parameter and gradient

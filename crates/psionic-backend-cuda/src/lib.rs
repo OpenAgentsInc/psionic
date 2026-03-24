@@ -3267,10 +3267,16 @@ impl AvailableCudaBackend {
                 "cuda parameter_golf_token_embedding_lookup_backward requires I32 token ids",
             )));
         }
-        if token_embedding.spec().dtype() != DType::F32 || grad_output.spec().dtype() != DType::F32
+        if token_embedding.spec().dtype() != DType::F32
+            && token_embedding.spec().dtype() != DType::BF16
         {
             return Err(RuntimeError::Backend(String::from(
-                "cuda parameter_golf_token_embedding_lookup_backward requires F32 embedding weights and grad_output",
+                "cuda parameter_golf_token_embedding_lookup_backward requires F32 or BF16 embedding weights",
+            )));
+        }
+        if grad_output.spec().dtype() != DType::F32 {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_token_embedding_lookup_backward requires F32 grad_output",
             )));
         }
         if token_id_dims.len() != 2
@@ -12118,6 +12124,74 @@ mod tests {
                 1e-5,
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_parameter_golf_token_embedding_lookup_backward_with_bf16_embeddings_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let mut builder = AutodiffGraphBuilder::with_context(
+            selected.device.clone(),
+            AutodiffContext::training(),
+        );
+        let token_ids = builder.input("token_ids", Shape::new(vec![2, 2]), DType::I32, false);
+        let embeddings = builder.input("embeddings", Shape::new(vec![4, 3]), DType::BF16, true);
+        let looked_up = builder.parameter_golf_token_embedding_lookup(&token_ids, &embeddings)?;
+        let graph = builder.finish(vec![looked_up.clone()]);
+        let backward_plan = graph.backward_plan(looked_up.id())?;
+        let embedding_gradient = backward_plan
+            .gradient_for(embeddings.id())
+            .ok_or("missing embedding gradient output")?;
+        let token_id_binding = backward_plan
+            .primal_bindings
+            .iter()
+            .find(|binding| binding.primal_tensor == token_ids.id())
+            .ok_or("missing token id binding")?
+            .gradient_graph_input;
+        let embedding_binding = backward_plan
+            .primal_bindings
+            .iter()
+            .find(|binding| binding.primal_tensor == embeddings.id())
+            .ok_or("missing embedding binding")?
+            .gradient_graph_input;
+
+        let inputs = std::collections::BTreeMap::from([
+            (
+                token_id_binding,
+                backend.input_i32_buffer(Shape::new(vec![2, 2]), vec![0_i32, 1, 1, 3])?,
+            ),
+            (
+                embedding_binding,
+                backend.input_bf16_buffer(
+                    Shape::new(vec![4, 3]),
+                    vec![
+                        1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0,
+                    ],
+                )?,
+            ),
+            (
+                backward_plan.seed_input,
+                backend.input_buffer(Shape::new(vec![2, 2, 3]), vec![1.0_f32; 12])?,
+            ),
+        ]);
+        let result = backend.compile_and_execute(&backward_plan.gradient_graph, &inputs)?;
+        let gradient = result
+            .outputs
+            .get(&embedding_gradient)
+            .ok_or("missing embedding gradient")?;
+        assert_close(
+            &gradient.read_f32()?,
+            &[
+                1.0_f32, 1.0, 1.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+            ],
+            1e-5,
+        );
         Ok(())
     }
 
