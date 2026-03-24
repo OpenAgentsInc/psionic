@@ -61,6 +61,7 @@ const PARAMETER_GOLF_SINGLE_H100_OUTPUT_REPORT_ENV_VAR: &str =
     "PSIONIC_PARAMETER_GOLF_OUTPUT_REPORT";
 const PARAMETER_GOLF_SINGLE_H100_MAX_STEPS_ENV_VAR: &str =
     "PSIONIC_PARAMETER_GOLF_MAX_STEPS";
+const PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE: &str = "distributed_8xh100_train";
 
 /// Machine-readable real execution contract shipped with the exported folder.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1061,6 +1062,14 @@ if EXECUTION_MODE == "single_h100_train":
     )
     sys.exit(completed.returncode)
 
+if EXECUTION_MODE == "{distributed_8xh100_execution_mode}":
+    print(
+        "parameter golf submission runtime does not ship a distributed 8xH100 trainer payload yet; "
+        "the runpod_8xh100 lane must refuse until the real distributed runtime lands",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 print(f"unsupported execution mode: {{EXECUTION_MODE}}", file=sys.stderr)
 sys.exit(1)
 "#,
@@ -1068,6 +1077,7 @@ sys.exit(1)
         runtime_manifest_ref = runtime_manifest_ref,
         real_execution_contract_ref = real_execution_contract_ref,
         execution_mode_env_var = PARAMETER_GOLF_EXECUTION_MODE_ENV_VAR,
+        distributed_8xh100_execution_mode = PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE,
     )
 }
 
@@ -1326,6 +1336,12 @@ fn render_readme(
     );
     let _ = writeln!(
         readme,
+        "- Set `{}` to `{}` on the exported-folder `8xH100` lane only when the shipped folder grows a real distributed trainer payload; today that mode refuses explicitly instead of silently falling back to the bounded local-reference replay.\n",
+        PARAMETER_GOLF_EXECUTION_MODE_ENV_VAR,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE
+    );
+    let _ = writeln!(
+        readme,
         "The package root for challenge-repo publication is `{}/{}`.",
         PARAMETER_GOLF_NON_RECORD_RECORDS_DIR, submission_id
     );
@@ -1427,6 +1443,7 @@ mod tests {
         PARAMETER_GOLF_ACCOUNTING_COMPONENT_BUILD_DEPS,
         PARAMETER_GOLF_ACCOUNTING_COMPONENT_ENTRYPOINT, PARAMETER_GOLF_ACCOUNTING_COMPONENT_MODEL,
         PARAMETER_GOLF_ACCOUNTING_COMPONENT_RUNTIME, PARAMETER_GOLF_ACCOUNTING_COMPONENT_WRAPPER,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE,
         PARAMETER_GOLF_NON_RECORD_SUBMISSION_VERSION, PARAMETER_GOLF_NON_RECORD_TRACK_ID,
         PARAMETER_GOLF_REAL_RUNTIME_CONTRACT_ARTIFACT_REF,
         PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF,
@@ -1562,6 +1579,43 @@ mod tests {
             .path()
             .join(PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF)
             .is_file());
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_non_record_submission_entrypoint_refuses_distributed_8xh100_mode(
+    ) -> Result<(), Box<dyn Error>> {
+        let fixture = ParameterGolfLocalReferenceFixture::reference()?;
+        let config = ParameterGolfReferenceTrainingConfig::local_reference();
+        let benchmark_bundle = benchmark_parameter_golf_local_reference(&fixture, &config)?;
+        let submission_bundle = build_parameter_golf_non_record_submission_bundle(
+            &benchmark_bundle,
+            &ParameterGolfNonRecordSubmissionConfig::local_reference_defaults(),
+        )?;
+
+        let temp_dir = tempfile::tempdir()?;
+        write_parameter_golf_non_record_submission_bundle(&submission_bundle, temp_dir.path())?;
+
+        let completed = Command::new("python3")
+            .arg("train_gpt.py")
+            .env(
+                "PSIONIC_PARAMETER_GOLF_EXECUTION_MODE",
+                PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE,
+            )
+            .current_dir(temp_dir.path())
+            .output()?;
+        assert!(
+            !completed.status.success(),
+            "distributed 8xH100 mode should refuse until the real distributed payload exists"
+        );
+        let stderr = String::from_utf8_lossy(&completed.stderr);
+        assert!(stderr.contains("does not ship a distributed 8xH100 trainer payload yet"));
+        assert!(
+            !temp_dir
+                .path()
+                .join(PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF)
+                .exists()
+        );
         Ok(())
     }
 

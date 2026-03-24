@@ -71,7 +71,9 @@ The committed launcher is explicit about four separate operator phases:
   `records/track_non_record_16mb/<submission_id>` root that later execution
   and finalization consume
 - execution entrypoint:
-  run the exported folder under the public `WORLD_SIZE=8` posture
+  run the exported folder under the public `WORLD_SIZE=8` posture while
+  forcing the explicit exported-folder execution mode
+  `PSIONIC_PARAMETER_GOLF_EXECUTION_MODE=distributed_8xh100_train`
 - finalization:
   generate the exported-folder submission run evidence under the RunPod
   `8xH100` posture, mirror the retained distributed challenge receipt into the
@@ -93,6 +95,13 @@ This means later real `8xH100` runs can retain not only the exported-folder
 evidence and finalizer outputs, but also the exact remote phase boundary,
 phase commands, and per-phase exit results from the launcher that drove the
 pod.
+
+This explicit execution-mode requirement is intentional. The current exported
+folder only ships the default bounded local-reference replay payload plus the
+real single-H100 trainer payload. It does not yet ship a real distributed
+`8xH100` trainer payload. The RunPod launcher therefore requests the reserved
+distributed mode explicitly so the execution phase fails closed instead of
+silently taking the local-reference replay path under `WORLD_SIZE=8`.
 
 The finalizer now also resolves the exported submission root explicitly. The
 canonical path is still the retained `records/track_non_record_16mb/<submission_id>`
@@ -151,6 +160,8 @@ This runbook does not claim:
 - final challenge metrics from exported-folder `8xH100` hardware
 - challenge-speed closure
 - record-track readiness
+- that the current exported folder already contains a real distributed `8xH100`
+  trainer payload
 
 It closes one narrower but important thing:
 

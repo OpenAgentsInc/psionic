@@ -96,6 +96,10 @@ if "$PGOLF_SUBMISSION_DIR" not in (commands.get("pre_training_command") or ""):
     fail("launch manifest pre_training no longer stages directly into the retained submission root")
 if "python3 train_gpt.py" not in (commands.get("execution_entrypoint_command") or ""):
     fail("launch manifest execution entrypoint no longer uses the exported folder surface")
+if "PSIONIC_PARAMETER_GOLF_EXECUTION_MODE=distributed_8xh100_train" not in (
+    commands.get("execution_entrypoint_command") or ""
+):
+    fail("launch manifest execution entrypoint no longer requests explicit distributed 8xH100 mode")
 if "parameter-golf-runpod-finalize-8xh100.sh" not in (commands.get("finalizer_command") or ""):
     fail("launch manifest finalizer contract drifted")
 

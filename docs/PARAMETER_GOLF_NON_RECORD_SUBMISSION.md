@@ -127,6 +127,12 @@ The same exported folder now also ships:
   `single_h100_train` mode when the dataset and tokenizer environment contract
   is provided
 
+The exported folder does not yet ship a real distributed `8xH100` trainer
+payload. The reserved execution mode
+`PSIONIC_PARAMETER_GOLF_EXECUTION_MODE=distributed_8xh100_train` therefore
+refuses explicitly today instead of silently falling back to the bounded
+local-reference replay path.
+
 That means the package now owns both:
 
 - a bounded local-reference replay path for challenge-clone dry runs
