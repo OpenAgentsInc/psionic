@@ -10,18 +10,18 @@ use psionic_core::{
     DType, PsionicRefusal, PsionicRefusalCode, PsionicRefusalScope, TensorData, TensorId,
 };
 use psionic_data::{
+    DatasetIterationMode, DatasetKey, PARAMETER_GOLF_TRAIN_SPLIT_NAME, ParameterGolfDataError,
+    ParameterGolfDatasetBundle, ParameterGolfSentencePieceByteLuts,
+    ParameterGolfTokenStreamContract, ParameterGolfTokenStreamCursor,
     builtin_parameter_golf_sentencepiece_byte_luts,
     load_parameter_golf_validation_tokens_from_paths, materialize_parameter_golf_token_window,
-    parameter_golf_dataset_bundle_from_local_dir, DatasetIterationMode, DatasetKey,
-    ParameterGolfDataError, ParameterGolfDatasetBundle, ParameterGolfSentencePieceByteLuts,
-    ParameterGolfTokenStreamContract, ParameterGolfTokenStreamCursor,
-    PARAMETER_GOLF_TRAIN_SPLIT_NAME,
+    parameter_golf_dataset_bundle_from_local_dir,
 };
 use psionic_ir::AutodiffBackwardResult;
 use psionic_ir::{AutodiffError, GraphError};
 use psionic_models::{
-    ParameterGolfModelError, ParameterGolfReferenceModel, PARAMETER_GOLF_BASELINE_MODEL_ID,
-    PARAMETER_GOLF_BASELINE_REVISION,
+    PARAMETER_GOLF_BASELINE_MODEL_ID, PARAMETER_GOLF_BASELINE_REVISION, ParameterGolfModelError,
+    ParameterGolfReferenceModel,
 };
 use psionic_runtime::{
     BufferHandle, DeliveredExecutionContext, DeviceDescriptor, RuntimeError, RuntimeHealth,
@@ -31,6 +31,14 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    PARAMETER_GOLF_SINGLE_H100_DATASET_REF, PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION,
+    PARAMETER_GOLF_SINGLE_H100_VARIANT, ParameterGolfBaselineTrainingGraph,
+    ParameterGolfBatchGeometry, ParameterGolfBf16MasterWeightStepReceipt,
+    ParameterGolfOptimizerExecution, ParameterGolfOptimizerGroupKind, ParameterGolfOptimizerPlan,
+    ParameterGolfReferenceTrainingError, ParameterGolfSingleH100BringupError,
+    ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100MachineObservation,
+    ParameterGolfTrainError, ParameterGolfTrainingHyperparameters, TrainingOptimizerConfig,
+    TrainingOptimizerState, TrainingPrecisionMode,
     apply_parameter_golf_cuda_bf16_master_weight_optimizer_step,
     apply_parameter_golf_cuda_muon_step, bind_parameter_golf_baseline_training_graph_inputs,
     build_parameter_golf_baseline_training_graph, build_tokenizer_digest,
@@ -38,14 +46,6 @@ use crate::{
     export_parameter_golf_int8_zlib_model_artifact, inspect_local_single_h100_machine,
     materialize_parameter_golf_baseline_training_gradients, parameter_golf_optimizer_plan,
     restore_parameter_golf_model_from_int8_zlib, training_batch_from_window_tokens,
-    ParameterGolfBaselineTrainingGraph, ParameterGolfBatchGeometry,
-    ParameterGolfBf16MasterWeightStepReceipt, ParameterGolfOptimizerExecution,
-    ParameterGolfOptimizerGroupKind, ParameterGolfOptimizerPlan,
-    ParameterGolfReferenceTrainingError, ParameterGolfSingleH100BringupError,
-    ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100MachineObservation,
-    ParameterGolfTrainError, ParameterGolfTrainingHyperparameters, TrainingOptimizerConfig,
-    TrainingOptimizerState, TrainingPrecisionMode, PARAMETER_GOLF_SINGLE_H100_DATASET_REF,
-    PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION, PARAMETER_GOLF_SINGLE_H100_VARIANT,
 };
 
 /// Config for the bounded Rust-owned single-H100 Parameter Golf trainer lane.
@@ -73,6 +73,9 @@ pub struct ParameterGolfSingleH100TrainingConfig {
     pub validation_loss_every: u64,
     /// Train-log cadence in optimizer steps. Zero disables train-step summaries.
     pub train_log_every: u64,
+    /// Explicit final-validation posture for the live-model and roundtrip passes.
+    #[serde(default)]
+    pub final_validation_mode: ParameterGolfSingleH100ValidationMode,
 }
 
 impl ParameterGolfSingleH100TrainingConfig {
@@ -97,6 +100,7 @@ impl ParameterGolfSingleH100TrainingConfig {
             warmup_steps: 20,
             validation_loss_every: 1_000,
             train_log_every: 200,
+            final_validation_mode: ParameterGolfSingleH100ValidationMode::Both,
             hyperparameters,
         }
     }
@@ -113,6 +117,7 @@ impl ParameterGolfSingleH100TrainingConfig {
         config.warmup_steps = 0;
         config.validation_loss_every = 0;
         config.train_log_every = 1;
+        config.final_validation_mode = ParameterGolfSingleH100ValidationMode::RoundtripOnly;
         config.hyperparameters.max_wallclock_seconds = None;
         config
     }
@@ -176,6 +181,52 @@ pub enum ParameterGolfSingleH100TrainingDisposition {
     RefusedMachineContract,
     RefusedCudaBlockers,
     TrainingExecuted,
+}
+
+/// Explicit final-validation posture for the single-H100 trainer.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfSingleH100ValidationMode {
+    LiveOnly,
+    RoundtripOnly,
+    #[default]
+    Both,
+}
+
+impl ParameterGolfSingleH100ValidationMode {
+    /// Parses one CLI-visible validation mode label.
+    pub fn parse(value: &str) -> Result<Self, ParameterGolfSingleH100TrainingError> {
+        match value {
+            "live_only" => Ok(Self::LiveOnly),
+            "roundtrip_only" => Ok(Self::RoundtripOnly),
+            "both" => Ok(Self::Both),
+            actual => Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: format!(
+                    "unsupported final validation mode `{actual}`, expected one of live_only, roundtrip_only, or both"
+                ),
+            }),
+        }
+    }
+
+    /// Stable string label for logs, reports, and CLI wiring.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::LiveOnly => "live_only",
+            Self::RoundtripOnly => "roundtrip_only",
+            Self::Both => "both",
+        }
+    }
+
+    #[must_use]
+    const fn runs_live_validation(self) -> bool {
+        matches!(self, Self::LiveOnly | Self::Both)
+    }
+
+    #[must_use]
+    const fn runs_roundtrip_validation(self) -> bool {
+        matches!(self, Self::RoundtripOnly | Self::Both)
+    }
 }
 
 /// Machine-readable phase timings for one challenge-step aggregate.
@@ -337,6 +388,8 @@ pub struct ParameterGolfSingleH100TrainingReport {
     pub completed_warmup_steps: u64,
     pub validation_loss_every: u64,
     pub train_log_every: u64,
+    #[serde(default)]
+    pub final_validation_mode: ParameterGolfSingleH100ValidationMode,
     pub executed_steps: u64,
     pub stop_reason: Option<ParameterGolfSingleH100TrainingStopReason>,
     pub delivered_execution: DeliveredExecutionContext,
@@ -673,18 +726,16 @@ pub fn build_parameter_golf_single_h100_training_report(
         DeliveredExecutionContext::new("cuda", None, vec![selected_device.inventory_qualifiers()]);
 
     emit_progress_line(format!(
-        "single_h100_train_start run_id={} device={} max_steps={} iterations={} warmup_steps={} grad_accum_steps={} val_loss_every={} train_log_every={} local_train_sequences={} local_validation_sequences={} max_wallclock_seconds={}",
+        "single_h100_train_start run_id={} device={} max_steps={} iterations={} warmup_steps={} grad_accum_steps={} val_loss_every={} train_log_every={} final_validation_mode={} local_train_sequences={} local_validation_sequences={} max_wallclock_seconds={}",
         config.run_id,
-        selected_device
-            .device_name
-            .as_deref()
-            .unwrap_or("unknown"),
+        selected_device.device_name.as_deref().unwrap_or("unknown"),
         config.max_steps,
         config.hyperparameters.iterations,
         config.warmup_steps,
         config.geometry.grad_accum_steps,
         config.validation_loss_every,
         config.train_log_every,
+        config.final_validation_mode.as_str(),
         config.geometry.local_train_batch_sequences(),
         config.geometry.local_validation_batch_sequences(),
         config.hyperparameters.max_wallclock_seconds.unwrap_or(0.0),
@@ -778,8 +829,11 @@ pub fn build_parameter_golf_single_h100_training_report(
 
     loop {
         let last_step = step == config.max_steps || stop_reason.is_some();
-        let should_validate = last_step
-            || (config.validation_loss_every > 0 && step % config.validation_loss_every == 0);
+        let should_validate = if last_step {
+            config.final_validation_mode.runs_live_validation()
+        } else {
+            config.validation_loss_every > 0 && step % config.validation_loss_every == 0
+        };
         if should_validate {
             let stage_label = if last_step {
                 String::from("final_validation")
@@ -823,6 +877,11 @@ pub fn build_parameter_golf_single_h100_training_report(
                     summary: validation_summary,
                 });
             }
+        } else if last_step {
+            emit_progress_line(format!(
+                "final_validation_skipped mode={} reason=explicit_final_validation_mode",
+                config.final_validation_mode.as_str(),
+            ));
         }
 
         if last_step {
@@ -890,63 +949,90 @@ pub fn build_parameter_golf_single_h100_training_report(
 
     let compressed_model_artifact =
         export_parameter_golf_int8_zlib_model_artifact(&current_model, &config.run_id, step)?;
-    emit_progress_line(format!(
-        "final_int8_zlib_roundtrip_start sequences={} batch_sequences={} compressed_model_bytes={} artifact_ref={} artifact_digest={}",
-        (validation_tokens.len() - 1) / config.geometry.train_sequence_length,
-        config.geometry.local_validation_batch_sequences(),
-        compressed_model_artifact.bytes.len(),
-        compressed_model_artifact.artifact_ref,
-        compressed_model_artifact.artifact_digest,
-    ));
-    let roundtrip_model = restore_parameter_golf_model_from_int8_zlib(
-        &initial_model,
-        compressed_model_artifact.bytes.as_slice(),
-    )?;
-    let roundtrip_validation_started = Instant::now();
-    let roundtrip_validation = evaluate_validation_on_cuda(
-        &mut cuda_backend,
-        &selected_device.device,
-        roundtrip_model.descriptor(),
-        &roundtrip_model,
-        validation_tokens.as_slice(),
-        &byte_luts,
-        config.geometry.train_sequence_length,
-        config.geometry.local_validation_batch_sequences(),
-        &mut train_graph_cache,
-        "final_int8_zlib_roundtrip",
-    )?;
-    let roundtrip_observed_ms = duration_ms(roundtrip_validation_started);
-    emit_progress_line(format!(
-        "final_int8_zlib_roundtrip val_loss:{:.4} val_bpb:{:.4} eval_time:{}ms compressed_model_bytes={} artifact_ref={} artifact_digest={}",
-        roundtrip_validation.mean_loss,
-        roundtrip_validation.bits_per_byte,
-        roundtrip_observed_ms,
-        compressed_model_artifact.bytes.len(),
-        compressed_model_artifact.artifact_ref,
-        compressed_model_artifact.artifact_digest,
-    ));
-    emit_progress_line(format!(
-        "final_int8_zlib_roundtrip_exact val_loss:{:.8} val_bpb:{:.8}",
-        roundtrip_validation.mean_loss, roundtrip_validation.bits_per_byte,
-    ));
-    let final_validation_observed_ms = Some(roundtrip_observed_ms);
-    let final_validation = Some(roundtrip_validation.clone());
-    let final_roundtrip_receipt = Some(ParameterGolfSingleH100RoundtripReceipt {
-        metric_source: String::from("int8_zlib_roundtrip"),
-        validation: roundtrip_validation,
-        observed_eval_ms: roundtrip_observed_ms,
-        compressed_model_bytes: compressed_model_artifact.bytes.len() as u64,
-        compressed_model_artifact_ref: compressed_model_artifact.artifact_ref.clone(),
-        compressed_model_artifact_digest: compressed_model_artifact.artifact_digest.clone(),
-    });
+    let mut final_validation = pre_export_final_validation.clone();
+    let mut final_validation_observed_ms = pre_export_final_validation_observed_ms;
+    let mut final_roundtrip_receipt = None;
+    if config.final_validation_mode.runs_roundtrip_validation() {
+        emit_progress_line(format!(
+            "final_int8_zlib_roundtrip_start sequences={} batch_sequences={} compressed_model_bytes={} artifact_ref={} artifact_digest={}",
+            (validation_tokens.len() - 1) / config.geometry.train_sequence_length,
+            config.geometry.local_validation_batch_sequences(),
+            compressed_model_artifact.bytes.len(),
+            compressed_model_artifact.artifact_ref,
+            compressed_model_artifact.artifact_digest,
+        ));
+        let roundtrip_model = restore_parameter_golf_model_from_int8_zlib(
+            &initial_model,
+            compressed_model_artifact.bytes.as_slice(),
+        )?;
+        let roundtrip_validation_started = Instant::now();
+        let roundtrip_validation = evaluate_validation_on_cuda(
+            &mut cuda_backend,
+            &selected_device.device,
+            roundtrip_model.descriptor(),
+            &roundtrip_model,
+            validation_tokens.as_slice(),
+            &byte_luts,
+            config.geometry.train_sequence_length,
+            config.geometry.local_validation_batch_sequences(),
+            &mut train_graph_cache,
+            "final_int8_zlib_roundtrip",
+        )?;
+        let roundtrip_observed_ms = duration_ms(roundtrip_validation_started);
+        emit_progress_line(format!(
+            "final_int8_zlib_roundtrip val_loss:{:.4} val_bpb:{:.4} eval_time:{}ms compressed_model_bytes={} artifact_ref={} artifact_digest={}",
+            roundtrip_validation.mean_loss,
+            roundtrip_validation.bits_per_byte,
+            roundtrip_observed_ms,
+            compressed_model_artifact.bytes.len(),
+            compressed_model_artifact.artifact_ref,
+            compressed_model_artifact.artifact_digest,
+        ));
+        emit_progress_line(format!(
+            "final_int8_zlib_roundtrip_exact val_loss:{:.8} val_bpb:{:.8}",
+            roundtrip_validation.mean_loss, roundtrip_validation.bits_per_byte,
+        ));
+        final_validation_observed_ms = Some(roundtrip_observed_ms);
+        final_validation = Some(roundtrip_validation.clone());
+        final_roundtrip_receipt = Some(ParameterGolfSingleH100RoundtripReceipt {
+            metric_source: String::from("int8_zlib_roundtrip"),
+            validation: roundtrip_validation,
+            observed_eval_ms: roundtrip_observed_ms,
+            compressed_model_bytes: compressed_model_artifact.bytes.len() as u64,
+            compressed_model_artifact_ref: compressed_model_artifact.artifact_ref.clone(),
+            compressed_model_artifact_digest: compressed_model_artifact.artifact_digest.clone(),
+        });
+    } else {
+        emit_progress_line(format!(
+            "final_int8_zlib_roundtrip_skipped mode={} reason=explicit_final_validation_mode compressed_model_bytes={} artifact_ref={} artifact_digest={}",
+            config.final_validation_mode.as_str(),
+            compressed_model_artifact.bytes.len(),
+            compressed_model_artifact.artifact_ref,
+            compressed_model_artifact.artifact_digest,
+        ));
+    }
 
     let finished_at_ms = unix_time_ms();
     let observed_wallclock_ms = finished_at_ms.saturating_sub(started_at_ms);
     let realized_stop_reason =
         stop_reason.unwrap_or(ParameterGolfSingleH100TrainingStopReason::StepBudgetReached);
+    let final_metric_surface = match config.final_validation_mode {
+        ParameterGolfSingleH100ValidationMode::LiveOnly => {
+            "reported final live-model validation metrics without running the exported int8+zlib roundtrip validation"
+        }
+        ParameterGolfSingleH100ValidationMode::RoundtripOnly => {
+            "reported canonical final contest metrics from the exported int8+zlib roundtrip artifact without also replaying the live-model final validation"
+        }
+        ParameterGolfSingleH100ValidationMode::Both => {
+            "preserved the pre-export live-model validation separately and reported canonical final contest metrics from the exported int8+zlib roundtrip artifact"
+        }
+    };
     let summary = format!(
-        "The Rust-owned single-H100 trainer executed {} optimizer step(s) with challenge single-device geometry on CUDA, used the widened train_gpt.py-style warmup, validation, and wallclock-stop control loop, preserved the pre-export live-model validation separately, and reported canonical final contest metrics from the exported int8+zlib roundtrip artifact before stopping via {:?}.",
-        step, realized_stop_reason
+        "The Rust-owned single-H100 trainer executed {} optimizer step(s) with challenge single-device geometry on CUDA, used the widened train_gpt.py-style warmup, validation, and wallclock-stop control loop, ran with final_validation_mode={}, {} before stopping via {:?}.",
+        step,
+        config.final_validation_mode.as_str(),
+        final_metric_surface,
+        realized_stop_reason
     );
 
     let mut report = ParameterGolfSingleH100TrainingReport {
@@ -970,6 +1056,7 @@ pub fn build_parameter_golf_single_h100_training_report(
         completed_warmup_steps: config.warmup_steps,
         validation_loss_every: config.validation_loss_every,
         train_log_every: config.train_log_every,
+        final_validation_mode: config.final_validation_mode,
         executed_steps: step,
         stop_reason: Some(realized_stop_reason),
         delivered_execution,
@@ -1056,6 +1143,7 @@ fn refusal_report(
         completed_warmup_steps: 0,
         validation_loss_every: config.validation_loss_every,
         train_log_every: config.train_log_every,
+        final_validation_mode: config.final_validation_mode,
         executed_steps: 0,
         stop_reason: None,
         delivered_execution: DeliveredExecutionContext::new("cuda", None, Vec::new()),
@@ -1820,7 +1908,7 @@ fn execute_cuda_graph_outputs(
                             message: format!(
                                 "tensor {tensor_id} expected dense F32 host values for graph input"
                             ),
-                        })
+                        });
                     }
                 },
                 psionic_core::DType::BF16 => match data {
@@ -1829,9 +1917,9 @@ fn execute_cuda_graph_outputs(
                     TensorData::I32(_) | TensorData::QuantizedBlocks(_) => {
                         return Err(ParameterGolfSingleH100TrainingError::Serialization {
                             message: format!(
-                            "tensor {tensor_id} expected dense BF16 host values for graph input"
-                        ),
-                        })
+                                "tensor {tensor_id} expected dense BF16 host values for graph input"
+                            ),
+                        });
                     }
                 },
                 psionic_core::DType::I32 => match data {
@@ -1842,7 +1930,7 @@ fn execute_cuda_graph_outputs(
                             message: format!(
                                 "tensor {tensor_id} expected dense I32 host values for graph input"
                             ),
-                        })
+                        });
                     }
                 },
                 actual => {
@@ -1850,7 +1938,7 @@ fn execute_cuda_graph_outputs(
                         message: format!(
                             "unsupported graph input dtype {actual:?} for tensor {tensor_id}"
                         ),
-                    })
+                    });
                 }
             };
         buffers.insert(*tensor_id, buffer);
@@ -1874,7 +1962,7 @@ fn execute_cuda_graph_outputs(
                         message: format!(
                             "unsupported graph output dtype {actual:?} for tensor {tensor_id}"
                         ),
-                    })
+                    });
                 }
             };
             Ok((*tensor_id, values))
@@ -1963,8 +2051,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn backward_result_from_outputs_rekeys_gradient_outputs_to_primal_tensors(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn backward_result_from_outputs_rekeys_gradient_outputs_to_primal_tensors()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let input = builder.input("x", Shape::new(vec![1, 1]), DType::F32, true);
@@ -1990,8 +2078,8 @@ mod tests {
     }
 
     #[test]
-    fn backward_result_from_outputs_preserves_bf16_gradient_dtype(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn backward_result_from_outputs_preserves_bf16_gradient_dtype()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let input = builder.input("x", Shape::new(vec![1, 1]), DType::BF16, true);
@@ -2035,6 +2123,10 @@ mod tests {
         assert_eq!(config.warmup_steps, 20);
         assert_eq!(config.validation_loss_every, 1_000);
         assert_eq!(config.train_log_every, 200);
+        assert_eq!(
+            config.final_validation_mode,
+            ParameterGolfSingleH100ValidationMode::Both
+        );
         assert_eq!(config.hyperparameters.max_wallclock_seconds, Some(600.0));
     }
 
@@ -2050,12 +2142,34 @@ mod tests {
         assert_eq!(config.warmup_steps, 0);
         assert_eq!(config.validation_loss_every, 0);
         assert_eq!(config.train_log_every, 1);
+        assert_eq!(
+            config.final_validation_mode,
+            ParameterGolfSingleH100ValidationMode::RoundtripOnly
+        );
         assert_eq!(config.hyperparameters.max_wallclock_seconds, None);
     }
 
     #[test]
-    fn seed_parameter_states_matches_upstream_precision_split(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn validation_mode_parser_accepts_all_supported_labels()
+    -> Result<(), Box<dyn std::error::Error>> {
+        assert_eq!(
+            ParameterGolfSingleH100ValidationMode::parse("live_only")?,
+            ParameterGolfSingleH100ValidationMode::LiveOnly
+        );
+        assert_eq!(
+            ParameterGolfSingleH100ValidationMode::parse("roundtrip_only")?,
+            ParameterGolfSingleH100ValidationMode::RoundtripOnly
+        );
+        assert_eq!(
+            ParameterGolfSingleH100ValidationMode::parse("both")?,
+            ParameterGolfSingleH100ValidationMode::Both
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn seed_parameter_states_matches_upstream_precision_split()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
         let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
         let optimizer_plan = parameter_golf_optimizer_plan(model.descriptor(), &hyperparameters)?;

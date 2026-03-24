@@ -164,7 +164,9 @@ impl ParameterGolfSameNodeParityReport {
         let mut report = Self {
             schema_version: 1,
             report_id: String::from("parameter_golf.same_node_parity_report.v1"),
-            benchmark_ref: String::from("benchmark://openagents/parameter_golf/same_node_single_h100"),
+            benchmark_ref: String::from(
+                "benchmark://openagents/parameter_golf/same_node_single_h100",
+            ),
             disposition: if blockers.is_empty() {
                 ParameterGolfSameNodeParityDisposition::Ready
             } else {
@@ -175,8 +177,10 @@ impl ParameterGolfSameNodeParityReport {
             upstream_run_id: upstream.run_id.clone(),
             upstream_report_digest: upstream.report_digest.clone(),
             device_names_match: psionic_device_name == upstream.device_name,
-            dataset_manifest_matches: psionic.dataset_manifest_digest == upstream.dataset_manifest_digest,
-            tokenizer_matches: psionic.tokenizer_digest.tokenizer_digest == upstream.tokenizer_digest,
+            dataset_manifest_matches: psionic.dataset_manifest_digest
+                == upstream.dataset_manifest_digest,
+            tokenizer_matches: psionic.tokenizer_digest.tokenizer_digest
+                == upstream.tokenizer_digest,
             geometry_matches: psionic.geometry == upstream.geometry,
             blockers,
             comparisons,
@@ -544,13 +548,14 @@ fn stable_digest(prefix: &[u8], value: &impl Serialize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        ParameterGolfSingleH100GroupPrecisionReceipt, ParameterGolfSingleH100PrecisionReceipt,
+        ParameterGolfSingleH100TrainingDisposition,
+    };
     use psionic_core::{DType, Device, DeviceKind};
     use psionic_data::{DatasetKey, TokenizerDigest, TokenizerFamily};
-    use psionic_runtime::{DeliveredExecutionContext, DeviceDescriptor, HealthStatus, RuntimeHealth};
-    use crate::{
-        ParameterGolfSingleH100GroupPrecisionReceipt,
-        ParameterGolfSingleH100PrecisionReceipt,
-        ParameterGolfSingleH100TrainingDisposition,
+    use psionic_runtime::{
+        DeliveredExecutionContext, DeviceDescriptor, HealthStatus, RuntimeHealth,
     };
 
     fn sample_geometry() -> ParameterGolfBatchGeometry {
@@ -589,6 +594,7 @@ mod tests {
             completed_warmup_steps: 0,
             validation_loss_every: 0,
             train_log_every: 1,
+            final_validation_mode: crate::ParameterGolfSingleH100ValidationMode::Both,
             executed_steps: 0,
             stop_reason: None,
             delivered_execution: DeliveredExecutionContext::new("cuda", None, Vec::new()),
@@ -658,8 +664,8 @@ mod tests {
     }
 
     #[test]
-    fn train_gpt_reference_receipt_parses_expected_metrics(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn train_gpt_reference_receipt_parses_expected_metrics()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempfile::tempdir()?;
         let log_path = temp_dir.path().join("train_gpt.log");
         fs::write(
@@ -726,9 +732,11 @@ mod tests {
             report.disposition,
             ParameterGolfSameNodeParityDisposition::Blocked
         );
-        assert!(report
-            .blockers
-            .iter()
-            .any(|blocker| blocker.contains("single-H100 machine contract")));
+        assert!(
+            report
+                .blockers
+                .iter()
+                .any(|blocker| blocker.contains("single-H100 machine contract"))
+        );
     }
 }

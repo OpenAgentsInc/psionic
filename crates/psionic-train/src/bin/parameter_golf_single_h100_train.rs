@@ -1,7 +1,8 @@
 use std::{env, path::PathBuf};
 
 use psionic_train::{
-    write_parameter_golf_single_h100_training_report, ParameterGolfSingleH100TrainingConfig,
+    ParameterGolfSingleH100TrainingConfig, ParameterGolfSingleH100ValidationMode,
+    write_parameter_golf_single_h100_training_report,
 };
 
 fn main() {
@@ -25,12 +26,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .get(3)
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("/tmp/parameter_golf_single_h100_training.json"));
-    let max_steps = args
-        .get(4)
-        .map(String::as_str)
-        .map(|value| value.parse::<u64>())
-        .transpose()?;
-    let config = if let Some(max_steps) = max_steps {
+    let (max_steps, final_validation_mode) =
+        parse_optional_max_steps_and_validation_mode(&args[4..])?;
+    let mut config = if let Some(max_steps) = max_steps {
         ParameterGolfSingleH100TrainingConfig::bounded_proof_defaults(
             dataset_root,
             tokenizer_path,
@@ -39,6 +37,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         ParameterGolfSingleH100TrainingConfig::challenge_defaults(dataset_root, tokenizer_path)
     };
+    if let Some(final_validation_mode) = final_validation_mode {
+        config.final_validation_mode = final_validation_mode;
+    }
     let report = write_parameter_golf_single_h100_training_report(&output_path, &config)?;
     println!(
         "wrote {} with disposition {:?} executed_steps={} stop_reason={:?}",
@@ -48,11 +49,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         report.stop_reason,
     );
     println!(
-        "warmup_steps={} completed_warmup_steps={} measured_training_time_ms={} validation_checkpoints={}",
+        "warmup_steps={} completed_warmup_steps={} measured_training_time_ms={} validation_checkpoints={} final_validation_mode={}",
         report.warmup_steps,
         report.completed_warmup_steps,
         report.observed_training_time_ms,
         report.validation_checkpoints.len(),
+        report.final_validation_mode.as_str(),
     );
     if let Some(ref initial_validation) = report.initial_validation {
         println!(
@@ -123,4 +125,23 @@ fn default_tokenizer_path() -> PathBuf {
         env::var("HOME").expect("HOME should exist for the default parameter-golf tokenizer path"),
     )
     .join("code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model")
+}
+
+fn parse_optional_max_steps_and_validation_mode(
+    args: &[String],
+) -> Result<(Option<u64>, Option<ParameterGolfSingleH100ValidationMode>), Box<dyn std::error::Error>>
+{
+    let Some(first) = args.first().map(String::as_str) else {
+        return Ok((None, None));
+    };
+    if let Ok(max_steps) = first.parse::<u64>() {
+        let validation_mode = args
+            .get(1)
+            .map(String::as_str)
+            .map(ParameterGolfSingleH100ValidationMode::parse)
+            .transpose()?;
+        return Ok((Some(max_steps), validation_mode));
+    }
+    let validation_mode = ParameterGolfSingleH100ValidationMode::parse(first)?;
+    Ok((None, Some(validation_mode)))
 }

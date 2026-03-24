@@ -37,14 +37,16 @@ cargo run -q -p psionic-train --bin parameter_golf_single_h100_train
 ```
 
 You can also pass the explicit cached-dataset and tokenizer paths, an output
-report path, and an explicit bounded proof step count:
+report path, an explicit bounded proof step count, and an optional explicit
+final-validation mode:
 
 ```bash
 cargo run -q -p psionic-train --bin parameter_golf_single_h100_train -- \
   ~/code/parameter-golf/data/datasets/fineweb10B_sp1024 \
   ~/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model \
   /tmp/parameter_golf_single_h100_training.json \
-  1
+  1 \
+  roundtrip_only
 ```
 
 Passing the final positional step count selects the old bounded proof posture:
@@ -52,6 +54,7 @@ Passing the final positional step count selects the old bounded proof posture:
 - `warmup_steps=0`
 - `validation_loss_every=0`
 - `train_log_every=1`
+- default `final_validation_mode=roundtrip_only`
 - no wallclock stop cap
 
 Omitting that positional step count selects the widened baseline posture:
@@ -60,7 +63,14 @@ Omitting that positional step count selects the widened baseline posture:
 - `warmup_steps=20`
 - `validation_loss_every=1000`
 - `train_log_every=200`
+- default `final_validation_mode=both`
 - `max_wallclock_seconds=600`
+
+Supported explicit final-validation modes are:
+
+- `live_only`
+- `roundtrip_only`
+- `both`
 
 ## Data Setup
 
@@ -112,10 +122,16 @@ The command is explicit about what it treats as trainer truth. It binds:
 - one measured CUDA training run when the machine and CUDA-capability
   contracts are satisfied
 - preserved initial, periodic, and final validation receipts directly from the
+  Psionic path, with an explicit `final_validation_mode` telling the report and
+  logs whether the last-step live-model validation, the exported int8+zlib
+  roundtrip validation, or both were requested
+- preserved initial, periodic, and final validation receipts directly from the
   Psionic path, with the pre-export live-model validation retained separately
+  whenever that posture is requested
 - post-step int8-plus-zlib artifact bytes, artifact ref, and artifact digest
 - canonical final contest metrics from the exported int8-plus-zlib roundtrip
-  artifact, including the preserved roundtrip eval time
+  artifact, including the preserved roundtrip eval time, when the requested
+  final-validation mode includes the roundtrip pass
 - stop reason plus measured warmup, training, validation, and per-step timing
   receipts so later same-node comparison work can reuse the same trainer report
 
