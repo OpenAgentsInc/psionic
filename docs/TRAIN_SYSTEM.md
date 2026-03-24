@@ -65,6 +65,14 @@ contract freezes the first Mac MLX Metal plus Linux RTX 4080 CUDA lane as one
 decentralized open-adapter delta program with explicit validator, replay,
 local-snapshot-only publication, and no-full-model-overclaim posture.
 
+The Mac node now also has a dedicated bring-up report seam in
+`crates/psionic-train/src/swarm_mlx_bringup.rs`, the binary
+`swarm_mac_mlx_bringup`, the verification runner
+`scripts/check-swarm-mac-mlx-bringup.sh`, and the committed report
+`fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json`. That report records
+real local Mac identity plus the bounded Metal array surface while keeping the
+missing MLX open-adapter training backend explicit.
+
 Apple-specific adapter work is no longer only later-family planning. The repo
 now owns a canonical spec-and-fixture baseline for it in:
 

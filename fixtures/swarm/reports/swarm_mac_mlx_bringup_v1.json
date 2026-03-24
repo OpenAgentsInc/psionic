@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "scope_window": "swarm_mac_mlx_bringup_v1",
+  "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+  "contract_digest": "203e652752f0cfc350b59d3ad9d3c17ae65b6012106c5ebbd9191ba44aaa39f0",
+  "host": {
+    "hostname": "Mac.lan",
+    "os_name": "macos",
+    "os_version": "26.1",
+    "os_build_version": "25B78",
+    "architecture": "arm64",
+    "hardware_model": "Mac14,10",
+    "chip_name": "Apple M2 Pro",
+    "unified_memory_bytes": 17179869184,
+    "metal_family_support": "spdisplays_metal4",
+    "gpu_core_count": 19
+  },
+  "machine_thresholds": {
+    "required_os": "macos",
+    "required_arch": "arm64",
+    "minimum_unified_memory_bytes": 17179869184,
+    "required_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+    "safe_sequence_length_tokens": 512,
+    "safe_microbatch_size": 4,
+    "safe_adapter_rank": 16,
+    "precision_policy": "f32_reference"
+  },
+  "machine_contract_satisfied": true,
+  "admitted_metal_slice": [
+    "psionic-array::ArrayContext::metal",
+    "dense_f32.constant",
+    "dense_f32.add",
+    "dense_f32.matmul"
+  ],
+  "metal_eval_probe": {
+    "admitted_ops": [
+      "constant_f32",
+      "matmul",
+      "add"
+    ],
+    "device_id": "metal:0",
+    "stream_id": 1,
+    "output": [
+      1.5,
+      2.5
+    ],
+    "eval_receipt_digest": "099382fb32f89db515c66f3c18cae22d1a01a14d24d875ec99d9a68a215572eb",
+    "out_of_slice_refusal": "cannot materialize tensor t6 for op `reshape`: bounded Metal eval currently materializes only constant, add, matmul graphs on the public array surface"
+  },
+  "training_backend_posture": "missing_open_adapter_backend",
+  "training_backend_blocker": "the shared MLX-backed Metal open-adapter backend is not implemented yet, so the Mac node can prove bounded Metal runtime health but cannot yet contribute a real swarm adapter delta",
+  "disposition": "refused_training_backend_blocker",
+  "refusal": {
+    "code": "unsupported_backend_capability",
+    "scope": "runtime",
+    "subject": "first_swarm_mac_mlx_training_backend",
+    "detail": "the shared MLX-backed Metal open-adapter backend is not implemented yet, so the Mac node can prove bounded Metal runtime health but cannot yet contribute a real swarm adapter delta"
+  },
+  "psionic_entrypoint": "cargo run -q -p psionic-train --bin swarm_mac_mlx_bringup -- fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json",
+  "claim_boundary": "This report proves one exact local Mac host identity, one bounded Metal eval slice through psionic-array, the first conservative sequence, microbatch, rank, and precision bounds for the swarm lane, and the explicit current training-backend blocker. It does not claim the Mac host already has a finished MLX open-adapter training backend or any general MLX distributed-training parity.",
+  "drift_notes": [
+    "The current MLX or Metal admission truth remains bounded to the public dense-f32 ArrayContext metal slice rather than blanket MLX training closure.",
+    "This report is refusal-proof: it records real local host and bounded Metal runtime facts first, then states the missing training backend explicitly.",
+    "Observed Metal-family support `spdisplays_metal4` on chip `Apple M2 Pro`.",
+    "Current swarm blocker: the shared MLX-backed Metal open-adapter backend is not implemented yet, so the Mac node can prove bounded Metal runtime health but cannot yet contribute a real swarm adapter delta",
+    "The bounded Metal eval probe executed through device `metal:0` stream `1` and kept explicit refusal for reshape-backed flatten outside the admitted slice."
+  ],
+  "started_at_ms": 1774393368086,
+  "finished_at_ms": 1774393368680,
+  "observed_wallclock_ms": 593,
+  "report_digest": "06a5973f1fd3c215b138fa9bb47bd8960cf0dd7b2acd80ec0350bc652e891940"
+}
