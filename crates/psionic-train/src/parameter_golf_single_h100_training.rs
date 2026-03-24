@@ -1420,13 +1420,7 @@ fn execute_training_step(
                 &backward_plan.primal_bindings,
             )?);
 
-        let loss = forward_outputs
-            .iter()
-            .find(|(tensor_id, _)| *tensor_id == graph.loss_tensor_id)
-            .and_then(|(_, values)| values.first().copied())
-            .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphOutput {
-                tensor_id: graph.loss_tensor_id,
-            })?;
+        let loss = scalar_float_graph_output(&forward_outputs, graph.loss_tensor_id)?;
         microbatch_loss_sum += loss;
 
         let backward_started = Instant::now();
@@ -1577,13 +1571,7 @@ fn evaluate_validation_on_cuda(
             target_ids.as_slice(),
         )?;
         let outputs = execute_cuda_graph_outputs(cuda_backend, graph.graph.graph(), &inputs)?;
-        let batch_loss = outputs
-            .iter()
-            .find(|(tensor_id, _)| *tensor_id == graph.loss_tensor_id)
-            .and_then(|(_, values)| values.first().copied())
-            .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphOutput {
-                tensor_id: graph.loss_tensor_id,
-            })?;
+        let batch_loss = scalar_float_graph_output(&outputs, graph.loss_tensor_id)?;
         let batch_token_count = target_ids.iter().map(Vec::len).sum::<usize>() as u64;
         total_loss_sum += f64::from(batch_loss) * batch_token_count as f64;
         total_token_count = total_token_count.saturating_add(batch_token_count);
@@ -1675,8 +1663,8 @@ fn retained_forward_graph(
 fn execute_backward_plan(
     cuda_backend: &mut CudaBackend,
     backward_plan: &psionic_ir::AutodiffBackwardPlan,
-    forward_outputs: &[(TensorId, Vec<f32>)],
-) -> Result<Vec<(TensorId, Vec<f32>)>, ParameterGolfSingleH100TrainingError> {
+    forward_outputs: &[(TensorId, TensorData)],
+) -> Result<Vec<(TensorId, TensorData)>, ParameterGolfSingleH100TrainingError> {
     let forward_map = forward_outputs
         .iter()
         .map(|(tensor_id, values)| (*tensor_id, values.clone()))
@@ -1699,7 +1687,7 @@ fn execute_backward_plan(
             .dtype();
         inputs.push((
             binding.gradient_graph_input,
-            floating_tensor_data_for_dtype(input_dtype, values.clone())?,
+            tensor_data_for_dtype(input_dtype, values.clone(), binding.gradient_graph_input)?,
         ));
     }
     let seed_dtype = backward_plan
@@ -1735,9 +1723,36 @@ fn floating_tensor_data_for_dtype(
     }
 }
 
+fn tensor_data_for_dtype(
+    dtype: DType,
+    data: TensorData,
+    tensor_id: TensorId,
+) -> Result<TensorData, ParameterGolfSingleH100TrainingError> {
+    match (dtype, data) {
+        (DType::F32, TensorData::F32(values)) | (DType::F32, TensorData::BF16(values)) => {
+            Ok(TensorData::F32(values))
+        }
+        (DType::BF16, TensorData::F32(values)) | (DType::BF16, TensorData::BF16(values)) => {
+            Ok(TensorData::BF16(values))
+        }
+        (DType::I32, TensorData::I32(values)) => Ok(TensorData::I32(values)),
+        (actual, observed) => Err(ParameterGolfSingleH100TrainingError::Serialization {
+            message: format!(
+                "tensor {tensor_id} expected {actual:?} data but observed {:?}",
+                match observed {
+                    TensorData::F32(_) => DType::F32,
+                    TensorData::BF16(_) => DType::BF16,
+                    TensorData::I32(_) => DType::I32,
+                    TensorData::QuantizedBlocks(_) => DType::I8,
+                }
+            ),
+        }),
+    }
+}
+
 fn backward_result_from_outputs(
     backward_plan: &psionic_ir::AutodiffBackwardPlan,
-    outputs: &[(TensorId, Vec<f32>)],
+    outputs: &[(TensorId, TensorData)],
 ) -> Result<AutodiffBackwardResult, ParameterGolfSingleH100TrainingError> {
     let gradient_targets = backward_plan
         .gradient_targets
@@ -1753,21 +1768,24 @@ fn backward_result_from_outputs(
                 .map(|primal_tensor| (*tensor_id, primal_tensor, values.clone()))
         })
         .map(
-            |(gradient_tensor_id, primal_tensor, values)| -> Result<_, ParameterGolfSingleH100TrainingError> {
-                let dtype = backward_plan
-                    .gradient_graph
-                    .node(gradient_tensor_id)
-                    .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphTensor {
-                        tensor_id: gradient_tensor_id,
-                    })?
-                    .tensor()
-                    .spec()
-                    .dtype();
-                Ok((
-                    primal_tensor,
-                    floating_tensor_data_for_dtype(dtype, values)?,
-                ))
-            },
+            |(gradient_tensor_id, primal_tensor, values)| -> Result<
+                (TensorId, TensorData),
+                ParameterGolfSingleH100TrainingError,
+            > {
+            let dtype = backward_plan
+                .gradient_graph
+                .node(gradient_tensor_id)
+                .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphTensor {
+                    tensor_id: gradient_tensor_id,
+                })?
+                .tensor()
+                .spec()
+                .dtype();
+            Ok((
+                primal_tensor,
+                tensor_data_for_dtype(dtype, values, gradient_tensor_id)?,
+            ))
+        },
         )
         .collect::<Result<BTreeMap<_, _>, _>>()?;
     Ok(AutodiffBackwardResult {
@@ -1781,7 +1799,7 @@ fn execute_cuda_graph_outputs(
     cuda_backend: &mut CudaBackend,
     graph: &psionic_ir::Graph,
     inputs: &BTreeMap<TensorId, TensorData>,
-) -> Result<Vec<(TensorId, Vec<f32>)>, ParameterGolfSingleH100TrainingError> {
+) -> Result<Vec<(TensorId, TensorData)>, ParameterGolfSingleH100TrainingError> {
     let mut buffers = BTreeMap::new();
     for (tensor_id, data) in inputs {
         let spec = graph
@@ -1848,8 +1866,9 @@ fn execute_cuda_graph_outputs(
                 },
             )?;
             let values = match output.spec().dtype() {
-                psionic_core::DType::F32 => output.read_f32()?,
-                psionic_core::DType::BF16 => output.read_bf16_to_f32()?,
+                psionic_core::DType::F32 => TensorData::F32(output.read_f32()?),
+                psionic_core::DType::BF16 => TensorData::BF16(output.read_bf16_to_f32()?),
+                psionic_core::DType::I32 => TensorData::I32(output.read_i32()?),
                 actual => {
                     return Err(ParameterGolfSingleH100TrainingError::Serialization {
                         message: format!(
@@ -1861,6 +1880,18 @@ fn execute_cuda_graph_outputs(
             Ok((*tensor_id, values))
         })
         .collect()
+}
+
+fn scalar_float_graph_output(
+    outputs: &[(TensorId, TensorData)],
+    tensor_id: TensorId,
+) -> Result<f32, ParameterGolfSingleH100TrainingError> {
+    outputs
+        .iter()
+        .find(|(current, _)| *current == tensor_id)
+        .and_then(|(_, values)| values.as_f32_slice())
+        .and_then(|values| values.first().copied())
+        .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphOutput { tensor_id })
 }
 
 fn split_token_count(bundle: &ParameterGolfDatasetBundle, split_name: &str) -> u64 {
@@ -1944,8 +1975,10 @@ mod tests {
             .gradient_for(input.id())
             .ok_or("missing input gradient target")?;
 
-        let backward_result =
-            backward_result_from_outputs(&backward_plan, &[(gradient_tensor_id, vec![42.0_f32])])?;
+        let backward_result = backward_result_from_outputs(
+            &backward_plan,
+            &[(gradient_tensor_id, TensorData::F32(vec![42.0_f32]))],
+        )?;
 
         assert_eq!(
             backward_result
@@ -1969,13 +2002,25 @@ mod tests {
             .gradient_for(input.id())
             .ok_or("missing input gradient target")?;
 
-        let backward_result =
-            backward_result_from_outputs(&backward_plan, &[(gradient_tensor_id, vec![42.0_f32])])?;
+        let backward_result = backward_result_from_outputs(
+            &backward_plan,
+            &[(gradient_tensor_id, TensorData::BF16(vec![42.0_f32]))],
+        )?;
 
         assert!(matches!(
             backward_result.gradient(input.id()),
             Some(TensorData::BF16(values)) if values == &vec![42.0_f32]
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn tensor_data_for_dtype_preserves_i32_outputs() -> Result<(), Box<dyn std::error::Error>> {
+        let tensor_id = TensorId(7);
+        assert_eq!(
+            tensor_data_for_dtype(DType::I32, TensorData::I32(vec![1, 2, 3]), tensor_id)?,
+            TensorData::I32(vec![1, 2, 3])
+        );
         Ok(())
     }
 
