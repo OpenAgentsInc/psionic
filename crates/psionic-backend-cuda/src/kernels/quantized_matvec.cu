@@ -2014,11 +2014,12 @@ __global__ void attention_causal_sequence_kernel(
     }
 }
 
-__global__ void attention_causal_sequence_backward_f32_kernel(
-    const float *query,
-    const float *key,
-    const float *value,
-    const float *grad_output,
+template <typename QueryT, typename KeyT, typename ValueT, typename GradOutputT>
+__global__ void attention_causal_sequence_backward_to_f32_kernel(
+    const QueryT *query,
+    const KeyT *key,
+    const ValueT *value,
+    const GradOutputT *grad_output,
     int batch_size,
     int head_count,
     int kv_head_count,
@@ -2045,17 +2046,14 @@ __global__ void attention_causal_sequence_backward_f32_kernel(
     const float scale = rsqrtf(static_cast<float>(head_dim));
     const int query_row_offset =
         ((batch_index * head_count + head_index) * sequence_length + position) * head_dim;
-    const float *query_row = query + query_row_offset;
-    const float *grad_output_row = grad_output + query_row_offset;
-
     for (int token_index = static_cast<int>(threadIdx.x); token_index <= position;
          token_index += blockDim.x) {
         const int key_row_offset =
             ((batch_index * kv_head_count + kv_head) * sequence_length + token_index) * head_dim;
-        const float *key_row = key + key_row_offset;
         float dot = 0.0f;
         for (int dim = 0; dim < head_dim; ++dim) {
-            dot += query_row[dim] * key_row[dim];
+            dot += load_attention_value(query, query_row_offset + dim) *
+                   load_attention_value(key, key_row_offset + dim);
         }
         logits[token_index] = dot * scale;
     }
@@ -2087,10 +2085,10 @@ __global__ void attention_causal_sequence_backward_f32_kernel(
          token_index += blockDim.x) {
         const int value_row_offset =
             ((batch_index * kv_head_count + kv_head) * sequence_length + token_index) * head_dim;
-        const float *value_row = value + value_row_offset;
         float grad_weight = 0.0f;
         for (int dim = 0; dim < head_dim; ++dim) {
-            grad_weight += grad_output_row[dim] * value_row[dim];
+            grad_weight += load_attention_value(grad_output, query_row_offset + dim) *
+                           load_attention_value(value, value_row_offset + dim);
         }
         logits[token_index] = grad_weight;
         local_weighted_grad_sum += weights[token_index] * grad_weight;
@@ -2110,7 +2108,8 @@ __global__ void attention_causal_sequence_backward_f32_kernel(
             const int key_row_offset =
                 ((batch_index * kv_head_count + kv_head) * sequence_length + token_index) *
                 head_dim;
-            query_grad_value += grad_scores[token_index] * scale * key[key_row_offset + dim];
+            query_grad_value += grad_scores[token_index] * scale *
+                                load_attention_value(key, key_row_offset + dim);
         }
         query_gradient[query_row_offset + dim] = query_grad_value;
     }
@@ -2121,8 +2120,14 @@ __global__ void attention_causal_sequence_backward_f32_kernel(
         const float key_scale = grad_scores[token_index] * scale;
         const float value_scale = weights[token_index];
         for (int dim = static_cast<int>(threadIdx.x); dim < head_dim; dim += blockDim.x) {
-            atomicAdd(&key_gradient[kv_row_offset + dim], key_scale * query_row[dim]);
-            atomicAdd(&value_gradient[kv_row_offset + dim], value_scale * grad_output_row[dim]);
+            atomicAdd(
+                &key_gradient[kv_row_offset + dim],
+                key_scale * load_attention_value(query, query_row_offset + dim)
+            );
+            atomicAdd(
+                &value_gradient[kv_row_offset + dim],
+                value_scale * load_attention_value(grad_output, query_row_offset + dim)
+            );
         }
     }
 }
@@ -6656,7 +6661,7 @@ extern "C" int psionic_cuda_attention_causal_sequence_backward_f32(
         static_cast<unsigned int>(sequence_length),
         static_cast<unsigned int>(batch_size)
     );
-    attention_causal_sequence_backward_f32_kernel<<<
+    attention_causal_sequence_backward_to_f32_kernel<float, float, float, float><<<
         grid,
         kAttentionBlockSize,
         0,
@@ -6666,6 +6671,52 @@ extern "C" int psionic_cuda_attention_causal_sequence_backward_f32(
         static_cast<const float *>(key),
         static_cast<const float *>(value),
         static_cast<const float *>(grad_output),
+        batch_size,
+        head_count,
+        kv_head_count,
+        sequence_length,
+        head_dim,
+        static_cast<float *>(query_gradient),
+        static_cast<float *>(key_gradient),
+        static_cast<float *>(value_gradient)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_attention_causal_sequence_backward_bf16_to_f32(
+    const void *query,
+    const void *key,
+    const void *value,
+    const void *grad_output,
+    int batch_size,
+    int head_count,
+    int kv_head_count,
+    int sequence_length,
+    int head_dim,
+    void *query_gradient,
+    void *key_gradient,
+    void *value_gradient,
+    void *stream
+) {
+    const dim3 grid(
+        static_cast<unsigned int>(head_count),
+        static_cast<unsigned int>(sequence_length),
+        static_cast<unsigned int>(batch_size)
+    );
+    attention_causal_sequence_backward_to_f32_kernel<
+        __nv_bfloat16,
+        __nv_bfloat16,
+        __nv_bfloat16,
+        __nv_bfloat16><<<
+        grid,
+        kAttentionBlockSize,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const __nv_bfloat16 *>(query),
+        static_cast<const __nv_bfloat16 *>(key),
+        static_cast<const __nv_bfloat16 *>(value),
+        static_cast<const __nv_bfloat16 *>(grad_output),
         batch_size,
         head_count,
         kv_head_count,

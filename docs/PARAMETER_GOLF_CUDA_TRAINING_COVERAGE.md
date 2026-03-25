@@ -163,8 +163,10 @@ the same bounded public lane before the next H100 rerun:
   reuses per-position gradient-weight scratch instead of recomputing the same
   inner products twice
 - one bounded CUDA causal full-sequence attention-backward kernel now writes
-  the query, key, and value gradients for the admitted `f32` PGOLF shapes
-  directly on-device
+  the query, key, and value gradients directly on-device for both:
+  - admitted `f32` PGOLF shapes
+  - admitted `bf16` PGOLF shapes through explicit `f32` accumulation followed
+    by on-device `f32 -> bf16` casts onto the graph surface
 - a fresh local profiled decoder-backward run on the RTX 4080 now leaves the
   fallback profile sink empty, so the bounded decoder backward path no longer
   touches host fallback at all on that lane
@@ -212,11 +214,9 @@ the same bounded public lane before the next H100 rerun:
     linear surface at pure `f32`
   - reverse-mode autodiff now admits the bounded float-cast family, so the
     graph layer no longer blocks mixed-precision train-path lowering
-  - CUDA eval still goes further than train today:
-    - eval `q`, `k`, and `v` inputs cast onto the admitted BF16
-      full-sequence attention lane before `scaled_dot_product_attention`
-    - train attention stays `f32` until the bounded BF16 attention-backward
-      lane exists on the public CUDA path
+  - CUDA train and eval now both cast admitted attention `q`, `k`, and `v`
+    inputs onto the bounded BF16 full-sequence attention lane before
+    `scaled_dot_product_attention`
 - the latest real `8xH100` scoreproof still retained the remaining
   training-side runtime bottleneck honestly:
   - wallclock cap hit after only `3` steps
@@ -263,7 +263,7 @@ Today it keeps these truths separate:
     `rotary_embedding_backward`
   - one bounded CUDA decoder backward kernel is also real on the public lane
     for `scaled_dot_product_attention_{query,key,value}_backward` on admitted
-    `f32` Parameter Golf shapes
+    `f32` and `bf16` Parameter Golf shapes
   - one bounded host-orchestrated CUDA BF16 master-weight optimizer step over
     BF16 train-visible parameter and gradient buffers with FP32 master weights
     and FP32 optimizer state is real on the public lane

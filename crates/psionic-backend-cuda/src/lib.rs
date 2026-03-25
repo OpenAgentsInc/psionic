@@ -124,6 +124,7 @@ struct ScaledDotProductAttentionBackwardCachedOutputs {
     query: CudaBuffer,
     key: CudaBuffer,
     value: CudaBuffer,
+    _scratch: Vec<CudaBuffer>,
 }
 
 impl ScaledDotProductAttentionBackwardCachedOutputs {
@@ -1557,6 +1558,43 @@ impl CudaSubmission {
     ) -> Result<(), RuntimeError> {
         self.platform
             .encode_attention_causal_sequence_backward_f32(
+                &query.platform,
+                &key.platform,
+                &value.platform,
+                &grad_output.platform,
+                batch_size,
+                head_count,
+                kv_head_count,
+                sequence_length,
+                head_dim,
+                &query_gradient.platform,
+                &key_gradient.platform,
+                &value_gradient.platform,
+            )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Applies one bounded full-sequence causal grouped-query attention
+    /// backward pass on contiguous `bf16` rank-4 tensors and writes all three
+    /// gradient surfaces into explicit `f32` buffers on device.
+    pub fn attention_causal_sequence_backward_bf16_to_f32(
+        &mut self,
+        query: &CudaBuffer,
+        key: &CudaBuffer,
+        value: &CudaBuffer,
+        grad_output: &CudaBuffer,
+        batch_size: usize,
+        head_count: usize,
+        kv_head_count: usize,
+        sequence_length: usize,
+        head_dim: usize,
+        query_gradient: &CudaBuffer,
+        key_gradient: &CudaBuffer,
+        value_gradient: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        self.platform
+            .encode_attention_causal_sequence_backward_bf16_to_f32(
                 &query.platform,
                 &key.platform,
                 &value.platform,
@@ -4156,6 +4194,67 @@ impl AvailableCudaBackend {
                 query: query_gradient,
                 key: key_gradient,
                 value: value_gradient,
+                _scratch: Vec::new(),
+            }
+        } else if query.spec().dtype() == DType::BF16
+            && key.spec().dtype() == DType::BF16
+            && value.spec().dtype() == DType::BF16
+            && grad_output.spec().dtype() == DType::BF16
+        {
+            let query_gradient = self.allocate(query.spec())?;
+            let key_gradient = self.allocate(key.spec())?;
+            let value_gradient = self.allocate(value.spec())?;
+            let query_gradient_f32 = self.allocate(&TensorSpec::from_layout(
+                query.spec().layout().clone(),
+                DType::F32,
+                query.spec().device().clone(),
+            ))?;
+            let key_gradient_f32 = self.allocate(&TensorSpec::from_layout(
+                key.spec().layout().clone(),
+                DType::F32,
+                key.spec().device().clone(),
+            ))?;
+            let value_gradient_f32 = self.allocate(&TensorSpec::from_layout(
+                value.spec().layout().clone(),
+                DType::F32,
+                value.spec().device().clone(),
+            ))?;
+            submission.fill_buffer(&key_gradient_f32, 0)?;
+            submission.fill_buffer(&value_gradient_f32, 0)?;
+            submission.attention_causal_sequence_backward_bf16_to_f32(
+                query,
+                key,
+                value,
+                grad_output,
+                batch_size,
+                query_heads,
+                kv_heads,
+                sequence_length,
+                head_dim,
+                &query_gradient_f32,
+                &key_gradient_f32,
+                &value_gradient_f32,
+            )?;
+            submission.cast_f32_to_bf16(
+                &query_gradient_f32,
+                &query_gradient,
+                query_gradient.spec().storage_size(),
+            )?;
+            submission.cast_f32_to_bf16(
+                &key_gradient_f32,
+                &key_gradient,
+                key_gradient.spec().storage_size(),
+            )?;
+            submission.cast_f32_to_bf16(
+                &value_gradient_f32,
+                &value_gradient,
+                value_gradient.spec().storage_size(),
+            )?;
+            ScaledDotProductAttentionBackwardCachedOutputs {
+                query: query_gradient,
+                key: key_gradient,
+                value: value_gradient,
+                _scratch: vec![query_gradient_f32, key_gradient_f32, value_gradient_f32],
             }
         } else {
             let query_values = query.read_f32()?;
@@ -4178,6 +4277,7 @@ impl AvailableCudaBackend {
                 key: self.buffer_from_tensor_data(key.spec(), &TensorData::F32(gradients.key))?,
                 value: self
                     .buffer_from_tensor_data(value.spec(), &TensorData::F32(gradients.value))?,
+                _scratch: Vec::new(),
             }
         };
         let output = cached.output(target);
@@ -4854,7 +4954,9 @@ impl AvailableCudaBackend {
                         let cache_key =
                             scaled_dot_product_attention_backward_cache_key(step, scale, *causal)?;
                         let use_device_path =
-                            supports_cuda_scaled_dot_product_attention_backward_f32(step, &values)?;
+                            supports_cuda_scaled_dot_product_attention_backward_device_path(
+                                step, &values,
+                            )?;
                         let output = if let Some(cached) = attention_backward_cache.get(&cache_key)
                         {
                             cached.output(ScaledDotProductAttentionBackwardTarget::Query)
@@ -4892,7 +4994,9 @@ impl AvailableCudaBackend {
                         let cache_key =
                             scaled_dot_product_attention_backward_cache_key(step, scale, *causal)?;
                         let use_device_path =
-                            supports_cuda_scaled_dot_product_attention_backward_f32(step, &values)?;
+                            supports_cuda_scaled_dot_product_attention_backward_device_path(
+                                step, &values,
+                            )?;
                         let output = if let Some(cached) = attention_backward_cache.get(&cache_key)
                         {
                             cached.output(ScaledDotProductAttentionBackwardTarget::Key)
@@ -4933,7 +5037,9 @@ impl AvailableCudaBackend {
                         let cache_key =
                             scaled_dot_product_attention_backward_cache_key(step, scale, *causal)?;
                         let use_device_path =
-                            supports_cuda_scaled_dot_product_attention_backward_f32(step, &values)?;
+                            supports_cuda_scaled_dot_product_attention_backward_device_path(
+                                step, &values,
+                            )?;
                         let output = if let Some(cached) = attention_backward_cache.get(&cache_key)
                         {
                             cached.output(ScaledDotProductAttentionBackwardTarget::Value)
@@ -5258,7 +5364,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
         | ExecutionOp::Select { .. }
         | ExecutionOp::Expand { .. }
         | ExecutionOp::ReduceSum { .. } => {
-            ensure_supported_spec(&step.spec)?;
+            ensure_supported_float_spec(&step.spec)?;
             if step.inputs.len() != 1 {
                 return Err(RuntimeError::Backend(format!(
                     "cuda {} step {} requires one input",
@@ -5268,7 +5374,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
             }
         }
         ExecutionOp::Concat { .. } => {
-            ensure_supported_spec(&step.spec)?;
+            ensure_supported_float_spec(&step.spec)?;
             if step.inputs.is_empty() {
                 return Err(RuntimeError::Backend(format!(
                     "cuda concat step {} requires at least one input",
@@ -5277,7 +5383,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
             }
         }
         ExecutionOp::Cast { dtype } => {
-            ensure_supported_spec(&step.spec)?;
+            ensure_supported_float_spec(&step.spec)?;
             if step.inputs.len() != 1 {
                 return Err(RuntimeError::Backend(format!(
                     "cuda cast step {} requires one input",
@@ -5293,7 +5399,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
             }
         }
         ExecutionOp::Add => {
-            ensure_supported_spec(&step.spec)?;
+            ensure_supported_float_spec(&step.spec)?;
             if step.inputs.len() != 2 {
                 return Err(RuntimeError::Backend(format!(
                     "cuda add step {} requires two inputs",
@@ -5302,7 +5408,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
             }
         }
         ExecutionOp::Mul => {
-            ensure_supported_spec(&step.spec)?;
+            ensure_supported_float_spec(&step.spec)?;
             if step.inputs.len() != 2 {
                 return Err(RuntimeError::Backend(format!(
                     "cuda mul step {} requires two inputs",
@@ -5311,7 +5417,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
             }
         }
         ExecutionOp::Matmul => {
-            ensure_supported_spec(&step.spec)?;
+            ensure_supported_f32_spec(&step.spec)?;
             if step.inputs.len() != 2 {
                 return Err(RuntimeError::Backend(format!(
                     "cuda matmul step {} requires two inputs",
@@ -5328,9 +5434,9 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
             }
         }
         ExecutionOp::BackendExtension { op } => {
-            ensure_supported_spec(&step.spec)?;
             match op {
                 BackendExtensionOp::ParameterGolfTokenEmbeddingLookup => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 2 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda parameter_golf_token_embedding_lookup step {} requires two inputs",
@@ -5339,6 +5445,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 3 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda parameter_golf_token_embedding_lookup_backward step {} requires three inputs",
@@ -5347,6 +5454,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::ReluSquared => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 1 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda relu_squared step {} requires one input",
@@ -5355,6 +5463,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::ReluSquaredBackward => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 2 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda relu_squared_backward step {} requires two inputs",
@@ -5363,6 +5472,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::Silu => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 1 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda silu step {} requires one input",
@@ -5371,6 +5481,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::SiluBackward => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 2 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda silu_backward step {} requires two inputs",
@@ -5379,6 +5490,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::ParameterGolfProjectionLoss { .. } => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 2 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda parameter_golf_projection_loss step {} requires two inputs",
@@ -5387,6 +5499,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::ParameterGolfProjectionTokenLosses { .. } => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 2 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda parameter_golf_projection_token_losses step {} requires two inputs",
@@ -5395,6 +5508,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::ParameterGolfProjectionLossBackward { .. } => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 3 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda parameter_golf_projection_loss_backward step {} requires three inputs",
@@ -5403,6 +5517,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::RmsNorm { .. } => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 2 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda rms_norm step {} requires two inputs",
@@ -5411,6 +5526,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::RmsNormInputBackward { .. } => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 3 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda rms_norm_input_backward step {} requires three inputs",
@@ -5419,6 +5535,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::RmsNormWeightBackward { .. } => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 2 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda rms_norm_weight_backward step {} requires two inputs",
@@ -5427,6 +5544,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::RotaryEmbedding { interleaved } => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 3 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda rotary_embedding step {} requires three inputs",
@@ -5440,6 +5558,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::RotaryEmbeddingBackward { interleaved } => {
+                    ensure_supported_f32_spec(&step.spec)?;
                     if step.inputs.len() != 3 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda rotary_embedding_backward step {} requires three inputs",
@@ -5453,6 +5572,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     }
                 }
                 BackendExtensionOp::ScaledDotProductAttention { causal, .. } => {
+                    ensure_supported_float_spec(&step.spec)?;
                     if step.inputs.len() != 3 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda scaled_dot_product_attention step {} requires three inputs",
@@ -5468,6 +5588,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                 BackendExtensionOp::ScaledDotProductAttentionQueryBackward { causal, .. }
                 | BackendExtensionOp::ScaledDotProductAttentionKeyBackward { causal, .. }
                 | BackendExtensionOp::ScaledDotProductAttentionValueBackward { causal, .. } => {
+                    ensure_supported_float_spec(&step.spec)?;
                     if step.inputs.len() != 4 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda {} step {} requires four inputs",
@@ -6093,10 +6214,10 @@ fn relu_squared_backward_values(input: &[f32], grad_output: &[f32]) -> Vec<f32> 
         .collect()
 }
 
-fn ensure_supported_spec(spec: &TensorSpec) -> Result<(), RuntimeError> {
-    if spec.dtype() != DType::F32 {
+fn ensure_supported_float_spec(spec: &TensorSpec) -> Result<(), RuntimeError> {
+    if spec.dtype() != DType::F32 && spec.dtype() != DType::BF16 {
         return Err(RuntimeError::Backend(format!(
-            "cuda dense surface only supports F32 tensors, actual {:?}",
+            "cuda dense surface only supports F32/BF16 tensors, actual {:?}",
             spec.dtype()
         )));
     }
@@ -6112,6 +6233,16 @@ fn ensure_supported_spec(spec: &TensorSpec) -> Result<(), RuntimeError> {
         )));
     }
     Ok(())
+}
+
+fn ensure_supported_f32_spec(spec: &TensorSpec) -> Result<(), RuntimeError> {
+    if spec.dtype() != DType::F32 {
+        return Err(RuntimeError::Backend(format!(
+            "cuda dense surface only supports F32 tensors for this operation, actual {:?}",
+            spec.dtype()
+        )));
+    }
+    ensure_supported_float_spec(spec)
 }
 
 fn ensure_supported_input_spec(spec: &TensorSpec) -> Result<(), RuntimeError> {
@@ -6534,7 +6665,7 @@ fn scaled_dot_product_attention_backward_cache_key(
     })
 }
 
-fn supports_cuda_scaled_dot_product_attention_backward_f32(
+fn supports_cuda_scaled_dot_product_attention_backward_device_path(
     step: &ExecutionStep,
     values: &BTreeMap<TensorId, CudaBuffer>,
 ) -> Result<bool, RuntimeError> {
@@ -6542,10 +6673,16 @@ fn supports_cuda_scaled_dot_product_attention_backward_f32(
     let key = step_input(step, values, 1)?;
     let value = step_input(step, values, 2)?;
     let grad_output = step_input(step, values, 3)?;
-    Ok(query.spec().dtype() == DType::F32
-        && key.spec().dtype() == DType::F32
-        && value.spec().dtype() == DType::F32
-        && grad_output.spec().dtype() == DType::F32)
+    Ok(
+        (query.spec().dtype() == DType::F32
+            && key.spec().dtype() == DType::F32
+            && value.spec().dtype() == DType::F32
+            && grad_output.spec().dtype() == DType::F32)
+            || (query.spec().dtype() == DType::BF16
+                && key.spec().dtype() == DType::BF16
+                && value.spec().dtype() == DType::BF16
+                && grad_output.spec().dtype() == DType::BF16),
+    )
 }
 
 fn supports_cuda_rank2_transpose(input_shape: &[usize], axes: &[usize]) -> bool {
@@ -7440,6 +7577,21 @@ mod platform {
             stream: CudaStream,
         ) -> CudaError;
         fn psionic_cuda_attention_causal_sequence_backward_f32(
+            query: *const c_void,
+            key: *const c_void,
+            value: *const c_void,
+            grad_output: *const c_void,
+            batch_size: c_int,
+            head_count: c_int,
+            kv_head_count: c_int,
+            sequence_length: c_int,
+            head_dim: c_int,
+            query_gradient: *mut c_void,
+            key_gradient: *mut c_void,
+            value_gradient: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_attention_causal_sequence_backward_bf16_to_f32(
             query: *const c_void,
             key: *const c_void,
             value: *const c_void,
@@ -10826,6 +10978,70 @@ mod platform {
         }
 
         #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_causal_sequence_backward_bf16_to_f32(
+            &mut self,
+            query: &PlatformBuffer,
+            key: &PlatformBuffer,
+            value: &PlatformBuffer,
+            grad_output: &PlatformBuffer,
+            batch_size: usize,
+            head_count: usize,
+            kv_head_count: usize,
+            sequence_length: usize,
+            head_dim: usize,
+            query_gradient: &PlatformBuffer,
+            key_gradient: &PlatformBuffer,
+            value_gradient: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let batch_size = c_int::try_from(batch_size).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention backward batch size exceeds c_int",
+                ))
+            })?;
+            let head_count = c_int::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention backward head count exceeds c_int",
+                ))
+            })?;
+            let kv_head_count = c_int::try_from(kv_head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention backward kv head count exceeds c_int",
+                ))
+            })?;
+            let sequence_length = c_int::try_from(sequence_length).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention backward sequence length exceeds c_int",
+                ))
+            })?;
+            let head_dim = c_int::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention backward head dim exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_attention_causal_sequence_backward_bf16_to_f32(
+                        query.inner.device_ptr.cast(),
+                        key.inner.device_ptr.cast(),
+                        value.inner.device_ptr.cast(),
+                        grad_output.inner.device_ptr.cast(),
+                        batch_size,
+                        head_count,
+                        kv_head_count,
+                        sequence_length,
+                        head_dim,
+                        query_gradient.inner.device_ptr.cast(),
+                        key_gradient.inner.device_ptr.cast(),
+                        value_gradient.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_attention_causal_sequence_backward_bf16_to_f32",
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
         pub(super) fn encode_router_topk_softmax(
             &mut self,
             weights: &PlatformBuffer,
@@ -12750,6 +12966,27 @@ mod platform {
         }
 
         #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_causal_sequence_backward_bf16_to_f32(
+            &mut self,
+            _query: &PlatformBuffer,
+            _key: &PlatformBuffer,
+            _value: &PlatformBuffer,
+            _grad_output: &PlatformBuffer,
+            _batch_size: usize,
+            _head_count: usize,
+            _kv_head_count: usize,
+            _sequence_length: usize,
+            _head_dim: usize,
+            _query_gradient: &PlatformBuffer,
+            _key_gradient: &PlatformBuffer,
+            _value_gradient: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
         pub(super) fn encode_router_topk_softmax(
             &mut self,
             _weights: &PlatformBuffer,
@@ -14379,6 +14616,173 @@ mod tests {
                 .ok_or("expected bf16 attention output is not dense float")?,
             2e-2,
         );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_bf16_scaled_dot_product_attention_backward_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let batch_size = 1usize;
+        let query_heads = 4usize;
+        let kv_heads = 2usize;
+        let sequence_length = 4usize;
+        let head_dim = 8usize;
+        let scale = 1.0_f32 / (head_dim as f32).sqrt();
+        let query_shape = Shape::new(vec![batch_size, query_heads, sequence_length, head_dim]);
+        let key_shape = Shape::new(vec![batch_size, kv_heads, sequence_length, head_dim]);
+
+        let mut builder = AutodiffGraphBuilder::with_context(
+            selected.device.clone(),
+            AutodiffContext::training(),
+        );
+        let query = builder.input("query", query_shape.clone(), DType::BF16, true);
+        let key = builder.input("key", key_shape.clone(), DType::BF16, true);
+        let value = builder.input("value", key_shape.clone(), DType::BF16, true);
+        let attended = builder.scaled_dot_product_attention(&query, &key, &value, scale, true)?;
+        let graph = builder.finish(vec![attended.clone()]);
+
+        let backward_plan = graph.backward_plan(attended.id())?;
+        assert!(
+            backward_plan
+                .gradient_graph
+                .nodes()
+                .iter()
+                .any(|node| matches!(
+                    node.op(),
+                    psionic_ir::OpKind::BackendExtension {
+                        op: psionic_core::BackendExtensionOp::ScaledDotProductAttentionQueryBackward { .. }
+                    }
+                ))
+        );
+
+        let query_values = (0..batch_size * query_heads * sequence_length * head_dim)
+            .map(|index| (index as f32 - 19.0) * 0.03125)
+            .collect::<Vec<_>>();
+        let key_values = (0..batch_size * kv_heads * sequence_length * head_dim)
+            .map(|index| (index as f32 - 7.0) * -0.0275)
+            .collect::<Vec<_>>();
+        let value_values = (0..batch_size * kv_heads * sequence_length * head_dim)
+            .map(|index| (index as f32 + 11.0) * 0.01875)
+            .collect::<Vec<_>>();
+        let primal_inputs = std::collections::BTreeMap::from([
+            (query.id(), TensorData::BF16(query_values.clone())),
+            (key.id(), TensorData::BF16(key_values.clone())),
+            (value.id(), TensorData::BF16(value_values.clone())),
+        ]);
+        let upstream_seed = (0..batch_size * query_heads * sequence_length * head_dim)
+            .map(|index| ((index * 11 % 23) as f32 - 11.0) * 0.0625)
+            .collect::<Vec<_>>();
+        let forward_values = evaluate_graph(graph.graph(), &primal_inputs)?;
+        let expected = graph.backward_materialized_with_seed(
+            attended.id(),
+            &primal_inputs,
+            Some(TensorData::BF16(upstream_seed.clone())),
+        )?;
+
+        let plan = compile_graph(&backward_plan.gradient_graph)?;
+        validate_supported_plan(&plan)?;
+
+        let mut backward_inputs = std::collections::BTreeMap::new();
+        for binding in &backward_plan.primal_bindings {
+            let value = forward_values
+                .get(&binding.primal_tensor)
+                .ok_or("missing forward value for backward binding")?;
+            let spec = backward_plan
+                .gradient_graph
+                .node(binding.gradient_graph_input)
+                .ok_or("missing backward graph input node")?
+                .tensor()
+                .spec()
+                .clone();
+            let buffer = match value {
+                TensorData::F32(values) => backend.input_buffer(spec.shape().clone(), values.clone())?,
+                TensorData::BF16(values) => {
+                    backend.input_bf16_buffer(spec.shape().clone(), values.clone())?
+                }
+                TensorData::I32(values) => backend.input_i32_buffer(spec.shape().clone(), values.clone())?,
+                TensorData::QuantizedBlocks(_) => {
+                    return Err("unexpected quantized backward binding value".into());
+                }
+            };
+            backward_inputs.insert(binding.gradient_graph_input, buffer);
+        }
+        let seed_shape = backward_plan
+            .gradient_graph
+            .node(backward_plan.seed_input)
+            .ok_or("missing backward seed node")?
+            .tensor()
+            .spec()
+            .shape()
+            .clone();
+        backward_inputs.insert(
+            backward_plan.seed_input,
+            backend.input_bf16_buffer(seed_shape, upstream_seed)?,
+        );
+
+        let result =
+            backend.compile_and_execute(&backward_plan.gradient_graph, &backward_inputs)?;
+        let query_gradient = result
+            .outputs
+            .get(
+                &backward_plan
+                    .gradient_for(query.id())
+                    .ok_or("missing query gradient id")?,
+            )
+            .ok_or("missing cuda bf16 attention query gradient output")?;
+        let key_gradient = result
+            .outputs
+            .get(
+                &backward_plan
+                    .gradient_for(key.id())
+                    .ok_or("missing key gradient id")?,
+            )
+            .ok_or("missing cuda bf16 attention key gradient output")?;
+        let value_gradient = result
+            .outputs
+            .get(
+                &backward_plan
+                    .gradient_for(value.id())
+                    .ok_or("missing value gradient id")?,
+            )
+            .ok_or("missing cuda bf16 attention value gradient output")?;
+
+        let expected_query = match expected
+            .gradient(query.id())
+            .ok_or("missing expected bf16 query gradient")?
+        {
+            TensorData::F32(values) | TensorData::BF16(values) => values.as_slice(),
+            TensorData::I32(_) | TensorData::QuantizedBlocks(_) => {
+                return Err("unexpected non-float expected bf16 query gradient".into());
+            }
+        };
+        let expected_key = match expected
+            .gradient(key.id())
+            .ok_or("missing expected bf16 key gradient")?
+        {
+            TensorData::F32(values) | TensorData::BF16(values) => values.as_slice(),
+            TensorData::I32(_) | TensorData::QuantizedBlocks(_) => {
+                return Err("unexpected non-float expected bf16 key gradient".into());
+            }
+        };
+        let expected_value = match expected
+            .gradient(value.id())
+            .ok_or("missing expected bf16 value gradient")?
+        {
+            TensorData::F32(values) | TensorData::BF16(values) => values.as_slice(),
+            TensorData::I32(_) | TensorData::QuantizedBlocks(_) => {
+                return Err("unexpected non-float expected bf16 value gradient".into());
+            }
+        };
+
+        assert_close(&query_gradient.read_bf16_to_f32()?, expected_query, 3e-2);
+        assert_close(&key_gradient.read_bf16_to_f32()?, expected_key, 3e-2);
+        assert_close(&value_gradient.read_bf16_to_f32()?, expected_value, 3e-2);
         Ok(())
     }
 

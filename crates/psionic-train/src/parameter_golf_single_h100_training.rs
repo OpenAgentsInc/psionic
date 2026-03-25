@@ -2275,7 +2275,7 @@ fn precision_receipt_from_optimizer_plan(
             })
             .collect(),
         notes: vec![String::from(
-            "train-visible Parameter Golf weights now upload through BF16 graph inputs on the token-embedding and linear hot path while scalar/control tensors and retained activations remain explicit F32 until wider BF16 execution kernels land",
+            "train-visible Parameter Golf weights now upload through BF16 graph inputs on the token-embedding, linear, and admitted attention hot path, while scalar/control tensors, optimizer math, and the wider retained graph surface stay explicit F32 where the bounded CUDA lane still requires it",
         )],
     }
 }
@@ -2293,7 +2293,7 @@ fn precision_receipt_from_trainer_state(
             .map(|(parameter_id, state)| state.precision_receipt(parameter_id.clone()))
             .collect(),
         notes: vec![String::from(
-            "train-visible Parameter Golf weights now upload through BF16 graph inputs on the token-embedding and linear hot path while scalar/control tensors and retained activations remain explicit F32 until wider BF16 execution kernels land",
+            "train-visible Parameter Golf weights now upload through BF16 graph inputs on the token-embedding, linear, and admitted attention hot path, while scalar/control tensors, optimizer math, and the wider retained graph surface stay explicit F32 where the bounded CUDA lane still requires it",
         )],
     }
 }

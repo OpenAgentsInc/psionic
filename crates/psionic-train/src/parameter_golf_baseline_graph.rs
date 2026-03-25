@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use psionic_core::{DType, Device, DeviceKind, Shape, TensorData, TensorId};
 use psionic_ir::{
-    AutodiffContext, AutodiffError, AutodiffExecutionMode, AutodiffGraph,
-    AutodiffGraphBuilder, AutodiffTensor, Graph, GraphError, ReferenceEvaluationError,
+    AutodiffContext, AutodiffError, AutodiffGraph, AutodiffGraphBuilder, AutodiffTensor, Graph,
+    GraphError, ReferenceEvaluationError,
 };
 use psionic_models::{
     ParameterGolfBankedWeights, ParameterGolfConfig, ParameterGolfConfigError,
@@ -1040,11 +1040,7 @@ fn attention_forward_graph(
         ]),
     )?;
     let q = builder.mul(&q, &q_gain)?;
-    let use_bf16_attention_fast_path = use_bf16_fast_path
-        && matches!(
-            builder.context().execution_mode,
-            AutodiffExecutionMode::Evaluation
-        );
+    let use_bf16_attention_fast_path = use_bf16_fast_path;
     let q = if use_bf16_attention_fast_path {
         builder.cast(&q, DType::BF16)?
     } else {
@@ -2055,7 +2051,7 @@ mod tests {
             .count();
 
         assert!(training_bf16_weight_matmul_count > 0);
-        assert_eq!(training_bf16_cast_count, 0);
+        assert!(training_bf16_cast_count > 0);
         assert!(eval_bf16_weight_matmul_count > 0);
         assert!(eval_bf16_cast_count > 0);
         Ok(())
