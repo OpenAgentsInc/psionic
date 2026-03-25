@@ -158,7 +158,10 @@ one deterministic configured-peer cluster id, one exact coordinator versus
 contributor node assignment, one explicit cluster-manifest plus launch-receipt
 pair, and one bounded adapter-cluster runtime that uses the existing generic
 worker-protocol, validation, and aggregation substrate instead of inventing a
-second Google-only control plane.
+second Google-only control plane. The live lane now also budgets ten minutes
+for the contributor peer-connect loop so cold per-node compile skew on real
+Google `g2` nodes does not produce a false cluster-port refusal before the
+coordinator listener binds.
 
 The repo now also owns explicit Google swarm impairment policy and host-side
 transport shaping for that lane in

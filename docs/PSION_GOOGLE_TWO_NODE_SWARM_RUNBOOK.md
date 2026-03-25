@@ -175,6 +175,12 @@ Minimum healthy artifacts before finalization:
 - both runtime reports carry the expected runtime roles
 - the coordinator runtime report retains two submission receipts
 
+On a cold machine image, the two nodes can spend several minutes compiling the
+bounded swarm binary before the coordinator starts listening. The contributor
+runtime now retries the peer endpoint for up to ten minutes to absorb that
+startup skew. Do not treat a missing runtime report as a hard failure until
+that window expires or the startup log shows an explicit runtime error.
+
 ## Impaired Rerun
 
 After the clean baseline, run at least one admitted impaired profile. Start with

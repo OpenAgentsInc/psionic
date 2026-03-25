@@ -739,6 +739,9 @@ fn run_contributor(
     context: ExecutionContext,
     started_at_ms: u64,
 ) -> Result<PsionGoogleTwoNodeSwarmRuntimeReport, PsionGoogleTwoNodeSwarmRuntimeError> {
+    // Cold first-boot cargo builds on separate Google nodes can drift by several minutes.
+    // Keep the contributor retry budget wide enough to absorb that skew before refusing.
+    const PEER_CONNECT_TIMEOUT_SECONDS: u64 = 600;
     let session_id = format!(
         "{}-session-{}",
         context.local_node.node_id, context.manifest.run_id
@@ -749,7 +752,10 @@ fn run_contributor(
     );
     let signing_public_key_hex = hex::encode(signing_key.verifying_key().to_bytes());
 
-    let mut stream = connect_with_retry(context.peer_endpoint.endpoint.as_str(), 90)?;
+    let mut stream = connect_with_retry(
+        context.peer_endpoint.endpoint.as_str(),
+        PEER_CONNECT_TIMEOUT_SECONDS,
+    )?;
     configure_stream(&stream)?;
     send_message(
         &mut stream,
