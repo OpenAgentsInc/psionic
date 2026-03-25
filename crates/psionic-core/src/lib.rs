@@ -1952,6 +1952,9 @@ pub enum BackendExtensionKind {
     /// Parameter Golf token-id embedding lookup over `[batch, seq]` ids and
     /// the token embedding table.
     ParameterGolfTokenEmbeddingLookup,
+    /// Parameter Golf banked linear over `[batch, seq, in_features]` activations
+    /// and one rank-3 matrix bank.
+    ParameterGolfBankedLinear,
     /// ReLU-squared pointwise activation.
     ReluSquared,
     /// Leaky-ReLU-squared pointwise activation.
@@ -1982,13 +1985,12 @@ impl BackendExtensionKind {
     pub const fn label(self) -> &'static str {
         match self {
             Self::ParameterGolfTokenEmbeddingLookup => "parameter_golf_token_embedding_lookup",
+            Self::ParameterGolfBankedLinear => "parameter_golf_banked_linear",
             Self::ReluSquared => "relu_squared",
             Self::LeakyReluSquared => "leaky_relu_squared",
             Self::Silu => "silu",
             Self::ParameterGolfProjectionLoss => "parameter_golf_projection_loss",
-            Self::ParameterGolfProjectionTokenLosses => {
-                "parameter_golf_projection_token_losses"
-            }
+            Self::ParameterGolfProjectionTokenLosses => "parameter_golf_projection_token_losses",
             Self::RmsNorm => "rms_norm",
             Self::LayerNorm => "layer_norm",
             Self::RotaryEmbedding => "rotary_embedding",
@@ -2004,6 +2006,12 @@ impl BackendExtensionKind {
 pub enum BackendExtensionOp {
     /// Parameter Golf token-id embedding lookup against the token embedding table.
     ParameterGolfTokenEmbeddingLookup,
+    /// Parameter Golf linear against one rank-3 matrix bank entry selected by
+    /// a stable bank index.
+    ParameterGolfBankedLinear {
+        /// Zero-based matrix index inside the rank-3 bank tensor.
+        bank_index: usize,
+    },
     /// Weight-gradient rule for Parameter Golf token-id embedding lookup.
     ParameterGolfTokenEmbeddingLookupBackward,
     /// ReLU-squared pointwise activation.
@@ -2115,6 +2123,9 @@ impl BackendExtensionOp {
             | Self::ParameterGolfTokenEmbeddingLookupBackward => {
                 BackendExtensionKind::ParameterGolfTokenEmbeddingLookup
             }
+            Self::ParameterGolfBankedLinear { .. } => {
+                BackendExtensionKind::ParameterGolfBankedLinear
+            }
             Self::ReluSquared | Self::ReluSquaredBackward => BackendExtensionKind::ReluSquared,
             Self::LeakyReluSquared { .. } | Self::LeakyReluSquaredBackward { .. } => {
                 BackendExtensionKind::LeakyReluSquared
@@ -2149,6 +2160,7 @@ impl BackendExtensionOp {
     pub const fn label(&self) -> &'static str {
         match self {
             Self::ParameterGolfTokenEmbeddingLookup => "parameter_golf_token_embedding_lookup",
+            Self::ParameterGolfBankedLinear { .. } => "parameter_golf_banked_linear",
             Self::ParameterGolfTokenEmbeddingLookupBackward => {
                 "parameter_golf_token_embedding_lookup_backward"
             }

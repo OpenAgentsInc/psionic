@@ -118,6 +118,13 @@ Psionic now encodes that exact posture explicitly instead of treating
   of forcing the runtime to stay on the fully split per-layer matrix surface,
   and the baseline graph plus trainer state now execute that banked runtime
   descriptor directly instead of treating it as metadata only
+- the non-gradient PGOLF banked forward or eval lane now also lowers
+  `q/k/v/out/fc/proj` through one explicit `parameter_golf_banked_linear`
+  backend extension instead of graph-level `slice` plus rank-2 `matmul`,
+  which matters on CUDA because the old bank-slice view path was still
+  materializing those rank-3 bank slices through host fallback before the
+  matmul; the gradient-bearing train lane is still on the older sliced-bank
+  posture until the corresponding backward path exists
 - `psionic-models` plus the lowered PGOLF baseline graph now also admit two
   architecture-pack slices under the shared config surface:
   `rope_rotary_dim` for Partial RoPE,
@@ -253,6 +260,9 @@ What is still missing is the scoreboard-grade proof:
 
 - no fresh `1xH100` or `8xH100` receipt yet proves that the banked path
   materially improves real train or validation wallclock
+- the gradient-bearing train lane still slices bank tensors for backward-owned
+  matrix families; only the non-gradient forward or eval lane now owns a
+  direct banked execution op
 - the later score-path issues still need to combine this surface with the
   persistent worker mesh, legal score-first TTT, and the remaining hot-kernel
   work before the repo can claim competitive scoreboard posture

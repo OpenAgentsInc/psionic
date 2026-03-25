@@ -2348,6 +2348,16 @@ impl AutodiffGraph {
                             )?;
                         }
                     }
+                    BackendExtensionOp::ParameterGolfBankedLinear { .. } => {
+                        let input_id = node.inputs()[0];
+                        let matrix_bank_id = node.inputs()[1];
+                        if self.requires_grad(input_id) || self.requires_grad(matrix_bank_id) {
+                            return Err(AutodiffError::UnsupportedGradientOp {
+                                tensor_id: node.tensor().id(),
+                                op: String::from("parameter_golf_banked_linear"),
+                            });
+                        }
+                    }
                     BackendExtensionOp::ParameterGolfProjectionLoss { logit_softcap } => {
                         let logits_id = node.inputs()[0];
                         let target_ids_id = node.inputs()[1];
@@ -3911,6 +3921,23 @@ impl AutodiffGraphBuilder {
         Ok(self.wrap(tensor, requires_grad))
     }
 
+    /// Applies one Parameter Golf linear against a rank-3 matrix bank without
+    /// first lowering that bank through a graph-level slice node.
+    pub fn parameter_golf_banked_linear(
+        &mut self,
+        input: &AutodiffTensor,
+        matrix_bank: &AutodiffTensor,
+        bank_index: usize,
+    ) -> Result<AutodiffTensor, GraphError> {
+        let requires_grad = self.any_requires_grad(&[input, matrix_bank]);
+        let tensor = self.builder.parameter_golf_banked_linear(
+            input.tensor(),
+            matrix_bank.tensor(),
+            bank_index,
+        )?;
+        Ok(self.wrap(tensor, requires_grad))
+    }
+
     pub(crate) fn parameter_golf_token_embedding_lookup_backward(
         &mut self,
         token_ids: &AutodiffTensor,
@@ -4483,6 +4510,39 @@ fn evaluate_backend_extension_reference(
                     &token_ids_shape,
                     token_embedding,
                     &token_embedding_shape,
+                )?,
+            ))
+        }
+        BackendExtensionOp::ParameterGolfBankedLinear { bank_index } => {
+            let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let matrix_bank =
+                resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            let input_shape = graph
+                .node(node.inputs()[0])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[0],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            let matrix_bank_shape = graph
+                .node(node.inputs()[1])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[1],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            Ok(TensorData::F32(
+                parameter_golf_banked_linear_forward_values(
+                    node.tensor().id(),
+                    input,
+                    &input_shape,
+                    matrix_bank,
+                    &matrix_bank_shape,
+                    *bank_index,
                 )?,
             ))
         }
@@ -5157,6 +5217,47 @@ fn matmul_values(left: &[f32], left_shape: &Shape, right: &[f32], right_shape: &
     output
 }
 
+fn parameter_golf_banked_linear_forward_values(
+    tensor_id: TensorId,
+    input: &[f32],
+    input_shape: &Shape,
+    matrix_bank: &[f32],
+    matrix_bank_shape: &Shape,
+    bank_index: usize,
+) -> Result<Vec<f32>, ReferenceEvaluationError> {
+    let batch_size = input_shape.dims()[0];
+    let sequence_length = input_shape.dims()[1];
+    let in_features = input_shape.dims()[2];
+    let out_features = matrix_bank_shape.dims()[1];
+    let bank_in_features = matrix_bank_shape.dims()[2];
+    if in_features != bank_in_features {
+        return Err(ReferenceEvaluationError::PayloadLengthMismatch {
+            tensor_id,
+            expected_len: in_features,
+            actual_len: bank_in_features,
+        });
+    }
+    let rows = batch_size.saturating_mul(sequence_length);
+    let matrix_elements = out_features.saturating_mul(in_features);
+    let bank_offset = bank_index.saturating_mul(matrix_elements);
+    let bank_end = bank_offset.saturating_add(matrix_elements);
+    let right = &matrix_bank[bank_offset..bank_end];
+    let flattened = Shape::new(vec![rows, in_features]);
+    let mut transposed = vec![0.0_f32; in_features.saturating_mul(out_features)];
+    for out_index in 0..out_features {
+        for in_index in 0..in_features {
+            transposed[(in_index * out_features) + out_index] =
+                right[(out_index * in_features) + in_index];
+        }
+    }
+    Ok(matmul_values(
+        input,
+        &flattened,
+        &transposed,
+        &Shape::new(vec![in_features, out_features]),
+    ))
+}
+
 fn permute_values(values: &[f32], input_shape: &Shape, axes: &[usize]) -> Vec<f32> {
     let output_shape = input_shape
         .permuted(axes)
@@ -5537,8 +5638,7 @@ fn parameter_golf_projection_token_losses_forward_values(
             for value in &softcapped_row {
                 exp_sum += (*value - max_logit).exp();
             }
-            output[row_index] =
-                max_logit + exp_sum.max(f32::EPSILON).ln() - softcapped_row[target];
+            output[row_index] = max_logit + exp_sum.max(f32::EPSILON).ln() - softcapped_row[target];
         }
     }
     Ok(output)

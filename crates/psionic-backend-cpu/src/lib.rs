@@ -454,6 +454,7 @@ impl CpuBackend {
                 self.quantized_matmul(step, values, *rhs_mode)
             }
             BackendExtensionOp::ParameterGolfTokenEmbeddingLookup
+            | BackendExtensionOp::ParameterGolfBankedLinear { .. }
             | BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward
             | BackendExtensionOp::ParameterGolfProjectionLoss { .. }
             | BackendExtensionOp::ParameterGolfProjectionTokenLosses { .. }
@@ -1790,7 +1791,7 @@ mod tests {
 
     use std::collections::BTreeMap;
 
-    use psionic_backend_tests::{GraphBackendConformanceHarness, run_graph_backend_conformance};
+    use psionic_backend_tests::{run_graph_backend_conformance, GraphBackendConformanceHarness};
     use psionic_core::{
         BackendExtensionKind, DType, Device, QuantizationMode, Shape, TensorSpec, ViewSemantics,
     };
@@ -1800,7 +1801,7 @@ mod tests {
         ExecutionResult, HealthStatus, RuntimeError, ServedProductBackendPolicy,
     };
 
-    use super::{CpuAllocatorPool, CpuBackend, CpuBuffer, cpu_allocator_pool_policy};
+    use super::{cpu_allocator_pool_policy, CpuAllocatorPool, CpuBackend, CpuBuffer};
 
     impl GraphBackendConformanceHarness for CpuBackend {
         type Buffer = CpuBuffer;
@@ -2024,8 +2025,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_backend_refuses_parameter_golf_projection_loss_backend_extension()
-    -> Result<(), RuntimeError> {
+    fn cpu_backend_refuses_parameter_golf_projection_loss_backend_extension(
+    ) -> Result<(), RuntimeError> {
         let mut builder = GraphBuilder::new(Device::cpu());
         let logits = builder.input("logits", Shape::new(vec![1, 2, 4]), DType::F32);
         let target_ids = builder.input("target_ids", Shape::new(vec![1, 2]), DType::I32);

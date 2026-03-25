@@ -78,6 +78,7 @@ pub const SUPPORTED_OPS: &[&str] = &[
     "silu",
     "silu_backward",
     "parameter_golf_token_embedding_lookup",
+    "parameter_golf_banked_linear",
     "parameter_golf_token_embedding_lookup_backward",
     "parameter_golf_projection_loss",
     "parameter_golf_projection_token_losses",
@@ -1883,12 +1884,13 @@ impl CudaSubmission {
         sequence_length: usize,
         scale: f32,
     ) -> Result<(), RuntimeError> {
-        self.platform.encode_attention_causal_row_softmax_in_place_f32(
-            &logits.platform,
-            row_count,
-            sequence_length,
-            scale,
-        )?;
+        self.platform
+            .encode_attention_causal_row_softmax_in_place_f32(
+                &logits.platform,
+                row_count,
+                sequence_length,
+                scale,
+            )?;
         self.encoded_operations += 1;
         Ok(())
     }
@@ -4145,6 +4147,150 @@ impl AvailableCudaBackend {
         Ok(output)
     }
 
+    fn execute_parameter_golf_banked_linear_step(
+        &self,
+        submission: &mut CudaSubmission,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CudaBuffer>,
+        bank_index: usize,
+    ) -> Result<CudaBuffer, RuntimeError> {
+        let input = step_input(step, values, 0)?;
+        let matrix_bank = step_input(step, values, 1)?;
+        let input_dims = input.spec().shape().dims();
+        let bank_dims = matrix_bank.spec().shape().dims();
+        if (input.spec().dtype() != DType::F32 && input.spec().dtype() != DType::BF16)
+            || (matrix_bank.spec().dtype() != DType::F32
+                && matrix_bank.spec().dtype() != DType::BF16)
+        {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_banked_linear requires F32 or BF16 activations and weights",
+            )));
+        }
+        if input_dims.len() != 3 || bank_dims.len() != 3 {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_banked_linear requires rank-3 input [batch, seq, in_features] and rank-3 matrix_bank [bank_len, out_features, in_features]",
+            )));
+        }
+        if input_dims[2] != bank_dims[2] {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_banked_linear requires input in_features to match matrix_bank in_features",
+            )));
+        }
+        if bank_index >= bank_dims[0] {
+            return Err(RuntimeError::Backend(format!(
+                "cuda parameter_golf_banked_linear bank_index {bank_index} exceeds bank length {}",
+                bank_dims[0]
+            )));
+        }
+
+        let rows = input_dims[0].saturating_mul(input_dims[1]);
+        let cols = bank_dims[1];
+        let inner = bank_dims[2];
+        let input_flat = input.alias_with_spec(&TensorSpec::new(
+            Shape::new(vec![rows, inner]),
+            input.spec().dtype(),
+            input.spec().device().clone(),
+        ))?;
+        let output = self.allocate(&step.spec)?;
+        let output_flat = output.alias_with_spec(&TensorSpec::new(
+            Shape::new(vec![rows, cols]),
+            DType::F32,
+            output.spec().device().clone(),
+        ))?;
+        let matrix_shape = Shape::new(vec![cols, inner]);
+        let matrix_spec = TensorSpec::new(
+            matrix_shape.clone(),
+            matrix_bank.spec().dtype(),
+            matrix_bank.spec().device().clone(),
+        );
+        let matrix = self.allocate(&matrix_spec)?;
+        let matrix_byte_len = matrix.byte_len();
+        let source_byte_offset = bank_index.checked_mul(matrix_byte_len).ok_or_else(|| {
+            RuntimeError::Backend(String::from(
+                "cuda parameter_golf_banked_linear source offset overflow",
+            ))
+        })?;
+        submission.copy_buffer_region(
+            matrix_bank,
+            source_byte_offset,
+            &matrix,
+            0,
+            matrix_byte_len,
+        )?;
+
+        match (input.spec().dtype(), matrix_bank.spec().dtype()) {
+            (DType::F32, DType::BF16) => submission
+                .matmul_f32_bf16_strided_batched_to_f32_with_strides(
+                    &input_flat,
+                    &matrix,
+                    &output_flat,
+                    rows,
+                    inner,
+                    cols,
+                    1,
+                    rows.saturating_mul(inner),
+                    cols.saturating_mul(inner),
+                    rows.saturating_mul(cols),
+                    false,
+                    true,
+                )?,
+            (DType::BF16, DType::BF16) => submission
+                .matmul_bf16_strided_batched_to_f32_with_strides(
+                    &input_flat,
+                    &matrix,
+                    &output_flat,
+                    rows,
+                    inner,
+                    cols,
+                    1,
+                    rows.saturating_mul(inner),
+                    cols.saturating_mul(inner),
+                    rows.saturating_mul(cols),
+                    false,
+                    true,
+                )?,
+            (input_dtype, DType::F32)
+                if input_dtype == DType::F32 || input_dtype == DType::BF16 =>
+            {
+                let input_f32 = if input_dtype == DType::F32 {
+                    input_flat.clone()
+                } else {
+                    let casted = self.allocate(&TensorSpec::new(
+                        Shape::new(vec![rows, inner]),
+                        DType::F32,
+                        input.spec().device().clone(),
+                    ))?;
+                    submission.cast_bf16_to_f32(
+                        &input_flat,
+                        &casted,
+                        rows.saturating_mul(inner),
+                    )?;
+                    casted
+                };
+                let matrix_transposed = self.allocate(&TensorSpec::new(
+                    Shape::new(vec![inner, cols]),
+                    DType::F32,
+                    matrix_bank.spec().device().clone(),
+                ))?;
+                submission.permute_rank2_transpose_f32(&matrix, &matrix_transposed, cols, inner)?;
+                submission.matmul(
+                    &input_f32,
+                    &matrix_transposed,
+                    &output_flat,
+                    rows,
+                    inner,
+                    cols,
+                )?;
+            }
+            (input_dtype, weight_dtype) => {
+                return Err(RuntimeError::Backend(format!(
+                    "cuda parameter_golf_banked_linear does not support dtype posture input={input_dtype:?} matrix_bank={weight_dtype:?}",
+                )));
+            }
+        }
+        Ok(output)
+    }
+
     fn execute_parameter_golf_token_embedding_lookup_backward_step(
         &self,
         submission: &mut CudaSubmission,
@@ -5413,6 +5559,15 @@ impl AvailableCudaBackend {
                         )?;
                         values.insert(step.output, output);
                     }
+                    BackendExtensionOp::ParameterGolfBankedLinear { bank_index } => {
+                        let output = self.execute_parameter_golf_banked_linear_step(
+                            &mut submission,
+                            step,
+                            &values,
+                            *bank_index,
+                        )?;
+                        values.insert(step.output, output);
+                    }
                     BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward => {
                         let output = self
                             .execute_parameter_golf_token_embedding_lookup_backward_step(
@@ -6106,6 +6261,22 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     return Err(RuntimeError::Backend(format!(
                         "cuda parameter_golf_token_embedding_lookup step {} requires two inputs",
                         step.output
+                    )));
+                }
+            }
+            BackendExtensionOp::ParameterGolfBankedLinear { .. } => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda parameter_golf_banked_linear step {} requires two inputs",
+                        step.output
+                    )));
+                }
+                if step.spec.shape().dims().len() != 3 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda parameter_golf_banked_linear step {} requires a rank-3 output, actual rank {}",
+                        step.output,
+                        step.spec.shape().dims().len()
                     )));
                 }
             }
@@ -14219,6 +14390,7 @@ mod platform {
 
 #[cfg(test)]
 mod tests {
+    use half::bf16;
     use psionic_backend_cpu::decode_quantized_row_into;
     use psionic_backend_cpu::quantized_row_dot;
     use psionic_backend_cpu::CpuBackend;
@@ -14390,6 +14562,7 @@ mod tests {
                 "leaky_relu_squared_backward",
                 "silu",
                 "silu_backward",
+                "parameter_golf_banked_linear",
                 "parameter_golf_projection_loss",
                 "parameter_golf_projection_token_losses",
                 "parameter_golf_projection_loss_backward",
@@ -14910,6 +15083,66 @@ mod tests {
             .as_f32_slice()
             .ok_or("reference parameter golf projection token-loss output should be f32")?;
         assert_close(&output.read_f32()?, expected_losses, 1e-5);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_parameter_golf_banked_linear_backend_extension_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let input_shape = Shape::new(vec![1, 2, 3]);
+        let bank_shape = Shape::new(vec![2, 4, 3]);
+        let input_values = vec![1.0_f32, -2.0, 0.5, 0.25, 1.5, -0.75];
+        let bank_values = vec![
+            0.2_f32, -0.4, 0.6, 1.0, 0.5, -0.5, -0.3, 0.8, 0.1, 0.7, -0.2, 0.9, -0.6, 0.4, 0.3,
+            0.5, -0.7, 0.2, 0.1, 0.9, -0.8, -0.2, 0.6, 0.4,
+        ];
+        let quantized_bank_values = bank_values
+            .iter()
+            .map(|value| bf16::from_f32(*value).to_f32())
+            .collect::<Vec<_>>();
+        let bank_index = 1;
+
+        let mut builder = GraphBuilder::new(selected.device.clone());
+        let input = builder.input("input", input_shape.clone(), DType::F32);
+        let matrix_bank = builder.input("matrix_bank", bank_shape.clone(), DType::BF16);
+        let output = builder.parameter_golf_banked_linear(&input, &matrix_bank, bank_index)?;
+        let graph = builder.finish(vec![output.clone()]);
+
+        let inputs = std::collections::BTreeMap::from([
+            (
+                input.id(),
+                backend.input_buffer(input_shape.clone(), input_values.clone())?,
+            ),
+            (
+                matrix_bank.id(),
+                backend.input_bf16_buffer(bank_shape.clone(), bank_values.clone())?,
+            ),
+        ]);
+        let result = backend.compile_and_execute(&graph, &inputs)?;
+        let actual = result
+            .outputs
+            .get(&output.id())
+            .ok_or("missing cuda parameter golf banked-linear output")?;
+
+        let expected = evaluate_graph(
+            &graph,
+            &std::collections::BTreeMap::from([
+                (input.id(), TensorData::F32(input_values)),
+                (matrix_bank.id(), TensorData::BF16(quantized_bank_values)),
+            ]),
+        )?;
+        let expected_values = expected
+            .get(&output.id())
+            .ok_or("missing reference parameter golf banked-linear output")?
+            .as_f32_slice()
+            .ok_or("reference parameter golf banked-linear output should be f32")?;
+        assert_close(&actual.read_f32()?, expected_values, 1e-5);
         Ok(())
     }
 
@@ -17077,8 +17310,8 @@ mod tests {
         let logits = backend.input_buffer(
             Shape::new(vec![4, 4]),
             vec![
-                10.0_f32, -1.0, -2.0, -3.0, 0.0, 0.0, 5.0, 6.0, -1.0, 0.0, 1.0, 2.0, 1.0, 2.0,
-                3.0, 4.0,
+                10.0_f32, -1.0, -2.0, -3.0, 0.0, 0.0, 5.0, 6.0, -1.0, 0.0, 1.0, 2.0, 1.0, 2.0, 3.0,
+                4.0,
             ],
         )?;
 
@@ -17089,22 +17322,8 @@ mod tests {
         assert_close(
             &logits.read_f32()?,
             &[
-                1.0,
-                0.0,
-                0.0,
-                0.0,
-                0.5,
-                0.5,
-                0.0,
-                0.0,
-                0.09003057,
-                0.24472848,
-                0.66524094,
-                0.0,
-                0.0320586,
-                0.08714432,
-                0.23688284,
-                0.6439143,
+                1.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.09003057, 0.24472848, 0.66524094, 0.0,
+                0.0320586, 0.08714432, 0.23688284, 0.6439143,
             ],
             1e-5,
         );
@@ -17123,15 +17342,15 @@ mod tests {
         let probabilities = backend.input_buffer(
             Shape::new(vec![4, 4]),
             vec![
-                1.0_f32, 0.0, 0.0, 0.0, 0.25, 0.75, 0.0, 0.0, 0.1, 0.2, 0.7, 0.0, 0.25, 0.25,
-                0.25, 0.25,
+                1.0_f32, 0.0, 0.0, 0.0, 0.25, 0.75, 0.0, 0.0, 0.1, 0.2, 0.7, 0.0, 0.25, 0.25, 0.25,
+                0.25,
             ],
         )?;
         let grad_probabilities = backend.input_buffer(
             Shape::new(vec![4, 4]),
             vec![
-                2.0_f32, 9.0, 9.0, 9.0, 2.0, -1.0, 9.0, 9.0, 3.0, -1.0, 2.0, 9.0, 4.0, 1.0,
-                -2.0, 3.0,
+                2.0_f32, 9.0, 9.0, 9.0, 2.0, -1.0, 9.0, 9.0, 3.0, -1.0, 2.0, 9.0, 4.0, 1.0, -2.0,
+                3.0,
             ],
         )?;
 
@@ -17148,22 +17367,8 @@ mod tests {
         assert_close(
             &grad_probabilities.read_f32()?,
             &[
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.5625,
-                -0.5625,
-                0.0,
-                0.0,
-                0.15,
-                -0.5,
-                0.35,
-                0.0,
-                0.625,
-                -0.125,
-                -0.875,
-                0.375,
+                0.0, 0.0, 0.0, 0.0, 0.5625, -0.5625, 0.0, 0.0, 0.15, -0.5, 0.35, 0.0, 0.625,
+                -0.125, -0.875, 0.375,
             ],
             1e-5,
         );

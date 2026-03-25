@@ -3895,6 +3895,12 @@ const BUILTIN_OPERATOR_SCHEMAS: &[OperatorSchema] = &[
         OperatorMetaExecutionKind::BuiltinInference,
     ),
     OperatorSchema::new(
+        "parameter_golf_banked_linear",
+        OperatorArity::Fixed(2),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
         "parameter_golf_token_embedding_lookup_backward",
         OperatorArity::Fixed(3),
         OperatorImplementationKind::BackendKernel,
@@ -4548,6 +4554,13 @@ fn meta_execute_backend_extension(
                 inputs,
             )
         }
+        BackendExtensionOp::ParameterGolfBankedLinear { bank_index } => {
+            validate_parameter_golf_banked_linear_spec(
+                "parameter_golf_banked_linear",
+                inputs,
+                *bank_index,
+            )
+        }
         BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward => {
             validate_parameter_golf_token_embedding_lookup_backward_spec(
                 "parameter_golf_token_embedding_lookup_backward",
@@ -5099,6 +5112,23 @@ impl GraphBuilder {
             None,
         )?;
         Ok(self.register_backend_extension(op, vec![token_ids.id(), token_embedding.id()], spec))
+    }
+
+    /// Applies one Parameter Golf linear against a rank-3 matrix bank without
+    /// first lowering that bank through a graph-level slice node.
+    pub fn parameter_golf_banked_linear(
+        &mut self,
+        input: &Tensor,
+        matrix_bank: &Tensor,
+        bank_index: usize,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::ParameterGolfBankedLinear { bank_index };
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[input, matrix_bank],
+            None,
+        )?;
+        Ok(self.register_backend_extension(op, vec![input.id(), matrix_bank.id()], spec))
     }
 
     pub(crate) fn parameter_golf_token_embedding_lookup_backward(
@@ -5667,6 +5697,9 @@ fn format_backend_extension_payload(op: &BackendExtensionOp) -> String {
         | BackendExtensionOp::ReluSquaredBackward
         | BackendExtensionOp::Silu
         | BackendExtensionOp::SiluBackward => String::new(),
+        BackendExtensionOp::ParameterGolfBankedLinear { bank_index } => {
+            format!("bank_index={bank_index}")
+        }
         BackendExtensionOp::LeakyReluSquared { negative_slope }
         | BackendExtensionOp::LeakyReluSquaredBackward { negative_slope } => {
             format!("negative_slope_bits={:08x}", negative_slope.0)
@@ -6144,6 +6177,95 @@ fn validate_parameter_golf_token_embedding_lookup_spec(
         ]),
         DType::F32,
         token_ids.device().clone(),
+    ))
+}
+
+fn validate_parameter_golf_banked_linear_spec(
+    label: &str,
+    inputs: &[TensorSpec],
+    bank_index: usize,
+) -> Result<TensorSpec, GraphError> {
+    if inputs.len() != 2 {
+        return Err(extension_error(
+            label,
+            format!("expected 2 inputs, received {}", inputs.len()),
+        ));
+    }
+    let input = &inputs[0];
+    let matrix_bank = &inputs[1];
+    if input.dtype() != DType::F32 && input.dtype() != DType::BF16 {
+        return Err(extension_error(
+            label,
+            format!(
+                "input dtype must be F32 or BF16 activations, actual {:?}",
+                input.dtype()
+            ),
+        ));
+    }
+    if matrix_bank.dtype() != DType::F32 && matrix_bank.dtype() != DType::BF16 {
+        return Err(extension_error(
+            label,
+            format!(
+                "matrix_bank dtype must be F32 or BF16 weights, actual {:?}",
+                matrix_bank.dtype()
+            ),
+        ));
+    }
+    if input.device() != matrix_bank.device() {
+        return Err(extension_error(
+            label,
+            format!(
+                "input device {} must match matrix_bank device {}",
+                input.device(),
+                matrix_bank.device()
+            ),
+        ));
+    }
+    if input.shape().dims().len() != 3 {
+        return Err(extension_error(
+            label,
+            format!(
+                "input shape {} must be rank-3 [batch, seq, in_features]",
+                input.shape()
+            ),
+        ));
+    }
+    if matrix_bank.shape().dims().len() != 3 {
+        return Err(extension_error(
+            label,
+            format!(
+                "matrix_bank shape {} must be rank-3 [bank_len, out_features, in_features]",
+                matrix_bank.shape()
+            ),
+        ));
+    }
+    if input.shape().dims()[2] != matrix_bank.shape().dims()[2] {
+        return Err(extension_error(
+            label,
+            format!(
+                "input in_features {} must match matrix_bank in_features {}",
+                input.shape().dims()[2],
+                matrix_bank.shape().dims()[2],
+            ),
+        ));
+    }
+    if bank_index >= matrix_bank.shape().dims()[0] {
+        return Err(extension_error(
+            label,
+            format!(
+                "bank_index {bank_index} exceeds matrix_bank length {}",
+                matrix_bank.shape().dims()[0]
+            ),
+        ));
+    }
+    Ok(TensorSpec::new(
+        Shape::new(vec![
+            input.shape().dims()[0],
+            input.shape().dims()[1],
+            matrix_bank.shape().dims()[1],
+        ]),
+        DType::F32,
+        input.device().clone(),
     ))
 }
 
