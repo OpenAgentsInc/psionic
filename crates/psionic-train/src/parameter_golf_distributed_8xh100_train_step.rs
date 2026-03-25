@@ -74,8 +74,11 @@ const VALIDATION_CHILD_GRADIENT_ARTIFACT_PATH_ENV_VAR: &str =
     "PSIONIC_PARAMETER_GOLF_DISTRIBUTED_8XH100_VALIDATION_GRADIENT_ARTIFACT_PATH";
 const VALIDATION_CHILD_MODEL_ARTIFACT_PATH_ENV_VAR: &str =
     "PSIONIC_PARAMETER_GOLF_DISTRIBUTED_8XH100_VALIDATION_MODEL_ARTIFACT_PATH";
+const VALIDATION_BATCH_SEQUENCES_ENV_VAR: &str =
+    "PSIONIC_PARAMETER_GOLF_VALIDATION_BATCH_SEQUENCES";
 
 const CHALLENGE_WORLD_SIZE: usize = 8;
+const SCOREBOARD_SLIDING_WINDOW_BATCH_SEQUENCES: usize = 1024;
 
 /// Aggregate runtime train-step receipt emitted by the shipped runtime payload.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -596,9 +599,25 @@ pub fn parameter_golf_distributed_8xh100_validation_rank_shards_dir(
 
 fn distributed_validation_batch_sequences(
     geometry: &ParameterGolfBatchGeometry,
-    _eval_mode: &ParameterGolfValidationEvalMode,
+    eval_mode: &ParameterGolfValidationEvalMode,
 ) -> usize {
-    geometry.local_validation_batch_sequences()
+    match eval_mode {
+        ParameterGolfValidationEvalMode::NonOverlapping => {
+            parse_validation_batch_sequences_override()
+                .unwrap_or_else(|| geometry.local_validation_batch_sequences())
+        }
+        ParameterGolfValidationEvalMode::SlidingWindow { .. } => {
+            parse_validation_batch_sequences_override()
+                .unwrap_or(SCOREBOARD_SLIDING_WINDOW_BATCH_SEQUENCES)
+        }
+    }
+}
+
+fn parse_validation_batch_sequences_override() -> Option<usize> {
+    env::var(VALIDATION_BATCH_SEQUENCES_ENV_VAR)
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
 }
 
 /// Executes one real multi-rank train step from the shipped runtime payload.
@@ -1826,10 +1845,11 @@ fn duration_ms(started: Instant) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, env};
 
     use super::{
         distributed_validation_batch_sequences, load_gradient_artifact, write_gradient_artifact,
+        SCOREBOARD_SLIDING_WINDOW_BATCH_SEQUENCES, VALIDATION_BATCH_SEQUENCES_ENV_VAR,
     };
     use crate::{ParameterGolfBatchGeometry, ParameterGolfValidationEvalMode};
 
@@ -1849,7 +1869,7 @@ mod tests {
     }
 
     #[test]
-    fn distributed_sliding_window_validation_uses_public_token_cap_geometry() {
+    fn distributed_non_overlapping_validation_uses_training_geometry_by_default() {
         let geometry = ParameterGolfBatchGeometry::challenge_distributed_8xh100_defaults();
         assert_eq!(geometry.local_validation_batch_sequences(), 64);
         assert_eq!(
@@ -1859,12 +1879,42 @@ mod tests {
             ),
             64
         );
+    }
+
+    #[test]
+    fn distributed_sliding_window_validation_uses_scoreboard_eval_geometry_by_default() {
+        let geometry = ParameterGolfBatchGeometry::challenge_distributed_8xh100_defaults();
         assert_eq!(
             distributed_validation_batch_sequences(
                 &geometry,
                 &ParameterGolfValidationEvalMode::SlidingWindow { stride: 64 }
             ),
-            64
+            SCOREBOARD_SLIDING_WINDOW_BATCH_SEQUENCES
         );
+    }
+
+    #[test]
+    fn distributed_validation_batch_sequences_honors_explicit_override() {
+        let geometry = ParameterGolfBatchGeometry::challenge_distributed_8xh100_defaults();
+        unsafe {
+            env::set_var(VALIDATION_BATCH_SEQUENCES_ENV_VAR, "256");
+        }
+        assert_eq!(
+            distributed_validation_batch_sequences(
+                &geometry,
+                &ParameterGolfValidationEvalMode::NonOverlapping
+            ),
+            256
+        );
+        assert_eq!(
+            distributed_validation_batch_sequences(
+                &geometry,
+                &ParameterGolfValidationEvalMode::SlidingWindow { stride: 64 }
+            ),
+            256
+        );
+        unsafe {
+            env::remove_var(VALIDATION_BATCH_SEQUENCES_ENV_VAR);
+        }
     }
 }
