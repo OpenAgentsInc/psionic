@@ -105,6 +105,30 @@ impl ParameterGolfSubmissionRuntimeManifest {
             &digestible,
         )
     }
+
+    fn execution_contract(
+        &self,
+        execution_mode: &str,
+    ) -> Option<&ParameterGolfSubmissionRealExecutionContract> {
+        self.real_execution_contracts
+            .iter()
+            .find(|contract| contract.execution_mode == execution_mode)
+    }
+
+    fn validation_eval_mode_for_execution_mode(
+        &self,
+        execution_mode: &str,
+    ) -> &ParameterGolfValidationEvalMode {
+        self.execution_contract(execution_mode)
+            .and_then(|contract| contract.validation_eval_mode.as_ref())
+            .unwrap_or(&self.validation_eval_mode)
+    }
+
+    fn validation_batch_sequences_for_execution_mode(&self, execution_mode: &str) -> u64 {
+        self.execution_contract(execution_mode)
+            .and_then(|contract| contract.validation_batch_sequences)
+            .unwrap_or(self.validation_batch_sequences)
+    }
 }
 
 /// Runtime result emitted by the shipped submission payload.
@@ -393,6 +417,11 @@ pub fn execute_parameter_golf_submission_runtime_entrypoint(
     )?;
     let execution_mode = env::var(PARAMETER_GOLF_EXECUTION_MODE_ENV_VAR)
         .unwrap_or(manifest.default_execution_mode.clone());
+    let resolved_validation_eval_mode = manifest
+        .validation_eval_mode_for_execution_mode(execution_mode.as_str())
+        .clone();
+    let resolved_validation_batch_sequences =
+        manifest.validation_batch_sequences_for_execution_mode(execution_mode.as_str());
     match execution_mode.as_str() {
         "local_reference_validation" => Ok(ParameterGolfSubmissionRuntimeOutcome::LocalReference(
             execute_parameter_golf_submission_runtime_manifest(root, manifest_path)?,
@@ -446,6 +475,8 @@ pub fn execute_parameter_golf_submission_runtime_entrypoint(
                 root,
                 manifest_path,
                 &manifest,
+                &resolved_validation_eval_mode,
+                resolved_validation_batch_sequences,
             )
         }
         other => Err(ParameterGolfSubmissionRuntimeError::ExecutionMode {
@@ -523,6 +554,8 @@ fn execute_parameter_golf_submission_distributed_8xh100_bootstrap(
     root: &Path,
     manifest_path: &Path,
     manifest: &ParameterGolfSubmissionRuntimeManifest,
+    validation_eval_mode: &ParameterGolfValidationEvalMode,
+    validation_batch_sequences: u64,
 ) -> Result<ParameterGolfSubmissionRuntimeOutcome, ParameterGolfSubmissionRuntimeError> {
     let output_path = root.join(&manifest.distributed_bringup_report_path);
     let config = ParameterGolfDistributed8xH100BringupConfig::challenge_defaults();
@@ -551,8 +584,8 @@ fn execute_parameter_golf_submission_distributed_8xh100_bootstrap(
         &manifest.run_id,
         &output_path,
         &report,
-        &manifest.validation_eval_mode,
-        manifest.validation_batch_sequences,
+        validation_eval_mode,
+        validation_batch_sequences,
         manifest.score_first_ttt.as_ref(),
         Some(&mut live_visualization_writer),
     )?;
@@ -1082,6 +1115,78 @@ mod tests {
             }
             other => panic!("unexpected error: {other}"),
         }
+    }
+
+    #[test]
+    fn execution_mode_specific_validation_contract_overrides_manifest_defaults() {
+        let manifest = ParameterGolfSubmissionRuntimeManifest {
+            schema_version: 1,
+            package_version: String::from("test"),
+            run_id: String::from("test-run"),
+            benchmark_ref: String::from("pgolf:test"),
+            entrypoint_path: String::from("train_gpt.py"),
+            runtime_payload_path: String::from("runtime/parameter_golf_submission_runtime"),
+            submission_manifest_path: String::from("submission.json"),
+            accounting_receipt_path: String::from("parameter_golf_submission_accounting.json"),
+            fixture_path: String::from("runtime/parameter_golf_local_reference_fixture.json"),
+            model_artifact_path: String::from("submission_model.bin.zlib"),
+            runtime_receipt_path: String::from("parameter_golf_submission_runtime_receipt.json"),
+            distributed_bringup_report_path: String::from(
+                "parameter-golf-distributed-8xh100-run/benchmark/parameter_golf_distributed_8xh100_bringup.json",
+            ),
+            sequence_length: 1024,
+            validation_batch_tokens: 16_384,
+            validation_eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
+            validation_batch_sequences: 256,
+            score_first_ttt: None,
+            expected_val_loss: 1.0,
+            expected_val_bpb: 1.0,
+            default_execution_mode: default_local_reference_execution_mode(),
+            real_execution_contracts: vec![ParameterGolfSubmissionRealExecutionContract {
+                schema_version: 1,
+                execution_mode: String::from(PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE),
+                trainer_payload_path: String::from("runtime/parameter_golf_submission_runtime"),
+                input_package_descriptor_path: String::from(
+                    "runtime/parameter_golf_input_package_descriptor.json",
+                ),
+                dataset_root_env_var: String::from("PGOLF_DATASET_ROOT"),
+                tokenizer_path_env_var: String::from("PGOLF_TOKENIZER_PATH"),
+                output_report_env_var: String::from("PGOLF_OUTPUT_REPORT"),
+                default_output_report_path: String::from(
+                    "parameter_golf_distributed_8xh100_train_step.json",
+                ),
+                max_steps_env_var: String::from("PGOLF_MAX_STEPS"),
+                default_max_steps: 0,
+                validation_eval_mode: Some(ParameterGolfValidationEvalMode::SlidingWindow {
+                    stride: 64,
+                }),
+                validation_batch_sequences: Some(1024),
+                claim_boundary: String::from("distributed contract"),
+            }],
+            runtime_posture: String::from("test"),
+            claim_boundary: String::from("test"),
+            manifest_digest: String::new(),
+        };
+        assert_eq!(
+            manifest.validation_eval_mode_for_execution_mode("local_reference_validation"),
+            &ParameterGolfValidationEvalMode::NonOverlapping
+        );
+        assert_eq!(
+            manifest.validation_batch_sequences_for_execution_mode("local_reference_validation"),
+            256
+        );
+        assert_eq!(
+            manifest.validation_eval_mode_for_execution_mode(
+                PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE
+            ),
+            &ParameterGolfValidationEvalMode::SlidingWindow { stride: 64 }
+        );
+        assert_eq!(
+            manifest.validation_batch_sequences_for_execution_mode(
+                PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE
+            ),
+            1024
+        );
     }
 
     #[test]

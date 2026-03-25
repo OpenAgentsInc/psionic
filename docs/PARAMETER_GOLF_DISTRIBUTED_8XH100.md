@@ -216,6 +216,11 @@ For the scoreboard-grade lane, Psionic now uses sliding-window validation with:
   batch geometry
 - one manifest-backed `validation_batch_sequences` value that the runtime now
   preserves into shard plans and receipts instead of silently re-deriving later
+- one exported-folder `real_execution_contract` entry for
+  `distributed_8xh100_train` that now carries
+  `validation_eval_mode=sliding_window:64` and
+  `validation_batch_sequences=1024` explicitly instead of inheriting the
+  bounded local-reference replay defaults
 - default `batch_sequences=1024` windows per rank-local forward batch only for
   the sliding-window score path, matching accepted public sliding-window record
   posture instead of the baseline non-overlapping token cap

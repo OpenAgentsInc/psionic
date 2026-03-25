@@ -118,16 +118,28 @@ The default shipped runtime payload then:
   receipt
 - writes `parameter_golf_submission_runtime_receipt.json` inside the folder
 
-The shipped runtime manifest now also records the requested
-`validation_eval_mode`, the explicit `validation_batch_sequences`, and any
-optional `score_first_ttt` overlay. That keeps the folder-level validation
-contract explicit when later operator lanes ask for scoreboard-grade evaluation
-semantics.
+The shipped runtime manifest now also records the bounded local-reference
+`validation_eval_mode`, the bounded `validation_batch_sequences`, and any
+optional `score_first_ttt` overlay. Each machine-readable
+`real_execution_contract` can also carry its own explicit validation contract.
+That keeps the folder-level validation posture explicit when later operator
+lanes ask for scoreboard-grade evaluation semantics instead of forcing the
+distributed lane to inherit the bounded local replay defaults.
 
 The current non-record exported runtime pins
 `validation_eval_mode=non_overlapping` and `validation_batch_sequences=256` so
 the RunPod proof lane no longer has to infer its eval batching from the train
 geometry alone.
+
+The shipped `distributed_8xh100_train` execution contract now carries its own
+score-lane validation contract explicitly:
+
+- `validation_eval_mode=sliding_window:64`
+- `validation_batch_sequences=1024`
+
+The runtime resolves those contract-scoped values when
+`PSIONIC_PARAMETER_GOLF_EXECUTION_MODE=distributed_8xh100_train` is supplied,
+while still keeping the top-level bounded local-reference defaults unchanged.
 
 Today the default bounded local-reference runtime still only supports the
 bounded replay posture. If the shipped manifest requests legal score-first TTT,

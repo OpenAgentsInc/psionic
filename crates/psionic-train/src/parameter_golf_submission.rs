@@ -104,6 +104,12 @@ pub struct ParameterGolfSubmissionRealExecutionContract {
     pub max_steps_env_var: String,
     /// Default bounded trainer step cap.
     pub default_max_steps: u64,
+    /// Optional validation mode requested by this exact real execution lane.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation_eval_mode: Option<crate::ParameterGolfValidationEvalMode>,
+    /// Optional explicit validation batch geometry requested by this exact real execution lane.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation_batch_sequences: Option<u64>,
     /// Honest claim boundary for this mode.
     pub claim_boundary: String,
 }
@@ -610,6 +616,8 @@ pub fn build_parameter_golf_non_record_submission_bundle(
         default_output_report_path: String::from(PARAMETER_GOLF_REAL_RUNTIME_REPORT_ARTIFACT_REF),
         max_steps_env_var: String::from(PARAMETER_GOLF_SINGLE_H100_MAX_STEPS_ENV_VAR),
         default_max_steps: 1,
+        validation_eval_mode: None,
+        validation_batch_sequences: None,
         claim_boundary: String::from(
             "This exported folder now ships the real single-H100 trainer payload and the immutable PGOLF input-package descriptor. When the explicit environment contract is supplied, train_gpt.py can invoke the actual bounded Rust-owned single-H100 trainer path and preserve its machine-readable report inside the folder.",
         ),
@@ -629,6 +637,10 @@ pub fn build_parameter_golf_non_record_submission_bundle(
         ),
         max_steps_env_var: String::from(PARAMETER_GOLF_SINGLE_H100_MAX_STEPS_ENV_VAR),
         default_max_steps: 0,
+        validation_eval_mode: Some(crate::ParameterGolfValidationEvalMode::SlidingWindow {
+            stride: 64,
+        }),
+        validation_batch_sequences: Some(1024),
         claim_boundary: String::from(
             "This exported folder now ships the Rust-owned distributed 8xH100 runtime lane through the same runtime payload. When the explicit environment contract is supplied and train_gpt.py is invoked in distributed_8xh100_train mode, the shipped runtime can admit the real 8xH100 machine contract, execute the retained bootstrap and train-step path, and preserve its machine-readable receipts inside the folder.",
         ),
@@ -1651,6 +1663,18 @@ mod tests {
             runtime_manifest.validation_batch_sequences,
             PARAMETER_GOLF_NON_RECORD_RUNTIME_VALIDATION_BATCH_SEQUENCES
         );
+        let distributed_contract = runtime_manifest
+            .real_execution_contracts
+            .iter()
+            .find(|contract| {
+                contract.execution_mode == PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE
+            })
+            .expect("distributed execution contract should exist");
+        assert_eq!(
+            distributed_contract.validation_eval_mode,
+            Some(crate::ParameterGolfValidationEvalMode::SlidingWindow { stride: 64 })
+        );
+        assert_eq!(distributed_contract.validation_batch_sequences, Some(1024));
         assert!(runtime_manifest
             .runtime_posture
             .contains("distributed 8xH100 runtime lane"));

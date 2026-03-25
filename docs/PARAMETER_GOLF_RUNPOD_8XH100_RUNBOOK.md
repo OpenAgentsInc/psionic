@@ -87,6 +87,11 @@ The committed launcher is explicit about four separate operator phases:
   dataset-root and tokenizer-path env vars required by the shipped runtime,
   while also forcing the explicit exported-folder execution mode
   `PSIONIC_PARAMETER_GOLF_EXECUTION_MODE=distributed_8xh100_train`, and while
+  resolving the distributed execution contract's explicit sliding-window
+  validation settings (`validation_eval_mode=sliding_window:64`,
+  `validation_batch_sequences=1024`) instead of inheriting the bounded
+  local-reference replay defaults,
+  and while
   emitting the provider-neutral remote-training bundle, run index, and
   append-only snapshots under `training_visualization/`
 - finalization:
