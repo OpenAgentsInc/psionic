@@ -102,20 +102,24 @@ folder ships:
 
 - the default bounded local-reference replay payload
 - the real single-H100 trainer payload
-- a Rust-owned distributed `8xH100` admission-plus-bootstrap path inside the
-  shipped runtime payload
+- a Rust-owned distributed `8xH100` admission, bootstrap, and one-step
+  train path inside the shipped runtime payload
 
 The committed Linux replay payload is now the stripped portable binary that was
 validated on the real RunPod `8xH100` Ubuntu image. The expected execution
-boundary on that pod is therefore the explicit distributed-trainer refusal from
+boundary on that pod is therefore the explicit post-train-step refusal from
 the shipped runtime, not an earlier libc or entrypoint mismatch.
 
-It still does not ship the real distributed `8xH100` trainer payload. The
-RunPod launcher therefore requests the reserved distributed mode explicitly so
-the execution phase writes the machine-readable bring-up report, one aggregate
-runtime-bootstrap receipt, retained per-rank bootstrap receipts, retained
-per-rank bootstrap logs, and then fails closed before train-step execution
-instead of silently taking the local-reference replay path under `WORLD_SIZE=8`.
+It still does not ship the later distributed validation and final execution
+closure path. The RunPod launcher therefore requests the reserved distributed
+mode explicitly so the execution phase writes the machine-readable bring-up
+report, one aggregate runtime-bootstrap receipt, retained per-rank bootstrap
+receipts, retained per-rank bootstrap logs, one aggregate train-step receipt,
+retained per-rank train-step receipts, retained per-rank train-step logs,
+retained train-step windows, retained per-rank gradient artifacts, one
+measured distributed receipt, and then fails closed before distributed
+validation or final challenge closure instead of silently taking the
+local-reference replay path under `WORLD_SIZE=8`.
 
 The finalizer now also resolves the exported submission root explicitly. The
 canonical path is still the retained `records/track_non_record_16mb/<submission_id>`
@@ -185,8 +189,8 @@ This runbook does not claim:
 - final challenge metrics from exported-folder `8xH100` hardware
 - challenge-speed closure
 - record-track readiness
-- that the current exported folder already contains a real distributed `8xH100`
-  trainer payload
+- that the current exported folder already contains the later distributed
+  validation and final execution-closure payload
 
 It closes one narrower but important thing:
 

@@ -12,8 +12,12 @@ use thiserror::Error;
 use crate::{
     execute_parameter_golf_distributed_8xh100_runtime_bootstrap,
     execute_parameter_golf_distributed_8xh100_runtime_bootstrap_child,
+    execute_parameter_golf_distributed_8xh100_train_step,
+    execute_parameter_golf_distributed_8xh100_train_step_child,
     parameter_golf_distributed_8xh100_runtime_bootstrap_child_enabled,
     parameter_golf_distributed_8xh100_runtime_bootstrap_receipt_path,
+    parameter_golf_distributed_8xh100_train_step_child_enabled,
+    parameter_golf_distributed_8xh100_train_step_receipt_path,
     restore_parameter_golf_model_from_int8_zlib,
     write_parameter_golf_distributed_8xh100_bringup_report,
     ParameterGolfDistributed8xH100BringupConfig, ParameterGolfDistributed8xH100BringupError,
@@ -23,7 +27,9 @@ use crate::{
     ParameterGolfDistributed8xH100RuntimeBootstrapReceipt, ParameterGolfLocalReferenceFixture,
     ParameterGolfNonRecordSubmissionManifest, ParameterGolfSubmissionAccountingReceipt,
     ParameterGolfSubmissionRealExecutionContract, PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE,
-    PARAMETER_GOLF_EXECUTION_MODE_ENV_VAR,
+    PARAMETER_GOLF_EXECUTION_MODE_ENV_VAR, ParameterGolfDistributed8xH100TrainStepError,
+    ParameterGolfDistributed8xH100TrainStepRankReceipt,
+    ParameterGolfDistributed8xH100TrainStepReceipt,
 };
 
 /// Machine-readable runtime manifest shipped with the submission folder.
@@ -105,10 +111,24 @@ pub enum ParameterGolfSubmissionRuntimeOutcome {
         receipt_path: String,
         receipt: ParameterGolfDistributed8xH100RuntimeBootstrapReceipt,
     },
+    /// Rust-owned distributed `8xH100` train-step receipt above the bootstrap gate.
+    Distributed8xH100TrainStep {
+        report_path: String,
+        report: ParameterGolfDistributed8xH100BringupReport,
+        bootstrap_receipt_path: String,
+        bootstrap_receipt: ParameterGolfDistributed8xH100RuntimeBootstrapReceipt,
+        train_step_receipt_path: String,
+        train_step_receipt: ParameterGolfDistributed8xH100TrainStepReceipt,
+    },
     /// Internal child-rank bootstrap receipt used by the shipped runtime fanout.
     Distributed8xH100BootstrapChild {
         receipt_path: String,
         receipt: ParameterGolfDistributed8xH100RuntimeBootstrapRankReceipt,
+    },
+    /// Internal child-rank train-step receipt used by the shipped runtime fanout.
+    Distributed8xH100TrainStepChild {
+        receipt_path: String,
+        receipt: ParameterGolfDistributed8xH100TrainStepRankReceipt,
     },
 }
 
@@ -254,6 +274,8 @@ pub enum ParameterGolfSubmissionRuntimeError {
     DistributedBringup(#[from] ParameterGolfDistributed8xH100BringupError),
     #[error(transparent)]
     DistributedRuntimeBootstrap(#[from] ParameterGolfDistributed8xH100RuntimeBootstrapError),
+    #[error(transparent)]
+    DistributedTrainStep(#[from] ParameterGolfDistributed8xH100TrainStepError),
 }
 
 /// Executes the shipped submission runtime manifest, writes the runtime receipt, and returns it.
@@ -301,6 +323,21 @@ pub fn execute_parameter_golf_submission_runtime_entrypoint(
             execute_parameter_golf_submission_runtime_manifest(root, manifest_path)?,
         )),
         PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE => {
+            if parameter_golf_distributed_8xh100_train_step_child_enabled() {
+                let receipt =
+                    execute_parameter_golf_submission_distributed_8xh100_train_step_child(
+                        &manifest,
+                    )?;
+                return Ok(
+                    ParameterGolfSubmissionRuntimeOutcome::Distributed8xH100TrainStepChild {
+                        receipt_path: env::var(
+                            "PSIONIC_PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_RECEIPT_PATH",
+                        )
+                        .unwrap_or_default(),
+                        receipt,
+                    },
+                );
+            }
             if parameter_golf_distributed_8xh100_runtime_bootstrap_child_enabled() {
                 let receipt = execute_parameter_golf_submission_distributed_8xh100_bootstrap_child(
                     &manifest,
@@ -404,16 +441,32 @@ fn execute_parameter_golf_submission_distributed_8xh100_bootstrap(
         &output_path,
         &report,
     )?;
-    let receipt_path = parameter_golf_distributed_8xh100_runtime_bootstrap_receipt_path(
+    let bootstrap_receipt_path = parameter_golf_distributed_8xh100_runtime_bootstrap_receipt_path(
         root,
         &manifest.distributed_bringup_report_path,
     );
+    let train_step_receipt = execute_parameter_golf_distributed_8xh100_train_step(
+        root,
+        manifest_path,
+        &manifest.run_id,
+        &output_path,
+        &report,
+        &bootstrap_receipt_path,
+        &receipt,
+    )?;
+    let train_step_receipt_path =
+        parameter_golf_distributed_8xh100_train_step_receipt_path(
+            root,
+            &manifest.distributed_bringup_report_path,
+        );
     Ok(
-        ParameterGolfSubmissionRuntimeOutcome::Distributed8xH100Bootstrap {
+        ParameterGolfSubmissionRuntimeOutcome::Distributed8xH100TrainStep {
             report_path: output_path.display().to_string(),
             report,
-            receipt_path: receipt_path.display().to_string(),
-            receipt,
+            bootstrap_receipt_path: bootstrap_receipt_path.display().to_string(),
+            bootstrap_receipt: receipt,
+            train_step_receipt_path: train_step_receipt_path.display().to_string(),
+            train_step_receipt,
         },
     )
 }
@@ -425,6 +478,17 @@ fn execute_parameter_golf_submission_distributed_8xh100_bootstrap_child(
     ParameterGolfSubmissionRuntimeError,
 > {
     Ok(execute_parameter_golf_distributed_8xh100_runtime_bootstrap_child(&manifest.run_id)?)
+}
+
+fn execute_parameter_golf_submission_distributed_8xh100_train_step_child(
+    manifest: &ParameterGolfSubmissionRuntimeManifest,
+) -> Result<
+    ParameterGolfDistributed8xH100TrainStepRankReceipt,
+    ParameterGolfSubmissionRuntimeError,
+> {
+    Ok(execute_parameter_golf_distributed_8xh100_train_step_child(
+        &manifest.run_id,
+    )?)
 }
 
 fn metric_matches(actual: f64, expected: f64) -> bool {

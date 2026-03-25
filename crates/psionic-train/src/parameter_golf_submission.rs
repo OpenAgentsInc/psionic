@@ -55,14 +55,25 @@ pub const PARAMETER_GOLF_DISTRIBUTED_8XH100_RUNTIME_BOOTSTRAP_RANK_RECEIPTS_DIR_
     "parameter-golf-distributed-8xh100-run/benchmark/runtime_bootstrap_receipts";
 pub const PARAMETER_GOLF_DISTRIBUTED_8XH100_RUNTIME_BOOTSTRAP_RANK_LOGS_DIR_ARTIFACT_REF: &str =
     "parameter-golf-distributed-8xh100-run/benchmark/runtime_bootstrap_logs";
+pub const PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_RECEIPT_ARTIFACT_REF: &str =
+    "parameter-golf-distributed-8xh100-run/benchmark/parameter_golf_distributed_8xh100_train_step.json";
+pub const PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_RANK_RECEIPTS_DIR_ARTIFACT_REF: &str =
+    "parameter-golf-distributed-8xh100-run/benchmark/runtime_train_step_receipts";
+pub const PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_RANK_LOGS_DIR_ARTIFACT_REF: &str =
+    "parameter-golf-distributed-8xh100-run/benchmark/runtime_train_step_logs";
+pub const PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_WINDOWS_DIR_ARTIFACT_REF: &str =
+    "parameter-golf-distributed-8xh100-run/benchmark/runtime_train_step_windows";
+pub const PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_GRADIENTS_DIR_ARTIFACT_REF: &str =
+    "parameter-golf-distributed-8xh100-run/benchmark/runtime_train_step_gradients";
 pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_ENTRYPOINT: &str = "entrypoint_code_bytes";
 pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_MODEL: &str = "compressed_model_bytes";
 pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_RUNTIME: &str = "shipped_runtime_code_bytes";
 pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_WRAPPER: &str = "shipped_wrapper_code_bytes";
 pub const PARAMETER_GOLF_ACCOUNTING_COMPONENT_BUILD_DEPS: &str = "required_build_dependency_bytes";
 pub const PARAMETER_GOLF_EXECUTION_MODE_ENV_VAR: &str = "PSIONIC_PARAMETER_GOLF_EXECUTION_MODE";
-const PARAMETER_GOLF_SINGLE_H100_DATASET_ROOT_ENV_VAR: &str = "PSIONIC_PARAMETER_GOLF_DATASET_ROOT";
-const PARAMETER_GOLF_SINGLE_H100_TOKENIZER_PATH_ENV_VAR: &str =
+pub const PARAMETER_GOLF_SINGLE_H100_DATASET_ROOT_ENV_VAR: &str =
+    "PSIONIC_PARAMETER_GOLF_DATASET_ROOT";
+pub const PARAMETER_GOLF_SINGLE_H100_TOKENIZER_PATH_ENV_VAR: &str =
     "PSIONIC_PARAMETER_GOLF_TOKENIZER_PATH";
 const PARAMETER_GOLF_SINGLE_H100_OUTPUT_REPORT_ENV_VAR: &str =
     "PSIONIC_PARAMETER_GOLF_OUTPUT_REPORT";
@@ -1338,12 +1349,17 @@ fn render_readme(
     );
     let _ = writeln!(
         readme,
-        "- Set `{}` to `{}` on the exported-folder `8xH100` lane to dispatch into the shipped Rust-owned distributed bootstrap path. That mode now writes the machine-readable bring-up report, one aggregate runtime-bootstrap receipt at `{}`, retained per-rank bootstrap receipts under `{}`, and retained per-rank bootstrap logs under `{}` before still refusing explicitly until the real distributed train step lands.\n",
+        "- Set `{}` to `{}` on the exported-folder `8xH100` lane to dispatch into the shipped Rust-owned distributed runtime path. That mode now writes the machine-readable bring-up report, one aggregate runtime-bootstrap receipt at `{}`, retained per-rank bootstrap receipts under `{}`, retained per-rank bootstrap logs under `{}`, one aggregate train-step receipt at `{}`, retained per-rank train-step receipts under `{}`, retained per-rank train-step logs under `{}`, retained train-step window plans under `{}`, retained per-rank gradient artifacts under `{}`, and one measured distributed receipt at `parameter-golf-distributed-8xh100-run/benchmark/parameter_golf_distributed_8xh100_receipt.json` before still refusing explicitly until distributed validation and final execution closure land.\n",
         PARAMETER_GOLF_EXECUTION_MODE_ENV_VAR,
         PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE,
         PARAMETER_GOLF_DISTRIBUTED_8XH100_RUNTIME_BOOTSTRAP_RECEIPT_ARTIFACT_REF,
         PARAMETER_GOLF_DISTRIBUTED_8XH100_RUNTIME_BOOTSTRAP_RANK_RECEIPTS_DIR_ARTIFACT_REF,
-        PARAMETER_GOLF_DISTRIBUTED_8XH100_RUNTIME_BOOTSTRAP_RANK_LOGS_DIR_ARTIFACT_REF
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_RUNTIME_BOOTSTRAP_RANK_LOGS_DIR_ARTIFACT_REF,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_RECEIPT_ARTIFACT_REF,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_RANK_RECEIPTS_DIR_ARTIFACT_REF,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_RANK_LOGS_DIR_ARTIFACT_REF,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_WINDOWS_DIR_ARTIFACT_REF,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_GRADIENTS_DIR_ARTIFACT_REF
     );
     let _ = writeln!(
         readme,

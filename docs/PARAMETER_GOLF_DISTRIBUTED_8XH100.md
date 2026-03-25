@@ -70,6 +70,12 @@ Psionic now encodes that exact posture explicitly instead of treating
   mode, so a real `8xH100` execution log can now cross from machine admission
   into explicit rank fanout and one runtime-owned mesh/bootstrap contract
   before the later train-step work begins
+- `psionic-train` now also ships the runtime-owned one-step execution seam
+  `ParameterGolfDistributed8xH100TrainStepReceipt`,
+  `ParameterGolfDistributed8xH100TrainStepRankReceipt`, retained per-rank
+  train-step windows, retained per-rank train-step gradient artifacts, and one
+  measured distributed receipt lift from that step, so the exported-folder
+  `distributed_8xh100_train` mode no longer stops at bring-up only
 - `psionic-eval` now exposes
   `ParameterGolfDistributedThroughputReceipt` plus the supporting topology,
   communication, timing, memory, threshold, and refusal types
@@ -117,6 +123,8 @@ different sharding story.
 The lane now preserves:
 
 - observed per-step timings
+- one real measured train-step receipt from the exported-folder runtime when
+  the machine contract is satisfied
 - observed validation duration
 - optional typed rank-local validation shard receipts plus aggregated
   `loss_sum`, `token_count`, and `byte_count`
@@ -227,6 +235,10 @@ What is now explicit:
 
 - the exact public `8xH100` topology
 - the DDP or Muon communication posture
+- the exported-folder runtime can now cross from machine admission into one
+  real `WORLD_SIZE=8` train step with retained per-rank receipts, logs,
+  windows, gradient artifacts, one aggregate train-step receipt, and one typed
+  measured distributed receipt
 - measured-or-refused timing receipts
 - measured-or-refused memory receipts
 - the Rust-owned local bring-up seam for exact `8xH100` admission and
@@ -235,6 +247,7 @@ What is now explicit:
 
 What is still separate work:
 
+- the later distributed validation path and final challenge-metric aggregation
 - retiring the explicit blocker list carried by the CUDA training coverage
   report
 - widening the public CUDA train path until the decoder-block, precision, and

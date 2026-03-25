@@ -15,7 +15,7 @@ use psionic_data::{
     parameter_golf_sentencepiece_byte_luts_from_tokenizer_path, DatasetIterationMode, DatasetKey,
     ParameterGolfDataError, ParameterGolfDatasetBundle, ParameterGolfSentencePieceByteLuts,
     ParameterGolfTokenStreamContract, ParameterGolfTokenStreamCursor,
-    PARAMETER_GOLF_TRAIN_SPLIT_NAME,
+    ParameterGolfTokenStreamWindow, PARAMETER_GOLF_TRAIN_SPLIT_NAME,
 };
 use psionic_ir::AutodiffBackwardResult;
 use psionic_ir::{AutodiffError, GraphError};
@@ -295,6 +295,15 @@ impl ParameterGolfSingleH100PhaseTimings {
             .saturating_add(self.gradient_readback_ms)
             .saturating_add(self.host_gradient_materialization_ms)
     }
+}
+
+/// Reusable one-window gradient result for Parameter Golf training.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub(crate) struct ParameterGolfTrainingGradientBatchResult {
+    pub window_id: String,
+    pub loss: f32,
+    pub phase_timings: ParameterGolfSingleH100PhaseTimings,
+    pub parameter_gradients: BTreeMap<String, Vec<f32>>,
 }
 
 /// Per-step machine-readable training metrics.
@@ -1703,7 +1712,7 @@ fn refusal_report(
     report
 }
 
-fn seed_parameter_states(
+pub(crate) fn seed_parameter_states(
     model: &ParameterGolfReferenceModel,
     optimizer_plan: &crate::ParameterGolfOptimizerPlan,
 ) -> Result<ParameterGolfSingleH100TrainerState, ParameterGolfSingleH100TrainingError> {
@@ -1843,7 +1852,9 @@ fn round_values_to_bf16(values: &mut [f32]) {
     }
 }
 
-fn zero_gradients(state: &ParameterGolfSingleH100TrainerState) -> Vec<(String, Vec<f32>)> {
+pub(crate) fn zero_gradients(
+    state: &ParameterGolfSingleH100TrainerState,
+) -> Vec<(String, Vec<f32>)> {
     state
         .parameter_states
         .iter()
@@ -1851,7 +1862,68 @@ fn zero_gradients(state: &ParameterGolfSingleH100TrainerState) -> Vec<(String, V
         .collect()
 }
 
-fn accumulate_gradients(
+pub(crate) fn flatten_parameter_golf_optimizer_group_values(
+    optimizer_plan: &ParameterGolfOptimizerPlan,
+    values_by_parameter: &BTreeMap<String, Vec<f32>>,
+) -> Result<BTreeMap<String, Vec<f32>>, ParameterGolfSingleH100TrainingError> {
+    optimizer_plan
+        .groups
+        .iter()
+        .map(|group| {
+            let mut values = Vec::with_capacity(group.parameter_count);
+            for parameter_id in &group.tensor_names {
+                let parameter_values = values_by_parameter.get(parameter_id).ok_or_else(|| {
+                    ParameterGolfSingleH100TrainingError::MissingParameterState {
+                        parameter_id: parameter_id.clone(),
+                    }
+                })?;
+                values.extend_from_slice(parameter_values);
+            }
+            if values.len() != group.parameter_count {
+                return Err(ParameterGolfSingleH100TrainingError::Serialization {
+                    message: format!(
+                        "optimizer group `{}` expected {} flattened values but produced {}",
+                        group.group_id,
+                        group.parameter_count,
+                        values.len()
+                    ),
+                });
+            }
+            Ok((group.group_id.clone(), values))
+        })
+        .collect()
+}
+
+pub(crate) fn flatten_parameter_golf_optimizer_group_buffers(
+    optimizer_plan: &ParameterGolfOptimizerPlan,
+    values_by_parameter: &BTreeMap<String, Vec<f32>>,
+) -> Result<BTreeMap<String, crate::TrainingTensorBuffer>, ParameterGolfSingleH100TrainingError> {
+    flatten_parameter_golf_optimizer_group_values(optimizer_plan, values_by_parameter)?
+        .into_iter()
+        .map(|(group_id, values)| {
+            let value_len = values.len();
+            Ok((
+                group_id.clone(),
+                crate::TrainingTensorBuffer::from_f32(
+                    group_id.clone(),
+                    psionic_core::TensorSpec::new(
+                        Shape::new(vec![value_len]),
+                        DType::F32,
+                        psionic_core::Device::cpu(),
+                    ),
+                    values,
+                )
+                .map_err(|error| ParameterGolfSingleH100TrainingError::Serialization {
+                    message: format!(
+                        "failed to build flattened optimizer group buffer `{group_id}` with {value_len} values: {error}"
+                    ),
+                })?,
+            ))
+        })
+        .collect()
+}
+
+pub(crate) fn accumulate_gradients(
     accumulated: &mut [(String, Vec<f32>)],
     trainer_state: &ParameterGolfSingleH100TrainerState,
     gradients: &BTreeMap<String, Vec<f32>>,
@@ -1888,7 +1960,7 @@ fn accumulate_gradients(
     Ok(())
 }
 
-fn apply_gradients_to_state(
+pub(crate) fn apply_gradients_to_state(
     state: &mut ParameterGolfSingleH100TrainerState,
     gradients: &[(String, Vec<f32>)],
     learning_rate_multiplier: f32,
@@ -1914,7 +1986,7 @@ fn apply_gradients_to_state(
     Ok(())
 }
 
-fn materialize_current_model(
+pub(crate) fn materialize_current_model(
     baseline: &ParameterGolfReferenceModel,
     state: &ParameterGolfSingleH100TrainerState,
 ) -> Result<ParameterGolfReferenceModel, ParameterGolfSingleH100TrainingError> {
@@ -1931,6 +2003,75 @@ fn materialize_current_model(
         baseline.descriptor().config.clone(),
         weights,
     )?)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn execute_parameter_golf_training_gradient_batch(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    bundle: &ParameterGolfDatasetBundle,
+    current_model: &ParameterGolfReferenceModel,
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineTrainingGraph>,
+    geometry: &ParameterGolfBatchGeometry,
+    window: &ParameterGolfTokenStreamWindow,
+) -> Result<ParameterGolfTrainingGradientBatchResult, ParameterGolfSingleH100TrainingError> {
+    let mut phase_timings = ParameterGolfSingleH100PhaseTimings::default();
+
+    let tokens_started = Instant::now();
+    let tokens = materialize_parameter_golf_token_window(bundle, window)?;
+    phase_timings.token_materialization_ms = duration_ms(tokens_started);
+    let (input_ids, target_ids) = training_batch_from_window_tokens(tokens.as_slice(), geometry)?;
+
+    let batch_size = input_ids.len();
+    let graph = training_graph_for_batch(
+        graph_cache,
+        device.clone(),
+        current_model.descriptor(),
+        batch_size,
+        geometry.train_sequence_length,
+    )?;
+    let inputs = bind_parameter_golf_baseline_training_graph_inputs(
+        graph,
+        current_model,
+        input_ids.as_slice(),
+        target_ids.as_slice(),
+    )?;
+    let backward_plan = graph.graph.backward_plan(graph.loss_tensor_id)?;
+    let retained_graph = retained_forward_graph(graph, &backward_plan);
+
+    let forward_started = Instant::now();
+    let forward_outputs = execute_cuda_graph_outputs(cuda_backend, &retained_graph, &inputs)?;
+    phase_timings.forward_loss_cuda_ms = duration_ms(forward_started);
+    phase_timings.retained_binding_tensor_count = backward_plan.primal_bindings.len() as u32;
+    phase_timings.retained_binding_f32_count =
+        count_output_elements(&retained_graph, &backward_plan.primal_bindings)?;
+
+    let loss = scalar_float_graph_output(&forward_outputs, graph.loss_tensor_id)?;
+
+    let backward_started = Instant::now();
+    let backward_outputs =
+        execute_backward_plan(cuda_backend, &backward_plan, forward_outputs.as_slice())?;
+    phase_timings.backward_cuda_ms = duration_ms(backward_started);
+    phase_timings.gradient_tensor_count = backward_plan.gradient_targets.len() as u32;
+    phase_timings.gradient_f32_count = count_gradient_elements(&backward_plan)?;
+
+    let materialize_started = Instant::now();
+    let backward_result =
+        backward_result_from_outputs(&backward_plan, backward_outputs.as_slice())?;
+    let gradients = materialize_parameter_golf_baseline_training_gradients(
+        graph,
+        &backward_result,
+        &current_model.descriptor().config,
+        input_ids.as_slice(),
+    )?;
+    phase_timings.host_gradient_materialization_ms = duration_ms(materialize_started);
+
+    Ok(ParameterGolfTrainingGradientBatchResult {
+        window_id: window.window_id.clone(),
+        loss,
+        phase_timings,
+        parameter_gradients: gradients.parameter_gradients,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1993,80 +2134,22 @@ fn execute_training_step(
             .window_planning_ms
             .saturating_add(duration_ms(plan_started));
         *cursor = window.end_cursor.clone();
-        window_ids.push(window.window_id.clone());
-
-        let tokens_started = Instant::now();
-        let tokens = materialize_parameter_golf_token_window(bundle, &window)?;
-        step_profile.token_materialization_ms = step_profile
-            .token_materialization_ms
-            .saturating_add(duration_ms(tokens_started));
-        let (input_ids, target_ids) =
-            training_batch_from_window_tokens(tokens.as_slice(), geometry)?;
-
-        let batch_size = input_ids.len();
-        let graph = training_graph_for_batch(
-            graph_cache,
-            device.clone(),
-            current_model.descriptor(),
-            batch_size,
-            geometry.train_sequence_length,
-        )?;
-        let inputs = bind_parameter_golf_baseline_training_graph_inputs(
-            graph,
+        let gradient_batch = execute_parameter_golf_training_gradient_batch(
+            cuda_backend,
+            device,
+            bundle,
             current_model,
-            input_ids.as_slice(),
-            target_ids.as_slice(),
+            graph_cache,
+            geometry,
+            &window,
         )?;
-        let backward_plan = graph.graph.backward_plan(graph.loss_tensor_id)?;
-        let retained_graph = retained_forward_graph(graph, &backward_plan);
-
-        let forward_started = Instant::now();
-        let forward_outputs = execute_cuda_graph_outputs(cuda_backend, &retained_graph, &inputs)?;
-        step_profile.forward_loss_cuda_ms = step_profile
-            .forward_loss_cuda_ms
-            .saturating_add(duration_ms(forward_started));
-        step_profile.retained_binding_tensor_count = step_profile
-            .retained_binding_tensor_count
-            .saturating_add(backward_plan.primal_bindings.len() as u32);
-        step_profile.retained_binding_f32_count = step_profile
-            .retained_binding_f32_count
-            .saturating_add(count_output_elements(
-                &retained_graph,
-                &backward_plan.primal_bindings,
-            )?);
-
-        let loss = scalar_float_graph_output(&forward_outputs, graph.loss_tensor_id)?;
-        microbatch_loss_sum += loss;
-
-        let backward_started = Instant::now();
-        let backward_outputs =
-            execute_backward_plan(cuda_backend, &backward_plan, forward_outputs.as_slice())?;
-        step_profile.backward_cuda_ms = step_profile
-            .backward_cuda_ms
-            .saturating_add(duration_ms(backward_started));
-        step_profile.gradient_tensor_count = step_profile
-            .gradient_tensor_count
-            .saturating_add(backward_plan.gradient_targets.len() as u32);
-        step_profile.gradient_f32_count = step_profile
-            .gradient_f32_count
-            .saturating_add(count_gradient_elements(&backward_plan)?);
-
-        let materialize_started = Instant::now();
-        let backward_result =
-            backward_result_from_outputs(&backward_plan, backward_outputs.as_slice())?;
-        let gradients = materialize_parameter_golf_baseline_training_gradients(
-            graph,
-            &backward_result,
-            &current_model.descriptor().config,
-            input_ids.as_slice(),
-        )?;
-        step_profile.host_gradient_materialization_ms = step_profile
-            .host_gradient_materialization_ms
-            .saturating_add(duration_ms(materialize_started));
+        window_ids.push(gradient_batch.window_id.clone());
+        microbatch_loss_sum += gradient_batch.loss;
+        step_profile.accumulate(&gradient_batch.phase_timings);
         accumulate_gradients(
             accumulated_gradients.as_mut_slice(),
             trainer_state,
-            &gradients.parameter_gradients,
+            &gradient_batch.parameter_gradients,
             geometry.grad_accum_steps as f32,
         )?;
         if emit_micro_step_logs {
@@ -2076,8 +2159,8 @@ fn execute_training_step(
                 max_steps,
                 micro_step + 1,
                 geometry.grad_accum_steps,
-                window.window_id,
-                loss,
+                gradient_batch.window_id,
+                gradient_batch.loss,
                 step_profile.forward_loss_cuda_ms,
                 step_profile.backward_cuda_ms,
                 step_profile.host_materialization_ms(),
@@ -3005,7 +3088,7 @@ fn count_gradient_elements(
         })
 }
 
-fn clip_gradients(
+pub(crate) fn clip_gradients(
     gradients: &mut [(String, Vec<f32>)],
     max_norm: f32,
 ) -> crate::GradientClipObservation {
@@ -3224,6 +3307,59 @@ mod tests {
             .ok_or("missing blocks.0.attn_scale source vector")?;
         assert_eq!(control.values(), control_source.values.as_slice());
 
+        Ok(())
+    }
+
+    #[test]
+    fn flatten_parameter_golf_optimizer_group_values_matches_group_parameter_counts(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+        let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
+        let optimizer_plan = parameter_golf_optimizer_plan(model.descriptor(), &hyperparameters)?;
+        let trainer_state = seed_parameter_states(&model, &optimizer_plan)?;
+        let values_by_parameter = trainer_state
+            .parameter_states
+            .iter()
+            .map(|(parameter_id, state)| (parameter_id.clone(), state.values().to_vec()))
+            .collect::<BTreeMap<_, _>>();
+
+        let flattened =
+            flatten_parameter_golf_optimizer_group_values(&optimizer_plan, &values_by_parameter)?;
+        for group in &optimizer_plan.groups {
+            let values = flattened
+                .get(group.group_id.as_str())
+                .ok_or("missing flattened optimizer group")?;
+            assert_eq!(values.len(), group.parameter_count);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn flatten_parameter_golf_optimizer_group_buffers_emits_cpu_f32_tensor_buffers(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+        let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
+        let optimizer_plan = parameter_golf_optimizer_plan(model.descriptor(), &hyperparameters)?;
+        let trainer_state = seed_parameter_states(&model, &optimizer_plan)?;
+        let values_by_parameter = trainer_state
+            .parameter_states
+            .iter()
+            .map(|(parameter_id, state)| (parameter_id.clone(), state.values().to_vec()))
+            .collect::<BTreeMap<_, _>>();
+
+        let buffers =
+            flatten_parameter_golf_optimizer_group_buffers(&optimizer_plan, &values_by_parameter)?;
+        for group in &optimizer_plan.groups {
+            let buffer = buffers
+                .get(group.group_id.as_str())
+                .ok_or("missing flattened optimizer buffer")?;
+            assert_eq!(buffer.spec.dtype(), DType::F32);
+            assert_eq!(buffer.spec.shape().element_count(), group.parameter_count);
+            assert!(matches!(
+                &buffer.data,
+                TensorData::F32(values) if values.len() == group.parameter_count
+            ));
+        }
         Ok(())
     }
 }

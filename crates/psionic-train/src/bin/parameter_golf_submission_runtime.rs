@@ -95,6 +95,43 @@ fn run() -> Result<(), ParameterGolfSubmissionRuntimeError> {
                 ),
             })
         }
+        ParameterGolfSubmissionRuntimeOutcome::Distributed8xH100TrainStep {
+            report_path,
+            report,
+            bootstrap_receipt_path,
+            bootstrap_receipt,
+            train_step_receipt_path,
+            train_step_receipt,
+        } => {
+            eprintln!(
+                "psionic_parameter_golf_distributed_8xh100_bringup matching_h100_device_count={} machine_contract_satisfied={} report_path={}",
+                report.matching_h100_device_count, report.machine_contract_satisfied, report_path
+            );
+            eprintln!(
+                "psionic_parameter_golf_distributed_8xh100_runtime_bootstrap disposition={:?} successful_rank_count={} receipt_path={}",
+                bootstrap_receipt.disposition,
+                bootstrap_receipt.successful_rank_count,
+                bootstrap_receipt_path
+            );
+            println!(
+                "step:1/1 train_loss:{:.4} train_time:{}ms step_avg:{:.2}ms",
+                train_step_receipt.mean_train_loss,
+                train_step_receipt.observed_step_ms,
+                train_step_receipt.observed_step_ms as f64,
+            );
+            eprintln!(
+                "psionic_parameter_golf_distributed_8xh100_train_step receipt_path={} distributed_receipt_path={} gradient_sync_ms={} optimizer_step_ms={}",
+                train_step_receipt_path,
+                train_step_receipt.distributed_receipt_path,
+                train_step_receipt.gradient_sync_ms,
+                train_step_receipt.optimizer_step_ms,
+            );
+            Err(ParameterGolfSubmissionRuntimeError::ExecutionMode {
+                message: String::from(
+                    "the exported folder now ships one real distributed 8xH100 train step and a measured distributed receipt, but the later distributed validation and final execution-closure path still have not landed",
+                ),
+            })
+        }
         ParameterGolfSubmissionRuntimeOutcome::Distributed8xH100BootstrapChild {
             receipt_path,
             receipt,
@@ -131,6 +168,23 @@ fn run() -> Result<(), ParameterGolfSubmissionRuntimeError> {
                     ),
                 });
             }
+            Ok(())
+        }
+        ParameterGolfSubmissionRuntimeOutcome::Distributed8xH100TrainStepChild {
+            receipt_path,
+            receipt,
+        } => {
+            println!(
+                "distributed_8xh100_train_step_rank_complete rank={} local_rank={} world_size={} window_id={} loss={:.8} train_time:{}ms receipt_path={} gradient_artifact_path={}",
+                receipt.rank,
+                receipt.local_rank,
+                receipt.world_size,
+                receipt.window_id,
+                receipt.loss,
+                receipt.observed_wallclock_ms,
+                receipt_path,
+                receipt.gradient_artifact_path,
+            );
             Ok(())
         }
     }
