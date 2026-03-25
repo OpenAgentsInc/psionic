@@ -82,7 +82,10 @@ Psionic now encodes that exact posture explicitly instead of treating
   stop reason in the aggregate train receipt instead of pretending the final
   retained step was the whole run. The live score lane now exports only the
   final runtime-owned model surfaces after the repeated loop instead of using
-  file-artifact gradient handoff in the hot path.
+  file-artifact gradient handoff in the hot path. The resident train-session
+  refresh path now also reuses prepacked host `bf16` staging for BF16-visible
+  parameter banks instead of repacking those large tensors on every optimizer
+  step.
 - `psionic-train` now also ships retained per-rank distributed validation
   receipts plus one completion receipt bound to the trained runtime-produced
   int8+zlib artifact, so the exported-folder `distributed_8xh100_train` mode

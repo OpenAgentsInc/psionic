@@ -513,6 +513,28 @@ impl CudaBuffer {
         self.write_bytes(bytes.as_slice())
     }
 
+    /// Writes contiguous prepacked `bf16` bit patterns into a `bf16` buffer.
+    pub fn write_bf16_bits(&mut self, values: &[u16]) -> Result<(), RuntimeError> {
+        if self.spec.dtype() != DType::BF16 {
+            return Err(RuntimeError::Backend(format!(
+                "write_bf16_bits requires BF16 buffer, actual {:?}",
+                self.spec.dtype()
+            )));
+        }
+        if values.len() != self.spec.storage_size() {
+            return Err(RuntimeError::Backend(format!(
+                "cuda bf16 buffer write length mismatch: expected {} values, actual {}",
+                self.spec.storage_size(),
+                values.len()
+            )));
+        }
+        let mut bytes = Vec::with_capacity(self.byte_len);
+        for value in values {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+        self.write_bytes(bytes.as_slice())
+    }
+
     /// Reads contiguous `f32` values from an `f32` buffer.
     pub fn read_f32(&self) -> Result<Vec<f32>, RuntimeError> {
         if self.spec.dtype() != DType::F32 {
@@ -15795,6 +15817,29 @@ mod tests {
         assert_close(&left_bf16.read_bf16_to_f32()?, &[1.0, 2.0], 1e-5);
         assert_close(&right.read_bf16_to_f32()?, &[1.0, 2.0, 3.0, 4.0], 1e-5);
         assert_close(&output.read_f32()?, &[7.0, 10.0], 1e-5);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_buffer_writes_bf16_bits_when_available() -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let mut buffer = backend.bf16_buffer(4)?;
+        let source = [1.0_f32, -2.0, 3.5, 0.25];
+        let bits = source
+            .iter()
+            .map(|value| half::bf16::from_f32(*value).to_bits())
+            .collect::<Vec<_>>();
+        buffer.write_bf16_bits(bits.as_slice())?;
+        let expected = source
+            .iter()
+            .map(|value| half::bf16::from_f32(*value).to_f32())
+            .collect::<Vec<_>>();
+        assert_close(&buffer.read_bf16_to_f32()?, expected.as_slice(), 1e-5);
         Ok(())
     }
 

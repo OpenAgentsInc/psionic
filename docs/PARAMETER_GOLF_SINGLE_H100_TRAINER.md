@@ -224,9 +224,11 @@ The command is explicit about what it treats as trainer truth. It binds:
   resident on device across repeated train batches for each admitted batch
   shape, reuses mutable token and target buffers, refreshes the resident
   parameter buffers once per optimizer step instead of rebuilding full graph
-  inputs every batch, and records one machine-readable training runtime receipt
-  per completed step with resident-buffer counts, named graph surface,
-  resident upload cost, parameter-refresh cost, and mutable token-write cost
+  inputs every batch, reuses prepacked host `bf16` staging for BF16-visible
+  parameter-state refresh instead of repacking those tensors on every step,
+  and records one machine-readable training runtime receipt per completed step
+  with resident-buffer counts, named graph surface, resident upload cost,
+  parameter-refresh cost, and mutable token-write cost
 - preserved initial, periodic, and final validation receipts directly from the
   Psionic path, with the pre-export live-model validation retained separately
   whenever that posture is requested

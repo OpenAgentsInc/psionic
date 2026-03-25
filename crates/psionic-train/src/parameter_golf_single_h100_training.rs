@@ -1099,6 +1099,7 @@ pub(crate) enum ParameterGolfParameterState {
     AdamBf16Master {
         shape: Vec<usize>,
         train_visible_values: Vec<f32>,
+        train_visible_bf16_bits: Vec<u16>,
         master_weight_values: Vec<f32>,
         optimizer: TrainingOptimizerConfig,
         optimizer_state: TrainingOptimizerState,
@@ -1113,6 +1114,7 @@ pub(crate) enum ParameterGolfParameterState {
     MuonBf16 {
         shape: Vec<usize>,
         values: Vec<f32>,
+        bf16_bits: Vec<u16>,
         optimizer: crate::ParameterGolfMuonConfig,
         optimizer_state: crate::ParameterGolfMuonState,
     },
@@ -1173,6 +1175,7 @@ impl ParameterGolfParameterState {
         match self {
             Self::AdamBf16Master {
                 train_visible_values,
+                train_visible_bf16_bits,
                 master_weight_values,
                 optimizer,
                 optimizer_state,
@@ -1189,6 +1192,8 @@ impl ParameterGolfParameterState {
                     optimizer_state,
                     step_number,
                 )?;
+                *train_visible_bf16_bits =
+                    bf16_bits_from_f32_values(train_visible_values.as_slice());
                 *last_step_receipt = Some(receipt);
                 Ok(())
             }
@@ -1211,6 +1216,7 @@ impl ParameterGolfParameterState {
             Self::MuonBf16 {
                 shape,
                 values,
+                bf16_bits,
                 optimizer,
                 optimizer_state,
             } => {
@@ -1225,6 +1231,7 @@ impl ParameterGolfParameterState {
                     optimizer_state,
                 )?;
                 round_values_to_bf16(values.as_mut_slice());
+                *bf16_bits = bf16_bits_from_f32_values(values.as_slice());
                 Ok(())
             }
         }
@@ -2232,9 +2239,12 @@ pub(crate) fn seed_parameter_states(
                     | ParameterGolfOptimizerGroupKind::UntiedLmHeadAdam => {
                         let mut train_visible_values = vector.values.clone();
                         round_values_to_bf16(train_visible_values.as_mut_slice());
+                        let train_visible_bf16_bits =
+                            bf16_bits_from_f32_values(train_visible_values.as_slice());
                         ParameterGolfParameterState::AdamBf16Master {
                             shape: vector.shape.dims().to_vec(),
                             train_visible_values,
+                            train_visible_bf16_bits,
                             master_weight_values: vector.values.clone(),
                             optimizer: optimizer.clone(),
                             optimizer_state: optimizer.initialize_state(vector.values.len()),
@@ -2261,9 +2271,11 @@ pub(crate) fn seed_parameter_states(
                 ParameterGolfOptimizerExecution::Muon { optimizer } => {
                     let mut values = vector.values.clone();
                     round_values_to_bf16(values.as_mut_slice());
+                    let bf16_bits = bf16_bits_from_f32_values(values.as_slice());
                     ParameterGolfParameterState::MuonBf16 {
                         shape: vector.shape.dims().to_vec(),
                         values,
+                        bf16_bits,
                         optimizer: optimizer.clone(),
                         optimizer_state: crate::ParameterGolfMuonState::zeros_for_len(
                             vector.values.len(),
@@ -2346,6 +2358,13 @@ fn round_values_to_bf16(values: &mut [f32]) {
     for value in values {
         *value = bf16::from_f32(*value).to_f32();
     }
+}
+
+fn bf16_bits_from_f32_values(values: &[f32]) -> Vec<u16> {
+    values
+        .iter()
+        .map(|value| bf16::from_f32(*value).to_bits())
+        .collect()
 }
 
 pub(crate) fn zero_gradients(
@@ -4431,10 +4450,20 @@ impl ParameterGolfCudaTrainingSession {
                 .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphTensor {
                     tensor_id: binding.graph_input_tensor_id,
                 })?;
-            match binding.graph_input_dtype {
-                DType::F32 => buffer.write_f32(parameter_state.values())?,
-                DType::BF16 => buffer.write_bf16_from_f32(parameter_state.values())?,
-                actual => {
+            match (binding.graph_input_dtype, parameter_state) {
+                (DType::F32, _) => buffer.write_f32(parameter_state.values())?,
+                (
+                    DType::BF16,
+                    ParameterGolfParameterState::AdamBf16Master {
+                        train_visible_bf16_bits,
+                        ..
+                    },
+                ) => buffer.write_bf16_bits(train_visible_bf16_bits.as_slice())?,
+                (DType::BF16, ParameterGolfParameterState::MuonBf16 { bf16_bits, .. }) => {
+                    buffer.write_bf16_bits(bf16_bits.as_slice())?
+                }
+                (DType::BF16, _) => buffer.write_bf16_from_f32(parameter_state.values())?,
+                (actual, _) => {
                     return Err(ParameterGolfSingleH100TrainingError::Serialization {
                         message: format!(
                             "training session does not support state refresh dtype {actual:?} for `{}`",
@@ -5339,6 +5368,7 @@ mod tests {
         match token_embedding {
             ParameterGolfParameterState::AdamBf16Master {
                 train_visible_values,
+                train_visible_bf16_bits,
                 master_weight_values,
                 ..
             } => {
@@ -5352,6 +5382,10 @@ mod tests {
                 assert_eq!(
                     master_weight_values.as_slice(),
                     token_embedding_source.values
+                );
+                assert_eq!(
+                    train_visible_bf16_bits.as_slice(),
+                    bf16_bits_from_f32_values(train_visible_values.as_slice()).as_slice()
                 );
             }
             _ => return Err("expected AdamBf16Master token embedding state".into()),
