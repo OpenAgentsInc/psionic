@@ -1,0 +1,470 @@
+{
+  "schema_version": "psionic.training_execution_evidence_bundle.v1",
+  "bundle_id": "psionic-cross-provider-training-execution-evidence-v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "run_id": "psion-xprovider-evidence-sample-1",
+  "lane_id": "psion.cross_provider.pretrain.reference",
+  "segment_evidence": [
+    {
+      "segment_id": "google-single-node",
+      "topology_kind": "single_node",
+      "source_ids": [
+        "google_l4_validator_node"
+      ],
+      "execution_classes": [
+        "dense_full_model_rank"
+      ],
+      "launch_facts": [
+        {
+          "artifact_role": "launch_contract",
+          "artifact_path": "fixtures/training/launch_contracts/google_single_node_accelerated_v1.json",
+          "artifact_digest": "8e71cee5c4aaa3b791001e42cb0ad7ce527da979379af9d47ce5c0bb861dad97",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Single-node Google lane keeps one explicit launch contract instead of provider-local launcher logs."
+        }
+      ],
+      "runtime_facts": [
+        {
+          "artifact_role": "dense_runtime_contract",
+          "artifact_path": "fixtures/training/dense_rank_runtime_reference_contract_v1.json",
+          "artifact_digest": "ea33ddbb1b066aee123cfc890c61155bd080904e50b4a1785641ee1115aebb5c",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Single-node dense execution still binds into the shared dense-rank runtime contract family."
+        }
+      ],
+      "checkpoint_facts": [
+        {
+          "artifact_role": "dense_checkpoint_artifact",
+          "artifact_path": "fixtures/psion/checkpoint_recovery/psion_dense_checkpoint_artifact_v1.json",
+          "artifact_digest": "663ed0ca37dbff121865f8d7770e28ad85110f9149054e4138193a22e63502ec",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Single-node checkpoint proof stays explicit instead of being hidden behind phase logs."
+        }
+      ],
+      "metric_facts": [
+        {
+          "artifact_role": "live_metric_bundle",
+          "artifact_path": "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json",
+          "artifact_digest": "932acaa04ebe4d9427e70a1b31fb07593b789198c36d92ae30ecf656e63da16a",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "The one-second Google live bundle is the authoritative metric surface for the single-node lane."
+        }
+      ],
+      "visualization_refs": [
+        {
+          "artifact_role": "visualization_bundle",
+          "artifact_path": "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json",
+          "artifact_digest": "932acaa04ebe4d9427e70a1b31fb07593b789198c36d92ae30ecf656e63da16a",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "The app-facing visualization bundle is carried directly into the final evidence bundle."
+        },
+        {
+          "artifact_role": "run_index",
+          "artifact_path": "fixtures/training_visualization/remote_training_run_index_v1.json",
+          "artifact_digest": "62044e3441c3ad34114bfe40a590175284e7aa70a83ea10b2a6d8dbd42bc3e0c",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Run discovery remains explicit through the typed run index."
+        }
+      ],
+      "validator_results": [
+        {
+          "validator_id": "google-single-node-validator",
+          "execution_class": "dense_full_model_rank",
+          "disposition": "completed_success",
+          "evidence_posture": "measured",
+          "detail": "Single-node Google execution preserved launch, runtime, checkpoint, metric, and visualization proof without degradation."
+        }
+      ],
+      "segment_disposition": "completed_success",
+      "detail": "This segment proves the bundle family can seal a successful single-node dense run without changing schema families."
+    },
+    {
+      "segment_id": "runpod-dense-distributed",
+      "topology_kind": "dense_distributed",
+      "source_ids": [
+        "runpod_8xh100_dense_node"
+      ],
+      "execution_classes": [
+        "dense_full_model_rank",
+        "checkpoint_writer"
+      ],
+      "launch_facts": [
+        {
+          "artifact_role": "launch_contract",
+          "artifact_path": "fixtures/training/launch_contracts/runpod_8xh100_v1.json",
+          "artifact_digest": "1eb7a60e6dde7a1e6a02562e0506bfa236e74172705924e14adb62647f5206c1",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "RunPod dense distributed execution keeps one typed launch contract instead of a lane-specific finalizer JSON family."
+        }
+      ],
+      "runtime_facts": [
+        {
+          "artifact_role": "dense_runtime_contract",
+          "artifact_path": "fixtures/training/dense_rank_runtime_reference_contract_v1.json",
+          "artifact_digest": "ea33ddbb1b066aee123cfc890c61155bd080904e50b4a1785641ee1115aebb5c",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Distributed dense execution still binds to the shared dense-rank runtime substrate."
+        },
+        {
+          "artifact_role": "distributed_checkpoint_contract",
+          "artifact_path": "fixtures/training/sharded_distributed_checkpoint_contract_v1.json",
+          "artifact_digest": "a4c1ebfcd7f04a452cd4b8eb69fb6ddb33870c120e63126daf9ef4d1947f8b5b",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Distributed checkpoint closure is carried directly into the final evidence bundle."
+        }
+      ],
+      "checkpoint_facts": [
+        {
+          "artifact_role": "distributed_checkpoint_contract",
+          "artifact_path": "fixtures/training/sharded_distributed_checkpoint_contract_v1.json",
+          "artifact_digest": "a4c1ebfcd7f04a452cd4b8eb69fb6ddb33870c120e63126daf9ef4d1947f8b5b",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "The sharded checkpoint contract seals checkpoint and restore truth for the distributed lane."
+        }
+      ],
+      "metric_facts": [
+        {
+          "artifact_role": "visualization_metric_bundle",
+          "artifact_path": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
+          "artifact_digest": "ad9533442c1132068f7ee1df391ce4a01186f530061dc0bbf5f590480cef95e0",
+          "evidence_posture": "derived",
+          "authoritative": true,
+          "detail": "The retained RunPod bundle is still post-run-only and keeps the missing live loss curve explicit."
+        }
+      ],
+      "visualization_refs": [
+        {
+          "artifact_role": "visualization_bundle",
+          "artifact_path": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
+          "artifact_digest": "ad9533442c1132068f7ee1df391ce4a01186f530061dc0bbf5f590480cef95e0",
+          "evidence_posture": "derived",
+          "authoritative": true,
+          "detail": "The provider-neutral visualization bundle is preserved even when the lane remains post-run-only."
+        },
+        {
+          "artifact_role": "run_index",
+          "artifact_path": "fixtures/training_visualization/remote_training_run_index_v1.json",
+          "artifact_digest": "62044e3441c3ad34114bfe40a590175284e7aa70a83ea10b2a6d8dbd42bc3e0c",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "The shared run index still enumerates the distributed lane through the same discovery surface."
+        }
+      ],
+      "validator_results": [
+        {
+          "validator_id": "distributed-lane-validator",
+          "execution_class": "dense_full_model_rank",
+          "disposition": "degraded_success",
+          "evidence_posture": "derived",
+          "detail": "The distributed lane sealed checkpoint and visualization proof, but the missing live primary series keeps the outcome degraded instead of promoted."
+        }
+      ],
+      "segment_disposition": "degraded_success",
+      "detail": "This segment proves the same schema can represent dense distributed proof with degraded-success posture instead of inventing a new RunPod-only bundle family."
+    },
+    {
+      "segment_id": "contributor-window",
+      "topology_kind": "contributor_window",
+      "source_ids": [
+        "local_mlx_mac_workstation",
+        "local_rtx4080_workstation"
+      ],
+      "execution_classes": [
+        "validated_contributor_window"
+      ],
+      "launch_facts": [
+        {
+          "artifact_role": "swarm_launch_contract",
+          "artifact_path": "fixtures/training/launch_contracts/local_first_swarm_v1.json",
+          "artifact_digest": "407dfe718c9593ec561f2d0bff0fee58dfddb99726c910b653466a01385a8687",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Contributor-window execution still uses one typed launch contract instead of provider-local orchestration logs."
+        }
+      ],
+      "runtime_facts": [
+        {
+          "artifact_role": "swarm_run_contract",
+          "artifact_path": "fixtures/swarm/first_swarm_run_contract_v1.json",
+          "artifact_digest": "1be7c492bf35421b34bcbd3bda1885efa2d2ccff035124214f3d512eb27c952d",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "The open-adapter swarm run contract remains the runtime truth surface for contributor windows."
+        },
+        {
+          "artifact_role": "swarm_receipt_contract",
+          "artifact_path": "fixtures/swarm/first_swarm_open_adapter_receipt_contract_v1.json",
+          "artifact_digest": "e898480916221250bfaf4f959448c417362a32a08d668ea460f574beeb99aa49",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Contributor receipts stay typed even when the first live attempt was refused before remote execution."
+        }
+      ],
+      "checkpoint_facts": [],
+      "metric_facts": [
+        {
+          "artifact_role": "swarm_rehearsal_report",
+          "artifact_path": "fixtures/swarm/reports/first_swarm_trusted_lan_rehearsal_v1.json",
+          "artifact_digest": "dc2d3d21ae94038a307985887a88ffe3d0a601b2619170f617e6b788333fa425",
+          "evidence_posture": "derived",
+          "authoritative": true,
+          "detail": "The current contributor-window lane only retains rehearsal-grade throughput and bottleneck metrics, so that derived posture stays explicit."
+        }
+      ],
+      "visualization_refs": [
+        {
+          "artifact_role": "swarm_evidence_bundle",
+          "artifact_path": "fixtures/swarm/reports/first_swarm_trusted_lan_evidence_bundle_v1.json",
+          "artifact_digest": "b45875a221cf9da23c798f7d5c155cce159173f907885c028043997056410ee8",
+          "evidence_posture": "refused",
+          "authoritative": true,
+          "detail": "The contributor-window lane preserves refusal and no-promotion posture instead of implying live two-node contributor execution."
+        }
+      ],
+      "validator_results": [
+        {
+          "validator_id": "swarm-validator",
+          "execution_class": "validated_contributor_window",
+          "disposition": "refused",
+          "evidence_posture": "refused",
+          "detail": "The first trusted-LAN attempt was refused before remote execution began, so the bundle keeps replay-required and no-promotion posture explicit."
+        }
+      ],
+      "segment_disposition": "refused",
+      "detail": "This segment proves the bundle family can represent a refused contributor-window outcome without a lane-specific refusal JSON family."
+    },
+    {
+      "segment_id": "validator-only",
+      "topology_kind": "validator_only",
+      "source_ids": [
+        "google_l4_validator_node"
+      ],
+      "execution_classes": [
+        "validator"
+      ],
+      "launch_facts": [
+        {
+          "artifact_role": "validator_launch_contract",
+          "artifact_path": "fixtures/training/launch_contracts/google_single_node_accelerated_v1.json",
+          "artifact_digest": "8e71cee5c4aaa3b791001e42cb0ad7ce527da979379af9d47ce5c0bb861dad97",
+          "evidence_posture": "measured",
+          "authoritative": false,
+          "detail": "Validator-only proof still binds into the current Google launch surface instead of inventing a validator-only launcher family."
+        }
+      ],
+      "runtime_facts": [
+        {
+          "artifact_role": "remote_backend_contract",
+          "artifact_path": "fixtures/training/remote_train_artifact_backend_contract_v1.json",
+          "artifact_digest": "673d2e48cd01f6f1a10ba760124d0b2aa1938377c9db7b62b07f14c64a79915e",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Validator proof depends on the shared remote artifact backend contract for finalizer and restore authority."
+        }
+      ],
+      "checkpoint_facts": [
+        {
+          "artifact_role": "dense_checkpoint_artifact",
+          "artifact_path": "fixtures/psion/checkpoint_recovery/psion_dense_checkpoint_artifact_v1.json",
+          "artifact_digest": "663ed0ca37dbff121865f8d7770e28ad85110f9149054e4138193a22e63502ec",
+          "evidence_posture": "measured",
+          "authoritative": false,
+          "detail": "Validator checks can still cite checkpoint evidence without becoming dense execution proof themselves."
+        }
+      ],
+      "metric_facts": [
+        {
+          "artifact_role": "summary_visualization_bundle",
+          "artifact_path": "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v1.json",
+          "artifact_digest": "edf1db385525976e4987e6006391272528e0b8cb730e4c3cb16b72247bc1dffa",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Validator-only metrics can be summary-only and still remain truthful inside the shared bundle family."
+        }
+      ],
+      "visualization_refs": [
+        {
+          "artifact_role": "summary_visualization_bundle",
+          "artifact_path": "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v1.json",
+          "artifact_digest": "edf1db385525976e4987e6006391272528e0b8cb730e4c3cb16b72247bc1dffa",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Validator-only visualization refs stay summary-only instead of forcing fake loss curves."
+        }
+      ],
+      "validator_results": [
+        {
+          "validator_id": "google-validator-1",
+          "execution_class": "validator",
+          "disposition": "completed_success",
+          "evidence_posture": "measured",
+          "detail": "Validator-only proof stays measured and explicit even when the underlying run class is not dense execution."
+        }
+      ],
+      "segment_disposition": "completed_success",
+      "detail": "This segment proves validator-only proof can be emitted through the same bundle family."
+    },
+    {
+      "segment_id": "hybrid-program",
+      "topology_kind": "hybrid",
+      "source_ids": [
+        "runpod_8xh100_dense_node",
+        "google_l4_validator_node",
+        "local_mlx_mac_workstation"
+      ],
+      "execution_classes": [
+        "dense_full_model_rank",
+        "validated_contributor_window",
+        "validator",
+        "checkpoint_writer",
+        "eval_worker"
+      ],
+      "launch_facts": [
+        {
+          "artifact_role": "google_swarm_launch_contract",
+          "artifact_path": "fixtures/training/launch_contracts/google_two_node_swarm_v1.json",
+          "artifact_digest": "1c90e785fee6f4c9db421b0273add4c38d8d88eec89d3008104d1522b4f1f4f4",
+          "evidence_posture": "measured",
+          "authoritative": false,
+          "detail": "Hybrid proof can cite multiple launch seams through one shared evidence family."
+        },
+        {
+          "artifact_role": "runpod_launch_contract",
+          "artifact_path": "fixtures/training/launch_contracts/runpod_8xh100_v1.json",
+          "artifact_digest": "1eb7a60e6dde7a1e6a02562e0506bfa236e74172705924e14adb62647f5206c1",
+          "evidence_posture": "measured",
+          "authoritative": false,
+          "detail": "The hybrid bundle can carry both dense-rank and mirror-side launch facts without lane-specific proof JSON."
+        }
+      ],
+      "runtime_facts": [
+        {
+          "artifact_role": "hybrid_plan",
+          "artifact_path": "fixtures/training/hybrid_pretraining_plan_v1.json",
+          "artifact_digest": "1404f26b92371994f413cb5cb7a6b68f962c70263b5d8df57919fc99474fdd4c",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "The hybrid planner provides the canonical mixed work-class runtime plan."
+        },
+        {
+          "artifact_role": "distributed_checkpoint_contract",
+          "artifact_path": "fixtures/training/sharded_distributed_checkpoint_contract_v1.json",
+          "artifact_digest": "a4c1ebfcd7f04a452cd4b8eb69fb6ddb33870c120e63126daf9ef4d1947f8b5b",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Hybrid closure reuses the shared distributed checkpoint contract instead of inventing a hybrid-only checkpoint proof family."
+        },
+        {
+          "artifact_role": "remote_backend_contract",
+          "artifact_path": "fixtures/training/remote_train_artifact_backend_contract_v1.json",
+          "artifact_digest": "673d2e48cd01f6f1a10ba760124d0b2aa1938377c9db7b62b07f14c64a79915e",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Hybrid closure reuses the shared remote artifact backend contract for finalizer projection and restore authority."
+        }
+      ],
+      "checkpoint_facts": [
+        {
+          "artifact_role": "distributed_checkpoint_contract",
+          "artifact_path": "fixtures/training/sharded_distributed_checkpoint_contract_v1.json",
+          "artifact_digest": "a4c1ebfcd7f04a452cd4b8eb69fb6ddb33870c120e63126daf9ef4d1947f8b5b",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Hybrid closure keeps one provider-neutral checkpoint family even when multiple execution classes contribute to the run."
+        }
+      ],
+      "metric_facts": [
+        {
+          "artifact_role": "run_index",
+          "artifact_path": "fixtures/training_visualization/remote_training_run_index_v1.json",
+          "artifact_digest": "62044e3441c3ad34114bfe40a590175284e7aa70a83ea10b2a6d8dbd42bc3e0c",
+          "evidence_posture": "measured",
+          "authoritative": true,
+          "detail": "Hybrid proof keeps the run index explicit because the app still discovers hybrid lanes through the same typed surface."
+        }
+      ],
+      "visualization_refs": [
+        {
+          "artifact_role": "google_live_visualization",
+          "artifact_path": "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json",
+          "artifact_digest": "932acaa04ebe4d9427e70a1b31fb07593b789198c36d92ae30ecf656e63da16a",
+          "evidence_posture": "measured",
+          "authoritative": false,
+          "detail": "Hybrid proof can cite live Google visualization state where available."
+        },
+        {
+          "artifact_role": "runpod_distributed_visualization",
+          "artifact_path": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
+          "artifact_digest": "ad9533442c1132068f7ee1df391ce4a01186f530061dc0bbf5f590480cef95e0",
+          "evidence_posture": "derived",
+          "authoritative": false,
+          "detail": "Hybrid proof can also cite post-run-only distributed visualization state while keeping the degraded posture explicit."
+        }
+      ],
+      "validator_results": [
+        {
+          "validator_id": "hybrid-validator-google",
+          "execution_class": "validator",
+          "disposition": "degraded_success",
+          "evidence_posture": "measured",
+          "detail": "The hybrid bundle preserves successful validator coverage but keeps missing always-live distributed telemetry explicit."
+        },
+        {
+          "validator_id": "hybrid-eval-worker",
+          "execution_class": "eval_worker",
+          "disposition": "completed_success",
+          "evidence_posture": "measured",
+          "detail": "Eval-worker proof is retained under the same bundle family instead of a sidecar eval-only proof JSON."
+        }
+      ],
+      "segment_disposition": "degraded_success",
+      "detail": "This segment proves the bundle family can seal a hybrid run that spans dense ranks, contributor windows, validator work, checkpoint writing, and eval work."
+    }
+  ],
+  "final_artifact_refs": [
+    {
+      "artifact_role": "remote_artifact_backend_contract",
+      "artifact_path": "fixtures/training/remote_train_artifact_backend_contract_v1.json",
+      "artifact_digest": "673d2e48cd01f6f1a10ba760124d0b2aa1938377c9db7b62b07f14c64a79915e",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "Remote backend placement and finalizer projection are part of final evidence closure."
+    },
+    {
+      "artifact_role": "hybrid_plan",
+      "artifact_path": "fixtures/training/hybrid_pretraining_plan_v1.json",
+      "artifact_digest": "1404f26b92371994f413cb5cb7a6b68f962c70263b5d8df57919fc99474fdd4c",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "The final bundle cites the shared hybrid planner instead of a lane-specific closeout summary."
+    }
+  ],
+  "after_action_refs": [
+    {
+      "artifact_role": "after_action_audit",
+      "artifact_path": "docs/audits/2026-03-25-cross-provider-pretraining-system-readiness-audit.md",
+      "artifact_digest": "95d0ffc06cfc23144062dd2564a9a3175aea20b3956d2da63a306c09044e637c",
+      "evidence_posture": "derived",
+      "authoritative": true,
+      "detail": "After-action direction remains explicit and machine-linkable instead of narrative-only closeout."
+    }
+  ],
+  "final_disposition": {
+    "disposition": "degraded_success",
+    "promotion_outcome": "no_global_promotion_yet",
+    "detail": "The canonical bundle proves the shared schema can encode successful, degraded, and refused segments together. The current cross-provider program remains degraded overall because dense distributed live telemetry and full hybrid runtime closure are not finished."
+  },
+  "claim_boundary": "This bundle family proves one provider-neutral final evidence schema can represent single-node dense runs, dense distributed runs, contributor-window runs, validator-only runs, and hybrid runs without lane-specific proof JSON. It does not claim that every segment shown here has already been executed together in one real production run.",
+  "bundle_digest": "a6041ad537c2db960fcb5001eb219476ca47933780106eb6266290d76d1e34be"
+}

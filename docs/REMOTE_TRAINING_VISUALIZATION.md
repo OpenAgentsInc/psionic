@@ -83,6 +83,11 @@ The contract does not require raw tensor dumps or per-parameter state.
 
 It requires bounded metrics that stay truthful and cheap enough to retain.
 
+The repo now also ships a provider-neutral final evidence bundle family in
+`crates/psionic-train/src/training_execution_evidence_bundle.rs`. Visualization
+refs from this document are one typed section inside that final evidence family,
+not a sidecar proof surface.
+
 ## Parameter Golf Single-H100
 
 The first live lane now lands directly from the Rust-owned single-H100 trainer.

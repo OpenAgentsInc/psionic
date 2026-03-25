@@ -169,6 +169,7 @@ mod tassadar_supervision_density;
 mod tassadar_trace_family_comparison;
 mod tassadar_verifier_guided_search_trace_family;
 mod tassadar_weak_supervision_executor;
+mod training_execution_evidence_bundle;
 mod worker_protocol;
 
 pub use adapter_aggregation::*;
@@ -320,6 +321,7 @@ pub use tassadar_supervision_density::*;
 pub use tassadar_trace_family_comparison::*;
 pub use tassadar_verifier_guided_search_trace_family::*;
 pub use tassadar_weak_supervision_executor::*;
+pub use training_execution_evidence_bundle::*;
 pub use worker_protocol::*;
 
 /// Human-readable crate ownership summary.

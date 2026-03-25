@@ -143,6 +143,17 @@ backends, byte-accounted placement policy, restore policy, and finalizer
 projections for checkpoints, logs, metrics bundles, and final evidence
 bundles.
 
+The repo now also owns the first provider-neutral final evidence bundle family
+in `crates/psionic-train/src/training_execution_evidence_bundle.rs`, the
+binary `training_execution_evidence_bundle`, the checker
+`scripts/check-training-execution-evidence-bundle.sh`, the focused reference
+doc `docs/TRAINING_EXECUTION_EVIDENCE_REFERENCE.md`, and the fixture
+`fixtures/training/provider_neutral_training_execution_evidence_bundle_v1.json`.
+That surface seals launch facts, runtime facts, checkpoints, metrics,
+visualization refs, validator results, and final disposition under one schema
+family across single-node, dense-distributed, contributor-window,
+validator-only, and hybrid runs.
+
 The first local mixed-hardware swarm lane now also has a canonical machine-
 legible contract in `crates/psionic-train/src/swarm_open_adapter.rs` plus the
 committed fixture `fixtures/swarm/first_swarm_run_contract_v1.json`. That
