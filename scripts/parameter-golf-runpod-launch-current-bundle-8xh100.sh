@@ -135,12 +135,12 @@ remote_support_root="${run_root}/support"
 remote_receipt_path="${run_root}/parameter_golf_runpod_8xh100_current_bundle_launch.json"
 
 "${ssh_cmd[@]}" "rm -rf \"${run_root}\" && mkdir -p \"${run_root}\" \"${remote_support_root}\""
-tar -C "${local_bundle_root}" -cf - exported_submission | "${ssh_cmd[@]}" "tar -xf - -C \"${run_root}\""
+tar -C "${local_bundle_root}" -cf - exported_submission | "${ssh_cmd[@]}" "tar --no-same-owner --no-same-permissions -xf - -C \"${run_root}\""
 tar -C "${repo_root}" -cf - \
   scripts/parameter-golf-materialize-public-cache.sh \
   scripts/parameter-golf-read-input-materialization-env.sh \
   fixtures/parameter_golf/google/parameter_golf_google_input_contract_v1.json \
-  | "${ssh_cmd[@]}" "tar -xf - -C \"${remote_support_root}\""
+  | "${ssh_cmd[@]}" "tar --no-same-owner --no-same-permissions -xf - -C \"${remote_support_root}\""
 
 "${ssh_cmd[@]}" bash -s -- \
   "${run_id}" \
