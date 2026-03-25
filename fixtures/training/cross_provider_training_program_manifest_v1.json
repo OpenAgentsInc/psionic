@@ -1,0 +1,85 @@
+{
+  "schema_version": "psionic.cross_provider_training_program_manifest.v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_family_id": "psionic.cross_provider_pretraining_program.v1",
+  "run_id_template": "psion-xprovider-pretrain-${RUN_ID}",
+  "stage_authority": {
+    "stage_id": "psion_pretrain",
+    "stage_kind": "pretrain",
+    "stage_config_fixture_path": "fixtures/psion/pretrain/psion_pretrain_stage_config_v1.json",
+    "stage_config_fixture_sha256": "60937fcdb08086072726430062162f11535ab9cfdc00544d4317000df83a623b",
+    "stage_doc_path": "docs/PSION_PRETRAIN_STAGE.md"
+  },
+  "checkpoint_family": "psion.cross_provider.pretrain.v1",
+  "dataset_family_id": "psion.curated_pretrain.dataset_family.v1",
+  "environment": {
+    "environment_ref": "psion.pretrain.reference_runtime",
+    "version": "v1"
+  },
+  "admitted_compute_source_classes": [
+    "google_cloud",
+    "runpod",
+    "local_workstation",
+    "trusted_lan_cluster"
+  ],
+  "admitted_execution_classes": [
+    "dense_full_model_rank",
+    "validated_contributor_window",
+    "validator",
+    "checkpoint_writer",
+    "eval_worker",
+    "data_builder"
+  ],
+  "artifact_roots": {
+    "run_root_template": "runs/${RUN_ID}",
+    "launch_root_template": "runs/${RUN_ID}/launch",
+    "checkpoint_root_template": "runs/${RUN_ID}/checkpoints",
+    "metrics_root_template": "runs/${RUN_ID}/metrics",
+    "visualization_root_template": "runs/${RUN_ID}/training_visualization",
+    "final_root_template": "runs/${RUN_ID}/final"
+  },
+  "budget_policy": {
+    "max_dense_full_model_ranks": 256,
+    "max_validated_contributors": 1024,
+    "max_validators": 64,
+    "max_program_wallclock_minutes": 10080,
+    "max_program_cost_usd_cents": 5000000
+  },
+  "evidence_authority": {
+    "evidence_family_id": "psionic.training_execution_evidence_bundle.v1.reserved",
+    "final_evidence_bundle_template": "runs/${RUN_ID}/final/cross_provider_training_execution_evidence_bundle.json",
+    "final_manifest_template": "runs/${RUN_ID}/final/cross_provider_training_final_manifest.json",
+    "after_action_audit_template": "docs/audits/${RUN_ID}-cross-provider-training-after-action-audit.md"
+  },
+  "authority_paths": {
+    "fixture_path": "fixtures/training/cross_provider_training_program_manifest_v1.json",
+    "check_script_path": "scripts/check-cross-provider-training-program-manifest.sh",
+    "reference_doc_path": "docs/TRAIN_PROGRAM_MANIFEST_REFERENCE.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md",
+    "audit_path": "docs/audits/2026-03-25-cross-provider-pretraining-system-readiness-audit.md"
+  },
+  "baseline_artifacts": [
+    {
+      "path": "fixtures/psion/pretrain/psion_pretrain_stage_config_v1.json",
+      "sha256": "60937fcdb08086072726430062162f11535ab9cfdc00544d4317000df83a623b",
+      "detail": "The first cross-provider program manifest still binds directly to the canonical Psion pretrain stage-config fixture instead of inventing a second stage-authority plane."
+    },
+    {
+      "path": "docs/PSION_PRETRAIN_STAGE.md",
+      "sha256": "5437cca00298a6b638cfa6cdfe87ae8577b53d3a861a4137b7644c7431df8f36",
+      "detail": "The first cross-provider program manifest still depends on the canonical pretrain-stage doc as the stage contract authority."
+    },
+    {
+      "path": "docs/audits/2026-03-25-cross-provider-pretraining-system-readiness-audit.md",
+      "sha256": "95d0ffc06cfc23144062dd2564a9a3175aea20b3956d2da63a306c09044e637c",
+      "detail": "The first cross-provider program manifest still depends on the readiness audit that froze the implementation path and issue spine."
+    }
+  ],
+  "non_goals": [
+    "provider-specific training control planes",
+    "same-job mixed-backend dense training closure in the root manifest",
+    "public or adversarial swarm compute"
+  ],
+  "claim_boundary": "This manifest freezes one provider-neutral cross-provider pretraining authority object over the current Psionic train substrate. It binds the canonical pretrain stage id, checkpoint family, environment key, artifact-root templates, admitted compute-source classes, and admitted execution classes under one stable manifest id and digest. It does not claim that every admitted execution class or backend family is already implemented; later issues close those runtime and provider-binding gaps.",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479"
+}

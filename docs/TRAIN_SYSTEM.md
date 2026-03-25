@@ -58,6 +58,19 @@ fixtures under `fixtures/training_visualization/`. Autopilot consumes that
 truth through its own cache, projection, and pane code instead of moving
 renderer semantics into this repo.
 
+The repo now also owns a canonical provider-neutral training-program manifest in
+`crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the
+binary `cross_provider_training_program_manifest`, the checker
+`scripts/check-cross-provider-training-program-manifest.sh`, the focused
+reference doc `docs/TRAIN_PROGRAM_MANIFEST_REFERENCE.md`, and the committed
+fixture `fixtures/training/cross_provider_training_program_manifest_v1.json`.
+That manifest freezes one root cross-provider pretraining authority over run id
+template, stage authority, checkpoint family, environment key, artifact-root
+layout, admitted compute-source classes, admitted execution classes, and one
+reserved final-evidence surface, and it now binds its manifest id and digest
+directly into `TrainingRunState` before the run graph may claim that program
+authority.
+
 The first local mixed-hardware swarm lane now also has a canonical machine-
 legible contract in `crates/psionic-train/src/swarm_open_adapter.rs` plus the
 committed fixture `fixtures/swarm/first_swarm_run_contract_v1.json`. That
@@ -254,6 +267,10 @@ and now also has:
   training telemetry contract for Google Cloud and RunPod lanes and freezes
   that Psionic owns typed live bundle truth while Autopilot owns rendering and
   pane behavior.
+- `docs/TRAIN_PROGRAM_MANIFEST_REFERENCE.md` is the canonical root
+  cross-provider training-program manifest record and freezes the first
+  provider-neutral training-program authority object before later compute-
+  source, launch-binder, and hybrid-run issues widen the system.
 - `docs/APPLE_ADAPTER_DATASET_SPEC.md`,
   `docs/APPLE_FMADAPTER_PACKAGE_SPEC.md`, and
   `docs/APPLE_ADAPTER_LINEAGE_SPEC.md` are the canonical

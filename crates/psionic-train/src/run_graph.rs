@@ -435,6 +435,12 @@ pub enum TrainingRunGraphError {
 pub struct TrainingRunState {
     /// Stable run id.
     pub run_id: String,
+    /// Bound cross-provider training-program manifest id when one exists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub program_manifest_id: Option<String>,
+    /// Bound cross-provider training-program manifest digest when one exists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub program_manifest_digest: Option<String>,
     /// Stable stage id.
     pub stage_id: String,
     /// Cluster id bound to this run.
@@ -490,6 +496,8 @@ impl TrainingRunState {
         }
         Ok(Self {
             run_id,
+            program_manifest_id: None,
+            program_manifest_digest: None,
             stage_id,
             cluster_id,
             checkpoint_family,
@@ -1442,8 +1450,8 @@ mod tests {
     }
 
     #[test]
-    fn run_graph_tracks_admission_readiness_and_contributor_selection()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn run_graph_tracks_admission_readiness_and_contributor_selection(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let state = cluster_state();
         let mut run = TrainingRunState::new(
             "train-run-1",
@@ -1525,8 +1533,8 @@ mod tests {
     }
 
     #[test]
-    fn windows_track_contributor_set_revisions_and_transitions()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn windows_track_contributor_set_revisions_and_transitions(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let state = cluster_state();
         let mut run = TrainingRunState::new(
             "train-run-3",
@@ -1606,8 +1614,8 @@ mod tests {
     }
 
     #[test]
-    fn explicit_contributor_selection_preserves_requested_order()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn explicit_contributor_selection_preserves_requested_order(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let state = cluster_state();
         let mut run = TrainingRunState::new(
             "train-run-5",
@@ -1636,8 +1644,8 @@ mod tests {
     }
 
     #[test]
-    fn explicit_contributor_selection_refuses_unready_or_duplicate_nodes()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn explicit_contributor_selection_refuses_unready_or_duplicate_nodes(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let state = cluster_state();
         let mut run = TrainingRunState::new(
             "train-run-6",
