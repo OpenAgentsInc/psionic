@@ -67,6 +67,7 @@ const HOST_FALLBACK_PARALLEL_MIN_CHUNK_ELEMENTS: usize = 1024;
 pub const SUPPORTED_OPS: &[&str] = &[
     "input",
     "constant",
+    "cast",
     "matmul",
     "add",
     "mul",
@@ -3800,14 +3801,16 @@ impl AvailableCudaBackend {
         let row_count = logits_dims[0].saturating_mul(logits_dims[1]);
         let vocab_size = logits_dims[2];
         let output = self.allocate(&step.spec)?;
-        submission.platform.encode_parameter_golf_projection_token_losses(
-            &logits.platform,
-            &target_ids.platform,
-            &output.platform,
-            row_count,
-            vocab_size,
-            logit_softcap,
-        )?;
+        submission
+            .platform
+            .encode_parameter_golf_projection_token_losses(
+                &logits.platform,
+                &target_ids.platform,
+                &output.platform,
+                row_count,
+                vocab_size,
+                logit_softcap,
+            )?;
         submission.encoded_operations += 1;
         Ok(output)
     }
@@ -4377,15 +4380,30 @@ impl AvailableCudaBackend {
                     let output = if input.spec().dtype() == *dtype {
                         input.alias_with_spec(&step.spec)?
                     } else {
-                        execute_profiled_host_fallback(&mut host_fallback_profile, step, || {
-                            let input_values = self.read_float_buffer_to_f32(input)?;
-                            let values_out = cast_contiguous_values(
-                                &input_values,
-                                input.spec().dtype(),
-                                *dtype,
-                            )?;
-                            self.materialize_host_view_step(step, &values_out)
-                        })?
+                        match (input.spec().dtype(), *dtype) {
+                            (DType::F32, DType::BF16) => {
+                                let output = self.allocate(&step.spec)?;
+                                submission.cast_f32_to_bf16(
+                                    input,
+                                    &output,
+                                    input.spec().element_count(),
+                                )?;
+                                output
+                            }
+                            _ => execute_profiled_host_fallback(
+                                &mut host_fallback_profile,
+                                step,
+                                || {
+                                    let input_values = self.read_float_buffer_to_f32(input)?;
+                                    let values_out = cast_contiguous_values(
+                                        &input_values,
+                                        input.spec().dtype(),
+                                        *dtype,
+                                    )?;
+                                    self.materialize_host_view_step(step, &values_out)
+                                },
+                            )?,
+                        }
                     };
                     values.insert(step.output, output);
                 }
@@ -5244,7 +5262,7 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     step.output
                 )));
             }
-            if *dtype != DType::F32 {
+            if *dtype != DType::F32 && *dtype != DType::BF16 {
                 return Err(RuntimeError::UnsupportedStep(format!(
                     "cast {:?}->{:?}",
                     DType::F32,
@@ -6848,7 +6866,7 @@ fn parse_memory_bytes(value: &str) -> Option<u64> {
 #[cfg(target_os = "linux")]
 mod platform {
     use std::{
-        ffi::{CStr, c_char, c_int, c_void},
+        ffi::{c_char, c_int, c_void, CStr},
         sync::Arc,
     };
 
@@ -12902,22 +12920,22 @@ mod platform {
 
 #[cfg(test)]
 mod tests {
-    use psionic_backend_cpu::CpuBackend;
     use psionic_backend_cpu::decode_quantized_row_into;
     use psionic_backend_cpu::quantized_row_dot;
-    use psionic_backend_tests::{GraphBackendConformanceHarness, run_graph_backend_conformance};
+    use psionic_backend_cpu::CpuBackend;
+    use psionic_backend_tests::{run_graph_backend_conformance, GraphBackendConformanceHarness};
     use psionic_compiler::compile_graph;
     use psionic_core::{
         BackendExtensionKind, DType, Device, DeviceKind, QuantizationMode, Shape, TensorData,
         TensorSpec,
     };
-    use psionic_ir::{AutodiffContext, AutodiffGraphBuilder, Graph, GraphBuilder, evaluate_graph};
+    use psionic_ir::{evaluate_graph, AutodiffContext, AutodiffGraphBuilder, Graph, GraphBuilder};
 
     use super::CudaMemorySpace;
     use super::{
-        CudaBackend, CudaBuffer, CudaCommandStatus, CudaCommandWait, HealthStatus, SUPPORTED_OPS,
         architecture_from_compute_capability, cuda_health, parse_inventory_row, parse_mig_profile,
-        recovery_profile, risk_profile, validate_supported_plan,
+        recovery_profile, risk_profile, validate_supported_plan, CudaBackend, CudaBuffer,
+        CudaCommandStatus, CudaCommandWait, HealthStatus, SUPPORTED_OPS,
     };
     use psionic_runtime::{
         Allocator, BackendDegradedPolicy, BackendSelectionState, BufferHandle, DeviceDiscovery,
@@ -13033,12 +13051,10 @@ mod tests {
     fn risk_profile_marks_display_and_mig_devices_as_elevated() {
         let display_risk = risk_profile(Some(true), None, Some(false));
         assert_eq!(display_risk.level, NvidiaRiskLevel::Elevated);
-        assert!(
-            display_risk
-                .warnings
-                .iter()
-                .any(|warning| warning.contains("display-attached"))
-        );
+        assert!(display_risk
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("display-attached")));
 
         let mig_risk = risk_profile(Some(false), Some("1g.10gb"), Some(true));
         assert_eq!(mig_risk.level, NvidiaRiskLevel::Elevated);
@@ -13088,8 +13104,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_plan_validation_accepts_host_fallback_view_ops()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_plan_validation_accepts_host_fallback_view_ops(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let device = Device::new(DeviceKind::Cuda, 0, Some(String::from("cuda:0")));
         let mut builder = GraphBuilder::new(device);
         let input = builder.input("features", Shape::new(vec![1, 2]), DType::F32);
@@ -13101,8 +13117,8 @@ mod tests {
     }
 
     #[test]
-    fn execution_value_retain_counts_track_consumers_and_final_outputs()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn execution_value_retain_counts_track_consumers_and_final_outputs(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let device = Device::new(DeviceKind::Cuda, 0, Some(String::from("cuda:0")));
         let mut builder = GraphBuilder::new(device);
         let left = builder.input("left", Shape::new(vec![1, 2]), DType::F32);
@@ -13130,8 +13146,8 @@ mod tests {
     }
 
     #[test]
-    fn permute_contiguous_values_matches_attention_layout_swap()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn permute_contiguous_values_matches_attention_layout_swap(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let values = (0..12).map(|value| value as f32).collect::<Vec<_>>();
         let permuted = super::permute_contiguous_values(&values, &[1, 2, 3, 2], &[0, 2, 1, 3])?;
         assert_eq!(
@@ -13142,8 +13158,8 @@ mod tests {
     }
 
     #[test]
-    fn expand_contiguous_values_repeats_broadcast_dimensions()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn expand_contiguous_values_repeats_broadcast_dimensions(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let values = vec![10.0_f32, 20.0];
         let expanded = super::expand_contiguous_values(&values, &[1, 2], &[3, 2])?;
         assert_eq!(expanded, vec![10.0, 20.0, 10.0, 20.0, 10.0, 20.0]);
@@ -13151,8 +13167,8 @@ mod tests {
     }
 
     #[test]
-    fn reduce_sum_contiguous_values_reduces_requested_axis()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn reduce_sum_contiguous_values_reduces_requested_axis(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let values = vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0];
         let reduced = super::reduce_sum_contiguous_values(&values, &[2, 3], Some(1))?;
         assert_eq!(reduced, vec![6.0, 15.0]);
@@ -13164,8 +13180,8 @@ mod tests {
     }
 
     #[test]
-    fn reduce_sum_contiguous_values_reduces_first_and_last_axis_fast_paths()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn reduce_sum_contiguous_values_reduces_first_and_last_axis_fast_paths(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let values = vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0];
         assert_eq!(
             super::reduce_sum_contiguous_values(&values, &[2, 3], Some(0))?,
@@ -13225,8 +13241,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_selection_reports_ready_or_degraded_cuda_when_available()
-    -> Result<(), psionic_runtime::RuntimeError> {
+    fn cuda_backend_selection_reports_ready_or_degraded_cuda_when_available(
+    ) -> Result<(), psionic_runtime::RuntimeError> {
         let backend = CudaBackend::new();
         let Some(_) = backend.selected_device() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13273,8 +13289,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_fallback_selection_reports_explicit_cpu_fallback_when_unavailable()
-    -> Result<(), psionic_runtime::RuntimeError> {
+    fn cuda_backend_fallback_selection_reports_explicit_cpu_fallback_when_unavailable(
+    ) -> Result<(), psionic_runtime::RuntimeError> {
         let backend = CudaBackend::new();
         if backend.selected_device().is_none() {
             let cpu = CpuBackend::new();
@@ -13307,8 +13323,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_allocates_and_submits_copy_when_available()
-    -> Result<(), psionic_runtime::RuntimeError> {
+    fn cuda_backend_allocates_and_submits_copy_when_available(
+    ) -> Result<(), psionic_runtime::RuntimeError> {
         let mut backend = CudaBackend::new();
         let Some(device) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13394,8 +13410,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_relu_squared_backend_extension_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_relu_squared_backend_extension_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13426,8 +13442,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_silu_backend_extension_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_silu_backend_extension_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13458,8 +13474,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_parameter_golf_projection_loss_backend_extension_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_parameter_golf_projection_loss_backend_extension_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13511,8 +13527,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_parameter_golf_projection_token_losses_backend_extension_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_parameter_golf_projection_token_losses_backend_extension_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13565,8 +13581,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_rms_norm_backend_extension_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_rms_norm_backend_extension_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13609,8 +13625,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_bounded_permute_graphs_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_bounded_permute_graphs_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13678,8 +13694,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_bounded_reduce_sum_graphs_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_bounded_reduce_sum_graphs_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13743,8 +13759,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_bounded_expand_graphs_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_bounded_expand_graphs_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13801,8 +13817,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_add_after_expand_materialization_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_add_after_expand_materialization_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13857,8 +13873,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_mul_after_expand_materialization_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_mul_after_expand_materialization_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13913,8 +13929,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_bf16_host_fallback_permute_graphs_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_bf16_host_fallback_permute_graphs_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -13957,8 +13973,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_bf16_host_fallback_reduce_sum_graphs_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_bf16_host_fallback_reduce_sum_graphs_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -14008,8 +14024,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_parameter_golf_token_embedding_lookup_backward_with_bf16_embeddings_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_parameter_golf_token_embedding_lookup_backward_with_bf16_embeddings_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -14076,8 +14092,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_reports_rms_norm_extension_support_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_reports_rms_norm_extension_support_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let backend = CudaBackend::new();
         if backend.selected_device().is_none() {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -14085,36 +14101,28 @@ mod tests {
         }
 
         let selection = backend.backend_selection(SUPPORTED_OPS)?;
-        assert!(
-            selection
-                .backend_extensions
-                .iter()
-                .any(|support| support.kind == BackendExtensionKind::ParameterGolfProjectionLoss)
-        );
-        assert!(
-            selection
-                .backend_extensions
-                .iter()
-                .any(|support| support.kind == BackendExtensionKind::RmsNorm)
-        );
-        assert!(
-            selection
-                .backend_extensions
-                .iter()
-                .any(|support| support.kind == BackendExtensionKind::RotaryEmbedding)
-        );
-        assert!(
-            selection
-                .backend_extensions
-                .iter()
-                .any(|support| support.kind == BackendExtensionKind::ScaledDotProductAttention)
-        );
+        assert!(selection
+            .backend_extensions
+            .iter()
+            .any(|support| support.kind == BackendExtensionKind::ParameterGolfProjectionLoss));
+        assert!(selection
+            .backend_extensions
+            .iter()
+            .any(|support| support.kind == BackendExtensionKind::RmsNorm));
+        assert!(selection
+            .backend_extensions
+            .iter()
+            .any(|support| support.kind == BackendExtensionKind::RotaryEmbedding));
+        assert!(selection
+            .backend_extensions
+            .iter()
+            .any(|support| support.kind == BackendExtensionKind::ScaledDotProductAttention));
         Ok(())
     }
 
     #[test]
-    fn cuda_backend_executes_parameter_golf_rope_gqa_decoder_block_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_parameter_golf_rope_gqa_decoder_block_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut cuda_backend = CudaBackend::new();
         let Some(selected) = cuda_backend.selected_device().cloned() else {
             assert_eq!(cuda_backend.health().status, HealthStatus::Offline);
@@ -14237,8 +14245,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_bf16_scaled_dot_product_attention_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_bf16_scaled_dot_product_attention_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -14313,8 +14321,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_rotary_embedding_backward_graph_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_rotary_embedding_backward_graph_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -14340,18 +14348,16 @@ mod tests {
         let graph = builder.finish(vec![roped.clone()]);
 
         let backward_plan = graph.backward_plan(roped.id())?;
-        assert!(
-            backward_plan
-                .gradient_graph
-                .nodes()
-                .iter()
-                .any(|node| matches!(
-                    node.op(),
-                    psionic_ir::OpKind::BackendExtension {
-                        op: psionic_core::BackendExtensionOp::RotaryEmbeddingBackward { .. }
-                    }
-                ))
-        );
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                psionic_ir::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::RotaryEmbeddingBackward { .. }
+                }
+            )));
 
         let input_values = (0..batch_size * head_count * sequence_length * head_dim)
             .map(|index| (index as f32 - 32.0) * 0.0375)
@@ -14432,8 +14438,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_parameter_golf_decoder_backward_graph_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_parameter_golf_decoder_backward_graph_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -14467,18 +14473,16 @@ mod tests {
         let graph = builder.finish(vec![attended.clone()]);
 
         let backward_plan = graph.backward_plan(attended.id())?;
-        assert!(
-            backward_plan
-                .gradient_graph
-                .nodes()
-                .iter()
-                .any(|node| matches!(
-                    node.op(),
-                    psionic_ir::OpKind::BackendExtension {
-                        op: psionic_core::BackendExtensionOp::RotaryEmbeddingBackward { .. }
-                    }
-                ))
-        );
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                psionic_ir::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::RotaryEmbeddingBackward { .. }
+                }
+            )));
         assert!(
             backward_plan
                 .gradient_graph
@@ -14638,8 +14642,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_relu_squared_backward_graph_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_relu_squared_backward_graph_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -14658,18 +14662,16 @@ mod tests {
 
         let backward_plan = graph.backward_plan(scaled.id())?;
         assert!(backward_plan.gradient_for(input.id()).is_some());
-        assert!(
-            backward_plan
-                .gradient_graph
-                .nodes()
-                .iter()
-                .any(|node| matches!(
-                    node.op(),
-                    psionic_ir::OpKind::BackendExtension {
-                        op: psionic_core::BackendExtensionOp::ReluSquaredBackward
-                    }
-                ))
-        );
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                psionic_ir::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::ReluSquaredBackward
+                }
+            )));
 
         let input_values = vec![-1.25_f32, -0.5, 0.75, 2.0];
         let upstream_seed = vec![1.0_f32, 0.5, -0.25, 2.0];
@@ -14746,8 +14748,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_silu_backward_graph_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_silu_backward_graph_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -14766,18 +14768,16 @@ mod tests {
 
         let backward_plan = graph.backward_plan(scaled.id())?;
         assert!(backward_plan.gradient_for(input.id()).is_some());
-        assert!(
-            backward_plan
-                .gradient_graph
-                .nodes()
-                .iter()
-                .any(|node| matches!(
-                    node.op(),
-                    psionic_ir::OpKind::BackendExtension {
-                        op: psionic_core::BackendExtensionOp::SiluBackward
-                    }
-                ))
-        );
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                psionic_ir::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::SiluBackward
+                }
+            )));
 
         let input_values = vec![-1.25_f32, -0.5, 0.75, 2.0];
         let upstream_seed = vec![1.0_f32, 0.5, -0.25, 2.0];
@@ -14854,8 +14854,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_rms_norm_backward_graph_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_rms_norm_backward_graph_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -14875,30 +14875,26 @@ mod tests {
         let graph = builder.finish(vec![scaled.clone()]);
 
         let backward_plan = graph.backward_plan(scaled.id())?;
-        assert!(
-            backward_plan
-                .gradient_graph
-                .nodes()
-                .iter()
-                .any(|node| matches!(
-                    node.op(),
-                    psionic_ir::OpKind::BackendExtension {
-                        op: psionic_core::BackendExtensionOp::RmsNormInputBackward { .. }
-                    }
-                ))
-        );
-        assert!(
-            backward_plan
-                .gradient_graph
-                .nodes()
-                .iter()
-                .any(|node| matches!(
-                    node.op(),
-                    psionic_ir::OpKind::BackendExtension {
-                        op: psionic_core::BackendExtensionOp::RmsNormWeightBackward { .. }
-                    }
-                ))
-        );
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                psionic_ir::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::RmsNormInputBackward { .. }
+                }
+            )));
+        assert!(backward_plan
+            .gradient_graph
+            .nodes()
+            .iter()
+            .any(|node| matches!(
+                node.op(),
+                psionic_ir::OpKind::BackendExtension {
+                    op: psionic_core::BackendExtensionOp::RmsNormWeightBackward { .. }
+                }
+            )));
 
         let input_values = vec![0.3_f32, -0.8, 1.1, -1.0];
         let weight_values = vec![1.2_f32, -0.7, 0.9, 1.5];
@@ -14995,8 +14991,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_parameter_golf_projection_loss_backward_graph_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_parameter_golf_projection_loss_backward_graph_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15106,8 +15102,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_parameter_golf_residual_mix_backward_graph_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_parameter_golf_residual_mix_backward_graph_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15256,8 +15252,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_f16_rhs_matmul_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_f16_rhs_matmul_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15287,8 +15283,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_bf16_matmul_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_bf16_matmul_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15312,8 +15308,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_f32_bf16_matmul_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_f32_bf16_matmul_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15337,8 +15333,36 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_multiple_matmuls_and_adds_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_f32_to_bf16_cast_graphs_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let mut builder = GraphBuilder::new(selected.device.clone());
+        let input = builder.input("input", Shape::new(vec![1, 4]), DType::F32);
+        let casted = builder.cast(&input, DType::BF16)?;
+        let casted_id = casted.id();
+        let graph = builder.finish(vec![casted]);
+        let inputs = std::collections::BTreeMap::from([(
+            input.id(),
+            backend.input_buffer(Shape::new(vec![1, 4]), vec![1.0_f32, -2.0, 3.5, 0.25])?,
+        )]);
+        let result = backend.compile_and_execute(&graph, &inputs)?;
+        let output = result
+            .outputs
+            .get(&casted_id)
+            .ok_or("missing f32->bf16 cast output")?;
+        assert_eq!(output.spec().dtype(), DType::BF16);
+        assert_close(&output.read_bf16_to_f32()?, &[1.0, -2.0, 3.5, 0.25], 1e-3);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_multiple_matmuls_and_adds_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15408,8 +15432,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_q8_0_quantized_matvec_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_q8_0_quantized_matvec_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15473,8 +15497,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_executes_mxfp4_quantized_matvec_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_executes_mxfp4_quantized_matvec_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15538,8 +15562,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_backend_gathers_f16_row_into_f32_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_backend_gathers_f16_row_into_f32_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15591,8 +15615,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_argmax_for_wide_rows_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_argmax_for_wide_rows_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15618,8 +15642,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_add_residual_rms_norm_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_add_residual_rms_norm_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15671,8 +15695,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_fused_attention_matches_separate_rope_attention_and_cache_path_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_fused_attention_matches_separate_rope_attention_and_cache_path_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15814,8 +15838,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_fused_attention_f16_kv_q8_1_matches_separate_attention_and_quantize_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_fused_attention_f16_kv_q8_1_matches_separate_attention_and_quantize_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -15938,8 +15962,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_fused_attention_graph_f16_kv_q8_1_matches_separate_attention_and_quantize_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_fused_attention_graph_f16_kv_q8_1_matches_separate_attention_and_quantize_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16061,8 +16085,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_fused_attention_turboquant_kv_matches_f16_kv_reference_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_fused_attention_turboquant_kv_matches_f16_kv_reference_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16192,8 +16216,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_fused_attention_graph_turboquant_kv_matches_f16_kv_reference_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_fused_attention_graph_turboquant_kv_matches_f16_kv_reference_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16322,8 +16346,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_fused_add_residual_rms_norm_q8_1_router_topk_matches_separate_kernels_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_fused_add_residual_rms_norm_q8_1_router_topk_matches_separate_kernels_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16455,8 +16479,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_router_topk_delayed_softmax_matches_fused_router_kernel_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_router_topk_delayed_softmax_matches_fused_router_kernel_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16555,8 +16579,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_q8_0_quantized_matvec_q8_1_fast_path_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_q8_0_quantized_matvec_q8_1_fast_path_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16599,8 +16623,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_q8_0_quantized_matvec_q8_1_fast_path_with_bias_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_q8_0_quantized_matvec_q8_1_fast_path_with_bias_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16645,8 +16669,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_q8_0_quantized_matvec_q8_1_argmax_fast_path_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_q8_0_quantized_matvec_q8_1_argmax_fast_path_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16704,8 +16728,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_mxfp4_quantized_matvec_q8_1_fast_path_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_mxfp4_quantized_matvec_q8_1_fast_path_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16748,8 +16772,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_q8_0_quantized_matvec_q8_1_fast_path_for_multi_block_rows_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_q8_0_quantized_matvec_q8_1_fast_path_for_multi_block_rows_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16798,8 +16822,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_mxfp4_quantized_matvec_q8_1_fast_path_for_multi_block_rows_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_mxfp4_quantized_matvec_q8_1_fast_path_for_multi_block_rows_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16848,8 +16872,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_mxfp4_moe_gate_up_swiglu_q8_1_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_mxfp4_moe_gate_up_swiglu_q8_1_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16905,8 +16929,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_mxfp4_expert_gate_up_swiglu_q8_1_ids_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_mxfp4_expert_gate_up_swiglu_q8_1_ids_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -16990,8 +17014,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_mxfp4_moe_down_aggregate_q8_1_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_mxfp4_moe_down_aggregate_q8_1_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -17056,8 +17080,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_mxfp4_moe_down_aggregate_q8_1_f32_selected4_path_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_mxfp4_moe_down_aggregate_q8_1_f32_selected4_path_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -17111,8 +17135,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_mxfp4_moe_down_aggregate_q8_1_grouped_selected_path_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_mxfp4_moe_down_aggregate_q8_1_grouped_selected_path_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -17177,8 +17201,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_executes_mxfp4_grouped_expert_matvec_and_accumulate_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn cuda_submission_executes_mxfp4_grouped_expert_matvec_and_accumulate_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);

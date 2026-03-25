@@ -32,10 +32,10 @@ use crate::{
     export_parameter_golf_banked_full_precision_weights_bytes,
     export_parameter_golf_int8_zlib_model_artifact, inspect_local_distributed_8xh100_machine,
     materialize_current_banked_weights, materialize_current_model, parameter_golf_optimizer_plan,
-    parameter_golf_single_h100_training::{
-        refresh_parameter_golf_cuda_training_sessions, ParameterGolfCudaTrainingSession,
-    },
     parameter_golf_runpod_8xh100_capability_profile,
+    parameter_golf_single_h100_training::{
+        refresh_parameter_golf_cuda_training_sessions_from_state, ParameterGolfCudaTrainingSession,
+    },
     restore_parameter_golf_banked_weights_from_safetensors,
     restore_parameter_golf_model_from_safetensors, seed_parameter_states, zero_gradients,
     ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph, ParameterGolfBatchGeometry,
@@ -611,12 +611,8 @@ struct ParameterGolfDistributed8xH100PersistentWorkerHandle {
 }
 
 enum ParameterGolfDistributed8xH100WorkerCollective {
-    RankZero {
-        peers: BTreeMap<usize, TcpStream>,
-    },
-    Peer {
-        stream: TcpStream,
-    },
+    RankZero { peers: BTreeMap<usize, TcpStream> },
+    Peer { stream: TcpStream },
 }
 
 struct ParameterGolfDistributed8xH100WorkerRuntime {
@@ -628,6 +624,7 @@ struct ParameterGolfDistributed8xH100WorkerRuntime {
     bundle: psionic_data::ParameterGolfDatasetBundle,
     baseline_model: ParameterGolfReferenceModel,
     current_model: ParameterGolfReferenceModel,
+    current_model_stale: bool,
     trainer_state: ParameterGolfSingleH100TrainerState,
     geometry: ParameterGolfBatchGeometry,
     hyperparameters: ParameterGolfTrainingHyperparameters,
@@ -655,8 +652,10 @@ fn parameter_golf_distributed_8xh100_worker_mesh_logs_dir(
 fn worker_response_from_reader(
     rank: usize,
     reader: &mut BufReader<ChildStdout>,
-) -> Result<ParameterGolfDistributed8xH100WorkerResponse, ParameterGolfDistributed8xH100TrainStepError>
-{
+) -> Result<
+    ParameterGolfDistributed8xH100WorkerResponse,
+    ParameterGolfDistributed8xH100TrainStepError,
+> {
     let mut line = String::new();
     let bytes_read = reader.read_line(&mut line).map_err(|error| {
         ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
@@ -665,10 +664,14 @@ fn worker_response_from_reader(
         }
     })?;
     if bytes_read == 0 {
-        return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-            rank,
-            message: String::from("worker stdout closed before one protocol response was written"),
-        });
+        return Err(
+            ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                rank,
+                message: String::from(
+                    "worker stdout closed before one protocol response was written",
+                ),
+            },
+        );
     }
     serde_json::from_str::<ParameterGolfDistributed8xH100WorkerResponse>(line.trim_end()).map_err(
         |error| ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
@@ -683,8 +686,8 @@ fn write_worker_command(
     writer: &mut BufWriter<ChildStdin>,
     command: &ParameterGolfDistributed8xH100WorkerCommand,
 ) -> Result<(), ParameterGolfDistributed8xH100TrainStepError> {
-    let encoded =
-        serde_json::to_string(command).map_err(ParameterGolfDistributed8xH100TrainStepError::Json)?;
+    let encoded = serde_json::to_string(command)
+        .map_err(ParameterGolfDistributed8xH100TrainStepError::Json)?;
     writer.write_all(encoded.as_bytes()).map_err(|error| {
         ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
             rank,
@@ -706,8 +709,8 @@ fn write_worker_command(
     Ok(())
 }
 
-fn choose_loopback_collective_addr(
-) -> Result<String, ParameterGolfDistributed8xH100TrainStepError> {
+fn choose_loopback_collective_addr() -> Result<String, ParameterGolfDistributed8xH100TrainStepError>
+{
     let listener = TcpListener::bind("127.0.0.1:0").map_err(|error| {
         ParameterGolfDistributed8xH100TrainStepError::Write {
             path: String::from("127.0.0.1:0"),
@@ -741,12 +744,12 @@ fn write_u64(
     rank: usize,
     detail: &str,
 ) -> Result<(), ParameterGolfDistributed8xH100TrainStepError> {
-    stream
-        .write_all(&value.to_le_bytes())
-        .map_err(|error| ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+    stream.write_all(&value.to_le_bytes()).map_err(|error| {
+        ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
             rank,
             message: format!("failed to write {detail}: {error}"),
-        })
+        }
+    })
 }
 
 fn read_u64(
@@ -777,14 +780,16 @@ fn f32_values_from_bytes(
     rank: usize,
 ) -> Result<Vec<f32>, ParameterGolfDistributed8xH100TrainStepError> {
     if bytes.len() % std::mem::size_of::<f32>() != 0 {
-        return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-            rank,
-            message: format!(
-                "received {} collective bytes, which is not divisible by {}",
-                bytes.len(),
-                std::mem::size_of::<f32>()
-            ),
-        });
+        return Err(
+            ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                rank,
+                message: format!(
+                    "received {} collective bytes, which is not divisible by {}",
+                    bytes.len(),
+                    std::mem::size_of::<f32>()
+                ),
+            },
+        );
     }
     Ok(bytes
         .chunks_exact(std::mem::size_of::<f32>())
@@ -920,8 +925,10 @@ fn unflatten_gradients_from_worker_mesh(
 fn connect_worker_collective(
     rank: usize,
     collective_addr: &str,
-) -> Result<ParameterGolfDistributed8xH100WorkerCollective, ParameterGolfDistributed8xH100TrainStepError>
-{
+) -> Result<
+    ParameterGolfDistributed8xH100WorkerCollective,
+    ParameterGolfDistributed8xH100TrainStepError,
+> {
     if rank == 0 {
         let listener = TcpListener::bind(collective_addr).map_err(|error| {
             ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
@@ -980,24 +987,28 @@ fn all_reduce_mean_flat_gradients(
                 let (peer_step_index, peer_values) =
                     read_collective_gradient_payload(stream, rank)?;
                 if peer_step_index != step_index {
-                    return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                        rank,
-                        message: format!(
-                            "peer rank {} sent step_index {} while rank 0 expected {}",
-                            peer_rank, peer_step_index, step_index
-                        ),
-                    });
+                    return Err(
+                        ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                            rank,
+                            message: format!(
+                                "peer rank {} sent step_index {} while rank 0 expected {}",
+                                peer_rank, peer_step_index, step_index
+                            ),
+                        },
+                    );
                 }
                 if peer_values.len() != reduced.len() {
-                    return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                        rank,
-                        message: format!(
-                            "peer rank {} sent {} flattened gradients but rank 0 expected {}",
-                            peer_rank,
-                            peer_values.len(),
-                            reduced.len()
-                        ),
-                    });
+                    return Err(
+                        ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                            rank,
+                            message: format!(
+                                "peer rank {} sent {} flattened gradients but rank 0 expected {}",
+                                peer_rank,
+                                peer_values.len(),
+                                reduced.len()
+                            ),
+                        },
+                    );
                 }
                 for (reduced_value, peer_value) in reduced.iter_mut().zip(peer_values.iter()) {
                     *reduced_value += *peer_value;
@@ -1015,13 +1026,15 @@ fn all_reduce_mean_flat_gradients(
             write_collective_gradient_payload(stream, step_index, local_gradients, rank)?;
             let (received_step_index, reduced) = read_collective_gradient_payload(stream, rank)?;
             if received_step_index != step_index {
-                return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                    rank,
-                    message: format!(
-                        "rank {} received averaged gradient step_index {} while expecting {}",
-                        rank, received_step_index, step_index
-                    ),
-                });
+                return Err(
+                    ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                        rank,
+                        message: format!(
+                            "rank {} received averaged gradient step_index {} while expecting {}",
+                            rank, received_step_index, step_index
+                        ),
+                    },
+                );
             }
             Ok(reduced)
         }
@@ -1029,6 +1042,17 @@ fn all_reduce_mean_flat_gradients(
 }
 
 impl ParameterGolfDistributed8xH100WorkerRuntime {
+    fn ensure_current_model_materialized(
+        &mut self,
+    ) -> Result<(), ParameterGolfDistributed8xH100TrainStepError> {
+        if self.current_model_stale {
+            self.current_model =
+                materialize_current_model(&self.baseline_model, &self.trainer_state)?;
+            self.current_model_stale = false;
+        }
+        Ok(())
+    }
+
     fn new(run_id: &str) -> Result<Self, ParameterGolfDistributed8xH100TrainStepError> {
         let rank = parse_env_usize(WORKER_CHILD_RANK_ENV_VAR)?;
         let local_rank = parse_env_usize(WORKER_CHILD_LOCAL_RANK_ENV_VAR)?;
@@ -1080,13 +1104,12 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
             parameter_golf_optimizer_plan(&baseline_model.banked_descriptor()?, &hyperparameters)?;
         let trainer_state = seed_parameter_states(&baseline_model, &optimizer_plan)?;
         let current_model = materialize_current_model(&baseline_model, &trainer_state)?;
-        let byte_luts = parameter_golf_sentencepiece_byte_luts_from_tokenizer_path(&tokenizer_path)?;
+        let byte_luts =
+            parameter_golf_sentencepiece_byte_luts_from_tokenizer_path(&tokenizer_path)?;
         let cuda_backend = CudaBackend::new();
         let selected_device = cuda_backend.selected_device().cloned().ok_or_else(|| {
             ParameterGolfDistributed8xH100TrainStepError::Aggregate {
-                message: format!(
-                    "persistent worker rank {rank} could not select one CUDA device"
-                ),
+                message: format!("persistent worker rank {rank} could not select one CUDA device"),
             }
         })?;
         let selected_device_label = selected_device
@@ -1103,6 +1126,7 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
             bundle,
             baseline_model,
             current_model,
+            current_model_stale: false,
             trainer_state,
             geometry: ParameterGolfBatchGeometry::challenge_distributed_8xh100_defaults(),
             hyperparameters,
@@ -1135,16 +1159,23 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
         window: &ParameterGolfTokenStreamWindow,
         learning_rate_multiplier: f32,
         muon_momentum: f32,
-    ) -> Result<ParameterGolfDistributed8xH100TrainStepRankReceipt, ParameterGolfDistributed8xH100TrainStepError>
-    {
+    ) -> Result<
+        ParameterGolfDistributed8xH100TrainStepRankReceipt,
+        ParameterGolfDistributed8xH100TrainStepError,
+    > {
         let step_started = Instant::now();
-        let current_banked_weights = self.current_model.banked_weights()?;
+        let current_banked_weights = if self.training_session_cache.is_empty() {
+            self.ensure_current_model_materialized()?;
+            Some(self.current_model.banked_weights()?)
+        } else {
+            None
+        };
         let gradient_batch = execute_parameter_golf_training_gradient_batch(
             &mut self.cuda_backend,
             &self.selected_device,
             &self.bundle,
             &self.current_model,
-            Some(&current_banked_weights),
+            current_banked_weights.as_ref(),
             &mut self.training_graph_cache,
             Some(&mut self.training_session_cache),
             &self.geometry,
@@ -1178,15 +1209,14 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
             muon_momentum,
             step_index,
         )?;
-        self.current_model = materialize_current_model(&self.baseline_model, &self.trainer_state)?;
-        let refreshed_banked_weights = self.current_model.banked_weights()?;
-        refresh_parameter_golf_cuda_training_sessions(
+        refresh_parameter_golf_cuda_training_sessions_from_state(
             &mut self.training_session_cache,
-            &self.current_model,
-            Some(&refreshed_banked_weights),
+            &self.trainer_state,
         )?;
+        self.current_model_stale = true;
         let optimizer_step_ms = duration_ms(optimizer_started);
-        let averaged_gradient_sha256 = sha256_hex(&f32_values_to_bytes(averaged_flattened.as_slice()));
+        let averaged_gradient_sha256 =
+            sha256_hex(&f32_values_to_bytes(averaged_flattened.as_slice()));
         Ok(ParameterGolfDistributed8xH100TrainStepRankReceipt {
             schema_version: 1,
             run_id: self.run_id.clone(),
@@ -1228,8 +1258,11 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
     fn execute_validation(
         &mut self,
         shard: &ParameterGolfDistributed8xH100ValidationShardPlan,
-    ) -> Result<ParameterGolfDistributed8xH100ValidationRankReceipt, ParameterGolfDistributed8xH100TrainStepError>
-    {
+    ) -> Result<
+        ParameterGolfDistributed8xH100ValidationRankReceipt,
+        ParameterGolfDistributed8xH100TrainStepError,
+    > {
+        self.ensure_current_model_materialized()?;
         let validation_tokens = load_parameter_golf_validation_tokens_from_paths(
             &self
                 .bundle
@@ -1239,8 +1272,8 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
                 .collect::<Vec<_>>(),
             self.geometry.train_sequence_length,
         )?;
-        let total_sequence_count =
-            (validation_tokens.len().saturating_sub(1) / self.geometry.train_sequence_length) as u64;
+        let total_sequence_count = (validation_tokens.len().saturating_sub(1)
+            / self.geometry.train_sequence_length) as u64;
         let expected_shards = build_validation_observation_plan(
             total_sequence_count,
             self.geometry.train_sequence_length,
@@ -1374,9 +1407,13 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
         executed_step_count: u64,
         current_model_artifact_path: &Path,
         current_model_int8_zlib_artifact_path: &Path,
-    ) -> Result<ParameterGolfDistributed8xH100WorkerArtifactExportReceipt, ParameterGolfDistributed8xH100TrainStepError>
-    {
-        let banked_weights = materialize_current_banked_weights(&self.baseline_model, &self.trainer_state)?;
+    ) -> Result<
+        ParameterGolfDistributed8xH100WorkerArtifactExportReceipt,
+        ParameterGolfDistributed8xH100TrainStepError,
+    > {
+        self.ensure_current_model_materialized()?;
+        let banked_weights =
+            materialize_current_banked_weights(&self.baseline_model, &self.trainer_state)?;
         let current_model_sha256 = write_bytes_artifact(
             current_model_artifact_path,
             &export_parameter_golf_banked_full_precision_weights_bytes(
@@ -1428,19 +1465,20 @@ fn write_worker_response_to_stdout(
     response: &ParameterGolfDistributed8xH100WorkerResponse,
 ) -> Result<(), ParameterGolfDistributed8xH100TrainStepError> {
     let mut stdout = std::io::stdout().lock();
-    serde_json::to_writer(&mut stdout, response).map_err(ParameterGolfDistributed8xH100TrainStepError::Json)?;
+    serde_json::to_writer(&mut stdout, response)
+        .map_err(ParameterGolfDistributed8xH100TrainStepError::Json)?;
     stdout.write_all(b"\n").map_err(|error| {
         ParameterGolfDistributed8xH100TrainStepError::Write {
             path: String::from("stdout"),
             error,
         }
     })?;
-    stdout.flush().map_err(|error| {
-        ParameterGolfDistributed8xH100TrainStepError::Write {
+    stdout.flush().map_err(
+        |error| ParameterGolfDistributed8xH100TrainStepError::Write {
             path: String::from("stdout"),
             error,
-        }
-    })?;
+        },
+    )?;
     Ok(())
 }
 
@@ -1466,10 +1504,9 @@ pub fn execute_parameter_golf_distributed_8xh100_worker_child(
         if bytes_read == 0 {
             return Ok(());
         }
-        let command = serde_json::from_str::<ParameterGolfDistributed8xH100WorkerCommand>(
-            line.trim_end(),
-        )
-        .map_err(ParameterGolfDistributed8xH100TrainStepError::Json)?;
+        let command =
+            serde_json::from_str::<ParameterGolfDistributed8xH100WorkerCommand>(line.trim_end())
+                .map_err(ParameterGolfDistributed8xH100TrainStepError::Json)?;
         let response = match command {
             ParameterGolfDistributed8xH100WorkerCommand::TrainStep {
                 step_index,
@@ -1764,8 +1801,10 @@ fn spawn_parameter_golf_distributed_8xh100_persistent_worker_mesh(
     logs_dir: &Path,
     dataset_root: &Path,
     tokenizer_path: &Path,
-) -> Result<Vec<ParameterGolfDistributed8xH100PersistentWorkerHandle>, ParameterGolfDistributed8xH100TrainStepError>
-{
+) -> Result<
+    Vec<ParameterGolfDistributed8xH100PersistentWorkerHandle>,
+    ParameterGolfDistributed8xH100TrainStepError,
+> {
     fs::create_dir_all(logs_dir).map_err(|error| {
         ParameterGolfDistributed8xH100TrainStepError::Write {
             path: logs_dir.display().to_string(),
@@ -1781,10 +1820,12 @@ fn spawn_parameter_golf_distributed_8xh100_persistent_worker_mesh(
             .truncate(true)
             .write(true)
             .open(&log_path)
-            .map_err(|error| ParameterGolfDistributed8xH100TrainStepError::Write {
-                path: log_path.display().to_string(),
-                error,
-            })?;
+            .map_err(
+                |error| ParameterGolfDistributed8xH100TrainStepError::Write {
+                    path: log_path.display().to_string(),
+                    error,
+                },
+            )?;
         let mut child = Command::new(current_exe)
             .arg(manifest_path)
             .current_dir(root)
@@ -1795,7 +1836,10 @@ fn spawn_parameter_golf_distributed_8xh100_persistent_worker_mesh(
             .env(WORKER_CHILD_ENV_VAR, "1")
             .env(WORKER_CHILD_RANK_ENV_VAR, rank.to_string())
             .env(WORKER_CHILD_LOCAL_RANK_ENV_VAR, rank.to_string())
-            .env(WORKER_CHILD_WORLD_SIZE_ENV_VAR, CHALLENGE_WORLD_SIZE.to_string())
+            .env(
+                WORKER_CHILD_WORLD_SIZE_ENV_VAR,
+                CHALLENGE_WORLD_SIZE.to_string(),
+            )
             .env(WORKER_CHILD_LOG_PATH_ENV_VAR, &log_path)
             .env(WORKER_CHILD_COLLECTIVE_ADDR_ENV_VAR, &collective_addr)
             .env(WORKER_CHILD_RUN_ID_ENV_VAR, run_id)
@@ -1819,10 +1863,9 @@ fn spawn_parameter_golf_distributed_8xh100_persistent_worker_mesh(
             .stdout(Stdio::piped())
             .stderr(Stdio::from(stderr))
             .spawn()
-            .map_err(|error| ParameterGolfDistributed8xH100TrainStepError::ChildSpawn {
-                rank,
-                error,
-            })?;
+            .map_err(
+                |error| ParameterGolfDistributed8xH100TrainStepError::ChildSpawn { rank, error },
+            )?;
         let stdin = child.stdin.take().ok_or_else(|| {
             ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
                 rank,
@@ -1850,16 +1893,17 @@ fn spawn_parameter_golf_distributed_8xh100_persistent_worker_mesh(
         let ready = match response {
             ParameterGolfDistributed8xH100WorkerResponse::Ready { receipt, .. } => receipt,
             ParameterGolfDistributed8xH100WorkerResponse::Error { message, .. } => {
-                return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                    rank,
-                    message,
-                });
+                return Err(
+                    ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol { rank, message },
+                );
             }
             other => {
-                return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                    rank,
-                    message: format!("expected one ready response, found {other:?}"),
-                });
+                return Err(
+                    ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                        rank,
+                        message: format!("expected one ready response, found {other:?}"),
+                    },
+                );
             }
         };
         workers.push(ParameterGolfDistributed8xH100PersistentWorkerHandle {
@@ -1898,16 +1942,20 @@ fn shutdown_parameter_golf_distributed_8xh100_persistent_worker_mesh(
             ParameterGolfDistributed8xH100WorkerResponse::ShutdownComplete { rank, .. }
                 if rank == worker.rank => {}
             ParameterGolfDistributed8xH100WorkerResponse::Error { message, .. } => {
-                return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                    rank: worker.rank,
-                    message,
-                });
+                return Err(
+                    ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                        rank: worker.rank,
+                        message,
+                    },
+                );
             }
             other => {
-                return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                    rank: worker.rank,
-                    message: format!("expected shutdown response, found {other:?}"),
-                });
+                return Err(
+                    ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                        rank: worker.rank,
+                        message: format!("expected shutdown response, found {other:?}"),
+                    },
+                );
             }
         }
         let status = worker.child.wait().map_err(|error| {
@@ -1917,14 +1965,16 @@ fn shutdown_parameter_golf_distributed_8xh100_persistent_worker_mesh(
             }
         })?;
         if status.code() != Some(0) {
-            return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                rank: worker.rank,
-                message: format!(
-                    "persistent worker exited with {:?}; see {}",
-                    status.code(),
-                    worker.log_path.display()
-                ),
-            });
+            return Err(
+                ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                    rank: worker.rank,
+                    message: format!(
+                        "persistent worker exited with {:?}; see {}",
+                        status.code(),
+                        worker.log_path.display()
+                    ),
+                },
+            );
         }
     }
     Ok(())
@@ -1935,8 +1985,10 @@ fn export_final_worker_artifacts(
     executed_step_count: u64,
     current_model_artifact_path: &Path,
     current_model_int8_zlib_artifact_path: &Path,
-) -> Result<ParameterGolfDistributed8xH100WorkerArtifactExportReceipt, ParameterGolfDistributed8xH100TrainStepError>
-{
+) -> Result<
+    ParameterGolfDistributed8xH100WorkerArtifactExportReceipt,
+    ParameterGolfDistributed8xH100TrainStepError,
+> {
     let rank_zero = workers.first_mut().ok_or_else(|| {
         ParameterGolfDistributed8xH100TrainStepError::Aggregate {
             message: String::from("persistent worker mesh was empty during artifact export"),
@@ -1955,19 +2007,21 @@ fn export_final_worker_artifacts(
         },
     )?;
     match worker_response_from_reader(rank_zero.rank, &mut rank_zero.stdout)? {
-        ParameterGolfDistributed8xH100WorkerResponse::ExportArtifactsComplete { receipt, .. } => {
-            Ok(receipt)
-        }
+        ParameterGolfDistributed8xH100WorkerResponse::ExportArtifactsComplete {
+            receipt, ..
+        } => Ok(receipt),
         ParameterGolfDistributed8xH100WorkerResponse::Error { message, .. } => Err(
             ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
                 rank: rank_zero.rank,
                 message,
             },
         ),
-        other => Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-            rank: rank_zero.rank,
-            message: format!("expected export-artifacts response, found {other:?}"),
-        }),
+        other => Err(
+            ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                rank: rank_zero.rank,
+                message: format!("expected export-artifacts response, found {other:?}"),
+            },
+        ),
     }
 }
 
@@ -2292,8 +2346,8 @@ fn execute_parameter_golf_distributed_8xh100_step_on_worker_mesh(
             }
         })?;
     }
-    let learning_rate_multiplier = hyperparameters
-        .learning_rate_multiplier(step_index - 1, observed_training_time_ms as f32);
+    let learning_rate_multiplier =
+        hyperparameters.learning_rate_multiplier(step_index - 1, observed_training_time_ms as f32);
     let muon_momentum = hyperparameters.muon_momentum_at_step(step_index - 1);
     let step_started = Instant::now();
     let mut planned_windows = Vec::with_capacity(CHALLENGE_WORLD_SIZE);
@@ -2335,16 +2389,20 @@ fn execute_parameter_golf_distributed_8xh100_step_on_worker_mesh(
                 receipt
             }
             ParameterGolfDistributed8xH100WorkerResponse::Error { message, .. } => {
-                return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                    rank: worker.rank,
-                    message,
-                });
+                return Err(
+                    ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                        rank: worker.rank,
+                        message,
+                    },
+                );
             }
             other => {
-                return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                    rank: worker.rank,
-                    message: format!("expected train-step response, found {other:?}"),
-                });
+                return Err(
+                    ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                        rank: worker.rank,
+                        message: format!("expected train-step response, found {other:?}"),
+                    },
+                );
             }
         };
         let receipt_path = rank_receipts_dir.join(format!("rank_{}.json", worker.rank));
@@ -2352,10 +2410,12 @@ fn execute_parameter_golf_distributed_8xh100_step_on_worker_mesh(
             &receipt_path,
             format!("{}\n", serde_json::to_string_pretty(&receipt)?),
         )
-        .map_err(|error| ParameterGolfDistributed8xH100TrainStepError::Write {
-            path: receipt_path.display().to_string(),
-            error,
-        })?;
+        .map_err(
+            |error| ParameterGolfDistributed8xH100TrainStepError::Write {
+                path: receipt_path.display().to_string(),
+                error,
+            },
+        )?;
         mean_train_loss += receipt.loss / CHALLENGE_WORLD_SIZE as f32;
         gradient_sync_ms = gradient_sync_ms.max(receipt.gradient_sync_ms);
         optimizer_step_ms = optimizer_step_ms.max(receipt.optimizer_step_ms);
@@ -2376,8 +2436,12 @@ fn execute_parameter_golf_distributed_8xh100_step_on_worker_mesh(
         });
     }
     let observed_step_ms = duration_ms(step_started);
-    let step_observation =
-        ParameterGolfDistributedStepObservation::new(step_index, 0, observed_step_ms, geometry.train_batch_tokens as u64);
+    let step_observation = ParameterGolfDistributedStepObservation::new(
+        step_index,
+        0,
+        observed_step_ms,
+        geometry.train_batch_tokens as u64,
+    );
     let aggregated_gradient_artifact_sha256 = rank_launches
         .first()
         .and_then(|launch| launch.receipt.as_ref())
@@ -2593,8 +2657,9 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
         &current_model_artifact_path,
         &current_model_int8_zlib_artifact_path,
     )?;
-    let current_model_int8_zlib_artifact_sha256 =
-        exported_artifacts.current_model_int8_zlib_artifact_sha256.clone();
+    let current_model_int8_zlib_artifact_sha256 = exported_artifacts
+        .current_model_int8_zlib_artifact_sha256
+        .clone();
     let current_model_int8_zlib_artifact_size_bytes =
         exported_artifacts.current_model_int8_zlib_artifact_size_bytes;
     let validation_eval_mode = ParameterGolfValidationEvalMode::SlidingWindow { stride: 64 };
@@ -2686,30 +2751,36 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
             },
         )?;
         let receipt = match worker_response_from_reader(worker.rank, &mut worker.stdout)? {
-            ParameterGolfDistributed8xH100WorkerResponse::ValidationComplete { receipt, .. } => {
-                receipt
-            }
+            ParameterGolfDistributed8xH100WorkerResponse::ValidationComplete {
+                receipt, ..
+            } => receipt,
             ParameterGolfDistributed8xH100WorkerResponse::Error { message, .. } => {
-                return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                    rank: worker.rank,
-                    message,
-                });
+                return Err(
+                    ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                        rank: worker.rank,
+                        message,
+                    },
+                );
             }
             other => {
-                return Err(ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
-                    rank: worker.rank,
-                    message: format!("expected validation response, found {other:?}"),
-                });
+                return Err(
+                    ParameterGolfDistributed8xH100TrainStepError::WorkerProtocol {
+                        rank: worker.rank,
+                        message: format!("expected validation response, found {other:?}"),
+                    },
+                );
             }
         };
         fs::write(
             &receipt_path,
             format!("{}\n", serde_json::to_string_pretty(&receipt)?),
         )
-        .map_err(|error| ParameterGolfDistributed8xH100TrainStepError::Write {
-            path: receipt_path.display().to_string(),
-            error,
-        })?;
+        .map_err(
+            |error| ParameterGolfDistributed8xH100TrainStepError::Write {
+                path: receipt_path.display().to_string(),
+                error,
+            },
+        )?;
         validation_rank_launches.push(ParameterGolfDistributed8xH100ValidationRankLaunch {
             rank: worker.rank,
             local_rank: worker.local_rank,
@@ -2947,24 +3018,27 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step_child(
     let baseline_model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
     let (model, explicit_banked_weights, input_model_artifact_sha256) =
         match input_model_artifact_path.as_ref() {
-        Some(path) => {
-            let bytes = fs::read(path).map_err(|error| {
-                ParameterGolfDistributed8xH100TrainStepError::Read {
-                    path: path.display().to_string(),
-                    error,
-                }
-            })?;
-            (
-                restore_parameter_golf_model_from_safetensors(&baseline_model, bytes.as_slice())?,
-                restore_parameter_golf_banked_weights_from_safetensors(
-                    &baseline_model,
-                    bytes.as_slice(),
-                )?,
-                Some(sha256_hex(bytes.as_slice())),
-            )
-        }
-        None => (baseline_model, None, None),
-    };
+            Some(path) => {
+                let bytes = fs::read(path).map_err(|error| {
+                    ParameterGolfDistributed8xH100TrainStepError::Read {
+                        path: path.display().to_string(),
+                        error,
+                    }
+                })?;
+                (
+                    restore_parameter_golf_model_from_safetensors(
+                        &baseline_model,
+                        bytes.as_slice(),
+                    )?,
+                    restore_parameter_golf_banked_weights_from_safetensors(
+                        &baseline_model,
+                        bytes.as_slice(),
+                    )?,
+                    Some(sha256_hex(bytes.as_slice())),
+                )
+            }
+            None => (baseline_model, None, None),
+        };
     let geometry = ParameterGolfBatchGeometry::challenge_distributed_8xh100_defaults();
     let mut cuda_backend = CudaBackend::new();
     let selected_device = cuda_backend.selected_device().cloned().ok_or_else(|| {

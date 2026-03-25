@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use psionic_core::{DType, Device, Shape, TensorData, TensorId};
+use psionic_core::{DType, Device, DeviceKind, Shape, TensorData, TensorId};
 use psionic_ir::{
     AutodiffContext, AutodiffError, AutodiffGraph, AutodiffGraphBuilder, AutodiffTensor, Graph,
     GraphError, ReferenceEvaluationError,
@@ -205,8 +205,14 @@ pub fn build_parameter_golf_baseline_graph(
     sequence_length: usize,
 ) -> Result<ParameterGolfBaselineGraph, ParameterGolfBaselineGraphError> {
     let mut builder = AutodiffGraphBuilder::with_context(device, AutodiffContext::training());
-    let state =
-        build_baseline_graph_state(&mut builder, descriptor, batch_size, sequence_length, true)?;
+    let state = build_baseline_graph_state(
+        &mut builder,
+        descriptor,
+        batch_size,
+        sequence_length,
+        true,
+        false,
+    )?;
     let graph = builder.finish(vec![state.pre_softcap_logits.clone()]);
 
     Ok(ParameterGolfBaselineGraph {
@@ -227,8 +233,14 @@ pub fn build_parameter_golf_baseline_training_graph(
     sequence_length: usize,
 ) -> Result<ParameterGolfBaselineTrainingGraph, ParameterGolfBaselineGraphError> {
     let mut builder = AutodiffGraphBuilder::with_context(device, AutodiffContext::training());
-    let state =
-        build_baseline_graph_state(&mut builder, descriptor, batch_size, sequence_length, true)?;
+    let state = build_baseline_graph_state(
+        &mut builder,
+        descriptor,
+        batch_size,
+        sequence_length,
+        true,
+        false,
+    )?;
     let target_ids = builder.input(
         "target_ids",
         Shape::new(vec![batch_size, sequence_length]),
@@ -261,9 +273,16 @@ pub fn build_parameter_golf_baseline_eval_graph(
     batch_size: usize,
     sequence_length: usize,
 ) -> Result<ParameterGolfBaselineEvalGraph, ParameterGolfBaselineGraphError> {
+    let use_bf16_fast_path = device.kind() == DeviceKind::Cuda;
     let mut builder = AutodiffGraphBuilder::with_context(device, AutodiffContext::evaluation());
-    let state =
-        build_baseline_graph_state(&mut builder, descriptor, batch_size, sequence_length, false)?;
+    let state = build_baseline_graph_state(
+        &mut builder,
+        descriptor,
+        batch_size,
+        sequence_length,
+        false,
+        use_bf16_fast_path,
+    )?;
     let target_ids = builder.input(
         "target_ids",
         Shape::new(vec![batch_size, sequence_length]),
@@ -333,11 +352,7 @@ pub fn bind_parameter_golf_baseline_training_graph_inputs(
     target_ids: &[Vec<u32>],
 ) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
     bind_parameter_golf_baseline_training_graph_inputs_with_banked_weights(
-        graph,
-        model,
-        None,
-        input_ids,
-        target_ids,
+        graph, model, None, input_ids, target_ids,
     )
 }
 
@@ -371,11 +386,7 @@ pub fn bind_parameter_golf_baseline_eval_graph_inputs(
     target_ids: &[Vec<u32>],
 ) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
     bind_parameter_golf_baseline_eval_graph_inputs_with_banked_weights(
-        graph,
-        model,
-        None,
-        input_ids,
-        target_ids,
+        graph, model, None, input_ids, target_ids,
     )
 }
 
@@ -410,8 +421,11 @@ fn bind_parameter_golf_graph_inputs(
     let config = &model.descriptor().config;
     validate_token_batch(input_ids, config.vocab_size)?;
 
-    let parameter_vectors =
-        parameter_golf_parameter_values_for_bindings(parameter_bindings, model, explicit_banked_weights)?;
+    let parameter_vectors = parameter_golf_parameter_values_for_bindings(
+        parameter_bindings,
+        model,
+        explicit_banked_weights,
+    )?;
     let mut inputs = BTreeMap::new();
     inputs.insert(
         input_token_ids_tensor_id,
@@ -495,7 +509,8 @@ pub(crate) fn parameter_golf_parameter_values_for_bindings(
     let needs_banked_runtime_surface = parameter_bindings
         .iter()
         .any(|binding| PARAMETER_GOLF_MATRIX_BANK_NAMES.contains(&binding.parameter_id.as_str()));
-    let owned_banked_weights = if explicit_banked_weights.is_none() && needs_banked_runtime_surface {
+    let owned_banked_weights = if explicit_banked_weights.is_none() && needs_banked_runtime_surface
+    {
         Some(model.banked_weights()?)
     } else {
         None
@@ -660,6 +675,7 @@ fn build_baseline_graph_state(
     batch_size: usize,
     sequence_length: usize,
     parameter_requires_grad: bool,
+    use_bf16_fast_path: bool,
 ) -> Result<ParameterGolfBaselineGraphBuildState, ParameterGolfBaselineGraphError> {
     let config = &descriptor.config;
     if batch_size == 0 {
@@ -749,6 +765,7 @@ fn build_baseline_graph_state(
             &ones_head,
             &rope_cos,
             &rope_sin,
+            use_bf16_fast_path,
         )?;
         skips.push(x.clone());
     }
@@ -789,6 +806,7 @@ fn build_baseline_graph_state(
             &ones_head,
             &rope_cos,
             &rope_sin,
+            use_bf16_fast_path,
         )?;
     }
     let hidden = builder.rms_norm(&x, &ones_model, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON)?;
@@ -799,6 +817,7 @@ fn build_baseline_graph_state(
         config,
         batch_size,
         sequence_length,
+        use_bf16_fast_path,
     )?;
 
     Ok(ParameterGolfBaselineGraphBuildState {
@@ -821,6 +840,7 @@ fn block_forward_graph(
     ones_head: &AutodiffTensor,
     rope_cos: &AutodiffTensor,
     rope_sin: &AutodiffTensor,
+    use_bf16_fast_path: bool,
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
     let resid_mix = parameters
         .get(format!("blocks.{layer_index}.resid_mix").as_str())
@@ -852,6 +872,7 @@ fn block_forward_graph(
         ones_head,
         rope_cos,
         rope_sin,
+        use_bf16_fast_path,
     )?;
     let attn_scale = parameters
         .get(format!("blocks.{layer_index}.attn_scale").as_str())
@@ -878,6 +899,7 @@ fn block_forward_graph(
         batch_size,
         sequence_length,
         layer_index,
+        use_bf16_fast_path,
     )?;
     let mlp_scale = parameters
         .get(format!("blocks.{layer_index}.mlp_scale").as_str())
@@ -907,6 +929,7 @@ fn attention_forward_graph(
     ones_head: &AutodiffTensor,
     rope_cos: &AutodiffTensor,
     rope_sin: &AutodiffTensor,
+    use_bf16_fast_path: bool,
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
     let head_dim = config.head_dim()?;
     let kv_dim = config.kv_dim()?;
@@ -945,6 +968,7 @@ fn attention_forward_graph(
         sequence_length,
         config.model_dim,
         config.model_dim,
+        use_bf16_fast_path,
     )?;
     let k_proj = linear_3d(
         builder,
@@ -954,6 +978,7 @@ fn attention_forward_graph(
         sequence_length,
         config.model_dim,
         kv_dim,
+        use_bf16_fast_path,
     )?;
     let v_proj = linear_3d(
         builder,
@@ -963,6 +988,7 @@ fn attention_forward_graph(
         sequence_length,
         config.model_dim,
         kv_dim,
+        use_bf16_fast_path,
     )?;
 
     let q = reshape_to_attention_heads(
@@ -1013,6 +1039,21 @@ fn attention_forward_graph(
         ]),
     )?;
     let q = builder.mul(&q, &q_gain)?;
+    let q = if use_bf16_fast_path {
+        builder.cast(&q, DType::BF16)?
+    } else {
+        q
+    };
+    let k = if use_bf16_fast_path {
+        builder.cast(&k, DType::BF16)?
+    } else {
+        k
+    };
+    let v = if use_bf16_fast_path {
+        builder.cast(&v, DType::BF16)?
+    } else {
+        v
+    };
     let attended = builder.scaled_dot_product_attention(
         &q,
         &k,
@@ -1042,6 +1083,7 @@ fn attention_forward_graph(
         sequence_length,
         config.model_dim,
         config.model_dim,
+        use_bf16_fast_path,
     )
 }
 
@@ -1053,6 +1095,7 @@ fn mlp_forward_graph(
     batch_size: usize,
     sequence_length: usize,
     layer_index: usize,
+    use_bf16_fast_path: bool,
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
     let hidden_dim = config.mlp_hidden_dim()?;
     let fc_weight = parameter_tensor_or_matrix_bank_slice_graph(
@@ -1072,6 +1115,7 @@ fn mlp_forward_graph(
         sequence_length,
         config.model_dim,
         hidden_dim,
+        use_bf16_fast_path,
     )?;
     let activated = builder.relu_squared(&hidden)?;
     let proj_weight = parameter_tensor_or_matrix_bank_slice_graph(
@@ -1091,6 +1135,7 @@ fn mlp_forward_graph(
         sequence_length,
         hidden_dim,
         config.model_dim,
+        use_bf16_fast_path,
     )
 }
 
@@ -1101,6 +1146,7 @@ fn hidden_to_pre_softcap_logits_graph(
     config: &ParameterGolfConfig,
     batch_size: usize,
     sequence_length: usize,
+    use_bf16_fast_path: bool,
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
     let head_weight = if config.tie_embeddings {
         parameters.get("tok_emb.weight").cloned().ok_or_else(|| {
@@ -1123,6 +1169,7 @@ fn hidden_to_pre_softcap_logits_graph(
         sequence_length,
         config.model_dim,
         config.vocab_size,
+        use_bf16_fast_path,
     )
 }
 
@@ -1134,13 +1181,28 @@ fn linear_3d(
     sequence_length: usize,
     in_features: usize,
     out_features: usize,
+    use_bf16_fast_path: bool,
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
     let flattened = builder.reshape(
         input,
         Shape::new(vec![batch_size * sequence_length, in_features]),
     )?;
     let transposed_weight = builder.permute(weight, vec![1, 0])?;
-    let output = builder.matmul(&flattened, &transposed_weight)?;
+    let output = if use_bf16_fast_path && transposed_weight.spec().dtype() == DType::BF16 {
+        let lowered_input = if flattened.spec().dtype() == DType::BF16 {
+            flattened.clone()
+        } else {
+            builder.cast(&flattened, DType::BF16)?
+        };
+        let lowered_output = builder.matmul(&lowered_input, &transposed_weight)?;
+        if lowered_output.spec().dtype() == DType::BF16 {
+            builder.cast(&lowered_output, DType::F32)?
+        } else {
+            lowered_output
+        }
+    } else {
+        builder.matmul(&flattened, &transposed_weight)?
+    };
     Ok(builder.reshape(
         &output,
         Shape::new(vec![batch_size, sequence_length, out_features]),
@@ -1409,7 +1471,7 @@ mod tests {
 
     use psionic_compiler::compile_graph;
     use psionic_core::TensorData;
-    use psionic_ir::evaluate_graph;
+    use psionic_ir::{evaluate_graph, OpKind};
     use serde::Deserialize;
 
     use super::*;
@@ -1926,6 +1988,55 @@ mod tests {
                         .flat_map(|row| row.iter().map(|token_id| *token_id as i32))
                         .collect::<Vec<_>>()
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_cuda_eval_graph_lowers_linear_and_attention_compute_to_bf16(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = load_baseline_fixture();
+        let model = baseline_model()?;
+        let cuda = Device::new(DeviceKind::Cuda, 0, Some(String::from("cuda:0")));
+        let training_graph = build_parameter_golf_baseline_training_graph(
+            cuda.clone(),
+            model.descriptor(),
+            fixture.input_ids.len(),
+            fixture.input_ids[0].len(),
+        )?;
+        let eval_graph = build_parameter_golf_baseline_eval_graph(
+            cuda,
+            model.descriptor(),
+            fixture.input_ids.len(),
+            fixture.input_ids[0].len(),
+        )?;
+
+        let training_bf16_matmul_count = training_graph
+            .graph
+            .graph()
+            .nodes()
+            .iter()
+            .filter(|node| {
+                matches!(node.op(), OpKind::Matmul) && node.tensor().spec().dtype() == DType::BF16
+            })
+            .count();
+        let eval_bf16_matmul_count = eval_graph
+            .graph
+            .nodes()
+            .iter()
+            .filter(|node| {
+                matches!(node.op(), OpKind::Matmul) && node.tensor().spec().dtype() == DType::BF16
+            })
+            .count();
+        let eval_bf16_cast_count = eval_graph
+            .graph
+            .nodes()
+            .iter()
+            .filter(|node| matches!(node.op(), OpKind::Cast { dtype: DType::BF16 }))
+            .count();
+
+        assert_eq!(training_bf16_matmul_count, 0);
+        assert!(eval_bf16_matmul_count > 0);
+        assert!(eval_bf16_cast_count > 0);
         Ok(())
     }
 }

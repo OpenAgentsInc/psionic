@@ -72,6 +72,9 @@ the baseline mixed-precision lane:
 
 - dense BF16 buffer residency on the public CUDA dense surface
 - bounded row-major BF16xBF16-to-F32 matmul execution through cuBLAS
+- bounded on-device `f32 -> bf16` cast execution on the public CUDA dense
+  surface, so later PGOLF graph slices can lower explicit BF16 boundaries
+  without forcing host replay
 - bounded Parameter Golf token-embedding forward and backward admission with
   BF16 train-visible embedding tables while preserving the current F32
   embedding-activation and grad-output posture
@@ -202,6 +205,23 @@ the same bounded public lane before the next H100 rerun:
   - device-resident eval-graph average batch time: `9048.00 ms`
   - runtime receipt: `path=device_resident_cuda_eval_graph_v1`,
     `graph_surface=parameter_golf_baseline_eval_graph_v1`
+- the CUDA eval graph now also lowers the attention hot path more explicitly on
+  CUDA devices:
+  - eval-only `q`, `k`, and `v` inputs now cast onto the admitted BF16
+    full-sequence attention lane before `scaled_dot_product_attention`
+  - eval-only linear hot-path matmuls now register BF16 compute tensors
+    directly in the lowered graph on CUDA while casting their outputs back to
+    the existing F32 eval surface
+  - the training graph still does not claim that same cast-based BF16 posture,
+    because reverse-mode autodiff still refuses `Cast` as a supported gradient
+    family
+- the latest real `8xH100` scoreproof retained that remaining training-side
+  blocker honestly:
+  - wallclock cap hit after only `3` steps
+  - step `2` rank-0 timings were about `53.3 s` forward, `123.6 s` backward,
+    `7.4 s` gradient sync, and `0.9 s` host gradient materialization
+  - that is still far outside the upstream `10 minute` scoreboard bar even
+    after the resident worker mesh and resident-parameter refresh slices landed
 - bounded PGOLF residual `add`/`mul` execution now preserves the IR broadcast
   contract when exact CUDA input specs do not match:
   - exact dense `f32` peers still encode directly on-device

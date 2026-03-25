@@ -34,8 +34,7 @@ use thiserror::Error;
 
 use crate::{
     apply_parameter_golf_cuda_bf16_master_weight_optimizer_step,
-    apply_parameter_golf_cuda_muon_step,
-    bind_parameter_golf_baseline_training_graph_inputs,
+    apply_parameter_golf_cuda_muon_step, bind_parameter_golf_baseline_training_graph_inputs,
     bind_parameter_golf_baseline_training_graph_inputs_with_banked_weights,
     build_parameter_golf_baseline_eval_graph, build_parameter_golf_baseline_training_graph,
     build_tokenizer_digest, builtin_parameter_golf_cuda_training_capability_report,
@@ -43,14 +42,13 @@ use crate::{
     inspect_local_single_h100_machine, materialize_parameter_golf_baseline_training_gradients,
     parameter_golf_optimizer_plan, parameter_golf_parameter_values_for_bindings,
     restore_parameter_golf_model_from_int8_zlib, training_batch_from_window_tokens,
-    ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph,
-    ParameterGolfBatchGeometry, ParameterGolfBf16MasterWeightStepReceipt,
-    ParameterGolfOptimizerExecution, ParameterGolfOptimizerGroupKind,
-    ParameterGolfOptimizerPlan, ParameterGolfReferenceTrainingError,
-    ParameterGolfSingleH100BringupError, ParameterGolfSingleH100ChallengeThresholds,
-    ParameterGolfSingleH100MachineObservation, ParameterGolfTrainError,
-    ParameterGolfTrainingHyperparameters, TrainingOptimizerConfig, TrainingOptimizerState,
-    TrainingPrecisionMode, PARAMETER_GOLF_SINGLE_H100_DATASET_REF,
+    ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph, ParameterGolfBatchGeometry,
+    ParameterGolfBf16MasterWeightStepReceipt, ParameterGolfOptimizerExecution,
+    ParameterGolfOptimizerGroupKind, ParameterGolfOptimizerPlan,
+    ParameterGolfReferenceTrainingError, ParameterGolfSingleH100BringupError,
+    ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100MachineObservation,
+    ParameterGolfTrainError, ParameterGolfTrainingHyperparameters, TrainingOptimizerConfig,
+    TrainingOptimizerState, TrainingPrecisionMode, PARAMETER_GOLF_SINGLE_H100_DATASET_REF,
     PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION, PARAMETER_GOLF_SINGLE_H100_VARIANT,
 };
 
@@ -2446,7 +2444,8 @@ pub(crate) fn materialize_current_model(
 ) -> Result<ParameterGolfReferenceModel, ParameterGolfSingleH100TrainingError> {
     let overrides = current_parameter_state_overrides(state);
     let weights = if uses_banked_runtime_surface(&overrides) {
-        materialize_current_banked_weights(baseline, state)?.to_split(&baseline.descriptor().config)?
+        materialize_current_banked_weights(baseline, state)?
+            .to_split(&baseline.descriptor().config)?
     } else {
         baseline
             .weights()
@@ -2804,11 +2803,9 @@ fn execute_training_step(
         global_step,
     )?;
     *current_model = materialize_current_model(baseline_model, trainer_state)?;
-    let refreshed_banked_weights = current_model.banked_weights()?;
-    refresh_parameter_golf_cuda_training_sessions(
+    refresh_parameter_golf_cuda_training_sessions_from_state(
         training_session_cache,
-        current_model,
-        Some(&refreshed_banked_weights),
+        trainer_state,
     )?;
     step_profile.optimizer_step_ms = duration_ms(optimizer_started);
     let observed_wallclock_ms = duration_ms(step_started);
@@ -4059,6 +4056,16 @@ pub(crate) fn refresh_parameter_golf_cuda_training_sessions(
     Ok(())
 }
 
+pub(crate) fn refresh_parameter_golf_cuda_training_sessions_from_state(
+    cache: &mut BTreeMap<usize, ParameterGolfCudaTrainingSession>,
+    state: &ParameterGolfSingleH100TrainerState,
+) -> Result<(), ParameterGolfSingleH100TrainingError> {
+    for session in cache.values_mut() {
+        session.refresh_parameters_from_state(state)?;
+    }
+    Ok(())
+}
+
 fn training_graph_for_batch<'a>(
     cache: &'a mut BTreeMap<usize, ParameterGolfBaselineTrainingGraph>,
     device: psionic_core::Device,
@@ -4270,7 +4277,9 @@ impl ParameterGolfCudaTrainingSession {
                     },
                 )?;
             let buffer = match binding.graph_input_dtype {
-                DType::F32 => cuda_backend.input_buffer(binding.shape.clone(), parameter.clone())?,
+                DType::F32 => {
+                    cuda_backend.input_buffer(binding.shape.clone(), parameter.clone())?
+                }
                 DType::BF16 => {
                     cuda_backend.input_bf16_buffer(binding.shape.clone(), parameter.clone())?
                 }
@@ -4343,6 +4352,43 @@ impl ParameterGolfCudaTrainingSession {
                     return Err(ParameterGolfSingleH100TrainingError::Serialization {
                         message: format!(
                             "training session does not support refresh dtype {actual:?} for `{}`",
+                            binding.parameter_id
+                        ),
+                    });
+                }
+            }
+        }
+        self.parameter_refresh_us_pending = Some(duration_us(refresh_started));
+        Ok(())
+    }
+
+    fn refresh_parameters_from_state(
+        &mut self,
+        state: &ParameterGolfSingleH100TrainerState,
+    ) -> Result<(), ParameterGolfSingleH100TrainingError> {
+        let refresh_started = Instant::now();
+        for binding in &self.graph.parameter_bindings {
+            let parameter_state = state
+                .parameter_states
+                .get(&binding.parameter_id)
+                .ok_or_else(
+                    || ParameterGolfSingleH100TrainingError::MissingParameterState {
+                        parameter_id: binding.parameter_id.clone(),
+                    },
+                )?;
+            let buffer = self
+                .static_inputs
+                .get_mut(&binding.graph_input_tensor_id)
+                .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphTensor {
+                    tensor_id: binding.graph_input_tensor_id,
+                })?;
+            match binding.graph_input_dtype {
+                DType::F32 => buffer.write_f32(parameter_state.values())?,
+                DType::BF16 => buffer.write_bf16_from_f32(parameter_state.values())?,
+                actual => {
+                    return Err(ParameterGolfSingleH100TrainingError::Serialization {
+                        message: format!(
+                            "training session does not support state refresh dtype {actual:?} for `{}`",
                             binding.parameter_id
                         ),
                     });
@@ -5167,6 +5213,18 @@ mod tests {
         )?;
         assert_eq!(refreshed_runtime.resident_parameter_upload_us, 0);
         assert!(refreshed_runtime.parameter_refresh_us > 0);
+
+        let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
+        let optimizer_plan = parameter_golf_optimizer_plan(model.descriptor(), &hyperparameters)?;
+        let trainer_state = seed_parameter_states(&model, &optimizer_plan)?;
+        resident_session.refresh_parameters_from_state(&trainer_state)?;
+        let (_, _, state_refreshed_runtime) = resident_session.execute_batch(
+            &mut cuda_backend,
+            input_ids.as_slice(),
+            target_ids.as_slice(),
+        )?;
+        assert_eq!(state_refreshed_runtime.resident_parameter_upload_us, 0);
+        assert!(state_refreshed_runtime.parameter_refresh_us > 0);
         Ok(())
     }
 
