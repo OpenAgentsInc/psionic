@@ -257,7 +257,9 @@ The command is explicit about what it treats as trainer truth. It binds:
   train path, so the trainer now only materializes parameter-input gradients
   back to host, only keeps backward-live primal bindings, and now sources
   graph-input primals straight from the original input buffers instead of
-  retaining that input-bound parameter surface as extra forward outputs
+  retaining that input-bound parameter surface as extra forward outputs; the
+  default PGOLF `relu_squared` MLP path now also binds backward against the
+  activation output instead of retaining the pre-activation hidden tensor
 - slice-wise Muon updates over that banked matrix surface, so rank-3 bank
   tensors are now treated as stacks of equal-shaped matrices rather than
   forcing the optimizer path back to the split surface before every update

@@ -416,6 +416,9 @@ impl CpuBackend {
         match op {
             BackendExtensionOp::ReluSquared => self.relu_squared(step, values),
             BackendExtensionOp::ReluSquaredBackward => self.relu_squared_backward(step, values),
+            BackendExtensionOp::ReluSquaredBackwardFromOutput => {
+                self.relu_squared_backward_from_output(step, values)
+            }
             BackendExtensionOp::LeakyReluSquared { negative_slope } => {
                 self.leaky_relu_squared(step, values, negative_slope.to_f32())
             }
@@ -628,6 +631,34 @@ impl CpuBackend {
             })
             .collect::<Vec<_>>();
         CpuBuffer::from_f32(step.spec.clone(), output)
+    }
+
+    fn relu_squared_backward_from_output(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CpuBuffer>,
+    ) -> Result<CpuBuffer, RuntimeError> {
+        let output = self.input(step, values, 0)?.logical_values()?;
+        let grad_output = self.input(step, values, 1)?.logical_values()?;
+        if output.len() != grad_output.len() {
+            return Err(RuntimeError::Backend(format!(
+                "cpu relu_squared_backward_from_output requires matching output and grad_output lengths, actual {} and {}",
+                output.len(),
+                grad_output.len()
+            )));
+        }
+        let input_gradient = output
+            .iter()
+            .zip(grad_output.iter())
+            .map(|(value, grad)| {
+                if *value > 0.0 {
+                    grad * (2.0 * value.sqrt())
+                } else {
+                    0.0
+                }
+            })
+            .collect::<Vec<_>>();
+        CpuBuffer::from_f32(step.spec.clone(), input_gradient)
     }
 
     fn leaky_relu_squared(

@@ -2249,14 +2249,14 @@ impl AutodiffGraph {
                     BackendExtensionOp::ReluSquared => {
                         let input_id = node.inputs()[0];
                         if self.requires_grad(input_id) {
-                            let input = primal_placeholder(
+                            let output = primal_placeholder(
                                 &mut backward_builder,
                                 &mut primal_bindings,
                                 &self.graph,
-                                input_id,
+                                output_id,
                             )?;
                             let contribution = backward_builder
-                                .relu_squared_backward(&input, &current_gradient)
+                                .relu_squared_backward_from_output(&output, &current_gradient)
                                 .map_err(map_graph_error)?;
                             accumulate_gradient(
                                 &mut backward_builder,
@@ -4496,6 +4496,15 @@ fn evaluate_backend_extension_reference(
                 grad_output,
             )))
         }
+        BackendExtensionOp::ReluSquaredBackwardFromOutput => {
+            let output = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let grad_output =
+                resolve_dense_input(graph, values, node.inputs()[1], node.op().label())?;
+            Ok(TensorData::F32(relu_squared_backward_from_output_values(
+                output,
+                grad_output,
+            )))
+        }
         BackendExtensionOp::LeakyReluSquared { negative_slope } => {
             let input = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
             Ok(TensorData::F32(leaky_relu_squared_forward_values(
@@ -5613,6 +5622,20 @@ fn relu_squared_backward_values(input: &[f32], grad_output: &[f32]) -> Vec<f32> 
         .map(|(value, grad)| {
             if *value > 0.0 {
                 grad * (2.0 * value)
+            } else {
+                0.0
+            }
+        })
+        .collect()
+}
+
+fn relu_squared_backward_from_output_values(output: &[f32], grad_output: &[f32]) -> Vec<f32> {
+    output
+        .iter()
+        .zip(grad_output.iter())
+        .map(|(value, grad)| {
+            if *value > 0.0 {
+                grad * (2.0 * value.sqrt())
             } else {
                 0.0
             }
@@ -6748,9 +6771,17 @@ mod tests {
             .any(|node| matches!(
                 node.op(),
                 crate::OpKind::BackendExtension {
-                    op: psionic_core::BackendExtensionOp::ReluSquaredBackward
+                    op: psionic_core::BackendExtensionOp::ReluSquaredBackwardFromOutput
                 }
             )));
+        assert!(backward_plan
+            .primal_bindings
+            .iter()
+            .any(|binding| binding.primal_tensor == activated.id()));
+        assert!(!backward_plan
+            .primal_bindings
+            .iter()
+            .any(|binding| binding.primal_tensor == input.id()));
 
         let input_values = vec![-1.25_f32, -0.5, 0.75, 2.0];
         let inputs = BTreeMap::from([(input.id(), TensorData::F32(input_values.clone()))]);

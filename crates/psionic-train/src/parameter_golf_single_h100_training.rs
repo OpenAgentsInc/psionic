@@ -6379,6 +6379,52 @@ mod tests {
     }
 
     #[test]
+    fn pgolf_relu_squared_backward_binds_activation_outputs_not_preactivation_inputs(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+        let graph = build_parameter_golf_baseline_training_graph(
+            psionic_core::Device::cpu(),
+            model.descriptor(),
+            1,
+            16,
+        )?;
+        let filtered_plan = parameter_only_backward_plan(&graph)?;
+        let retained_tensor_ids = retained_forward_tensor_ids(&graph, &filtered_plan)
+            .into_iter()
+            .collect::<std::collections::BTreeSet<_>>();
+        let bound_primal_tensors = filtered_plan
+            .primal_bindings
+            .iter()
+            .map(|binding| binding.primal_tensor)
+            .collect::<std::collections::BTreeSet<_>>();
+        let relu_squared_nodes = graph
+            .graph
+            .graph()
+            .nodes()
+            .iter()
+            .filter(|node| {
+                matches!(
+                    node.op(),
+                    psionic_ir::OpKind::BackendExtension {
+                        op: psionic_core::BackendExtensionOp::ReluSquared
+                    }
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert!(!relu_squared_nodes.is_empty());
+        for node in relu_squared_nodes {
+            let output_id = node.tensor().id();
+            let input_id = node.inputs()[0];
+            assert!(bound_primal_tensors.contains(&output_id));
+            assert!(!bound_primal_tensors.contains(&input_id));
+            assert!(retained_tensor_ids.contains(&output_id));
+            assert!(!retained_tensor_ids.contains(&input_id));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn device_resident_training_session_matches_legacy_loss_and_gradients(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut cuda_backend = CudaBackend::new();

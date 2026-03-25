@@ -73,6 +73,7 @@ pub const SUPPORTED_OPS: &[&str] = &[
     "mul",
     "relu_squared",
     "relu_squared_backward",
+    "relu_squared_backward_from_output",
     "leaky_relu_squared",
     "leaky_relu_squared_backward",
     "silu",
@@ -4047,6 +4048,20 @@ impl AvailableCudaBackend {
         self.buffer_from_tensor_data(&step.spec, &TensorData::F32(output_values))
     }
 
+    fn execute_relu_squared_backward_from_output_step(
+        &self,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CudaBuffer>,
+    ) -> Result<CudaBuffer, RuntimeError> {
+        let output = step_input(step, values, 0)?;
+        let grad_output = step_input(step, values, 1)?;
+        let output_values = output.read_f32()?;
+        let grad_output_values = grad_output.read_f32()?;
+        let input_gradient_values =
+            relu_squared_backward_from_output_values(&output_values, &grad_output_values);
+        self.buffer_from_tensor_data(&step.spec, &TensorData::F32(input_gradient_values))
+    }
+
     fn execute_leaky_relu_squared_step(
         &self,
         step: &ExecutionStep,
@@ -5828,6 +5843,12 @@ impl AvailableCudaBackend {
                             self.execute_relu_squared_backward_step(step, &values)?,
                         );
                     }
+                    BackendExtensionOp::ReluSquaredBackwardFromOutput => {
+                        values.insert(
+                            step.output,
+                            self.execute_relu_squared_backward_from_output_step(step, &values)?,
+                        );
+                    }
                     BackendExtensionOp::LeakyReluSquared { negative_slope } => {
                         values.insert(
                             step.output,
@@ -6577,6 +6598,15 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                 if step.inputs.len() != 2 {
                     return Err(RuntimeError::Backend(format!(
                         "cuda relu_squared_backward step {} requires two inputs",
+                        step.output
+                    )));
+                }
+            }
+            BackendExtensionOp::ReluSquaredBackwardFromOutput => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda relu_squared_backward_from_output step {} requires two inputs",
                         step.output
                     )));
                 }
@@ -7334,6 +7364,20 @@ fn relu_squared_backward_values(input: &[f32], grad_output: &[f32]) -> Vec<f32> 
         .map(|(value, grad)| {
             if *value > 0.0 {
                 grad * (2.0 * value)
+            } else {
+                0.0
+            }
+        })
+        .collect()
+}
+
+fn relu_squared_backward_from_output_values(output: &[f32], grad_output: &[f32]) -> Vec<f32> {
+    output
+        .iter()
+        .zip(grad_output.iter())
+        .map(|(value, grad)| {
+            if *value > 0.0 {
+                grad * (2.0 * value.sqrt())
             } else {
                 0.0
             }
@@ -14832,6 +14876,7 @@ mod tests {
                 "mul",
                 "relu_squared",
                 "relu_squared_backward",
+                "relu_squared_backward_from_output",
                 "leaky_relu_squared",
                 "leaky_relu_squared_backward",
                 "silu",
@@ -16677,10 +16722,10 @@ mod tests {
             .gradient_graph
             .nodes()
             .iter()
-            .any(|node| matches!(
+                .any(|node| matches!(
                 node.op(),
                 psionic_ir::OpKind::BackendExtension {
-                    op: psionic_core::BackendExtensionOp::ReluSquaredBackward
+                    op: psionic_core::BackendExtensionOp::ReluSquaredBackwardFromOutput
                 }
             )));
 

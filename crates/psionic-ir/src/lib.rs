@@ -3865,6 +3865,12 @@ const BUILTIN_OPERATOR_SCHEMAS: &[OperatorSchema] = &[
         OperatorMetaExecutionKind::BuiltinInference,
     ),
     OperatorSchema::new(
+        "relu_squared_backward_from_output",
+        OperatorArity::Fixed(2),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
         "leaky_relu_squared",
         OperatorArity::Fixed(1),
         OperatorImplementationKind::BackendKernel,
@@ -4484,6 +4490,31 @@ fn meta_execute_backend_extension(
                 input.device().clone(),
             ))
         }
+        BackendExtensionOp::ReluSquaredBackwardFromOutput => {
+            if inputs.len() != 2 {
+                return Err(extension_error(
+                    "relu_squared_backward_from_output",
+                    format!("expected 2 inputs, received {}", inputs.len()),
+                ));
+            }
+            let output = &inputs[0];
+            let grad_output = &inputs[1];
+            if output != grad_output {
+                return Err(extension_error(
+                    "relu_squared_backward_from_output",
+                    format!(
+                        "output spec {} must match grad_output spec {}",
+                        format_spec(output),
+                        format_spec(grad_output)
+                    ),
+                ));
+            }
+            Ok(TensorSpec::new(
+                output.shape().clone(),
+                output.dtype(),
+                output.device().clone(),
+            ))
+        }
         BackendExtensionOp::LeakyReluSquared { .. } => {
             if inputs.len() != 1 {
                 return Err(extension_error(
@@ -5051,18 +5082,22 @@ impl GraphBuilder {
         Ok(self.register_backend_extension(op, vec![input.id()], spec))
     }
 
-    pub(crate) fn relu_squared_backward(
+    pub(crate) fn relu_squared_backward_from_output(
         &mut self,
-        input: &Tensor,
+        output: &Tensor,
         grad_output: &Tensor,
     ) -> Result<Tensor, GraphError> {
-        let op = BackendExtensionOp::ReluSquaredBackward;
+        let op = BackendExtensionOp::ReluSquaredBackwardFromOutput;
         let spec = self.meta_spec(
             &ExecutionOp::BackendExtension { op: op.clone() },
-            &[input, grad_output],
+            &[output, grad_output],
             None,
         )?;
-        Ok(self.register_backend_extension(op, vec![input.id(), grad_output.id()], spec))
+        Ok(self.register_backend_extension(
+            op,
+            vec![output.id(), grad_output.id()],
+            spec,
+        ))
     }
 
     /// Applies leaky-ReLU-squared pointwise activation.
@@ -5756,6 +5791,7 @@ fn format_backend_extension_payload(op: &BackendExtensionOp) -> String {
         | BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward
         | BackendExtensionOp::ReluSquared
         | BackendExtensionOp::ReluSquaredBackward
+        | BackendExtensionOp::ReluSquaredBackwardFromOutput
         | BackendExtensionOp::Silu
         | BackendExtensionOp::SiluBackward => String::new(),
         BackendExtensionOp::ParameterGolfBankedLinear { bank_index }

@@ -2028,6 +2028,8 @@ pub enum BackendExtensionOp {
     ReluSquared,
     /// Input-gradient rule for ReLU-squared pointwise activation.
     ReluSquaredBackward,
+    /// Input-gradient rule for ReLU-squared using the forward activation output.
+    ReluSquaredBackwardFromOutput,
     /// Leaky-ReLU-squared pointwise activation.
     LeakyReluSquared {
         /// Negative slope applied to values below zero before squaring.
@@ -2138,7 +2140,9 @@ impl BackendExtensionOp {
             | Self::ParameterGolfBankedLinearWeightBackward { .. } => {
                 BackendExtensionKind::ParameterGolfBankedLinear
             }
-            Self::ReluSquared | Self::ReluSquaredBackward => BackendExtensionKind::ReluSquared,
+            Self::ReluSquared
+            | Self::ReluSquaredBackward
+            | Self::ReluSquaredBackwardFromOutput => BackendExtensionKind::ReluSquared,
             Self::LeakyReluSquared { .. } | Self::LeakyReluSquaredBackward { .. } => {
                 BackendExtensionKind::LeakyReluSquared
             }
@@ -2184,6 +2188,7 @@ impl BackendExtensionOp {
             }
             Self::ReluSquared => "relu_squared",
             Self::ReluSquaredBackward => "relu_squared_backward",
+            Self::ReluSquaredBackwardFromOutput => "relu_squared_backward_from_output",
             Self::LeakyReluSquared { .. } => "leaky_relu_squared",
             Self::LeakyReluSquaredBackward { .. } => "leaky_relu_squared_backward",
             Self::Silu => "silu",
