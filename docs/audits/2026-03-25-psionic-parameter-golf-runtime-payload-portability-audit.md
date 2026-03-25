@@ -81,13 +81,14 @@ at:
 Current fixture identity:
 
 - SHA-256:
-  `c48bd4962d31412400b307ccc58dd6b9cbdd8d08887569ce7cab51ce34864931`
-- size: `6,091,816` bytes
+  `a0bfb03c43069357c97724cd908b23e0f018159c33d56e269dc7286ec70111e1`
+- size: `6,054,904` bytes
 
 Current fixture provenance:
 
-- built on the real RunPod `8xH100` host `157.66.254.12:16223`
-- source revision: `a0688399`
+- rebuilt from the local `psionic` checkout after widening the distributed
+  validation source path
+- source revision: `83bdbf87`
 - source binary: `target/debug/parameter_golf_submission_runtime`
 - stripped target copied back into the committed fixture path
 

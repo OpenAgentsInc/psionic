@@ -91,8 +91,8 @@
     },
     {
       "relative_path": "runtime/parameter_golf_submission_runtime",
-      "size_bytes": 6091816,
-      "sha256_digest": "c48bd4962d31412400b307ccc58dd6b9cbdd8d08887569ce7cab51ce34864931"
+      "size_bytes": 6054904,
+      "sha256_digest": "a0bfb03c43069357c97724cd908b23e0f018159c33d56e269dc7286ec70111e1"
     },
     {
       "relative_path": "runtime/parameter_golf_submission_runtime.json",
