@@ -602,6 +602,634 @@ compute sources contribute to one pretraining program. It only needs that if
 product or research goals require the exact same dense train-step graph to span
 those backends.
 
+## Comprehensive Phase-By-Phase Issue Program
+
+The phase summary above is not enough to drive the work. The repo needs one
+explicit issue spine that covers the whole implementation surface.
+
+Some of that spine already exists as open GitHub issues. The rest is still
+missing from the backlog. This section treats both the same way: each item has
+one name, one short description, and one filing-ready issue body.
+
+The `XTRAIN-*` labels below are proposed new issues that do not exist in GitHub
+yet.
+
+Unless an item says otherwise, the canonical inputs are:
+
+- this audit
+- `docs/TRAIN_SYSTEM.md`
+- the subsystem reference docs cited in the relevant phase
+- the runtime modules and runbooks named earlier in this audit
+
+### Phase 0: Program Contract
+
+#### `XTRAIN-0: Ship The Provider-Neutral Cross-Provider Pretraining System`
+
+Description: master issue for the full training-system program.
+
+Issue body:
+
+- Summary: land one Psionic-native training system that can admit local,
+  Google, RunPod, and later providers under one run graph, one checkpoint
+  family, one evidence model, and one execution-class contract.
+- Why: the repo has strong bounded lanes but no single master issue whose done
+  bar is the full cross-provider system.
+- Depends On: every issue in phases 0 through 7.
+- Scope: define the master acceptance bar, link the whole child stack, and
+  keep the final proof runs and final audit explicit.
+- Acceptance Criteria: every child issue is closed, one real multi-provider
+  dense CUDA pretraining run exists with retained evidence, one real
+  mixed-execution-class pretraining program exists, and if same-job MLX plus
+  CUDA dense training remains required the mixed-backend proof issue is also
+  closed.
+
+#### `XTRAIN-1: Freeze The Cross-Provider Training Program Manifest And Run Authority`
+
+Description: canonical root contract for one cross-provider pretraining program.
+
+Issue body:
+
+- Summary: add one typed training-program manifest that binds run id, stage,
+  checkpoint family, dataset family, artifact roots, cost budget, and admitted
+  execution classes.
+- Why: the current system has strong run graph and stage contracts, but there
+  is still no single top-level manifest that spans dense ranks, contributors,
+  validators, and provider-managed launch surfaces.
+- Depends On: none.
+- Scope: add the manifest type, fixture, checker, and documentation; bind it to
+  `TrainingRunState`, `PSION_PRETRAIN_STAGE`, and final evidence surfaces.
+- Acceptance Criteria: every multi-provider lane can point at one canonical
+  program manifest instead of provider-specific launch manifests as the root
+  training authority.
+
+#### `XTRAIN-2: Freeze The Compute-Source And Execution-Class Admission Contract`
+
+Description: canonical training-facing identity for machines and roles.
+
+Issue body:
+
+- Summary: add one typed compute-source contract that reports provider,
+  locality, accelerator inventory, backend family, network posture, storage
+  posture, cost posture, and admitted execution classes.
+- Why: the current lanes each publish some of this, but they do it through
+  different Google, RunPod, swarm, and bring-up artifacts.
+- Depends On: `XTRAIN-1`.
+- Scope: define the machine contract for local, Google, RunPod, and later
+  providers; freeze the execution classes `dense_full_model_rank`,
+  `validated_contributor_window`, `validator`, `checkpoint_writer`,
+  `eval_worker`, and `data_builder`.
+- Acceptance Criteria: the same planner can admit a Google node, a RunPod pod,
+  a local RTX host, and a local Mac through one machine-legible contract.
+
+#### `XTRAIN-3: Add The Provider-Neutral Launch, Startup, Runtime-Env, And Finalizer Contract`
+
+Description: one shared runtime envelope above provider-specific resource
+creation.
+
+Issue body:
+
+- Summary: define one launch contract that every provider binder must project
+  into concrete startup scripts, runtime environment variables, artifact roots,
+  and finalizer hooks.
+- Why: the current operator paths are good but fragmented across Google
+  single-node, Google swarm, RunPod, and local launchers.
+- Depends On: `XTRAIN-1`, `XTRAIN-2`.
+- Scope: freeze one shared manifest for runtime env, cluster ports, checkpoint
+  roots, metric roots, evidence roots, and finalizer expectations.
+- Acceptance Criteria: provider-specific scripts only create and bind resources;
+  they no longer define training truth or lane-specific runtime semantics.
+
+### Phase 1: Dense Distributed Runtime
+
+#### `#466 PGOLF_PARITY-0: Close The Remaining train_gpt.py Parity Gaps In Psionic`
+
+Description: existing umbrella issue for the remaining public-baseline parity
+stack.
+
+Issue body:
+
+- Summary: keep one explicit Rust-versus-`train_gpt.py` parity stack so the
+  distributed runtime work stays measurable.
+- Why: the repo still has several lower-level gaps that block an honest parity
+  claim even after the operator and bootstrap surfaces landed.
+- Depends On: `#473`, `#510`, `#511`, `#512`, and the rest of the current PGOLF
+  parity stack.
+- Scope: preserve one measurable parity backlog instead of letting the missing
+  work disappear into broader training issues.
+- Acceptance Criteria: the final readiness audit cites no remaining
+  `train_gpt.py` parity blocker for the distributed baseline lane.
+
+#### `#473 PGOLF_PARITY-7: Replace The Analytic 8xH100 Lane With Real Rust-Native Distributed Execution`
+
+Description: existing master runtime issue for real multi-rank Parameter Golf
+execution.
+
+Issue body:
+
+- Summary: replace the current analytic `8xH100` lane with one real Rust-native
+  distributed runtime under the public `WORLD_SIZE=8` posture.
+- Why: without a real runtime, the strongest distributed lane in the repo still
+  stops before the actual train step and final metric closure.
+- Depends On: the current closed bootstrap prerequisites plus `#510`, `#511`,
+  and `#512`.
+- Scope: make the `8xH100` lane execution-backed for train-step, validation,
+  receipt generation, and final evidence.
+- Acceptance Criteria: the distributed lane no longer relies on analytic or
+  measurements-missing closure for steady-state success.
+
+#### `#511 PGOLF_PARITY-14: Implement Real Rust-Native Distributed PGOLF Train-Step Execution`
+
+Description: existing issue for the actual multi-rank train step.
+
+Issue body:
+
+- Summary: implement real per-rank batches, forward or backward passes,
+  gradient synchronization, and optimizer updates under the exact distributed
+  PGOLF geometry.
+- Why: bootstrap is not enough; the main missing boundary is the actual
+  multi-rank train loop.
+- Depends On: the current bootstrap and train-step prerequisites already named
+  on the live issue.
+- Scope: land real train-step execution with measured step, communication, and
+  memory observations.
+- Acceptance Criteria: the distributed receipt and runtime logs are fed by real
+  multi-rank execution rather than placeholders.
+
+#### `#510 PGOLF_PARITY-15: Implement Real Distributed Validation And Metric Aggregation For PGOLF 8xH100`
+
+Description: existing issue for distributed validation closure.
+
+Issue body:
+
+- Summary: shard validation sequences across ranks and emit one aggregated final
+  metric result for the whole run.
+- Why: a real distributed training system cannot close on single-rank
+  validation or narrative-only aggregation.
+- Depends On: the bootstrap, train-step, and validation prerequisites already
+  named on the live issue.
+- Scope: add rank-local validation facts, aggregation, and one execution-backed
+  final validation result.
+- Acceptance Criteria: the distributed receipt, finalizer, and exported-folder
+  evidence all preserve the same aggregated distributed validation result.
+
+#### `#512 PGOLF_PARITY-16: Close The Exported-Folder Distributed Runtime Outcome And Receipt Path`
+
+Description: existing issue for turning the distributed mode into a real success
+path instead of a default refusal path.
+
+Issue body:
+
+- Summary: replace the current refusal-only `distributed_8xh100_train` outcome
+  with one real completion path that emits final receipts and final artifacts.
+- Why: even after bootstrap and train-step work exist, the shipped runtime and
+  finalizer still need to stop treating distributed success as unsupported.
+- Depends On: `#510` and `#511`.
+- Scope: switch the exported-folder runtime, finalizer, and submission evidence
+  path from refusal semantics to real success semantics when the lane succeeds.
+- Acceptance Criteria: the shipped runtime can finish the distributed lane with
+  real final receipts and no silent fallback to local replay.
+
+#### `XTRAIN-4: Promote The PGOLF Distributed Runtime Into One Generic Dense-Rank Engine In psionic-train`
+
+Description: turn the PGOLF-forced runtime into shared train-system substrate.
+
+Issue body:
+
+- Summary: extract the real distributed CUDA train-step, validation, and
+  receipt surfaces from the PGOLF-specific lane into one reusable dense-rank
+  engine inside `psionic-train`.
+- Why: the broader training system should not depend on a contest-only runtime
+  if the goal is one provider-neutral pretraining substrate.
+- Depends On: `#473`, `#510`, `#511`, `#512`.
+- Scope: move common dense-rank runtime types and hooks into generic
+  train-system modules; keep PGOLF as one consumer instead of the only owner.
+- Acceptance Criteria: a non-PGOLF pretraining lane can call the same generic
+  dense-rank runtime without inheriting contest-specific wrappers.
+
+### Phase 2: Data, Checkpoint, And Model-State Mobility
+
+#### `XTRAIN-5: Extend Distributed Data-Feed Semantics To Topology-Revisable Cross-Provider Pretraining`
+
+Description: move the data plane past fixed-world-size seeded feeds.
+
+Issue body:
+
+- Summary: extend `psionic-data` from fixed-world-size distributed feeds to a
+  contract that can survive admitted topology revision, dense-rank replacement,
+  and cross-provider host loss.
+- Why: the current data-feed contract explicitly refuses elastic or rebalance-
+  aware partitioning.
+- Depends On: `XTRAIN-1`, `XTRAIN-2`, `XTRAIN-4`.
+- Scope: define topology-aware shard ownership, re-assignment, replay-safe
+  ordering, and data receipts for dense-rank runs.
+- Acceptance Criteria: a dense-rank run can lose or replace a node and still
+  retain explicit data-ordering and replay truth.
+
+#### `XTRAIN-6: Add A Hybrid Dense-Rank Plus Validated-Contributor Data Planner`
+
+Description: let one pretraining program assign data honestly to different
+execution classes.
+
+Issue body:
+
+- Summary: add a planner that can split one pretraining program into dense-rank
+  batches, contributor windows, validator work, and eval slices without
+  blurring those classes together.
+- Why: many compute sources can contribute only if the program can assign
+  heterogeneous work honestly.
+- Depends On: `XTRAIN-2`, `XTRAIN-5`, `#484`.
+- Scope: bind dense-rank batch planning, contributor-window planning, and eval
+  planning to the same dataset and checkpoint family.
+- Acceptance Criteria: one program manifest can emit admitted work plans for
+  dense ranks and contributor windows in the same run.
+
+#### `#515 PLIB-320C: Add Asynchronous Checkpoint Writeback For psionic-train`
+
+Description: existing issue for non-blocking checkpoint writeback.
+
+Issue body:
+
+- Summary: add bounded asynchronous checkpoint writeback so long-running train
+  loops do not stall on checkpoint serialization.
+- Why: a serious multi-provider pretraining run cannot rely only on synchronous
+  checkpoint writes.
+- Depends On: none.
+- Scope: immutable checkpoint handoff, bounded writer queues, atomic
+  finalization, backpressure, and restore-equivalent semantics.
+- Acceptance Criteria: async writeback reduces train-loop stall without
+  weakening checkpoint lineage or durability truth.
+
+#### `XTRAIN-7: Add Sharded Distributed Checkpoint Manifests, Upload Receipts, And Restore Planning`
+
+Description: close the distributed checkpoint gap that current checkpoint docs
+still leave open.
+
+Issue body:
+
+- Summary: extend checkpoint recovery from dense single-manifest closure to
+  true sharded distributed checkpoint manifests, shard placement receipts,
+  restore planning, and optimizer-state recovery.
+- Why: the current checkpoint-recovery doc explicitly does not claim
+  distributed optimizer recovery or parameter-shard semantics.
+- Depends On: `XTRAIN-4`, `#515`.
+- Scope: define distributed checkpoint shard manifests, shard uploader
+  assignments, optimizer-state shard bindings, restore receipts, and refusal
+  posture for partial or incompatible shard sets.
+- Acceptance Criteria: a dense-rank multi-provider run can checkpoint and
+  restore distributed state without inventing provider-specific restore logic.
+
+#### `XTRAIN-8: Add Provider-Neutral Remote Artifact Backends And Placement Policy For Train Artifacts`
+
+Description: close the gap between local artifact lifecycle logic and real
+remote storage behavior.
+
+Issue body:
+
+- Summary: add blob-store-backed artifact and checkpoint backends with explicit
+  placement policy, restore policy, and cost posture across providers.
+- Why: the current artifact-storage layer explicitly stops before real remote
+  storage and placement optimization.
+- Depends On: `XTRAIN-3`, `XTRAIN-7`.
+- Scope: add remote artifact backends, byte-accounted placement policy, restore
+  policy, and retention rules for checkpoints, logs, metrics, and evidence.
+- Acceptance Criteria: Google, RunPod, and later providers all persist train
+  artifacts through one typed storage backend contract.
+
+### Phase 3: Telemetry, Conformance, And Evidence
+
+#### `#514 PLIB-320B: Add A Shared Backend Conformance Harness Across CPU, CUDA, Metal, And MLX-Backed Lanes`
+
+Description: existing issue for one shared backend truth surface.
+
+Issue body:
+
+- Summary: run one canonical correctness harness across all admitted backend
+  lanes with explicit `pass`, `fail`, and `unsupported` semantics.
+- Why: one training system cannot work the same way across compute sources
+  without one shared backend-truth discipline.
+- Depends On: none.
+- Scope: operator coverage, dtype coverage, deterministic seed behavior, and
+  explicit refusal coverage for unsupported features.
+- Acceptance Criteria: backend promotion no longer depends on scattered
+  backend-local correctness scaffolding.
+
+#### `#516 PLIB-320D: Add A Local Metric-Sink Layer For Train-Loop Telemetry`
+
+Description: existing issue for stable train-loop metric emission.
+
+Issue body:
+
+- Summary: add one typed metric fanout layer that can drive structured logs,
+  JSONL output, local progress, and pre-aggregation consumers.
+- Why: the remote-visualization contract is not enough if every runtime still
+  writes its own local telemetry format.
+- Depends On: none.
+- Scope: stable step binding, phase binding, deterministic flush, and a shared
+  schema across train loops.
+- Acceptance Criteria: training packages emit one local metric vocabulary
+  instead of bespoke per-lane telemetry structures.
+
+#### `#479 PSION_VIS-0: Ship The Psionic Live Remote-Training Visualization Substrate`
+
+Description: existing issue for always-live provider-neutral visualization.
+
+Issue body:
+
+- Summary: close the remaining gap between the provider-neutral visualization
+  bundle family and every active remote training lane.
+- Why: the RunPod distributed lane still lacks the coordinator-owned live
+  writer needed for the every-second requirement.
+- Depends On: the remaining RunPod distributed runtime closure.
+- Scope: one-second heartbeat and metric updates, live bundle refresh, and
+  truthful stale-state behavior across all active remote lanes.
+- Acceptance Criteria: active Google and RunPod training runs keep the typed
+  visualization bundle fresh every second during execution.
+
+#### `XTRAIN-9: Add One Provider-Neutral Final Evidence Bundle Family Across All Training Execution Classes`
+
+Description: unify final machine-legible proof across single-node, dense-rank,
+contributor-window, validator, and hybrid runs.
+
+Issue body:
+
+- Summary: define one final evidence bundle family that can seal single-node
+  training, dense-rank distributed training, validated-contributor windows,
+  hybrid runs, and after-action audit refs under one schema family.
+- Why: the current evidence discipline is strong, but the bundle shapes are
+  still lane-specific.
+- Depends On: `XTRAIN-1`, `XTRAIN-3`, `XTRAIN-4`, `#516`.
+- Scope: freeze one family for launch facts, runtime facts, checkpoints,
+  metrics, validator results, visualization refs, and final disposition.
+- Acceptance Criteria: finalizers stop inventing lane-specific proof JSON when
+  the underlying run class differs.
+
+### Phase 4: Provider Convergence, Launch Binding, And Planning
+
+#### `XTRAIN-10: Add One Provider-Neutral Launcher And Runtime Binder Above Google, RunPod, And Local Lanes`
+
+Description: shared binder between the training program contract and concrete
+provider launchers.
+
+Issue body:
+
+- Summary: add one runtime binder that turns the program manifest and admitted
+  compute sources into concrete launch manifests, runtime envs, startup plans,
+  and finalizer plans.
+- Why: provider-specific scripts should not remain the long-term training API.
+- Depends On: `XTRAIN-2`, `XTRAIN-3`.
+- Scope: freeze the binder interface, generated launch records, runtime env
+  contract, and provider hooks.
+- Acceptance Criteria: Google, RunPod, and local launchers become provider
+  adapters over one shared binder instead of separate control planes.
+
+#### `XTRAIN-11: Rebind The Google Single-Node And Google Swarm Lanes To The Shared Binder`
+
+Description: make the Google lanes consumers of the shared launcher contract.
+
+Issue body:
+
+- Summary: migrate the existing Google single-node and Google swarm paths onto
+  the provider-neutral binder without weakening their current evidence and
+  preflight posture.
+- Why: the Google surfaces are the strongest current operator paths and should
+  become the first consumers of the shared contract.
+- Depends On: `XTRAIN-10`.
+- Scope: map Google launch profiles, quota preflight, startup, finalizer, and
+  evidence generation into the shared binder contract.
+- Acceptance Criteria: both Google lanes still run truthfully, but their
+  training semantics come from shared contracts rather than Google-only wiring.
+
+#### `XTRAIN-12: Rebind The RunPod And Local Fleet Lanes To The Shared Binder`
+
+Description: converge non-Google operator surfaces onto the same launch model.
+
+Issue body:
+
+- Summary: migrate the RunPod distributed lane and the local workstation or
+  trusted-LAN lanes onto the same provider-neutral binder used by Google.
+- Why: a cross-provider system only closes when non-Google lanes stop being
+  special operator programs.
+- Depends On: `XTRAIN-10`.
+- Scope: bind RunPod launch and finalization plus local launch and bring-up
+  flows to the shared launch, runtime, and finalizer contracts.
+- Acceptance Criteria: Google, RunPod, and local training lanes all project
+  from the same binder and differ only in provider-specific resource steps.
+
+#### `XTRAIN-13: Add A Cross-Provider Admission Planner With Cost, Network, And Trust Policy`
+
+Description: one planner that decides which compute sources may join which run
+in which role.
+
+Issue body:
+
+- Summary: add a planner that ranks and admits compute sources by backend,
+  accelerator, network posture, storage posture, trust tier, and cost budget.
+- Why: one universal system needs one explicit answer for where a machine fits
+  before launch begins.
+- Depends On: `XTRAIN-2`, `XTRAIN-10`.
+- Scope: add admission policy, refusal reasons, role placement policy, and
+  explicit trust-tier gating for local, cloud, and rented nodes.
+- Acceptance Criteria: operator surfaces can explain why a machine was admitted
+  as a dense rank, contributor, validator, or refused entirely.
+
+### Phase 5: Heterogeneous Contribution Under One Pretraining Program
+
+#### `#484 SWARM-0: Ship The First Local Mixed-Hardware Swarm Training Run On One Mac MLX Node Plus One Linux RTX 4080 Node`
+
+Description: existing master issue for the first truthful mixed-hardware
+contributor lane.
+
+Issue body:
+
+- Summary: finish the first real mixed-hardware swarm run as a bounded
+  decentralized open-adapter lane.
+- Why: it is the strongest current proof that heterogeneous hardware can
+  contribute honestly without fake mixed dense training claims.
+- Depends On: its closed child issue stack plus the remaining truthful live-run
+  acceptance bar.
+- Scope: retain one accepted live result with honest contributor, validator,
+  replay, and closeout truth.
+- Acceptance Criteria: the master issue closes with one real retained mixed-
+  hardware swarm result and one explicit after-action audit.
+
+#### `XTRAIN-14: Bind Validated Contributor Windows To Canonical Pretraining Checkpoint Families And Policy Revisions`
+
+Description: stop treating contributor windows as a side system outside the main
+pretraining program.
+
+Issue body:
+
+- Summary: bind contributor windows to the same checkpoint family, policy
+  revision lineage, and dataset authority used by the dense pretraining
+  program.
+- Why: heterogeneous contributors only count toward one program if their work is
+  attached to the same lineage and governance objects.
+- Depends On: `XTRAIN-1`, `XTRAIN-6`, `#484`.
+- Scope: freeze checkpoint, policy, dataset, and lineage bindings between
+  dense-rank runs and contributor windows.
+- Acceptance Criteria: contributor work can be traced directly into one
+  canonical pretraining program lineage instead of a separate swarm namespace.
+
+#### `XTRAIN-15: Unify Validator, Replay, And Promotion Contracts Across Providers And Execution Classes`
+
+Description: one acceptance discipline for dense ranks, contributor windows, and
+later hybrid programs.
+
+Issue body:
+
+- Summary: make validation, replay, quarantine, rejection, acceptance, and
+  promotion semantics uniform across Google, RunPod, and local contributors and
+  dense-rank lanes.
+- Why: one cross-provider program fails if each execution class invents its own
+  acceptance vocabulary.
+- Depends On: `XTRAIN-9`, `XTRAIN-14`.
+- Scope: freeze shared verdict classes, replay rules, promotion gates, and
+  final disposition language.
+- Acceptance Criteria: final evidence bundles and program audits use one shared
+  validator and promotion vocabulary across all admitted execution classes.
+
+#### `XTRAIN-16: Carry Dense Ranks, Contributor Windows, Validators, Checkpoint Writers, And Eval Workers In One Pretraining Run Graph`
+
+Description: expand the run graph from one class of training participants to
+one whole-program participant model.
+
+Issue body:
+
+- Summary: extend the run graph and orchestrator so one pretraining program can
+  carry dense ranks, contributor windows, validators, checkpoint writers, and
+  eval workers at the same time.
+- Why: this is the actual system-level answer to “a lot of different compute
+  can all contribute to one run.”
+- Depends On: `XTRAIN-6`, `XTRAIN-13`, `XTRAIN-15`.
+- Scope: add participant classes, assignment policy, state transitions, and
+  finalizer bindings for the hybrid run graph.
+- Acceptance Criteria: one run id can admit and track every execution class
+  without splitting into separate program identities.
+
+### Phase 6: Resilience, Elasticity, And Cross-Provider Proof Runs
+
+#### `XTRAIN-17: Add Dense-Rank Recovery After Preemption, Node Loss, And Provider Loss`
+
+Description: explicit failure recovery for real multi-provider dense training.
+
+Issue body:
+
+- Summary: add dense-rank recovery logic for preemption, host loss, provider
+  loss, and controlled rejoin under one checkpoint and data-ordering contract.
+- Why: multi-provider pretraining is not real if the first cloud failure forces
+  manual operator recovery.
+- Depends On: `XTRAIN-5`, `XTRAIN-7`, `XTRAIN-8`.
+- Scope: define recovery paths, restore plans, refusal paths, and recovery
+  receipts for dense-rank runs.
+- Acceptance Criteria: a multi-provider dense run can recover from admitted node
+  or provider loss with explicit receipts instead of ad hoc operator action.
+
+#### `XTRAIN-18: Add Controlled Topology Revision And Elasticity For Cross-Provider Dense Clusters`
+
+Description: let the dense cluster change under explicit rules instead of fixed
+world-size only.
+
+Issue body:
+
+- Summary: add controlled topology revision for dense clusters, including
+  admitted grow, shrink, and replace operations with replay-safe receipts.
+- Why: the current dense data and checkpoint semantics are still fixed-world-
+  size oriented.
+- Depends On: `XTRAIN-5`, `XTRAIN-7`, `XTRAIN-17`.
+- Scope: define allowed topology revisions, re-assignment rules, and refusal
+  rules for unsupported changes.
+- Acceptance Criteria: the dense cluster can revise topology under explicit
+  policy without invalidating run truth or data-ordering receipts.
+
+#### `XTRAIN-19: Execute The First Real Multi-Provider Dense CUDA Pretraining Run And Publish The After-Action Audit`
+
+Description: the proof run that closes the core cross-provider dense system for
+homogeneous CUDA hardware.
+
+Issue body:
+
+- Summary: run the first real dense CUDA pretraining job across at least Google
+  and one non-Google provider under the shared contracts and retain the full
+  evidence bundle.
+- Why: until this run exists, the cross-provider dense system is still only
+  architectural closure.
+- Depends On: `XTRAIN-10` through `XTRAIN-18`.
+- Scope: execute one real bounded multi-provider dense CUDA run, retain the
+  evidence bundle, and write one after-action audit.
+- Acceptance Criteria: the repo can cite one truthful multi-provider dense CUDA
+  pretraining run as implemented rather than planned.
+
+### Phase 7: Mixed-Backend Dense Training, If Same-Step MLX Plus CUDA Remains Required
+
+#### `XTRAIN-20: Implement MLX-Backed Dense-Rank Training Runtime Parity On Metal`
+
+Description: move the Apple lane from contributor-only truth toward dense-rank
+runtime truth.
+
+Issue body:
+
+- Summary: add one MLX-backed dense-rank train-step runtime on Metal with
+  checkpoint, metric, and receipt semantics comparable to the dense CUDA path.
+- Why: same-job MLX plus CUDA dense training is impossible without a real MLX
+  dense-rank runtime.
+- Depends On: `#514`, `XTRAIN-4`.
+- Scope: implement dense train-step, validation, metric, and checkpoint hooks
+  for MLX-backed training.
+- Acceptance Criteria: the Apple lane can run as a truthful dense rank instead
+  of only a validated contributor window.
+
+#### `XTRAIN-21: Add A Cross-Backend Collective, Precision, And Optimizer Contract For CUDA Plus MLX Dense Meshes`
+
+Description: define the math and transport boundary for same-job mixed-backend
+dense training.
+
+Issue body:
+
+- Summary: define the collective, precision, optimizer, and master-weight
+  contract required for a dense mesh that spans CUDA and MLX backends.
+- Why: mixed-backend dense training fails without one explicit answer for how
+  synchronization, precision, and optimizer ownership work.
+- Depends On: `XTRAIN-20`.
+- Scope: freeze cross-backend collective semantics, precision policy,
+  optimizer-state ownership, and refusal posture for unsupported operations.
+- Acceptance Criteria: a mixed CUDA-plus-MLX dense mesh has one typed math
+  contract instead of ad hoc backend glue.
+
+#### `XTRAIN-22: Add Mixed-Backend Checkpoint, Restore, And Optimizer-State Parity Across CUDA Plus MLX`
+
+Description: make mixed-backend dense runs restartable and portable.
+
+Issue body:
+
+- Summary: extend the distributed checkpoint and restore layer so mixed CUDA
+  plus MLX dense runs can checkpoint, restore, and migrate state truthfully.
+- Why: same-job mixed-backend training is not real if it cannot checkpoint or
+  restore its mixed optimizer and parameter state.
+- Depends On: `XTRAIN-7`, `XTRAIN-20`, `XTRAIN-21`.
+- Scope: add mixed-backend checkpoint manifests, optimizer-state parity,
+  restore receipts, and refusal posture for unsupported migrations.
+- Acceptance Criteria: a mixed CUDA-plus-MLX dense run can checkpoint and
+  restore without backend-specific manual conversion.
+
+#### `XTRAIN-23: Execute The First Real Same-Job MLX-Plus-CUDA Dense Pretraining Run And Publish The Acceptance Audit`
+
+Description: final proof issue only if the product requirement remains same-job
+mixed dense training.
+
+Issue body:
+
+- Summary: execute the first real same-job dense pretraining run that spans at
+  least one MLX-backed Mac node and one CUDA-backed NVIDIA node under the
+  shared contracts.
+- Why: until this run exists, the system still does not truthfully claim
+  same-step mixed-backend dense training.
+- Depends On: `XTRAIN-20`, `XTRAIN-21`, `XTRAIN-22`.
+- Scope: run one bounded mixed-backend dense job, retain the evidence bundle,
+  and write one acceptance audit that states exactly what was proved.
+- Acceptance Criteria: the repo can truthfully claim one real same-job
+  MLX-plus-CUDA dense pretraining run, or else keep the capability marked
+  partial.
+
 ## What Not To Do
 
 - Do not build separate Google, RunPod, and local training control planes.
