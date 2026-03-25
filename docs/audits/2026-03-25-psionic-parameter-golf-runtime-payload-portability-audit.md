@@ -81,16 +81,19 @@ at:
 Current fixture identity:
 
 - SHA-256:
-  `a0bfb03c43069357c97724cd908b23e0f018159c33d56e269dc7286ec70111e1`
-- size: `6,054,904` bytes
+  `75c0a72c000e76f639f352d8c83025f0b5b43987ffca0fc6e9de9ebb3795048d`
+- size: `6,214,696` bytes
 
 Current fixture provenance:
 
-- rebuilt from the local `psionic` checkout after widening the distributed
-  validation source path
-- source revision: `83bdbf87`
+- rebuilt on the real RunPod `8xH100` host at `157.66.254.12:16223`
+- source revision: `8a5638d1`
 - source binary: `target/debug/parameter_golf_submission_runtime`
 - stripped target copied back into the committed fixture path
+- the canonical local review-host reports were then regenerated with
+  `LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12` so the same shipped bytes
+  remained runnable on the maintainer workstation without changing the fixture
+  again
 
 This payload is honest for the current non-record exported-folder lane because:
 
@@ -99,6 +102,9 @@ This payload is honest for the current non-record exported-folder lane because:
 - it has already been exercised on the real RunPod Ubuntu image used by the
   live `8xH100` lane
 - it no longer lags behind the current distributed-runtime source tree
+- the committed evidence and PR-bundle reports now bind the same RunPod-built
+  runtime digest and size across the exported-folder, replay-verification, and
+  record-track contract surfaces
 
 ## Release-Build Boundary
 

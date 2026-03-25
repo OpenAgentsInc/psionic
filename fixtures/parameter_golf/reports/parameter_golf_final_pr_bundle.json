@@ -16,8 +16,8 @@
     },
     {
       "relative_path": "README.md",
-      "size_bytes": 6115,
-      "sha256_digest": "5d7704b09610b3a99821b9125a8d08e6773e4972ac7616580164a205798859dc"
+      "size_bytes": 6204,
+      "sha256_digest": "18d9ec63a89f4741ff50c57b46f35f83342c4ba35b2b9ce18346c650875c0aa5"
     },
     {
       "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_benchmark_package.json",
@@ -37,7 +37,7 @@
     {
       "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_accounting.json",
       "size_bytes": 2125,
-      "sha256_digest": "4979a7ca41842d128eeec4fbef5deecd9025077ef8a5950433f743f086bfd608"
+      "sha256_digest": "a414e606ba1c065303fbf284ef708e0000c9442fbe4699b9774f02283cc95083"
     },
     {
       "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_runtime_receipt.json",
@@ -57,7 +57,7 @@
     {
       "relative_path": "psionic_parameter_golf_record_folder_replay_verification.json",
       "size_bytes": 3556,
-      "sha256_digest": "33b7ae5f7e952d01ddac9c37450d43cc78939fd294406b2bc0ec79f05bcc95af"
+      "sha256_digest": "ff9421f2e120957438dbea019a363f3164802107d95104988d936d6ff7c42f89"
     },
     {
       "relative_path": "psionic_parameter_golf_submission_promotion_receipt.json",
@@ -67,7 +67,7 @@
     {
       "relative_path": "psionic_parameter_golf_submission_run_evidence.json",
       "size_bytes": 15508,
-      "sha256_digest": "88b49112e88bf5382e1aa5875cd3fee6785c8f6f643700dc16ad62ea6f7a5514"
+      "sha256_digest": "0405394975f1c8bbdc21dccd17c7fcc87d63290491ccb6da8544e54cc29a1f9d"
     },
     {
       "relative_path": "runtime/parameter_golf_google_input_package_descriptor_v1.json",
@@ -91,8 +91,8 @@
     },
     {
       "relative_path": "runtime/parameter_golf_submission_runtime",
-      "size_bytes": 6054904,
-      "sha256_digest": "a0bfb03c43069357c97724cd908b23e0f018159c33d56e269dc7286ec70111e1"
+      "size_bytes": 6214696,
+      "sha256_digest": "75c0a72c000e76f639f352d8c83025f0b5b43987ffca0fc6e9de9ebb3795048d"
     },
     {
       "relative_path": "runtime/parameter_golf_submission_runtime.json",
@@ -102,7 +102,7 @@
     {
       "relative_path": "submission.json",
       "size_bytes": 3011,
-      "sha256_digest": "49a1617b98bff1d44dc9247a1fdac3824d311053324e9893cfc02ecd2d475ea2"
+      "sha256_digest": "565b6675757ea279027891b717eb0a174aedc851373ef2b4d97639c17743881e"
     },
     {
       "relative_path": "train.log",
@@ -126,5 +126,5 @@
     "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2/PSIONIC_PARAMETER_GOLF_PR_CHECKLIST.md"
   ],
   "claim_boundary": "This bundle is PR-ready for the current non-record lane only. It adds the exact records/... folder plus maintainer-facing evidence and checklist text, but the included promotion receipt still refuses record promotion until true record-track evidence exists.",
-  "report_digest": "d14f6af7b3665f34c1ca7c2769d0e1a9898313a2ba2d7f74ec5c6906bb86d652"
+  "report_digest": "29dd2678035966dc5bade10cc90bee072e35bd7381f2dca58e1244c32fe8412f"
 }

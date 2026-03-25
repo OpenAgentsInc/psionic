@@ -2,9 +2,9 @@
   "schema_version": 1,
   "report_id": "parameter_golf.submission_run_evidence.v1",
   "package_version": "2026.03.18.non_record_submission.v2",
-  "submission_id": "2026-03-18_psionic_local_reference_runtime_replay_v2",
+  "submission_id": "tmp.Km4HqFl7nF",
   "track_id": "non-record-unlimited-compute-16mb",
-  "record_folder_relpath": "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2",
+  "record_folder_relpath": "records/track_non_record_16mb/tmp.Km4HqFl7nF",
   "run_id": "parameter-golf-local-reference-run",
   "challenge_execution_posture": {
     "posture_id": "local_review_host_single_rtx4080",
@@ -71,8 +71,8 @@
   },
   "runtime_payload": {
     "relative_path": "runtime/parameter_golf_submission_runtime",
-    "size_bytes": 6054904,
-    "sha256_digest": "a0bfb03c43069357c97724cd908b23e0f018159c33d56e269dc7286ec70111e1"
+    "size_bytes": 6214696,
+    "sha256_digest": "75c0a72c000e76f639f352d8c83025f0b5b43987ffca0fc6e9de9ebb3795048d"
   },
   "runtime_manifest": {
     "relative_path": "runtime/parameter_golf_submission_runtime.json",
@@ -92,7 +92,7 @@
   "accounting_receipt": {
     "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_accounting.json",
     "size_bytes": 2125,
-    "sha256_digest": "4979a7ca41842d128eeec4fbef5deecd9025077ef8a5950433f743f086bfd608"
+    "sha256_digest": "a414e606ba1c065303fbf284ef708e0000c9442fbe4699b9774f02283cc95083"
   },
   "benchmark_receipt": {
     "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_challenge_benchmark_receipt.json",
@@ -382,5 +382,5 @@
     "receipt_digest": "5e019c3a263a0e3adf0f09d1050c59dfbf4e0ad7c8270af7e664aad7faded21b"
   },
   "claim_boundary": "This report binds the exact exported submission folder to one real folder-local entrypoint replay, the preserved bounded wallclock/memory/artifact receipts, and one measured-or-refused 8xH100 challenge receipt. The committed evidence is still a local review-host refusal rather than true 8xH100 success.",
-  "report_digest": "131729f70188d2e6286ce6c4d6ae17727131a7c8100aaa0bf1c8bb235ff99051"
+  "report_digest": "96edb872a361babb298bbb5914cde3dc584dba3d00ecb1d5ea7712f0db784557"
 }

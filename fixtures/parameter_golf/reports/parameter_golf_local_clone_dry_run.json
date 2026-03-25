@@ -6,10 +6,10 @@
   "record_folder_relpath": "records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2",
   "clone_status_before": "## main...origin/main\n",
   "clone_status_after": "## main...origin/main\n",
-  "final_pr_bundle_report_digest": "d14f6af7b3665f34c1ca7c2769d0e1a9898313a2ba2d7f74ec5c6906bb86d652",
+  "final_pr_bundle_report_digest": "29dd2678035966dc5bade10cc90bee072e35bd7381f2dca58e1244c32fe8412f",
   "compatibility_verification": {
     "runner": "scripts/check-parameter-golf-record-folder-compatibility.sh",
-    "compatibility_report_digest": "0418b65be7515edfd73768a9349cf02b7acd6586f80725627b8fc58bf476e149",
+    "compatibility_report_digest": "9a7dc9b8110354ce2cdeaa2597f8baaf39b20459c38c16b0ec700f05bab63b09",
     "track_id": "non_record_16mb",
     "records_relpath": "records/track_non_record_16mb",
     "required_top_level_files": [
@@ -41,7 +41,7 @@
     ],
     "entrypoint_dry_run_exit_code": 0,
     "verdict": "compatible",
-    "report_digest": "f2e99db429eaff23ff8b72070c2559926888a7153973590bc5780ec225667969"
+    "report_digest": "5fadfb628f0627c6d1fd20248f43f9a7d7a8ab0e506a0d06d1969927579f91f5"
   },
   "replay_verification": {
     "schema_version": 1,
@@ -70,18 +70,18 @@
     "submission_manifest_wallclock_seconds": 25.779,
     "benchmark_training_wallclock_seconds": 25.779,
     "submission_manifest_bytes": {
-      "total_bytes": 9708882,
-      "code_bytes": 9629924,
+      "total_bytes": 9831762,
+      "code_bytes": 9752804,
       "model_bytes": 78958
     },
     "accounting_receipt_bytes": {
-      "total_bytes": 9708882,
-      "code_bytes": 9629924,
+      "total_bytes": 9831762,
+      "code_bytes": 9752804,
       "model_bytes": 78958
     },
     "actual_shipped_bytes": {
-      "total_bytes": 9708882,
-      "code_bytes": 9629924,
+      "total_bytes": 9831762,
+      "code_bytes": 9752804,
       "model_bytes": 78958
     },
     "accounting_component_verifications": [
@@ -101,8 +101,8 @@
       },
       {
         "component_id": "shipped_runtime_code_bytes",
-        "declared_size_bytes": 9627672,
-        "actual_size_bytes": 9627672,
+        "declared_size_bytes": 9750552,
+        "actual_size_bytes": 9750552,
         "matches_actual_size": true,
         "detail": "the package ships two prebuilt Psionic runtime payloads: one lightweight local-reference replay binary for the default challenge-clone dry run, plus the real single-H100 trainer binary used by the exported-folder remote execution path"
       },
@@ -129,9 +129,9 @@
     "matches_benchmark_artifact_bytes": true,
     "verdict": "verified",
     "claim_boundary": "This verifier confirms only the current exported-folder replay path: offline entrypoint execution, final int8+zlib metrics, bounded wallclock facts, and counted-byte facts. It does not by itself turn the bounded non-record replay into a record-track claim.",
-    "report_digest": "931aac86d22d85dd153d308ef5e4343f408f5852e0e42691a62fb481a639d786"
+    "report_digest": "a36483b23b20cb5c101d8c28e63fb9e5624e95604435576ab48b267df410aea1"
   },
   "verdict": "clean_pass",
   "claim_boundary": "This dry run proves that the current generated folder can be staged into a live local parameter-golf clone, reverified there, and cleaned back out without drift. It does not by itself upgrade the bounded non-record lane into record-track readiness.",
-  "report_digest": "2d1efed2b0302dbfa0fc4f931927ac5e6df19c24080c9c583297c378b3c7acf5"
+  "report_digest": "2d6c66e07f65fafb90bcefe06c64717528c9418aa6c7218b4863ba1515a5a18e"
 }

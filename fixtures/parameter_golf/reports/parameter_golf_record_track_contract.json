@@ -12,11 +12,11 @@
   "baseline_entrypoint_artifact_digest": "9f52fcca32581e8ab38493636cb6f5fa4046ff8ad56683961fc4f41385d1fcd3",
   "baseline_model_artifact_digest": "efe272503950104f1557f5c73cad69ce717e60d9b75f05e48d17ffbeb6940af1",
   "baseline_accounting_receipt_digest": "c98b2390a3ca2eaf26933cadc8939e2139c16894d671f4db22ad8f7948ba933a",
-  "baseline_submission_run_evidence_report_digest": "131729f70188d2e6286ce6c4d6ae17727131a7c8100aaa0bf1c8bb235ff99051",
+  "baseline_submission_run_evidence_report_digest": "96edb872a361babb298bbb5914cde3dc584dba3d00ecb1d5ea7712f0db784557",
   "baseline_export_surface_contract_report_digest": "d0235e7647d6f732df34532bed7fd90196bdabd7fdd28f6f9e2d819be0b04fae",
-  "baseline_record_folder_replay_verification_report_digest": "931aac86d22d85dd153d308ef5e4343f408f5852e0e42691a62fb481a639d786",
-  "baseline_final_pr_bundle_report_digest": "d14f6af7b3665f34c1ca7c2769d0e1a9898313a2ba2d7f74ec5c6906bb86d652",
-  "baseline_local_clone_dry_run_report_digest": "2d1efed2b0302dbfa0fc4f931927ac5e6df19c24080c9c583297c378b3c7acf5",
+  "baseline_record_folder_replay_verification_report_digest": "b649d7b0528d17a6b811a33ff813fa23e607dd04fc19a8b06b2c61a23cab029c",
+  "baseline_final_pr_bundle_report_digest": "29dd2678035966dc5bade10cc90bee072e35bd7381f2dca58e1244c32fe8412f",
+  "baseline_local_clone_dry_run_report_digest": "2d6c66e07f65fafb90bcefe06c64717528c9418aa6c7218b4863ba1515a5a18e",
   "required_counted_component_ids": [
     "entrypoint_code_bytes",
     "compressed_model_bytes",
@@ -127,5 +127,5 @@
     }
   ],
   "claim_boundary": "record-track contract is now explicit, the shipped runtime-byte contract is defended, and the current lane remains blocked on reproducible 8xH100 challenge-speed execution",
-  "report_digest": "e241ccb4f49c48feefbd7b255c07c40ffd5bb9984acffcf2378a34c606ae7f0f"
+  "report_digest": "24fc0145aadfabe786c70a75b0382340a8c89db06bdc139257bda22031d38285"
 }

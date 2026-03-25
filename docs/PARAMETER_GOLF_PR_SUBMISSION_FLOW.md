@@ -66,6 +66,13 @@ cargo run -p psionic-train --example parameter_golf_final_pr_bundle \
   /tmp/psionic_parameter_golf_final_pr_bundle
 ```
 
+Write the canonical machine-readable final-bundle report directly with:
+
+```bash
+cargo run -p psionic-train --example parameter_golf_final_pr_bundle_report \
+  fixtures/parameter_golf/reports/parameter_golf_final_pr_bundle.json
+```
+
 ## Local Challenge-Clone Dry Run
 
 The last anti-drift gate is now also explicit.
