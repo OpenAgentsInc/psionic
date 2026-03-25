@@ -619,6 +619,26 @@ That bundle matters because it keeps the current state honest in a second way:
   receipts are still absent and therefore remain absent in the bundle instead
   of being faked
 
+The repo now also retains one deterministic closeout report at:
+
+- `fixtures/swarm/reports/first_swarm_trusted_lan_closeout_v1.json`
+
+and one matching after-action audit at:
+
+- `docs/audits/2026-03-24-first-swarm-closeout-after-action-audit.md`
+
+Those matter because they close the current first-swarm attempt without
+weakening the bar:
+
+- merge-or-no-merge truth is now explicit and currently ends `no_merge`
+- publish-or-refusal truth is now explicit and currently ends `refused`
+- the exact MLX local-snapshot publish surface is named, but it stays planned
+  only until a later accepted mergeable outcome exists
+
+That means the first swarm lane now has honest bring-up, topology, rehearsal,
+refused live-attempt, and closeout artifacts. It still does not have one real
+successful mixed-hardware two-node training run.
+
 ## Bottom Line
 
 `psionic` is already strong enough to support an honest clustered training push.

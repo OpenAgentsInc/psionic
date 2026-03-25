@@ -26,6 +26,10 @@ a general cluster rehearsal.
   `fixtures/swarm/reports/first_swarm_trusted_lan_rehearsal_v1.json`
 - live-attempt evidence bundle:
   `fixtures/swarm/reports/first_swarm_trusted_lan_evidence_bundle_v1.json`
+- closeout report:
+  `fixtures/swarm/reports/first_swarm_trusted_lan_closeout_v1.json`
+- after-action audit:
+  `docs/audits/2026-03-24-first-swarm-closeout-after-action-audit.md`
 - first swarm workflow plan:
   `fixtures/swarm/first_swarm_live_workflow_plan_v1.json`
 - Mac bring-up report:
@@ -40,6 +44,8 @@ a general cluster rehearsal.
   `scripts/check-first-swarm-trusted-lan-rehearsal.sh`
 - live-attempt bundle checker:
   `scripts/check-first-swarm-trusted-lan-evidence-bundle.sh`
+- closeout checker:
+  `scripts/check-first-swarm-trusted-lan-closeout.sh`
 
 ## What This Runbook Does Not Claim
 
@@ -157,6 +163,34 @@ Current live-attempt outcome:
   gate, but refuses to fabricate contributor execution, validator, aggregation,
   or publication receipts that do not exist yet
 
+## Current Closeout Outcome
+
+The canonical first swarm closeout report now lives at:
+
+- `fixtures/swarm/reports/first_swarm_trusted_lan_closeout_v1.json`
+
+Regenerate and validate it with:
+
+```bash
+scripts/check-first-swarm-trusted-lan-closeout.sh
+```
+
+Current closeout verdict:
+
+- merge: `no_merge`
+- publish: `refused`
+- expected publish path if a later run earns promotion:
+  `local_publish/openagents_swarm_local_open_adapter/first-swarm-local-snapshot`
+- why:
+  the lane still has no accepted contributor receipt set, no replay receipts,
+  no aggregation result, and no promoted local snapshot, so the closeout keeps
+  the existing MLX publish surface explicit without pretending a snapshot was
+  actually published
+
+The matching after-action audit now lives at:
+
+- `docs/audits/2026-03-24-first-swarm-closeout-after-action-audit.md`
+
 ## Exact Per-Host Commands
 
 Mac coordinator:
@@ -233,6 +267,6 @@ Stop the attempt immediately if any of the following happens:
 This runbook proves that the first swarm lane now has one exact trusted-LAN
 topology contract, one exact bundle-materializing launcher, one exact per-host
 preflight path, one exact failure-drill bundle, and one exact rehearsal-grade
-bottleneck report plus one explicit refused live-attempt evidence bundle. It
-does not by itself prove that a live two-node swarm run succeeded or promoted a
-local snapshot.
+bottleneck report plus one explicit refused live-attempt evidence bundle and
+one explicit no-merge/no-publish closeout report. It does not by itself prove
+that a live two-node swarm run succeeded or promoted a local snapshot.

@@ -139,6 +139,17 @@ summaries, and no-promotion truth for a refused first live attempt rather than
 pretending execution, validator, aggregation, replay, or publication receipts
 already exist.
 
+The repo now also owns one deterministic closeout report for that lane in
+`crates/psionic-train/src/swarm_first_closeout.rs`, the binary
+`first_swarm_trusted_lan_closeout_report`, the checker
+`scripts/check-first-swarm-trusted-lan-closeout.sh`, and the committed report
+`fixtures/swarm/reports/first_swarm_trusted_lan_closeout_v1.json`. That report
+keeps merge-or-no-merge truth explicit, keeps publish-or-refusal truth
+explicit, binds the lane to the existing MLX local-snapshot publish surface,
+and currently ends with `no_merge` plus `publish_refused` because the retained
+first live attempt never earned accepted contributor, replay, aggregation, or
+promotion receipts.
+
 Apple-specific adapter work is no longer only later-family planning. The repo
 now owns a canonical spec-and-fixture baseline for it in:
 

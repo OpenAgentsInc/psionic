@@ -94,3 +94,11 @@ existing safetensors export boundary, including:
 
 Direct GGUF export remains an explicit refusal because the current portable
 model-IO boundary imports GGUF but does not emit GGUF.
+
+The first swarm closeout now keeps that publish boundary explicit. The retained
+closeout report at
+`fixtures/swarm/reports/first_swarm_trusted_lan_closeout_v1.json` says the
+current lane still ends `publish_refused`, but it also names the exact surface
+that will be used once a later run actually earns promotion:
+`psionic-mlx-workflows::MlxWorkflowWorkspace::publish_bundle` targeting the
+local snapshot directory frozen in the first swarm workflow plan.

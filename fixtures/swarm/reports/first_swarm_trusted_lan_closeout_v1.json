@@ -1,0 +1,76 @@
+{
+  "schema_version": "swarm.first_trusted_lan_closeout_report.v1",
+  "scope_window": "first_swarm_trusted_lan_closeout_v1",
+  "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+  "swarm_contract_digest": "203e652752f0cfc350b59d3ad9d3c17ae65b6012106c5ebbd9191ba44aaa39f0",
+  "topology_contract_digest": "144481e413d4892b375e7b5f2fd8d24b7d98094806506b0e00a34262a2a9aa07",
+  "rehearsal_report_digest": "9eb315845668b132f748468a6d4e51b582ff6bf6a0fd35f2b48865ab264f691d",
+  "evidence_bundle_digest": "3c37189b153e3fa622e6fa16a3cf0b9b7591e5ea5ea0febbb7f0964a0b7ddbeb",
+  "workflow_plan_digest": "573b6df00266981819b8cb08654ac6e6f727418cb5a46768255e8ea27b2f2821",
+  "promotion_posture": "local_snapshot_only",
+  "validator_policy_id": "validator.open_adapter.reference",
+  "aggregation_policy_id": "aggregation.open_adapter.mean_delta",
+  "replay_policy_id": "replay.open_adapter.strict",
+  "promotion_disposition": "no_promotion",
+  "merge_disposition": "no_merge",
+  "merge_reason": "No mergeable output exists because the first live attempt was refused before contributor execution, validator acceptance, replay, and aggregation could produce one accepted merged adapter state.",
+  "publish_disposition": "refused",
+  "publish_reason": "Publication is refused because the lane did not earn a mergeable local snapshot. The retained workflow plan still points at `local_publish/openagents_swarm_local_open_adapter/first-swarm-local-snapshot` via `psionic-mlx-workflows::MlxWorkflowWorkspace::publish_bundle`, but that publish path stays planned-only until accepted contributor outputs, replay receipts, aggregation, and promotion truth all exist.",
+  "publish_expectation": {
+    "publisher_role_id": "swarm.mac.mlx.coordinator_validator_contributor",
+    "publish_id": "first-swarm-local-snapshot",
+    "target": "hugging_face_snapshot",
+    "repo_id": "openagents/swarm-local-open-adapter",
+    "expected_local_snapshot_directory": "local_publish/openagents_swarm_local_open_adapter/first-swarm-local-snapshot",
+    "publish_posture": "no_served_promotion",
+    "publish_surface": "psionic-mlx-workflows::MlxWorkflowWorkspace::publish_bundle"
+  },
+  "closeout_gates": [
+    {
+      "gate_id": "all_required_contributor_roles_present",
+      "satisfied": false,
+      "detail": "The evidence bundle records a refused first live attempt before remote execution began, so the exact two-node lane never produced contributor execution receipts for both required roles."
+    },
+    {
+      "gate_id": "validator_acceptance_receipts_exist",
+      "satisfied": false,
+      "detail": "The contributor rows remain `validator_posture = not_executed`, so no accepted validator disposition exists for merge or publication."
+    },
+    {
+      "gate_id": "replay_receipts_exist_for_accepted_contributions",
+      "satisfied": false,
+      "detail": "Replay receipts remain absent because contributor execution never started and the lane requires replay receipts per accepted contribution."
+    },
+    {
+      "gate_id": "aggregation_completed_under_policy",
+      "satisfied": false,
+      "detail": "Aggregation never ran under `aggregation.open_adapter.mean_delta` because no accepted contribution set existed to aggregate."
+    },
+    {
+      "gate_id": "promotion_earned_local_snapshot",
+      "satisfied": false,
+      "detail": "The retained evidence bundle ends with `promotion_outcome.disposition = no_promotion`, so no local snapshot was earned for publication."
+    }
+  ],
+  "proved": [
+    "The first swarm lane now closes out with one deterministic machine-legible no-merge and no-publish report instead of leaving the end state implicit.",
+    "The closeout stays bound to the exact swarm contract, trusted-LAN topology contract, rehearsal report, retained evidence bundle, and workflow publish expectation for the Mac-plus-RTX-4080 lane.",
+    "The report names the exact local snapshot surface that would be used once the lane earns mergeable outputs: `psionic-mlx-workflows::MlxWorkflowWorkspace::publish_bundle` targeting one local Hugging Face-style snapshot directory."
+  ],
+  "surprises": [
+    "The publish surface itself is not the blocker for the first swarm lane. The blocker is still the missing live contributor, validator, replay, and aggregation receipt set.",
+    "The lane already has enough retained planning truth to name the exact publish directory and repo identifier without widening the claim into a fake published snapshot."
+  ],
+  "remaining_blockers": [
+    "Earn one real two-node contributor execution receipt set for the exact trusted-LAN lane.",
+    "Retain validator acceptance, replay, and aggregation receipts for both contributors under the frozen swarm governance contract.",
+    "Earn `promotion_outcome = promoted` before attempting local snapshot publication."
+  ],
+  "next_steps": [
+    "Lift the current `no_go` gate only after the exact two-node lane can emit live contributor execution receipts instead of a refused bundle.",
+    "Wire accepted contributor outputs through the existing merge and aggregation path, then re-run closeout to determine whether a local snapshot is actually earned.",
+    "Only after merge and promotion are truthful should the Mac publisher role call `psionic-mlx-workflows::MlxWorkflowWorkspace::publish_bundle` for `first-swarm-local-snapshot`."
+  ],
+  "claim_boundary": "This closeout report records the end state of the current first swarm trusted-LAN attempt. It proves explicit no-merge truth, explicit publish-refused truth, and the exact local publish surface that would be used after a later accepted mergeable outcome. It does not claim a successful two-node live execution, accepted contributor receipts, aggregation completion, or a published local snapshot.",
+  "report_digest": "a33bcff4ec74e6362725aafda761d4622aa7a4307f53c2e8afcc87a6735efccc"
+}
