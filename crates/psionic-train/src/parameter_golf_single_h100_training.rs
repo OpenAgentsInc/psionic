@@ -4622,14 +4622,36 @@ fn filter_backward_plan_to_primal_targets(
         .iter()
         .map(|target| target.gradient_tensor)
         .collect::<Vec<_>>();
+    let gradient_graph = backward_plan
+        .gradient_graph
+        .with_outputs(unique_tensor_ids(gradient_outputs));
+    let live_tensor_ids = live_tensor_ids_for_outputs(&gradient_graph);
+    let primal_bindings = backward_plan
+        .primal_bindings
+        .iter()
+        .filter(|binding| live_tensor_ids.contains(&binding.gradient_graph_input))
+        .cloned()
+        .collect::<Vec<_>>();
     psionic_ir::AutodiffBackwardPlan {
-        gradient_graph: backward_plan
-            .gradient_graph
-            .with_outputs(unique_tensor_ids(gradient_outputs)),
-        primal_bindings: backward_plan.primal_bindings.clone(),
+        gradient_graph,
+        primal_bindings,
         seed_input: backward_plan.seed_input,
         gradient_targets,
     }
+}
+
+fn live_tensor_ids_for_outputs(graph: &psionic_ir::Graph) -> std::collections::BTreeSet<TensorId> {
+    let mut live = std::collections::BTreeSet::new();
+    let mut stack = graph.outputs().to_vec();
+    while let Some(tensor_id) = stack.pop() {
+        if !live.insert(tensor_id) {
+            continue;
+        }
+        if let Some(node) = graph.node(tensor_id) {
+            stack.extend_from_slice(node.inputs());
+        }
+    }
+    live
 }
 
 fn execute_backward_plan(
@@ -5260,6 +5282,12 @@ mod tests {
             filtered_plan.gradient_graph.outputs().len(),
             filtered_plan.gradient_targets.len()
         );
+        let live_tensor_ids = live_tensor_ids_for_outputs(&filtered_plan.gradient_graph);
+        assert!(filtered_plan
+            .primal_bindings
+            .iter()
+            .all(|binding| live_tensor_ids.contains(&binding.gradient_graph_input)));
+        assert!(full_plan.primal_bindings.len() >= filtered_plan.primal_bindings.len());
         Ok(())
     }
 

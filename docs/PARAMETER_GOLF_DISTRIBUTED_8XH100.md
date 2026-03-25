@@ -85,9 +85,10 @@ Psionic now encodes that exact posture explicitly instead of treating
   file-artifact gradient handoff in the hot path. The resident train-session
   refresh path now also reuses prepacked host `bf16` staging for BF16-visible
   parameter banks instead of repacking those large tensors on every optimizer
-  step. The shared CUDA train path now also narrows the backward graph output
-  surface to parameter-input gradients before host materialization, instead of
-  reading every gradient-bearing tensor the full autodiff plan can expose.
+  step. The shared CUDA train path now also narrows both the backward graph
+  output surface and the retained primal-binding surface to the parameter-only
+  backward-live subset, instead of reading every gradient-bearing tensor and
+  retaining every primal value the full autodiff plan can expose.
 - `psionic-train` now also ships retained per-rank distributed validation
   receipts plus one completion receipt bound to the trained runtime-produced
   int8+zlib artifact, so the exported-folder `distributed_8xh100_train` mode
