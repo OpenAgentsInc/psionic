@@ -132,6 +132,17 @@ operator surfaces bounded and truthful while moving their launch, runtime env,
 artifact-root, and final evidence semantics onto the same shared binder used by
 the Google lanes.
 
+The repo now also owns the first cross-provider admission planner in
+`crates/psionic-train/src/cross_provider_admission_planner.rs`, the binary
+`cross_provider_admission_plan`, the checker
+`scripts/check-cross-provider-admission-planner.sh`, the focused reference doc
+`docs/CROSS_PROVIDER_ADMISSION_PLANNER_REFERENCE.md`, and the committed fixture
+`fixtures/training/cross_provider_admission_plan_v1.json`. That surface turns
+the retained source contracts plus the shared binder into one deterministic
+role-placement policy with score breakdowns across trust, network, storage,
+cost, backend, and binder alignment instead of leaving source admission to
+runbook prose or operator instinct.
+
 The repo now also owns the first generic dense-rank runtime layer in
 `crates/psionic-train/src/dense_rank_runtime.rs`, the binary
 `dense_rank_runtime_reference_contract`, the checker
