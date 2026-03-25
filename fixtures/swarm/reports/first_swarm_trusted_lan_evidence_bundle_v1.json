@@ -1,0 +1,93 @@
+{
+  "schema_version": "swarm.first_trusted_lan_evidence_bundle.v1",
+  "bundle_id": "swarm.first_trusted_lan_evidence_bundle.v1",
+  "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+  "swarm_contract_digest": "203e652752f0cfc350b59d3ad9d3c17ae65b6012106c5ebbd9191ba44aaa39f0",
+  "topology_contract_digest": "144481e413d4892b375e7b5f2fd8d24b7d98094806506b0e00a34262a2a9aa07",
+  "rehearsal_report_digest": "9eb315845668b132f748468a6d4e51b582ff6bf6a0fd35f2b48865ab264f691d",
+  "failure_drills_digest": "ad84b1d34b232ac2562a75b0afad1e60085f146bcbacbd9bf59780807ea2a08f",
+  "workflow_plan_digest": "573b6df00266981819b8cb08654ac6e6f727418cb5a46768255e8ea27b2f2821",
+  "membership_receipt_digest": "a2505e7d710da81a6548c42d17b68b31991cceced626fc77ef560754325f1acb",
+  "launch_manifest_digest": "0e2510b26e2ab07c56417ceb5cd1da7fbfbd9060858f36e69030063cfb984ce8",
+  "launch_receipt_digest": "1b45ded9aeb6d477d3d489e66ff39037648a677135cfa36f2b3b2c6729b6b5f6",
+  "launch_status": "bundle_materialized",
+  "live_attempt_disposition": "refused",
+  "live_attempt_reason": "The live attempt is refused because the committed rehearsal report still ends `no_go`: no live two-node contributor execution receipt exists for the exact trusted-LAN lane, upload/validator/aggregation timing are still simulated, and no promotion or no-promotion receipt has yet been earned from a real contribution set.",
+  "contributors": [
+    {
+      "role_id": "swarm.mac.mlx.coordinator_validator_contributor",
+      "node_id": "swarm-mac-a",
+      "backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+      "membership_receipt_digest": "a2505e7d710da81a6548c42d17b68b31991cceced626fc77ef560754325f1acb",
+      "contribution_id": "adapter-contribution:first-swarm-live-plan-window-1:swarm-mac-a:0",
+      "expected_upload_reference": "object://swarm/first-swarm-live-plan-window-1/adapter-contribution:first-swarm-live-plan-window-1:swarm-mac-a:0/adapter_delta.safetensors",
+      "expected_upload_manifest_digest": "ea41cc5421eb87178c08d3d1eaab7431a5510a6dbbf972a4122b12c37843a197",
+      "upload_posture": "planned_only",
+      "validator_posture": "not_executed",
+      "aggregation_posture": "not_executed",
+      "replay_posture": "not_executed",
+      "detail": "The exact contributor assignment is frozen from the live workflow plan, but the current evidence bundle records a refused attempt before remote execution began."
+    },
+    {
+      "role_id": "swarm.linux.cuda.rtx4080.contributor",
+      "node_id": "swarm-linux-4080-a",
+      "backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+      "membership_receipt_digest": "a2505e7d710da81a6548c42d17b68b31991cceced626fc77ef560754325f1acb",
+      "contribution_id": "adapter-contribution:first-swarm-live-plan-window-1:swarm-linux-4080-a:0",
+      "expected_upload_reference": "object://swarm/first-swarm-live-plan-window-1/adapter-contribution:first-swarm-live-plan-window-1:swarm-linux-4080-a:0/adapter_delta.safetensors",
+      "expected_upload_manifest_digest": "6cef06e5424ac08c86e1644eac1e3e6d73a9dc859416f8888af9b6605ada5965",
+      "upload_posture": "planned_only",
+      "validator_posture": "not_executed",
+      "aggregation_posture": "not_executed",
+      "replay_posture": "not_executed",
+      "detail": "The exact contributor assignment is frozen from the live workflow plan, but the current evidence bundle records a refused attempt before remote execution began."
+    }
+  ],
+  "stages": [
+    {
+      "stage_id": "operator_bundle_materialization",
+      "disposition": "completed",
+      "wallclock_ms": 37945,
+      "detail": "The exact trusted-LAN launcher materialized the live-attempt bundle, including topology, failure-drill, and workflow-plan artifacts.",
+      "stage_digest": "dc8f66fd5ac34634a1f29f1ffbe1a87dc9cc25e041dca858c0abf6c2ed062bf8"
+    },
+    {
+      "stage_id": "live_attempt_gate",
+      "disposition": "refused",
+      "wallclock_ms": 0,
+      "detail": "The live attempt was explicitly refused by the rehearsal no-go gate before contributor execution could begin.",
+      "stage_digest": "c606b8481848a75a9835e2fa0016c946a92d9ea464d37a7ba92dcebaf5ba87bd"
+    },
+    {
+      "stage_id": "contributor_execution",
+      "disposition": "skipped",
+      "wallclock_ms": 0,
+      "detail": "Contributor execution never started because the live-attempt gate refused the run before the exact two-node lane could launch remote work.",
+      "stage_digest": "72848b9eab149ed533cf219bbeb4c03df20793f8cfcad776b177a83518417afa"
+    },
+    {
+      "stage_id": "upload_validation_aggregation",
+      "disposition": "skipped",
+      "wallclock_ms": 0,
+      "detail": "Upload, validator, and aggregation work were skipped because no contributor execution receipts existed to process.",
+      "stage_digest": "2d2398258d97a1d06d199ad230b9619544dfa667b75e5d23d0634ecc5b99a2ba"
+    },
+    {
+      "stage_id": "promotion_closeout",
+      "disposition": "completed",
+      "wallclock_ms": 0,
+      "detail": "The bundle records explicit no-promotion truth instead of leaving publication posture implicit.",
+      "stage_digest": "88625b737559ee27c156601c0202267794616eef4073a85dc547a960cf626702"
+    }
+  ],
+  "promotion_outcome": {
+    "disposition": "no_promotion",
+    "reason": "The live attempt never reached contributor execution, validator disposition, or aggregation, so the lane retains explicit no-promotion truth."
+  },
+  "drift_notes": [
+    "This bundle is an explicit refused live-attempt bundle, not a success bundle. It preserves the exact topology, workflow plan, and expected contributor artifacts while keeping execution absent rather than faked.",
+    "The contributor rows keep the planned upload references and manifest digests so the after-action audit can name exactly what would have been executed once the live gate is lifted."
+  ],
+  "claim_boundary": "This evidence bundle records one refused first live attempt for the exact first swarm trusted-LAN lane. It proves bundle materialization, contributor planning truth, refusal gating, replay posture, and explicit no-promotion outcome. It does not claim live two-node contributor execution, live upload/validator/aggregation receipts, or a promoted local snapshot.",
+  "bundle_digest": "3c37189b153e3fa622e6fa16a3cf0b9b7591e5ea5ea0febbb7f0964a0b7ddbeb"
+}

@@ -129,6 +129,16 @@ keeps contributor/upload/validator/aggregation timing explicitly simulated
 where live receipts do not yet exist, produces a bottleneck map, and currently
 ends with a `no_go` recommendation for a truthful live two-node attempt.
 
+The repo now also owns one explicit live-attempt evidence bundle for that lane
+in `crates/psionic-train/src/swarm_first_evidence_bundle.rs`, the binary
+`first_swarm_trusted_lan_evidence_bundle`, the checker
+`scripts/check-first-swarm-trusted-lan-evidence-bundle.sh`, and the committed
+bundle `fixtures/swarm/reports/first_swarm_trusted_lan_evidence_bundle_v1.json`.
+That bundle retains the exact contributor plan, launch digests, stage
+summaries, and no-promotion truth for a refused first live attempt rather than
+pretending execution, validator, aggregation, replay, or publication receipts
+already exist.
+
 Apple-specific adapter work is no longer only later-family planning. The repo
 now owns a canonical spec-and-fixture baseline for it in:
 

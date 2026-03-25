@@ -24,6 +24,8 @@ a general cluster rehearsal.
   `fixtures/swarm/reports/first_swarm_trusted_lan_failure_drills_v1.json`
 - rehearsal report:
   `fixtures/swarm/reports/first_swarm_trusted_lan_rehearsal_v1.json`
+- live-attempt evidence bundle:
+  `fixtures/swarm/reports/first_swarm_trusted_lan_evidence_bundle_v1.json`
 - first swarm workflow plan:
   `fixtures/swarm/first_swarm_live_workflow_plan_v1.json`
 - Mac bring-up report:
@@ -36,6 +38,8 @@ a general cluster rehearsal.
   `scripts/check-first-swarm-trusted-lan.sh`
 - rehearsal checker:
   `scripts/check-first-swarm-trusted-lan-rehearsal.sh`
+- live-attempt bundle checker:
+  `scripts/check-first-swarm-trusted-lan-evidence-bundle.sh`
 
 ## What This Runbook Does Not Claim
 
@@ -132,6 +136,27 @@ Current verdict:
   timing are still partly simulated and not yet backed by a live two-node
   contribution receipt set
 
+## Current Live-Attempt Bundle
+
+The canonical first live-attempt evidence bundle now lives at:
+
+- `fixtures/swarm/reports/first_swarm_trusted_lan_evidence_bundle_v1.json`
+
+Regenerate and validate it with:
+
+```bash
+scripts/check-first-swarm-trusted-lan-evidence-bundle.sh
+```
+
+Current live-attempt outcome:
+
+- disposition: `refused`
+- promotion: `no_promotion`
+- why:
+  the bundle preserves the exact contributor plan, launch status, and no-go
+  gate, but refuses to fabricate contributor execution, validator, aggregation,
+  or publication receipts that do not exist yet
+
 ## Exact Per-Host Commands
 
 Mac coordinator:
@@ -208,5 +233,6 @@ Stop the attempt immediately if any of the following happens:
 This runbook proves that the first swarm lane now has one exact trusted-LAN
 topology contract, one exact bundle-materializing launcher, one exact per-host
 preflight path, one exact failure-drill bundle, and one exact rehearsal-grade
-bottleneck report. It does not by itself prove that a live two-node swarm run
-succeeded or promoted a local snapshot.
+bottleneck report plus one explicit refused live-attempt evidence bundle. It
+does not by itself prove that a live two-node swarm run succeeded or promoted a
+local snapshot.

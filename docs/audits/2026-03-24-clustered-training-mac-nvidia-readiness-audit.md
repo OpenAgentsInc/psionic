@@ -607,6 +607,18 @@ That rehearsal report is useful because it keeps the current state honest:
 - the current recommendation for a truthful live two-node attempt is `no_go`
   until those live receipt gaps close
 
+The repo now also retains one explicit refused live-attempt bundle at:
+
+- `fixtures/swarm/reports/first_swarm_trusted_lan_evidence_bundle_v1.json`
+
+That bundle matters because it keeps the current state honest in a second way:
+
+- the exact contributor plan, upload-manifest expectations, launch status, and
+  no-promotion posture are now retained
+- contributor execution, validator, aggregation, replay, and publication
+  receipts are still absent and therefore remain absent in the bundle instead
+  of being faked
+
 ## Bottom Line
 
 `psionic` is already strong enough to support an honest clustered training push.
