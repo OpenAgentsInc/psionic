@@ -170,6 +170,16 @@ and emits one machine-legible impairment receipt with the active profile,
 affected ports, host identity, role-specific parameters, and observed `tc`
 verification output.
 
+The repo now also owns the first Google swarm bring-up, evidence, and finalizer
+surfaces in `scripts/psion-google-two-node-swarm-startup.sh`,
+`scripts/psion-google-finalize-two-node-swarm-run.sh`, and
+`scripts/check-psion-google-two-node-swarm-evidence-bundle.sh`. That surface
+emits one bring-up report per node before the runtime command begins, binds
+those reports plus the runtime reports and optional impairment receipts into one
+cluster-wide evidence bundle, uploads the evidence bundle and final manifest to
+the dedicated training bucket, and keeps typed result classes explicit instead
+of flattening every failure into generic launch or operator text.
+
 The repo now also owns one rehearsal-grade bottleneck report for that lane in
 `crates/psionic-train/src/swarm_trusted_lan_rehearsal.rs`, the binary
 `first_swarm_trusted_lan_rehearsal_report`, the checker
