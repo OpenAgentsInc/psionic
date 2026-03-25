@@ -922,7 +922,6 @@ fn build_bootstrap_group_snapshot(
             &mesh,
             ClusterTransportClass::TrustedLanStream,
             &members,
-            &local_node_id,
         ),
     );
     ParameterGolfDistributed8xH100RuntimeBootstrapGroupSnapshot {
@@ -1073,6 +1072,16 @@ mod tests {
             ClusterCommunicationClass::TensorCollectiveMesh
         );
         assert_eq!(group.mesh.member_node_ids[2], bootstrap_node_id(2));
+    }
+
+    #[test]
+    fn distributed_runtime_bootstrap_group_id_is_shared_across_ranks() {
+        let rank_zero = build_bootstrap_group_snapshot(0);
+        let rank_seven = build_bootstrap_group_snapshot(7);
+        assert_eq!(rank_zero.group_id, rank_seven.group_id);
+        assert_ne!(rank_zero.local_node_id, rank_seven.local_node_id);
+        assert_eq!(rank_zero.mesh, rank_seven.mesh);
+        assert_eq!(rank_zero.members, rank_seven.members);
     }
 
     #[test]
