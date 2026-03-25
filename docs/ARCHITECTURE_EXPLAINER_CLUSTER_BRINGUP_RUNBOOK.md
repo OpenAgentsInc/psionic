@@ -52,6 +52,12 @@ Current non-claims:
 The first clustered bring-up is therefore a rehearsal and validation exercise,
 not a market-ready training product.
 
+For the exact local two-node Mac MLX plus RTX 4080 swarm lane, use the narrower
+runbook in `FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md`. That document freezes the
+first-swarm topology contract, launch bundle, and failure drills for the
+specific local hardware pair instead of the broader exploratory mixed-hardware
+cluster posture described here.
+
 ## Three Postures To Keep Separate
 
 ### 1. Current Live Product Truth

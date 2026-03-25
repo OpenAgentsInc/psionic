@@ -105,6 +105,20 @@ mixed-backend contributor selection plus one shared capability policy that
 admits both the Mac MLX Metal and Linux CUDA lanes without introducing a second
 trainer or notebook side control plane.
 
+That lane now also has one exact trusted-LAN cluster contract in
+`crates/psionic-train/src/swarm_trusted_lan.rs`, the binaries
+`first_swarm_trusted_lan_topology_contract` and
+`first_swarm_trusted_lan_failure_drills`, the launcher
+`scripts/first-swarm-launch-trusted-lan.sh`, the checker
+`scripts/check-first-swarm-trusted-lan.sh`, the narrow runbook
+`docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md`, and the committed fixtures
+`fixtures/swarm/first_swarm_trusted_lan_topology_contract_v1.json` plus
+`fixtures/swarm/reports/first_swarm_trusted_lan_failure_drills_v1.json`. That
+surface freezes the exact two-node trusted-LAN topology, artifact staging,
+heartbeat and stale-worker thresholds, per-host bring-up commands, and the
+required stale-worker, upload-disagreement, contributor-loss, and skew drills
+before the later rehearsal and live-run issues claim anything broader.
+
 Apple-specific adapter work is no longer only later-family planning. The repo
 now owns a canonical spec-and-fixture baseline for it in:
 

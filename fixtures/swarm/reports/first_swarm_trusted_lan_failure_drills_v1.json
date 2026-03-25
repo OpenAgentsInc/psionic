@@ -1,0 +1,97 @@
+{
+  "schema_version": "swarm.first_trusted_lan_failure_drills.v1",
+  "bundle_id": "swarm.first_trusted_lan_failure_drills.v1",
+  "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+  "swarm_contract_digest": "203e652752f0cfc350b59d3ad9d3c17ae65b6012106c5ebbd9191ba44aaa39f0",
+  "topology_contract_digest": "144481e413d4892b375e7b5f2fd8d24b7d98094806506b0e00a34262a2a9aa07",
+  "live_workflow_plan_digest": "573b6df00266981819b8cb08654ac6e6f727418cb5a46768255e8ea27b2f2821",
+  "drills": [
+    {
+      "drill_id": "first-swarm-trusted-lan:stale_worker",
+      "drill_kind": "stale_worker",
+      "affected_node_ids": [
+        "swarm-linux-4080-a"
+      ],
+      "validator_disposition": "replay_required",
+      "security_reason_codes": [
+        "stale_session"
+      ],
+      "departure_reason": "timed_out",
+      "suspension_reason": "capability_prerequisite_missing",
+      "contributor_role_id": "swarm.linux.cuda.rtx4080.contributor",
+      "contribution_id": "adapter-contribution:first-swarm-live-plan-window-1:swarm-linux-4080-a:0",
+      "expected_upload_manifest_digest": "6cef06e5424ac08c86e1644eac1e3e6d73a9dc859416f8888af9b6605ada5965",
+      "stale_after_ms": 5000,
+      "disposition": "replay_required",
+      "aggregation_blocked": true,
+      "replay_required": true,
+      "operator_action": "Mark the Linux contributor stale, refuse aggregation for the window, and replay the same dataset slice under a fresh contributor-set revision.",
+      "detail": "If the Linux worker stops heartbeating for more than five seconds during the active window, the coordinator records contributor loss, the validator keeps replay-required truth explicit, and the lane does not aggregate a one-node partial result.",
+      "drill_digest": "4dc50cc8ae92acabfc00ce4a975fe28b3e641195e37fbee3e7ccd2f8134472fc"
+    },
+    {
+      "drill_id": "first-swarm-trusted-lan:upload_disagreement",
+      "drill_kind": "upload_disagreement",
+      "affected_node_ids": [
+        "swarm-linux-4080-a"
+      ],
+      "validator_disposition": "rejected",
+      "security_reason_codes": [
+        "manifest_digest_mismatch"
+      ],
+      "suspension_reason": "duplicate_contribution",
+      "contributor_role_id": "swarm.linux.cuda.rtx4080.contributor",
+      "contribution_id": "adapter-contribution:first-swarm-live-plan-window-1:swarm-linux-4080-a:0",
+      "expected_upload_manifest_digest": "6cef06e5424ac08c86e1644eac1e3e6d73a9dc859416f8888af9b6605ada5965",
+      "observed_upload_manifest_digest": "7bd0f1cf536dd0cd53b575360649d91d4866d1f2bac7449f672c42aab99ac711",
+      "disposition": "rejected",
+      "aggregation_blocked": true,
+      "replay_required": false,
+      "operator_action": "Quarantine the mismatched upload, keep the validator reason explicit, and refuse promotion until the contributor replays with the planned manifest digest.",
+      "detail": "If the uploaded contribution manifest does not match the workflow-plan digest for the Linux node, the validator rejects the contribution and the lane stays no-promotion instead of silently accepting drifted artifacts.",
+      "drill_digest": "19ce581aac299f0ba51797c1671483722852db18398e77640e9f760fb65035f2"
+    },
+    {
+      "drill_id": "first-swarm-trusted-lan:contributor_loss",
+      "drill_kind": "contributor_loss",
+      "affected_node_ids": [
+        "swarm-linux-4080-a"
+      ],
+      "validator_disposition": "replay_required",
+      "departure_reason": "crashed",
+      "suspension_reason": "operator_hold",
+      "contributor_role_id": "swarm.linux.cuda.rtx4080.contributor",
+      "contribution_id": "adapter-contribution:first-swarm-live-plan-window-1:swarm-linux-4080-a:0",
+      "expected_upload_manifest_digest": "6cef06e5424ac08c86e1644eac1e3e6d73a9dc859416f8888af9b6605ada5965",
+      "disposition": "replay_required",
+      "aggregation_blocked": true,
+      "replay_required": true,
+      "operator_action": "Record the contributor as departed, preserve replay-required validator truth, and refuse aggregation until the lane is replayed with both contributor roles present.",
+      "detail": "If the Linux contributor disappears during the active window, the coordinator keeps the departure reason explicit and the window seals without promotion because the first lane requires both contributor roles.",
+      "drill_digest": "71911a4a940c0f327abc4348e53aa66c758d987877a72255db3ed15abc220a10"
+    },
+    {
+      "drill_id": "first-swarm-trusted-lan:uneven_worker_speed",
+      "drill_kind": "uneven_worker_speed",
+      "affected_node_ids": [
+        "swarm-mac-a",
+        "swarm-linux-4080-a"
+      ],
+      "validator_disposition": "quarantined",
+      "suspension_reason": "reliability_penalty",
+      "contributor_role_id": "swarm.mac.mlx.coordinator_validator_contributor",
+      "contribution_id": "adapter-contribution:first-swarm-live-plan-window-1:swarm-mac-a:0",
+      "expected_upload_manifest_digest": "ea41cc5421eb87178c08d3d1eaab7431a5510a6dbbf972a4122b12c37843a197",
+      "observed_worker_skew_ms": 18000,
+      "disposition": "wait_then_replay",
+      "aggregation_blocked": true,
+      "replay_required": true,
+      "operator_action": "If contributor skew exceeds the fifteen-second bound, wait briefly, then replay the slower slice instead of hiding idle time or late uploads behind aggregate success language.",
+      "detail": "The first swarm lane treats sustained skew above the frozen bound as a real operator-visible bottleneck. The coordinator does not silently stretch the window forever or call the result healthy when one node idles waiting for the other.",
+      "drill_digest": "6f25dde0e461f47f69aca573ee592cc9c0a7a91b4d4f80de963f262f47303d12"
+    }
+  ],
+  "summary": "The first swarm trusted-LAN drill bundle keeps four exact failure classes explicit: stale-worker timeout, upload-manifest disagreement, contributor loss, and sustained worker skew. Each drill names the affected node, the exact validator posture, whether replay is required, and the operator action that preserves no-promotion truth when the lane stops being comparable.",
+  "claim_boundary": "This bundle freezes refusal and replay handling for the first trusted-LAN two-node swarm lane. It is a machine-legible operator drill bundle, not a live-run evidence bundle.",
+  "bundle_digest": "ad84b1d34b232ac2562a75b0afad1e60085f146bcbacbd9bf59780807ea2a08f"
+}

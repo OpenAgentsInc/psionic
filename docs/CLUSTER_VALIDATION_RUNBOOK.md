@@ -37,6 +37,11 @@ This runbook still does not claim internet-wide adversarial safety. It validates
 the current truthful cluster claims and the current homogeneous CUDA planning
 lanes.
 
+For the exact first local Mac MLX plus Linux RTX 4080 swarm lane, run the
+dedicated checker in `scripts/check-first-swarm-trusted-lan.sh` and then follow
+`docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md`. The swarm lane freezes a narrower
+two-node trusted-LAN contract on top of these broader cluster validation gates.
+
 ## Topology Acceptance Matrix
 
 Run this before claiming any current Psionic support for replica-routed, public-
