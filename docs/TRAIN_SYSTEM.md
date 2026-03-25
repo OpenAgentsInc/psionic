@@ -189,6 +189,17 @@ checkpoint shard restore assignments, checkpoint artifact placement and restore
 authority, replay-order continuity for same-rank replacement, and an explicit
 shrink-world refusal instead of a hidden best-effort fallback.
 
+The repo now also owns the first controlled dense topology-revision contract in
+`crates/psionic-train/src/dense_topology_revision_contract.rs`, the binary
+`dense_topology_revision_contract`, the checker
+`scripts/check-dense-topology-revision-contract.sh`, the focused reference doc
+`docs/DENSE_TOPOLOGY_REVISION_REFERENCE.md`, and the committed fixture
+`fixtures/training/dense_topology_revision_contract_v1.json`. That surface
+keeps three revision classes explicit: hot replace-rank, checkpoint-barrier
+grow-world, and checkpoint-barrier shrink-world. It still refuses live
+remove-without-replacement instead of pretending the current fixed-world
+data-feed path already does generic live elasticity.
+
 The repo now also owns the first generic dense-rank runtime layer in
 `crates/psionic-train/src/dense_rank_runtime.rs`, the binary
 `dense_rank_runtime_reference_contract`, the checker

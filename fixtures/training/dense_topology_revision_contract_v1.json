@@ -1,0 +1,118 @@
+{
+  "schema_version": "psionic.dense_topology_revision_contract.v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "whole_program_run_graph_digest": "d323bce8c1b324e9d4ab12e50f17678624d48272ae3aaaa913bb8ad61be751be",
+  "dense_recovery_contract_digest": "1084d44b21e975950ba6b27b25eb6fe421237461258dc56f4c153454111ea7b4",
+  "distributed_checkpoint_contract_digest": "53386fdd8fc1f9b157df000ea869260905589469468feaf2cb596b6ba8053810",
+  "revisions": [
+    {
+      "scenario_id": "dense_topology.replace_rank.rank2_cross_provider",
+      "topology_revision_id": "psion-xprovider-pretrain-topology-r2",
+      "action_kind": "replace_rank",
+      "previous_world_size": 8,
+      "next_world_size": 8,
+      "affected_rank_ids": [
+        2
+      ],
+      "data_ordering": {
+        "policy_kind": "replay_continuation",
+        "topology_case_id": "dense_rank.provider_loss.replace_rank2",
+        "baseline_global_order_digest": "d26252d593443f937725f4c3f4604c24761eb5ae03b10ee3ef498cb042bc723e",
+        "revised_global_order_digest": "d26252d593443f937725f4c3f4604c24761eb5ae03b10ee3ef498cb042bc723e",
+        "replay_continuity_digest": "e112b9d3f1015a84712657484e8354b28285286c7a493b8cae3b6995781e9c54",
+        "detail": "Hot replace-rank topology revision reuses the admitted provider-loss replay-continuity proof from the dense recovery contract."
+      },
+      "checkpoint_transition": {
+        "transition_kind": "reuse_latest_stable_checkpoint",
+        "checkpoint_manifest_digest": "802aa997400ce2259031a375c1cd38c472ede21accee09809c2befe93eeb494f",
+        "recovery_scenario_id": "dense_rank.provider_loss.rank2.cross_provider_replace",
+        "restore_assignment_ids": [
+          "restore-rank-2"
+        ],
+        "detail": "Hot replace-rank revision reuses the last stable checkpoint and the admitted dense recovery assignment for the replaced rank."
+      },
+      "operator_action": "admit_replacement_rank",
+      "finalizer_action": "publish_revision_receipt",
+      "disposition": "supported",
+      "detail": "Current scope supports same-world-size replace-rank revisions as a hot topology change when recovery already proved replay continuity and checkpoint restore binding."
+    },
+    {
+      "scenario_id": "dense_topology.grow_world.8_to_10_checkpoint_barrier",
+      "topology_revision_id": "psion-xprovider-pretrain-topology-r3",
+      "action_kind": "grow_world",
+      "previous_world_size": 8,
+      "next_world_size": 10,
+      "affected_rank_ids": [
+        8,
+        9
+      ],
+      "data_ordering": {
+        "policy_kind": "checkpoint_barrier_reseed",
+        "reseed_digest": "722c37d193254a69543731d91948cbecd1f17b648e4d56343f073cbcc3cf0415",
+        "detail": "Grow-world revision is admitted only by pausing at a durable checkpoint barrier, reseeding data ordering for the new world size, and restoring through a new reshard plan."
+      },
+      "checkpoint_transition": {
+        "transition_kind": "barrier_checkpoint_reshard_and_restore",
+        "checkpoint_manifest_digest": "802aa997400ce2259031a375c1cd38c472ede21accee09809c2befe93eeb494f",
+        "barrier_reshard_plan_id": "grow-world-8-to-10-reshard",
+        "detail": "Grow-world revision requires a barrier checkpoint and a fresh reshard plan across the larger dense world."
+      },
+      "operator_action": "pause_at_checkpoint_barrier_and_reshard",
+      "finalizer_action": "publish_barrier_revision_receipt",
+      "disposition": "supported",
+      "detail": "Current scope admits grow-world only as a checkpoint-barrier elasticity operation. It is not a live elastic data-feed mutation."
+    },
+    {
+      "scenario_id": "dense_topology.shrink_world.8_to_6_checkpoint_barrier",
+      "topology_revision_id": "psion-xprovider-pretrain-topology-r4",
+      "action_kind": "shrink_world",
+      "previous_world_size": 8,
+      "next_world_size": 6,
+      "affected_rank_ids": [
+        6,
+        7
+      ],
+      "data_ordering": {
+        "policy_kind": "checkpoint_barrier_reseed",
+        "reseed_digest": "695051f5f4634da8ab7f8aebed3344f84d40c987d611850a0e4a03f0ecade150",
+        "detail": "Shrink-world revision is admitted only by pausing at a durable checkpoint barrier, reseeding ordering for the smaller world size, and restoring through a new reshard plan."
+      },
+      "checkpoint_transition": {
+        "transition_kind": "barrier_checkpoint_reshard_and_restore",
+        "checkpoint_manifest_digest": "802aa997400ce2259031a375c1cd38c472ede21accee09809c2befe93eeb494f",
+        "barrier_reshard_plan_id": "shrink-world-8-to-6-reshard",
+        "detail": "Shrink-world revision requires a barrier checkpoint and a fresh reshard plan across the smaller dense world."
+      },
+      "operator_action": "pause_at_checkpoint_barrier_and_reshard",
+      "finalizer_action": "publish_barrier_revision_receipt",
+      "disposition": "supported",
+      "detail": "Current scope admits shrink-world only as a checkpoint-barrier elasticity operation with an explicit retirement of ranks 6 and 7."
+    },
+    {
+      "scenario_id": "dense_topology.remove_rank_without_replacement.live_refused",
+      "topology_revision_id": "psion-xprovider-pretrain-topology-r5",
+      "action_kind": "remove_without_replacement",
+      "previous_world_size": 8,
+      "next_world_size": 7,
+      "affected_rank_ids": [
+        3
+      ],
+      "data_ordering": {
+        "policy_kind": "refused",
+        "refusal": "remove-without-replacement still refuses because the current dense control plane requires either hot replace-rank or a checkpoint-barrier grow or shrink revision.",
+        "detail": "Live remove-without-replacement remains out of scope because it would silently blur hot repair and checkpoint-barrier elasticity."
+      },
+      "checkpoint_transition": {
+        "transition_kind": "refused_no_checkpoint_transition",
+        "detail": "Refused live removal emits no fake checkpoint transition."
+      },
+      "operator_action": "refuse_live_revision_and_page_operator",
+      "finalizer_action": "publish_refusal_receipt",
+      "disposition": "refused",
+      "detail": "Current scope still refuses live removal without replacement. Operators must choose hot replace-rank or a checkpoint-barrier shrink revision instead."
+    }
+  ],
+  "claim_boundary": "This contract closes controlled replace, grow, and shrink topology revisions for the current dense cluster only under explicit hot-repair or checkpoint-barrier policy. It does not claim generic live elasticity, public-swarm membership, or hidden world-size changes.",
+  "contract_digest": "6fcd1c8872e888d34159ed10fe85b5d7a48c80fba478d2ec71a4d75ca7907cb6"
+}
