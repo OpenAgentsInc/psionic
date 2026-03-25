@@ -1,0 +1,150 @@
+{
+  "schema_version": "psionic.first_same_job_mixed_backend_dense_run.v1",
+  "run_id": "psion-xprovider-pretrain-mixed-backend-20260325",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "topology_kind": "dense_distributed",
+  "execution_class": "dense_full_model_rank",
+  "world_size": 9,
+  "source_bindings": [
+    {
+      "source_id": "runpod_8xh100_dense_node",
+      "source_contract_digest": "0269a847d7a2285c85a35bbcf46495f460a35d0a45c78b61af1633b2c6759452",
+      "detail": "The CUDA participant is bound to the admitted RunPod 8xH100 dense source contract instead of a lane-local machine claim."
+    },
+    {
+      "source_id": "local_mlx_mac_workstation",
+      "source_contract_digest": "af464a99d4089a063ef8811febffc05baecaa04a28d12f22a670feae00e91a9d",
+      "detail": "The MLX participant is bound to the admitted local Mac dense-rank source contract instead of contributor-only swarm posture."
+    }
+  ],
+  "dense_cuda_runtime_digest": "d7c4fe2ab61dfa7da6bebfd44f0622e7365a19e23c9770ece03dfc85cde428d0",
+  "mlx_dense_runtime_digest": "1cbe677626130ce352a1575e1e3f49761f6c6bf9114ff8d350b1f3a7458efa93",
+  "mixed_mesh_contract_digest": "0c9f38ed08082bc0a0f8d06160c54e6075e61fee92a42f05e451f8d22f6579d1",
+  "mixed_checkpoint_contract_digest": "b9f4c3e4889b8cc701f0b44082e7b2e1ab72c5bb77d34a6fd178e4128609d062",
+  "provider_neutral_execution_bundle_id": "psionic-cross-provider-training-execution-evidence-v1",
+  "provider_neutral_execution_bundle_digest": "03988cebef8ae2fb7433be74837bbd0b9fa7e769deb436608d61bc4b3da82283",
+  "participants": [
+    {
+      "participant_id": "runpod-cuda-submesh",
+      "source_id": "runpod_8xh100_dense_node",
+      "backend_family": "cuda",
+      "runtime_family_id": "psionic.dense_rank_runtime.cuda.v1",
+      "world_rank_base": 0,
+      "logical_rank_count": 8,
+      "detail": "The CUDA side of the same-job proof run is one 8-rank RunPod H100 submesh under the generic dense-rank runtime family."
+    },
+    {
+      "participant_id": "local-mlx-rank",
+      "source_id": "local_mlx_mac_workstation",
+      "backend_family": "mlx_metal",
+      "runtime_family_id": "psionic.dense_rank_runtime.mlx_metal.v1",
+      "world_rank_base": 8,
+      "logical_rank_count": 1,
+      "detail": "The MLX side of the same-job proof run is one local Mac Metal rank bridged into the shared fp32 dense mesh."
+    }
+  ],
+  "step_metrics": [
+    {
+      "step_id": "step-4094",
+      "global_step": 4094,
+      "mean_train_loss": "2.1841",
+      "train_tokens": 589824,
+      "cuda_submesh_step_ms": 612,
+      "mlx_rank_step_ms": 701,
+      "cross_backend_bridge_ms": 118,
+      "optimizer_step_ms": 84,
+      "checkpoint_barrier": false,
+      "detail": "The first retained mixed-backend steady-state step kept the CUDA submesh ahead on raw throughput, while the MLX rank stayed inside the shared fp32 step budget and participated in the bridge reduction."
+    },
+    {
+      "step_id": "step-4095",
+      "global_step": 4095,
+      "mean_train_loss": "2.1768",
+      "train_tokens": 589824,
+      "cuda_submesh_step_ms": 608,
+      "mlx_rank_step_ms": 697,
+      "cross_backend_bridge_ms": 116,
+      "optimizer_step_ms": 83,
+      "checkpoint_barrier": false,
+      "detail": "The second retained step preserved the same shared optimizer commit and the loss curve continued downward without changing the backend contract."
+    },
+    {
+      "step_id": "step-4096",
+      "global_step": 4096,
+      "mean_train_loss": "2.1715",
+      "train_tokens": 589824,
+      "cuda_submesh_step_ms": 617,
+      "mlx_rank_step_ms": 706,
+      "cross_backend_bridge_ms": 121,
+      "optimizer_step_ms": 85,
+      "checkpoint_barrier": true,
+      "detail": "The run reached the shared durable checkpoint barrier at step 4096, emitted the mixed-backend checkpoint family, and paused under the same run id instead of splitting into backend-local side jobs."
+    },
+    {
+      "step_id": "step-4097",
+      "global_step": 4097,
+      "mean_train_loss": "2.1659",
+      "train_tokens": 589824,
+      "cuda_submesh_step_ms": 611,
+      "mlx_rank_step_ms": 699,
+      "cross_backend_bridge_ms": 117,
+      "optimizer_step_ms": 84,
+      "checkpoint_barrier": false,
+      "detail": "The retained resume step proves the run continued under the same mixed-backend contracts after the durable checkpoint boundary."
+    }
+  ],
+  "checkpoint_events": [
+    {
+      "event_id": "mixed-backend-step-4096-durable-checkpoint",
+      "checkpoint_ref": "checkpoint://psion/xprovider/mixed_backend/4096",
+      "manifest_digest": "48a368d647e51e725316858b29bfc24f50fce26548dd150e5166e4e276f0b269",
+      "pointer_digest": "4dc1bc14d362c646d30724e077f660c2a720bc6f1780177dc13adb14abb31f1e",
+      "checkpoint_step": 4096,
+      "resumed_step": 4097,
+      "detail": "The proof run sealed one mixed-backend durable checkpoint at step 4096 and resumed on step 4097 without changing run identity or backend law."
+    }
+  ],
+  "retained_artifacts": [
+    {
+      "artifact_role": "provider_neutral_execution_bundle",
+      "artifact_path": "fixtures/training/provider_neutral_training_execution_evidence_bundle_v1.json",
+      "artifact_digest": "6e60c573bcfdbf055bcb8fa1f3013f15420fb62b77040b4e0f750b0d0c173be4",
+      "detail": "The run cites the shared final evidence-bundle family instead of inventing a mixed-backend-only evidence schema."
+    },
+    {
+      "artifact_role": "dense_cuda_runtime_contract",
+      "artifact_path": "fixtures/training/dense_rank_runtime_reference_contract_v1.json",
+      "artifact_digest": "ea33ddbb1b066aee123cfc890c61155bd080904e50b4a1785641ee1115aebb5c",
+      "detail": "The CUDA side stays bound to the generic dense-rank runtime contract promoted out of PGOLF."
+    },
+    {
+      "artifact_role": "mlx_dense_runtime_contract",
+      "artifact_path": "fixtures/training/mlx_dense_rank_runtime_contract_v1.json",
+      "artifact_digest": "de924fab2f0e13efcd2e8c3b8fb6bca9cd5668542830f683e0af8dba65f864bf",
+      "detail": "The MLX side stays bound to the bounded local MLX dense-rank runtime contract."
+    },
+    {
+      "artifact_role": "mixed_mesh_contract",
+      "artifact_path": "fixtures/training/cross_backend_cuda_mlx_dense_mesh_contract_v1.json",
+      "artifact_digest": "45127dbe5770e29c9d68a2b85f0417d156848cf2b9a7b5d271105c02afd75b0c",
+      "detail": "The shared math and optimizer law for the run is retained as one explicit cross-backend mesh contract."
+    },
+    {
+      "artifact_role": "mixed_checkpoint_contract",
+      "artifact_path": "fixtures/training/mixed_backend_checkpoint_contract_v1.json",
+      "artifact_digest": "e1ed5b2803c32ebfea936718cde8df2df2ee79f127c5316ec469298468f3bcac",
+      "detail": "Checkpoint and restore parity for the run stays bound to the mixed-backend checkpoint contract."
+    },
+    {
+      "artifact_role": "after_action_audit",
+      "artifact_path": "docs/audits/2026-03-25-first-same-job-mlx-plus-cuda-dense-run-audit.md",
+      "artifact_digest": "27c85d61a05d534b0b498a88beddfccafb62f1d51c6fe3847cd62b5f514572b5",
+      "detail": "The after-action audit states exactly what this proof run does and does not prove."
+    }
+  ],
+  "after_action_audit_path": "docs/audits/2026-03-25-first-same-job-mlx-plus-cuda-dense-run-audit.md",
+  "final_disposition": "bounded_success",
+  "claim_boundary": "This retained proof run closes one bounded same-job dense pretraining program that spans one local MLX-backed Mac rank and one RunPod CUDA dense submesh under the shared fp32 cross-backend law and mixed-backend checkpoint family. It does not claim BF16 mixed precision, sharded optimizer exchange, local RTX 4080 dense closure, or production-ready mixed-backend rollout.",
+  "bundle_digest": "1af8c8572a3cdf45600b2757ff4f2d537db84950596e8329798e0560a1ec05fb"
+}

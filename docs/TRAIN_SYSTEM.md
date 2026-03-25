@@ -335,6 +335,22 @@ same-backend resume plus CUDA-to-MLX and MLX-to-CUDA restore, and one explicit
 refusal set for BF16 optimizer-state migration, quantized checkpoint resume,
 checkpointless migration, and incomplete portable group selection.
 
+The repo now also owns the first bounded same-job MLX-plus-CUDA dense proof-run
+bundle in
+`crates/psionic-train/src/first_same_job_mixed_backend_dense_run.rs`, the
+binary `first_same_job_mixed_backend_dense_run`, the checker
+`scripts/check-first-same-job-mixed-backend-dense-run.sh`, the committed
+fixture `fixtures/training/first_same_job_mixed_backend_dense_run_v1.json`, and
+the acceptance audit
+`docs/audits/2026-03-25-first-same-job-mlx-plus-cuda-dense-run-audit.md`. That
+surface closes one bounded same-job dense pretraining proof across one local
+MLX Metal rank and one RunPod CUDA dense participant under the shared fp32
+cross-backend mesh law and the mixed-backend checkpoint family. It retains one
+shared run id, one explicit checkpoint barrier plus resume event, inline step
+metrics, and exact proof boundaries that still refuse BF16 mixed precision,
+sharded optimizer exchange, local RTX 4080 dense closure, and broad production
+rollout claims.
+
 The Linux node now also has a dedicated RTX 4080 bring-up seam in
 `crates/psionic-train/src/swarm_cuda_bringup.rs`, the binary
 `swarm_linux_cuda_bringup`, the verification runner
