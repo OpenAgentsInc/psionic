@@ -304,7 +304,7 @@ The open issue stack is now explicit about eight additional competitive-path gap
 - EMA and SWA weight averaging on the score lane
 - competitive final-artifact quantization and compression beyond the current naive roundtrip path
 
-Since the initial audit pass, Psionic has landed the code-local halves of four of
+Since the initial audit pass, Psionic has landed the code-local halves of five of
 those gaps:
 
 - `LeakyReLU(0.5)^2` now exists across the reference-model, graph, IR, CPU, and
@@ -314,8 +314,11 @@ those gaps:
 - Parameter Banking now exists as a typed model surface, runtime artifact
   surface, and bank-aware optimizer grouping
 - legal score-first TTT now exists in the distributed exported-folder runtime
+- Partial RoPE plus inverse-sqrt per-layer RMSNorm output scaling now exist in
+  the shared PGOLF config surface, CPU reference model, and lowered baseline
+  graph
 
-Those four issues remain open because the retained `H100` or `8xH100`
+Those five issue slices remain open because the retained `H100` or `8xH100`
 score-path receipts either do not exist yet or do not yet prove the stronger
 public posture on hardware.
 

@@ -77,6 +77,37 @@ pub enum ParameterGolfMlpActivation {
     },
 }
 
+/// Layerwise RMSNorm output scaling posture for one Parameter Golf decoder.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfLayerNormScale {
+    /// No extra layerwise norm-output scaling.
+    None,
+    /// Scale each block-local RMSNorm output by `1 / sqrt(layer_index + 1)`.
+    InverseSqrtLayerIndexPlusOne,
+}
+
+impl ParameterGolfLayerNormScale {
+    /// Returns the resolved multiplicative factor for one zero-based layer index.
+    #[must_use]
+    pub fn factor(self, layer_index: usize) -> f32 {
+        match self {
+            Self::None => 1.0,
+            Self::InverseSqrtLayerIndexPlusOne => 1.0 / ((layer_index + 1) as f32).sqrt(),
+        }
+    }
+}
+
+impl Default for ParameterGolfLayerNormScale {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+fn parameter_golf_layer_norm_scale_is_none(scale: &ParameterGolfLayerNormScale) -> bool {
+    matches!(scale, ParameterGolfLayerNormScale::None)
+}
+
 impl ParameterGolfMlpActivation {
     /// Competitive public score-path posture from the current top local record surface.
     #[must_use]
@@ -135,6 +166,12 @@ pub struct ParameterGolfConfig {
     pub logit_softcap: f32,
     /// Rotary frequency base.
     pub rope_base: f32,
+    /// Optional rotary sub-dimension. `None` means the full head width.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rope_rotary_dim: Option<usize>,
+    /// Optional layerwise scaling on block-local RMSNorm outputs.
+    #[serde(default, skip_serializing_if = "parameter_golf_layer_norm_scale_is_none")]
+    pub layer_norm_scale: ParameterGolfLayerNormScale,
     /// Initial learned q-gain value.
     pub qk_gain_init: f32,
 }
@@ -158,6 +195,8 @@ impl ParameterGolfConfig {
             tied_embed_init_std: PARAMETER_GOLF_BASELINE_TIED_EMBED_INIT_STD,
             logit_softcap: PARAMETER_GOLF_BASELINE_LOGIT_SOFTCAP,
             rope_base: PARAMETER_GOLF_BASELINE_ROPE_BASE,
+            rope_rotary_dim: None,
+            layer_norm_scale: ParameterGolfLayerNormScale::None,
             qk_gain_init: PARAMETER_GOLF_BASELINE_QK_GAIN_INIT,
         }
     }
@@ -198,6 +237,19 @@ impl ParameterGolfConfig {
         let head_dim = self.model_dim / self.num_heads;
         if !head_dim.is_multiple_of(2) {
             return Err(ParameterGolfConfigError::HeadDimMustBeEven { head_dim });
+        }
+        let rope_rotary_dim = self.rope_rotary_dim.unwrap_or(head_dim);
+        if rope_rotary_dim == 0 {
+            return Err(ParameterGolfConfigError::RopeRotaryDimMustBePositive);
+        }
+        if rope_rotary_dim > head_dim {
+            return Err(ParameterGolfConfigError::RopeRotaryDimMustNotExceedHeadDim {
+                rope_rotary_dim,
+                head_dim,
+            });
+        }
+        if !rope_rotary_dim.is_multiple_of(2) {
+            return Err(ParameterGolfConfigError::RopeRotaryDimMustBeEven { rope_rotary_dim });
         }
         if self.mlp_mult == 0 {
             return Err(ParameterGolfConfigError::MlpMultMustBePositive);
@@ -277,6 +329,11 @@ impl ParameterGolfConfig {
         Ok(self.num_kv_heads * self.head_dim()?)
     }
 
+    /// Returns the effective rotary sub-dimension per head.
+    pub fn effective_rope_rotary_dim(&self) -> Result<usize, ParameterGolfConfigError> {
+        Ok(self.rope_rotary_dim.unwrap_or(self.head_dim()?))
+    }
+
     /// Returns the MLP hidden width.
     pub fn mlp_hidden_dim(&self) -> Result<usize, ParameterGolfConfigError> {
         self.model_dim.checked_mul(self.mlp_mult).ok_or(
@@ -308,6 +365,13 @@ impl ParameterGolfConfig {
             hashed.push(hashed_row);
         }
         Ok(Some(hashed))
+    }
+
+    /// Returns the resolved multiplicative scale applied to block-local
+    /// RMSNorm outputs for one zero-based layer index.
+    #[must_use]
+    pub fn layer_norm_scale_factor(&self, layer_index: usize) -> f32 {
+        self.layer_norm_scale.factor(layer_index)
     }
 
     /// Returns challenge-specific parameter accounting facts for the family.
@@ -445,6 +509,23 @@ pub enum ParameterGolfConfigError {
     HeadDimMustBeEven {
         /// Invalid head dimension.
         head_dim: usize,
+    },
+    /// The rotary sub-dimension must be positive when provided.
+    #[error("rope_rotary_dim must be positive when provided")]
+    RopeRotaryDimMustBePositive,
+    /// The rotary sub-dimension must fit within the head width.
+    #[error("rope_rotary_dim ({rope_rotary_dim}) must not exceed head_dim ({head_dim})")]
+    RopeRotaryDimMustNotExceedHeadDim {
+        /// Invalid rotary sub-dimension.
+        rope_rotary_dim: usize,
+        /// Resolved head width.
+        head_dim: usize,
+    },
+    /// The rotary sub-dimension must stay even.
+    #[error("rope_rotary_dim must be even for RoPE, got {rope_rotary_dim}")]
+    RopeRotaryDimMustBeEven {
+        /// Invalid rotary sub-dimension.
+        rope_rotary_dim: usize,
     },
     /// `mlp_mult` must be strictly positive.
     #[error("mlp_mult must be positive")]
@@ -1882,6 +1963,7 @@ impl ParameterGolfReferenceModel {
                 &x,
                 &x0,
                 config,
+                layer_index,
                 attention_window_size,
             );
             skips.push(x.clone());
@@ -1899,6 +1981,7 @@ impl ParameterGolfReferenceModel {
                 &x,
                 &x0,
                 config,
+                config.num_encoder_layers() + decoder_index,
                 attention_window_size,
             );
         }
@@ -2551,15 +2634,30 @@ fn add_scaled_in_place(
     }
 }
 
+fn scale_tensor3_in_place(target: &mut ParameterGolfTensor3, scale: f32) {
+    if scale == 1.0 {
+        return;
+    }
+    for value in &mut target.values {
+        *value *= scale;
+    }
+}
+
 fn block_forward(
     block: &ParameterGolfBlockWeights,
     x: &ParameterGolfTensor3,
     x0: &ParameterGolfTensor3,
     config: &ParameterGolfConfig,
+    layer_index: usize,
     attention_window_size: Option<usize>,
 ) -> ParameterGolfTensor3 {
     let mixed = blend_with_source(x, x0, block.resid_mix.as_slice());
-    let normed_for_attention = rms_norm_last_dim(&mixed, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON);
+    let mut normed_for_attention =
+        rms_norm_last_dim(&mixed, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON);
+    scale_tensor3_in_place(
+        &mut normed_for_attention,
+        config.layer_norm_scale_factor(layer_index),
+    );
     let attention = attention_forward(
         &block.attention,
         &normed_for_attention,
@@ -2568,7 +2666,8 @@ fn block_forward(
     );
     let mut x = mixed;
     add_scaled_in_place(&mut x, &attention, block.attn_scale.as_slice());
-    let normed_for_mlp = rms_norm_last_dim(&x, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON);
+    let mut normed_for_mlp = rms_norm_last_dim(&x, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON);
+    scale_tensor3_in_place(&mut normed_for_mlp, config.layer_norm_scale_factor(layer_index));
     let mlp = mlp_forward(&block.mlp, &normed_for_mlp, config);
     add_scaled_in_place(&mut x, &mlp, block.mlp_scale.as_slice());
     x
@@ -2710,6 +2809,9 @@ fn attention_forward(
         head_dim,
         PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON,
     );
+    let rope_rotary_dim = config
+        .effective_rope_rotary_dim()
+        .expect("validated parameter golf config should resolve rope_rotary_dim");
     apply_rope_in_place(
         q.as_mut_slice(),
         batch_size,
@@ -2717,6 +2819,7 @@ fn attention_forward(
         sequence_length,
         head_dim,
         config.rope_base,
+        rope_rotary_dim,
     );
     apply_rope_in_place(
         k.as_mut_slice(),
@@ -2725,6 +2828,7 @@ fn attention_forward(
         sequence_length,
         head_dim,
         config.rope_base,
+        rope_rotary_dim,
     );
     for batch in 0..batch_size {
         for head in 0..config.num_heads {
@@ -2928,13 +3032,14 @@ fn apply_rope_in_place(
     sequence_length: usize,
     head_dim: usize,
     rope_base: f32,
+    rope_rotary_dim: usize,
 ) {
-    let half = head_dim / 2;
+    let half = rope_rotary_dim / 2;
     let mut cos = vec![0.0_f32; sequence_length * half];
     let mut sin = vec![0.0_f32; sequence_length * half];
     for position in 0..sequence_length {
         for feature in 0..half {
-            let exponent = (2 * feature) as f32 / head_dim as f32;
+            let exponent = (2 * feature) as f32 / rope_rotary_dim as f32;
             let inv_freq = 1.0_f32 / rope_base.powf(exponent);
             let angle = position as f32 * inv_freq;
             cos[position * half + feature] = angle.cos();
@@ -2945,6 +3050,18 @@ fn apply_rope_in_place(
         for head in 0..head_count {
             for position in 0..sequence_length {
                 let mut rotated = vec![0.0_f32; head_dim];
+                for feature in 0..head_dim {
+                    rotated[feature] = values[tensor4_index(
+                        batch_size,
+                        head_count,
+                        sequence_length,
+                        head_dim,
+                        batch,
+                        head,
+                        position,
+                        feature,
+                    )];
+                }
                 for feature in 0..half {
                     let x1_index = tensor4_index(
                         batch_size,
@@ -3224,6 +3341,11 @@ mod tests {
             fixture.config.mlp_activation,
             ParameterGolfMlpActivation::ReluSquared
         );
+        assert_eq!(fixture.config.rope_rotary_dim, None);
+        assert_eq!(
+            fixture.config.layer_norm_scale,
+            ParameterGolfLayerNormScale::None
+        );
     }
 
     #[test]
@@ -3251,6 +3373,31 @@ mod tests {
             hashed[0][3],
             (((36_313_u64 * 7_u64) ^ (27_191_u64 * 99_u64)) % mod_base as u64) as u32
         );
+    }
+
+    #[test]
+    fn config_rejects_odd_rope_rotary_dim() {
+        let config = ParameterGolfConfig {
+            rope_rotary_dim: Some(15),
+            ..ParameterGolfConfig::baseline_sp1024_9x512()
+        };
+        let err = config
+            .validate()
+            .expect_err("odd rope rotary dim should be refused");
+        assert!(matches!(
+            err,
+            ParameterGolfConfigError::RopeRotaryDimMustBeEven { rope_rotary_dim: 15 }
+        ));
+    }
+
+    #[test]
+    fn inverse_sqrt_layer_norm_scale_factor_matches_expected_schedule() {
+        let config = ParameterGolfConfig {
+            layer_norm_scale: ParameterGolfLayerNormScale::InverseSqrtLayerIndexPlusOne,
+            ..ParameterGolfConfig::baseline_sp1024_9x512()
+        };
+        assert_eq!(config.layer_norm_scale_factor(0), 1.0);
+        assert!((config.layer_norm_scale_factor(3) - 0.5).abs() < 1e-6);
     }
 
     #[test]
@@ -3292,6 +3439,34 @@ mod tests {
             .forward_logits(&input_ids)
             .expect("leaky logits should materialize");
         assert_ne!(baseline_logits.values, leaky_logits.values);
+    }
+
+    #[test]
+    fn partial_rope_and_layer_norm_scale_change_reference_logits() {
+        let input_ids = vec![vec![0_u32, 1, 2, 3]];
+        let baseline = ParameterGolfReferenceModel::baseline_fixture(Default::default())
+            .expect("baseline fixture should build");
+        let scorepath_config = ParameterGolfConfig {
+            rope_rotary_dim: Some(16),
+            layer_norm_scale: ParameterGolfLayerNormScale::InverseSqrtLayerIndexPlusOne,
+            ..baseline.descriptor().config.clone()
+        };
+        let scorepath = ParameterGolfReferenceModel::new(
+            baseline.descriptor().model.clone(),
+            scorepath_config,
+            baseline.weights().clone(),
+        )
+        .expect("scorepath variant should build");
+        let baseline_logits = baseline
+            .forward_logits(input_ids.as_slice())
+            .expect("baseline logits should execute");
+        let scorepath_logits = scorepath
+            .forward_logits(input_ids.as_slice())
+            .expect("scorepath logits should execute");
+        assert!(
+            baseline_logits.max_abs_diff(&scorepath_logits).unwrap_or_default() > 1e-4,
+            "partial rope plus layerwise LN scaling should change reference logits"
+        );
     }
 
     #[test]

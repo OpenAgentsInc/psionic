@@ -9,9 +9,10 @@ use psionic_models::{
     ParameterGolfBankedWeights, ParameterGolfConfig, ParameterGolfConfigError,
     ParameterGolfExecutionError, ParameterGolfMlpActivation, ParameterGolfModelDescriptor,
     ParameterGolfModelError, ParameterGolfReferenceModel, ParameterGolfTensor3,
-    ParameterGolfTensorError, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON, PARAMETER_GOLF_KV_BANK_NAME,
-    PARAMETER_GOLF_MATRIX_BANK_NAMES, PARAMETER_GOLF_MLP_DOWN_BANK_NAME,
-    PARAMETER_GOLF_MLP_UP_BANK_NAME, PARAMETER_GOLF_QO_BANK_NAME,
+    ParameterGolfTensorError, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON,
+    PARAMETER_GOLF_KV_BANK_NAME, PARAMETER_GOLF_MATRIX_BANK_NAMES,
+    PARAMETER_GOLF_MLP_DOWN_BANK_NAME, PARAMETER_GOLF_MLP_UP_BANK_NAME,
+    PARAMETER_GOLF_QO_BANK_NAME,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -831,8 +832,12 @@ fn build_baseline_graph_state(
     )?;
     let head_dim = config.head_dim()?;
     let ones_head = builder.constant_f32(Shape::new(vec![head_dim]), vec![1.0; head_dim])?;
-    let (rope_cos, rope_sin) =
-        rope_table_constants(builder, sequence_length, head_dim, config.rope_base)?;
+    let (rope_cos, rope_sin) = rope_table_constants(
+        builder,
+        sequence_length,
+        config.effective_rope_rotary_dim()?,
+        config.rope_base,
+    )?;
 
     let mut x = builder.rms_norm(
         &embedded_input,
@@ -952,6 +957,14 @@ fn block_forward_graph(
     )?;
     let normed_for_attention =
         builder.rms_norm(&mixed, ones_model, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON)?;
+    let normed_for_attention = apply_layer_norm_scale_graph(
+        builder,
+        &normed_for_attention,
+        batch_size,
+        sequence_length,
+        config.model_dim,
+        config.layer_norm_scale_factor(layer_index),
+    )?;
     let attention = attention_forward_graph(
         builder,
         parameters,
@@ -982,6 +995,14 @@ fn block_forward_graph(
     )?;
     let normed_for_mlp =
         builder.rms_norm(&x, ones_model, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON)?;
+    let normed_for_mlp = apply_layer_norm_scale_graph(
+        builder,
+        &normed_for_mlp,
+        batch_size,
+        sequence_length,
+        config.model_dim,
+        config.layer_norm_scale_factor(layer_index),
+    )?;
     let mlp = mlp_forward_graph(
         builder,
         parameters,
@@ -1024,6 +1045,7 @@ fn attention_forward_graph(
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
     let head_dim = config.head_dim()?;
     let kv_dim = config.kv_dim()?;
+    let rope_rotary_dim = config.effective_rope_rotary_dim()?;
     let q_weight = parameter_tensor_or_matrix_bank_slice_graph(
         builder,
         parameters,
@@ -1109,8 +1131,8 @@ fn attention_forward_graph(
 
     let q = builder.rms_norm(&q, ones_head, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON)?;
     let k = builder.rms_norm(&k, ones_head, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON)?;
-    let q = builder.rope(&q, rope_cos, rope_sin, false)?;
-    let k = builder.rope(&k, rope_cos, rope_sin, false)?;
+    let q = apply_rope_graph(builder, &q, rope_cos, rope_sin, head_dim, rope_rotary_dim)?;
+    let k = apply_rope_graph(builder, &k, rope_cos, rope_sin, head_dim, rope_rotary_dim)?;
     let q_gain = parameters
         .get(format!("blocks.{layer_index}.attn.q_gain").as_str())
         .cloned()
@@ -1301,6 +1323,42 @@ fn linear_3d(
     )?)
 }
 
+fn apply_layer_norm_scale_graph(
+    builder: &mut AutodiffGraphBuilder,
+    input: &AutodiffTensor,
+    batch_size: usize,
+    sequence_length: usize,
+    feature_count: usize,
+    scale: f32,
+) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
+    if scale == 1.0 {
+        return Ok(input.clone());
+    }
+    let scale = builder.constant_f32(Shape::new(vec![1, 1, 1]), vec![scale])?;
+    let scale = builder.expand(
+        &scale,
+        Shape::new(vec![batch_size, sequence_length, feature_count]),
+    )?;
+    Ok(builder.mul(input, &scale)?)
+}
+
+fn apply_rope_graph(
+    builder: &mut AutodiffGraphBuilder,
+    input: &AutodiffTensor,
+    rope_cos: &AutodiffTensor,
+    rope_sin: &AutodiffTensor,
+    head_dim: usize,
+    rope_rotary_dim: usize,
+) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
+    if rope_rotary_dim == head_dim {
+        return Ok(builder.rope(input, rope_cos, rope_sin, false)?);
+    }
+    let rotated_prefix = builder.slice(input, 3, 0, rope_rotary_dim)?;
+    let rotated_prefix = builder.rope(&rotated_prefix, rope_cos, rope_sin, false)?;
+    let passthrough_suffix = builder.slice(input, 3, rope_rotary_dim, head_dim)?;
+    Ok(builder.concat(&[rotated_prefix, passthrough_suffix], 3)?)
+}
+
 fn parameter_tensor_or_matrix_bank_slice_graph(
     builder: &mut AutodiffGraphBuilder,
     parameters: &BTreeMap<String, AutodiffTensor>,
@@ -1475,15 +1533,15 @@ fn select_parameter_matrix_slice_graph(
 fn rope_table_constants(
     builder: &mut AutodiffGraphBuilder,
     sequence_length: usize,
-    head_dim: usize,
+    rope_rotary_dim: usize,
     rope_base: f32,
 ) -> Result<(AutodiffTensor, AutodiffTensor), ParameterGolfBaselineGraphError> {
-    let half_dim = head_dim / 2;
+    let half_dim = rope_rotary_dim / 2;
     let mut cos = vec![0.0_f32; sequence_length * half_dim];
     let mut sin = vec![0.0_f32; sequence_length * half_dim];
     for position in 0..sequence_length {
         for feature in 0..half_dim {
-            let exponent = (2 * feature) as f32 / head_dim as f32;
+            let exponent = (2 * feature) as f32 / rope_rotary_dim as f32;
             let inv_freq = 1.0_f32 / rope_base.powf(exponent);
             let angle = position as f32 * inv_freq;
             cos[position * half_dim + feature] = angle.cos();
@@ -1568,7 +1626,8 @@ mod tests {
 
     use super::*;
     use psionic_models::{
-        ModelDescriptor, ParameterGolfDeterministicInitializer, ParameterGolfWeights,
+        ModelDescriptor, ParameterGolfDeterministicInitializer, ParameterGolfLayerNormScale,
+        ParameterGolfWeights,
     };
 
     #[derive(Deserialize)]
@@ -1751,6 +1810,55 @@ mod tests {
             ModelDescriptor::new("parameter-golf-test-bigram", "parameter_golf_decoder", "v1"),
             config.clone(),
             weights,
+        )?;
+        let graph = build_parameter_golf_baseline_graph(
+            Device::cpu(),
+            model.descriptor(),
+            fixture.input_ids.len(),
+            fixture.input_ids[0].len(),
+        )?;
+        compile_graph(graph.graph.graph())?;
+
+        let inputs = bind_parameter_golf_baseline_graph_inputs(
+            &graph,
+            &model,
+            fixture.input_ids.as_slice(),
+        )?;
+        let values = evaluate_graph(graph.graph.graph(), &inputs)?;
+        let pre_softcap_logits = output_tensor3(
+            values
+                .get(&graph.pre_softcap_logits_tensor_id)
+                .ok_or("missing pre-softcap logits")?,
+            [1, 4, model.descriptor().config.vocab_size],
+            "pre_softcap_logits",
+        )?;
+        let seeded = parameter_golf_projection_seed(
+            &pre_softcap_logits,
+            fixture.target_ids.as_slice(),
+            model.descriptor().config.logit_softcap,
+        )?;
+        let reference = model.forward_logits(fixture.input_ids.as_slice())?;
+        let max_abs_diff = seeded.softcapped_logits.max_abs_diff(&reference)?;
+        assert!(
+            max_abs_diff < 5e-5,
+            "max logit drift {max_abs_diff} exceeded tolerance"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_baseline_graph_matches_reference_logits_with_partial_rope_and_ln_scale(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = load_baseline_fixture();
+        let config = ParameterGolfConfig {
+            rope_rotary_dim: Some(16),
+            layer_norm_scale: ParameterGolfLayerNormScale::InverseSqrtLayerIndexPlusOne,
+            ..ParameterGolfConfig::baseline_sp1024_9x512()
+        };
+        let model = ParameterGolfReferenceModel::new(
+            ModelDescriptor::new("parameter-golf-test-scorepath-arch", "parameter_golf_decoder", "v1"),
+            config.clone(),
+            ParameterGolfWeights::from_initializer(&config, fixture.initializer)?,
         )?;
         let graph = build_parameter_golf_baseline_graph(
             Device::cpu(),
