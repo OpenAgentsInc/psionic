@@ -1984,6 +1984,15 @@ Its public API centers on `TrainingSessionState`, which already supports:
 - `mark_checkpoint_durable`
 - `plan_live_recovery`
 
+That session truth now also has a repo-owned writeback implementation under
+`psionic-train`:
+
+- `AsyncCheckpointWritebackWorker`
+- `AsyncCheckpointWritebackPayload`
+- `AsyncCheckpointWritebackReceipt`
+- `write_checkpoint_payload_sync`
+- `train_parameter_golf_local_reference_with_async_checkpoint_writeback`
+
 What that means in practice:
 
 - Psionic can derive elastic-membership epochs from authoritative cluster truth.
@@ -1995,6 +2004,13 @@ What that means in practice:
   durable recovery posture.
 - Psionic can derive explicit live-recovery plans for recovering nodes and late
   joiners.
+- Psionic can hand immutable checkpoint payloads to a bounded writer worker,
+  publish checkpoint directories atomically, refuse queue overload explicitly,
+  and flush or refuse pending writes during shutdown without making partial
+  checkpoints look committed.
+- The representative `Parameter Golf` local-reference lane now exercises that
+  writeback path and proves restore equivalence plus lower train-loop stall at
+  the handoff point relative to synchronous writes.
 
 The current recovery action set is already meaningful:
 

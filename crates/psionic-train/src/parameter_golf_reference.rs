@@ -1,32 +1,37 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     io::{Read, Write},
+    path::Path,
 };
 
 use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
 use half::f16;
 use psionic_data::{
-    ParameterGolfDataError, ParameterGolfSentencePieceByteLuts, ParameterGolfSentencePieceTokenEntry,
+    ParameterGolfDataError, ParameterGolfSentencePieceByteLuts,
+    ParameterGolfSentencePieceTokenEntry,
 };
 use psionic_eval::{
-    ParameterGolfValidationEvalError, ParameterGolfValidationEvalReport,
-    evaluate_parameter_golf_validation,
+    evaluate_parameter_golf_validation, ParameterGolfValidationEvalError,
+    ParameterGolfValidationEvalReport,
 };
 use psionic_models::{
     ParameterGolfExecutionError, ParameterGolfModelError, ParameterGolfParameterVector,
     ParameterGolfReferenceModel,
 };
 use psionic_runtime::TrainingCheckpointReference;
-use safetensors::{Dtype as SafeTensorsDType, SafeTensors, serialize, tensor::TensorView};
+use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    PARAMETER_GOLF_CONTROL_TENSOR_NAME_PATTERNS, ParameterGolfMuonConfig, ParameterGolfMuonState,
+    apply_parameter_golf_muon_step, parameter_golf_optimizer_plan, AsyncCheckpointWritebackError,
+    AsyncCheckpointWritebackFile, AsyncCheckpointWritebackOptions, AsyncCheckpointWritebackPayload,
+    AsyncCheckpointWritebackReceipt, AsyncCheckpointWritebackTicket,
+    AsyncCheckpointWritebackWorker, ParameterGolfMuonConfig, ParameterGolfMuonState,
     ParameterGolfOptimizerExecution, ParameterGolfTrainError, ParameterGolfTrainingHyperparameters,
     TrainingOptimizerConfig, TrainingOptimizerError, TrainingOptimizerState,
-    apply_parameter_golf_muon_step, parameter_golf_optimizer_plan,
+    PARAMETER_GOLF_CONTROL_TENSOR_NAME_PATTERNS,
 };
 
 const PARAMETER_GOLF_CHECKPOINT_MANIFEST_KEY: &str = "psionic.parameter_golf.checkpoint_manifest";
@@ -206,13 +211,19 @@ impl ParameterGolfLocalReferenceFixture {
     /// Returns a stable digest over the training token stream.
     #[must_use]
     pub fn training_digest(&self) -> String {
-        stable_digest(b"psionic_parameter_golf_training_tokens|", &self.training_tokens)
+        stable_digest(
+            b"psionic_parameter_golf_training_tokens|",
+            &self.training_tokens,
+        )
     }
 
     /// Returns a stable digest over the validation token stream.
     #[must_use]
     pub fn validation_digest(&self) -> String {
-        stable_digest(b"psionic_parameter_golf_validation_tokens|", &self.validation_tokens)
+        stable_digest(
+            b"psionic_parameter_golf_validation_tokens|",
+            &self.validation_tokens,
+        )
     }
 
     fn validate(&self) -> Result<(), ParameterGolfReferenceTrainingError> {
@@ -546,6 +557,9 @@ pub struct ParameterGolfReferenceTrainingOutcome {
     pub raw_roundtrip_validation_eval: ParameterGolfValidationEvalReport,
     /// Validation report after int8+zlib restore.
     pub int8_zlib_roundtrip_validation_eval: ParameterGolfValidationEvalReport,
+    /// Durable checkpoint writeback receipts when the run used async writeback.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub checkpoint_writeback_receipts: Vec<AsyncCheckpointWritebackReceipt>,
     /// Final summary.
     pub summary: ParameterGolfReferenceTrainingSummary,
 }
@@ -627,6 +641,8 @@ pub enum ParameterGolfReferenceTrainingError {
     Train(#[from] ParameterGolfTrainError),
     #[error(transparent)]
     Optimizer(#[from] TrainingOptimizerError),
+    #[error(transparent)]
+    AsyncCheckpointWriteback(#[from] AsyncCheckpointWritebackError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -836,17 +852,21 @@ impl ParameterGolfReferenceTrainingRunner {
             let parameter = initial_model
                 .weights()
                 .parameter_vector(&initial_model.descriptor().config, parameter_id.as_str())
-                .ok_or_else(|| ParameterGolfReferenceTrainingError::MissingOptimizerGroup {
-                    parameter_id: parameter_id.clone(),
-                })?;
+                .ok_or_else(
+                    || ParameterGolfReferenceTrainingError::MissingOptimizerGroup {
+                        parameter_id: parameter_id.clone(),
+                    },
+                )?;
             validate_selected_indices(&parameter_id, &selected_indices, parameter.values.len())?;
             let group = optimizer_plan
                 .groups
                 .iter()
                 .find(|group| group.tensor_names.iter().any(|name| name == &parameter_id))
-                .ok_or_else(|| ParameterGolfReferenceTrainingError::MissingOptimizerGroup {
-                    parameter_id: parameter_id.clone(),
-                })?;
+                .ok_or_else(
+                    || ParameterGolfReferenceTrainingError::MissingOptimizerGroup {
+                        parameter_id: parameter_id.clone(),
+                    },
+                )?;
             baseline_vectors.insert(parameter_id.clone(), parameter.clone());
             match &group.execution {
                 ParameterGolfOptimizerExecution::Adam { optimizer } => {
@@ -970,10 +990,9 @@ impl ParameterGolfReferenceTrainingRunner {
                 &self.config.geometry,
                 global_micro_step,
             )?;
-            let microbatch_loss = self.current_model.loss(
-                input_ids.as_slice(),
-                target_ids.as_slice(),
-            )?;
+            let microbatch_loss = self
+                .current_model
+                .loss(input_ids.as_slice(), target_ids.as_slice())?;
             microbatch_loss_sum += microbatch_loss;
             for (tensor_index, tensor) in self.trainable_tensors.iter().enumerate() {
                 let gradients = finite_difference_gradients(
@@ -1003,7 +1022,10 @@ impl ParameterGolfReferenceTrainingRunner {
             .config
             .hyperparameters
             .learning_rate_multiplier(step_index, elapsed_ms);
-        let muon_momentum = self.config.hyperparameters.muon_momentum_at_step(step_index);
+        let muon_momentum = self
+            .config
+            .hyperparameters
+            .muon_momentum_at_step(step_index);
         let step_number = step_index.saturating_add(1);
         for (tensor, gradients) in self
             .trainable_tensors
@@ -1033,7 +1055,8 @@ impl ParameterGolfReferenceTrainingRunner {
         )?;
         let step_metrics = ParameterGolfReferenceTrainingStepMetrics {
             global_step: step_number,
-            mean_microbatch_loss: microbatch_loss_sum / self.config.geometry.grad_accum_steps as f32,
+            mean_microbatch_loss: microbatch_loss_sum
+                / self.config.geometry.grad_accum_steps as f32,
             validation_mean_loss: self.current_validation_eval.mean_loss,
             validation_bits_per_byte: self.current_validation_eval.bits_per_byte,
             learning_rate_multiplier,
@@ -1099,8 +1122,7 @@ impl ParameterGolfReferenceTrainingRunner {
             final_validation_mean_loss: self.current_validation_eval.mean_loss,
             final_validation_bits_per_byte: self.current_validation_eval.bits_per_byte,
             raw_roundtrip_validation_mean_loss: raw_roundtrip_validation_eval.mean_loss,
-            int8_zlib_roundtrip_validation_mean_loss: int8_zlib_roundtrip_validation_eval
-                .mean_loss,
+            int8_zlib_roundtrip_validation_mean_loss: int8_zlib_roundtrip_validation_eval.mean_loss,
             initial_checkpoint_manifest_digest: self.initial_checkpoint.manifest.stable_digest(),
             final_checkpoint_manifest_digest: self.latest_checkpoint.manifest.stable_digest(),
             raw_model_artifact_digest: raw_model_artifact.artifact_digest.clone(),
@@ -1118,6 +1140,7 @@ impl ParameterGolfReferenceTrainingRunner {
             final_validation_eval: self.current_validation_eval,
             raw_roundtrip_validation_eval,
             int8_zlib_roundtrip_validation_eval,
+            checkpoint_writeback_receipts: Vec::new(),
             summary,
         })
     }
@@ -1133,6 +1156,221 @@ pub fn train_parameter_golf_local_reference(
         runner.step()?;
     }
     runner.into_outcome()
+}
+
+/// Runs the bounded local-reference trainer end to end and persists each emitted
+/// checkpoint through the shared async writeback worker.
+pub fn train_parameter_golf_local_reference_with_async_checkpoint_writeback(
+    fixture: &ParameterGolfLocalReferenceFixture,
+    config: &ParameterGolfReferenceTrainingConfig,
+    checkpoint_output_root: &Path,
+    writeback_options: AsyncCheckpointWritebackOptions,
+) -> Result<ParameterGolfReferenceTrainingOutcome, ParameterGolfReferenceTrainingError> {
+    let mut runner = ParameterGolfReferenceTrainingRunner::new(fixture, config)?;
+    let max_in_flight_writes = writeback_options.max_in_flight_writes();
+    let mut worker = AsyncCheckpointWritebackWorker::new(writeback_options)?;
+    let mut pending_tickets = VecDeque::new();
+    let mut receipts = Vec::new();
+
+    submit_checkpoint_async_writeback(
+        &worker,
+        runner.latest_checkpoint(),
+        checkpoint_output_root,
+        max_in_flight_writes,
+        &mut pending_tickets,
+        &mut receipts,
+    )?;
+    while !runner.is_complete() {
+        runner.step()?;
+        submit_checkpoint_async_writeback(
+            &worker,
+            runner.latest_checkpoint(),
+            checkpoint_output_root,
+            max_in_flight_writes,
+            &mut pending_tickets,
+            &mut receipts,
+        )?;
+    }
+    drain_checkpoint_async_writeback_tickets(&mut pending_tickets, &mut receipts)?;
+    let shutdown_receipts = worker.shutdown_flush()?;
+
+    let mut outcome = runner.into_outcome()?;
+    outcome.checkpoint_writeback_receipts =
+        merge_checkpoint_writeback_receipts(receipts, shutdown_receipts);
+    Ok(outcome)
+}
+
+fn submit_checkpoint_async_writeback(
+    worker: &AsyncCheckpointWritebackWorker,
+    checkpoint: &ParameterGolfCheckpointArtifact,
+    checkpoint_output_root: &Path,
+    max_in_flight_writes: usize,
+    pending_tickets: &mut VecDeque<AsyncCheckpointWritebackTicket>,
+    receipts: &mut Vec<AsyncCheckpointWritebackReceipt>,
+) -> Result<(), ParameterGolfReferenceTrainingError> {
+    while pending_tickets.len() >= max_in_flight_writes {
+        complete_oldest_checkpoint_async_writeback(pending_tickets, receipts)?;
+    }
+
+    let payload = checkpoint_async_writeback_payload(checkpoint, checkpoint_output_root)?;
+    match worker.submit(payload) {
+        Ok(ticket) => {
+            pending_tickets.push_back(ticket);
+            Ok(())
+        }
+        Err(AsyncCheckpointWritebackError::QueueFull { .. }) => {
+            complete_oldest_checkpoint_async_writeback(pending_tickets, receipts)?;
+            let payload = checkpoint_async_writeback_payload(checkpoint, checkpoint_output_root)?;
+            let ticket = worker.submit(payload)?;
+            pending_tickets.push_back(ticket);
+            Ok(())
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn drain_checkpoint_async_writeback_tickets(
+    pending_tickets: &mut VecDeque<AsyncCheckpointWritebackTicket>,
+    receipts: &mut Vec<AsyncCheckpointWritebackReceipt>,
+) -> Result<(), ParameterGolfReferenceTrainingError> {
+    while !pending_tickets.is_empty() {
+        complete_oldest_checkpoint_async_writeback(pending_tickets, receipts)?;
+    }
+    Ok(())
+}
+
+fn complete_oldest_checkpoint_async_writeback(
+    pending_tickets: &mut VecDeque<AsyncCheckpointWritebackTicket>,
+    receipts: &mut Vec<AsyncCheckpointWritebackReceipt>,
+) -> Result<(), ParameterGolfReferenceTrainingError> {
+    let ticket = pending_tickets.pop_front().ok_or_else(|| {
+        ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf async checkpoint writeback",
+            message: String::from("bounded queue saturated without an in-flight ticket"),
+        }
+    })?;
+    receipts.push(ticket.wait()?);
+    Ok(())
+}
+
+fn checkpoint_async_writeback_payload(
+    checkpoint: &ParameterGolfCheckpointArtifact,
+    checkpoint_output_root: &Path,
+) -> Result<AsyncCheckpointWritebackPayload, ParameterGolfReferenceTrainingError> {
+    let step = checkpoint.manifest.step;
+    let checkpoint_ref = checkpoint
+        .checkpoint
+        .checkpoint_ref
+        .clone()
+        .unwrap_or_else(|| checkpoint.manifest.checkpoint_ref.clone());
+    AsyncCheckpointWritebackPayload::new(
+        format!("{}-step-{step:05}", checkpoint.manifest.run_id),
+        checkpoint_ref,
+        checkpoint.checkpoint.checkpoint_family.clone(),
+        checkpoint
+            .checkpoint
+            .stream_id
+            .strip_suffix("/checkpoint_model.safetensors")
+            .map_or_else(
+                || {
+                    checkpoint_output_root
+                        .join(checkpoint.manifest.run_id.as_str())
+                        .join(format!("step-{step:05}"))
+                },
+                |stream_prefix| checkpoint_output_root.join(stream_prefix),
+            ),
+        vec![
+            AsyncCheckpointWritebackFile::new(
+                "checkpoint_model.safetensors",
+                checkpoint.weights_artifact.artifact_digest.clone(),
+                checkpoint.weights_artifact.bytes.clone(),
+            )?,
+            AsyncCheckpointWritebackFile::new(
+                "checkpoint_manifest.json",
+                checkpoint.manifest_artifact.artifact_digest.clone(),
+                checkpoint.manifest_artifact.bytes.clone(),
+            )?,
+        ],
+    )
+    .map_err(Into::into)
+}
+
+fn merge_checkpoint_writeback_receipts(
+    completed: Vec<AsyncCheckpointWritebackReceipt>,
+    shutdown: Vec<AsyncCheckpointWritebackReceipt>,
+) -> Vec<AsyncCheckpointWritebackReceipt> {
+    let mut seen = BTreeSet::new();
+    completed
+        .into_iter()
+        .chain(shutdown)
+        .filter(|receipt| seen.insert(receipt.write_id.clone()))
+        .collect()
+}
+
+#[cfg(test)]
+fn read_parameter_golf_checkpoint_from_directory(
+    directory: &Path,
+    checkpoint: &TrainingCheckpointReference,
+) -> Result<ParameterGolfCheckpointArtifact, ParameterGolfReferenceTrainingError> {
+    let weights_path = directory.join("checkpoint_model.safetensors");
+    let manifest_path = directory.join("checkpoint_manifest.json");
+    let weights_bytes = std::fs::read(weights_path.as_path())?;
+    let manifest_bytes = std::fs::read(manifest_path.as_path())?;
+    let manifest =
+        serde_json::from_slice::<ParameterGolfCheckpointManifest>(manifest_bytes.as_slice())
+            .map_err(|error| ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf checkpoint manifest import",
+                message: error.to_string(),
+            })?;
+    if manifest.checkpoint_family != checkpoint.checkpoint_family {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf checkpoint import",
+            message: format!(
+                "checkpoint family mismatch: manifest `{}` vs runtime `{}`",
+                manifest.checkpoint_family, checkpoint.checkpoint_family
+            ),
+        });
+    }
+    if checkpoint.checkpoint_ref.as_ref() != Some(&manifest.checkpoint_ref) {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf checkpoint import",
+            message: format!(
+                "checkpoint ref mismatch: manifest `{}` vs runtime `{:?}`",
+                manifest.checkpoint_ref, checkpoint.checkpoint_ref
+            ),
+        });
+    }
+    if checkpoint.step != Some(manifest.step) {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf checkpoint import",
+            message: format!(
+                "checkpoint step mismatch: manifest `{}` vs runtime `{:?}`",
+                manifest.step, checkpoint.step
+            ),
+        });
+    }
+    let weights_artifact = ParameterGolfTrainingArtifact::new(
+        "parameter_golf_model_safetensors",
+        format!(
+            "{}/step-{:05}/checkpoint_model.safetensors",
+            manifest.run_id, manifest.step
+        ),
+        weights_bytes,
+    );
+    let manifest_artifact = ParameterGolfTrainingArtifact::new(
+        "parameter_golf_checkpoint_manifest",
+        format!(
+            "{}/step-{:05}/checkpoint_manifest.json",
+            manifest.run_id, manifest.step
+        ),
+        manifest_bytes,
+    );
+    Ok(ParameterGolfCheckpointArtifact {
+        weights_artifact,
+        manifest_artifact,
+        manifest,
+        checkpoint: checkpoint.clone(),
+    })
 }
 
 /// Restores one local-reference runner from a persisted checkpoint.
@@ -1212,10 +1450,15 @@ pub fn restore_parameter_golf_local_reference_checkpoint(
     for tensor in &manifest.trainable_tensors {
         let baseline_vector = initial_model
             .weights()
-            .parameter_vector(&initial_model.descriptor().config, tensor.parameter_id.as_str())
-            .ok_or_else(|| ParameterGolfReferenceTrainingError::MissingOptimizerGroup {
-                parameter_id: tensor.parameter_id.clone(),
-            })?;
+            .parameter_vector(
+                &initial_model.descriptor().config,
+                tensor.parameter_id.as_str(),
+            )
+            .ok_or_else(
+                || ParameterGolfReferenceTrainingError::MissingOptimizerGroup {
+                    parameter_id: tensor.parameter_id.clone(),
+                },
+            )?;
         validate_selected_indices(
             tensor.parameter_id.as_str(),
             tensor.selected_indices.as_slice(),
@@ -1224,10 +1467,15 @@ pub fn restore_parameter_golf_local_reference_checkpoint(
         baseline_vectors.insert(tensor.parameter_id.clone(), baseline_vector);
         let current_vector = current_model
             .weights()
-            .parameter_vector(&current_model.descriptor().config, tensor.parameter_id.as_str())
-            .ok_or_else(|| ParameterGolfReferenceTrainingError::MissingArtifactTensor {
-                parameter_id: tensor.parameter_id.clone(),
-            })?;
+            .parameter_vector(
+                &current_model.descriptor().config,
+                tensor.parameter_id.as_str(),
+            )
+            .ok_or_else(
+                || ParameterGolfReferenceTrainingError::MissingArtifactTensor {
+                    parameter_id: tensor.parameter_id.clone(),
+                },
+            )?;
         match (&tensor.execution, &tensor.optimizer_state) {
             (
                 ParameterGolfOptimizerExecution::Adam { optimizer },
@@ -1341,9 +1589,11 @@ pub fn restore_parameter_golf_model_from_safetensors(
     {
         let tensor = safetensors
             .tensor(parameter.parameter_id.as_str())
-            .map_err(|_| ParameterGolfReferenceTrainingError::MissingArtifactTensor {
-                parameter_id: parameter.parameter_id.clone(),
-            })?;
+            .map_err(
+                |_| ParameterGolfReferenceTrainingError::MissingArtifactTensor {
+                    parameter_id: parameter.parameter_id.clone(),
+                },
+            )?;
         validate_tensor_shape(
             parameter.parameter_id.as_str(),
             tensor.shape(),
@@ -1529,11 +1779,19 @@ fn microbatch_as_sequences(
     }
     let input_ids = tokens[..tokens.len() - 1]
         .chunks(seq_len)
-        .map(|row| row.iter().map(|token| u32::from(*token)).collect::<Vec<_>>())
+        .map(|row| {
+            row.iter()
+                .map(|token| u32::from(*token))
+                .collect::<Vec<_>>()
+        })
         .collect::<Vec<_>>();
     let target_ids = tokens[1..]
         .chunks(seq_len)
-        .map(|row| row.iter().map(|token| u32::from(*token)).collect::<Vec<_>>())
+        .map(|row| {
+            row.iter()
+                .map(|token| u32::from(*token))
+                .collect::<Vec<_>>()
+        })
         .collect::<Vec<_>>();
     Ok((input_ids, target_ids))
 }
@@ -1597,7 +1855,8 @@ fn symmetric_finite_difference(
 ) -> Result<f32, ParameterGolfReferenceTrainingError> {
     let mut plus = values.to_vec();
     plus[flat_index] += epsilon;
-    let plus_loss = loss_with_parameter_override(current_model, parameter_id, plus, input_ids, target_ids)?;
+    let plus_loss =
+        loss_with_parameter_override(current_model, parameter_id, plus, input_ids, target_ids)?;
     let mut minus = values.to_vec();
     minus[flat_index] -= epsilon;
     let minus_loss =
@@ -1690,15 +1949,13 @@ fn export_checkpoint(
             .iter()
             .map(TrainableTensorRuntime::checkpoint_tensor)
             .collect(),
-        parent_checkpoint_ref: previous.and_then(|artifact| artifact.checkpoint.checkpoint_ref.clone()),
+        parent_checkpoint_ref: previous
+            .and_then(|artifact| artifact.checkpoint.checkpoint_ref.clone()),
         parent_manifest_digest: previous.map(|artifact| artifact.manifest.stable_digest()),
     };
     let manifest_artifact = ParameterGolfTrainingArtifact::new(
         "parameter_golf_checkpoint_manifest",
-        format!(
-            "{}/step-{step:05}/checkpoint_manifest.json",
-            config.run_id
-        ),
+        format!("{}/step-{step:05}/checkpoint_manifest.json", config.run_id),
         serde_json::to_vec_pretty(&manifest).map_err(|error| {
             ParameterGolfReferenceTrainingError::Serialization {
                 context: "parameter golf checkpoint manifest export",
@@ -1709,10 +1966,14 @@ fn export_checkpoint(
     let started_at_ms = config
         .started_at_ms
         .saturating_add(step.saturating_mul(config.step_duration_ms));
-    let cluster_state_digest =
-        stable_digest(b"psionic_parameter_golf_local_reference_cluster|", &config.run_id);
-    let topology_digest =
-        stable_digest(b"psionic_parameter_golf_local_reference_topology|", &config.geometry);
+    let cluster_state_digest = stable_digest(
+        b"psionic_parameter_golf_local_reference_cluster|",
+        &config.run_id,
+    );
+    let topology_digest = stable_digest(
+        b"psionic_parameter_golf_local_reference_topology|",
+        &config.geometry,
+    );
     let checkpoint = TrainingCheckpointReference::new(
         config.checkpoint_family.clone(),
         weights_artifact.artifact_ref.clone(),
@@ -1774,7 +2035,10 @@ fn export_int8_zlib_model_artifact(
         String::from("psionic.parameter_golf.quant_format"),
         String::from(PARAMETER_GOLF_INT8_ZLIB_FORMAT),
     );
-    for parameter in model.weights().parameter_vectors(&model.descriptor().config) {
+    for parameter in model
+        .weights()
+        .parameter_vectors(&model.descriptor().config)
+    {
         let shape = parameter.shape.dims().to_vec();
         if keep_float_tensor(parameter.parameter_id.as_str(), parameter.values.len()) {
             if is_control_tensor_name(parameter.parameter_id.as_str()) {
@@ -1799,18 +2063,8 @@ fn export_int8_zlib_model_artifact(
         let scale_name = format!("{}.__scale", parameter.parameter_id);
         let (quantized_bytes, scale_bytes, scale_shape) =
             quantize_int8_tensor(parameter.values.as_slice(), shape.as_slice());
-        encoded_tensors.push((
-            quantized_name,
-            SafeTensorsDType::I8,
-            shape,
-            quantized_bytes,
-        ));
-        encoded_tensors.push((
-            scale_name,
-            SafeTensorsDType::F16,
-            scale_shape,
-            scale_bytes,
-        ));
+        encoded_tensors.push((quantized_name, SafeTensorsDType::I8, shape, quantized_bytes));
+        encoded_tensors.push((scale_name, SafeTensorsDType::F16, scale_shape, scale_bytes));
     }
     let raw = serialize_tensors(
         encoded_tensors,
@@ -1853,7 +2107,9 @@ fn serialize_tensors(
         views.push((name.clone(), view));
     }
     serialize(
-        views.iter().map(|(name, view)| (name.as_str(), view.clone())),
+        views
+            .iter()
+            .map(|(name, view)| (name.as_str(), view.clone())),
         metadata,
     )
     .map_err(|error| ParameterGolfReferenceTrainingError::Serialization {
@@ -1863,7 +2119,8 @@ fn serialize_tensors(
 }
 
 fn keep_float_tensor(parameter_id: &str, parameter_len: usize) -> bool {
-    is_control_tensor_name(parameter_id) || parameter_len <= PARAMETER_GOLF_INT8_KEEP_FLOAT_MAX_NUMEL
+    is_control_tensor_name(parameter_id)
+        || parameter_len <= PARAMETER_GOLF_INT8_KEEP_FLOAT_MAX_NUMEL
 }
 
 fn is_control_tensor_name(parameter_id: &str) -> bool {
@@ -1897,7 +2154,11 @@ fn quantize_int8_tensor(values: &[f32], shape: &[usize]) -> (Vec<u8>, Vec<u8>, V
     }
 
     let clip_abs = quantile_abs(values, PARAMETER_GOLF_INT8_CLIP_Q);
-    let scale = if clip_abs > 0.0 { clip_abs / 127.0 } else { 1.0 };
+    let scale = if clip_abs > 0.0 {
+        clip_abs / 127.0
+    } else {
+        1.0
+    };
     let quantized = values
         .iter()
         .map(|value| {
@@ -2075,13 +2336,23 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
+    use std::{error::Error, time::Instant};
+
+    use tempfile::tempdir;
+
+    use crate::{
+        async_checkpoint_writeback::write_checkpoint_payload_sync_with_options,
+        AsyncCheckpointWritebackOptions, AsyncCheckpointWritebackWorker,
+    };
 
     use super::{
-        ParameterGolfLocalReferenceFixture, ParameterGolfReferenceTrainingConfig,
-        ParameterGolfReferenceTrainingRunner, restore_parameter_golf_local_reference_checkpoint,
+        checkpoint_async_writeback_payload, read_parameter_golf_checkpoint_from_directory,
+        restore_parameter_golf_local_reference_checkpoint,
         restore_parameter_golf_model_from_int8_zlib, restore_parameter_golf_model_from_safetensors,
         train_parameter_golf_local_reference,
+        train_parameter_golf_local_reference_with_async_checkpoint_writeback,
+        ParameterGolfLocalReferenceFixture, ParameterGolfReferenceTrainingConfig,
+        ParameterGolfReferenceTrainingRunner,
     };
 
     #[test]
@@ -2098,18 +2369,25 @@ mod tests {
 
         restored_source.step()?;
         let checkpoint = restored_source.latest_checkpoint().clone();
-        let mut restored = restore_parameter_golf_local_reference_checkpoint(&fixture, &checkpoint)?;
+        let mut restored =
+            restore_parameter_golf_local_reference_checkpoint(&fixture, &checkpoint)?;
         restored.step()?;
 
         let continuous_outcome = continuous.into_outcome()?;
         let restored_outcome = restored.into_outcome()?;
 
-        assert_eq!(continuous_outcome.trained_model, restored_outcome.trained_model);
+        assert_eq!(
+            continuous_outcome.trained_model,
+            restored_outcome.trained_model
+        );
         assert_eq!(
             continuous_outcome.final_validation_eval,
             restored_outcome.final_validation_eval
         );
-        assert_eq!(continuous_outcome.step_metrics, restored_outcome.step_metrics);
+        assert_eq!(
+            continuous_outcome.step_metrics,
+            restored_outcome.step_metrics
+        );
         assert_eq!(
             continuous_outcome.final_checkpoint.manifest.stable_digest(),
             restored_outcome.final_checkpoint.manifest.stable_digest()
@@ -2118,8 +2396,8 @@ mod tests {
     }
 
     #[test]
-    fn parameter_golf_local_reference_exports_raw_and_int8_roundtrips(
-    ) -> Result<(), Box<dyn Error>> {
+    fn parameter_golf_local_reference_exports_raw_and_int8_roundtrips() -> Result<(), Box<dyn Error>>
+    {
         let fixture = ParameterGolfLocalReferenceFixture::reference()?;
         let config = ParameterGolfReferenceTrainingConfig::local_reference();
         let outcome = train_parameter_golf_local_reference(&fixture, &config)?;
@@ -2148,6 +2426,118 @@ mod tests {
         assert_eq!(int8_eval, outcome.int8_zlib_roundtrip_validation_eval);
         assert!(int8_eval.mean_loss.is_finite());
         assert!(int8_eval.bits_per_byte.is_finite());
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_local_reference_async_checkpoint_writeback_restores_sync_equivalently(
+    ) -> Result<(), Box<dyn Error>> {
+        let fixture = ParameterGolfLocalReferenceFixture::reference()?;
+        let config = ParameterGolfReferenceTrainingConfig::local_reference();
+        let sync_outcome = train_parameter_golf_local_reference(&fixture, &config)?;
+        let checkpoint_root = tempdir()?;
+        let async_outcome = train_parameter_golf_local_reference_with_async_checkpoint_writeback(
+            &fixture,
+            &config,
+            checkpoint_root.path(),
+            AsyncCheckpointWritebackOptions::bounded(1)?,
+        )?;
+
+        assert_eq!(async_outcome.trained_model, sync_outcome.trained_model);
+        assert_eq!(
+            async_outcome.final_validation_eval,
+            sync_outcome.final_validation_eval
+        );
+        assert_eq!(async_outcome.step_metrics, sync_outcome.step_metrics);
+        assert_eq!(
+            async_outcome.final_checkpoint.manifest.stable_digest(),
+            sync_outcome.final_checkpoint.manifest.stable_digest()
+        );
+        assert_eq!(
+            async_outcome.checkpoint_writeback_receipts.len(),
+            (config.max_steps + 1) as usize
+        );
+
+        let final_receipt = async_outcome
+            .checkpoint_writeback_receipts
+            .last()
+            .expect("final checkpoint receipt should exist");
+        let restored_checkpoint = read_parameter_golf_checkpoint_from_directory(
+            final_receipt.final_directory.as_path(),
+            &async_outcome.final_checkpoint.checkpoint,
+        )?;
+        assert_eq!(
+            restored_checkpoint.manifest_artifact.bytes,
+            async_outcome.final_checkpoint.manifest_artifact.bytes
+        );
+        assert_eq!(
+            restored_checkpoint.weights_artifact.bytes,
+            async_outcome.final_checkpoint.weights_artifact.bytes
+        );
+        assert_eq!(
+            restored_checkpoint.manifest_artifact.artifact_digest,
+            async_outcome
+                .final_checkpoint
+                .manifest_artifact
+                .artifact_digest
+        );
+        assert_eq!(
+            restored_checkpoint.weights_artifact.artifact_digest,
+            async_outcome
+                .final_checkpoint
+                .weights_artifact
+                .artifact_digest
+        );
+
+        let restored_runner =
+            restore_parameter_golf_local_reference_checkpoint(&fixture, &restored_checkpoint)?;
+        let restored_outcome = restored_runner.into_outcome()?;
+        assert_eq!(restored_outcome.trained_model, sync_outcome.trained_model);
+        assert_eq!(
+            restored_outcome.final_validation_eval,
+            sync_outcome.final_validation_eval
+        );
+        assert_eq!(
+            restored_outcome.final_checkpoint.manifest.stable_digest(),
+            sync_outcome.final_checkpoint.manifest.stable_digest()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_local_reference_async_checkpoint_handoff_beats_sync_stall(
+    ) -> Result<(), Box<dyn Error>> {
+        let fixture = ParameterGolfLocalReferenceFixture::reference()?;
+        let config = ParameterGolfReferenceTrainingConfig::local_reference();
+        let runner = ParameterGolfReferenceTrainingRunner::new(&fixture, &config)?;
+        let sync_root = tempdir()?;
+        let async_root = tempdir()?;
+        let options = AsyncCheckpointWritebackOptions::bounded(1)?
+            .with_test_injected_write_delay(std::time::Duration::from_millis(75));
+        let sync_payload =
+            checkpoint_async_writeback_payload(runner.latest_checkpoint(), sync_root.path())?;
+
+        let sync_started = Instant::now();
+        let _ = write_checkpoint_payload_sync_with_options(&sync_payload, &options)?;
+        let sync_elapsed = sync_started.elapsed();
+
+        let async_payload =
+            checkpoint_async_writeback_payload(runner.latest_checkpoint(), async_root.path())?;
+        let mut worker = AsyncCheckpointWritebackWorker::new(options.clone())?;
+        let async_started = Instant::now();
+        let ticket = worker.submit(async_payload)?;
+        let async_submit_elapsed = async_started.elapsed();
+        let receipt = ticket.wait()?;
+        let _ = worker.shutdown_flush()?;
+
+        assert!(receipt.final_directory.exists());
+        assert!(sync_elapsed >= std::time::Duration::from_millis(60));
+        assert!(
+            async_submit_elapsed.as_millis() * 5 < sync_elapsed.as_millis(),
+            "expected async handoff {:?} to be materially smaller than sync stall {:?}",
+            async_submit_elapsed,
+            sync_elapsed
+        );
         Ok(())
     }
 }

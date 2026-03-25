@@ -33,6 +33,7 @@ mod apple_adapter_experiment;
 #[cfg(feature = "legacy-apple-toolkit-oracle")]
 mod apple_toolkit;
 mod artifact_storage;
+mod async_checkpoint_writeback;
 mod attnres;
 mod benchmarking;
 mod checkpoint_recovery;
@@ -179,6 +180,7 @@ pub use apple_adapter_experiment::*;
 #[cfg(feature = "legacy-apple-toolkit-oracle")]
 pub use apple_toolkit::*;
 pub use artifact_storage::*;
+pub use async_checkpoint_writeback::*;
 pub use attnres::*;
 pub use benchmarking::*;
 pub use checkpoint_recovery::*;
