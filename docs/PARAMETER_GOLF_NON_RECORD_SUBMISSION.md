@@ -137,6 +137,9 @@ closure work.
 The same exported folder now also ships:
 
 - one machine-readable real-execution contract
+- one machine-readable runtime manifest whose `real_execution_contracts` vector
+  explicitly advertises both `single_h100_train` and
+  `distributed_8xh100_train`
 - the immutable PGOLF input-package descriptor used by the later Google and
   RunPod operator lanes
 - one prebuilt single-H100 trainer payload that `train_gpt.py` can invoke in

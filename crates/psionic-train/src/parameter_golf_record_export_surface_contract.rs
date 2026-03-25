@@ -116,14 +116,17 @@ impl ParameterGolfRecordExportSurfaceContractReport {
             record_folder_relpath: record_folder_relpath.into(),
             entrypoint_path: String::from("train_gpt.py"),
             default_execution_mode: String::from("local_reference_validation"),
-            additional_execution_modes: vec![String::from("single_h100_train")],
+            additional_execution_modes: vec![
+                String::from("single_h100_train"),
+                String::from("distributed_8xh100_train"),
+            ],
             contest_faithful_to_readme_train_gpt_surface: false,
             counted_code_lives_only_in_train_gpt_py: false,
             ships_additional_executable_payloads: true,
             folder_local_self_contained_execution: true,
             judgment: ParameterGolfRecordExportSurfaceJudgment::MaintainerEquivalenceArgument,
             judgment_detail: String::from(
-                "The current exported folder is not literally README-faithful because executable counted code spans the top-level train_gpt.py launcher plus two shipped Psionic runtime binaries. The difference is now explicit rather than implied: the report binds the exact launcher, replay runtime, real single-H100 trainer, runtime manifest, real execution contract, and immutable input-package descriptor bytes so maintainers can review one concrete equivalence argument instead of inferring it from scattered artifacts.",
+                "The current exported folder is not literally README-faithful because executable counted code spans the top-level train_gpt.py launcher plus two shipped Psionic runtime binaries. The difference is now explicit rather than implied: the report binds the exact launcher, replay runtime, real single-H100 trainer, distributed 8xH100 runtime lane, runtime manifest, real execution contract, and immutable input-package descriptor bytes so maintainers can review one concrete equivalence argument instead of inferring it from scattered artifacts.",
             ),
             relevant_artifacts,
             evidence_refs: vec![

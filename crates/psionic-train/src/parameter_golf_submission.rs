@@ -28,7 +28,7 @@ pub const PARAMETER_GOLF_SUBMISSION_ARTIFACT_CAP_BYTES: u64 = 16_000_000;
 
 /// Explicit claim boundary for the first non-record submission package.
 pub const PARAMETER_GOLF_NON_RECORD_SUBMISSION_CLAIM_BOUNDARY: &str =
-    "current honest non-record submission package only; the shipped train_gpt.py defaults to a bounded local-reference replay path, but the same exported folder now also ships a real single-H100 trainer payload plus the immutable PGOLF input-package descriptor for later remote execution, still without claiming record-track readiness";
+    "current honest non-record submission package only; the shipped train_gpt.py defaults to a bounded local-reference replay path, but the same exported folder now also ships a real single-H100 trainer payload plus the immutable PGOLF input-package descriptor and one Rust-owned distributed 8xH100 runtime lane for later remote execution, still without claiming record-track readiness";
 
 const PARAMETER_GOLF_NON_RECORD_RECORDS_DIR: &str = "records/track_non_record_16mb";
 const PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF: &str =
@@ -596,7 +596,7 @@ pub fn build_parameter_golf_non_record_submission_bundle(
         String::from(PARAMETER_GOLF_RUNTIME_INPUT_PACKAGE_DESCRIPTOR_ARTIFACT_REF),
         fs::read(parameter_golf_google_input_package_descriptor_fixture_path())?,
     );
-    let real_execution_contract = ParameterGolfSubmissionRealExecutionContract {
+    let single_h100_execution_contract = ParameterGolfSubmissionRealExecutionContract {
         schema_version: 1,
         execution_mode: String::from("single_h100_train"),
         trainer_payload_path: String::from(PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF),
@@ -613,10 +613,29 @@ pub fn build_parameter_golf_non_record_submission_bundle(
             "This exported folder now ships the real single-H100 trainer payload and the immutable PGOLF input-package descriptor. When the explicit environment contract is supplied, train_gpt.py can invoke the actual bounded Rust-owned single-H100 trainer path and preserve its machine-readable report inside the folder.",
         ),
     };
+    let distributed_8xh100_execution_contract = ParameterGolfSubmissionRealExecutionContract {
+        schema_version: 1,
+        execution_mode: String::from(PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE),
+        trainer_payload_path: String::from(PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF),
+        input_package_descriptor_path: String::from(
+            PARAMETER_GOLF_RUNTIME_INPUT_PACKAGE_DESCRIPTOR_ARTIFACT_REF,
+        ),
+        dataset_root_env_var: String::from(PARAMETER_GOLF_SINGLE_H100_DATASET_ROOT_ENV_VAR),
+        tokenizer_path_env_var: String::from(PARAMETER_GOLF_SINGLE_H100_TOKENIZER_PATH_ENV_VAR),
+        output_report_env_var: String::from(PARAMETER_GOLF_SINGLE_H100_OUTPUT_REPORT_ENV_VAR),
+        default_output_report_path: String::from(
+            PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_RECEIPT_ARTIFACT_REF,
+        ),
+        max_steps_env_var: String::from(PARAMETER_GOLF_SINGLE_H100_MAX_STEPS_ENV_VAR),
+        default_max_steps: 0,
+        claim_boundary: String::from(
+            "This exported folder now ships the Rust-owned distributed 8xH100 runtime lane through the same runtime payload. When the explicit environment contract is supplied and train_gpt.py is invoked in distributed_8xh100_train mode, the shipped runtime can admit the real 8xH100 machine contract, execute the retained bootstrap and train-step path, and preserve its machine-readable receipts inside the folder.",
+        ),
+    };
     let real_execution_contract_artifact = json_artifact(
         "parameter_golf_real_execution_contract",
         String::from(PARAMETER_GOLF_REAL_RUNTIME_CONTRACT_ARTIFACT_REF),
-        &real_execution_contract,
+        &single_h100_execution_contract,
     )?;
     let mut runtime_manifest = ParameterGolfSubmissionRuntimeManifest {
         schema_version: 1,
@@ -646,9 +665,12 @@ pub fn build_parameter_golf_non_record_submission_bundle(
             .int8_zlib_roundtrip_validation
             .bits_per_byte,
         default_execution_mode: String::from("local_reference_validation"),
-        real_execution_contracts: vec![real_execution_contract.clone()],
+        real_execution_contracts: vec![
+            single_h100_execution_contract.clone(),
+            distributed_8xh100_execution_contract.clone(),
+        ],
         runtime_posture: String::from(
-            "shipped_folder_defaults to bounded local-reference replay through one prebuilt runtime payload, while also carrying the real single-H100 trainer payload plus input-package descriptor for explicit later remote execution",
+            "shipped_folder_defaults to bounded local-reference replay through one prebuilt runtime payload, while also carrying the real single-H100 trainer payload plus input-package descriptor and one Rust-owned distributed 8xH100 runtime lane for explicit later remote execution",
         ),
         claim_boundary: String::from(PARAMETER_GOLF_NON_RECORD_SUBMISSION_CLAIM_BOUNDARY),
         manifest_digest: String::new(),
@@ -1479,13 +1501,14 @@ mod tests {
         PARAMETER_GOLF_NON_RECORD_SUBMISSION_VERSION, PARAMETER_GOLF_NON_RECORD_TRACK_ID,
         PARAMETER_GOLF_REAL_RUNTIME_CONTRACT_ARTIFACT_REF,
         PARAMETER_GOLF_REAL_RUNTIME_PAYLOAD_ARTIFACT_REF,
+        PARAMETER_GOLF_RUNTIME_MANIFEST_ARTIFACT_REF,
         PARAMETER_GOLF_RUNTIME_INPUT_PACKAGE_DESCRIPTOR_ARTIFACT_REF,
         PARAMETER_GOLF_RUNTIME_PAYLOAD_ARTIFACT_REF, PARAMETER_GOLF_RUNTIME_RECEIPT_ARTIFACT_REF,
     };
     use crate::{
         benchmark_parameter_golf_local_reference, ParameterGolfDistributed8xH100BringupReport,
         ParameterGolfLocalReferenceFixture, ParameterGolfNonRecordSubmissionConfig,
-        ParameterGolfReferenceTrainingConfig,
+        ParameterGolfReferenceTrainingConfig, ParameterGolfSubmissionRuntimeManifest,
     };
 
     fn repo_root() -> PathBuf {
@@ -1600,6 +1623,26 @@ mod tests {
         assert!(submission_json.contains("\"track\": \"non-record-unlimited-compute-16mb\""));
         let readme = fs::read_to_string(temp_dir.path().join("README.md"))?;
         assert!(readme.contains("non-record submission package"));
+        let runtime_manifest: ParameterGolfSubmissionRuntimeManifest = serde_json::from_slice(
+            &submission_bundle
+                .artifact(PARAMETER_GOLF_RUNTIME_MANIFEST_ARTIFACT_REF)
+                .expect("runtime manifest artifact should exist")
+                .bytes,
+        )?;
+        assert_eq!(
+            runtime_manifest
+                .real_execution_contracts
+                .iter()
+                .map(|contract| contract.execution_mode.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "single_h100_train",
+                PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE
+            ]
+        );
+        assert!(runtime_manifest
+            .runtime_posture
+            .contains("distributed 8xH100 runtime lane"));
         Ok(())
     }
 
