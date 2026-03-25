@@ -166,6 +166,18 @@ surface freezes one shared vocabulary for `accepted`, `quarantined`,
 contract id directly instead of treating validator and promotion language as
 lane-local convention.
 
+The repo now also owns the first whole-program cross-provider run graph in
+`crates/psionic-train/src/cross_provider_program_run_graph.rs`, the binary
+`cross_provider_program_run_graph`, the checker
+`scripts/check-cross-provider-program-run-graph.sh`, the focused reference doc
+`docs/CROSS_PROVIDER_PROGRAM_RUN_GRAPH_REFERENCE.md`, and the committed fixture
+`fixtures/training/cross_provider_program_run_graph_v1.json`. That surface
+reuses the existing run graph and orchestrator state, then layers typed
+whole-program role participants and role-window composition over them so one
+shared run id can carry dense ranks, validated contributor windows, validators,
+checkpoint writers, eval workers, and data builders at the same time without
+splitting provider-local side jobs into hidden program identities.
+
 The repo now also owns the first generic dense-rank runtime layer in
 `crates/psionic-train/src/dense_rank_runtime.rs`, the binary
 `dense_rank_runtime_reference_contract`, the checker

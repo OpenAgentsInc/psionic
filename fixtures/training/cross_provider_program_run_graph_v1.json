@@ -1,0 +1,1871 @@
+{
+  "schema_version": "psionic.cross_provider_program_run_graph.v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "admission_plan_digest": "b1dee80398b538648478188ac12dcecf68d3c08edf28a592dd5681bd159f0b12",
+  "contributor_lineage_digest": "7c5c23684ae1277cef8e892dfdc6824ca628a13b93820aabe902b74bc6e7a902",
+  "validator_promotion_contract_id": "psionic.shared_validator_promotion_contract.v1",
+  "evidence_bundle_id": "psionic-cross-provider-training-execution-evidence-v1",
+  "evidence_bundle_digest": "4e79457bafaa9f856897b040a46060396fc5e54c4abff0d276681d88d24e86e6",
+  "run_id": "psion-xprovider-pretrain-whole-program-001",
+  "stage_id": "psion_pretrain",
+  "orchestrator": {
+    "run": {
+      "run_id": "psion-xprovider-pretrain-whole-program-001",
+      "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+      "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+      "stage_id": "psion_pretrain",
+      "cluster_id": "e1374b282971d05a05ea612a612c80ba1c5edaabb975277fe99e6aff1c27943a",
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "environment": {
+        "environment_ref": "psion.pretrain.reference_runtime",
+        "version": "v1"
+      },
+      "status": "running",
+      "participants": [
+        {
+          "node_id": "google_l4_validator_node--checkpoint-writer-google-1",
+          "role": "trainer_contributor",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 6900,
+          "reliability_bps": 8600,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "google_l4_validator_node--contributor-window-google-1",
+          "role": "contributor_only",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "active",
+          "priority_bps": 9800,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "google_l4_validator_node--data-builder",
+          "role": "contributor_only",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 6200,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "google_l4_validator_node--eval-google-1",
+          "role": "contributor_only",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 6400,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "google_l4_validator_node--validator-google-1",
+          "role": "contributor_only",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 6600,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "local_mlx_mac_workstation--contributor-window-mac-1",
+          "role": "contributor_only",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "active",
+          "priority_bps": 9800,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "local_mlx_mac_workstation--data-builder",
+          "role": "contributor_only",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 6200,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "local_mlx_mac_workstation--validator-mac-1",
+          "role": "contributor_only",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 6600,
+          "reliability_bps": 6000,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "local_rtx4080_workstation--contributor-window-rtx4080-1",
+          "role": "contributor_only",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "active",
+          "priority_bps": 9800,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "local_rtx4080_workstation--eval-rtx4080-1",
+          "role": "contributor_only",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 6400,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "runpod_8xh100_dense_node--checkpoint-writer-runpod-1",
+          "role": "trainer_contributor",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 6900,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "runpod_8xh100_dense_node--dense-rank-0",
+          "role": "trainer_contributor",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 7400,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "runpod_8xh100_dense_node--dense-rank-1",
+          "role": "trainer_contributor",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 7400,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "runpod_8xh100_dense_node--dense-rank-2",
+          "role": "trainer_contributor",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 7400,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "runpod_8xh100_dense_node--dense-rank-3",
+          "role": "trainer_contributor",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 7400,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "runpod_8xh100_dense_node--dense-rank-4",
+          "role": "trainer_contributor",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 7400,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "runpod_8xh100_dense_node--dense-rank-5",
+          "role": "trainer_contributor",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 7400,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "runpod_8xh100_dense_node--dense-rank-6",
+          "role": "trainer_contributor",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 7400,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        },
+        {
+          "node_id": "runpod_8xh100_dense_node--dense-rank-7",
+          "role": "trainer_contributor",
+          "admission_state": "admitted",
+          "readiness_state": "ready",
+          "contribution_state": "standby",
+          "priority_bps": 7400,
+          "reliability_bps": 9200,
+          "joined_at_ms": 1710002000000,
+          "last_heartbeat_at_ms": 1710002000000
+        }
+      ],
+      "topology_revisions": [
+        {
+          "topology_revision_id": "psion-xprovider-pretrain-whole-program-001-topology-1",
+          "revision_number": 1,
+          "admitted_node_ids": [
+            "google_l4_validator_node--checkpoint-writer-google-1",
+            "google_l4_validator_node--contributor-window-google-1",
+            "google_l4_validator_node--data-builder",
+            "google_l4_validator_node--eval-google-1",
+            "google_l4_validator_node--validator-google-1",
+            "local_mlx_mac_workstation--contributor-window-mac-1",
+            "local_mlx_mac_workstation--data-builder",
+            "local_mlx_mac_workstation--validator-mac-1",
+            "local_rtx4080_workstation--contributor-window-rtx4080-1",
+            "local_rtx4080_workstation--eval-rtx4080-1",
+            "runpod_8xh100_dense_node--checkpoint-writer-runpod-1",
+            "runpod_8xh100_dense_node--dense-rank-0",
+            "runpod_8xh100_dense_node--dense-rank-1",
+            "runpod_8xh100_dense_node--dense-rank-2",
+            "runpod_8xh100_dense_node--dense-rank-3",
+            "runpod_8xh100_dense_node--dense-rank-4",
+            "runpod_8xh100_dense_node--dense-rank-5",
+            "runpod_8xh100_dense_node--dense-rank-6",
+            "runpod_8xh100_dense_node--dense-rank-7"
+          ],
+          "ready_node_ids": [
+            "google_l4_validator_node--checkpoint-writer-google-1",
+            "google_l4_validator_node--contributor-window-google-1",
+            "google_l4_validator_node--data-builder",
+            "google_l4_validator_node--eval-google-1",
+            "google_l4_validator_node--validator-google-1",
+            "local_mlx_mac_workstation--contributor-window-mac-1",
+            "local_mlx_mac_workstation--data-builder",
+            "local_mlx_mac_workstation--validator-mac-1",
+            "local_rtx4080_workstation--contributor-window-rtx4080-1",
+            "local_rtx4080_workstation--eval-rtx4080-1",
+            "runpod_8xh100_dense_node--checkpoint-writer-runpod-1",
+            "runpod_8xh100_dense_node--dense-rank-0",
+            "runpod_8xh100_dense_node--dense-rank-1",
+            "runpod_8xh100_dense_node--dense-rank-2",
+            "runpod_8xh100_dense_node--dense-rank-3",
+            "runpod_8xh100_dense_node--dense-rank-4",
+            "runpod_8xh100_dense_node--dense-rank-5",
+            "runpod_8xh100_dense_node--dense-rank-6",
+            "runpod_8xh100_dense_node--dense-rank-7"
+          ],
+          "created_at_ms": 1710002000000,
+          "revision_digest": "b3904351660a541081bc0525d829827b85bc5247114254035d86e6149d088d37"
+        }
+      ],
+      "contributor_set_revisions": [
+        {
+          "contributor_set_revision_id": "psion-xprovider-pretrain-whole-program-001-contributors-1",
+          "revision_number": 1,
+          "contributor_node_ids": [
+            "google_l4_validator_node--contributor-window-google-1",
+            "local_mlx_mac_workstation--contributor-window-mac-1",
+            "local_rtx4080_workstation--contributor-window-rtx4080-1"
+          ],
+          "standby_node_ids": [
+            "runpod_8xh100_dense_node--dense-rank-0",
+            "runpod_8xh100_dense_node--dense-rank-1",
+            "runpod_8xh100_dense_node--dense-rank-2",
+            "runpod_8xh100_dense_node--dense-rank-3",
+            "runpod_8xh100_dense_node--dense-rank-4",
+            "runpod_8xh100_dense_node--dense-rank-5",
+            "runpod_8xh100_dense_node--dense-rank-6",
+            "runpod_8xh100_dense_node--dense-rank-7",
+            "runpod_8xh100_dense_node--checkpoint-writer-runpod-1",
+            "google_l4_validator_node--checkpoint-writer-google-1",
+            "google_l4_validator_node--validator-google-1",
+            "local_mlx_mac_workstation--validator-mac-1",
+            "google_l4_validator_node--eval-google-1",
+            "local_rtx4080_workstation--eval-rtx4080-1",
+            "google_l4_validator_node--data-builder",
+            "local_mlx_mac_workstation--data-builder"
+          ],
+          "selection_digest": "b96fc430d7b18e9d499319e370e1a9b7d27d61131284695840e24f0195727eb9",
+          "selected_at_ms": 1710002000200
+        }
+      ],
+      "windows": [
+        {
+          "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "topology_revision_id": "psion-xprovider-pretrain-whole-program-001-topology-1",
+          "contributor_set_revision_id": "psion-xprovider-pretrain-whole-program-001-contributors-1",
+          "policy_revision_id": "pretrain-policy-r7",
+          "status": "active",
+          "assignment_rule": {
+            "round_robin_by_priority": {
+              "batch_slice_count": 6,
+              "eval_slice_count": 3
+            }
+          },
+          "batch_assignments": [
+            {
+              "slice_index": 0,
+              "node_id": "google_l4_validator_node--contributor-window-google-1"
+            },
+            {
+              "slice_index": 1,
+              "node_id": "local_mlx_mac_workstation--contributor-window-mac-1"
+            },
+            {
+              "slice_index": 2,
+              "node_id": "local_rtx4080_workstation--contributor-window-rtx4080-1"
+            },
+            {
+              "slice_index": 3,
+              "node_id": "google_l4_validator_node--contributor-window-google-1"
+            },
+            {
+              "slice_index": 4,
+              "node_id": "local_mlx_mac_workstation--contributor-window-mac-1"
+            },
+            {
+              "slice_index": 5,
+              "node_id": "local_rtx4080_workstation--contributor-window-rtx4080-1"
+            }
+          ],
+          "eval_assignments": [
+            {
+              "slice_index": 0,
+              "node_id": "google_l4_validator_node--contributor-window-google-1"
+            },
+            {
+              "slice_index": 1,
+              "node_id": "local_mlx_mac_workstation--contributor-window-mac-1"
+            },
+            {
+              "slice_index": 2,
+              "node_id": "local_rtx4080_workstation--contributor-window-rtx4080-1"
+            }
+          ],
+          "window_digest": "d8c680a544ff21b5dcb98fc8668b1c4c28c52b4b2329c35b2663d17ac45cafb1"
+        }
+      ],
+      "lifecycle_events": [
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-1",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "google_l4_validator_node--checkpoint-writer-google-1",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "346f7c265951c227108ba206342428b2eafe0f07fc55713e1f2efb249aeab345"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-2",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "google_l4_validator_node--contributor-window-google-1",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "bae180260f57d26d81b78168c77a924eee52285d21a70307c50749bc66a22bae"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-3",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "google_l4_validator_node--data-builder",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "c5745b95bec45cb1de57991a544ae033416483a76b180e4f17e6f9ee6e9ab0e2"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-4",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "google_l4_validator_node--eval-google-1",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "8993af9a234e0199824d36554b0535d4490acb4cde4a96c68d9ca6786774b21f"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-5",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "google_l4_validator_node--validator-google-1",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "81e6aaaf9d4ca47a9b03ed4e87407d956b04357337571968425a4d3d132a72f5"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-6",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "local_mlx_mac_workstation--contributor-window-mac-1",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "a87ebf31d9b03ed5f3e1843a6ae3bfb7499afb5a36a6e5d0a7ad6297146f87d5"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-7",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "local_mlx_mac_workstation--data-builder",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "9ea394b8c6d38a6919185b58c1823d09e6d0a1b9d55fb455791a3aef7db44699"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-8",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "local_mlx_mac_workstation--validator-mac-1",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "22131b6fdd81b9e5acff4a151c717372708e7ca9f01270ff765c5d80ddcad322"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-9",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "local_rtx4080_workstation--contributor-window-rtx4080-1",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "a70734af059ca7f4beccbd6c317ac44bb402cc610eb0f8acf76c313996fea60a"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-10",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "local_rtx4080_workstation--eval-rtx4080-1",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "6e8513357f657c6bfff5c6f8d90a0a1303d08ab9404198a7f4ed0d17c8c23f0a"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-11",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--checkpoint-writer-runpod-1",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "7cb2146dd176fc1762d248cdda3c56c092246930f6673ab091faa1b6a142ebe9"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-12",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-0",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "b23280ffa61d7ffe73c5e1635f9c65e5f177f8fe0a7539baf7e7ee5219b1102a"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-13",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-1",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "9b08fcf7006387ba5867dab279e8945c7463b11d65277eaa23b1c46a4787de23"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-14",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-2",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "0aacd3da0560ad72aa1285c1f495b9dc7545a4b4485bfc599f1a8b5e02ad370e"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-15",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-3",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "5dce7896de5307452f6910f4a0a8292003fc33abc3dc686c343800d9bb8f8135"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-16",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-4",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "a1d88e2dff06a7b109e9afca9bcd883076cb15f7e394bdea82a97e6a77a0d8e0"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-17",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-5",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "d823f5deae97adc08e5bf49de0799cfe4316e30971d2000fabcc160095c1a0cf"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-18",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-6",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "9a9a17a4b042a20f6b6ce6c1a1cbb0ff4b5b07c0b011e044a2c157b8d1b589c7"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-19",
+          "kind": "participant_joined",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-7",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "c7bd4576c8202a4824d1def88dc35850ad4f8f63c0b0ac70c8100d343fbd220d"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-20",
+          "kind": "topology_revised",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "topology_revision_id": "psion-xprovider-pretrain-whole-program-001-topology-1",
+          "occurred_at_ms": 1710002000000,
+          "event_digest": "2fed17390b7061cab48646fbfc13733395e0fe0b62d1b1d7b99428ab3fa69d08"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-21",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-0",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "2b6015b1c1a88d17bc39eb003f287fb4448395ae3a464685598ec8c97919355b"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-22",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-1",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "cb222e6bb62abf769155bd9a2f00e3eb087099e06ccd22dbb4da2c74a114028b"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-23",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-2",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "667170e621fa6fb7c2f794cdb175b6099942c7110e1725344941525adf01ccb2"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-24",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-3",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "2ff7b05e526f54aae667f34442d193896ca2d0db8beb0a25bccbbdf9d1295e12"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-25",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-4",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "ee1b9be02710aa612b5a5ac9333da560432669f5723ac8fd39deee02e585a5b4"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-26",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-5",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "7ad4a92cd88d9b190107321a22d212671c00dfa123ad34c6e72c25986f10b395"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-27",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-6",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "0d20c5b6ecd400e1dfc9872d9caf38eaa2657cb0d167f564a710f306a85a78c4"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-28",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--dense-rank-7",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "59c992f7b6cb11a65b5e889e8bf455a0d1378719220fa5794163fd7d0ec17a2d"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-29",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "local_mlx_mac_workstation--contributor-window-mac-1",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "205883be39ec5c6c53127a5a3044fa7754c894db5e293d69effb0d8cb150598b"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-30",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "local_rtx4080_workstation--contributor-window-rtx4080-1",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "514de52530deca62cce27fd0928c8d9f80e3dd189094c803307f643d979bbe69"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-31",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "google_l4_validator_node--contributor-window-google-1",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "5a51bd0d0e2ecd867b2df186f3de94e97a514fec4ca9a14d0fb889085d07b87e"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-32",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "google_l4_validator_node--validator-google-1",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "341d73b8a733b897a38260caefff71a82571e854e380f0be465248178d91a193"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-33",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "local_mlx_mac_workstation--validator-mac-1",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "c639f2a6c63e62b6a484173b9c065785f77c504f4a17f5a7e632108595276cd8"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-34",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "runpod_8xh100_dense_node--checkpoint-writer-runpod-1",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "6021a4d648910498bf687d3b574ed06c7689a900699e18900346ff855f51b686"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-35",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "google_l4_validator_node--checkpoint-writer-google-1",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "c5eb9238cf14fc1dfd1b799d9a365c041958f468d2c3e88132e370ed03df5b15"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-36",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "google_l4_validator_node--eval-google-1",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "bd8c80e2354a3da9a75b7b46a314d70b669a06306aed4a0e6a958b2432d54c23"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-37",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "local_rtx4080_workstation--eval-rtx4080-1",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "9f4744c40f124aed684a7ecae4a386744e3aa982fffabecc4ff7bd0562d77400"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-38",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "google_l4_validator_node--data-builder",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "be15d984ca88debf5ab825b3bf121881173af94f604316b7e28277c27c5c084f"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-39",
+          "kind": "participant_priority_updated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "node_id": "local_mlx_mac_workstation--data-builder",
+          "occurred_at_ms": 1710002000020,
+          "event_digest": "415501ac8fba8e0035a9c0450f77ac85d6c20d45b621c3a5face34ec819314fb"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-40",
+          "kind": "contributor_set_revised",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "topology_revision_id": "psion-xprovider-pretrain-whole-program-001-topology-1",
+          "contributor_set_revision_id": "psion-xprovider-pretrain-whole-program-001-contributors-1",
+          "occurred_at_ms": 1710002000200,
+          "event_digest": "44600398887e9ad5fe7b00f3b6f4626cf0211ea237deb720369f0c712d406fc6"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-41",
+          "kind": "window_planned",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "topology_revision_id": "psion-xprovider-pretrain-whole-program-001-topology-1",
+          "contributor_set_revision_id": "psion-xprovider-pretrain-whole-program-001-contributors-1",
+          "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+          "occurred_at_ms": 1710002000200,
+          "event_digest": "c4985b60e7b6ddc40f8a24eb3649b05f64109dc63af3a028695d65638d9f6264"
+        },
+        {
+          "event_id": "psion-xprovider-pretrain-whole-program-001-event-42",
+          "kind": "window_activated",
+          "run_id": "psion-xprovider-pretrain-whole-program-001",
+          "stage_id": "psion_pretrain",
+          "topology_revision_id": "psion-xprovider-pretrain-whole-program-001-topology-1",
+          "contributor_set_revision_id": "psion-xprovider-pretrain-whole-program-001-contributors-1",
+          "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+          "occurred_at_ms": 1710002000220,
+          "event_digest": "f1425e76f32e9bafdb233436dbaa212cc264d92d80748e0d47b18e8950f8fbf5"
+        }
+      ]
+    },
+    "target_policy_revision": {
+      "policy_family": "psion.cross_provider.pretrain.v1",
+      "revision_id": "pretrain-policy-r7",
+      "revision_number": 7,
+      "policy_digest": "pretrain-policy-r7-digest",
+      "parent_revision_id": "pretrain-policy-r6",
+      "produced_at_ms": 1710000700000
+    },
+    "policy_weight_broadcast": {
+      "policy_id": "psion.cross_provider.pretrain.v1",
+      "policy_revision": 7,
+      "assembled_artifact_digest": "71b94cff0b0c6ca20ce33b84f4766cb6a75aae93644f2db591ecab83c6082fda",
+      "published_at_ms": 1710000700000,
+      "freshness_window_ms": 1710000760000,
+      "shards": [
+        {
+          "stream_id": "xtrain-program-policy-shard-a",
+          "manifest_digest": "3469fe90cb9ebb2892fe1b57a72b713a0f9d729c2e572839c26530e5f11cdc4a",
+          "object_digest": "fdc42bdbd51080b9d9e6704c3e6863331553679e84f951a9f9fdd1b08b3d838f",
+          "policy_id": "psion.cross_provider.pretrain.v1",
+          "policy_revision": 7,
+          "shard_id": "shard-a",
+          "shard_index": 0,
+          "shard_count": 2,
+          "assembled_artifact_digest": "71b94cff0b0c6ca20ce33b84f4766cb6a75aae93644f2db591ecab83c6082fda",
+          "published_at_ms": 1710000700000,
+          "freshness_window_ms": 1710000760000,
+          "control_plane_digest": "b0ec9149d484a18e7309ebbe4a80531a944ea708e9d255ae2180d2fe1ef593f8"
+        },
+        {
+          "stream_id": "xtrain-program-policy-shard-b",
+          "manifest_digest": "47527719f00fd3b4a39925a3ef44d368cf50522ec766e601642d81ec1854c749",
+          "object_digest": "71ba736c5ce7827b66409752efe470d8233099daac811de0864eab8d73ef887c",
+          "policy_id": "psion.cross_provider.pretrain.v1",
+          "policy_revision": 7,
+          "shard_id": "shard-b",
+          "shard_index": 1,
+          "shard_count": 2,
+          "assembled_artifact_digest": "71b94cff0b0c6ca20ce33b84f4766cb6a75aae93644f2db591ecab83c6082fda",
+          "published_at_ms": 1710000700000,
+          "freshness_window_ms": 1710000760000,
+          "control_plane_digest": "1077a56f0122f3ec24a35721b0345057a280cce96cca8d2e0ed82ecb943aa221"
+        }
+      ],
+      "broadcast_digest": "bfeee6a5e9175c10d2b75bcfb4843e511571cadf59a3ac01ec6c93d25ba189ba"
+    },
+    "off_policy_budget": {
+      "max_revision_drift": 3,
+      "quarantine_revision_drift": 5,
+      "max_rollout_age_ms": 30000,
+      "quarantine_rollout_age_ms": 60000
+    },
+    "current_window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+    "orchestrator_windows": [
+      {
+        "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+        "contributor_set_revision_id": "psion-xprovider-pretrain-whole-program-001-contributors-1",
+        "assignment_posture": {
+          "assignment_seed": 701,
+          "policy_revision_id": "pretrain-policy-r7",
+          "policy_weight_broadcast_digest": "bfeee6a5e9175c10d2b75bcfb4843e511571cadf59a3ac01ec6c93d25ba189ba",
+          "posture_digest": "b5ab49391d4738e4038d0375bba6b2321a839d857abe22a1a5a52271c39241a5"
+        },
+        "rollout_assignments": [
+          {
+            "assignment_id": "psion-xprovider-pretrain-whole-program-001-window-1-rollout-0",
+            "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+            "contributor_node_id": "google_l4_validator_node--contributor-window-google-1",
+            "batch_slice_index": 0,
+            "environment_key": "psion.pretrain.reference_runtime@v1",
+            "policy_revision_id": "pretrain-policy-r7",
+            "policy_weight_broadcast_digest": "bfeee6a5e9175c10d2b75bcfb4843e511571cadf59a3ac01ec6c93d25ba189ba",
+            "policy_weight_shard_manifest_digests": [
+              "3469fe90cb9ebb2892fe1b57a72b713a0f9d729c2e572839c26530e5f11cdc4a",
+              "47527719f00fd3b4a39925a3ef44d368cf50522ec766e601642d81ec1854c749"
+            ],
+            "assignment_digest": "cbe00187b51aed71b28f2c23cad7b256302608ece6e51dc4fb257f400d264434"
+          },
+          {
+            "assignment_id": "psion-xprovider-pretrain-whole-program-001-window-1-rollout-1",
+            "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+            "contributor_node_id": "local_mlx_mac_workstation--contributor-window-mac-1",
+            "batch_slice_index": 1,
+            "environment_key": "psion.pretrain.reference_runtime@v1",
+            "policy_revision_id": "pretrain-policy-r7",
+            "policy_weight_broadcast_digest": "bfeee6a5e9175c10d2b75bcfb4843e511571cadf59a3ac01ec6c93d25ba189ba",
+            "policy_weight_shard_manifest_digests": [
+              "3469fe90cb9ebb2892fe1b57a72b713a0f9d729c2e572839c26530e5f11cdc4a",
+              "47527719f00fd3b4a39925a3ef44d368cf50522ec766e601642d81ec1854c749"
+            ],
+            "assignment_digest": "dc7662abc63e0b127e38125bb6694fb242e45f4f34090338bebbb51526a8f341"
+          },
+          {
+            "assignment_id": "psion-xprovider-pretrain-whole-program-001-window-1-rollout-2",
+            "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+            "contributor_node_id": "local_rtx4080_workstation--contributor-window-rtx4080-1",
+            "batch_slice_index": 2,
+            "environment_key": "psion.pretrain.reference_runtime@v1",
+            "policy_revision_id": "pretrain-policy-r7",
+            "policy_weight_broadcast_digest": "bfeee6a5e9175c10d2b75bcfb4843e511571cadf59a3ac01ec6c93d25ba189ba",
+            "policy_weight_shard_manifest_digests": [
+              "3469fe90cb9ebb2892fe1b57a72b713a0f9d729c2e572839c26530e5f11cdc4a",
+              "47527719f00fd3b4a39925a3ef44d368cf50522ec766e601642d81ec1854c749"
+            ],
+            "assignment_digest": "6bb635569104dbd5e170423c926839cba92bd85a2c09c2fbeafb82a3af449e80"
+          },
+          {
+            "assignment_id": "psion-xprovider-pretrain-whole-program-001-window-1-rollout-3",
+            "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+            "contributor_node_id": "google_l4_validator_node--contributor-window-google-1",
+            "batch_slice_index": 3,
+            "environment_key": "psion.pretrain.reference_runtime@v1",
+            "policy_revision_id": "pretrain-policy-r7",
+            "policy_weight_broadcast_digest": "bfeee6a5e9175c10d2b75bcfb4843e511571cadf59a3ac01ec6c93d25ba189ba",
+            "policy_weight_shard_manifest_digests": [
+              "3469fe90cb9ebb2892fe1b57a72b713a0f9d729c2e572839c26530e5f11cdc4a",
+              "47527719f00fd3b4a39925a3ef44d368cf50522ec766e601642d81ec1854c749"
+            ],
+            "assignment_digest": "e47c877853173d13c9d5ea38d4eddb3208e1ce0e6a41dbb7d800575b30c1918f"
+          },
+          {
+            "assignment_id": "psion-xprovider-pretrain-whole-program-001-window-1-rollout-4",
+            "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+            "contributor_node_id": "local_mlx_mac_workstation--contributor-window-mac-1",
+            "batch_slice_index": 4,
+            "environment_key": "psion.pretrain.reference_runtime@v1",
+            "policy_revision_id": "pretrain-policy-r7",
+            "policy_weight_broadcast_digest": "bfeee6a5e9175c10d2b75bcfb4843e511571cadf59a3ac01ec6c93d25ba189ba",
+            "policy_weight_shard_manifest_digests": [
+              "3469fe90cb9ebb2892fe1b57a72b713a0f9d729c2e572839c26530e5f11cdc4a",
+              "47527719f00fd3b4a39925a3ef44d368cf50522ec766e601642d81ec1854c749"
+            ],
+            "assignment_digest": "05eae75ece3156c80ecdb3d70a07d8d0a3710e7018eeffe2120c6fdaaf7da483"
+          },
+          {
+            "assignment_id": "psion-xprovider-pretrain-whole-program-001-window-1-rollout-5",
+            "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+            "contributor_node_id": "local_rtx4080_workstation--contributor-window-rtx4080-1",
+            "batch_slice_index": 5,
+            "environment_key": "psion.pretrain.reference_runtime@v1",
+            "policy_revision_id": "pretrain-policy-r7",
+            "policy_weight_broadcast_digest": "bfeee6a5e9175c10d2b75bcfb4843e511571cadf59a3ac01ec6c93d25ba189ba",
+            "policy_weight_shard_manifest_digests": [
+              "3469fe90cb9ebb2892fe1b57a72b713a0f9d729c2e572839c26530e5f11cdc4a",
+              "47527719f00fd3b4a39925a3ef44d368cf50522ec766e601642d81ec1854c749"
+            ],
+            "assignment_digest": "22983b5a8cb6e4d4b129de6f904fc04c25a5e70a76f2a9a2a4401ad3eea538ab"
+          }
+        ],
+        "eval_assignments": [
+          {
+            "assignment_id": "psion-xprovider-pretrain-whole-program-001-window-1-eval-0",
+            "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+            "contributor_node_id": "google_l4_validator_node--contributor-window-google-1",
+            "eval_slice_index": 0,
+            "policy_revision_id": "pretrain-policy-r7",
+            "assignment_digest": "73c8607cf9aa6766602f400e0070e052b2ca60c383668c223bc60223d96c03a0"
+          },
+          {
+            "assignment_id": "psion-xprovider-pretrain-whole-program-001-window-1-eval-1",
+            "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+            "contributor_node_id": "local_mlx_mac_workstation--contributor-window-mac-1",
+            "eval_slice_index": 1,
+            "policy_revision_id": "pretrain-policy-r7",
+            "assignment_digest": "3d8d1057c94f3ecf0f5dc870962ede4c62749a5b45c4252dfddb3a229015551c"
+          },
+          {
+            "assignment_id": "psion-xprovider-pretrain-whole-program-001-window-1-eval-2",
+            "window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+            "contributor_node_id": "local_rtx4080_workstation--contributor-window-rtx4080-1",
+            "eval_slice_index": 2,
+            "policy_revision_id": "pretrain-policy-r7",
+            "assignment_digest": "23e2e351c1917948cc1be1369d396ead7fe1c15bb45dca2ddbe1bd5682040ae7"
+          }
+        ],
+        "rollout_telemetry": {
+          "accepted_exact_rollout_count": 0,
+          "accepted_off_policy_rollout_count": 0,
+          "quarantined_rollout_count": 0,
+          "discarded_rollout_count": 0,
+          "accepted_token_count": 0,
+          "quarantined_token_count": 0,
+          "discarded_token_count": 0
+        }
+      }
+    ]
+  },
+  "participants": [
+    {
+      "participant_id": "dense-rank-0",
+      "node_id": "runpod_8xh100_dense_node--dense-rank-0",
+      "source_id": "runpod_8xh100_dense_node",
+      "execution_class": "dense_full_model_rank",
+      "assignment_id": "dense-rank-0",
+      "lineage_slot_id": "lineage.dense_rank.0",
+      "run_graph_role": "trainer_contributor",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Dense ranks are reconstructed from the retained hybrid-program segment and the dense-distributed runtime receipts that segment points at."
+      },
+      "detail": "Dense rank 0 stays under the shared run id instead of splintering into a provider-local distributed job identity."
+    },
+    {
+      "participant_id": "dense-rank-1",
+      "node_id": "runpod_8xh100_dense_node--dense-rank-1",
+      "source_id": "runpod_8xh100_dense_node",
+      "execution_class": "dense_full_model_rank",
+      "assignment_id": "dense-rank-1",
+      "lineage_slot_id": "lineage.dense_rank.1",
+      "run_graph_role": "trainer_contributor",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Dense ranks are reconstructed from the retained hybrid-program segment and the dense-distributed runtime receipts that segment points at."
+      },
+      "detail": "Dense rank 1 stays under the shared run id instead of splintering into a provider-local distributed job identity."
+    },
+    {
+      "participant_id": "dense-rank-2",
+      "node_id": "runpod_8xh100_dense_node--dense-rank-2",
+      "source_id": "runpod_8xh100_dense_node",
+      "execution_class": "dense_full_model_rank",
+      "assignment_id": "dense-rank-2",
+      "lineage_slot_id": "lineage.dense_rank.2",
+      "run_graph_role": "trainer_contributor",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Dense ranks are reconstructed from the retained hybrid-program segment and the dense-distributed runtime receipts that segment points at."
+      },
+      "detail": "Dense rank 2 stays under the shared run id instead of splintering into a provider-local distributed job identity."
+    },
+    {
+      "participant_id": "dense-rank-3",
+      "node_id": "runpod_8xh100_dense_node--dense-rank-3",
+      "source_id": "runpod_8xh100_dense_node",
+      "execution_class": "dense_full_model_rank",
+      "assignment_id": "dense-rank-3",
+      "lineage_slot_id": "lineage.dense_rank.3",
+      "run_graph_role": "trainer_contributor",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Dense ranks are reconstructed from the retained hybrid-program segment and the dense-distributed runtime receipts that segment points at."
+      },
+      "detail": "Dense rank 3 stays under the shared run id instead of splintering into a provider-local distributed job identity."
+    },
+    {
+      "participant_id": "dense-rank-4",
+      "node_id": "runpod_8xh100_dense_node--dense-rank-4",
+      "source_id": "runpod_8xh100_dense_node",
+      "execution_class": "dense_full_model_rank",
+      "assignment_id": "dense-rank-4",
+      "lineage_slot_id": "lineage.dense_rank.4",
+      "run_graph_role": "trainer_contributor",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Dense ranks are reconstructed from the retained hybrid-program segment and the dense-distributed runtime receipts that segment points at."
+      },
+      "detail": "Dense rank 4 stays under the shared run id instead of splintering into a provider-local distributed job identity."
+    },
+    {
+      "participant_id": "dense-rank-5",
+      "node_id": "runpod_8xh100_dense_node--dense-rank-5",
+      "source_id": "runpod_8xh100_dense_node",
+      "execution_class": "dense_full_model_rank",
+      "assignment_id": "dense-rank-5",
+      "lineage_slot_id": "lineage.dense_rank.5",
+      "run_graph_role": "trainer_contributor",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Dense ranks are reconstructed from the retained hybrid-program segment and the dense-distributed runtime receipts that segment points at."
+      },
+      "detail": "Dense rank 5 stays under the shared run id instead of splintering into a provider-local distributed job identity."
+    },
+    {
+      "participant_id": "dense-rank-6",
+      "node_id": "runpod_8xh100_dense_node--dense-rank-6",
+      "source_id": "runpod_8xh100_dense_node",
+      "execution_class": "dense_full_model_rank",
+      "assignment_id": "dense-rank-6",
+      "lineage_slot_id": "lineage.dense_rank.6",
+      "run_graph_role": "trainer_contributor",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Dense ranks are reconstructed from the retained hybrid-program segment and the dense-distributed runtime receipts that segment points at."
+      },
+      "detail": "Dense rank 6 stays under the shared run id instead of splintering into a provider-local distributed job identity."
+    },
+    {
+      "participant_id": "dense-rank-7",
+      "node_id": "runpod_8xh100_dense_node--dense-rank-7",
+      "source_id": "runpod_8xh100_dense_node",
+      "execution_class": "dense_full_model_rank",
+      "assignment_id": "dense-rank-7",
+      "lineage_slot_id": "lineage.dense_rank.7",
+      "run_graph_role": "trainer_contributor",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Dense ranks are reconstructed from the retained hybrid-program segment and the dense-distributed runtime receipts that segment points at."
+      },
+      "detail": "Dense rank 7 stays under the shared run id instead of splintering into a provider-local distributed job identity."
+    },
+    {
+      "participant_id": "contributor-window-mac-1",
+      "node_id": "local_mlx_mac_workstation--contributor-window-mac-1",
+      "source_id": "local_mlx_mac_workstation",
+      "execution_class": "validated_contributor_window",
+      "assignment_id": "contributor-window-mac-1",
+      "lineage_slot_id": "lineage.contributor_window.mac.1",
+      "run_graph_role": "contributor_only",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "active",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "contributor-window",
+        "detail": "Validated contributor windows are reconstructed from the contributor-window execution segment and the shared lineage bridge."
+      },
+      "detail": "Validated contributor window `contributor-window-mac-1` keeps its own slot identity while staying inside the same pretraining run id."
+    },
+    {
+      "participant_id": "contributor-window-rtx4080-1",
+      "node_id": "local_rtx4080_workstation--contributor-window-rtx4080-1",
+      "source_id": "local_rtx4080_workstation",
+      "execution_class": "validated_contributor_window",
+      "assignment_id": "contributor-window-rtx4080-1",
+      "lineage_slot_id": "lineage.contributor_window.rtx4080.1",
+      "run_graph_role": "contributor_only",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "active",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "contributor-window",
+        "detail": "Validated contributor windows are reconstructed from the contributor-window execution segment and the shared lineage bridge."
+      },
+      "detail": "Validated contributor window `contributor-window-rtx4080-1` keeps its own slot identity while staying inside the same pretraining run id."
+    },
+    {
+      "participant_id": "contributor-window-google-1",
+      "node_id": "google_l4_validator_node--contributor-window-google-1",
+      "source_id": "google_l4_validator_node",
+      "execution_class": "validated_contributor_window",
+      "assignment_id": "contributor-window-google-1",
+      "lineage_slot_id": "lineage.contributor_window.google.1",
+      "run_graph_role": "contributor_only",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "active",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "contributor-window",
+        "detail": "Validated contributor windows are reconstructed from the contributor-window execution segment and the shared lineage bridge."
+      },
+      "detail": "Validated contributor window `contributor-window-google-1` keeps its own slot identity while staying inside the same pretraining run id."
+    },
+    {
+      "participant_id": "validator-google-1",
+      "node_id": "google_l4_validator_node--validator-google-1",
+      "source_id": "google_l4_validator_node",
+      "execution_class": "validator",
+      "assignment_id": "validator-google-1",
+      "lineage_slot_id": "lineage.validator.google.1",
+      "run_graph_role": "contributor_only",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "validator-only",
+        "detail": "The primary validator is reconstructed from the validator-only retained evidence segment."
+      },
+      "detail": "Validator `validator-google-1` stays typed as validator work instead of collapsing into a contributor or eval role."
+    },
+    {
+      "participant_id": "validator-mac-1",
+      "node_id": "local_mlx_mac_workstation--validator-mac-1",
+      "source_id": "local_mlx_mac_workstation",
+      "execution_class": "validator",
+      "assignment_id": "validator-mac-1",
+      "lineage_slot_id": "lineage.validator.mac.1",
+      "run_graph_role": "contributor_only",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "quarantined",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "The secondary validator remains present under the shared run id but is quarantined in the hybrid evidence segment until replay closure exists."
+      },
+      "detail": "Validator `validator-mac-1` stays typed as validator work instead of collapsing into a contributor or eval role."
+    },
+    {
+      "participant_id": "checkpoint-writer-runpod-1",
+      "node_id": "runpod_8xh100_dense_node--checkpoint-writer-runpod-1",
+      "source_id": "runpod_8xh100_dense_node",
+      "execution_class": "checkpoint_writer",
+      "assignment_id": "checkpoint-writer-runpod-1",
+      "lineage_slot_id": "lineage.checkpoint_writer.runpod.1",
+      "run_graph_role": "trainer_contributor",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Checkpoint writers are reconstructed from the hybrid segment plus the provider-neutral checkpoint authority that segment retains."
+      },
+      "detail": "The dense provider-local writer stays active as the current shard writer for the whole program."
+    },
+    {
+      "participant_id": "checkpoint-writer-google-1",
+      "node_id": "google_l4_validator_node--checkpoint-writer-google-1",
+      "source_id": "google_l4_validator_node",
+      "execution_class": "checkpoint_writer",
+      "assignment_id": "checkpoint-writer-google-1",
+      "lineage_slot_id": "lineage.checkpoint_writer.google.1",
+      "run_graph_role": "trainer_contributor",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "standby",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Checkpoint writers are reconstructed from the hybrid segment plus the provider-neutral checkpoint authority that segment retains."
+      },
+      "detail": "The secondary checkpoint writer stays admitted under the same run id but remains standby until recovery or topology revision promotes it."
+    },
+    {
+      "participant_id": "eval-google-1",
+      "node_id": "google_l4_validator_node--eval-google-1",
+      "source_id": "google_l4_validator_node",
+      "execution_class": "eval_worker",
+      "assignment_id": "eval-google-1",
+      "lineage_slot_id": "lineage.eval.google.1",
+      "run_graph_role": "contributor_only",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Eval workers are reconstructed from the hybrid execution segment because they score the same program revision while staying separate from validators."
+      },
+      "detail": "Eval worker `eval-google-1` remains a typed eval lane under the shared run id."
+    },
+    {
+      "participant_id": "eval-rtx4080-1",
+      "node_id": "local_rtx4080_workstation--eval-rtx4080-1",
+      "source_id": "local_rtx4080_workstation",
+      "execution_class": "eval_worker",
+      "assignment_id": "eval-rtx4080-1",
+      "lineage_slot_id": "lineage.eval.rtx4080.1",
+      "run_graph_role": "contributor_only",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "execution_segment",
+        "binding_id": "hybrid-program",
+        "detail": "Eval workers are reconstructed from the hybrid execution segment because they score the same program revision while staying separate from validators."
+      },
+      "detail": "Eval worker `eval-rtx4080-1` remains a typed eval lane under the shared run id."
+    },
+    {
+      "participant_id": "data-builder-google_l4_validator_node",
+      "node_id": "google_l4_validator_node--data-builder",
+      "source_id": "google_l4_validator_node",
+      "execution_class": "data_builder",
+      "assignment_id": "data-builder-google_l4_validator_node",
+      "run_graph_role": "contributor_only",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "manifest_dataset_authority",
+        "binding_id": "psion.curated_pretrain.dataset_family.v1",
+        "detail": "Data builders are reconstructed from the canonical dataset-family authority because provider-neutral final execution segments do not yet emit a dedicated data-builder segment."
+      },
+      "detail": "The data-builder role is admitted under the same run id as the dense and validation roles instead of living in a separate hidden data pipeline identity."
+    },
+    {
+      "participant_id": "data-builder-local_mlx_mac_workstation",
+      "node_id": "local_mlx_mac_workstation--data-builder",
+      "source_id": "local_mlx_mac_workstation",
+      "execution_class": "data_builder",
+      "assignment_id": "data-builder-local_mlx_mac_workstation",
+      "run_graph_role": "contributor_only",
+      "admission_state": "admitted",
+      "readiness_state": "ready",
+      "contribution_state": "standby",
+      "program_posture": "active",
+      "evidence_binding": {
+        "binding_kind": "manifest_dataset_authority",
+        "binding_id": "psion.curated_pretrain.dataset_family.v1",
+        "detail": "Data builders are reconstructed from the canonical dataset-family authority because provider-neutral final execution segments do not yet emit a dedicated data-builder segment."
+      },
+      "detail": "The data-builder role is admitted under the same run id as the dense and validation roles instead of living in a separate hidden data pipeline identity."
+    }
+  ],
+  "role_windows": [
+    {
+      "role_window_id": "psion-xprovider-pretrain-whole-program-001-role-window-1",
+      "run_id": "psion-xprovider-pretrain-whole-program-001",
+      "orchestrator_window_id": "psion-xprovider-pretrain-whole-program-001-window-1",
+      "topology_revision_id": "psion-xprovider-pretrain-whole-program-001-topology-1",
+      "contributor_set_revision_id": "psion-xprovider-pretrain-whole-program-001-contributors-1",
+      "active_dense_rank_participant_ids": [
+        "dense-rank-0",
+        "dense-rank-1",
+        "dense-rank-2",
+        "dense-rank-3",
+        "dense-rank-4",
+        "dense-rank-5",
+        "dense-rank-6",
+        "dense-rank-7"
+      ],
+      "active_contributor_window_participant_ids": [
+        "contributor-window-mac-1",
+        "contributor-window-rtx4080-1",
+        "contributor-window-google-1"
+      ],
+      "active_validator_participant_ids": [
+        "validator-google-1"
+      ],
+      "quarantined_validator_participant_ids": [
+        "validator-mac-1"
+      ],
+      "active_checkpoint_writer_participant_ids": [
+        "checkpoint-writer-runpod-1"
+      ],
+      "standby_checkpoint_writer_participant_ids": [
+        "checkpoint-writer-google-1"
+      ],
+      "active_eval_worker_participant_ids": [
+        "eval-google-1",
+        "eval-rtx4080-1"
+      ],
+      "active_data_builder_participant_ids": [
+        "data-builder-google_l4_validator_node",
+        "data-builder-local_mlx_mac_workstation"
+      ],
+      "role_window_digest": "ea6cfd8c1b7aad14714c2d07358759e957f0b04e3d189cd96d8f8cafbf8e2a9a"
+    }
+  ],
+  "transition_log": [
+    {
+      "transition_id": "dense-rank-0-admitted-1710002000000",
+      "participant_id": "dense-rank-0",
+      "execution_class": "dense_full_model_rank",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000000,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "0e06cc67a9e92b9143d1f2b217c8784fe6a58fc0cc16a2e0a4c283e921b03389"
+    },
+    {
+      "transition_id": "dense-rank-0-activated-1710002000500",
+      "participant_id": "dense-rank-0",
+      "execution_class": "dense_full_model_rank",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000500,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "bbea8a5ac8b5001873a4dad0b2270b33a6b2d4ecc7001c225ba96a4973f39b3d"
+    },
+    {
+      "transition_id": "dense-rank-0-evidence_linked-1710002001000",
+      "participant_id": "dense-rank-0",
+      "execution_class": "dense_full_model_rank",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001000,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "b5920dfc62c880c25c0a60042cbc005587e3d93ec28b3c3e5ecb0801e67e7367"
+    },
+    {
+      "transition_id": "dense-rank-1-admitted-1710002000010",
+      "participant_id": "dense-rank-1",
+      "execution_class": "dense_full_model_rank",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000010,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "4c0045f9bd9c19acce94b70547b815f7485358a07dd66d36c3b68300e05da0ab"
+    },
+    {
+      "transition_id": "dense-rank-1-activated-1710002000510",
+      "participant_id": "dense-rank-1",
+      "execution_class": "dense_full_model_rank",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000510,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "496f8456d66aa082f1882dc7d9c79ca2b8a01f5040f8f07d4c6c74468f6b038c"
+    },
+    {
+      "transition_id": "dense-rank-1-evidence_linked-1710002001010",
+      "participant_id": "dense-rank-1",
+      "execution_class": "dense_full_model_rank",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001010,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "cfdc2346b92ef88de0604b9640d681236dcc87cae882da75f47db2bae6c0bd73"
+    },
+    {
+      "transition_id": "dense-rank-2-admitted-1710002000020",
+      "participant_id": "dense-rank-2",
+      "execution_class": "dense_full_model_rank",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000020,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "4cff336425caaf6de9635ded189e506e571b50acec1909585606dadce02df550"
+    },
+    {
+      "transition_id": "dense-rank-2-activated-1710002000520",
+      "participant_id": "dense-rank-2",
+      "execution_class": "dense_full_model_rank",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000520,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "e5b0ff5d2f13b340c3679bc32b6be0cd5d30a6ec2b01e380ec43eaf68012aa3c"
+    },
+    {
+      "transition_id": "dense-rank-2-evidence_linked-1710002001020",
+      "participant_id": "dense-rank-2",
+      "execution_class": "dense_full_model_rank",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001020,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "64f234155fad767c67cb958fe9242080e7dbd3c050d968cee7eafcdb80fe0b12"
+    },
+    {
+      "transition_id": "dense-rank-3-admitted-1710002000030",
+      "participant_id": "dense-rank-3",
+      "execution_class": "dense_full_model_rank",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000030,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "290e1eaf17e400c6098eb1a23263a6a7f6179903102ac310f84dd4af784c71cf"
+    },
+    {
+      "transition_id": "dense-rank-3-activated-1710002000530",
+      "participant_id": "dense-rank-3",
+      "execution_class": "dense_full_model_rank",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000530,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "aae33b770917d48dbbf59edd798a17f702d6f9a49ab9f23141b380db89a47e4a"
+    },
+    {
+      "transition_id": "dense-rank-3-evidence_linked-1710002001030",
+      "participant_id": "dense-rank-3",
+      "execution_class": "dense_full_model_rank",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001030,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "63f2ef0e19a9ba4cf714067e6bc0e4ab0ad655cf21cc0e9715961f7b5f8708fd"
+    },
+    {
+      "transition_id": "dense-rank-4-admitted-1710002000040",
+      "participant_id": "dense-rank-4",
+      "execution_class": "dense_full_model_rank",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000040,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "a5bf76d41c19bec49a47e90240078c73042db08da1bc76788d60bd3b9b9120da"
+    },
+    {
+      "transition_id": "dense-rank-4-activated-1710002000540",
+      "participant_id": "dense-rank-4",
+      "execution_class": "dense_full_model_rank",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000540,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "50c47aca33485ee12975ea045c856213912a9dccc6affedc6ebc5762ebd283f6"
+    },
+    {
+      "transition_id": "dense-rank-4-evidence_linked-1710002001040",
+      "participant_id": "dense-rank-4",
+      "execution_class": "dense_full_model_rank",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001040,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "780e3a4afaef0a36e6a0950e04af1f8c91418ac039af1b8147e2dd2e63298b1d"
+    },
+    {
+      "transition_id": "dense-rank-5-admitted-1710002000050",
+      "participant_id": "dense-rank-5",
+      "execution_class": "dense_full_model_rank",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000050,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "8f304f2ea6c9aebf0cf4bb3a114cac8cd91e4aae10bba97a5bf1e1688d1c0b3a"
+    },
+    {
+      "transition_id": "dense-rank-5-activated-1710002000550",
+      "participant_id": "dense-rank-5",
+      "execution_class": "dense_full_model_rank",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000550,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "408c7e78706b189d8654686ae882899cfd996a59efbd6a44c5fa247552f86f01"
+    },
+    {
+      "transition_id": "dense-rank-5-evidence_linked-1710002001050",
+      "participant_id": "dense-rank-5",
+      "execution_class": "dense_full_model_rank",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001050,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "2742a57ff6271fb0f520d79a41272abc7ae20c1eab129296bbb8c51703654ae8"
+    },
+    {
+      "transition_id": "dense-rank-6-admitted-1710002000060",
+      "participant_id": "dense-rank-6",
+      "execution_class": "dense_full_model_rank",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000060,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "b2e5188ca8c875ac2392ae9d10834533fa444a97c1ddc91d3af9bd8b515d0b34"
+    },
+    {
+      "transition_id": "dense-rank-6-activated-1710002000560",
+      "participant_id": "dense-rank-6",
+      "execution_class": "dense_full_model_rank",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000560,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "7728e3f7d8939e2136ae6a164e50f51cad4b44414f65232a48dc29a28c56a83c"
+    },
+    {
+      "transition_id": "dense-rank-6-evidence_linked-1710002001060",
+      "participant_id": "dense-rank-6",
+      "execution_class": "dense_full_model_rank",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001060,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "e292207d3984a6840d47e0c1a7556a161233102446b7d5adb7e4575ec2407ca2"
+    },
+    {
+      "transition_id": "dense-rank-7-admitted-1710002000070",
+      "participant_id": "dense-rank-7",
+      "execution_class": "dense_full_model_rank",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000070,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "f0597eceb380c0e4a7e7cfe468d5183f07031c25cefb69147b14226d87ca3e0e"
+    },
+    {
+      "transition_id": "dense-rank-7-activated-1710002000570",
+      "participant_id": "dense-rank-7",
+      "execution_class": "dense_full_model_rank",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000570,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "464850f2908b2e28e9b267d81ca379c46db8a300561760d5138e0011814a54d9"
+    },
+    {
+      "transition_id": "dense-rank-7-evidence_linked-1710002001070",
+      "participant_id": "dense-rank-7",
+      "execution_class": "dense_full_model_rank",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001070,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "30256834df9790ecf8370ad8f87bce95fd30488531122bc7b3e91091458a949a"
+    },
+    {
+      "transition_id": "contributor-window-mac-1-admitted-1710002000080",
+      "participant_id": "contributor-window-mac-1",
+      "execution_class": "validated_contributor_window",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000080,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "815feae47b6cabc08919bf533e0d63b61b044f9cd8aca63086ca8af0c0e9856f"
+    },
+    {
+      "transition_id": "contributor-window-mac-1-activated-1710002000580",
+      "participant_id": "contributor-window-mac-1",
+      "execution_class": "validated_contributor_window",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000580,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "fd481cde434b757ca90a54932c58f6af3a198fbf5f4c241068a6ab5825afb7a6"
+    },
+    {
+      "transition_id": "contributor-window-mac-1-evidence_linked-1710002001080",
+      "participant_id": "contributor-window-mac-1",
+      "execution_class": "validated_contributor_window",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001080,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "5dea2b595f535239ff93a488099444e3efa747cb34b9d2fbcc20981e7b63b2cb"
+    },
+    {
+      "transition_id": "contributor-window-rtx4080-1-admitted-1710002000090",
+      "participant_id": "contributor-window-rtx4080-1",
+      "execution_class": "validated_contributor_window",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000090,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "de3637f67b1cd1adcc66ceb5e09e6a65acc03fc6b2fbb3d3c0437ad47d03ba6d"
+    },
+    {
+      "transition_id": "contributor-window-rtx4080-1-activated-1710002000590",
+      "participant_id": "contributor-window-rtx4080-1",
+      "execution_class": "validated_contributor_window",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000590,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "f293c2408ee64c1965a847b3163e48c232c91d3eab7bf5835f4000f304c6e58b"
+    },
+    {
+      "transition_id": "contributor-window-rtx4080-1-evidence_linked-1710002001090",
+      "participant_id": "contributor-window-rtx4080-1",
+      "execution_class": "validated_contributor_window",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001090,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "6c4904b1d7894326f662a317b6aa601baa9b10b72f8be18e7ae3e5fc35515b5e"
+    },
+    {
+      "transition_id": "contributor-window-google-1-admitted-1710002000100",
+      "participant_id": "contributor-window-google-1",
+      "execution_class": "validated_contributor_window",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000100,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "762abe52ca990f9a71cb413d90b38b7f3167fa4d30c73e846ebf26b0c6427047"
+    },
+    {
+      "transition_id": "contributor-window-google-1-activated-1710002000600",
+      "participant_id": "contributor-window-google-1",
+      "execution_class": "validated_contributor_window",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000600,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "96ed6e3a030a1dabf1cbdbdd78c327aa8fa45ecffb2dfca457597973ec80e283"
+    },
+    {
+      "transition_id": "contributor-window-google-1-evidence_linked-1710002001100",
+      "participant_id": "contributor-window-google-1",
+      "execution_class": "validated_contributor_window",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001100,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "fb188dea85b9006a0d0d0d02dd4bd2f055f387d973c2188165e2083bfda67d56"
+    },
+    {
+      "transition_id": "validator-google-1-admitted-1710002000110",
+      "participant_id": "validator-google-1",
+      "execution_class": "validator",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000110,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "9af1ad8635692d1a5ce316417399ea7372279553dcb076170b2c418dec8d002b"
+    },
+    {
+      "transition_id": "validator-google-1-activated-1710002000610",
+      "participant_id": "validator-google-1",
+      "execution_class": "validator",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000610,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "3d47165189f434ec942a1fcf17afe47426479f9915dcf12a0de6ff31d8025312"
+    },
+    {
+      "transition_id": "validator-google-1-evidence_linked-1710002001110",
+      "participant_id": "validator-google-1",
+      "execution_class": "validator",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001110,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "2f2c6e37a6765e72a8a74691ab061cb4e073e0e3027513b91689e0a3f7faaf96"
+    },
+    {
+      "transition_id": "validator-mac-1-admitted-1710002000120",
+      "participant_id": "validator-mac-1",
+      "execution_class": "validator",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000120,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "a6ba1873d6dcced3bc7636815b7a1756c0c620c2bb7db072f340753e492d077e"
+    },
+    {
+      "transition_id": "validator-mac-1-quarantined-1710002000620",
+      "participant_id": "validator-mac-1",
+      "execution_class": "validator",
+      "kind": "quarantined",
+      "occurred_at_ms": 1710002000620,
+      "detail": "Participant remains admitted but quarantined under the shared validator contract.",
+      "transition_digest": "21728ff950157da96dbcff3df18949693a4d04ebd4de8b0bf694d6633dd3eeb1"
+    },
+    {
+      "transition_id": "validator-mac-1-evidence_linked-1710002001120",
+      "participant_id": "validator-mac-1",
+      "execution_class": "validator",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001120,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "a8183d54099c9cee1825491727c64f878a6c4b28baff71d63d1fdc2fd1c880df"
+    },
+    {
+      "transition_id": "checkpoint-writer-runpod-1-admitted-1710002000130",
+      "participant_id": "checkpoint-writer-runpod-1",
+      "execution_class": "checkpoint_writer",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000130,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "cce5e7d3f6d409a17a20f721cda49dd5edfee63093d94163764db647c1a774c3"
+    },
+    {
+      "transition_id": "checkpoint-writer-runpod-1-activated-1710002000630",
+      "participant_id": "checkpoint-writer-runpod-1",
+      "execution_class": "checkpoint_writer",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000630,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "3d0c7bc36244537bb64caa97178e430280c8be451711344516aaadad50c6fdb5"
+    },
+    {
+      "transition_id": "checkpoint-writer-runpod-1-evidence_linked-1710002001130",
+      "participant_id": "checkpoint-writer-runpod-1",
+      "execution_class": "checkpoint_writer",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001130,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "644ef8c8492b7422874b306b2abdf03aa271b62dde17805406ea1d8cd39fd6de"
+    },
+    {
+      "transition_id": "checkpoint-writer-google-1-admitted-1710002000140",
+      "participant_id": "checkpoint-writer-google-1",
+      "execution_class": "checkpoint_writer",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000140,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "f5f58a9a9575962c20b508db28c769f4d6161e9e98ee8d0be233c1b24e9e8f5d"
+    },
+    {
+      "transition_id": "checkpoint-writer-google-1-held_standby-1710002000640",
+      "participant_id": "checkpoint-writer-google-1",
+      "execution_class": "checkpoint_writer",
+      "kind": "held_standby",
+      "occurred_at_ms": 1710002000640,
+      "detail": "Participant remains admitted but standby inside the current whole-program role window.",
+      "transition_digest": "14725a9f2b8cc62d6eb02643e9744eb16b84357d7699233d8ebb794ba47adf32"
+    },
+    {
+      "transition_id": "checkpoint-writer-google-1-evidence_linked-1710002001140",
+      "participant_id": "checkpoint-writer-google-1",
+      "execution_class": "checkpoint_writer",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001140,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "703238837961b0ce1f60a227780aa1b749a68f3fe6a7009ff731503b02ef8ebd"
+    },
+    {
+      "transition_id": "eval-google-1-admitted-1710002000150",
+      "participant_id": "eval-google-1",
+      "execution_class": "eval_worker",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000150,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "00504ec85118efafdeb537e87db599815b3f4268c5b59090994b283c17c85885"
+    },
+    {
+      "transition_id": "eval-google-1-activated-1710002000650",
+      "participant_id": "eval-google-1",
+      "execution_class": "eval_worker",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000650,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "101a0cbffe21a0e26e5289d5d072629319e240eb2ca358f2fffe43306936ea13"
+    },
+    {
+      "transition_id": "eval-google-1-evidence_linked-1710002001150",
+      "participant_id": "eval-google-1",
+      "execution_class": "eval_worker",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001150,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "bd3e747b2ab795c7a0460348846f772f5dc52dae37d08b0e2742a2629d791499"
+    },
+    {
+      "transition_id": "eval-rtx4080-1-admitted-1710002000160",
+      "participant_id": "eval-rtx4080-1",
+      "execution_class": "eval_worker",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000160,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "447c8c9bf600de76f2a946b538d0e5a990a6be4610b4ff3384b677efc2e4e962"
+    },
+    {
+      "transition_id": "eval-rtx4080-1-activated-1710002000660",
+      "participant_id": "eval-rtx4080-1",
+      "execution_class": "eval_worker",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000660,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "af899d99516bf2fa743b816a2a2d3bdf9c06b3449aeb69704c07fc8b2f60566b"
+    },
+    {
+      "transition_id": "eval-rtx4080-1-evidence_linked-1710002001160",
+      "participant_id": "eval-rtx4080-1",
+      "execution_class": "eval_worker",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001160,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "298e192836c82869953252049866d41dd7e1317cd371f253440b439af693b18d"
+    },
+    {
+      "transition_id": "data-builder-google_l4_validator_node-admitted-1710002000170",
+      "participant_id": "data-builder-google_l4_validator_node",
+      "execution_class": "data_builder",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000170,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "f3f03c048ded478dac6d6488eb562cad9a44238abdd17451170036c163106b89"
+    },
+    {
+      "transition_id": "data-builder-google_l4_validator_node-activated-1710002000670",
+      "participant_id": "data-builder-google_l4_validator_node",
+      "execution_class": "data_builder",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000670,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "78e3f1fe819d51176769bd9ec283c1ac742ea318432e507ca451fac1cc275da3"
+    },
+    {
+      "transition_id": "data-builder-google_l4_validator_node-evidence_linked-1710002001170",
+      "participant_id": "data-builder-google_l4_validator_node",
+      "execution_class": "data_builder",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001170,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "f791ad20ff1d34e819fbe25e27ebae6d75da43ac24f26f2bb53c6bdd6c4733b9"
+    },
+    {
+      "transition_id": "data-builder-local_mlx_mac_workstation-admitted-1710002000180",
+      "participant_id": "data-builder-local_mlx_mac_workstation",
+      "execution_class": "data_builder",
+      "kind": "admitted",
+      "occurred_at_ms": 1710002000180,
+      "detail": "Participant joined the whole-program run graph under the shared run id.",
+      "transition_digest": "39f396358779d4ec5d89d2af50833b4d63aa6df9453938be2530e0941d0a451a"
+    },
+    {
+      "transition_id": "data-builder-local_mlx_mac_workstation-activated-1710002000680",
+      "participant_id": "data-builder-local_mlx_mac_workstation",
+      "execution_class": "data_builder",
+      "kind": "activated",
+      "occurred_at_ms": 1710002000680,
+      "detail": "Participant was activated for the current whole-program role window.",
+      "transition_digest": "57b2841001f71ac0b305284f258c94a63cdd24ca98ccfe7fb37799447b57a587"
+    },
+    {
+      "transition_id": "data-builder-local_mlx_mac_workstation-evidence_linked-1710002001180",
+      "participant_id": "data-builder-local_mlx_mac_workstation",
+      "execution_class": "data_builder",
+      "kind": "evidence_linked",
+      "occurred_at_ms": 1710002001180,
+      "detail": "Participant role was bound to retained provider-neutral evidence for later whole-program reconstruction.",
+      "transition_digest": "d5f929c407eea4f5782f887f7cb0e966bc8c509470b0b70546d8e54a11a4ca99"
+    }
+  ],
+  "claim_boundary": "This artifact proves one provider-neutral run graph can carry dense ranks, contributor windows, validators, checkpoint writers, eval workers, and data builders under one shared run id. It does not yet claim dense recovery, elastic world-size closure, or a retained multi-provider dense proof run.",
+  "contract_digest": "d323bce8c1b324e9d4ab12e50f17678624d48272ae3aaaa913bb8ad61be751be"
+}
