@@ -205,18 +205,20 @@ the same bounded public lane before the next H100 rerun:
   - device-resident eval-graph average batch time: `9048.00 ms`
   - runtime receipt: `path=device_resident_cuda_eval_graph_v1`,
     `graph_surface=parameter_golf_baseline_eval_graph_v1`
-- the CUDA eval graph now also lowers the attention hot path more explicitly on
-  CUDA devices:
-  - eval-only `q`, `k`, and `v` inputs now cast onto the admitted BF16
-    full-sequence attention lane before `scaled_dot_product_attention`
-  - eval-only linear hot-path matmuls now register BF16 compute tensors
-    directly in the lowered graph on CUDA while casting their outputs back to
-    the existing F32 eval surface
-  - the training graph still does not claim that same cast-based BF16 posture,
-    because reverse-mode autodiff still refuses `Cast` as a supported gradient
-    family
-- the latest real `8xH100` scoreproof retained that remaining training-side
-  blocker honestly:
+- the CUDA training and eval graphs now lower the linear hot path more
+  explicitly on CUDA devices:
+  - CUDA linear hot-path matmuls now route through the admitted
+    `f32 x bf16 -> f32` lane in the lowered graph instead of leaving the whole
+    linear surface at pure `f32`
+  - reverse-mode autodiff now admits the bounded float-cast family, so the
+    graph layer no longer blocks mixed-precision train-path lowering
+  - CUDA eval still goes further than train today:
+    - eval `q`, `k`, and `v` inputs cast onto the admitted BF16
+      full-sequence attention lane before `scaled_dot_product_attention`
+    - train attention stays `f32` until the bounded BF16 attention-backward
+      lane exists on the public CUDA path
+- the latest real `8xH100` scoreproof still retained the remaining
+  training-side runtime bottleneck honestly:
   - wallclock cap hit after only `3` steps
   - step `2` rank-0 timings were about `53.3 s` forward, `123.6 s` backward,
     `7.4 s` gradient sync, and `0.9 s` host gradient materialization

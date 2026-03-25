@@ -486,6 +486,18 @@ __global__ void cast_f32_to_bf16_kernel(
     output[index] = __float2bfloat16(input[index]);
 }
 
+__global__ void cast_bf16_to_f32_kernel(
+    const __nv_bfloat16 *input,
+    int element_count,
+    float *output
+) {
+    const int index = static_cast<int>(blockIdx.x) * blockDim.x + static_cast<int>(threadIdx.x);
+    if (index >= element_count) {
+        return;
+    }
+    output[index] = __bfloat162float(input[index]);
+}
+
 __global__ void gather_f16_row_to_f32_kernel(
     const __half *input,
     int rows,
@@ -5160,6 +5172,21 @@ extern "C" int psionic_cuda_cast_f32_to_bf16(
         static_cast<const float *>(input),
         element_count,
         static_cast<__nv_bfloat16 *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_cast_bf16_to_f32(
+    const void *input,
+    int element_count,
+    void *output,
+    void *stream
+) {
+    const int blocks = (element_count + kBlockSize - 1) / kBlockSize;
+    cast_bf16_to_f32_kernel<<<blocks, kBlockSize, 0, static_cast<cudaStream_t>(stream)>>>(
+        static_cast<const __nv_bfloat16 *>(input),
+        element_count,
+        static_cast<float *>(output)
     );
     return static_cast<int>(cudaGetLastError());
 }

@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use psionic_core::{DType, Device, DeviceKind, Shape, TensorData, TensorId};
 use psionic_ir::{
-    AutodiffContext, AutodiffError, AutodiffGraph, AutodiffGraphBuilder, AutodiffTensor, Graph,
-    GraphError, ReferenceEvaluationError,
+    AutodiffContext, AutodiffError, AutodiffExecutionMode, AutodiffGraph,
+    AutodiffGraphBuilder, AutodiffTensor, Graph, GraphError, ReferenceEvaluationError,
 };
 use psionic_models::{
     ParameterGolfBankedWeights, ParameterGolfConfig, ParameterGolfConfigError,
@@ -232,6 +232,7 @@ pub fn build_parameter_golf_baseline_training_graph(
     batch_size: usize,
     sequence_length: usize,
 ) -> Result<ParameterGolfBaselineTrainingGraph, ParameterGolfBaselineGraphError> {
+    let use_bf16_fast_path = device.kind() == DeviceKind::Cuda;
     let mut builder = AutodiffGraphBuilder::with_context(device, AutodiffContext::training());
     let state = build_baseline_graph_state(
         &mut builder,
@@ -239,7 +240,7 @@ pub fn build_parameter_golf_baseline_training_graph(
         batch_size,
         sequence_length,
         true,
-        false,
+        use_bf16_fast_path,
     )?;
     let target_ids = builder.input(
         "target_ids",
@@ -1039,17 +1040,22 @@ fn attention_forward_graph(
         ]),
     )?;
     let q = builder.mul(&q, &q_gain)?;
-    let q = if use_bf16_fast_path {
+    let use_bf16_attention_fast_path = use_bf16_fast_path
+        && matches!(
+            builder.context().execution_mode,
+            AutodiffExecutionMode::Evaluation
+        );
+    let q = if use_bf16_attention_fast_path {
         builder.cast(&q, DType::BF16)?
     } else {
         q
     };
-    let k = if use_bf16_fast_path {
+    let k = if use_bf16_attention_fast_path {
         builder.cast(&k, DType::BF16)?
     } else {
         k
     };
-    let v = if use_bf16_fast_path {
+    let v = if use_bf16_attention_fast_path {
         builder.cast(&v, DType::BF16)?
     } else {
         v
@@ -1189,17 +1195,12 @@ fn linear_3d(
     )?;
     let transposed_weight = builder.permute(weight, vec![1, 0])?;
     let output = if use_bf16_fast_path && transposed_weight.spec().dtype() == DType::BF16 {
-        let lowered_input = if flattened.spec().dtype() == DType::BF16 {
+        let lowered_input = if flattened.spec().dtype() == DType::F32 {
             flattened.clone()
         } else {
-            builder.cast(&flattened, DType::BF16)?
+            builder.cast(&flattened, DType::F32)?
         };
-        let lowered_output = builder.matmul(&lowered_input, &transposed_weight)?;
-        if lowered_output.spec().dtype() == DType::BF16 {
-            builder.cast(&lowered_output, DType::F32)?
-        } else {
-            lowered_output
-        }
+        builder.matmul(&lowered_input, &transposed_weight)?
     } else {
         builder.matmul(&flattened, &transposed_weight)?
     };
@@ -1992,7 +1993,7 @@ mod tests {
     }
 
     #[test]
-    fn parameter_golf_cuda_eval_graph_lowers_linear_and_attention_compute_to_bf16(
+    fn parameter_golf_cuda_training_and_eval_graphs_lower_linear_and_attention_compute_to_bf16(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let fixture = load_baseline_fixture();
         let model = baseline_model()?;
@@ -2010,21 +2011,40 @@ mod tests {
             fixture.input_ids[0].len(),
         )?;
 
-        let training_bf16_matmul_count = training_graph
+        let training_bf16_weight_matmul_count = training_graph
             .graph
             .graph()
             .nodes()
             .iter()
             .filter(|node| {
-                matches!(node.op(), OpKind::Matmul) && node.tensor().spec().dtype() == DType::BF16
+                matches!(node.op(), OpKind::Matmul)
+                    && node.tensor().spec().dtype() == DType::F32
+                    && node
+                        .inputs()
+                        .get(1)
+                        .and_then(|tensor_id| training_graph.graph.graph().node(*tensor_id))
+                        .is_some_and(|input| input.tensor().spec().dtype() == DType::BF16)
             })
             .count();
-        let eval_bf16_matmul_count = eval_graph
+        let training_bf16_cast_count = training_graph
+            .graph
+            .graph()
+            .nodes()
+            .iter()
+            .filter(|node| matches!(node.op(), OpKind::Cast { dtype: DType::BF16 }))
+            .count();
+        let eval_bf16_weight_matmul_count = eval_graph
             .graph
             .nodes()
             .iter()
             .filter(|node| {
-                matches!(node.op(), OpKind::Matmul) && node.tensor().spec().dtype() == DType::BF16
+                matches!(node.op(), OpKind::Matmul)
+                    && node.tensor().spec().dtype() == DType::F32
+                    && node
+                        .inputs()
+                        .get(1)
+                        .and_then(|tensor_id| eval_graph.graph.node(*tensor_id))
+                        .is_some_and(|input| input.tensor().spec().dtype() == DType::BF16)
             })
             .count();
         let eval_bf16_cast_count = eval_graph
@@ -2034,8 +2054,9 @@ mod tests {
             .filter(|node| matches!(node.op(), OpKind::Cast { dtype: DType::BF16 }))
             .count();
 
-        assert_eq!(training_bf16_matmul_count, 0);
-        assert!(eval_bf16_matmul_count > 0);
+        assert!(training_bf16_weight_matmul_count > 0);
+        assert_eq!(training_bf16_cast_count, 0);
+        assert!(eval_bf16_weight_matmul_count > 0);
         assert!(eval_bf16_cast_count > 0);
         Ok(())
     }

@@ -1057,6 +1057,19 @@ impl CudaSubmission {
         Ok(())
     }
 
+    /// Casts contiguous `bf16` values to contiguous `f32` values on CUDA.
+    pub fn cast_bf16_to_f32(
+        &mut self,
+        input: &CudaBuffer,
+        output: &CudaBuffer,
+        element_count: usize,
+    ) -> Result<(), RuntimeError> {
+        self.platform
+            .encode_cast_bf16_to_f32(&input.platform, &output.platform, element_count)?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
     /// Reduces each contiguous `f32` row to its argmax index on CUDA.
     pub fn argmax_f32(
         &mut self,
@@ -4390,6 +4403,15 @@ impl AvailableCudaBackend {
                                 )?;
                                 output
                             }
+                            (DType::BF16, DType::F32) => {
+                                let output = self.allocate(&step.spec)?;
+                                submission.cast_bf16_to_f32(
+                                    input,
+                                    &output,
+                                    input.spec().element_count(),
+                                )?;
+                                output
+                            }
                             _ => execute_profiled_host_fallback(
                                 &mut host_fallback_profile,
                                 step,
@@ -7078,6 +7100,12 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_cast_bf16_to_f32(
+            input: *const c_void,
+            element_count: c_int,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_gather_f16_row_to_f32(
             input: *const c_void,
             rows: c_int,
@@ -8479,6 +8507,29 @@ mod platform {
                     )
                 },
                 "psionic_cuda_cast_f32_to_bf16",
+            )
+        }
+
+        pub(super) fn encode_cast_bf16_to_f32(
+            &mut self,
+            input: &PlatformBuffer,
+            output: &PlatformBuffer,
+            element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            let element_count = c_int::try_from(element_count).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda bf16->f32 cast length exceeds c_int"))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_cast_bf16_to_f32(
+                        input.inner.device_ptr.cast(),
+                        element_count,
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_cast_bf16_to_f32",
             )
         }
 
@@ -12022,6 +12073,17 @@ mod platform {
             )))
         }
 
+        pub(super) fn encode_cast_bf16_to_f32(
+            &mut self,
+            _input: &PlatformBuffer,
+            _output: &PlatformBuffer,
+            _element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
         pub(super) fn encode_quantized_matvec_q8_1(
             &mut self,
             _weights: &PlatformBuffer,
@@ -15357,6 +15419,34 @@ mod tests {
             .ok_or("missing f32->bf16 cast output")?;
         assert_eq!(output.spec().dtype(), DType::BF16);
         assert_close(&output.read_bf16_to_f32()?, &[1.0, -2.0, 3.5, 0.25], 1e-3);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_bf16_to_f32_cast_graphs_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let mut builder = GraphBuilder::new(selected.device.clone());
+        let input = builder.input("input", Shape::new(vec![1, 4]), DType::BF16);
+        let casted = builder.cast(&input, DType::F32)?;
+        let casted_id = casted.id();
+        let graph = builder.finish(vec![casted]);
+        let inputs = std::collections::BTreeMap::from([(
+            input.id(),
+            backend.input_bf16_buffer(Shape::new(vec![1, 4]), vec![1.0_f32, -2.0, 3.5, 0.25])?,
+        )]);
+        let result = backend.compile_and_execute(&graph, &inputs)?;
+        let output = result
+            .outputs
+            .get(&casted_id)
+            .ok_or("missing bf16->f32 cast output")?;
+        assert_eq!(output.spec().dtype(), DType::F32);
+        assert_close(&output.read_f32()?, &[1.0, -2.0, 3.5, 0.25], 1e-3);
         Ok(())
     }
 
