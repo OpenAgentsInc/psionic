@@ -108,6 +108,17 @@ machine-legible launch-time authority above the current Google, RunPod, and
 local adapters. Resource creation remains provider-specific, but the adapters
 no longer define training-facing runtime truth on their own.
 
+The Google lanes now also consume that binder explicitly through
+`crates/psionic-train/src/google_training_binder_projection.rs`, the binary
+`google_training_binder_projection`, the checker
+`scripts/check-google-training-binder-projection.sh`, the focused reference doc
+`docs/GOOGLE_TRAINING_BINDER_REFERENCE.md`, and the committed fixture
+`fixtures/training/google_training_binder_projection_v1.json`. That projection
+keeps the current single-node and two-node swarm Google operator surfaces
+truthful while moving their runtime semantics, retained evidence surfaces, and
+finalizer expectations onto the shared binder instead of Google-only training
+truth.
+
 The repo now also owns the first generic dense-rank runtime layer in
 `crates/psionic-train/src/dense_rank_runtime.rs`, the binary
 `dense_rank_runtime_reference_contract`, the checker

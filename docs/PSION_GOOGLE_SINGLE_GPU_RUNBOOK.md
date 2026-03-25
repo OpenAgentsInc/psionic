@@ -149,6 +149,8 @@ It is not the same as:
   `fixtures/psion/google/psion_google_single_node_launch_profiles_v1.json`
 - local operator preflight:
   `fixtures/psion/google/psion_google_operator_preflight_policy_v1.json`
+- shared binder projection:
+  `fixtures/training/google_training_binder_projection_v1.json`
 - host observability and final-manifest authority:
   `fixtures/psion/google/psion_google_host_observability_policy_v1.json`
 - local operator preflight command:
@@ -181,6 +183,8 @@ It is not the same as:
   `docs/audits/2026-03-22-openagentsgemini-first-google-host-native-plugin-conditioned-run-audit.md`
 - first real mixed plugin-conditioned run audit:
   `docs/audits/2026-03-22-openagentsgemini-first-google-mixed-plugin-conditioned-run-audit.md`
+- shared binder reference:
+  `docs/GOOGLE_TRAINING_BINDER_REFERENCE.md`
 
 ## Local Requirements
 

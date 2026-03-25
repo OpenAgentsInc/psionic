@@ -23,6 +23,8 @@ lane and not a broader cluster claim.
 
 - contract:
   `fixtures/psion/google/psion_google_two_node_swarm_contract_v1.json`
+- shared binder projection:
+  `fixtures/training/google_training_binder_projection_v1.json`
 - launch authority:
   `fixtures/psion/google/psion_google_two_node_swarm_launch_profiles_v1.json`
 - network posture:
@@ -47,6 +49,8 @@ lane and not a broader cluster claim.
   `scripts/psion-google-finalize-two-node-swarm-run.sh`
 - evidence-bundle checker:
   `scripts/check-psion-google-two-node-swarm-evidence-bundle.sh`
+- shared binder reference:
+  `docs/GOOGLE_TRAINING_BINDER_REFERENCE.md`
 - teardown:
   `scripts/psion-google-delete-two-node-swarm.sh`
 

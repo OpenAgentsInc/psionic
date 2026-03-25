@@ -1,0 +1,65 @@
+{
+  "schema_version": "psionic.google_training_binder_projection.v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "runtime_binder_contract_digest": "ff2e025536321ad7483fcb43a57a1898c3cf90bbdad98ffc684cdc12ac62e518",
+  "lane_projections": [
+    {
+      "lane_projection_id": "google_single_node_accelerated",
+      "lane_kind": "single_node_accelerated",
+      "runtime_binding_id": "psionic-cross-provider-pretraining-program-v1.psionic-google-single-node-accelerated-launch-contract-v1.binding",
+      "runtime_binding_digest": "b6f46f510a2968323b10f146848a5be41f2eac16f1ea6aa8264cbda710d5dca4",
+      "launch_contract_id": "psionic-google-single-node-accelerated-launch-contract-v1",
+      "runbook_path": "docs/PSION_GOOGLE_SINGLE_GPU_RUNBOOK.md",
+      "preflight_authorities": [
+        "fixtures/psion/google/psion_google_single_node_launch_profiles_v1.json",
+        "fixtures/psion/google/psion_google_operator_preflight_policy_v1.json"
+      ],
+      "launch_authority_path": "fixtures/psion/google/psion_google_host_observability_policy_v1.json",
+      "launch_script_path": "scripts/psion-google-launch-single-node.sh",
+      "startup_script_path": "scripts/psion-google-single-node-startup.sh",
+      "finalizer_script_path": "scripts/psion-google-finalize-run.sh",
+      "retained_checker_paths": [
+        "scripts/check-cross-provider-runtime-binder.sh"
+      ],
+      "retained_evidence_paths": [
+        "psion_google_accelerator_validation_receipt.json",
+        "psion_google_run_cost_receipt.json",
+        "training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json"
+      ],
+      "claim_boundary": "The accelerated single-node Google lane still owns its quota, launch, and finalizer scripts, but the training-facing runtime and evidence semantics now come from the shared binder.",
+      "projection_digest": "1e315af0e318e2402e737910c4a06f8f21f896a98764cc084c92893dca3fc11c"
+    },
+    {
+      "lane_projection_id": "google_two_node_configured_peer_swarm",
+      "lane_kind": "two_node_configured_peer_swarm",
+      "runtime_binding_id": "psionic-cross-provider-pretraining-program-v1.psionic-google-two-node-swarm-launch-contract-v1.binding",
+      "runtime_binding_digest": "5f608293fe3382683d1b20a0bd9584e7d1391f75e4949e22e5e4bbdff69c307e",
+      "launch_contract_id": "psionic-google-two-node-swarm-launch-contract-v1",
+      "runbook_path": "docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md",
+      "preflight_authorities": [
+        "fixtures/psion/google/psion_google_two_node_swarm_contract_v1.json",
+        "fixtures/psion/google/psion_google_two_node_swarm_launch_profiles_v1.json",
+        "fixtures/psion/google/psion_google_two_node_swarm_operator_preflight_policy_v1.json"
+      ],
+      "launch_authority_path": "fixtures/psion/google/psion_google_two_node_swarm_contract_v1.json",
+      "launch_script_path": "scripts/psion-google-launch-two-node-swarm.sh",
+      "startup_script_path": "scripts/psion-google-two-node-swarm-startup.sh",
+      "finalizer_script_path": "scripts/psion-google-finalize-two-node-swarm-run.sh",
+      "retained_checker_paths": [
+        "scripts/check-psion-google-two-node-swarm-contract.sh",
+        "scripts/check-psion-google-two-node-swarm-runbook.sh",
+        "scripts/check-psion-google-two-node-swarm-evidence-bundle.sh"
+      ],
+      "retained_evidence_paths": [
+        "final/psion_google_two_node_swarm_evidence_bundle.json",
+        "final/psion_google_two_node_swarm_final_manifest.json",
+        "training_visualization/remote_training_run_index_v1.json"
+      ],
+      "claim_boundary": "The Google two-node swarm lane still keeps its bounded configured-peer claim, but its launch, runtime env, artifact roots, and finalizer semantics now come from the shared binder instead of Google-only training truth.",
+      "projection_digest": "3f107cb401541b3e0700d79713e18beb2a10ec0fa8a0f026c734f9bb91c9e86c"
+    }
+  ],
+  "claim_boundary": "This projection closes the Google single-node and Google swarm lanes as consumers of the shared cross-provider runtime binder. It does not widen the Google swarm claim to dense full-model training and it does not replace the current Google operator scripts with generic provider automation.",
+  "contract_digest": "cbb8c7cb9b76bf3b95d65c6e0855286d33440d952cf935e2dde6412f44c4455b"
+}
