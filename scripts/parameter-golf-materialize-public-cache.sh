@@ -114,8 +114,10 @@ fi
 
 # shellcheck disable=SC1091
 source "${target_root}/.venv/bin/activate"
-python -m pip install --upgrade pip >/dev/null
-python -m pip install huggingface-hub >/dev/null
+if ! python -c 'import huggingface_hub' >/dev/null 2>&1; then
+  python -m pip install --upgrade pip >/dev/null
+  python -m pip install huggingface-hub >/dev/null
+fi
 
 if [[ -n "${matched_fineweb_repo_id}" ]]; then
   export MATCHED_FINEWEB_REPO_ID="${matched_fineweb_repo_id}"
