@@ -717,6 +717,7 @@ impl BufferHandle for CudaBuffer {
 pub struct CudaSubmission {
     encoded_operations: usize,
     capturing: bool,
+    retained_buffers: Vec<CudaBuffer>,
     platform: platform::PlatformSubmission,
 }
 
@@ -1053,6 +1054,131 @@ impl CudaSubmission {
             cols,
         )?;
         self.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Launches one strided-batched dense row-major matrix multiply with
+    /// `bf16` inputs and `f32` accumulate/output. Transpose flags are applied
+    /// to the row-major logical matrices, not the underlying cuBLAS column-
+    /// major views.
+    pub fn matmul_bf16_strided_batched_to_f32(
+        &mut self,
+        left: &CudaBuffer,
+        right: &CudaBuffer,
+        output: &CudaBuffer,
+        rows: usize,
+        inner: usize,
+        cols: usize,
+        batch_count: usize,
+        transpose_left: bool,
+        transpose_right: bool,
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_matmul_bf16_strided_batched_to_f32(
+            &left.platform,
+            &right.platform,
+            &output.platform,
+            rows,
+            inner,
+            cols,
+            batch_count,
+            transpose_left,
+            transpose_right,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Launches one strided-batched dense row-major matrix multiply with
+    /// `f32` activations, `bf16` weights, and `f32` accumulate/output.
+    /// Transpose flags are applied to the row-major logical matrices.
+    pub fn matmul_f32_bf16_strided_batched_to_f32(
+        &mut self,
+        left: &CudaBuffer,
+        right: &CudaBuffer,
+        output: &CudaBuffer,
+        rows: usize,
+        inner: usize,
+        cols: usize,
+        batch_count: usize,
+        transpose_left: bool,
+        transpose_right: bool,
+    ) -> Result<(), RuntimeError> {
+        let left_elements = rows
+            .checked_mul(inner)
+            .and_then(|value| value.checked_mul(batch_count))
+            .ok_or_else(|| {
+                RuntimeError::Backend(String::from(
+                    "cuda mixed strided batched matmul lhs element count overflow",
+                ))
+            })?;
+        let right_elements = inner
+            .checked_mul(cols)
+            .and_then(|value| value.checked_mul(batch_count))
+            .ok_or_else(|| {
+                RuntimeError::Backend(String::from(
+                    "cuda mixed strided batched matmul rhs element count overflow",
+                ))
+            })?;
+        let output_elements = rows
+            .checked_mul(cols)
+            .and_then(|value| value.checked_mul(batch_count))
+            .ok_or_else(|| {
+                RuntimeError::Backend(String::from(
+                    "cuda mixed strided batched matmul output element count overflow",
+                ))
+            })?;
+        if left.spec.storage_size() != left_elements {
+            return Err(RuntimeError::Backend(format!(
+                "cuda mixed strided batched matmul lhs storage mismatch: expected {left_elements} elements, actual {}",
+                left.spec.storage_size()
+            )));
+        }
+        if right.spec.storage_size() != right_elements {
+            return Err(RuntimeError::Backend(format!(
+                "cuda mixed strided batched matmul rhs storage mismatch: expected {right_elements} elements, actual {}",
+                right.spec.storage_size()
+            )));
+        }
+        if output.spec.storage_size() != output_elements {
+            return Err(RuntimeError::Backend(format!(
+                "cuda mixed strided batched matmul output storage mismatch: expected {output_elements} elements, actual {}",
+                output.spec.storage_size()
+            )));
+        }
+
+        let scratch_spec = TensorSpec::new(
+            left.spec.shape().clone(),
+            DType::BF16,
+            left.spec.device().clone(),
+        );
+        let scratch_byte_len = scratch_spec
+            .storage_size()
+            .checked_mul(size_of_dtype(scratch_spec.dtype()))
+            .ok_or_else(|| {
+                RuntimeError::Backend(String::from(
+                    "cuda mixed strided batched matmul scratch allocation overflow",
+                ))
+            })?;
+        let scratch = CudaBuffer {
+            spec: scratch_spec,
+            byte_len: scratch_byte_len,
+            memory_space: CudaMemorySpace::Device,
+            host_visible: false,
+            platform: self.platform.allocate(scratch_byte_len)?,
+        };
+        self.cast_f32_to_bf16(left, &scratch, left_elements)?;
+        self.matmul_bf16_strided_batched_to_f32(
+            &scratch,
+            right,
+            output,
+            rows,
+            inner,
+            cols,
+            batch_count,
+            transpose_left,
+            transpose_right,
+        )?;
+        self.retained_buffers.push(scratch);
         Ok(())
     }
 
@@ -3116,6 +3242,7 @@ impl CudaBackend {
         Ok(CudaSubmission {
             encoded_operations: 0,
             capturing: false,
+            retained_buffers: Vec::new(),
             platform: backend.platform.begin_submission()?,
         })
     }
@@ -3128,6 +3255,7 @@ impl CudaBackend {
         Ok(CudaSubmission {
             encoded_operations: 0,
             capturing: true,
+            retained_buffers: Vec::new(),
             platform: backend.platform.begin_capture_submission()?,
         })
     }
@@ -3689,11 +3817,8 @@ impl AvailableCudaBackend {
         let grad_output = step_input(step, values, 1)?;
         let input_values = input.read_f32()?;
         let grad_output_values = grad_output.read_f32()?;
-        let output_values = leaky_relu_squared_backward_values(
-            &input_values,
-            &grad_output_values,
-            negative_slope,
-        );
+        let output_values =
+            leaky_relu_squared_backward_values(&input_values, &grad_output_values, negative_slope);
         self.buffer_from_tensor_data(&step.spec, &TensorData::F32(output_values))
     }
 
@@ -4348,6 +4473,7 @@ impl AvailableCudaBackend {
         let mut submission = CudaSubmission {
             encoded_operations: 0,
             capturing: false,
+            retained_buffers: Vec::new(),
             platform: self.platform.begin_submission()?,
         };
         let mut values = BTreeMap::new();
@@ -5508,199 +5634,197 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                 )));
             }
         }
-        ExecutionOp::BackendExtension { op } => {
-            match op {
-                BackendExtensionOp::ParameterGolfTokenEmbeddingLookup => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 2 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda parameter_golf_token_embedding_lookup step {} requires two inputs",
-                            step.output
-                        )));
-                    }
+        ExecutionOp::BackendExtension { op } => match op {
+            BackendExtensionOp::ParameterGolfTokenEmbeddingLookup => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda parameter_golf_token_embedding_lookup step {} requires two inputs",
+                        step.output
+                    )));
                 }
-                BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 3 {
-                        return Err(RuntimeError::Backend(format!(
+            }
+            BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 3 {
+                    return Err(RuntimeError::Backend(format!(
                             "cuda parameter_golf_token_embedding_lookup_backward step {} requires three inputs",
                             step.output
                         )));
-                    }
                 }
-                BackendExtensionOp::ReluSquared => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 1 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda relu_squared step {} requires one input",
-                            step.output
-                        )));
-                    }
+            }
+            BackendExtensionOp::ReluSquared => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 1 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda relu_squared step {} requires one input",
+                        step.output
+                    )));
                 }
-                BackendExtensionOp::ReluSquaredBackward => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 2 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda relu_squared_backward step {} requires two inputs",
-                            step.output
-                        )));
-                    }
+            }
+            BackendExtensionOp::ReluSquaredBackward => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda relu_squared_backward step {} requires two inputs",
+                        step.output
+                    )));
                 }
-                BackendExtensionOp::LeakyReluSquared { .. } => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 1 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda leaky_relu_squared step {} requires one input",
-                            step.output
-                        )));
-                    }
+            }
+            BackendExtensionOp::LeakyReluSquared { .. } => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 1 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda leaky_relu_squared step {} requires one input",
+                        step.output
+                    )));
                 }
-                BackendExtensionOp::LeakyReluSquaredBackward { .. } => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 2 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda leaky_relu_squared_backward step {} requires two inputs",
-                            step.output
-                        )));
-                    }
+            }
+            BackendExtensionOp::LeakyReluSquaredBackward { .. } => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda leaky_relu_squared_backward step {} requires two inputs",
+                        step.output
+                    )));
                 }
-                BackendExtensionOp::Silu => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 1 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda silu step {} requires one input",
-                            step.output
-                        )));
-                    }
+            }
+            BackendExtensionOp::Silu => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 1 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda silu step {} requires one input",
+                        step.output
+                    )));
                 }
-                BackendExtensionOp::SiluBackward => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 2 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda silu_backward step {} requires two inputs",
-                            step.output
-                        )));
-                    }
+            }
+            BackendExtensionOp::SiluBackward => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda silu_backward step {} requires two inputs",
+                        step.output
+                    )));
                 }
-                BackendExtensionOp::ParameterGolfProjectionLoss { .. } => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 2 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda parameter_golf_projection_loss step {} requires two inputs",
-                            step.output
-                        )));
-                    }
+            }
+            BackendExtensionOp::ParameterGolfProjectionLoss { .. } => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda parameter_golf_projection_loss step {} requires two inputs",
+                        step.output
+                    )));
                 }
-                BackendExtensionOp::ParameterGolfProjectionTokenLosses { .. } => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 2 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda parameter_golf_projection_token_losses step {} requires two inputs",
-                            step.output
-                        )));
-                    }
+            }
+            BackendExtensionOp::ParameterGolfProjectionTokenLosses { .. } => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda parameter_golf_projection_token_losses step {} requires two inputs",
+                        step.output
+                    )));
                 }
-                BackendExtensionOp::ParameterGolfProjectionLossBackward { .. } => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 3 {
-                        return Err(RuntimeError::Backend(format!(
+            }
+            BackendExtensionOp::ParameterGolfProjectionLossBackward { .. } => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 3 {
+                    return Err(RuntimeError::Backend(format!(
                             "cuda parameter_golf_projection_loss_backward step {} requires three inputs",
                             step.output
                         )));
-                    }
-                }
-                BackendExtensionOp::RmsNorm { .. } => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 2 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda rms_norm step {} requires two inputs",
-                            step.output
-                        )));
-                    }
-                }
-                BackendExtensionOp::RmsNormInputBackward { .. } => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 3 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda rms_norm_input_backward step {} requires three inputs",
-                            step.output
-                        )));
-                    }
-                }
-                BackendExtensionOp::RmsNormWeightBackward { .. } => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 2 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda rms_norm_weight_backward step {} requires two inputs",
-                            step.output
-                        )));
-                    }
-                }
-                BackendExtensionOp::RotaryEmbedding { interleaved } => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 3 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda rotary_embedding step {} requires three inputs",
-                            step.output
-                        )));
-                    }
-                    if *interleaved {
-                        return Err(RuntimeError::UnsupportedStep(String::from(
-                            "rotary_embedding_interleaved",
-                        )));
-                    }
-                }
-                BackendExtensionOp::RotaryEmbeddingBackward { interleaved } => {
-                    ensure_supported_f32_spec(&step.spec)?;
-                    if step.inputs.len() != 3 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda rotary_embedding_backward step {} requires three inputs",
-                            step.output
-                        )));
-                    }
-                    if *interleaved {
-                        return Err(RuntimeError::UnsupportedStep(String::from(
-                            "rotary_embedding_backward_interleaved",
-                        )));
-                    }
-                }
-                BackendExtensionOp::ScaledDotProductAttention { causal, .. } => {
-                    ensure_supported_float_spec(&step.spec)?;
-                    if step.inputs.len() != 3 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda scaled_dot_product_attention step {} requires three inputs",
-                            step.output
-                        )));
-                    }
-                    if !causal {
-                        return Err(RuntimeError::UnsupportedStep(String::from(
-                            "scaled_dot_product_attention_non_causal",
-                        )));
-                    }
-                }
-                BackendExtensionOp::ScaledDotProductAttentionQueryBackward { causal, .. }
-                | BackendExtensionOp::ScaledDotProductAttentionKeyBackward { causal, .. }
-                | BackendExtensionOp::ScaledDotProductAttentionValueBackward { causal, .. } => {
-                    ensure_supported_float_spec(&step.spec)?;
-                    if step.inputs.len() != 4 {
-                        return Err(RuntimeError::Backend(format!(
-                            "cuda {} step {} requires four inputs",
-                            op.label(),
-                            step.output
-                        )));
-                    }
-                    if !causal {
-                        return Err(RuntimeError::UnsupportedStep(format!(
-                            "{}_non_causal",
-                            op.label()
-                        )));
-                    }
-                }
-                _ => {
-                    return Err(RuntimeError::UnsupportedStep(step.op.label().to_string()));
                 }
             }
-        }
+            BackendExtensionOp::RmsNorm { .. } => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda rms_norm step {} requires two inputs",
+                        step.output
+                    )));
+                }
+            }
+            BackendExtensionOp::RmsNormInputBackward { .. } => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 3 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda rms_norm_input_backward step {} requires three inputs",
+                        step.output
+                    )));
+                }
+            }
+            BackendExtensionOp::RmsNormWeightBackward { .. } => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 2 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda rms_norm_weight_backward step {} requires two inputs",
+                        step.output
+                    )));
+                }
+            }
+            BackendExtensionOp::RotaryEmbedding { interleaved } => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 3 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda rotary_embedding step {} requires three inputs",
+                        step.output
+                    )));
+                }
+                if *interleaved {
+                    return Err(RuntimeError::UnsupportedStep(String::from(
+                        "rotary_embedding_interleaved",
+                    )));
+                }
+            }
+            BackendExtensionOp::RotaryEmbeddingBackward { interleaved } => {
+                ensure_supported_f32_spec(&step.spec)?;
+                if step.inputs.len() != 3 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda rotary_embedding_backward step {} requires three inputs",
+                        step.output
+                    )));
+                }
+                if *interleaved {
+                    return Err(RuntimeError::UnsupportedStep(String::from(
+                        "rotary_embedding_backward_interleaved",
+                    )));
+                }
+            }
+            BackendExtensionOp::ScaledDotProductAttention { causal, .. } => {
+                ensure_supported_float_spec(&step.spec)?;
+                if step.inputs.len() != 3 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda scaled_dot_product_attention step {} requires three inputs",
+                        step.output
+                    )));
+                }
+                if !causal {
+                    return Err(RuntimeError::UnsupportedStep(String::from(
+                        "scaled_dot_product_attention_non_causal",
+                    )));
+                }
+            }
+            BackendExtensionOp::ScaledDotProductAttentionQueryBackward { causal, .. }
+            | BackendExtensionOp::ScaledDotProductAttentionKeyBackward { causal, .. }
+            | BackendExtensionOp::ScaledDotProductAttentionValueBackward { causal, .. } => {
+                ensure_supported_float_spec(&step.spec)?;
+                if step.inputs.len() != 4 {
+                    return Err(RuntimeError::Backend(format!(
+                        "cuda {} step {} requires four inputs",
+                        op.label(),
+                        step.output
+                    )));
+                }
+                if !causal {
+                    return Err(RuntimeError::UnsupportedStep(format!(
+                        "{}_non_causal",
+                        op.label()
+                    )));
+                }
+            }
+            _ => {
+                return Err(RuntimeError::UnsupportedStep(step.op.label().to_string()));
+            }
+        },
     }
     Ok(())
 }
@@ -6799,16 +6923,14 @@ fn supports_cuda_scaled_dot_product_attention_backward_device_path(
     let key = step_input(step, values, 1)?;
     let value = step_input(step, values, 2)?;
     let grad_output = step_input(step, values, 3)?;
-    Ok(
-        (query.spec().dtype() == DType::F32
-            && key.spec().dtype() == DType::F32
-            && value.spec().dtype() == DType::F32
-            && grad_output.spec().dtype() == DType::F32)
-            || (query.spec().dtype() == DType::BF16
-                && key.spec().dtype() == DType::BF16
-                && value.spec().dtype() == DType::BF16
-                && grad_output.spec().dtype() == DType::BF16),
-    )
+    Ok((query.spec().dtype() == DType::F32
+        && key.spec().dtype() == DType::F32
+        && value.spec().dtype() == DType::F32
+        && grad_output.spec().dtype() == DType::F32)
+        || (query.spec().dtype() == DType::BF16
+            && key.spec().dtype() == DType::BF16
+            && value.spec().dtype() == DType::BF16
+            && grad_output.spec().dtype() == DType::BF16))
 }
 
 fn supports_cuda_rank2_transpose(input_shape: &[usize], axes: &[usize]) -> bool {
@@ -7151,7 +7273,7 @@ fn parse_memory_bytes(value: &str) -> Option<u64> {
 #[cfg(target_os = "linux")]
 mod platform {
     use std::{
-        ffi::{c_char, c_int, c_void, CStr},
+        ffi::{c_char, c_int, c_longlong, c_void, CStr},
         sync::Arc,
     };
 
@@ -7173,6 +7295,7 @@ mod platform {
     const CUDA_MEMCPY_DEVICE_TO_HOST: c_int = 2;
     const CUDA_MEMCPY_DEVICE_TO_DEVICE: c_int = 3;
     const CUBLAS_OP_N: c_int = 0;
+    const CUBLAS_OP_T: c_int = 1;
     const CUDA_R_32F: c_int = 0;
     const CUDA_R_16F: c_int = 2;
     const CUDA_R_16BF: c_int = 14;
@@ -7256,6 +7379,56 @@ mod platform {
         c_int,
         c_int,
     ) -> CublasStatus;
+    type CublasGemmStridedBatchedEx = unsafe extern "C" fn(
+        CublasHandle,
+        c_int,
+        c_int,
+        c_int,
+        c_int,
+        c_int,
+        *const c_void,
+        *const c_void,
+        c_int,
+        c_int,
+        c_longlong,
+        *const c_void,
+        c_int,
+        c_int,
+        c_longlong,
+        *const c_void,
+        *mut c_void,
+        c_int,
+        c_int,
+        c_longlong,
+        c_int,
+        c_int,
+        c_int,
+    ) -> CublasStatus;
+
+    fn cublas_row_major_op(transpose: bool) -> c_int {
+        if transpose {
+            CUBLAS_OP_T
+        } else {
+            CUBLAS_OP_N
+        }
+    }
+
+    fn checked_cublas_stride(
+        rows: usize,
+        cols: usize,
+        label: &str,
+    ) -> Result<c_longlong, RuntimeError> {
+        let elements = rows.checked_mul(cols).ok_or_else(|| {
+            RuntimeError::Backend(format!(
+                "cuda {label} strided batched matmul element count overflow"
+            ))
+        })?;
+        c_longlong::try_from(elements).map_err(|_| {
+            RuntimeError::Backend(format!(
+                "cuda {label} strided batched matmul stride exceeds cublas limits"
+            ))
+        })
+    }
 
     type QuantizedMatvecKernel = unsafe extern "C" fn(
         *const c_void,
@@ -8110,6 +8283,7 @@ mod platform {
         cublas_sgemm: CublasSgemm,
         cublas_sgeam: CublasSgeam,
         cublas_gemm_ex: CublasGemmEx,
+        cublas_gemm_strided_batched_ex: CublasGemmStridedBatchedEx,
     }
 
     impl ConfiguredBackend {
@@ -8320,6 +8494,22 @@ mod platform {
     }
 
     impl PlatformSubmission {
+        pub(super) fn allocate(&self, byte_len: usize) -> Result<PlatformBuffer, RuntimeError> {
+            self.runtime.set_device()?;
+            let mut device_ptr = std::ptr::null_mut();
+            let allocation_len = byte_len.max(1);
+            self.runtime.check(
+                unsafe { (self.runtime.cuda_malloc)(&mut device_ptr, allocation_len) },
+                "cudaMalloc",
+            )?;
+            Ok(PlatformBuffer {
+                inner: Arc::new(PlatformBufferInner {
+                    runtime: Arc::clone(&self.runtime),
+                    device_ptr,
+                }),
+            })
+        }
+
         pub(super) fn fill_buffer(
             &mut self,
             buffer: &PlatformBuffer,
@@ -8739,6 +8929,81 @@ mod platform {
                     )
                 },
                 "cublasGemmEx",
+            )
+        }
+
+        pub(super) fn encode_matmul_bf16_strided_batched_to_f32(
+            &mut self,
+            left: &PlatformBuffer,
+            right: &PlatformBuffer,
+            output: &PlatformBuffer,
+            rows: usize,
+            inner: usize,
+            cols: usize,
+            batch_count: usize,
+            transpose_left: bool,
+            transpose_right: bool,
+        ) -> Result<(), RuntimeError> {
+            if rows == 0 || inner == 0 || cols == 0 || batch_count == 0 {
+                return Ok(());
+            }
+            let m = c_int::try_from(cols).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda bf16 strided batched matmul column count exceeds cublas limits",
+                ))
+            })?;
+            let n = c_int::try_from(rows).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda bf16 strided batched matmul row count exceeds cublas limits",
+                ))
+            })?;
+            let k = c_int::try_from(inner).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda bf16 strided batched matmul inner dimension exceeds cublas limits",
+                ))
+            })?;
+            let batch_count = c_int::try_from(batch_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda bf16 strided batched matmul batch count exceeds cublas limits",
+                ))
+            })?;
+            let lda = if transpose_right { k } else { m };
+            let ldb = if transpose_left { n } else { k };
+            let stride_a = checked_cublas_stride(inner, cols, "bf16 rhs")?;
+            let stride_b = checked_cublas_stride(rows, inner, "bf16 lhs")?;
+            let stride_c = checked_cublas_stride(rows, cols, "bf16 output")?;
+            let alpha = 1.0_f32;
+            let beta = 0.0_f32;
+            self.runtime.bind_stream(self.stream)?;
+            self.runtime.check_cublas(
+                unsafe {
+                    (self.runtime.cublas_gemm_strided_batched_ex)(
+                        self.runtime.cublas_handle,
+                        cublas_row_major_op(transpose_right),
+                        cublas_row_major_op(transpose_left),
+                        m,
+                        n,
+                        k,
+                        (&alpha as *const f32).cast(),
+                        right.inner.device_ptr,
+                        CUDA_R_16BF,
+                        lda,
+                        stride_a,
+                        left.inner.device_ptr,
+                        CUDA_R_16BF,
+                        ldb,
+                        stride_b,
+                        (&beta as *const f32).cast(),
+                        output.inner.device_ptr,
+                        CUDA_R_32F,
+                        m,
+                        stride_c,
+                        batch_count,
+                        CUBLAS_COMPUTE_32F,
+                        CUBLAS_GEMM_DEFAULT_TENSOR_OP,
+                    )
+                },
+                "cublasGemmStridedBatchedEx",
             )
         }
 
@@ -11967,6 +12232,9 @@ mod platform {
                 cublas_sgemm: unsafe { load_symbol(&cublas_library, b"cublasSgemm_v2\0")? },
                 cublas_sgeam: unsafe { load_symbol(&cublas_library, b"cublasSgeam\0")? },
                 cublas_gemm_ex: unsafe { load_symbol(&cublas_library, b"cublasGemmEx\0")? },
+                cublas_gemm_strided_batched_ex: unsafe {
+                    load_symbol(&cublas_library, b"cublasGemmStridedBatchedEx\0")?
+                },
                 _cudart_library: cudart_library,
                 _cublas_library: cublas_library,
             };
@@ -12332,6 +12600,23 @@ mod platform {
             _rows: usize,
             _inner: usize,
             _cols: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda runtime substrate currently requires Linux libcudart",
+            )))
+        }
+
+        pub(super) fn encode_matmul_bf16_strided_batched_to_f32(
+            &mut self,
+            _left: &PlatformBuffer,
+            _right: &PlatformBuffer,
+            _output: &PlatformBuffer,
+            _rows: usize,
+            _inner: usize,
+            _cols: usize,
+            _batch_count: usize,
+            _transpose_left: bool,
+            _transpose_right: bool,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "cuda runtime substrate currently requires Linux libcudart",
@@ -14861,11 +15146,15 @@ mod tests {
                 .spec()
                 .clone();
             let buffer = match value {
-                TensorData::F32(values) => backend.input_buffer(spec.shape().clone(), values.clone())?,
+                TensorData::F32(values) => {
+                    backend.input_buffer(spec.shape().clone(), values.clone())?
+                }
                 TensorData::BF16(values) => {
                     backend.input_bf16_buffer(spec.shape().clone(), values.clone())?
                 }
-                TensorData::I32(values) => backend.input_i32_buffer(spec.shape().clone(), values.clone())?,
+                TensorData::I32(values) => {
+                    backend.input_i32_buffer(spec.shape().clone(), values.clone())?
+                }
                 TensorData::QuantizedBlocks(_) => {
                     return Err("unexpected quantized backward binding value".into());
                 }
@@ -16061,6 +16350,67 @@ mod tests {
         assert_close(&left_bf16.read_bf16_to_f32()?, &[1.0, 2.0], 1e-5);
         assert_close(&right.read_bf16_to_f32()?, &[1.0, 2.0, 3.0, 4.0], 1e-5);
         assert_close(&output.read_f32()?, &[7.0, 10.0], 1e-5);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_executes_bf16_strided_batched_matmul_with_rhs_transpose_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let mut left = backend.bf16_buffer(12)?;
+        left.write_bf16_from_f32(&[
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0,
+        ])?;
+        let mut right = backend.bf16_buffer(12)?;
+        right.write_bf16_from_f32(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0])?;
+        let output = backend.f32_buffer(8)?;
+
+        let mut submission = backend.begin_submission()?;
+        submission
+            .matmul_bf16_strided_batched_to_f32(&left, &right, &output, 2, 3, 2, 2, false, true)?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.status, CudaCommandStatus::Completed);
+        assert_close(
+            &output.read_f32()?,
+            &[14.0, 32.0, 32.0, 77.0, 16.0, 8.0, 22.0, 11.0],
+            1e-5,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_executes_f32_bf16_strided_batched_matmul_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let left = backend.input_buffer(
+            Shape::new(vec![2, 2, 2]),
+            vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+        )?;
+        let mut right = backend.bf16_buffer(8)?;
+        right.write_bf16_from_f32(&[1.0, 0.0, 0.0, 1.0, 2.0, 1.0, 1.0, 2.0])?;
+        let output = backend.f32_buffer(8)?;
+
+        let mut submission = backend.begin_submission()?;
+        submission.matmul_f32_bf16_strided_batched_to_f32(
+            &left, &right, &output, 2, 2, 2, 2, false, false,
+        )?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.status, CudaCommandStatus::Completed);
+        assert_close(
+            &output.read_f32()?,
+            &[1.0, 2.0, 3.0, 4.0, 16.0, 17.0, 22.0, 23.0],
+            1e-5,
+        );
         Ok(())
     }
 

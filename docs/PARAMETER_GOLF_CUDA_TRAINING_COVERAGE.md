@@ -93,6 +93,21 @@ buffers:
 That retires the last family-level BF16 blocker from the canonical coverage
 report while keeping the mixed-precision boundary honest.
 
+The public CUDA dense surface now also owns the first transpose-aware
+strided-batched cuBLAS matmul lane needed by the score-path attention rewrite:
+
+- bounded row-major `bf16 x bf16 -> f32` strided-batched GEMM with explicit
+  transpose control on the row-major logical matrices
+- bounded row-major `f32 x bf16 -> f32` batched GEMM helper with the same
+  transpose contract, currently encoded as repeated `cublasGemmEx` launches on
+  one CUDA stream because the mixed-type strided-batched cuBLAS posture was
+  not admitted on this lane
+
+That does not retire the attention hot-path blocker by itself. It removes one
+runtime-surface gap for the `#562` forward replacement work so the next score
+lane can encode QK and AV batches without falling back to one-position-at-a-
+time kernels or one-GEMM-at-a-time host orchestration.
+
 `psionic-train` now also owns one bounded public CUDA Muon step over the same
 matrix-shaped parameter groups used by the baseline optimizer split:
 
