@@ -12,9 +12,9 @@
     "sequence_length": 4,
     "artifact_cap_bytes": 16000000,
     "baseline_submission_package_version": "2026.03.18.non_record_submission.v2",
-    "baseline_code_bytes": 4415250,
-    "baseline_entrypoint_artifact_digest": "c91b14bb8de85c3359377fb47d50fc684768dc358305fbfaa81e7288f4d92b7c",
-    "baseline_accounting_receipt_digest": "0463d3ed56b7aba39a92aa2c3608a71eb1696722292ffef592980dc2ebf8260c"
+    "baseline_code_bytes": 7188700,
+    "baseline_entrypoint_artifact_digest": "9f52fcca32581e8ab38493636cb6f5fa4046ff8ad56683961fc4f41385d1fcd3",
+    "baseline_accounting_receipt_digest": "c98b2390a3ca2eaf26933cadc8939e2139c16894d671f4db22ad8f7948ba933a"
   },
   "baseline_control": {
     "issue_ref": "PGOLF-402/#173",
@@ -31,9 +31,9 @@
     "metrics": {
       "val_loss": 8.598987817764282,
       "val_bpb": 9.924573665082512,
-      "bytes_code": 4415250,
+      "bytes_code": 7188700,
       "bytes_model_int8_zlib": 78958,
-      "bytes_total": 4494208,
+      "bytes_total": 7267658,
       "delta_val_bpb_vs_baseline": 0.0,
       "delta_model_bytes_vs_baseline": 0
     },
@@ -61,9 +61,9 @@
       "metrics": {
         "val_loss": 9.10285472869873,
         "val_bpb": 10.506114700021048,
-        "bytes_code": 4415250,
+        "bytes_code": 7188700,
         "bytes_model_int8_zlib": 78939,
-        "bytes_total": 4494189,
+        "bytes_total": 7267639,
         "delta_val_bpb_vs_baseline": 0.5815410349385353,
         "delta_model_bytes_vs_baseline": -19
       },
@@ -90,9 +90,9 @@
       "metrics": {
         "val_loss": 7.601267337799072,
         "val_bpb": 8.773048554171181,
-        "bytes_code": 4415250,
+        "bytes_code": 7188700,
         "bytes_model_int8_zlib": 82070,
-        "bytes_total": 4497320,
+        "bytes_total": 7270770,
         "delta_val_bpb_vs_baseline": -1.1515251109113311,
         "delta_model_bytes_vs_baseline": 3112
       },
@@ -121,5 +121,5 @@
       ]
     }
   ],
-  "report_digest": "87da22894b16f48c3e622093b1740f7c0ee8fd8e2e790612de66e6b80dfe0f02"
+  "report_digest": "ec466462b00c71033b2181451792bf2a9e309a7ed0a6dfa021fea1cbb146bc4c"
 }

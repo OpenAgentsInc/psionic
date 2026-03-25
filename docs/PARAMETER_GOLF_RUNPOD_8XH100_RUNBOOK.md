@@ -105,6 +105,11 @@ folder ships:
 - a Rust-owned distributed `8xH100` bring-up path inside the shipped runtime
   payload
 
+The committed Linux replay payload is now the stripped portable binary that was
+validated on the real RunPod `8xH100` Ubuntu image. The expected execution
+boundary on that pod is therefore the explicit distributed-trainer refusal from
+the shipped runtime, not an earlier libc or entrypoint mismatch.
+
 It still does not ship the real distributed `8xH100` trainer payload. The
 RunPod launcher therefore requests the reserved distributed mode explicitly so
 the execution phase writes a machine-readable bring-up report and then fails

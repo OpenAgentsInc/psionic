@@ -25,25 +25,25 @@
   "submission_manifest_wallclock_seconds": 25.779,
   "benchmark_training_wallclock_seconds": 25.779,
   "submission_manifest_bytes": {
-    "total_bytes": 4494208,
-    "code_bytes": 4415250,
+    "total_bytes": 7267658,
+    "code_bytes": 7188700,
     "model_bytes": 78958
   },
   "accounting_receipt_bytes": {
-    "total_bytes": 4494208,
-    "code_bytes": 4415250,
+    "total_bytes": 7267658,
+    "code_bytes": 7188700,
     "model_bytes": 78958
   },
   "actual_shipped_bytes": {
-    "total_bytes": 4494208,
-    "code_bytes": 4415250,
+    "total_bytes": 7267658,
+    "code_bytes": 7188700,
     "model_bytes": 78958
   },
   "accounting_component_verifications": [
     {
       "component_id": "entrypoint_code_bytes",
-      "declared_size_bytes": 2066,
-      "actual_size_bytes": 2066,
+      "declared_size_bytes": 2252,
+      "actual_size_bytes": 2252,
       "matches_actual_size": true,
       "detail": "the package ships one Python train_gpt.py launcher at the submission root that execs the shipped Psionic runtime payload"
     },
@@ -56,8 +56,8 @@
     },
     {
       "component_id": "shipped_runtime_code_bytes",
-      "declared_size_bytes": 4413184,
-      "actual_size_bytes": 4413184,
+      "declared_size_bytes": 7186448,
+      "actual_size_bytes": 7186448,
       "matches_actual_size": true,
       "detail": "the package ships two prebuilt Psionic runtime payloads: one lightweight local-reference replay binary for the default challenge-clone dry run, plus the real single-H100 trainer binary used by the exported-folder remote execution path"
     },
@@ -84,5 +84,5 @@
   "matches_benchmark_artifact_bytes": true,
   "verdict": "verified",
   "claim_boundary": "This verifier confirms only the current exported-folder replay path: offline entrypoint execution, final int8+zlib metrics, bounded wallclock facts, and counted-byte facts. It does not by itself turn the bounded non-record replay into a record-track claim.",
-  "report_digest": "7d207c7a3782f11ca2e6e4bf2311a5c80848b5f22553a7c1a27ccca82f1288ea"
+  "report_digest": "b2a0c9d9407eece716a96a3c5673455c344988b85caaa7642e7f5d5a8946c220"
 }

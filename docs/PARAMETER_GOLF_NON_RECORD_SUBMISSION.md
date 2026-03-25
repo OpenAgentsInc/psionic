@@ -118,6 +118,12 @@ The default shipped runtime payload then:
   receipt
 - writes `parameter_golf_submission_runtime_receipt.json` inside the folder
 
+The committed Linux replay payload is currently the stripped portable binary
+validated on the real RunPod `8xH100` Ubuntu image. This keeps the exported
+folder on one known-correct glibc baseline while the release-profile replay
+artifact is still being investigated separately from the distributed-trainer
+closure work.
+
 The same exported folder now also ships:
 
 - one machine-readable real-execution contract

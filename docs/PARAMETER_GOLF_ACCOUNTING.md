@@ -108,6 +108,10 @@ shipped payload:
 - counted runtime code is the root `train_gpt.py` launcher plus the shipped
   binaries `runtime/parameter_golf_submission_runtime` and
   `runtime/parameter_golf_single_h100_train`
+- the committed replay-runtime bytes are tied to the exact portable Linux
+  binary shipped in `fixtures/parameter_golf/runtime/`; refreshing that binary
+  changes the counted-runtime surface and requires refreshing the canonical
+  PGOLF reports that bind its digest and byte size
 - counted wrapper bytes are `0`
 - required build-dependency bytes are `0` because the folder ships prebuilt
   binaries and no in-folder Cargo tree

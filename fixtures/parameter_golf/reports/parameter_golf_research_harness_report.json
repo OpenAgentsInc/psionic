@@ -19,9 +19,9 @@
       "required_build_dependency_bytes"
     ],
     "baseline_submission_package_version": "2026.03.18.non_record_submission.v2",
-    "baseline_entrypoint_artifact_digest": "c91b14bb8de85c3359377fb47d50fc684768dc358305fbfaa81e7288f4d92b7c",
+    "baseline_entrypoint_artifact_digest": "9f52fcca32581e8ab38493636cb6f5fa4046ff8ad56683961fc4f41385d1fcd3",
     "baseline_model_artifact_digest": "efe272503950104f1557f5c73cad69ce717e60d9b75f05e48d17ffbeb6940af1",
-    "baseline_accounting_receipt_digest": "0463d3ed56b7aba39a92aa2c3608a71eb1696722292ffef592980dc2ebf8260c"
+    "baseline_accounting_receipt_digest": "c98b2390a3ca2eaf26933cadc8939e2139c16894d671f4db22ad8f7948ba933a"
   },
   "variants": [
     {
@@ -52,8 +52,8 @@
       "measured_metrics": {
         "val_loss": 8.598987817764282,
         "val_bpb": 9.924573665082512,
-        "bytes_total": 4494208,
-        "bytes_code": 4415250,
+        "bytes_total": 7267658,
+        "bytes_code": 7188700,
         "bytes_model_int8_zlib": 78958,
         "logical_training_ms": 100
       }
@@ -137,5 +137,5 @@
       "boundary_note": "Compression or quantization changes only belong in this harness when they still report the same counted components and final roundtrip metric as the baseline lane."
     }
   ],
-  "report_digest": "807c5abdbb020bdd9fe53569ab9fc4059d520de17a298d1f503445e0175ab5b0"
+  "report_digest": "a6979f86b9d7fec14be924b39ebdc1a5232e79f85670f33ddbaf2a052d623b6e"
 }

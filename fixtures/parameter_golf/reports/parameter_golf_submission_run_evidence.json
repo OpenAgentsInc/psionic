@@ -66,18 +66,18 @@
   },
   "entrypoint": {
     "relative_path": "train_gpt.py",
-    "size_bytes": 2066,
-    "sha256_digest": "44f151617a77e464691d684fed014ee7170625cfbb908317573bf5d4a98271d1"
+    "size_bytes": 2252,
+    "sha256_digest": "9acf359de2ddb12001a99e03121e0e9166043e5db2a4937d3bd19771a18e1b3a"
   },
   "runtime_payload": {
     "relative_path": "runtime/parameter_golf_submission_runtime",
-    "size_bytes": 877328,
-    "sha256_digest": "555cfb1605d8512c4c075e00462702bc2434adf5d480a7ce6e2c598299203287"
+    "size_bytes": 3650592,
+    "sha256_digest": "925973482624f88a72c0d2ff11ab06780be4907da82c59642b52745d84cfe9fd"
   },
   "runtime_manifest": {
     "relative_path": "runtime/parameter_golf_submission_runtime.json",
-    "size_bytes": 2729,
-    "sha256_digest": "8e5e6ea1166ee598ba3a0bca8da0e99400004472c0afc20c2fd4be01f34380f6"
+    "size_bytes": 2864,
+    "sha256_digest": "1b1333b53b101abbbd499e5048741d2feb43bd1bd5e59831d22e45e92cac46bb"
   },
   "train_log": {
     "relative_path": "train.log",
@@ -92,7 +92,7 @@
   "accounting_receipt": {
     "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_submission_accounting.json",
     "size_bytes": 2125,
-    "sha256_digest": "8ee45093b9f0bbce9605b030187705366fd68f3ffb9f24163a63706de6b08423"
+    "sha256_digest": "3f457dfb919abf49da24c10ede23c3392cb3b610aafee9d5b0e40166198f8c25"
   },
   "benchmark_receipt": {
     "relative_path": "parameter-golf-local-reference-run/benchmark/parameter_golf_challenge_benchmark_receipt.json",
@@ -382,5 +382,5 @@
     "receipt_digest": "5e019c3a263a0e3adf0f09d1050c59dfbf4e0ad7c8270af7e664aad7faded21b"
   },
   "claim_boundary": "This report binds the exact exported submission folder to one real folder-local entrypoint replay, the preserved bounded wallclock/memory/artifact receipts, and one measured-or-refused 8xH100 challenge receipt. The committed evidence is still a local review-host refusal rather than true 8xH100 success.",
-  "report_digest": "f65656fd3747ab65da841b42cfc9aa7433416ee6680b99f000b3ca4ab622f23f"
+  "report_digest": "be4dd4ebc14971bf6428654b3efec9c8e40e4face131c689e3cf2d08fa8b3cad"
 }

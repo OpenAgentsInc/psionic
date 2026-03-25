@@ -43,7 +43,7 @@
       "role": "readme",
       "must_live_at_folder_root": true,
       "must_be_regular_file": true,
-      "current_psionic_size_bytes": 4537,
+      "current_psionic_size_bytes": 4853,
       "detail": "human-readable folder overview required by the public README"
     },
     {
@@ -67,7 +67,7 @@
       "role": "entrypoint",
       "must_live_at_folder_root": true,
       "must_be_regular_file": true,
-      "current_psionic_size_bytes": 2066,
+      "current_psionic_size_bytes": 2252,
       "detail": "top-level entrypoint required by the public README and used by the compatibility verifier dry-run"
     }
   ],
@@ -91,5 +91,5 @@
   "verifier_runner": "scripts/check-parameter-golf-record-folder-compatibility.sh",
   "verifier_example_command": "scripts/check-parameter-golf-record-folder-compatibility.sh --parameter-golf-root ~/code/parameter-golf --submission-dir /tmp/records/track_non_record_16mb/<submission_id>",
   "claim_boundary": "This report closes challenge-repo folder compatibility only. It confirms that the current non-record folder carries a real folder-local train_gpt.py launcher plus shipped Psionic runtime payloads, but it does not by itself promote the bounded local-reference replay path into a record-track runtime claim or prove reproducible 8xH100 record-track execution from the exported folder.",
-  "report_digest": "9fc8e2458fdacd19cb95274f21bba18813c8d6f5eddae473f8f464f935561cbc"
+  "report_digest": "0418b65be7515edfd73768a9349cf02b7acd6586f80725627b8fc58bf476e149"
 }

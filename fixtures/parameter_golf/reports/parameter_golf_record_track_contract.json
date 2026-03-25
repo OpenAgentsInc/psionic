@@ -7,16 +7,16 @@
   "benchmark_ref": "benchmark://openagents/psionic/parameter_golf/distributed_8xh100",
   "disposition": "blocked",
   "acceptance_report_digest": "29ad99bfa7b151e0c9694941c4b78ba72765838eef6326deb8e20de5dade992b",
-  "research_harness_report_digest": "807c5abdbb020bdd9fe53569ab9fc4059d520de17a298d1f503445e0175ab5b0",
+  "research_harness_report_digest": "a6979f86b9d7fec14be924b39ebdc1a5232e79f85670f33ddbaf2a052d623b6e",
   "baseline_submission_package_version": "2026.03.18.non_record_submission.v2",
-  "baseline_entrypoint_artifact_digest": "c91b14bb8de85c3359377fb47d50fc684768dc358305fbfaa81e7288f4d92b7c",
+  "baseline_entrypoint_artifact_digest": "9f52fcca32581e8ab38493636cb6f5fa4046ff8ad56683961fc4f41385d1fcd3",
   "baseline_model_artifact_digest": "efe272503950104f1557f5c73cad69ce717e60d9b75f05e48d17ffbeb6940af1",
-  "baseline_accounting_receipt_digest": "0463d3ed56b7aba39a92aa2c3608a71eb1696722292ffef592980dc2ebf8260c",
-  "baseline_submission_run_evidence_report_digest": "f65656fd3747ab65da841b42cfc9aa7433416ee6680b99f000b3ca4ab622f23f",
-  "baseline_export_surface_contract_report_digest": "5366f2aa092f2d0079adb54bce1c0dea366ca4fc4f4a4fabf92154c0f07f46eb",
-  "baseline_record_folder_replay_verification_report_digest": "7d207c7a3782f11ca2e6e4bf2311a5c80848b5f22553a7c1a27ccca82f1288ea",
-  "baseline_final_pr_bundle_report_digest": "1c4ad7c7f4626d7b21b0249740489dbcd41c175832008a802870c27669bd124e",
-  "baseline_local_clone_dry_run_report_digest": "94810fb1ff0787dba24df5b52237cb7b6160e3ba987fc89403dea6c33538832e",
+  "baseline_accounting_receipt_digest": "c98b2390a3ca2eaf26933cadc8939e2139c16894d671f4db22ad8f7948ba933a",
+  "baseline_submission_run_evidence_report_digest": "be4dd4ebc14971bf6428654b3efec9c8e40e4face131c689e3cf2d08fa8b3cad",
+  "baseline_export_surface_contract_report_digest": "cd96111f1e10b905df18d4849b352d9be64f51677a651fba87ce547dbceeb6ac",
+  "baseline_record_folder_replay_verification_report_digest": "b2a0c9d9407eece716a96a3c5673455c344988b85caaa7642e7f5d5a8946c220",
+  "baseline_final_pr_bundle_report_digest": "c7f7dd635a738f762b3df83b8d2d0be43db2e8e58f6a3f0790d02ffcc573f322",
+  "baseline_local_clone_dry_run_report_digest": "6c35167172683b7cd0aab4c91e602fca07f0f6d513684341dc2a061dc16894f6",
   "required_counted_component_ids": [
     "entrypoint_code_bytes",
     "compressed_model_bytes",
@@ -54,7 +54,7 @@
     {
       "surface_id": "record_runtime_entrypoint",
       "status": "satisfied",
-      "detail": "The current shipped train_gpt.py surface is a real non-record submission launcher keyed by entrypoint digest `c91b14bb8de85c3359377fb47d50fc684768dc358305fbfaa81e7288f4d92b7c`; it execs a shipped Psionic runtime payload, replays the bounded local-reference validation path, and writes a runtime receipt inside the exported folder.",
+      "detail": "The current shipped train_gpt.py surface is a real non-record submission launcher keyed by entrypoint digest `9f52fcca32581e8ab38493636cb6f5fa4046ff8ad56683961fc4f41385d1fcd3`; it execs a shipped Psionic runtime payload, replays the bounded local-reference validation path, and writes a runtime receipt inside the exported folder.",
       "evidence_refs": [
         "docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md",
         "docs/PARAMETER_GOLF_RECORD_FOLDER_COMPATIBILITY.md"
@@ -127,5 +127,5 @@
     }
   ],
   "claim_boundary": "record-track contract is now explicit, the shipped runtime-byte contract is defended, and the current lane remains blocked on reproducible 8xH100 challenge-speed execution",
-  "report_digest": "f154990f08102fd7937b079c454783691cbda2cf9c212d7802fc1ddabeaeb56d"
+  "report_digest": "89fb14d948b8d4fc05b06c173707e37e29914e2ab5ea8292643fac35810c7f4c"
 }
