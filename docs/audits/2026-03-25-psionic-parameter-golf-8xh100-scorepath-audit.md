@@ -288,24 +288,36 @@ Existing relevant issues:
 - `#552`: Parallel Muon collectives
 - `#556`: `LeakyReLU(0.5)^2` MLP activation support
 - `#557`: `BigramHash`-style context features
+- `#558`: real banked PGOLF execution instead of banked storage plus split-matrix execution
+- `#559`: public XSA, Partial-RoPE, LN-scale, and VE architecture pack
+- `#560`: EMA and SWA weight averaging
+- `#561`: competitive final-artifact quantization and compression path
 
-The open issue stack is now explicit about four additional competitive-path gaps that were not tracked when this audit was first written:
+The open issue stack is now explicit about eight additional competitive-path gaps that were not tracked when this audit was first written:
 
 - Parameter Banking in the model surface
 - Parallel Muon collectives in the distributed optimizer path
 - `LeakyReLU(0.5)^2` in the PGOLF MLP activation surface
 - `BigramHash`-style local context features
+- banked PGOLF execution instead of slicing rank-3 banks back into the old split-matrix path
+- the public PR `#414` architecture pack: XSA, Partial-RoPE, LN-scale, and VE
+- EMA and SWA weight averaging on the score lane
+- competitive final-artifact quantization and compression beyond the current naive roundtrip path
 
-Since the initial audit pass, Psionic has landed the code-local halves of two of
+Since the initial audit pass, Psionic has landed the code-local halves of four of
 those gaps:
 
 - `LeakyReLU(0.5)^2` now exists across the reference-model, graph, IR, CPU, and
   CUDA lanes
 - `BigramHash` now exists in the PGOLF config, parameter accounting, reference
   model, optimizer classification, and baseline graph input path
+- Parameter Banking now exists as a typed model surface, runtime artifact
+  surface, and bank-aware optimizer grouping
+- legal score-first TTT now exists in the distributed exported-folder runtime
 
-Those two issues remain open because the retained `H100` or `8xH100`
-score-path receipts do not exist yet.
+Those four issues remain open because the retained `H100` or `8xH100`
+score-path receipts either do not exist yet or do not yet prove the stronger
+public posture on hardware.
 
 ## Bottom Line
 
