@@ -652,6 +652,58 @@ fn step_scope_dir(step_scope_root_dir: &Path, step_index: u64) -> PathBuf {
     step_scope_root_dir.join(format!("step_{step_index:05}"))
 }
 
+fn remove_path_recursively(
+    path: &Path,
+) -> Result<(), ParameterGolfDistributed8xH100TrainStepError> {
+    if !path.exists() {
+        return Ok(());
+    }
+    if path.is_dir() {
+        fs::remove_dir_all(path).map_err(
+            |error| ParameterGolfDistributed8xH100TrainStepError::Write {
+                path: path.display().to_string(),
+                error,
+            },
+        )?;
+    } else {
+        fs::remove_file(path).map_err(
+            |error| ParameterGolfDistributed8xH100TrainStepError::Write {
+                path: path.display().to_string(),
+                error,
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn prune_step_scope_for_next_step(
+    step_dir: &Path,
+) -> Result<(), ParameterGolfDistributed8xH100TrainStepError> {
+    if !step_dir.is_dir() {
+        return Ok(());
+    }
+    let retained_model_path = step_dir.join("current_model.safetensors");
+    for entry in fs::read_dir(step_dir).map_err(
+        |error| ParameterGolfDistributed8xH100TrainStepError::Read {
+            path: step_dir.display().to_string(),
+            error,
+        },
+    )? {
+        let entry = entry.map_err(
+            |error| ParameterGolfDistributed8xH100TrainStepError::Read {
+                path: step_dir.display().to_string(),
+                error,
+            },
+        )?;
+        let path = entry.path();
+        if path == retained_model_path {
+            continue;
+        }
+        remove_path_recursively(&path)?;
+    }
+    Ok(())
+}
+
 fn emit_distributed_progress_line(message: impl AsRef<str>) {
     println!("{}", message.as_ref());
 }
@@ -1063,12 +1115,25 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
     let mut observed_training_time_ms = 0_u64;
     let mut stop_reason = None;
     let mut step_observations = Vec::new();
-    let mut current_model_artifact_input_path = None;
+    let mut current_model_artifact_input_path: Option<PathBuf> = None;
+    let mut pruned_input_step_dir_pending_delete = None;
     let mut final_step_execution = None;
     loop {
         if executed_step_count >= hyperparameters.iterations {
             stop_reason = Some(String::from("iteration_cap_reached"));
             break;
+        }
+        if let Some(input_model_artifact_path) = current_model_artifact_input_path.as_ref() {
+            let input_step_dir = input_model_artifact_path.parent().ok_or_else(|| {
+                ParameterGolfDistributed8xH100TrainStepError::Aggregate {
+                    message: format!(
+                        "distributed train loop could not resolve the parent step scope for `{}`",
+                        input_model_artifact_path.display()
+                    ),
+                }
+            })?;
+            prune_step_scope_for_next_step(input_step_dir)?;
+            pruned_input_step_dir_pending_delete = Some(input_step_dir.to_path_buf());
         }
         let step_execution = execute_parameter_golf_distributed_8xh100_step(
             root,
@@ -1089,6 +1154,9 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
             observed_training_time_ms,
             current_model_artifact_input_path.as_deref(),
         )?;
+        if let Some(previous_step_dir) = pruned_input_step_dir_pending_delete.take() {
+            remove_path_recursively(&previous_step_dir)?;
+        }
         executed_step_count = step_execution.step_observation.global_step;
         observed_training_time_ms =
             observed_training_time_ms.saturating_add(step_execution.observed_step_ms);
@@ -2146,7 +2214,8 @@ mod tests {
     use std::{collections::BTreeMap, env};
 
     use super::{
-        distributed_validation_batch_sequences, load_gradient_artifact, write_gradient_artifact,
+        distributed_validation_batch_sequences, load_gradient_artifact,
+        prune_step_scope_for_next_step, write_gradient_artifact,
         SCOREBOARD_SLIDING_WINDOW_BATCH_SEQUENCES, VALIDATION_BATCH_SEQUENCES_ENV_VAR,
     };
     use crate::{ParameterGolfBatchGeometry, ParameterGolfValidationEvalMode};
@@ -2214,5 +2283,32 @@ mod tests {
         unsafe {
             env::remove_var(VALIDATION_BATCH_SEQUENCES_ENV_VAR);
         }
+    }
+
+    #[test]
+    fn distributed_step_scope_prune_keeps_only_current_model() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let temp_dir = tempfile::tempdir()?;
+        let step_dir = temp_dir.path().join("step_00001");
+        std::fs::create_dir_all(step_dir.join("runtime_train_step_gradients"))?;
+        std::fs::create_dir_all(step_dir.join("runtime_train_step_logs"))?;
+        std::fs::write(step_dir.join("aggregated_gradients.safetensors"), b"gradients")?;
+        std::fs::write(step_dir.join("current_model.safetensors"), b"model")?;
+        std::fs::write(
+            step_dir.join("runtime_train_step_gradients").join("rank_0.safetensors"),
+            b"rank-gradients",
+        )?;
+        std::fs::write(
+            step_dir.join("runtime_train_step_logs").join("rank_0.log"),
+            b"log",
+        )?;
+
+        prune_step_scope_for_next_step(&step_dir)?;
+
+        let retained = std::fs::read_dir(&step_dir)?
+            .map(|entry| entry.map(|entry| entry.file_name().to_string_lossy().into_owned()))
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(retained, vec![String::from("current_model.safetensors")]);
+        Ok(())
     }
 }
