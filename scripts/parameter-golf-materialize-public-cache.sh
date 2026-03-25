@@ -126,10 +126,20 @@ if [[ -n "${matched_fineweb_remote_root_prefix}" ]]; then
   export MATCHED_FINEWEB_REMOTE_ROOT_PREFIX="${matched_fineweb_remote_root_prefix}"
 fi
 
-(
-  cd "${target_root}"
-  python data/cached_challenge_fineweb.py --variant "${variant}" --train-shards "${train_shards}"
-)
+bootstrap_entrypoint="${target_root}/data/cached_challenge_fineweb.py"
+if [[ -f "${bootstrap_entrypoint}" ]]; then
+  (
+    cd "${target_root}"
+    python data/cached_challenge_fineweb.py --variant "${variant}" --train-shards "${train_shards}"
+  )
+elif [[ "${workspace_checkout_posture}" == "existing_non_git_target" ]] \
+  && [[ -d "${dataset_root}" ]] \
+  && [[ -f "${tokenizer_path}" ]]; then
+  workspace_checkout_posture="existing_non_git_cache_only_target"
+else
+  echo "error: expected bootstrap entrypoint ${bootstrap_entrypoint} or an already materialized cache target" >&2
+  exit 1
+fi
 
 if [[ ! -d "${dataset_root}" ]]; then
   echo "error: expected dataset root ${dataset_root} after cache materialization" >&2
