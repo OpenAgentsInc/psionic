@@ -87,6 +87,11 @@ Psionic now encodes that exact posture explicitly instead of treating
   int8+zlib artifact, so the exported-folder `distributed_8xh100_train` mode
   can finish with a real runtime outcome when the measured distributed
   validation surface exists
+- `psionic-models` now also ships the upstream-style banked PGOLF matrix
+  surface under `ParameterGolfBankedWeights`, with the exact public bank tensor
+  ids `qo_bank`, `kv_bank`, `mlp_up_bank`, and `mlp_down_bank`; the optimizer
+  planner now classifies those `3D` matrix banks as Muon-owned tensors instead
+  of forcing the runtime to stay on the fully split per-layer matrix surface
 - `psionic-eval` now exposes
   `ParameterGolfDistributedThroughputReceipt` plus the supporting topology,
   communication, timing, memory, threshold, and refusal types
@@ -168,6 +173,21 @@ This is still score-only sliding-window parity. The legal score-first TTT path
 now exists on the single-H100 CUDA trainer, but the distributed `8xH100`
 runtime does not yet claim chunk-local adaptation, adaptation-step receipts, or
 README-grade score-first TTT equivalence.
+
+## Current Matrix Banking Boundary
+
+Psionic now owns the same four-bank matrix vocabulary cited by the public top
+record:
+
+- `qo_bank`
+- `kv_bank`
+- `mlp_up_bank`
+- `mlp_down_bank`
+
+That banked surface is explicit and machine-legible, but it is not yet the
+default runtime hot path. Until later score-path issues land, most retained
+train receipts still come from the older split matrix surface and parent-side
+proof topology. Receipts and issue comments must keep that distinction explicit.
 
 ## Timing And Memory Receipts
 

@@ -1,7 +1,7 @@
 use half::bf16;
 use psionic_backend_cuda::{CudaBackend, CudaCommandStatus, CudaCommandWait};
 use psionic_core::{DType, Shape};
-use psionic_models::ParameterGolfModelDescriptor;
+use psionic_models::{ParameterGolfModelDescriptor, PARAMETER_GOLF_MATRIX_BANK_NAMES};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -297,6 +297,9 @@ pub fn parameter_golf_optimizer_plan(
         } else if name == "lm_head.weight" {
             head_names.push(String::from(name));
             head_parameter_count += parameter_count;
+        } else if is_matrix_bank_name(name) && tensor.shape.dims().len() == 3 {
+            matrix_names.push(String::from(name));
+            matrix_parameter_count += parameter_count;
         } else if name == "skip_weights"
             || (name.starts_with("blocks.")
                 && (tensor.shape.dims().len() < 2 || is_control_tensor_name(name)))
@@ -406,6 +409,9 @@ pub fn parameter_golf_graph_parameter_dtype(
     if tensor_name == "tok_emb.weight" || tensor_name == "lm_head.weight" {
         return Ok(DType::BF16);
     }
+    if is_matrix_bank_name(tensor_name) && shape.dims().len() == 3 {
+        return Ok(DType::BF16);
+    }
     if tensor_name == "skip_weights"
         || (tensor_name.starts_with("blocks.")
             && (shape.dims().len() < 2 || is_control_tensor_name(tensor_name)))
@@ -427,6 +433,10 @@ fn is_control_tensor_name(name: &str) -> bool {
     PARAMETER_GOLF_CONTROL_TENSOR_NAME_PATTERNS
         .iter()
         .any(|pattern| name.contains(pattern))
+}
+
+fn is_matrix_bank_name(name: &str) -> bool {
+    PARAMETER_GOLF_MATRIX_BANK_NAMES.contains(&name)
 }
 
 /// Exact Muon config used by the Parameter Golf lane.
@@ -1092,6 +1102,51 @@ mod tests {
                 .iter()
                 .map(psionic_models::WeightTensorMetadata::element_count)
                 .sum::<usize>()
+        );
+    }
+
+    #[test]
+    fn optimizer_plan_classifies_banked_matrix_surface_as_muon() {
+        let fixture = load_fixture();
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())
+            .expect("baseline model should build");
+        let banked = model
+            .banked_weights()
+            .expect("banked weights should materialize");
+        let descriptor = ParameterGolfModelDescriptor {
+            model: model.descriptor().model.clone(),
+            config: model.descriptor().config.clone(),
+            weights: banked.weight_bundle_metadata(&model.descriptor().config),
+        };
+        let plan = parameter_golf_optimizer_plan(&descriptor, &fixture.hyperparameters)
+            .expect("optimizer plan should build for the banked surface");
+        let matrix_group = plan
+            .groups
+            .iter()
+            .find(|group| group.kind == ParameterGolfOptimizerGroupKind::MatrixMuon)
+            .expect("matrix group should exist");
+        assert_eq!(
+            matrix_group.tensor_names,
+            vec![
+                String::from("kv_bank"),
+                String::from("mlp_down_bank"),
+                String::from("mlp_up_bank"),
+                String::from("qo_bank"),
+            ]
+        );
+    }
+
+    #[test]
+    fn graph_parameter_dtype_admits_banked_matrix_tensors() {
+        assert_eq!(
+            parameter_golf_graph_parameter_dtype("qo_bank", &Shape::new(vec![18, 512, 512]))
+                .expect("qo bank should classify"),
+            DType::BF16
+        );
+        assert_eq!(
+            parameter_golf_graph_parameter_dtype("kv_bank", &Shape::new(vec![18, 256, 512]))
+                .expect("kv bank should classify"),
+            DType::BF16
         );
     }
 

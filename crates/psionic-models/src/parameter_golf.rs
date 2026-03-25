@@ -39,6 +39,21 @@ pub const PARAMETER_GOLF_BASELINE_LOGIT_SOFTCAP: f32 = 30.0;
 pub const PARAMETER_GOLF_BASELINE_ROPE_BASE: f32 = 10_000.0;
 /// The current public baseline q-gain init.
 pub const PARAMETER_GOLF_BASELINE_QK_GAIN_INIT: f32 = 1.5;
+/// Stable Parameter Banking tensor id for the combined query/output bank.
+pub const PARAMETER_GOLF_QO_BANK_NAME: &str = "qo_bank";
+/// Stable Parameter Banking tensor id for the combined key/value bank.
+pub const PARAMETER_GOLF_KV_BANK_NAME: &str = "kv_bank";
+/// Stable Parameter Banking tensor id for the MLP up-projection bank.
+pub const PARAMETER_GOLF_MLP_UP_BANK_NAME: &str = "mlp_up_bank";
+/// Stable Parameter Banking tensor id for the MLP down-projection bank.
+pub const PARAMETER_GOLF_MLP_DOWN_BANK_NAME: &str = "mlp_down_bank";
+/// Ordered upstream-style matrix bank tensor ids used by the competitive score path.
+pub const PARAMETER_GOLF_MATRIX_BANK_NAMES: &[&str] = &[
+    PARAMETER_GOLF_KV_BANK_NAME,
+    PARAMETER_GOLF_MLP_DOWN_BANK_NAME,
+    PARAMETER_GOLF_MLP_UP_BANK_NAME,
+    PARAMETER_GOLF_QO_BANK_NAME,
+];
 /// The effective epsilon used when the public PyTorch path leaves RMSNorm epsilon unset.
 pub const PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON: f32 = f32::EPSILON;
 
@@ -650,6 +665,91 @@ impl ParameterGolfLinearWeights {
     }
 }
 
+/// One contiguous 3D matrix bank in `[bank_len, out_features, in_features]` order.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfLinearBankWeights {
+    /// Flat row-major bank values in `[bank_len, out_features, in_features]` order.
+    pub weight: Vec<f32>,
+    /// Number of bank slices.
+    pub bank_len: usize,
+    /// Number of output rows per bank slice.
+    pub out_features: usize,
+    /// Number of input columns per bank slice.
+    pub in_features: usize,
+}
+
+impl ParameterGolfLinearBankWeights {
+    fn from_linears(linears: &[&ParameterGolfLinearWeights]) -> Self {
+        let first = linears
+            .first()
+            .expect("parameter golf banks require at least one slice");
+        let mut weight = Vec::with_capacity(
+            linears.len() * first.out_features.saturating_mul(first.in_features),
+        );
+        for linear in linears {
+            weight.extend_from_slice(linear.weight.as_slice());
+        }
+        Self {
+            weight,
+            bank_len: linears.len(),
+            out_features: first.out_features,
+            in_features: first.in_features,
+        }
+    }
+
+    fn validate(
+        &self,
+        bank_name: &str,
+        expected_bank_len: usize,
+    ) -> Result<(), ParameterGolfModelError> {
+        if self.bank_len != expected_bank_len {
+            return Err(ParameterGolfModelError::BankLengthMismatch {
+                name: String::from(bank_name),
+                actual: self.bank_len,
+                expected: expected_bank_len,
+            });
+        }
+        let expected = self
+            .bank_len
+            .checked_mul(self.out_features)
+            .and_then(|value| value.checked_mul(self.in_features))
+            .ok_or_else(|| ParameterGolfModelError::InvalidVectorLength {
+                name: String::from(bank_name),
+                actual: self.weight.len(),
+                expected: usize::MAX,
+            })?;
+        if self.weight.len() != expected {
+            return Err(ParameterGolfModelError::InvalidVectorLength {
+                name: String::from(bank_name),
+                actual: self.weight.len(),
+                expected,
+            });
+        }
+        Ok(())
+    }
+
+    fn shape(&self) -> Shape {
+        Shape::new(vec![self.bank_len, self.out_features, self.in_features])
+    }
+
+    fn linear_at(
+        &self,
+        bank_name: &str,
+        expected_bank_len: usize,
+        index: usize,
+    ) -> Result<ParameterGolfLinearWeights, ParameterGolfModelError> {
+        self.validate(bank_name, expected_bank_len)?;
+        let stride = self.out_features.saturating_mul(self.in_features);
+        let start = index.saturating_mul(stride);
+        let end = start.saturating_add(stride);
+        Ok(ParameterGolfLinearWeights {
+            weight: self.weight[start..end].to_vec(),
+            out_features: self.out_features,
+            in_features: self.in_features,
+        })
+    }
+}
+
 /// Attention weights for one Parameter Golf block.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfAttentionWeights {
@@ -689,6 +789,19 @@ pub struct ParameterGolfBlockWeights {
     pub resid_mix: Vec<f32>,
 }
 
+/// Control tensors kept separate from the contiguous matrix banks.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfBlockControlWeights {
+    /// Learned q-gain, one scalar per query head.
+    pub q_gain: Vec<f32>,
+    /// Learned attention residual scale.
+    pub attn_scale: Vec<f32>,
+    /// Learned MLP residual scale.
+    pub mlp_scale: Vec<f32>,
+    /// Learned residual mixing coefficients in `[2, model_dim]` order.
+    pub resid_mix: Vec<f32>,
+}
+
 /// Full logical weight bundle for one Parameter Golf family instance.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfWeights {
@@ -698,6 +811,27 @@ pub struct ParameterGolfWeights {
     pub skip_weights: Vec<f32>,
     /// Ordered block weights.
     pub blocks: Vec<ParameterGolfBlockWeights>,
+    /// Optional untied LM head in `[vocab_size, model_dim]` order.
+    pub lm_head: Option<ParameterGolfLinearWeights>,
+}
+
+/// Parameter-banked matrix surface matching the upstream competitive PGOLF lane.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfBankedWeights {
+    /// Token embedding matrix in `[vocab_size, model_dim]` order.
+    pub token_embedding: Vec<f32>,
+    /// Learned skip-weight table in `[num_skip_weights, model_dim]` order.
+    pub skip_weights: Vec<f32>,
+    /// Combined query/output bank in `[2 * num_layers, model_dim, model_dim]` order.
+    pub qo_bank: ParameterGolfLinearBankWeights,
+    /// Combined key/value bank in `[2 * num_layers, kv_dim, model_dim]` order.
+    pub kv_bank: ParameterGolfLinearBankWeights,
+    /// Combined MLP up-projection bank in `[num_layers, mlp_hidden_dim, model_dim]` order.
+    pub mlp_up_bank: ParameterGolfLinearBankWeights,
+    /// Combined MLP down-projection bank in `[num_layers, model_dim, mlp_hidden_dim]` order.
+    pub mlp_down_bank: ParameterGolfLinearBankWeights,
+    /// Per-block control tensors that remain separate from the banks.
+    pub block_controls: Vec<ParameterGolfBlockControlWeights>,
     /// Optional untied LM head in `[vocab_size, model_dim]` order.
     pub lm_head: Option<ParameterGolfLinearWeights>,
 }
@@ -816,6 +950,56 @@ impl ParameterGolfWeights {
             tensors: entries.into_iter().map(|(metadata, _)| metadata).collect(),
             artifacts: Vec::new(),
         }
+    }
+
+    /// Returns the upstream-style banked matrix surface for the current split bundle.
+    pub fn banked(
+        &self,
+        config: &ParameterGolfConfig,
+    ) -> Result<ParameterGolfBankedWeights, ParameterGolfModelError> {
+        config.validate()?;
+        validate_weights(config, self)?;
+        let qo_slices = self
+            .blocks
+            .iter()
+            .map(|block| &block.attention.q_proj)
+            .chain(self.blocks.iter().map(|block| &block.attention.out_proj))
+            .collect::<Vec<_>>();
+        let kv_slices = self
+            .blocks
+            .iter()
+            .map(|block| &block.attention.k_proj)
+            .chain(self.blocks.iter().map(|block| &block.attention.v_proj))
+            .collect::<Vec<_>>();
+        let mlp_up_slices = self
+            .blocks
+            .iter()
+            .map(|block| &block.mlp.fc)
+            .collect::<Vec<_>>();
+        let mlp_down_slices = self
+            .blocks
+            .iter()
+            .map(|block| &block.mlp.proj)
+            .collect::<Vec<_>>();
+        Ok(ParameterGolfBankedWeights {
+            token_embedding: self.token_embedding.clone(),
+            skip_weights: self.skip_weights.clone(),
+            qo_bank: ParameterGolfLinearBankWeights::from_linears(qo_slices.as_slice()),
+            kv_bank: ParameterGolfLinearBankWeights::from_linears(kv_slices.as_slice()),
+            mlp_up_bank: ParameterGolfLinearBankWeights::from_linears(mlp_up_slices.as_slice()),
+            mlp_down_bank: ParameterGolfLinearBankWeights::from_linears(mlp_down_slices.as_slice()),
+            block_controls: self
+                .blocks
+                .iter()
+                .map(|block| ParameterGolfBlockControlWeights {
+                    q_gain: block.attention.q_gain.clone(),
+                    attn_scale: block.attn_scale.clone(),
+                    mlp_scale: block.mlp_scale.clone(),
+                    resid_mix: block.resid_mix.clone(),
+                })
+                .collect(),
+            lm_head: self.lm_head.clone(),
+        })
     }
 
     fn tensor_entries<'a>(
@@ -954,7 +1138,10 @@ impl ParameterGolfWeights {
 
     /// Returns all named parameter tensors in stable name order.
     #[must_use]
-    pub fn parameter_vectors(&self, config: &ParameterGolfConfig) -> Vec<ParameterGolfParameterVector> {
+    pub fn parameter_vectors(
+        &self,
+        config: &ParameterGolfConfig,
+    ) -> Vec<ParameterGolfParameterVector> {
         let mut vectors = self
             .tensor_entries(config)
             .into_iter()
@@ -995,6 +1182,230 @@ impl ParameterGolfWeights {
     }
 }
 
+impl ParameterGolfBankedWeights {
+    /// Rebuilds the split logical bundle from the banked matrix surface.
+    pub fn to_split(
+        &self,
+        config: &ParameterGolfConfig,
+    ) -> Result<ParameterGolfWeights, ParameterGolfModelError> {
+        config.validate()?;
+        if self.block_controls.len() != config.num_layers {
+            return Err(ParameterGolfModelError::LayerCountMismatch {
+                actual: self.block_controls.len(),
+                expected: config.num_layers,
+            });
+        }
+        self.qo_bank
+            .validate(PARAMETER_GOLF_QO_BANK_NAME, 2 * config.num_layers)?;
+        self.kv_bank
+            .validate(PARAMETER_GOLF_KV_BANK_NAME, 2 * config.num_layers)?;
+        self.mlp_up_bank
+            .validate(PARAMETER_GOLF_MLP_UP_BANK_NAME, config.num_layers)?;
+        self.mlp_down_bank
+            .validate(PARAMETER_GOLF_MLP_DOWN_BANK_NAME, config.num_layers)?;
+
+        let mut blocks = Vec::with_capacity(config.num_layers);
+        for layer_index in 0..config.num_layers {
+            let controls = &self.block_controls[layer_index];
+            blocks.push(ParameterGolfBlockWeights {
+                attention: ParameterGolfAttentionWeights {
+                    q_proj: self.qo_bank.linear_at(
+                        PARAMETER_GOLF_QO_BANK_NAME,
+                        2 * config.num_layers,
+                        layer_index,
+                    )?,
+                    k_proj: self.kv_bank.linear_at(
+                        PARAMETER_GOLF_KV_BANK_NAME,
+                        2 * config.num_layers,
+                        layer_index,
+                    )?,
+                    v_proj: self.kv_bank.linear_at(
+                        PARAMETER_GOLF_KV_BANK_NAME,
+                        2 * config.num_layers,
+                        config.num_layers + layer_index,
+                    )?,
+                    out_proj: self.qo_bank.linear_at(
+                        PARAMETER_GOLF_QO_BANK_NAME,
+                        2 * config.num_layers,
+                        config.num_layers + layer_index,
+                    )?,
+                    q_gain: controls.q_gain.clone(),
+                },
+                mlp: ParameterGolfMlpWeights {
+                    fc: self.mlp_up_bank.linear_at(
+                        PARAMETER_GOLF_MLP_UP_BANK_NAME,
+                        config.num_layers,
+                        layer_index,
+                    )?,
+                    proj: self.mlp_down_bank.linear_at(
+                        PARAMETER_GOLF_MLP_DOWN_BANK_NAME,
+                        config.num_layers,
+                        layer_index,
+                    )?,
+                },
+                attn_scale: controls.attn_scale.clone(),
+                mlp_scale: controls.mlp_scale.clone(),
+                resid_mix: controls.resid_mix.clone(),
+            });
+        }
+
+        let weights = ParameterGolfWeights {
+            token_embedding: self.token_embedding.clone(),
+            skip_weights: self.skip_weights.clone(),
+            blocks,
+            lm_head: self.lm_head.clone(),
+        };
+        validate_weights(config, &weights)?;
+        Ok(weights)
+    }
+
+    fn bundle_metadata(&self, config: &ParameterGolfConfig) -> WeightBundleMetadata {
+        let mut entries = self.tensor_entries(config);
+        entries.sort_by(|(left, _), (right, _)| left.name.cmp(&right.name));
+        let mut hasher = Sha256::new();
+        for (metadata, values) in &entries {
+            digest_tensor_values(&mut hasher, metadata, values);
+        }
+        WeightBundleMetadata {
+            format: WeightFormat::ProgrammaticFixture,
+            source: WeightSource::Fixture,
+            quantization: QuantizationMode::None,
+            quantization_modes: Vec::new(),
+            digest: hex::encode(hasher.finalize()),
+            tensors: entries.into_iter().map(|(metadata, _)| metadata).collect(),
+            artifacts: Vec::new(),
+        }
+    }
+
+    fn tensor_entries<'a>(
+        &'a self,
+        config: &ParameterGolfConfig,
+    ) -> Vec<(WeightTensorMetadata, &'a [f32])> {
+        let mut entries = vec![
+            (
+                WeightTensorMetadata::new(
+                    "tok_emb.weight",
+                    Shape::new(vec![config.vocab_size, config.model_dim]),
+                    DType::F32,
+                ),
+                self.token_embedding.as_slice(),
+            ),
+            (
+                WeightTensorMetadata::new(
+                    "skip_weights",
+                    Shape::new(vec![config.num_skip_weights(), config.model_dim]),
+                    DType::F32,
+                ),
+                self.skip_weights.as_slice(),
+            ),
+            (
+                WeightTensorMetadata::new(
+                    PARAMETER_GOLF_QO_BANK_NAME,
+                    self.qo_bank.shape(),
+                    DType::F32,
+                ),
+                self.qo_bank.weight.as_slice(),
+            ),
+            (
+                WeightTensorMetadata::new(
+                    PARAMETER_GOLF_KV_BANK_NAME,
+                    self.kv_bank.shape(),
+                    DType::F32,
+                ),
+                self.kv_bank.weight.as_slice(),
+            ),
+            (
+                WeightTensorMetadata::new(
+                    PARAMETER_GOLF_MLP_UP_BANK_NAME,
+                    self.mlp_up_bank.shape(),
+                    DType::F32,
+                ),
+                self.mlp_up_bank.weight.as_slice(),
+            ),
+            (
+                WeightTensorMetadata::new(
+                    PARAMETER_GOLF_MLP_DOWN_BANK_NAME,
+                    self.mlp_down_bank.shape(),
+                    DType::F32,
+                ),
+                self.mlp_down_bank.weight.as_slice(),
+            ),
+        ];
+        for (layer_index, controls) in self.block_controls.iter().enumerate() {
+            entries.extend_from_slice(&[
+                (
+                    WeightTensorMetadata::new(
+                        format!("blocks.{layer_index}.attn.q_gain"),
+                        Shape::new(vec![config.num_heads]),
+                        DType::F32,
+                    ),
+                    controls.q_gain.as_slice(),
+                ),
+                (
+                    WeightTensorMetadata::new(
+                        format!("blocks.{layer_index}.attn_scale"),
+                        Shape::new(vec![config.model_dim]),
+                        DType::F32,
+                    ),
+                    controls.attn_scale.as_slice(),
+                ),
+                (
+                    WeightTensorMetadata::new(
+                        format!("blocks.{layer_index}.mlp_scale"),
+                        Shape::new(vec![config.model_dim]),
+                        DType::F32,
+                    ),
+                    controls.mlp_scale.as_slice(),
+                ),
+                (
+                    WeightTensorMetadata::new(
+                        format!("blocks.{layer_index}.resid_mix"),
+                        Shape::new(vec![2, config.model_dim]),
+                        DType::F32,
+                    ),
+                    controls.resid_mix.as_slice(),
+                ),
+            ]);
+        }
+        if let Some(lm_head) = &self.lm_head {
+            entries.push((
+                WeightTensorMetadata::new(
+                    "lm_head.weight",
+                    Shape::new(vec![lm_head.out_features, lm_head.in_features]),
+                    DType::F32,
+                ),
+                lm_head.weight.as_slice(),
+            ));
+        }
+        entries
+    }
+
+    /// Returns all named tensors in stable name order for the banked surface.
+    #[must_use]
+    pub fn parameter_vectors(
+        &self,
+        config: &ParameterGolfConfig,
+    ) -> Vec<ParameterGolfParameterVector> {
+        let mut vectors = self
+            .tensor_entries(config)
+            .into_iter()
+            .map(|(metadata, values)| ParameterGolfParameterVector {
+                parameter_id: metadata.name,
+                shape: metadata.shape,
+                values: values.to_vec(),
+            })
+            .collect::<Vec<_>>();
+        vectors.sort_by(|left, right| left.parameter_id.cmp(&right.parameter_id));
+        vectors
+    }
+
+    /// Returns the weight metadata surface for the banked representation.
+    #[must_use]
+    pub fn weight_bundle_metadata(&self, config: &ParameterGolfConfig) -> WeightBundleMetadata {
+        self.bundle_metadata(config)
+    }
+}
+
 /// CPU-reference build failure for the Parameter Golf family.
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum ParameterGolfModelError {
@@ -1025,6 +1436,16 @@ pub enum ParameterGolfModelError {
     /// Untied configs require an LM head.
     #[error("lm_head is required when tie_embeddings=false")]
     MissingLmHead,
+    /// One bank carried the wrong number of slices.
+    #[error("weight bank `{name}` has bank_len {actual}; expected {expected}")]
+    BankLengthMismatch {
+        /// Bank tensor name.
+        name: String,
+        /// Actual bank slice count.
+        actual: usize,
+        /// Expected bank slice count.
+        expected: usize,
+    },
     /// A named parameter override targeted an unknown tensor.
     #[error("unknown parameter golf tensor `{parameter_id}`")]
     UnknownParameter {
@@ -1138,6 +1559,11 @@ impl ParameterGolfReferenceModel {
     #[must_use]
     pub fn weights(&self) -> &ParameterGolfWeights {
         &self.weights
+    }
+
+    /// Returns the upstream-style banked matrix surface for the current weights.
+    pub fn banked_weights(&self) -> Result<ParameterGolfBankedWeights, ParameterGolfModelError> {
+        self.weights.banked(&self.descriptor.config)
     }
 
     /// Returns the final normalized hidden states before the LM head.
@@ -1473,26 +1899,18 @@ fn apply_parameter_override(
             });
         };
         match tail {
-            "attn.c_q.weight" => assign_parameter_values(
-                &mut block.attention.q_proj.weight,
-                parameter_id,
-                values,
-            )?,
-            "attn.c_k.weight" => assign_parameter_values(
-                &mut block.attention.k_proj.weight,
-                parameter_id,
-                values,
-            )?,
-            "attn.c_v.weight" => assign_parameter_values(
-                &mut block.attention.v_proj.weight,
-                parameter_id,
-                values,
-            )?,
-            "attn.proj.weight" => assign_parameter_values(
-                &mut block.attention.out_proj.weight,
-                parameter_id,
-                values,
-            )?,
+            "attn.c_q.weight" => {
+                assign_parameter_values(&mut block.attention.q_proj.weight, parameter_id, values)?
+            }
+            "attn.c_k.weight" => {
+                assign_parameter_values(&mut block.attention.k_proj.weight, parameter_id, values)?
+            }
+            "attn.c_v.weight" => {
+                assign_parameter_values(&mut block.attention.v_proj.weight, parameter_id, values)?
+            }
+            "attn.proj.weight" => {
+                assign_parameter_values(&mut block.attention.out_proj.weight, parameter_id, values)?
+            }
             "attn.q_gain" => {
                 assign_parameter_values(&mut block.attention.q_gain, parameter_id, values)?
             }
@@ -2285,6 +2703,49 @@ mod tests {
     }
 
     #[test]
+    fn banked_weights_roundtrip_back_to_split_bundle() {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())
+            .expect("baseline fixture model should build");
+        let banked = model
+            .banked_weights()
+            .expect("banked weights should materialize");
+        let restored = banked
+            .to_split(&model.descriptor().config)
+            .expect("banked weights should restore the split bundle");
+        assert_eq!(restored, *model.weights());
+    }
+
+    #[test]
+    fn banked_weights_publish_upstream_bank_tensor_names_and_shapes() {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())
+            .expect("baseline fixture model should build");
+        let banked = model
+            .banked_weights()
+            .expect("banked weights should materialize");
+        let vectors = banked.parameter_vectors(&model.descriptor().config);
+        let qo_bank = vectors
+            .iter()
+            .find(|vector| vector.parameter_id == PARAMETER_GOLF_QO_BANK_NAME)
+            .expect("qo bank should exist");
+        let kv_bank = vectors
+            .iter()
+            .find(|vector| vector.parameter_id == PARAMETER_GOLF_KV_BANK_NAME)
+            .expect("kv bank should exist");
+        let mlp_up_bank = vectors
+            .iter()
+            .find(|vector| vector.parameter_id == PARAMETER_GOLF_MLP_UP_BANK_NAME)
+            .expect("mlp up bank should exist");
+        let mlp_down_bank = vectors
+            .iter()
+            .find(|vector| vector.parameter_id == PARAMETER_GOLF_MLP_DOWN_BANK_NAME)
+            .expect("mlp down bank should exist");
+        assert_eq!(qo_bank.shape.dims(), &[18, 512, 512]);
+        assert_eq!(kv_bank.shape.dims(), &[18, 256, 512]);
+        assert_eq!(mlp_up_bank.shape.dims(), &[9, 1024, 512]);
+        assert_eq!(mlp_down_bank.shape.dims(), &[9, 512, 1024]);
+    }
+
+    #[test]
     fn deterministic_baseline_fixture_matches_train_gpt_logits_and_loss() {
         let fixture = load_baseline_fixture();
         let model = ParameterGolfReferenceModel::baseline_fixture(fixture.initializer)
@@ -2329,7 +2790,10 @@ mod tests {
         let max_abs_diff = dense_logits
             .max_abs_diff(&windowed_logits)
             .expect("shapes should match");
-        assert!(max_abs_diff < 1e-6, "unexpected dense/windowed drift: {max_abs_diff}");
+        assert!(
+            max_abs_diff < 1e-6,
+            "unexpected dense/windowed drift: {max_abs_diff}"
+        );
     }
 
     #[test]
