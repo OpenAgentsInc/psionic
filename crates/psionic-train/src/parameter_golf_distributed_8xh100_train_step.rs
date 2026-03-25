@@ -36,8 +36,9 @@ use crate::{
     ParameterGolfDistributedLiveVisualizationWriter, ParameterGolfDistributedStepObservation,
     ParameterGolfDistributedValidationShardObservation, ParameterGolfDistributedVisualizationError,
     ParameterGolfRunPod8xH100Measurements, ParameterGolfSingleH100PhaseTimings,
-    ParameterGolfSingleH100TrainingError, ParameterGolfTrainingHyperparameters,
-    ParameterGolfValidationEvalMode, PARAMETER_GOLF_SINGLE_H100_VARIANT,
+    ParameterGolfSingleH100TrainerState, ParameterGolfSingleH100TrainingError,
+    ParameterGolfTrainingHyperparameters, ParameterGolfValidationEvalMode,
+    PARAMETER_GOLF_SINGLE_H100_VARIANT,
 };
 
 const CHILD_ENV_VAR: &str = "PSIONIC_PARAMETER_GOLF_DISTRIBUTED_8XH100_TRAIN_STEP_CHILD";
@@ -106,6 +107,20 @@ pub struct ParameterGolfDistributed8xH100TrainStepReceipt {
     pub distributed_receipt_path: String,
     /// Retained typed train-step receipt path.
     pub train_step_receipt_path: String,
+    /// Root directory holding all step-scoped train-step artifacts.
+    pub step_scope_root_dir: String,
+    /// Number of completed train steps retained under `step_scope_root_dir`.
+    #[serde(default)]
+    pub executed_step_count: u64,
+    /// Observed cumulative train-loop wallclock before final validation.
+    #[serde(default)]
+    pub observed_training_time_ms: u64,
+    /// Ordered measured step observations across the retained train loop.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub step_observations: Vec<ParameterGolfDistributedStepObservation>,
+    /// Honest stop reason for the retained repeated train loop.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stop_reason: Option<String>,
     /// Mean train loss across all rank-local microbatches.
     pub mean_train_loss: f32,
     /// Global train tokens represented by the step.
@@ -544,6 +559,19 @@ pub fn parameter_golf_distributed_8xh100_train_step_rank_gradients_dir(
     }
 }
 
+/// Derives the canonical aggregate step-scope directory beside the bring-up report.
+#[must_use]
+pub fn parameter_golf_distributed_8xh100_step_scope_root_dir(
+    root: &Path,
+    bringup_report_path: &str,
+) -> PathBuf {
+    let resolved = root.join(bringup_report_path);
+    match resolved.parent() {
+        Some(parent) => parent.join("runtime_step_scopes"),
+        None => root.join("runtime_step_scopes"),
+    }
+}
+
 /// Derives the canonical runtime model-artifact directory beside the bring-up report.
 #[must_use]
 pub fn parameter_golf_distributed_8xh100_model_artifacts_dir(
@@ -619,75 +647,65 @@ fn parse_validation_batch_sequences_override() -> Option<usize> {
         .filter(|value| *value > 0)
 }
 
-/// Executes one real multi-rank train step from the shipped runtime payload.
+fn step_scope_dir(step_scope_root_dir: &Path, step_index: u64) -> PathBuf {
+    step_scope_root_dir.join(format!("step_{step_index:05}"))
+}
+
+fn emit_distributed_progress_line(message: impl AsRef<str>) {
+    println!("{}", message.as_ref());
+}
+
+struct ParameterGolfDistributed8xH100StepExecution {
+    mean_train_loss: f32,
+    train_tokens: u64,
+    observed_step_ms: u64,
+    gradient_sync_ms: u64,
+    optimizer_step_ms: u64,
+    gradient_norm_after_clip: f32,
+    clip_applied: bool,
+    non_finite_gradient_count: u64,
+    rank_launches: Vec<ParameterGolfDistributed8xH100TrainStepRankLaunch>,
+    aggregated_gradient_artifact_path: PathBuf,
+    aggregated_gradient_artifact_sha256: String,
+    current_model_artifact_path: PathBuf,
+    current_model_artifact_sha256: String,
+    current_model: ParameterGolfReferenceModel,
+    step_observation: ParameterGolfDistributedStepObservation,
+}
+
 #[allow(clippy::too_many_arguments)]
-pub fn execute_parameter_golf_distributed_8xh100_train_step(
+fn execute_parameter_golf_distributed_8xh100_step(
     root: &Path,
     manifest_path: &Path,
-    run_id: &str,
-    bringup_report_path: &Path,
-    bringup_report: &ParameterGolfDistributed8xH100BringupReport,
-    bootstrap_receipt_path: &Path,
-    bootstrap_receipt: &ParameterGolfDistributed8xH100RuntimeBootstrapReceipt,
-    mut live_visualization_writer: Option<&mut ParameterGolfDistributedLiveVisualizationWriter>,
-) -> Result<
-    ParameterGolfDistributed8xH100TrainStepReceipt,
-    ParameterGolfDistributed8xH100TrainStepError,
-> {
-    if bootstrap_receipt.successful_rank_count != CHALLENGE_WORLD_SIZE {
-        return Err(ParameterGolfDistributed8xH100TrainStepError::Aggregate {
-            message: format!(
-                "runtime bootstrap admitted only {} of {} ranks",
-                bootstrap_receipt.successful_rank_count, CHALLENGE_WORLD_SIZE
-            ),
-        });
-    }
-
-    let bringup_report_relpath = bringup_report_path
-        .strip_prefix(root)
-        .unwrap_or(bringup_report_path)
-        .display()
-        .to_string();
-    let train_step_receipt_path =
-        parameter_golf_distributed_8xh100_train_step_receipt_path(root, &bringup_report_relpath);
-    let measurements_path =
-        parameter_golf_distributed_8xh100_measurements_path(root, &bringup_report_relpath);
-    let distributed_receipt_path =
-        parameter_golf_distributed_8xh100_receipt_path(root, &bringup_report_relpath);
-    let rank_receipts_dir = parameter_golf_distributed_8xh100_train_step_rank_receipts_dir(
-        root,
-        &bringup_report_relpath,
-    );
-    let rank_logs_dir =
-        parameter_golf_distributed_8xh100_train_step_rank_logs_dir(root, &bringup_report_relpath);
-    let rank_windows_dir = parameter_golf_distributed_8xh100_train_step_rank_windows_dir(
-        root,
-        &bringup_report_relpath,
-    );
-    let rank_gradients_dir = parameter_golf_distributed_8xh100_train_step_rank_gradients_dir(
-        root,
-        &bringup_report_relpath,
-    );
-    let model_artifacts_dir =
-        parameter_golf_distributed_8xh100_model_artifacts_dir(root, &bringup_report_relpath);
-    let validation_rank_receipts_dir =
-        parameter_golf_distributed_8xh100_validation_rank_receipts_dir(
-            root,
-            &bringup_report_relpath,
-        );
-    let validation_rank_logs_dir =
-        parameter_golf_distributed_8xh100_validation_rank_logs_dir(root, &bringup_report_relpath);
-    let validation_rank_shards_dir =
-        parameter_golf_distributed_8xh100_validation_rank_shards_dir(root, &bringup_report_relpath);
+    dataset_root: &Path,
+    tokenizer_path: &Path,
+    bundle: &psionic_data::ParameterGolfDatasetBundle,
+    hyperparameters: &ParameterGolfTrainingHyperparameters,
+    initial_model: &ParameterGolfReferenceModel,
+    trainer_state: &mut ParameterGolfSingleH100TrainerState,
+    train_contract: &ParameterGolfTokenStreamContract,
+    cursor: &mut ParameterGolfTokenStreamCursor,
+    geometry: &ParameterGolfBatchGeometry,
+    current_exe: &Path,
+    step_scope_root_dir: &Path,
+    requested_train_tokens: u64,
+    completed_step_count: u64,
+    observed_training_time_ms: u64,
+    input_model_artifact_path: Option<&Path>,
+) -> Result<ParameterGolfDistributed8xH100StepExecution, ParameterGolfDistributed8xH100TrainStepError>
+{
+    let step_index = completed_step_count + 1;
+    let step_dir = step_scope_dir(step_scope_root_dir, step_index);
+    let rank_receipts_dir = step_dir.join("runtime_train_step_receipts");
+    let rank_logs_dir = step_dir.join("runtime_train_step_logs");
+    let rank_windows_dir = step_dir.join("runtime_train_step_windows");
+    let rank_gradients_dir = step_dir.join("runtime_train_step_gradients");
     for directory in [
+        &step_dir,
         &rank_receipts_dir,
         &rank_logs_dir,
         &rank_windows_dir,
         &rank_gradients_dir,
-        &model_artifacts_dir,
-        &validation_rank_receipts_dir,
-        &validation_rank_logs_dir,
-        &validation_rank_shards_dir,
     ] {
         fs::create_dir_all(directory).map_err(|error| {
             ParameterGolfDistributed8xH100TrainStepError::Write {
@@ -696,61 +714,15 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
             }
         })?;
     }
-    if let Some(parent) = train_step_receipt_path.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            ParameterGolfDistributed8xH100TrainStepError::Write {
-                path: parent.display().to_string(),
-                error,
-            }
-        })?;
-    }
-
-    let dataset_root = PathBuf::from(required_env(
-        crate::PARAMETER_GOLF_SINGLE_H100_DATASET_ROOT_ENV_VAR,
-    )?);
-    let tokenizer_path = PathBuf::from(required_env(
-        crate::PARAMETER_GOLF_SINGLE_H100_TOKENIZER_PATH_ENV_VAR,
-    )?);
-    let tokenizer_bytes = fs::read(&tokenizer_path).map_err(|error| {
-        ParameterGolfDistributed8xH100TrainStepError::Read {
-            path: tokenizer_path.display().to_string(),
-            error,
-        }
-    })?;
-    let tokenizer_digest = build_tokenizer_digest(tokenizer_bytes.as_slice());
-    let geometry = ParameterGolfBatchGeometry::challenge_distributed_8xh100_defaults();
-    let bundle = parameter_golf_dataset_bundle_from_local_dir(
-        DatasetKey::new(
-            crate::PARAMETER_GOLF_SINGLE_H100_DATASET_REF,
-            crate::PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION,
-        ),
-        &dataset_root,
-        String::from(PARAMETER_GOLF_SINGLE_H100_VARIANT),
-        tokenizer_digest,
-        tokenizer_path.display().to_string(),
-        None,
-    )?;
-    let initial_model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
-    let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
-    let optimizer_plan =
-        parameter_golf_optimizer_plan(initial_model.descriptor(), &hyperparameters)?;
-    let mut trainer_state = seed_parameter_states(&initial_model, &optimizer_plan)?;
-    let mut cursor = ParameterGolfTokenStreamCursor::new(PARAMETER_GOLF_TRAIN_SPLIT_NAME);
-    let train_contract = ParameterGolfTokenStreamContract::new(
-        bundle.manifest.key.clone(),
-        PARAMETER_GOLF_TRAIN_SPLIT_NAME,
-    )
-    .with_mode(DatasetIterationMode::Repeat);
-    let requested_train_tokens = geometry.local_train_batch_tokens().saturating_add(1) as u64;
     for rank in 0..CHALLENGE_WORLD_SIZE {
         let window = train_contract
-            .plan_window(&bundle.manifest, &cursor, requested_train_tokens)?
+            .plan_window(&bundle.manifest, cursor, requested_train_tokens)?
             .ok_or_else(|| ParameterGolfDistributed8xH100TrainStepError::Aggregate {
                 message: format!(
                     "failed to plan one train-step window for rank {rank} under the distributed posture"
                 ),
             })?;
-        cursor = window.end_cursor.clone();
+        *cursor = window.end_cursor.clone();
         let window_path = rank_windows_dir.join(format!("rank_{rank}.json"));
         fs::write(
             &window_path,
@@ -763,35 +735,6 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
             },
         )?;
     }
-
-    let current_exe =
-        env::current_exe().map_err(|error| ParameterGolfDistributed8xH100TrainStepError::Read {
-            path: String::from("current_exe"),
-            error,
-        })?;
-    let runtime_payload_path = current_exe.display().to_string();
-    let manifest_path = manifest_path
-        .canonicalize()
-        .unwrap_or_else(|_| manifest_path.to_path_buf());
-
-    if let Some(writer) = live_visualization_writer.as_deref_mut() {
-        writer.record_phase(
-            "training",
-            Some(String::from("distributed_train_step")),
-            format!(
-                "Launching {} distributed train-step ranks for optimizer step 1.",
-                CHALLENGE_WORLD_SIZE
-            ),
-            vec![
-                String::from("distributed_train_step"),
-                String::from("rank_fanout"),
-                String::from("cuda_execution"),
-            ],
-            Some(1),
-            true,
-        )?;
-    }
-
     let step_started = Instant::now();
     let mut children = Vec::new();
     for rank in 0..CHALLENGE_WORLD_SIZE {
@@ -816,8 +759,9 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
                 error,
             }
         })?;
-        let child = Command::new(&current_exe)
-            .arg(&manifest_path)
+        let mut command = Command::new(current_exe);
+        command
+            .arg(manifest_path)
             .current_dir(root)
             .env(
                 crate::PARAMETER_GOLF_EXECUTION_MODE_ENV_VAR,
@@ -836,11 +780,11 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
             )
             .env(
                 crate::PARAMETER_GOLF_SINGLE_H100_DATASET_ROOT_ENV_VAR,
-                &dataset_root,
+                dataset_root,
             )
             .env(
                 crate::PARAMETER_GOLF_SINGLE_H100_TOKENIZER_PATH_ENV_VAR,
-                &tokenizer_path,
+                tokenizer_path,
             )
             .env("CUDA_VISIBLE_DEVICES", rank.to_string())
             .env("WORLD_SIZE", CHALLENGE_WORLD_SIZE.to_string())
@@ -851,23 +795,20 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
                 CHALLENGE_WORLD_SIZE.to_string(),
             )
             .stdout(Stdio::from(stdout))
-            .stderr(Stdio::from(stderr))
-            .spawn()
-            .map_err(
-                |error| ParameterGolfDistributed8xH100TrainStepError::ChildSpawn { rank, error },
-            )?;
-        children.push((
-            rank,
-            window_path,
-            gradient_artifact_path,
-            receipt_path,
-            log_path,
-            child,
-        ));
+            .stderr(Stdio::from(stderr));
+        if let Some(model_artifact_path) = input_model_artifact_path {
+            command.env(CHILD_MODEL_ARTIFACT_PATH_ENV_VAR, model_artifact_path);
+        }
+        let child = command.spawn().map_err(
+            |error| ParameterGolfDistributed8xH100TrainStepError::ChildSpawn {
+                rank,
+                error,
+            },
+        )?;
+        children.push((rank, window_path, gradient_artifact_path, receipt_path, log_path, child));
     }
 
     let mut rank_launches = Vec::with_capacity(CHALLENGE_WORLD_SIZE);
-    let mut completed_train_rank_count = 0_usize;
     for (rank, window_path, gradient_artifact_path, receipt_path, log_path, mut child) in children {
         let status = child.wait().map_err(|error| {
             ParameterGolfDistributed8xH100TrainStepError::ChildWait { rank, error }
@@ -904,24 +845,6 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
             exit_code: status.code(),
             receipt,
         });
-        completed_train_rank_count = completed_train_rank_count.saturating_add(1);
-        if let Some(writer) = live_visualization_writer.as_deref_mut() {
-            writer.record_phase(
-                "training",
-                Some(String::from("distributed_train_step")),
-                format!(
-                    "Distributed train-step ranks completed: {completed_train_rank_count}/{}.",
-                    CHALLENGE_WORLD_SIZE
-                ),
-                vec![
-                    String::from("distributed_train_step"),
-                    String::from("rank_wait"),
-                    String::from("cuda_execution"),
-                ],
-                Some(1),
-                false,
-            )?;
-        }
     }
 
     for launch in &rank_launches {
@@ -943,7 +866,7 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
     }
 
     let sync_started = Instant::now();
-    let mut accumulated_gradients = zero_gradients(&trainer_state);
+    let mut accumulated_gradients = zero_gradients(trainer_state);
     for launch in &rank_launches {
         let rank_receipt = launch
             .receipt
@@ -952,19 +875,16 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
         let gradients = load_gradient_artifact(Path::new(&rank_receipt.gradient_artifact_path))?;
         crate::accumulate_gradients(
             accumulated_gradients.as_mut_slice(),
-            &trainer_state,
+            trainer_state,
             &gradients,
             CHALLENGE_WORLD_SIZE as f32,
         )?;
     }
     let gradient_sync_ms = duration_ms(sync_started);
 
-    let clip_observation = clip_gradients(
-        accumulated_gradients.as_mut_slice(),
-        hyperparameters.grad_clip_norm,
-    );
-    let aggregated_gradient_artifact_path =
-        rank_gradients_dir.join("aggregated_step_1.safetensors");
+    let clip_observation =
+        clip_gradients(accumulated_gradients.as_mut_slice(), hyperparameters.grad_clip_norm);
+    let aggregated_gradient_artifact_path = step_dir.join("aggregated_gradients.safetensors");
     let aggregated_gradient_artifact_sha256 = write_gradient_artifact(
         &aggregated_gradient_artifact_path,
         &accumulated_gradients
@@ -973,31 +893,22 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
             .collect::<BTreeMap<_, _>>(),
     )?;
     let optimizer_started = Instant::now();
-    let learning_rate_multiplier = hyperparameters.learning_rate_multiplier(0, 0.0);
-    let muon_momentum = hyperparameters.muon_momentum_at_step(0);
+    let learning_rate_multiplier = hyperparameters
+        .learning_rate_multiplier(completed_step_count, observed_training_time_ms as f32);
+    let muon_momentum = hyperparameters.muon_momentum_at_step(completed_step_count);
     apply_gradients_to_state(
-        &mut trainer_state,
+        trainer_state,
         accumulated_gradients.as_slice(),
         learning_rate_multiplier,
         muon_momentum,
-        1,
+        step_index,
     )?;
-    let current_model = materialize_current_model(&initial_model, &trainer_state)?;
-    let current_model_artifact_path = model_artifacts_dir.join("post_step_1.safetensors");
+    let current_model = materialize_current_model(initial_model, trainer_state)?;
+    let current_model_artifact_path = step_dir.join("current_model.safetensors");
     let current_model_artifact_sha256 = write_bytes_artifact(
         &current_model_artifact_path,
         &export_parameter_golf_full_precision_model_bytes(&current_model)?,
     )?;
-    let current_model_int8_zlib_artifact =
-        export_parameter_golf_int8_zlib_model_artifact(&current_model, run_id, 1)?;
-    let current_model_int8_zlib_artifact_path =
-        model_artifacts_dir.join("post_step_1_final_model.int8.ptz");
-    let current_model_int8_zlib_artifact_sha256 = write_bytes_artifact(
-        &current_model_int8_zlib_artifact_path,
-        current_model_int8_zlib_artifact.bytes.as_slice(),
-    )?;
-    let current_model_int8_zlib_artifact_size_bytes =
-        current_model_int8_zlib_artifact.bytes.len() as u64;
     let optimizer_step_ms = duration_ms(optimizer_started);
     let observed_step_ms = duration_ms(step_started);
     let mean_train_loss = rank_launches
@@ -1013,7 +924,221 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
         / CHALLENGE_WORLD_SIZE as f32;
     let train_tokens = geometry.train_batch_tokens as u64;
     let step_observation =
-        ParameterGolfDistributedStepObservation::new(1, 0, observed_step_ms, train_tokens);
+        ParameterGolfDistributedStepObservation::new(step_index, 0, observed_step_ms, train_tokens);
+
+    Ok(ParameterGolfDistributed8xH100StepExecution {
+        mean_train_loss,
+        train_tokens,
+        observed_step_ms,
+        gradient_sync_ms,
+        optimizer_step_ms,
+        gradient_norm_after_clip: clip_observation.gradient_norm_after_clip.unwrap_or_default(),
+        clip_applied: clip_observation.clip_applied,
+        non_finite_gradient_count: u64::from(clip_observation.non_finite_count),
+        rank_launches,
+        aggregated_gradient_artifact_path,
+        aggregated_gradient_artifact_sha256,
+        current_model_artifact_path,
+        current_model_artifact_sha256,
+        current_model,
+        step_observation,
+    })
+}
+
+/// Executes one real multi-rank train step from the shipped runtime payload.
+#[allow(clippy::too_many_arguments)]
+pub fn execute_parameter_golf_distributed_8xh100_train_step(
+    root: &Path,
+    manifest_path: &Path,
+    run_id: &str,
+    bringup_report_path: &Path,
+    bringup_report: &ParameterGolfDistributed8xH100BringupReport,
+    bootstrap_receipt_path: &Path,
+    bootstrap_receipt: &ParameterGolfDistributed8xH100RuntimeBootstrapReceipt,
+    mut live_visualization_writer: Option<&mut ParameterGolfDistributedLiveVisualizationWriter>,
+) -> Result<ParameterGolfDistributed8xH100TrainStepReceipt, ParameterGolfDistributed8xH100TrainStepError>
+{
+    if bootstrap_receipt.successful_rank_count != CHALLENGE_WORLD_SIZE {
+        return Err(ParameterGolfDistributed8xH100TrainStepError::Aggregate {
+            message: format!(
+                "runtime bootstrap admitted only {} of {} ranks",
+                bootstrap_receipt.successful_rank_count, CHALLENGE_WORLD_SIZE
+            ),
+        });
+    }
+
+    let bringup_report_relpath = bringup_report_path
+        .strip_prefix(root)
+        .unwrap_or(bringup_report_path)
+        .display()
+        .to_string();
+    let train_step_receipt_path =
+        parameter_golf_distributed_8xh100_train_step_receipt_path(root, &bringup_report_relpath);
+    let measurements_path =
+        parameter_golf_distributed_8xh100_measurements_path(root, &bringup_report_relpath);
+    let distributed_receipt_path =
+        parameter_golf_distributed_8xh100_receipt_path(root, &bringup_report_relpath);
+    let step_scope_root_dir =
+        parameter_golf_distributed_8xh100_step_scope_root_dir(root, &bringup_report_relpath);
+    let model_artifacts_dir =
+        parameter_golf_distributed_8xh100_model_artifacts_dir(root, &bringup_report_relpath);
+    let validation_rank_receipts_dir = parameter_golf_distributed_8xh100_validation_rank_receipts_dir(
+        root,
+        &bringup_report_relpath,
+    );
+    let validation_rank_logs_dir =
+        parameter_golf_distributed_8xh100_validation_rank_logs_dir(root, &bringup_report_relpath);
+    let validation_rank_shards_dir =
+        parameter_golf_distributed_8xh100_validation_rank_shards_dir(root, &bringup_report_relpath);
+    for directory in [
+        &step_scope_root_dir,
+        &model_artifacts_dir,
+        &validation_rank_receipts_dir,
+        &validation_rank_logs_dir,
+        &validation_rank_shards_dir,
+    ] {
+        fs::create_dir_all(directory).map_err(
+            |error| ParameterGolfDistributed8xH100TrainStepError::Write {
+                path: directory.display().to_string(),
+                error,
+            },
+        )?;
+    }
+    if let Some(parent) = train_step_receipt_path.parent() {
+        fs::create_dir_all(parent).map_err(
+            |error| ParameterGolfDistributed8xH100TrainStepError::Write {
+                path: parent.display().to_string(),
+                error,
+            },
+        )?;
+    }
+
+    let dataset_root = PathBuf::from(required_env(
+        crate::PARAMETER_GOLF_SINGLE_H100_DATASET_ROOT_ENV_VAR,
+    )?);
+    let tokenizer_path = PathBuf::from(required_env(
+        crate::PARAMETER_GOLF_SINGLE_H100_TOKENIZER_PATH_ENV_VAR,
+    )?);
+    let tokenizer_bytes = fs::read(&tokenizer_path).map_err(|error| {
+        ParameterGolfDistributed8xH100TrainStepError::Read {
+            path: tokenizer_path.display().to_string(),
+            error,
+        }
+    })?;
+    let tokenizer_digest = build_tokenizer_digest(tokenizer_bytes.as_slice());
+    let geometry = ParameterGolfBatchGeometry::challenge_distributed_8xh100_defaults();
+    let bundle = parameter_golf_dataset_bundle_from_local_dir(
+        DatasetKey::new(
+            crate::PARAMETER_GOLF_SINGLE_H100_DATASET_REF,
+            crate::PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION,
+        ),
+        &dataset_root,
+        String::from(PARAMETER_GOLF_SINGLE_H100_VARIANT),
+        tokenizer_digest,
+        tokenizer_path.display().to_string(),
+        None,
+    )?;
+    let initial_model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+    let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
+    let optimizer_plan = parameter_golf_optimizer_plan(initial_model.descriptor(), &hyperparameters)?;
+    let mut trainer_state = seed_parameter_states(&initial_model, &optimizer_plan)?;
+    let mut cursor = ParameterGolfTokenStreamCursor::new(PARAMETER_GOLF_TRAIN_SPLIT_NAME);
+    let train_contract = ParameterGolfTokenStreamContract::new(
+        bundle.manifest.key.clone(),
+        PARAMETER_GOLF_TRAIN_SPLIT_NAME,
+    )
+    .with_mode(DatasetIterationMode::Repeat);
+    let requested_train_tokens = geometry.local_train_batch_tokens().saturating_add(1) as u64;
+    let current_exe = env::current_exe().map_err(|error| {
+        ParameterGolfDistributed8xH100TrainStepError::Read {
+            path: String::from("current_exe"),
+            error,
+        }
+    })?;
+    let runtime_payload_path = current_exe.display().to_string();
+    let manifest_path = manifest_path
+        .canonicalize()
+        .unwrap_or_else(|_| manifest_path.to_path_buf());
+    let max_wallclock_ms = hyperparameters
+        .max_wallclock_seconds
+        .filter(|seconds| *seconds > 0.0)
+        .map(|seconds| (seconds * 1000.0) as u64);
+    let mut executed_step_count = 0_u64;
+    let mut observed_training_time_ms = 0_u64;
+    let mut stop_reason = None;
+    let mut step_observations = Vec::new();
+    let mut current_model_artifact_input_path = None;
+    let mut final_step_execution = None;
+    loop {
+        if executed_step_count >= hyperparameters.iterations {
+            stop_reason = Some(String::from("iteration_cap_reached"));
+            break;
+        }
+        let step_execution = execute_parameter_golf_distributed_8xh100_step(
+            root,
+            &manifest_path,
+            &dataset_root,
+            &tokenizer_path,
+            &bundle,
+            &hyperparameters,
+            &initial_model,
+            &mut trainer_state,
+            &train_contract,
+            &mut cursor,
+            &geometry,
+            &current_exe,
+            &step_scope_root_dir,
+            requested_train_tokens,
+            executed_step_count,
+            observed_training_time_ms,
+            current_model_artifact_input_path.as_deref(),
+        )?;
+        executed_step_count = step_execution.step_observation.global_step;
+        observed_training_time_ms =
+            observed_training_time_ms.saturating_add(step_execution.observed_step_ms);
+        step_observations.push(step_execution.step_observation.clone());
+        emit_distributed_progress_line(format!(
+            "step:{}/{} train_loss:{:.4} train_time:{}ms step_avg:{:.2}ms",
+            executed_step_count,
+            hyperparameters.iterations,
+            step_execution.mean_train_loss,
+            observed_training_time_ms,
+            observed_training_time_ms as f64 / executed_step_count.max(1) as f64,
+        ));
+        current_model_artifact_input_path =
+            Some(step_execution.current_model_artifact_path.clone());
+        final_step_execution = Some(step_execution);
+        if max_wallclock_ms.is_some_and(|wallclock_ms| observed_training_time_ms >= wallclock_ms) {
+            stop_reason = Some(String::from("wallclock_cap_reached"));
+            emit_distributed_progress_line(format!(
+                "stopping_early: wallclock_cap train_time:{}ms step:{}/{}",
+                observed_training_time_ms, executed_step_count, hyperparameters.iterations,
+            ));
+            break;
+        }
+    }
+    if stop_reason.is_none() {
+        stop_reason = Some(String::from("iteration_cap_reached"));
+    }
+    let final_step_execution = final_step_execution.ok_or_else(|| {
+        ParameterGolfDistributed8xH100TrainStepError::Aggregate {
+            message: String::from(
+                "distributed 8xH100 train loop finished without one successful step",
+            ),
+        }
+    })?;
+    let current_model = final_step_execution.current_model.clone();
+    let current_model_int8_zlib_artifact =
+        export_parameter_golf_int8_zlib_model_artifact(&current_model, run_id, executed_step_count)?;
+    let current_model_int8_zlib_artifact_path = model_artifacts_dir.join(format!(
+        "post_step_{executed_step_count}_final_model.int8.ptz"
+    ));
+    let current_model_int8_zlib_artifact_sha256 = write_bytes_artifact(
+        &current_model_int8_zlib_artifact_path,
+        current_model_int8_zlib_artifact.bytes.as_slice(),
+    )?;
+    let current_model_int8_zlib_artifact_size_bytes =
+        current_model_int8_zlib_artifact.bytes.len() as u64;
     let validation_eval_mode = ParameterGolfValidationEvalMode::SlidingWindow { stride: 64 };
     let validation_batch_sequences =
         distributed_validation_batch_sequences(&geometry, &validation_eval_mode) as u64;
@@ -1113,11 +1238,11 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
             .env(VALIDATION_CHILD_SHARD_PATH_ENV_VAR, &shard_path)
             .env(
                 VALIDATION_CHILD_GRADIENT_ARTIFACT_PATH_ENV_VAR,
-                &aggregated_gradient_artifact_path,
+                &final_step_execution.aggregated_gradient_artifact_path,
             )
             .env(
                 VALIDATION_CHILD_MODEL_ARTIFACT_PATH_ENV_VAR,
-                &current_model_artifact_path,
+                &final_step_execution.current_model_artifact_path,
             )
             .env(
                 crate::PARAMETER_GOLF_SINGLE_H100_DATASET_ROOT_ENV_VAR,
@@ -1246,7 +1371,7 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
     let mut measurements = ParameterGolfRunPod8xH100Measurements::challenge_defaults();
     measurements.run_id = Some(String::from(run_id));
     measurements.mesh_id = Some(String::from("mesh.parameter_golf.runpod_8xh100"));
-    measurements.step_observations = vec![step_observation.clone()];
+    measurements.step_observations = step_observations.clone();
     measurements.validation_eval_mode = validation_eval_mode.clone();
     measurements.validation_batch_sequences = validation_batch_sequences;
     measurements.validation_observed_ms = validation_observed_ms;
@@ -1267,7 +1392,7 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
     let mut distributed_config = crate::ParameterGolfDistributed8xH100Config::challenge_defaults();
     distributed_config.run_id = String::from(run_id);
     distributed_config.mesh_id = String::from("mesh.parameter_golf.runpod_8xh100");
-    distributed_config.step_observations = vec![step_observation.clone()];
+    distributed_config.step_observations = step_observations.clone();
     distributed_config.validation_eval_mode = validation_eval_mode;
     distributed_config.validation_batch_sequences = validation_batch_sequences;
     distributed_config.validation_observed_ms = validation_observed_ms;
@@ -1304,34 +1429,44 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
         measurements_path: measurements_path.display().to_string(),
         distributed_receipt_path: distributed_receipt_path.display().to_string(),
         train_step_receipt_path: train_step_receipt_path.display().to_string(),
-        mean_train_loss,
-        train_tokens,
-        observed_step_ms,
-        gradient_sync_ms,
-        optimizer_step_ms,
-        gradient_norm_after_clip: clip_observation.gradient_norm_after_clip.unwrap_or_default(),
-        clip_applied: clip_observation.clip_applied,
-        non_finite_gradient_count: u64::from(clip_observation.non_finite_count),
-        rank_launches,
-        aggregated_gradient_artifact_path: aggregated_gradient_artifact_path
+        step_scope_root_dir: step_scope_root_dir.display().to_string(),
+        executed_step_count,
+        observed_training_time_ms,
+        step_observations,
+        stop_reason,
+        mean_train_loss: final_step_execution.mean_train_loss,
+        train_tokens: final_step_execution.train_tokens,
+        observed_step_ms: final_step_execution.observed_step_ms,
+        gradient_sync_ms: final_step_execution.gradient_sync_ms,
+        optimizer_step_ms: final_step_execution.optimizer_step_ms,
+        gradient_norm_after_clip: final_step_execution.gradient_norm_after_clip,
+        clip_applied: final_step_execution.clip_applied,
+        non_finite_gradient_count: final_step_execution.non_finite_gradient_count,
+        rank_launches: final_step_execution.rank_launches,
+        aggregated_gradient_artifact_path: final_step_execution
+            .aggregated_gradient_artifact_path
             .display()
             .to_string(),
-        aggregated_gradient_artifact_sha256,
-        current_model_artifact_path: current_model_artifact_path.display().to_string(),
-        current_model_artifact_sha256,
+        aggregated_gradient_artifact_sha256: final_step_execution
+            .aggregated_gradient_artifact_sha256,
+        current_model_artifact_path: final_step_execution
+            .current_model_artifact_path
+            .display()
+            .to_string(),
+        current_model_artifact_sha256: final_step_execution.current_model_artifact_sha256,
         current_model_int8_zlib_artifact_path: current_model_int8_zlib_artifact_path
             .display()
             .to_string(),
         current_model_int8_zlib_artifact_sha256,
         current_model_int8_zlib_artifact_size_bytes,
         validation_rank_launches,
-        step_observation,
+        step_observation: final_step_execution.step_observation,
         validation_observed_ms,
         validation_total_sequence_count,
         validation_shard_observations,
         distributed_receipt,
         claim_boundary: String::from(
-            "This receipt proves the exported-folder distributed runtime executed one real 8-rank Parameter Golf train step, reconstructed the post-step model on all ranks, and emitted one real distributed validation aggregation into the typed distributed receipt lane. It does not yet claim final artifact closure or full record-track completion.",
+            "This receipt proves the exported-folder distributed runtime executed one real wallclock-bounded repeated 8-rank Parameter Golf train loop, retained step-scoped train artifacts under the benchmark root, reconstructed the final post-step model on all ranks, and emitted one real distributed validation aggregation into the typed distributed receipt lane. It does not by itself claim record-track promotion.",
         ),
         receipt_digest: String::new(),
     };

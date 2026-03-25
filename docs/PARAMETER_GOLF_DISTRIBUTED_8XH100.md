@@ -70,13 +70,15 @@ Psionic now encodes that exact posture explicitly instead of treating
   mode, so a real `8xH100` execution log can now cross from machine admission
   into explicit rank fanout and one runtime-owned mesh/bootstrap contract
   before the later train-step work begins
-- `psionic-train` now also ships the runtime-owned one-step execution seam
-  `ParameterGolfDistributed8xH100TrainStepReceipt`,
-  `ParameterGolfDistributed8xH100TrainStepRankReceipt`, retained per-rank
-  train-step windows, retained per-rank train-step gradient artifacts,
-  retained runtime-owned post-step model artifacts, and one measured
-  distributed receipt lift from that step, so the exported-folder
-  `distributed_8xh100_train` mode no longer stops at bring-up only
+- `psionic-train` now also ships the runtime-owned repeated train-loop seam
+  behind `ParameterGolfDistributed8xH100TrainStepReceipt` and
+  `ParameterGolfDistributed8xH100TrainStepRankReceipt`; the exported-folder
+  `distributed_8xh100_train` mode now retains step-scoped train artifacts
+  under `runtime_step_scopes/step_<n>/...`, emits wallclock-bounded step
+  progress lines during execution, and preserves ordered
+  `step_observations` plus the honest loop stop reason in the aggregate
+  train receipt instead of pretending the final retained step was the whole
+  run
 - `psionic-train` now also ships retained per-rank distributed validation
   receipts plus one completion receipt bound to the trained runtime-produced
   int8+zlib artifact, so the exported-folder `distributed_8xh100_train` mode
