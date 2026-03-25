@@ -310,6 +310,19 @@ checkpoint manifest and pointer, one retained local metric-event set, and one
 explicit final-evidence projection. It still refuses cross-host collectives,
 same-job mixed-backend dense meshes, and sharded optimizer exchange.
 
+The repo now also owns the first shared CUDA-plus-MLX dense mesh math contract
+in `crates/psionic-train/src/cross_backend_cuda_mlx_dense_mesh.rs`, the binary
+`cross_backend_cuda_mlx_dense_mesh_contract`, the checker
+`scripts/check-cross-backend-cuda-mlx-dense-mesh-contract.sh`, the focused
+reference doc `docs/CROSS_BACKEND_CUDA_MLX_DENSE_MESH_REFERENCE.md`, and the
+committed fixture
+`fixtures/training/cross_backend_cuda_mlx_dense_mesh_contract_v1.json`. That
+surface freezes one explicit mixed-backend law above the generic CUDA dense
+runtime and the MLX dense-rank runtime: fp32 gradient all-reduce, fp32
+master-weight broadcast, mirrored fp32 AdamW state, and one explicit refusal
+set for BF16 mixed precision, fp16 loss scaling, direct NCCL claims by MLX
+ranks, split master-weight authority, and checkpointless optimizer migration.
+
 The Linux node now also has a dedicated RTX 4080 bring-up seam in
 `crates/psionic-train/src/swarm_cuda_bringup.rs`, the binary
 `swarm_linux_cuda_bringup`, the verification runner
