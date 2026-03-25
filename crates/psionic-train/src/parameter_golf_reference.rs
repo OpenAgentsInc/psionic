@@ -28,10 +28,11 @@ use crate::{
     apply_parameter_golf_muon_step, parameter_golf_optimizer_plan, AsyncCheckpointWritebackError,
     AsyncCheckpointWritebackFile, AsyncCheckpointWritebackOptions, AsyncCheckpointWritebackPayload,
     AsyncCheckpointWritebackReceipt, AsyncCheckpointWritebackTicket,
-    AsyncCheckpointWritebackWorker, ParameterGolfMuonConfig, ParameterGolfMuonState,
-    ParameterGolfOptimizerExecution, ParameterGolfTrainError, ParameterGolfTrainingHyperparameters,
-    TrainingOptimizerConfig, TrainingOptimizerError, TrainingOptimizerState,
-    PARAMETER_GOLF_CONTROL_TENSOR_NAME_PATTERNS,
+    AsyncCheckpointWritebackWorker, LocalTrainMetricEvent, LocalTrainMetricFanout,
+    LocalTrainMetricPhase, LocalTrainMetricSinkError, LocalTrainMetricValue,
+    ParameterGolfMuonConfig, ParameterGolfMuonState, ParameterGolfOptimizerExecution,
+    ParameterGolfTrainError, ParameterGolfTrainingHyperparameters, TrainingOptimizerConfig,
+    TrainingOptimizerError, TrainingOptimizerState, PARAMETER_GOLF_CONTROL_TENSOR_NAME_PATTERNS,
 };
 
 const PARAMETER_GOLF_CHECKPOINT_MANIFEST_KEY: &str = "psionic.parameter_golf.checkpoint_manifest";
@@ -644,6 +645,8 @@ pub enum ParameterGolfReferenceTrainingError {
     #[error(transparent)]
     AsyncCheckpointWriteback(#[from] AsyncCheckpointWritebackError),
     #[error(transparent)]
+    LocalMetricSink(#[from] LocalTrainMetricSinkError),
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 }
 
@@ -1158,6 +1161,26 @@ pub fn train_parameter_golf_local_reference(
     runner.into_outcome()
 }
 
+/// Runs the bounded local-reference trainer end to end and fans typed local
+/// telemetry into the provided metric sink surface.
+pub fn train_parameter_golf_local_reference_with_metric_sink(
+    fixture: &ParameterGolfLocalReferenceFixture,
+    config: &ParameterGolfReferenceTrainingConfig,
+    metric_sink: &mut LocalTrainMetricFanout,
+) -> Result<ParameterGolfReferenceTrainingOutcome, ParameterGolfReferenceTrainingError> {
+    let mut runner = ParameterGolfReferenceTrainingRunner::new(fixture, config)?;
+    while !runner.is_complete() {
+        runner.step()?;
+        emit_parameter_golf_step_metrics(
+            metric_sink,
+            config.run_id.as_str(),
+            runner.step_metrics(),
+        )?;
+    }
+    metric_sink.flush()?;
+    runner.into_outcome()
+}
+
 /// Runs the bounded local-reference trainer end to end and persists each emitted
 /// checkpoint through the shared async writeback worker.
 pub fn train_parameter_golf_local_reference_with_async_checkpoint_writeback(
@@ -1293,6 +1316,41 @@ fn checkpoint_async_writeback_payload(
         ],
     )
     .map_err(Into::into)
+}
+
+fn emit_parameter_golf_step_metrics(
+    metric_sink: &mut LocalTrainMetricFanout,
+    run_id: &str,
+    step_metrics: &[ParameterGolfReferenceTrainingStepMetrics],
+) -> Result<(), ParameterGolfReferenceTrainingError> {
+    let Some(step_metrics) = step_metrics.last() else {
+        return Ok(());
+    };
+    let step = step_metrics.global_step;
+    metric_sink.record(LocalTrainMetricEvent::new(
+        run_id,
+        LocalTrainMetricPhase::Train,
+        step,
+        "mean_microbatch_loss",
+        LocalTrainMetricValue::F32(step_metrics.mean_microbatch_loss),
+    ))?;
+    metric_sink.flush()?;
+    metric_sink.record(LocalTrainMetricEvent::new(
+        run_id,
+        LocalTrainMetricPhase::Validation,
+        step,
+        "validation_mean_loss",
+        LocalTrainMetricValue::F64(step_metrics.validation_mean_loss),
+    ))?;
+    metric_sink.record(LocalTrainMetricEvent::new(
+        run_id,
+        LocalTrainMetricPhase::Validation,
+        step,
+        "validation_bits_per_byte",
+        LocalTrainMetricValue::F64(step_metrics.validation_bits_per_byte),
+    ))?;
+    metric_sink.flush()?;
+    Ok(())
 }
 
 fn merge_checkpoint_writeback_receipts(
@@ -2336,13 +2394,20 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, time::Instant};
+    use std::{
+        error::Error,
+        io::{self, Write},
+        sync::{Arc, Mutex},
+        time::Instant,
+    };
 
     use tempfile::tempdir;
 
     use crate::{
         async_checkpoint_writeback::write_checkpoint_payload_sync_with_options,
-        AsyncCheckpointWritebackOptions, AsyncCheckpointWritebackWorker,
+        AsyncCheckpointWritebackOptions, AsyncCheckpointWritebackWorker, LocalTrainMetricCollector,
+        LocalTrainMetricFanout, LocalTrainMetricJsonlSink, LocalTrainMetricProgressSink,
+        LocalTrainMetricStructuredLogSink, LocalTrainMetricValue,
     };
 
     use super::{
@@ -2351,9 +2416,38 @@ mod tests {
         restore_parameter_golf_model_from_int8_zlib, restore_parameter_golf_model_from_safetensors,
         train_parameter_golf_local_reference,
         train_parameter_golf_local_reference_with_async_checkpoint_writeback,
-        ParameterGolfLocalReferenceFixture, ParameterGolfReferenceTrainingConfig,
-        ParameterGolfReferenceTrainingRunner,
+        train_parameter_golf_local_reference_with_metric_sink, ParameterGolfLocalReferenceFixture,
+        ParameterGolfReferenceTrainingConfig, ParameterGolfReferenceTrainingRunner,
     };
+
+    #[derive(Clone, Default)]
+    struct SharedWriter(Arc<Mutex<Vec<u8>>>);
+
+    impl SharedWriter {
+        fn contents(&self) -> String {
+            String::from_utf8(
+                self.0
+                    .lock()
+                    .expect("shared writer mutex should not be poisoned")
+                    .clone(),
+            )
+            .expect("shared writer should only contain utf8")
+        }
+    }
+
+    impl Write for SharedWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.0
+                .lock()
+                .expect("shared writer mutex should not be poisoned")
+                .extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
 
     #[test]
     fn parameter_golf_local_reference_runner_restores_and_matches_continuous_run(
@@ -2538,6 +2632,43 @@ mod tests {
             async_submit_elapsed,
             sync_elapsed
         );
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_local_reference_metric_sink_fanout_stays_local_and_deterministic(
+    ) -> Result<(), Box<dyn Error>> {
+        let fixture = ParameterGolfLocalReferenceFixture::reference()?;
+        let config = ParameterGolfReferenceTrainingConfig::local_reference();
+        let baseline_outcome = train_parameter_golf_local_reference(&fixture, &config)?;
+        let progress = SharedWriter::default();
+        let structured = SharedWriter::default();
+        let collector = LocalTrainMetricCollector::default();
+        let jsonl_dir = tempdir()?;
+        let jsonl_path = jsonl_dir.path().join("telemetry.jsonl");
+        let mut sink = LocalTrainMetricFanout::new(config.run_id.clone());
+        sink.add_sink(LocalTrainMetricProgressSink::new(progress.clone()));
+        sink.add_sink(LocalTrainMetricStructuredLogSink::new(structured.clone()));
+        sink.add_sink(LocalTrainMetricJsonlSink::create(jsonl_path.as_path())?);
+        sink.add_sink(collector.clone());
+
+        let sink_outcome =
+            train_parameter_golf_local_reference_with_metric_sink(&fixture, &config, &mut sink)?;
+        let collected = collector.events();
+        let jsonl_lines = std::fs::read_to_string(jsonl_path.as_path())?
+            .lines()
+            .map(serde_json::from_str::<crate::LocalTrainMetricEvent>)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        assert_eq!(sink_outcome, baseline_outcome);
+        assert_eq!(collected, jsonl_lines);
+        assert_eq!(collected.len(), (config.max_steps as usize) * 3);
+        assert!(collected
+            .iter()
+            .any(|event| event.metric_id == "mean_microbatch_loss"
+                && matches!(event.value, LocalTrainMetricValue::F32(_))));
+        assert!(progress.contents().contains("mean_microbatch_loss"));
+        assert!(structured.contents().starts_with("metric_event {"));
         Ok(())
     }
 }

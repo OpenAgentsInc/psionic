@@ -1992,6 +1992,11 @@ That session truth now also has a repo-owned writeback implementation under
 - `AsyncCheckpointWritebackReceipt`
 - `write_checkpoint_payload_sync`
 - `train_parameter_golf_local_reference_with_async_checkpoint_writeback`
+- `LocalTrainMetricFanout`
+- `LocalTrainMetricJsonlSink`
+- `LocalTrainMetricProgressSink`
+- `LocalTrainMetricStructuredLogSink`
+- `train_parameter_golf_local_reference_with_metric_sink`
 
 What that means in practice:
 
@@ -2011,6 +2016,9 @@ What that means in practice:
 - The representative `Parameter Golf` local-reference lane now exercises that
   writeback path and proves restore equivalence plus lower train-loop stall at
   the handoff point relative to synchronous writes.
+- Psionic can fan one typed local train metric into progress output,
+  structured-log lines, JSONL telemetry, and in-memory pre-aggregation without
+  turning those local streams into benchmark or receipt truth.
 
 The current recovery action set is already meaningful:
 
