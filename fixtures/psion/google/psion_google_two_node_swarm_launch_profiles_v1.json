@@ -1,0 +1,90 @@
+{
+  "schema_version": "psion.google_two_node_swarm_launch_profiles.v1",
+  "launch_bundle_id": "openagentsgemini-psion-google-two-node-swarm-launch-v1",
+  "contract_digest": "b279e935039f6a7a26cc34f1c189c4d804f6cc33491cb0ae47976dbf62e88ef8",
+  "project_id": "openagentsgemini",
+  "bucket_url": "gs://openagentsgemini-psion-train-us-central1",
+  "repo_clone_url": "https://github.com/OpenAgentsInc/psionic.git",
+  "service_account_email": "psion-train-swarm@openagentsgemini.iam.gserviceaccount.com",
+  "network": "oa-lightning",
+  "external_ip": false,
+  "os_login": true,
+  "provisioning_model": "STANDARD",
+  "maintenance_policy": "TERMINATE",
+  "restart_on_failure": false,
+  "image_policy": {
+    "image_project": "deeplearning-platform-release",
+    "image_family": "common-cu128-ubuntu-2204-nvidia-570",
+    "driver_posture": "verify_prevalidated_gpu_image"
+  },
+  "startup_policy": {
+    "script_path": "scripts/psion-google-two-node-swarm-startup.sh",
+    "workspace_root": "/var/lib/psion-google-two-node-swarm",
+    "package_install": [
+      "build-essential",
+      "pkg-config",
+      "libssl-dev",
+      "clang",
+      "cmake",
+      "git",
+      "curl",
+      "jq",
+      "ca-certificates",
+      "python3"
+    ],
+    "rustup_default_toolchain": "stable",
+    "pre_training_command": "cargo build -q -p psionic-train --bin psion_google_two_node_configured_peer_open_adapter_swarm",
+    "training_command": "cargo run -q -p psionic-train --bin psion_google_two_node_configured_peer_open_adapter_swarm -- --role \"$PSION_SWARM_ROLE\" --cluster-manifest \"$PSION_CLUSTER_MANIFEST_FILE\" --local-endpoint \"$PSION_LOCAL_ENDPOINT_FILE\" --peer-endpoint \"$PSION_PEER_ENDPOINT_FILE\" --output \"$PSION_RUNTIME_REPORT_FILE\"",
+    "endpoint_manifest_timeout_seconds": 900,
+    "endpoint_manifest_poll_interval_seconds": 5
+  },
+  "artifact_paths": {
+    "cluster_manifest_object": "launch/psion_google_two_node_swarm_cluster_manifest.json",
+    "launch_receipt_object": "launch/psion_google_two_node_swarm_launch_receipt.json",
+    "startup_script_object": "launch/psion-google-two-node-swarm-startup.sh",
+    "quota_preflight_object": "launch/psion_google_two_node_swarm_quota_preflight.json",
+    "coordinator_endpoint_manifest_object": "manifests/psion_google_two_node_swarm_coordinator_endpoint_manifest.json",
+    "contributor_endpoint_manifest_object": "manifests/psion_google_two_node_swarm_contributor_endpoint_manifest.json",
+    "coordinator_runtime_report_object": "host/coordinator/psion_google_two_node_swarm_runtime_report.json",
+    "contributor_runtime_report_object": "host/contributor/psion_google_two_node_swarm_runtime_report.json",
+    "final_manifest_object": "final/psion_google_two_node_swarm_final_manifest.json"
+  },
+  "zone_pair_fallback_order": [
+    "us-central1-a__us-central1-b",
+    "us-central1-a__us-central1-c",
+    "us-central1-b__us-central1-c"
+  ],
+  "profiles": [
+    {
+      "profile_id": "g2_l4_two_node_swarm_coordinator",
+      "profile_label": "g2-l4-swarm-coordinator",
+      "role_id": "psion.google_swarm.coordinator_validator_aggregator_contributor",
+      "role_kind": "coordinator_validator_aggregator_contributor",
+      "node_id": "psion-google-swarm-coordinator-a",
+      "machine_type": "g2-standard-8",
+      "accelerator_type": "nvidia-l4",
+      "accelerator_count": 1,
+      "cluster_port": 34100,
+      "boot_disk_type": "pd-balanced",
+      "boot_disk_gb": 200,
+      "low_disk_watermark_gb": 40,
+      "declared_run_cost_ceiling_usd": 20.0
+    },
+    {
+      "profile_id": "g2_l4_two_node_swarm_contributor",
+      "profile_label": "g2-l4-swarm-contributor",
+      "role_id": "psion.google_swarm.contributor",
+      "role_kind": "contributor",
+      "node_id": "psion-google-swarm-contributor-b",
+      "machine_type": "g2-standard-8",
+      "accelerator_type": "nvidia-l4",
+      "accelerator_count": 1,
+      "cluster_port": 34101,
+      "boot_disk_type": "pd-balanced",
+      "boot_disk_gb": 200,
+      "low_disk_watermark_gb": 40,
+      "declared_run_cost_ceiling_usd": 20.0
+    }
+  ],
+  "claim_boundary": "This launch authority freezes one bounded Google two-node configured-peer swarm launch bundle over two private GCE L4 nodes, one repo-owned role-aware startup script, one bounded adapter-delta runtime command, and one explicit bucket object layout. It does not claim broader Google orchestration, elastic membership, trusted-cluster full-model training, or public swarm compute."
+}

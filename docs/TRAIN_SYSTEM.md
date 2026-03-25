@@ -145,6 +145,21 @@ freezes two dedicated subnetworks, one swarm service account, one zone-pair
 quota gate, and one operator preflight that rejects missing network, identity,
 or pair-level headroom before the later launcher spends money.
 
+The repo now also owns the first Google dual-node launch and runtime wiring for
+that lane in
+`fixtures/psion/google/psion_google_two_node_swarm_launch_profiles_v1.json`,
+`scripts/psion-google-launch-two-node-swarm.sh`,
+`scripts/psion-google-two-node-swarm-startup.sh`,
+`scripts/psion-google-delete-two-node-swarm.sh`,
+`crates/psionic-train/src/psion_google_two_node_swarm_runtime.rs`, and the
+binary `psion_google_two_node_configured_peer_open_adapter_swarm`. That
+surface freezes one repo-owned launch authority, one role-aware startup path,
+one deterministic configured-peer cluster id, one exact coordinator versus
+contributor node assignment, one explicit cluster-manifest plus launch-receipt
+pair, and one bounded adapter-cluster runtime that uses the existing generic
+worker-protocol, validation, and aggregation substrate instead of inventing a
+second Google-only control plane.
+
 The repo now also owns one rehearsal-grade bottleneck report for that lane in
 `crates/psionic-train/src/swarm_trusted_lan_rehearsal.rs`, the binary
 `first_swarm_trusted_lan_rehearsal_report`, the checker
