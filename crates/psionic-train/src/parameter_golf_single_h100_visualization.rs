@@ -13,13 +13,12 @@ use crate::{
     ParameterGolfSingleH100TrainingReport, ParameterGolfSingleH100TrainingStepMetrics,
     ParameterGolfSingleH100TrainingStopReason, ParameterGolfSingleH100ValidationCheckpoint,
     ParameterGolfSingleH100ValidationSummary, ParameterGolfValidationEvalMode,
-    RemoteTrainingArtifactSourceKind,
-    RemoteTrainingEmissionMode, RemoteTrainingEventSample, RemoteTrainingEventSeverity,
-    RemoteTrainingGpuSample, RemoteTrainingHeartbeatSample, RemoteTrainingLossSample,
-    RemoteTrainingMathSample, RemoteTrainingProvider, RemoteTrainingRefreshContract,
-    RemoteTrainingResultClassification, RemoteTrainingRunIndex, RemoteTrainingRunIndexEntry,
-    RemoteTrainingRuntimeSample, RemoteTrainingSeriesStatus, RemoteTrainingSourceArtifact,
-    RemoteTrainingTimelineEntry, RemoteTrainingVisualizationBundle,
+    RemoteTrainingArtifactSourceKind, RemoteTrainingEmissionMode, RemoteTrainingEventSample,
+    RemoteTrainingEventSeverity, RemoteTrainingGpuSample, RemoteTrainingHeartbeatSample,
+    RemoteTrainingLossSample, RemoteTrainingMathSample, RemoteTrainingProvider,
+    RemoteTrainingRefreshContract, RemoteTrainingResultClassification, RemoteTrainingRunIndex,
+    RemoteTrainingRunIndexEntry, RemoteTrainingRuntimeSample, RemoteTrainingSeriesStatus,
+    RemoteTrainingSourceArtifact, RemoteTrainingTimelineEntry, RemoteTrainingVisualizationBundle,
     RemoteTrainingVisualizationError, RemoteTrainingVisualizationSummary,
     REMOTE_TRAINING_TARGET_UI_UPDATE_INTERVAL_MS,
 };
@@ -1115,6 +1114,7 @@ fn state_from_log_fallback(
                     .local_train_batch_sequences(),
                 observed_wallclock_ms.max(1),
             ),
+            runtime_receipt: None,
         });
     }
     let total_elapsed_ms = step_metrics
@@ -1647,6 +1647,7 @@ mod tests {
                     non_finite_gradient_count: 0,
                     tokens_per_second: Some(140_000),
                     samples_per_second_milli: Some(136),
+                    runtime_receipt: None,
                 },
                 ParameterGolfSingleH100TrainingStepMetrics {
                     global_step: 2,
@@ -1670,6 +1671,7 @@ mod tests {
                     non_finite_gradient_count: 0,
                     tokens_per_second: Some(142_000),
                     samples_per_second_milli: Some(138),
+                    runtime_receipt: None,
                 },
             ],
             aggregate_phase_timings: Some(Default::default()),

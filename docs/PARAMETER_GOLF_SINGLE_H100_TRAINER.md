@@ -164,6 +164,13 @@ The command is explicit about what it treats as trainer truth. It binds:
   validation runtime receipt with the resident parameter buffer count,
   stable-buffer allocation posture, named eval graph surface, token-write
   cost, byte-accounting cost, and explicit eval mode for each validation pass
+- a device-resident training runner that keeps the stable parameter surface
+  resident on device across repeated train batches for each admitted batch
+  shape, reuses mutable token and target buffers, refreshes the resident
+  parameter buffers once per optimizer step instead of rebuilding full graph
+  inputs every batch, and records one machine-readable training runtime receipt
+  per completed step with resident-buffer counts, named graph surface,
+  resident upload cost, parameter-refresh cost, and mutable token-write cost
 - preserved initial, periodic, and final validation receipts directly from the
   Psionic path, with the pre-export live-model validation retained separately
   whenever that posture is requested

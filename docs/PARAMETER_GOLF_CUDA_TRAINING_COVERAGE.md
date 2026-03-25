@@ -246,6 +246,10 @@ Today it keeps these truths separate:
     BF16 train-visible parameter and gradient buffers with FP32 master weights
     and FP32 optimizer state is real on the public lane
   - one bounded host-orchestrated CUDA Muon step is real on the public lane
+  - one bounded device-resident single-H100 train runner now keeps the stable
+    Parameter Golf graph-input weight surface resident across repeated train
+    batches for one admitted batch shape and refreshes those buffers once per
+    optimizer step instead of rebuilding full host-side graph inputs every batch
   - post-train quantized export or roundtrip support is real
 
 This is the intended contract for the issue: do not hide missing CUDA kernels

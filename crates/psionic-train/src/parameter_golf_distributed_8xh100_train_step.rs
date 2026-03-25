@@ -1453,6 +1453,7 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step_child(
         &bundle,
         &model,
         &mut graph_cache,
+        None,
         &geometry,
         &window,
     )?;
