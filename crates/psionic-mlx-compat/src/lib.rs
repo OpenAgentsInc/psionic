@@ -15,8 +15,7 @@ pub const CRATE_ROLE: &str =
 pub const FROZEN_UPSTREAM_WINDOW: &str = "ml-explore/mlx:v0.31.0..v0.31.1";
 
 /// Boundary note that keeps the naming shell honest.
-pub const BOUNDARY_NOTE: &str =
-    "This facade is a thin name and module shim over existing Psionic-native surfaces; it does not imply MLX-identical signatures, missing native semantics, or any Python, C, or Swift binding layer.";
+pub const BOUNDARY_NOTE: &str = "This facade is a thin name and module shim over existing Psionic-native surfaces; it does not imply MLX-identical signatures, missing native semantics, or any Python, C, or Swift binding layer.";
 
 /// MLX-like core surface above the native array facade.
 pub mod core {
@@ -230,13 +229,13 @@ pub mod core {
 /// MLX-like transform surface over the native autodiff and compile crates.
 pub mod transforms {
     pub use psionic_compiler::{
-        compile_transform, CompileTransform, CompileTransformConfig, CompileTransformDebugMode,
-        CompileTransformError, CompileTransformTraceMode,
+        CompileTransform, CompileTransformConfig, CompileTransformDebugMode, CompileTransformError,
+        CompileTransformTraceMode, compile_transform,
     };
     pub use psionic_ir::{
-        checkpoint, custom_vjp, grad, jvp, value_and_grad, vjp, vmap, AutodiffGraph,
-        AutodiffGraphBuilder, CustomVjpTransform, CustomVjpTransformResult, VmapSupport,
-        VmapTransformError, VmapUnsupportedReason,
+        AutodiffGraph, AutodiffGraphBuilder, CustomVjpTransform, CustomVjpTransformResult,
+        VmapSupport, VmapTransformError, VmapUnsupportedReason, checkpoint, custom_vjp, grad, jvp,
+        value_and_grad, vjp, vmap,
     };
 }
 
@@ -268,9 +267,9 @@ pub mod distributed {
 /// Repo-owned compatibility reports that keep this facade bounded and reviewable.
 pub mod reports {
     pub use psionic_compat::{
-        builtin_mlx_compatibility_matrix_report, builtin_mlx_compatibility_scope_report,
         MlxCompatibilityMatrixEntry, MlxCompatibilityMatrixReport, MlxCompatibilityMatrixStatus,
-        MlxCompatibilityScopeReport,
+        MlxCompatibilityScopeReport, builtin_mlx_compatibility_matrix_report,
+        builtin_mlx_compatibility_scope_report,
     };
 }
 
@@ -282,12 +281,65 @@ pub mod prelude {
 
 #[cfg(test)]
 mod tests {
+    use psionic_backend_tests::{
+        ArrayBackendConformanceHarness, ArrayConformanceOutput, run_array_backend_conformance,
+    };
+
     use super::{core, nn, optimizers, reports};
     use psionic_core::Shape;
 
+    impl ArrayBackendConformanceHarness for core::Context {
+        type Array = core::Array;
+        type Error = core::ArrayError;
+
+        fn backend_label(&self) -> String {
+            self.device_handle().backend().to_string()
+        }
+
+        fn ones(&self, shape: Shape) -> Result<Self::Array, Self::Error> {
+            self.ones(shape)
+        }
+
+        fn full(&self, shape: Shape, value: f32) -> Result<Self::Array, Self::Error> {
+            self.full(shape, value)
+        }
+
+        fn add(&self, left: &Self::Array, right: &Self::Array) -> Result<Self::Array, Self::Error> {
+            left.add(right)
+        }
+
+        fn sum_axis(&self, array: &Self::Array, axis: usize) -> Result<Self::Array, Self::Error> {
+            array.sum_axis(axis)
+        }
+
+        fn squeeze_axis(
+            &self,
+            array: &Self::Array,
+            axis: usize,
+        ) -> Result<Self::Array, Self::Error> {
+            array.squeeze_axis(axis)
+        }
+
+        fn evaluate(&self, array: &Self::Array) -> Result<ArrayConformanceOutput, Self::Error> {
+            let evaluated = array.eval()?;
+            let host = evaluated.to_host_data()?;
+            let values = host.as_f32_slice().map(ToOwned::to_owned).ok_or_else(|| {
+                core::ArrayError::HostInteropRefusal {
+                    tensor: array.tensor_id(),
+                    dtype: array.spec().dtype(),
+                    detail: String::from("expected dense f32 host output"),
+                }
+            })?;
+            Ok(ArrayConformanceOutput {
+                shape: evaluated.shape().clone(),
+                values,
+            })
+        }
+    }
+
     #[test]
-    fn core_context_helpers_build_and_eval_bounded_cpu_arrays(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn core_context_helpers_build_and_eval_bounded_cpu_arrays()
+    -> Result<(), Box<dyn std::error::Error>> {
         let context = core::cpu_seeded(7)?;
         let ones = context.ones(Shape::new(vec![2, 2]))?;
         let filled = context.full(Shape::new(vec![2, 2]), 2.0)?;
@@ -316,14 +368,28 @@ mod tests {
             naming.matrix_status,
             reports::MlxCompatibilityMatrixStatus::Supported
         );
-        assert!(naming
-            .blocking_issue_refs
-            .iter()
-            .all(|issue| !issue.contains("PMLX-606")));
-        assert!(naming
-            .blocking_issue_refs
-            .iter()
-            .all(|issue| !issue.contains("PMLX-607")));
+        assert!(
+            naming
+                .blocking_issue_refs
+                .iter()
+                .all(|issue| !issue.contains("PMLX-606"))
+        );
+        assert!(
+            naming
+                .blocking_issue_refs
+                .iter()
+                .all(|issue| !issue.contains("PMLX-607"))
+        );
         assert!(naming.summary.contains("psionic-mlx-compat"));
+    }
+
+    #[test]
+    fn mlx_compat_cpu_context_shared_conformance_harness_has_no_failures()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let context = core::cpu_seeded(7)?;
+        let report = run_array_backend_conformance(&context);
+        assert_eq!(report.surface, "array_context");
+        assert!(!report.has_failures(), "{report:?}");
+        Ok(())
     }
 }

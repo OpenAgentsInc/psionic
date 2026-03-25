@@ -25,6 +25,7 @@ psionic-runtime = { path = "../psionic-runtime" }
 
 [dev-dependencies]
 psionic-backend-cpu = { path = "../psionic-backend-cpu" }
+psionic-backend-tests = { path = "../psionic-backend-tests" }
 
 [build-dependencies]
 cc = "1.1"

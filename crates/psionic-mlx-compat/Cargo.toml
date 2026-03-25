@@ -23,3 +23,6 @@ psionic-function-io = { path = "../psionic-function-io" }
 psionic-ir = { path = "../psionic-ir" }
 psionic-nn = { path = "../psionic-nn" }
 psionic-nn-optimizers = { path = "../psionic-nn-optimizers" }
+
+[dev-dependencies]
+psionic-backend-tests = { path = "../psionic-backend-tests" }

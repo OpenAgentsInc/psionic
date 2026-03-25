@@ -597,6 +597,9 @@ impl DistributedReferenceTensor {
                     .ok_or(DistributedCollectiveError::HostInteropStorageMismatch { dtype })?
                     .to_vec(),
             ),
+            DType::I32 => {
+                return Err(DistributedCollectiveError::HostInteropStorageMismatch { dtype });
+            }
         };
         Ok(Self {
             shape,
@@ -4564,6 +4567,12 @@ fn training_buffer_values<'a>(
             }
             Ok(values.as_slice())
         }
+        TensorData::BF16(_) | TensorData::I32(_) => {
+            Err(TrainingCoreError::UnsupportedTensorDType {
+                group_id: group_id.to_string(),
+                dtype: buffer.spec.dtype(),
+            })
+        }
         TensorData::QuantizedBlocks(_) => Err(TrainingCoreError::UnsupportedTensorDType {
             group_id: group_id.to_string(),
             dtype: buffer.spec.dtype(),
@@ -4588,6 +4597,12 @@ fn assign_training_buffer_values(
         TensorData::F32(existing) => {
             *existing = values.to_vec();
             Ok(())
+        }
+        TensorData::BF16(_) | TensorData::I32(_) => {
+            Err(TrainingCoreError::UnsupportedTensorDType {
+                group_id: group_id.to_string(),
+                dtype: buffer.spec.dtype(),
+            })
         }
         TensorData::QuantizedBlocks(_) => Err(TrainingCoreError::UnsupportedTensorDType {
             group_id: group_id.to_string(),
@@ -5688,6 +5703,7 @@ fn concatenate_reference_tensors(
             }
             Ok(DistributedReferenceTensor::i8(shape, values)?)
         }
+        DType::I32 => Err(DistributedCollectiveError::HostInteropStorageMismatch { dtype }.into()),
     }
 }
 
@@ -5727,6 +5743,12 @@ fn split_reduced_group(
                         .to_array(&leaf.context())?,
                 );
             }
+        }
+        DType::I32 => {
+            return Err(DistributedCollectiveError::HostInteropStorageMismatch {
+                dtype: reduced_group.dtype(),
+            }
+            .into());
         }
     }
     Ok(rebuilt)

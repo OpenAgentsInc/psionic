@@ -29,6 +29,30 @@ Shipped backend claims are bounded by
 backend/product lane as shipped unless it has a row in that matrix and the
 referenced tests are green.
 
+## Shared Conformance Harness
+
+Psionic now keeps one shared backend conformance harness in
+`crates/psionic-backend-tests`.
+
+That harness currently covers:
+
+- execution-backend discovery and selection truth
+- a canonical `matmul + add` graph execution case
+- one documented unsupported boundary per backend so the refusal posture stays
+  explicit even when backend support sets differ
+- array-context conformance for MLX-facing and array-facing contexts
+
+The harness is wired into:
+
+- `psionic-backend-cpu`
+- `psionic-backend-cuda`
+- `psionic-backend-metal`
+- `psionic-mlx-compat`
+
+Backend-specific tests still matter for kernel families, quantization modes,
+and platform edge cases. The shared harness exists to stop the basic discovery,
+selection, execution, and refusal story from drifting across backends.
+
 ## AMD Policy
 
 AMD KFD and AMD userspace remain separate backends in both code and provider

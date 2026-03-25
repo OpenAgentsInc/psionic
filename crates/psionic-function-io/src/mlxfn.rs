@@ -453,7 +453,7 @@ impl MlxfnTrace {
                         spec,
                         values: values.clone(),
                     },
-                    TensorData::QuantizedBlocks(_) => {
+                    TensorData::BF16(_) | TensorData::I32(_) | TensorData::QuantizedBlocks(_) => {
                         return Err(MlxfnIoError::UnsupportedConstantDType {
                             dtype: node.tensor().spec().dtype(),
                         });
@@ -1298,6 +1298,12 @@ fn mlx_dtype_from_psionic(dtype: DType) -> Result<(i32, u8), MlxfnIoError> {
         DType::F16 => Ok((9, 2)),
         DType::BF16 => Ok((12, 2)),
         DType::I8 => Ok((5, 1)),
+        DType::I32 => Err(MlxfnIoError::UnsupportedExportDType {
+            dtype,
+            detail: String::from(
+                "the bounded Psionic `.mlxfn` bridge supports only f32, f16, bf16, and i8 tensors",
+            ),
+        }),
     }
 }
 

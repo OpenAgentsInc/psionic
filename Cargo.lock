@@ -4001,6 +4001,7 @@ dependencies = [
 name = "psionic-backend-cpu"
 version = "0.1.1"
 dependencies = [
+ "psionic-backend-tests",
  "psionic-compiler",
  "psionic-core",
  "psionic-ir",
@@ -4015,6 +4016,7 @@ dependencies = [
  "half",
  "libloading",
  "psionic-backend-cpu",
+ "psionic-backend-tests",
  "psionic-compiler",
  "psionic-core",
  "psionic-ir",
@@ -4028,10 +4030,23 @@ version = "0.1.1"
 dependencies = [
  "metal 0.33.0",
  "psionic-backend-cpu",
+ "psionic-backend-tests",
  "psionic-compiler",
  "psionic-core",
  "psionic-ir",
  "psionic-runtime",
+]
+
+[[package]]
+name = "psionic-backend-tests"
+version = "0.1.1"
+dependencies = [
+ "hex",
+ "psionic-core",
+ "psionic-ir",
+ "psionic-runtime",
+ "serde",
+ "sha2",
 ]
 
 [[package]]
@@ -4294,6 +4309,7 @@ name = "psionic-mlx-compat"
 version = "0.1.1"
 dependencies = [
  "psionic-array",
+ "psionic-backend-tests",
  "psionic-compat",
  "psionic-compiler",
  "psionic-core",

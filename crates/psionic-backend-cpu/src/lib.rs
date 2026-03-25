@@ -1731,16 +1731,101 @@ mod tests {
 
     use std::collections::BTreeMap;
 
+    use psionic_backend_tests::{GraphBackendConformanceHarness, run_graph_backend_conformance};
     use psionic_core::{
         BackendExtensionKind, DType, Device, QuantizationMode, Shape, TensorSpec, ViewSemantics,
     };
-    use psionic_ir::GraphBuilder;
+    use psionic_ir::{Graph, GraphBuilder};
     use psionic_runtime::{
         Allocator, AllocatorPoolMode, BackendSelectionState, BufferHandle, DeviceDiscovery,
-        HealthStatus, RuntimeError, ServedProductBackendPolicy,
+        ExecutionResult, HealthStatus, RuntimeError, ServedProductBackendPolicy,
     };
 
-    use super::{cpu_allocator_pool_policy, CpuAllocatorPool, CpuBackend, CpuBuffer};
+    use super::{CpuAllocatorPool, CpuBackend, CpuBuffer, cpu_allocator_pool_policy};
+
+    impl GraphBackendConformanceHarness for CpuBackend {
+        type Buffer = CpuBuffer;
+
+        fn backend_selection(
+            &self,
+            supported_ops: &[&str],
+        ) -> Result<psionic_runtime::BackendSelection, RuntimeError> {
+            CpuBackend::backend_selection(self, supported_ops)
+        }
+
+        fn input_buffer(
+            &mut self,
+            shape: Shape,
+            values: Vec<f32>,
+        ) -> Result<Self::Buffer, RuntimeError> {
+            CpuBackend::input_buffer(self, shape, values)
+        }
+
+        fn compile_and_execute(
+            &mut self,
+            graph: &Graph,
+            inputs: &BTreeMap<psionic_core::TensorId, Self::Buffer>,
+        ) -> Result<ExecutionResult<Self::Buffer>, RuntimeError> {
+            CpuBackend::compile_and_execute(self, graph, inputs)
+        }
+
+        fn dense_values(&self, buffer: &Self::Buffer) -> Result<Vec<f32>, RuntimeError> {
+            buffer
+                .as_f32_slice()
+                .map(ToOwned::to_owned)
+                .ok_or_else(|| RuntimeError::Backend(String::from("expected dense f32 cpu buffer")))
+        }
+
+        fn known_unsupported_case(&mut self) -> Result<String, RuntimeError> {
+            let mut builder = GraphBuilder::new(Device::cpu());
+            let logits = builder.input("logits", Shape::new(vec![1, 2, 4]), DType::F32);
+            let target_ids = builder.input("target_ids", Shape::new(vec![1, 2]), DType::I32);
+            let loss = builder
+                .parameter_golf_projection_loss(&logits, &target_ids, 30.0)
+                .map_err(|error| RuntimeError::Backend(error.to_string()))?;
+            let graph = builder.finish(vec![loss]);
+            let inputs = BTreeMap::from([
+                (
+                    logits.id(),
+                    self.input_buffer(
+                        Shape::new(vec![1, 2, 4]),
+                        vec![0.1_f32, -0.2, 0.3, 0.7, -0.4, 0.5, -0.1, 0.2],
+                    )?,
+                ),
+                (
+                    target_ids.id(),
+                    CpuBuffer::from_f32(
+                        TensorSpec::new(Shape::new(vec![1, 2]), DType::I32, Device::cpu()),
+                        vec![3.0_f32, 1.0],
+                    )?,
+                ),
+            ]);
+            match self.compile_and_execute(&graph, &inputs) {
+                Err(RuntimeError::UnsupportedStep(step))
+                    if step == "parameter_golf_projection_loss" =>
+                {
+                    Ok(String::from(
+                        "parameter_golf_projection_loss remained an explicit unsupported-step refusal",
+                    ))
+                }
+                Err(other) => Err(RuntimeError::Backend(format!(
+                    "expected parameter_golf_projection_loss refusal, found {other}"
+                ))),
+                Ok(_) => Err(RuntimeError::Backend(String::from(
+                    "parameter_golf_projection_loss executed successfully instead of refusing",
+                ))),
+            }
+        }
+    }
+
+    #[test]
+    fn cpu_backend_shared_conformance_harness_has_no_failures() {
+        let mut backend = CpuBackend::new();
+        let report = run_graph_backend_conformance(&mut backend);
+        assert_eq!(report.backend, "cpu");
+        assert_eq!(report.surface, "graph_execution");
+        assert!(!report.has_failures(), "{report:?}");
+    }
 
     #[test]
     fn cpu_backend_reports_default_device() -> Result<(), psionic_runtime::RuntimeError> {
@@ -1879,11 +1964,11 @@ mod tests {
     }
 
     #[test]
-    fn cpu_backend_refuses_parameter_golf_projection_loss_backend_extension(
-    ) -> Result<(), RuntimeError> {
+    fn cpu_backend_refuses_parameter_golf_projection_loss_backend_extension()
+    -> Result<(), RuntimeError> {
         let mut builder = GraphBuilder::new(Device::cpu());
         let logits = builder.input("logits", Shape::new(vec![1, 2, 4]), DType::F32);
-        let target_ids = builder.input("target_ids", Shape::new(vec![1, 2]), DType::F32);
+        let target_ids = builder.input("target_ids", Shape::new(vec![1, 2]), DType::I32);
         let loss = builder
             .parameter_golf_projection_loss(&logits, &target_ids, 30.0)
             .map_err(|error| RuntimeError::Backend(error.to_string()))?;
@@ -1900,7 +1985,10 @@ mod tests {
             ),
             (
                 target_ids.id(),
-                backend.input_buffer(Shape::new(vec![1, 2]), vec![3.0_f32, 1.0])?,
+                CpuBuffer::from_f32(
+                    TensorSpec::new(Shape::new(vec![1, 2]), DType::I32, Device::cpu()),
+                    vec![3.0_f32, 1.0],
+                )?,
             ),
         ]);
 
