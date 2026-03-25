@@ -31,10 +31,9 @@ use crate::{
     DistributedOptimizerRun, DistributedTrainingMemoryBudget, OptimizerStateResidency,
     ParameterGolfBatchGeometry, ParameterGolfOptimizerExecution, ParameterGolfTrainError,
     ParameterGolfTrainingHyperparameters, ParameterGolfValidationEvalMode,
-    TrainingActivationCheckpointPolicy,
-    TrainingDistributedOptimizerKind, TrainingGradientAccumulationPolicy,
-    TrainingGradientAccumulationReduction, TrainingLoopBudget, TrainingOptimizerConfig,
-    TrainingOptimizerResidencyPolicy, TrainingOptimizerShardResidency,
+    TrainingActivationCheckpointPolicy, TrainingDistributedOptimizerKind,
+    TrainingGradientAccumulationPolicy, TrainingGradientAccumulationReduction, TrainingLoopBudget,
+    TrainingOptimizerConfig, TrainingOptimizerResidencyPolicy, TrainingOptimizerShardResidency,
     TrainingOptimizerStateShardKind, TrainingOptimizerStateShardLayout,
     TrainingParameterGroupState, TrainingParameterShardKind, TrainingParameterShardLayout,
     TrainingPrecisionPolicy, TrainingShardPlacement, TrainingShardRange, TrainingTensorBuffer,
@@ -792,26 +791,18 @@ pub fn build_parameter_golf_runpod_8xh100_measurements_from_train_log(
                     rank,
                     sequence_start,
                     sequence_count,
-                    evaluation_unit_start: extract_u64_after(
-                        line,
-                        "evaluation_unit_start=",
-                        " ",
-                    )
-                    .unwrap_or(sequence_start),
-                    evaluation_unit_count: extract_u64_after(
-                        line,
-                        "evaluation_unit_count=",
-                        " ",
-                    )
-                    .unwrap_or(sequence_count),
+                    evaluation_unit_start: extract_u64_after(line, "evaluation_unit_start=", " ")
+                        .unwrap_or(sequence_start),
+                    evaluation_unit_count: extract_u64_after(line, "evaluation_unit_count=", " ")
+                        .unwrap_or(sequence_count),
                     scored_token_start: extract_u64_after(line, "scored_token_start=", " ")
-                        .unwrap_or(sequence_start.saturating_mul(
-                            geometry.train_sequence_length as u64,
-                        )),
+                        .unwrap_or(
+                            sequence_start.saturating_mul(geometry.train_sequence_length as u64),
+                        ),
                     scored_token_count: extract_u64_after(line, "scored_token_count=", " ")
-                        .unwrap_or(sequence_count.saturating_mul(
-                            geometry.train_sequence_length as u64,
-                        )),
+                        .unwrap_or(
+                            sequence_count.saturating_mul(geometry.train_sequence_length as u64),
+                        ),
                     loss_sum,
                     token_count,
                     byte_count,
@@ -1532,12 +1523,12 @@ pub(crate) fn build_validation_observation_plan(
                     (total_tokens, 0)
                 } else {
                     let first_window_start = window_starts[evaluation_unit_start as usize] as u64;
-                    let last_window_start =
-                        window_starts[(evaluation_unit_start + evaluation_unit_count - 1) as usize]
-                            as u64;
-                    let first_valid_length =
-                        (first_window_start + sequence_length).min(total_tokens)
-                            - first_window_start;
+                    let last_window_start = window_starts
+                        [(evaluation_unit_start + evaluation_unit_count - 1) as usize]
+                        as u64;
+                    let first_valid_length = (first_window_start + sequence_length)
+                        .min(total_tokens)
+                        - first_window_start;
                     let last_valid_length =
                         (last_window_start + sequence_length).min(total_tokens) - last_window_start;
                     let first_score_start = if first_window_start == 0 {
@@ -1570,8 +1561,7 @@ pub(crate) fn build_validation_observation_plan(
                     scored_token_start,
                     scored_token_count,
                 });
-                evaluation_unit_start =
-                    evaluation_unit_start.saturating_add(evaluation_unit_count);
+                evaluation_unit_start = evaluation_unit_start.saturating_add(evaluation_unit_count);
             }
             Ok(plan)
         }
@@ -1718,8 +1708,7 @@ mod tests {
         benchmark_parameter_golf_distributed_8xh100,
         benchmark_parameter_golf_runpod_8xh100_from_measurements,
         build_parameter_golf_runpod_8xh100_measurements_from_train_log,
-        device_capacity_matches_h100_threshold,
-        parameter_golf_runpod_8xh100_capability_profile,
+        device_capacity_matches_h100_threshold, parameter_golf_runpod_8xh100_capability_profile,
         parse_parameter_golf_runpod_8xh100_inventory, ParameterGolfBatchGeometry,
         ParameterGolfDistributed8xH100Config, ParameterGolfDistributedLaneError,
         ParameterGolfDistributedMemoryObservation, ParameterGolfDistributedStepObservation,
@@ -1739,6 +1728,8 @@ mod tests {
             num_heads: 2,
             num_kv_heads: 1,
             mlp_mult: 2,
+            bigram_vocab_size: 0,
+            bigram_dim: 128,
             mlp_activation: Default::default(),
             max_context: 16,
             tie_embeddings: true,

@@ -293,7 +293,7 @@ pub fn parameter_golf_optimizer_plan(
     for tensor in &descriptor.weights.tensors {
         let name = tensor.name.as_str();
         let parameter_count = tensor.element_count();
-        if name == "tok_emb.weight" {
+        if name == "tok_emb.weight" || name == "bigram.embed.weight" {
             token_names.push(String::from(name));
             token_parameter_count += parameter_count;
         } else if name == "lm_head.weight" {
@@ -302,7 +302,9 @@ pub fn parameter_golf_optimizer_plan(
         } else if is_matrix_bank_name(name) && tensor.shape.dims().len() == 3 {
             matrix_names.push(String::from(name));
             matrix_parameter_count += parameter_count;
-        } else if name == "skip_weights"
+        } else if name == "bigram.scale"
+            || name == "bigram.proj.weight"
+            || name == "skip_weights"
             || (name.starts_with("blocks.")
                 && (tensor.shape.dims().len() < 2 || is_control_tensor_name(name)))
         {
@@ -408,17 +410,24 @@ pub fn parameter_golf_graph_parameter_dtype(
     tensor_name: &str,
     shape: &Shape,
 ) -> Result<DType, ParameterGolfTrainError> {
-    if tensor_name == "tok_emb.weight" || tensor_name == "lm_head.weight" {
+    if tensor_name == "tok_emb.weight"
+        || tensor_name == "bigram.embed.weight"
+        || tensor_name == "lm_head.weight"
+    {
         return Ok(DType::BF16);
     }
     if is_matrix_bank_name(tensor_name) && shape.dims().len() == 3 {
         return Ok(DType::BF16);
     }
-    if tensor_name == "skip_weights"
+    if tensor_name == "bigram.scale"
+        || tensor_name == "skip_weights"
         || (tensor_name.starts_with("blocks.")
             && (shape.dims().len() < 2 || is_control_tensor_name(tensor_name)))
     {
         return Ok(DType::F32);
+    }
+    if tensor_name == "bigram.proj.weight" && shape.dims().len() == 2 {
+        return Ok(DType::BF16);
     }
     if tensor_name.starts_with("blocks.")
         && shape.dims().len() == 2

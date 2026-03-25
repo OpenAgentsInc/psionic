@@ -296,6 +296,17 @@ The open issue stack is now explicit about four additional competitive-path gaps
 - `LeakyReLU(0.5)^2` in the PGOLF MLP activation surface
 - `BigramHash`-style local context features
 
+Since the initial audit pass, Psionic has landed the code-local halves of two of
+those gaps:
+
+- `LeakyReLU(0.5)^2` now exists across the reference-model, graph, IR, CPU, and
+  CUDA lanes
+- `BigramHash` now exists in the PGOLF config, parameter accounting, reference
+  model, optimizer classification, and baseline graph input path
+
+Those two issues remain open because the retained `H100` or `8xH100`
+score-path receipts do not exist yet.
+
 ## Bottom Line
 
 Psionic now has a real RunPod `8xH100` operator lane, a real repeated-step

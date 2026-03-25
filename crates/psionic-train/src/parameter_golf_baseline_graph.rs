@@ -9,10 +9,9 @@ use psionic_models::{
     ParameterGolfBankedWeights, ParameterGolfConfig, ParameterGolfConfigError,
     ParameterGolfExecutionError, ParameterGolfMlpActivation, ParameterGolfModelDescriptor,
     ParameterGolfModelError, ParameterGolfReferenceModel, ParameterGolfTensor3,
-    ParameterGolfTensorError, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON,
-    PARAMETER_GOLF_KV_BANK_NAME, PARAMETER_GOLF_MATRIX_BANK_NAMES,
-    PARAMETER_GOLF_MLP_DOWN_BANK_NAME, PARAMETER_GOLF_MLP_UP_BANK_NAME,
-    PARAMETER_GOLF_QO_BANK_NAME,
+    ParameterGolfTensorError, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON, PARAMETER_GOLF_KV_BANK_NAME,
+    PARAMETER_GOLF_MATRIX_BANK_NAMES, PARAMETER_GOLF_MLP_DOWN_BANK_NAME,
+    PARAMETER_GOLF_MLP_UP_BANK_NAME, PARAMETER_GOLF_QO_BANK_NAME,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -50,6 +49,8 @@ pub struct ParameterGolfBaselineGraph {
     pub graph: AutodiffGraph,
     /// Non-trainable integer token-id tensor consumed by the graph.
     pub input_token_ids_tensor_id: TensorId,
+    /// Optional non-trainable hashed-bigram token ids consumed by the graph.
+    pub bigram_token_ids_tensor_id: Option<TensorId>,
     /// Final pre-softcap logits tensor emitted by the graph.
     pub pre_softcap_logits_tensor_id: TensorId,
     /// Parameter bindings in deterministic order.
@@ -77,6 +78,8 @@ pub struct ParameterGolfBaselineTrainingGraph {
     pub graph: AutodiffGraph,
     /// Non-trainable integer token-id tensor consumed by the graph.
     pub input_token_ids_tensor_id: TensorId,
+    /// Optional non-trainable hashed-bigram token ids consumed by the graph.
+    pub bigram_token_ids_tensor_id: Option<TensorId>,
     /// Integer target ids consumed by the projection-loss op.
     pub target_ids_tensor_id: TensorId,
     /// Final scalar mean-loss tensor emitted by the graph.
@@ -107,6 +110,8 @@ pub struct ParameterGolfBaselineEvalGraph {
     pub graph: Graph,
     /// Non-trainable integer token-id tensor consumed by the graph.
     pub input_token_ids_tensor_id: TensorId,
+    /// Optional non-trainable hashed-bigram token ids consumed by the graph.
+    pub bigram_token_ids_tensor_id: Option<TensorId>,
     /// Integer target ids consumed by the projection-loss op.
     pub target_ids_tensor_id: TensorId,
     /// Per-token loss tensor emitted by the eval graph.
@@ -193,6 +198,7 @@ pub enum ParameterGolfBaselineGraphError {
 
 struct ParameterGolfBaselineGraphBuildState {
     input_token_ids: AutodiffTensor,
+    bigram_token_ids: Option<AutodiffTensor>,
     parameter_bindings: Vec<ParameterGolfBaselineGraphParameterBinding>,
     pre_softcap_logits: AutodiffTensor,
 }
@@ -218,6 +224,7 @@ pub fn build_parameter_golf_baseline_graph(
 
     Ok(ParameterGolfBaselineGraph {
         input_token_ids_tensor_id: state.input_token_ids.id(),
+        bigram_token_ids_tensor_id: state.bigram_token_ids.as_ref().map(AutodiffTensor::id),
         pre_softcap_logits_tensor_id: state.pre_softcap_logits.id(),
         graph,
         parameter_bindings: state.parameter_bindings,
@@ -258,6 +265,7 @@ pub fn build_parameter_golf_baseline_training_graph(
 
     Ok(ParameterGolfBaselineTrainingGraph {
         input_token_ids_tensor_id: state.input_token_ids.id(),
+        bigram_token_ids_tensor_id: state.bigram_token_ids.as_ref().map(AutodiffTensor::id),
         target_ids_tensor_id: target_ids.id(),
         loss_tensor_id: loss.id(),
         graph,
@@ -310,6 +318,7 @@ pub fn build_parameter_golf_baseline_eval_graph(
     Ok(ParameterGolfBaselineEvalGraph {
         graph,
         input_token_ids_tensor_id: state.input_token_ids.id(),
+        bigram_token_ids_tensor_id: state.bigram_token_ids.as_ref().map(AutodiffTensor::id),
         target_ids_tensor_id: target_ids.id(),
         token_losses_tensor_id: token_losses.id(),
         loss_tensor_id: loss.id(),
@@ -338,6 +347,7 @@ pub fn bind_parameter_golf_baseline_graph_inputs_with_banked_weights(
 ) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
     bind_parameter_golf_graph_inputs(
         graph.input_token_ids_tensor_id,
+        graph.bigram_token_ids_tensor_id,
         graph.parameter_bindings.as_slice(),
         model,
         explicit_banked_weights,
@@ -370,6 +380,7 @@ pub fn bind_parameter_golf_baseline_training_graph_inputs_with_banked_weights(
 ) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
     bind_parameter_golf_loss_graph_inputs(
         graph.input_token_ids_tensor_id,
+        graph.bigram_token_ids_tensor_id,
         graph.target_ids_tensor_id,
         graph.parameter_bindings.as_slice(),
         model,
@@ -404,6 +415,7 @@ pub fn bind_parameter_golf_baseline_eval_graph_inputs_with_banked_weights(
 ) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
     bind_parameter_golf_loss_graph_inputs(
         graph.input_token_ids_tensor_id,
+        graph.bigram_token_ids_tensor_id,
         graph.target_ids_tensor_id,
         graph.parameter_bindings.as_slice(),
         model,
@@ -415,6 +427,7 @@ pub fn bind_parameter_golf_baseline_eval_graph_inputs_with_banked_weights(
 
 fn bind_parameter_golf_graph_inputs(
     input_token_ids_tensor_id: TensorId,
+    bigram_token_ids_tensor_id: Option<TensorId>,
     parameter_bindings: &[ParameterGolfBaselineGraphParameterBinding],
     model: &ParameterGolfReferenceModel,
     explicit_banked_weights: Option<&ParameterGolfBankedWeights>,
@@ -438,6 +451,20 @@ fn bind_parameter_golf_graph_inputs(
                 .collect(),
         ),
     );
+    if let Some(bigram_token_ids_tensor_id) = bigram_token_ids_tensor_id {
+        let bigram_ids = config
+            .bigram_hash_batch(input_ids)?
+            .expect("bigram graph input must not exist when the feature is disabled");
+        inputs.insert(
+            bigram_token_ids_tensor_id,
+            TensorData::I32(
+                bigram_ids
+                    .iter()
+                    .flat_map(|row| row.iter().map(|token_id| *token_id as i32))
+                    .collect(),
+            ),
+        );
+    }
     for binding in parameter_bindings {
         let parameter = parameter_vectors
             .get(&binding.parameter_id)
@@ -466,6 +493,7 @@ fn bind_parameter_golf_graph_inputs(
 
 fn bind_parameter_golf_loss_graph_inputs(
     input_token_ids_tensor_id: TensorId,
+    bigram_token_ids_tensor_id: Option<TensorId>,
     target_ids_tensor_id: TensorId,
     parameter_bindings: &[ParameterGolfBaselineGraphParameterBinding],
     model: &ParameterGolfReferenceModel,
@@ -475,6 +503,7 @@ fn bind_parameter_golf_loss_graph_inputs(
 ) -> Result<BTreeMap<TensorId, TensorData>, ParameterGolfBaselineGraphError> {
     let mut inputs = bind_parameter_golf_graph_inputs(
         input_token_ids_tensor_id,
+        bigram_token_ids_tensor_id,
         parameter_bindings,
         model,
         explicit_banked_weights,
@@ -706,6 +735,16 @@ fn build_baseline_graph_state(
         DType::I32,
         false,
     );
+    let bigram_token_ids = if config.bigram_vocab_size > 0 {
+        Some(builder.input(
+            "bigram_token_ids",
+            Shape::new(vec![batch_size, sequence_length]),
+            DType::I32,
+            false,
+        ))
+    } else {
+        None
+    };
 
     let mut parameter_inputs = BTreeMap::new();
     let mut parameter_bindings = Vec::new();
@@ -734,8 +773,57 @@ fn build_baseline_graph_state(
                 parameter_id: String::from("tok_emb.weight"),
             },
         )?;
-    let embedded_input =
+    let mut embedded_input =
         builder.parameter_golf_token_embedding_lookup(&input_token_ids, &tok_emb)?;
+    if let Some(bigram_token_ids) = &bigram_token_ids {
+        let bigram_emb = parameter_inputs
+            .get("bigram.embed.weight")
+            .cloned()
+            .ok_or_else(
+                || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                    parameter_id: String::from("bigram.embed.weight"),
+                },
+            )?;
+        let bigram_embedded =
+            builder.parameter_golf_token_embedding_lookup(bigram_token_ids, &bigram_emb)?;
+        let bigram_features = if config.bigram_dim == config.model_dim {
+            bigram_embedded
+        } else {
+            let bigram_proj = parameter_inputs
+                .get("bigram.proj.weight")
+                .cloned()
+                .ok_or_else(
+                    || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                        parameter_id: String::from("bigram.proj.weight"),
+                    },
+                )?;
+            linear_3d(
+                builder,
+                &bigram_embedded,
+                &bigram_proj,
+                batch_size,
+                sequence_length,
+                config.bigram_dim,
+                config.model_dim,
+                use_bf16_fast_path,
+            )?
+        };
+        let bigram_scale = parameter_inputs
+            .get("bigram.scale")
+            .cloned()
+            .ok_or_else(
+                || ParameterGolfBaselineGraphError::MissingParameterBinding {
+                    parameter_id: String::from("bigram.scale"),
+                },
+            )?;
+        let bigram_scale = builder.reshape(&bigram_scale, Shape::new(vec![1, 1, 1]))?;
+        let bigram_scale = builder.expand(
+            &bigram_scale,
+            Shape::new(vec![batch_size, sequence_length, config.model_dim]),
+        )?;
+        let bigram_features = builder.mul(&bigram_features, &bigram_scale)?;
+        embedded_input = builder.add(&embedded_input, &bigram_features)?;
+    }
 
     let ones_model = builder.constant_f32(
         Shape::new(vec![config.model_dim]),
@@ -824,6 +912,7 @@ fn build_baseline_graph_state(
 
     Ok(ParameterGolfBaselineGraphBuildState {
         input_token_ids,
+        bigram_token_ids,
         parameter_bindings,
         pre_softcap_logits,
     })
@@ -1591,6 +1680,77 @@ mod tests {
             ModelDescriptor::new("parameter-golf-test-leaky", "parameter_golf_decoder", "v1"),
             config.clone(),
             ParameterGolfWeights::from_initializer(&config, fixture.initializer)?,
+        )?;
+        let graph = build_parameter_golf_baseline_graph(
+            Device::cpu(),
+            model.descriptor(),
+            fixture.input_ids.len(),
+            fixture.input_ids[0].len(),
+        )?;
+        compile_graph(graph.graph.graph())?;
+
+        let inputs = bind_parameter_golf_baseline_graph_inputs(
+            &graph,
+            &model,
+            fixture.input_ids.as_slice(),
+        )?;
+        let values = evaluate_graph(graph.graph.graph(), &inputs)?;
+        let pre_softcap_logits = output_tensor3(
+            values
+                .get(&graph.pre_softcap_logits_tensor_id)
+                .ok_or("missing pre-softcap logits")?,
+            [1, 4, model.descriptor().config.vocab_size],
+            "pre_softcap_logits",
+        )?;
+        let seeded = parameter_golf_projection_seed(
+            &pre_softcap_logits,
+            fixture.target_ids.as_slice(),
+            model.descriptor().config.logit_softcap,
+        )?;
+        let reference = model.forward_logits(fixture.input_ids.as_slice())?;
+        let max_abs_diff = seeded.softcapped_logits.max_abs_diff(&reference)?;
+        assert!(
+            max_abs_diff < 5e-5,
+            "max logit drift {max_abs_diff} exceeded tolerance"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_baseline_graph_matches_reference_logits_with_bigram_hash(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = load_baseline_fixture();
+        let config = ParameterGolfConfig {
+            bigram_vocab_size: 1536,
+            bigram_dim: 128,
+            ..ParameterGolfConfig::baseline_sp1024_9x512()
+        };
+        let mut weights = ParameterGolfWeights::from_initializer(&config, fixture.initializer)?;
+        let hashed = config
+            .bigram_hash_batch(fixture.input_ids.as_slice())?
+            .expect("bigram should be enabled");
+        let bigram = weights
+            .bigram
+            .as_mut()
+            .expect("bigram weights should exist");
+        for row in &hashed {
+            for token_id in row {
+                let row_offset = *token_id as usize * config.bigram_dim;
+                for feature in 0..config.bigram_dim {
+                    bigram.embedding[row_offset + feature] = 0.01 * (feature as f32 + 1.0);
+                }
+            }
+        }
+        if let Some(proj) = &mut bigram.proj {
+            for value in &mut proj.weight {
+                *value = 0.001;
+            }
+        }
+        bigram.scale[0] = 0.2;
+        let model = ParameterGolfReferenceModel::new(
+            ModelDescriptor::new("parameter-golf-test-bigram", "parameter_golf_decoder", "v1"),
+            config.clone(),
+            weights,
         )?;
         let graph = build_parameter_golf_baseline_graph(
             Device::cpu(),

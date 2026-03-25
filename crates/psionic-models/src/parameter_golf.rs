@@ -27,6 +27,10 @@ pub const PARAMETER_GOLF_BASELINE_NUM_HEADS: usize = 8;
 pub const PARAMETER_GOLF_BASELINE_NUM_KV_HEADS: usize = 4;
 /// The current public baseline MLP expansion multiplier.
 pub const PARAMETER_GOLF_BASELINE_MLP_MULT: usize = 2;
+/// The current public baseline bigram-hash vocab size.
+pub const PARAMETER_GOLF_BASELINE_BIGRAM_VOCAB_SIZE: usize = 0;
+/// The current public baseline bigram embedding width.
+pub const PARAMETER_GOLF_BASELINE_BIGRAM_DIM: usize = 128;
 /// The current public baseline context length.
 pub const PARAMETER_GOLF_BASELINE_MAX_CONTEXT: usize = 1024;
 /// The current public baseline tied-embedding posture.
@@ -89,6 +93,14 @@ impl Default for ParameterGolfMlpActivation {
     }
 }
 
+const fn parameter_golf_default_bigram_vocab_size() -> usize {
+    PARAMETER_GOLF_BASELINE_BIGRAM_VOCAB_SIZE
+}
+
+const fn parameter_golf_default_bigram_dim() -> usize {
+    PARAMETER_GOLF_BASELINE_BIGRAM_DIM
+}
+
 /// Configuration for one Parameter Golf decoder-family instance.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfConfig {
@@ -104,6 +116,12 @@ pub struct ParameterGolfConfig {
     pub num_kv_heads: usize,
     /// MLP expansion multiplier.
     pub mlp_mult: usize,
+    /// Hashed bigram feature vocab size. Zero disables the feature.
+    #[serde(default = "parameter_golf_default_bigram_vocab_size")]
+    pub bigram_vocab_size: usize,
+    /// Bigram embedding width before the optional projection.
+    #[serde(default = "parameter_golf_default_bigram_dim")]
+    pub bigram_dim: usize,
     /// MLP activation family.
     #[serde(default)]
     pub mlp_activation: ParameterGolfMlpActivation,
@@ -132,6 +150,8 @@ impl ParameterGolfConfig {
             num_heads: PARAMETER_GOLF_BASELINE_NUM_HEADS,
             num_kv_heads: PARAMETER_GOLF_BASELINE_NUM_KV_HEADS,
             mlp_mult: PARAMETER_GOLF_BASELINE_MLP_MULT,
+            bigram_vocab_size: PARAMETER_GOLF_BASELINE_BIGRAM_VOCAB_SIZE,
+            bigram_dim: PARAMETER_GOLF_BASELINE_BIGRAM_DIM,
             mlp_activation: PARAMETER_GOLF_BASELINE_MLP_ACTIVATION,
             max_context: PARAMETER_GOLF_BASELINE_MAX_CONTEXT,
             tie_embeddings: PARAMETER_GOLF_BASELINE_TIE_EMBEDDINGS,
@@ -182,14 +202,21 @@ impl ParameterGolfConfig {
         if self.mlp_mult == 0 {
             return Err(ParameterGolfConfigError::MlpMultMustBePositive);
         }
-        if let ParameterGolfMlpActivation::LeakyReluSquared { negative_slope } =
-            self.mlp_activation
+        if self.bigram_vocab_size == 1 {
+            return Err(ParameterGolfConfigError::BigramVocabSizeMustBeZeroOrAtLeastTwo);
+        }
+        if self.bigram_vocab_size > 0 && self.bigram_dim == 0 {
+            return Err(ParameterGolfConfigError::BigramDimMustBePositiveWhenEnabled);
+        }
+        if let ParameterGolfMlpActivation::LeakyReluSquared { negative_slope } = self.mlp_activation
         {
             let negative_slope = negative_slope.to_f32();
             if !negative_slope.is_finite() || negative_slope < 0.0 {
-                return Err(ParameterGolfConfigError::MlpActivationNegativeSlopeMustBeFinite {
-                    value: negative_slope,
-                });
+                return Err(
+                    ParameterGolfConfigError::MlpActivationNegativeSlopeMustBeFinite {
+                        value: negative_slope,
+                    },
+                );
             }
         }
         if self.max_context == 0 {
@@ -259,6 +286,30 @@ impl ParameterGolfConfig {
         )
     }
 
+    /// Returns one deterministic hashed-bigram id surface for the supplied
+    /// token batch, or `None` when the feature is disabled.
+    pub fn bigram_hash_batch(
+        &self,
+        input_ids: &[Vec<u32>],
+    ) -> Result<Option<Vec<Vec<u32>>>, ParameterGolfExecutionError> {
+        let _ = validate_token_batch(input_ids, self.vocab_size)?;
+        if self.bigram_vocab_size == 0 {
+            return Ok(None);
+        }
+        let mod_base = (self.bigram_vocab_size - 1) as u64;
+        let mut hashed = Vec::with_capacity(input_ids.len());
+        for row in input_ids {
+            let mut hashed_row = vec![mod_base as u32; row.len()];
+            for position in 1..row.len() {
+                hashed_row[position] = (((36_313_u64 * row[position] as u64)
+                    ^ (27_191_u64 * row[position - 1] as u64))
+                    % mod_base) as u32;
+            }
+            hashed.push(hashed_row);
+        }
+        Ok(Some(hashed))
+    }
+
     /// Returns challenge-specific parameter accounting facts for the family.
     pub fn parameter_facts(&self) -> Result<ParameterGolfParameterFacts, ParameterGolfConfigError> {
         let head_dim = self.model_dim / self.num_heads;
@@ -269,6 +320,17 @@ impl ParameterGolfConfig {
         )?;
         let token_embedding =
             checked_mul_usize(self.vocab_size, self.model_dim, "token_embedding")?;
+        let bigram_embedding = if self.bigram_vocab_size > 0 {
+            checked_mul_usize(self.bigram_vocab_size, self.bigram_dim, "bigram_embedding")?
+        } else {
+            0
+        };
+        let bigram_projection = if self.bigram_vocab_size > 0 && self.bigram_dim != self.model_dim {
+            checked_mul_usize(self.model_dim, self.bigram_dim, "bigram_projection")?
+        } else {
+            0
+        };
+        let bigram_scale = usize::from(self.bigram_vocab_size > 0);
         let q_proj = checked_mul_usize(self.model_dim, self.model_dim, "q_proj")?;
         let k_proj = checked_mul_usize(kv_dim, self.model_dim, "k_proj")?;
         let v_proj = checked_mul_usize(kv_dim, self.model_dim, "v_proj")?;
@@ -317,16 +379,23 @@ impl ParameterGolfConfig {
             "per_block_total",
         )?;
         let total_parameters = checked_add_usize(
-            checked_add_usize(token_embedding, skip_weights, "total_parameters")?,
+            checked_add_usize(
+                checked_add_usize(token_embedding, bigram_embedding, "total_parameters")?,
+                checked_add_usize(bigram_projection, bigram_scale, "total_parameters")?,
+                "total_parameters",
+            )?,
             checked_add_usize(
                 checked_mul_usize(self.num_layers, per_block_total, "blocks_total")?,
-                lm_head,
+                checked_add_usize(skip_weights, lm_head, "total_parameters")?,
                 "total_parameters",
             )?,
             "total_parameters",
         )?;
         Ok(ParameterGolfParameterFacts {
             token_embedding,
+            bigram_embedding,
+            bigram_projection,
+            bigram_scale,
             skip_weights,
             per_block_attention,
             per_block_feed_forward,
@@ -380,6 +449,12 @@ pub enum ParameterGolfConfigError {
     /// `mlp_mult` must be strictly positive.
     #[error("mlp_mult must be positive")]
     MlpMultMustBePositive,
+    /// `bigram_vocab_size` must be zero or at least two.
+    #[error("bigram_vocab_size must be zero or at least two")]
+    BigramVocabSizeMustBeZeroOrAtLeastTwo,
+    /// `bigram_dim` must be strictly positive when the feature is enabled.
+    #[error("bigram_dim must be positive when bigram_vocab_size > 0")]
+    BigramDimMustBePositiveWhenEnabled,
     /// The leaky-ReLU negative slope must be finite and non-negative.
     #[error("mlp_activation negative_slope must be finite and non-negative, got {value}")]
     MlpActivationNegativeSlopeMustBeFinite {
@@ -426,6 +501,12 @@ pub enum ParameterGolfConfigError {
 pub struct ParameterGolfParameterFacts {
     /// Parameters in the token embedding matrix.
     pub token_embedding: usize,
+    /// Parameters in the optional bigram embedding table.
+    pub bigram_embedding: usize,
+    /// Parameters in the optional bigram projection matrix.
+    pub bigram_projection: usize,
+    /// Parameters in the optional bigram scalar scale.
+    pub bigram_scale: usize,
     /// Parameters in the learned skip-weight table.
     pub skip_weights: usize,
     /// Per-block attention parameters, including q-gain.
@@ -854,11 +935,24 @@ pub struct ParameterGolfBlockControlWeights {
     pub resid_mix: Vec<f32>,
 }
 
+/// Optional hashed-bigram feature tensors kept outside the block stack.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfBigramHashWeights {
+    /// Bigram embedding matrix in `[bigram_vocab_size, bigram_dim]` order.
+    pub embedding: Vec<f32>,
+    /// Optional projection in `[model_dim, bigram_dim]` order.
+    pub proj: Option<ParameterGolfLinearWeights>,
+    /// Learned scalar multiplier.
+    pub scale: Vec<f32>,
+}
+
 /// Full logical weight bundle for one Parameter Golf family instance.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfWeights {
     /// Token embedding matrix in `[vocab_size, model_dim]` order.
     pub token_embedding: Vec<f32>,
+    /// Optional hashed bigram feature tensors.
+    pub bigram: Option<ParameterGolfBigramHashWeights>,
     /// Learned skip-weight table in `[num_skip_weights, model_dim]` order.
     pub skip_weights: Vec<f32>,
     /// Ordered block weights.
@@ -872,6 +966,8 @@ pub struct ParameterGolfWeights {
 pub struct ParameterGolfBankedWeights {
     /// Token embedding matrix in `[vocab_size, model_dim]` order.
     pub token_embedding: Vec<f32>,
+    /// Optional hashed bigram feature tensors that stay outside the matrix banks.
+    pub bigram: Option<ParameterGolfBigramHashWeights>,
     /// Learned skip-weight table in `[num_skip_weights, model_dim]` order.
     pub skip_weights: Vec<f32>,
     /// Combined query/output bank in `[2 * num_layers, model_dim, model_dim]` order.
@@ -968,6 +1064,19 @@ impl ParameterGolfWeights {
                 ),
             })
             .collect();
+        let bigram = if config.bigram_vocab_size > 0 {
+            Some(ParameterGolfBigramHashWeights {
+                embedding: vec![0.0; config.bigram_vocab_size * config.bigram_dim],
+                proj: (config.bigram_dim != config.model_dim).then(|| ParameterGolfLinearWeights {
+                    out_features: config.model_dim,
+                    in_features: config.bigram_dim,
+                    weight: vec![0.0; config.model_dim * config.bigram_dim],
+                }),
+                scale: vec![0.05],
+            })
+        } else {
+            None
+        };
         let lm_head = (!config.tie_embeddings).then(|| {
             ParameterGolfLinearWeights::from_initializer(
                 "lm_head.weight",
@@ -979,6 +1088,7 @@ impl ParameterGolfWeights {
         Ok(Self {
             token_embedding: initializer
                 .values_for("tok_emb.weight", config.vocab_size * config.model_dim),
+            bigram,
             skip_weights: initializer
                 .values_for("skip_weights", config.num_skip_weights() * config.model_dim),
             blocks,
@@ -1035,6 +1145,7 @@ impl ParameterGolfWeights {
             .collect::<Vec<_>>();
         Ok(ParameterGolfBankedWeights {
             token_embedding: self.token_embedding.clone(),
+            bigram: self.bigram.clone(),
             skip_weights: self.skip_weights.clone(),
             qo_bank: ParameterGolfLinearBankWeights::from_linears(qo_slices.as_slice()),
             kv_bank: ParameterGolfLinearBankWeights::from_linears(kv_slices.as_slice()),
@@ -1058,24 +1169,46 @@ impl ParameterGolfWeights {
         &'a self,
         config: &ParameterGolfConfig,
     ) -> Vec<(WeightTensorMetadata, &'a [f32])> {
-        let mut entries = vec![
-            (
+        let mut entries = vec![(
+            WeightTensorMetadata::new(
+                "tok_emb.weight",
+                Shape::new(vec![config.vocab_size, config.model_dim]),
+                DType::F32,
+            ),
+            self.token_embedding.as_slice(),
+        )];
+        if let Some(bigram) = &self.bigram {
+            entries.push((
                 WeightTensorMetadata::new(
-                    "tok_emb.weight",
-                    Shape::new(vec![config.vocab_size, config.model_dim]),
+                    "bigram.embed.weight",
+                    Shape::new(vec![config.bigram_vocab_size, config.bigram_dim]),
                     DType::F32,
                 ),
-                self.token_embedding.as_slice(),
+                bigram.embedding.as_slice(),
+            ));
+            if let Some(proj) = &bigram.proj {
+                entries.push((
+                    WeightTensorMetadata::new(
+                        "bigram.proj.weight",
+                        Shape::new(vec![proj.out_features, proj.in_features]),
+                        DType::F32,
+                    ),
+                    proj.weight.as_slice(),
+                ));
+            }
+            entries.push((
+                WeightTensorMetadata::new("bigram.scale", Shape::new(vec![1]), DType::F32),
+                bigram.scale.as_slice(),
+            ));
+        }
+        entries.push((
+            WeightTensorMetadata::new(
+                "skip_weights",
+                Shape::new(vec![config.num_skip_weights(), config.model_dim]),
+                DType::F32,
             ),
-            (
-                WeightTensorMetadata::new(
-                    "skip_weights",
-                    Shape::new(vec![config.num_skip_weights(), config.model_dim]),
-                    DType::F32,
-                ),
-                self.skip_weights.as_slice(),
-            ),
-        ];
+            self.skip_weights.as_slice(),
+        ));
         for (layer_index, block) in self.blocks.iter().enumerate() {
             entries.extend_from_slice(&[
                 (
@@ -1321,6 +1454,7 @@ impl ParameterGolfBankedWeights {
 
         let weights = ParameterGolfWeights {
             token_embedding: self.token_embedding.clone(),
+            bigram: self.bigram.clone(),
             skip_weights: self.skip_weights.clone(),
             blocks,
             lm_head: self.lm_head.clone(),
@@ -1362,14 +1496,6 @@ impl ParameterGolfBankedWeights {
             ),
             (
                 WeightTensorMetadata::new(
-                    "skip_weights",
-                    Shape::new(vec![config.num_skip_weights(), config.model_dim]),
-                    DType::F32,
-                ),
-                self.skip_weights.as_slice(),
-            ),
-            (
-                WeightTensorMetadata::new(
                     PARAMETER_GOLF_QO_BANK_NAME,
                     self.qo_bank.shape(),
                     DType::F32,
@@ -1401,6 +1527,38 @@ impl ParameterGolfBankedWeights {
                 self.mlp_down_bank.weight.as_slice(),
             ),
         ];
+        if let Some(bigram) = &self.bigram {
+            entries.push((
+                WeightTensorMetadata::new(
+                    "bigram.embed.weight",
+                    Shape::new(vec![config.bigram_vocab_size, config.bigram_dim]),
+                    DType::F32,
+                ),
+                bigram.embedding.as_slice(),
+            ));
+            if let Some(proj) = &bigram.proj {
+                entries.push((
+                    WeightTensorMetadata::new(
+                        "bigram.proj.weight",
+                        Shape::new(vec![proj.out_features, proj.in_features]),
+                        DType::F32,
+                    ),
+                    proj.weight.as_slice(),
+                ));
+            }
+            entries.push((
+                WeightTensorMetadata::new("bigram.scale", Shape::new(vec![1]), DType::F32),
+                bigram.scale.as_slice(),
+            ));
+        }
+        entries.push((
+            WeightTensorMetadata::new(
+                "skip_weights",
+                Shape::new(vec![config.num_skip_weights(), config.model_dim]),
+                DType::F32,
+            ),
+            self.skip_weights.as_slice(),
+        ));
         for (layer_index, controls) in self.block_controls.iter().enumerate() {
             entries.extend_from_slice(&[
                 (
@@ -1506,6 +1664,18 @@ pub enum ParameterGolfModelError {
     /// Untied configs require an LM head.
     #[error("lm_head is required when tie_embeddings=false")]
     MissingLmHead,
+    /// Bigram-disabled configs must not carry bigram tensors.
+    #[error("bigram tensors must be absent when bigram_vocab_size=0")]
+    UnexpectedBigram,
+    /// Bigram-enabled configs require bigram tensors.
+    #[error("bigram tensors are required when bigram_vocab_size>0")]
+    MissingBigram,
+    /// The bigram projection must be absent when `bigram_dim == model_dim`.
+    #[error("bigram projection must be absent when bigram_dim == model_dim")]
+    UnexpectedBigramProjection,
+    /// The bigram projection is required when `bigram_dim != model_dim`.
+    #[error("bigram projection is required when bigram_dim != model_dim")]
+    MissingBigramProjection,
     /// One bank carried the wrong number of slices.
     #[error("weight bank `{name}` has bank_len {actual}; expected {expected}")]
     BankLengthMismatch {
@@ -1699,6 +1869,10 @@ impl ParameterGolfReferenceModel {
             batch_size,
             sequence_length,
         );
+        if let Some(bigram) = &self.weights.bigram {
+            let bigram = bigram_forward(bigram, config, input_ids, batch_size, sequence_length)?;
+            add_in_place(&mut x, &bigram);
+        }
         x = rms_norm_last_dim(&x, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON);
         let x0 = x.clone();
         let mut skips = Vec::new();
@@ -1842,6 +2016,36 @@ fn validate_weights(
         weights.token_embedding.as_slice(),
         config.vocab_size * config.model_dim,
     )?;
+    if config.bigram_vocab_size == 0 {
+        if weights.bigram.is_some() {
+            return Err(ParameterGolfModelError::UnexpectedBigram);
+        }
+    } else {
+        let Some(bigram) = &weights.bigram else {
+            return Err(ParameterGolfModelError::MissingBigram);
+        };
+        validate_vector_length(
+            "bigram.embed.weight",
+            bigram.embedding.as_slice(),
+            config.bigram_vocab_size * config.bigram_dim,
+        )?;
+        if config.bigram_dim == config.model_dim {
+            if bigram.proj.is_some() {
+                return Err(ParameterGolfModelError::UnexpectedBigramProjection);
+            }
+        } else {
+            let Some(proj) = &bigram.proj else {
+                return Err(ParameterGolfModelError::MissingBigramProjection);
+            };
+            validate_linear(
+                "bigram.proj.weight",
+                proj,
+                config.model_dim,
+                config.bigram_dim,
+            )?;
+        }
+        validate_vector_length("bigram.scale", bigram.scale.as_slice(), 1)?;
+    }
     validate_vector_length(
         "skip_weights",
         weights.skip_weights.as_slice(),
@@ -1969,6 +2173,38 @@ fn apply_parameter_override(
         assign_parameter_values(&mut bundle.token_embedding, parameter_id, values)?;
         return Ok(());
     }
+    if parameter_id == "bigram.embed.weight" {
+        let Some(bigram) = &mut bundle.bigram else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        assign_parameter_values(&mut bigram.embedding, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == "bigram.proj.weight" {
+        let Some(bigram) = &mut bundle.bigram else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        let Some(proj) = &mut bigram.proj else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        assign_parameter_values(&mut proj.weight, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == "bigram.scale" {
+        let Some(bigram) = &mut bundle.bigram else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        assign_parameter_values(&mut bigram.scale, parameter_id, values)?;
+        return Ok(());
+    }
     if parameter_id == "skip_weights" {
         assign_parameter_values(&mut bundle.skip_weights, parameter_id, values)?;
         return Ok(());
@@ -2043,6 +2279,38 @@ fn apply_banked_parameter_override(
 ) -> Result<(), ParameterGolfModelError> {
     if parameter_id == "tok_emb.weight" {
         assign_parameter_values(&mut bundle.token_embedding, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == "bigram.embed.weight" {
+        let Some(bigram) = &mut bundle.bigram else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        assign_parameter_values(&mut bigram.embedding, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == "bigram.proj.weight" {
+        let Some(bigram) = &mut bundle.bigram else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        let Some(proj) = &mut bigram.proj else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        assign_parameter_values(&mut proj.weight, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == "bigram.scale" {
+        let Some(bigram) = &mut bundle.bigram else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        assign_parameter_values(&mut bigram.scale, parameter_id, values)?;
         return Ok(());
     }
     if parameter_id == "skip_weights" {
@@ -2184,6 +2452,33 @@ fn embedding_forward(
     output
 }
 
+fn bigram_forward(
+    bigram: &ParameterGolfBigramHashWeights,
+    config: &ParameterGolfConfig,
+    input_ids: &[Vec<u32>],
+    batch_size: usize,
+    sequence_length: usize,
+) -> Result<ParameterGolfTensor3, ParameterGolfExecutionError> {
+    let hashed = config
+        .bigram_hash_batch(input_ids)?
+        .expect("validated bigram-enabled config must materialize hashes");
+    let mut output = embedding_forward(
+        bigram.embedding.as_slice(),
+        config.bigram_vocab_size,
+        config.bigram_dim,
+        hashed.as_slice(),
+        batch_size,
+        sequence_length,
+    );
+    if let Some(proj) = &bigram.proj {
+        output = linear_forward(proj, &output);
+    }
+    for value in &mut output.values {
+        *value *= bigram.scale[0];
+    }
+    Ok(output)
+}
+
 fn rms_norm_last_dim(input: &ParameterGolfTensor3, epsilon: f32) -> ParameterGolfTensor3 {
     let mut output = ParameterGolfTensor3::zeros(input.shape());
     let width = input.width();
@@ -2226,6 +2521,18 @@ fn blend_with_source(
         }
     }
     output
+}
+
+fn add_in_place(target: &mut ParameterGolfTensor3, delta: &ParameterGolfTensor3) {
+    for batch in 0..target.batch_size() {
+        for position in 0..target.sequence_length() {
+            for feature in 0..target.width() {
+                let value =
+                    target.get(batch, position, feature) + delta.get(batch, position, feature);
+                target.set(batch, position, feature, value);
+            }
+        }
+    }
 }
 
 fn add_scaled_in_place(
@@ -2827,6 +3134,9 @@ mod tests {
             1024
         );
         assert_eq!(facts.token_embedding, 524_288);
+        assert_eq!(facts.bigram_embedding, 0);
+        assert_eq!(facts.bigram_projection, 0);
+        assert_eq!(facts.bigram_scale, 0);
         assert_eq!(facts.skip_weights, 2_048);
         assert_eq!(facts.per_block_attention, 786_440);
         assert_eq!(facts.per_block_feed_forward, 1_048_576);
@@ -2877,11 +3187,69 @@ mod tests {
     }
 
     #[test]
-    fn baseline_fixture_deserializes_without_explicit_mlp_activation() {
+    fn config_rejects_invalid_bigram_shape() {
+        let err = ParameterGolfConfig {
+            bigram_vocab_size: 1,
+            ..ParameterGolfConfig::baseline_sp1024_9x512()
+        }
+        .validate()
+        .expect_err("size-one bigram vocab should be refused");
+        assert!(matches!(
+            err,
+            ParameterGolfConfigError::BigramVocabSizeMustBeZeroOrAtLeastTwo
+        ));
+
+        let err = ParameterGolfConfig {
+            bigram_vocab_size: 1536,
+            bigram_dim: 0,
+            ..ParameterGolfConfig::baseline_sp1024_9x512()
+        }
+        .validate()
+        .expect_err("zero-width enabled bigram should be refused");
+        assert!(matches!(
+            err,
+            ParameterGolfConfigError::BigramDimMustBePositiveWhenEnabled
+        ));
+    }
+
+    #[test]
+    fn baseline_fixture_deserializes_without_explicit_optional_scorepath_fields() {
         let fixture = load_baseline_fixture();
+        assert_eq!(fixture.config.bigram_vocab_size, 0);
+        assert_eq!(
+            fixture.config.bigram_dim,
+            PARAMETER_GOLF_BASELINE_BIGRAM_DIM
+        );
         assert_eq!(
             fixture.config.mlp_activation,
             ParameterGolfMlpActivation::ReluSquared
+        );
+    }
+
+    #[test]
+    fn bigram_hash_batch_matches_public_reference_formula() {
+        let config = ParameterGolfConfig {
+            bigram_vocab_size: 1536,
+            bigram_dim: 128,
+            ..ParameterGolfConfig::baseline_sp1024_9x512()
+        };
+        let hashed = config
+            .bigram_hash_batch(&[vec![11_u32, 7, 99, 7]])
+            .expect("hashing should succeed")
+            .expect("bigram should be enabled");
+        let mod_base = (config.bigram_vocab_size - 1) as u32;
+        assert_eq!(hashed[0][0], mod_base);
+        assert_eq!(
+            hashed[0][1],
+            (((36_313_u64 * 7_u64) ^ (27_191_u64 * 11_u64)) % mod_base as u64) as u32
+        );
+        assert_eq!(
+            hashed[0][2],
+            (((36_313_u64 * 99_u64) ^ (27_191_u64 * 7_u64)) % mod_base as u64) as u32
+        );
+        assert_eq!(
+            hashed[0][3],
+            (((36_313_u64 * 7_u64) ^ (27_191_u64 * 99_u64)) % mod_base as u64) as u32
         );
     }
 
@@ -2891,7 +3259,11 @@ mod tests {
         let input_ids = vec![vec![0_u32, 1, 2, 3]];
         let baseline_config = ParameterGolfConfig::baseline_sp1024_9x512();
         let baseline = ParameterGolfReferenceModel::new(
-            ModelDescriptor::new("parameter-golf-test-baseline", PARAMETER_GOLF_MODEL_FAMILY, "v1"),
+            ModelDescriptor::new(
+                "parameter-golf-test-baseline",
+                PARAMETER_GOLF_MODEL_FAMILY,
+                "v1",
+            ),
             baseline_config.clone(),
             ParameterGolfWeights::from_initializer(&baseline_config, initializer)
                 .expect("baseline weights should build"),
@@ -2902,7 +3274,11 @@ mod tests {
             ..baseline_config
         };
         let leaky = ParameterGolfReferenceModel::new(
-            ModelDescriptor::new("parameter-golf-test-leaky", PARAMETER_GOLF_MODEL_FAMILY, "v1"),
+            ModelDescriptor::new(
+                "parameter-golf-test-leaky",
+                PARAMETER_GOLF_MODEL_FAMILY,
+                "v1",
+            ),
             leaky_config.clone(),
             ParameterGolfWeights::from_initializer(&leaky_config, initializer)
                 .expect("leaky weights should build"),
@@ -2916,6 +3292,70 @@ mod tests {
             .forward_logits(&input_ids)
             .expect("leaky logits should materialize");
         assert_ne!(baseline_logits.values, leaky_logits.values);
+    }
+
+    #[test]
+    fn bigram_hash_changes_reference_logits_when_weights_are_nonzero() {
+        let initializer = ParameterGolfDeterministicInitializer::default();
+        let input_ids = vec![vec![0_u32, 1, 2, 3]];
+        let baseline_config = ParameterGolfConfig::baseline_sp1024_9x512();
+        let baseline = ParameterGolfReferenceModel::new(
+            ModelDescriptor::new(
+                "parameter-golf-test-baseline",
+                PARAMETER_GOLF_MODEL_FAMILY,
+                "v1",
+            ),
+            baseline_config.clone(),
+            ParameterGolfWeights::from_initializer(&baseline_config, initializer)
+                .expect("baseline weights should build"),
+        )
+        .expect("baseline model should build");
+        let bigram_config = ParameterGolfConfig {
+            bigram_vocab_size: 1536,
+            bigram_dim: 128,
+            ..baseline_config
+        };
+        let mut bigram_weights =
+            ParameterGolfWeights::from_initializer(&bigram_config, initializer)
+                .expect("bigram weights should build");
+        let hashed = bigram_config
+            .bigram_hash_batch(&input_ids)
+            .expect("hashing should succeed")
+            .expect("bigram should be enabled");
+        let bigram = bigram_weights
+            .bigram
+            .as_mut()
+            .expect("bigram weights should exist");
+        for token_id in &hashed[0] {
+            let row_offset = *token_id as usize * bigram_config.bigram_dim;
+            for feature in 0..bigram_config.bigram_dim {
+                bigram.embedding[row_offset + feature] = 0.01 * (feature as f32 + 1.0);
+            }
+        }
+        if let Some(proj) = &mut bigram.proj {
+            for value in &mut proj.weight {
+                *value = 0.001;
+            }
+        }
+        bigram.scale[0] = 0.2;
+        let bigram_model = ParameterGolfReferenceModel::new(
+            ModelDescriptor::new(
+                "parameter-golf-test-bigram",
+                PARAMETER_GOLF_MODEL_FAMILY,
+                "v1",
+            ),
+            bigram_config,
+            bigram_weights,
+        )
+        .expect("bigram model should build");
+
+        let baseline_logits = baseline
+            .forward_logits(&input_ids)
+            .expect("baseline logits should materialize");
+        let bigram_logits = bigram_model
+            .forward_logits(&input_ids)
+            .expect("bigram logits should materialize");
+        assert_ne!(baseline_logits.values, bigram_logits.values);
     }
 
     #[test]
