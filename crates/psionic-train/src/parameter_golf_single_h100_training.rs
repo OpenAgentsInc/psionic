@@ -89,6 +89,12 @@ pub struct ParameterGolfSingleH100TrainingConfig {
     /// Optional legal score-first TTT overlay for the final validation passes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub score_first_ttt: Option<ParameterGolfScoreFirstTttConfig>,
+    /// Optional EMA posture for the final exported model surface.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ema: Option<ParameterGolfEmaConfig>,
+    /// Explicit final model surface to validate and export after training.
+    #[serde(default)]
+    pub final_model_surface: ParameterGolfFinalModelSurface,
 }
 
 impl ParameterGolfSingleH100TrainingConfig {
@@ -120,6 +126,8 @@ impl ParameterGolfSingleH100TrainingConfig {
                 &ParameterGolfValidationEvalMode::NonOverlapping,
             ),
             score_first_ttt: None,
+            ema: None,
+            final_model_surface: ParameterGolfFinalModelSurface::Raw,
             hyperparameters,
         }
     }
@@ -139,6 +147,8 @@ impl ParameterGolfSingleH100TrainingConfig {
         config.final_validation_mode = ParameterGolfSingleH100ValidationMode::RoundtripOnly;
         config.validation_eval_mode = ParameterGolfValidationEvalMode::NonOverlapping;
         config.score_first_ttt = None;
+        config.ema = None;
+        config.final_model_surface = ParameterGolfFinalModelSurface::Raw;
         config.hyperparameters.max_wallclock_seconds = None;
         config
     }
@@ -219,6 +229,66 @@ impl ParameterGolfSingleH100TrainingConfig {
                     });
                 }
             }
+        }
+        if let Some(ema) = self.ema.as_ref() {
+            ema.validate()?;
+        }
+        if self.final_model_surface == ParameterGolfFinalModelSurface::Ema && self.ema.is_none() {
+            return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: String::from(
+                    "final_model_surface=ema requires an explicit ema config",
+                ),
+            });
+        }
+        Ok(())
+    }
+}
+
+/// Explicit final-model surface evaluated and exported after training.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfFinalModelSurface {
+    Raw,
+    Ema,
+}
+
+impl Default for ParameterGolfFinalModelSurface {
+    fn default() -> Self {
+        Self::Raw
+    }
+}
+
+impl ParameterGolfFinalModelSurface {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Raw => "raw",
+            Self::Ema => "ema",
+        }
+    }
+}
+
+/// Explicit EMA posture for the PGOLF final exported model surface.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfEmaConfig {
+    pub decay: f32,
+}
+
+impl Default for ParameterGolfEmaConfig {
+    fn default() -> Self {
+        Self { decay: 0.997 }
+    }
+}
+
+impl ParameterGolfEmaConfig {
+    fn validate(&self) -> Result<(), ParameterGolfSingleH100TrainingError> {
+        if !self.decay.is_finite() || !(0.0..1.0).contains(&self.decay) {
+            return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: format!(
+                    "ema decay must be finite and inside [0, 1), observed {}",
+                    self.decay
+                ),
+            });
         }
         Ok(())
     }
@@ -796,6 +866,8 @@ pub struct ParameterGolfSingleH100ValidationCheckpoint {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfSingleH100RoundtripReceipt {
+    #[serde(default)]
+    pub final_model_surface: ParameterGolfFinalModelSurface,
     pub metric_source: String,
     pub validation: ParameterGolfSingleH100ValidationSummary,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -864,6 +936,10 @@ pub struct ParameterGolfSingleH100TrainingReport {
     pub validation_batch_sequences: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub score_first_ttt: Option<ParameterGolfScoreFirstTttConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ema: Option<ParameterGolfEmaConfig>,
+    #[serde(default)]
+    pub final_model_surface: ParameterGolfFinalModelSurface,
     pub executed_steps: u64,
     pub stop_reason: Option<ParameterGolfSingleH100TrainingStopReason>,
     pub delivered_execution: DeliveredExecutionContext,
@@ -1021,6 +1097,52 @@ pub struct ParameterGolfSingleH100ValidationRuntimeComparisonReceipt {
 #[derive(Clone, Debug)]
 pub(crate) struct ParameterGolfSingleH100TrainerState {
     pub(crate) parameter_states: BTreeMap<String, ParameterGolfParameterState>,
+}
+
+#[derive(Clone, Debug)]
+struct ParameterGolfEmaState {
+    config: ParameterGolfEmaConfig,
+    parameter_values: BTreeMap<String, Vec<f32>>,
+}
+
+impl ParameterGolfEmaState {
+    fn new(
+        config: ParameterGolfEmaConfig,
+        state: &ParameterGolfSingleH100TrainerState,
+    ) -> Self {
+        Self {
+            config,
+            parameter_values: current_parameter_state_overrides(state),
+        }
+    }
+
+    fn update(
+        &mut self,
+        state: &ParameterGolfSingleH100TrainerState,
+    ) -> Result<(), ParameterGolfSingleH100TrainingError> {
+        let current_values = current_parameter_state_overrides(state);
+        for (parameter_id, values) in current_values {
+            let ema_values = self.parameter_values.get_mut(&parameter_id).ok_or_else(|| {
+                ParameterGolfSingleH100TrainingError::MissingParameterState {
+                    parameter_id: parameter_id.clone(),
+                }
+            })?;
+            if ema_values.len() != values.len() {
+                return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                    message: format!(
+                        "ema state length mismatch for `{parameter_id}`: {} vs {}",
+                        ema_values.len(),
+                        values.len()
+                    ),
+                });
+            }
+            for (ema_value, current_value) in ema_values.iter_mut().zip(values) {
+                *ema_value = (*ema_value * self.config.decay)
+                    + (current_value * (1.0 - self.config.decay));
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1633,6 +1755,10 @@ fn build_parameter_golf_single_h100_training_report_inner(
     .with_mode(DatasetIterationMode::Repeat);
     let mut cursor = ParameterGolfTokenStreamCursor::new(PARAMETER_GOLF_TRAIN_SPLIT_NAME);
     let mut current_model = initial_model.clone();
+    let mut ema_state = config
+        .ema
+        .clone()
+        .map(|ema| ParameterGolfEmaState::new(ema, &trainer_state));
     let mut step_metrics = Vec::new();
     let mut validation_checkpoints = Vec::new();
     let mut aggregate_phase_timings = ParameterGolfSingleH100PhaseTimings::default();
@@ -1748,6 +1874,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         let last_step = step == config.max_steps || stop_reason.is_some();
         let should_validate = if last_step {
             config.final_validation_mode.runs_live_validation()
+                && config.final_model_surface == ParameterGolfFinalModelSurface::Raw
         } else {
             config.validation_loss_every > 0 && step % config.validation_loss_every == 0
         };
@@ -1910,6 +2037,9 @@ fn build_parameter_golf_single_h100_training_report_inner(
         }
         step_metrics.push(step_metrics_next);
         step += 1;
+        if let Some(ema_state) = ema_state.as_mut() {
+            ema_state.update(&trainer_state)?;
+        }
 
         let should_log_train = config.train_log_every > 0
             && (step <= 10 || step % config.train_log_every == 0 || stop_reason.is_some());
@@ -1934,8 +2064,71 @@ fn build_parameter_golf_single_h100_training_report_inner(
         }
     }
 
+    let final_model = match config.final_model_surface {
+        ParameterGolfFinalModelSurface::Raw => current_model.clone(),
+        ParameterGolfFinalModelSurface::Ema => {
+            let ema_state = ema_state.as_ref().ok_or_else(|| {
+                ParameterGolfSingleH100TrainingError::InvalidConfig {
+                    message: String::from(
+                        "final_model_surface=ema requested without one live ema state",
+                    ),
+                }
+            })?;
+            emit_progress_line(format!(
+                "final_model_surface_apply surface=ema decay={}",
+                ema_state.config.decay
+            ));
+            materialize_model_from_overrides(&initial_model, &ema_state.parameter_values)?
+        }
+    };
+
+    if config.final_validation_mode.runs_live_validation()
+        && config.final_model_surface != ParameterGolfFinalModelSurface::Raw
+    {
+        let stage_label = format!("final_validation_{}", config.final_model_surface.as_str());
+        emit_progress_line(format!(
+            "{}_start sequences={} batch_sequences={} surface={}",
+            stage_label,
+            (validation_tokens.len() - 1) / config.geometry.train_sequence_length,
+            config.validation_batch_sequences,
+            config.final_model_surface.as_str(),
+        ));
+        let validation_started = Instant::now();
+        let validation_summary = evaluate_validation_with_optional_score_first_ttt_on_cuda(
+            &mut cuda_backend,
+            &selected_device.device,
+            final_model.descriptor(),
+            &final_model,
+            validation_tokens.as_slice(),
+            &byte_luts,
+            config.geometry.train_sequence_length,
+            config.validation_batch_sequences,
+            &config.validation_eval_mode,
+            config.score_first_ttt.as_ref(),
+            &mut eval_graph_cache,
+            &mut train_graph_cache,
+            &stage_label,
+            live_visualization_writer.as_mut(),
+        )?;
+        let observed_validation_ms = duration_ms(validation_started);
+        pre_export_final_validation_observed_ms = Some(observed_validation_ms);
+        pre_export_final_validation = Some(validation_summary.clone());
+        if let Some(writer) = live_visualization_writer.as_mut() {
+            writer.record_validation_checkpoint(
+                ParameterGolfSingleH100ValidationCheckpoint {
+                    stage_label,
+                    trigger_step: step,
+                    observed_training_time_ms: training_time_ms,
+                    observed_validation_ms,
+                    summary: validation_summary,
+                },
+                crate::ValidationSlot::PreExportFinal,
+            )?;
+        }
+    }
+
     let compressed_model_artifact =
-        export_parameter_golf_int8_zlib_model_artifact(&current_model, &config.run_id, step)?;
+        export_parameter_golf_int8_zlib_model_artifact(&final_model, &config.run_id, step)?;
     let mut final_validation = pre_export_final_validation.clone();
     let mut final_validation_observed_ms = pre_export_final_validation_observed_ms;
     let mut final_roundtrip_receipt = None;
@@ -1986,6 +2179,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         final_validation_observed_ms = Some(roundtrip_observed_ms);
         final_validation = Some(roundtrip_validation.clone());
         final_roundtrip_receipt = Some(ParameterGolfSingleH100RoundtripReceipt {
+            final_model_surface: config.final_model_surface,
             metric_source: String::from("int8_zlib_roundtrip"),
             validation: roundtrip_validation,
             pre_ttt_validation: None,
@@ -2049,11 +2243,12 @@ fn build_parameter_golf_single_h100_training_report_inner(
         }
     };
     let summary = format!(
-        "The Rust-owned single-H100 trainer executed {} optimizer step(s) with challenge single-device geometry on CUDA, used the widened train_gpt.py-style warmup, validation, and wallclock-stop control loop, ran with final_validation_mode={}, validation_eval_mode={}, and validation_batch_sequences={}, {} before stopping via {:?}.",
+        "The Rust-owned single-H100 trainer executed {} optimizer step(s) with challenge single-device geometry on CUDA, used the widened train_gpt.py-style warmup, validation, and wallclock-stop control loop, ran with final_validation_mode={}, validation_eval_mode={}, validation_batch_sequences={}, and final_model_surface={}, {} before stopping via {:?}.",
         step,
         config.final_validation_mode.as_str(),
         config.validation_eval_mode.as_str(),
         config.validation_batch_sequences,
+        config.final_model_surface.as_str(),
         final_metric_surface,
         realized_stop_reason
     );
@@ -2083,6 +2278,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
         validation_eval_mode: config.validation_eval_mode.clone(),
         validation_batch_sequences: config.validation_batch_sequences,
         score_first_ttt: config.score_first_ttt.clone(),
+        ema: config.ema.clone(),
+        final_model_surface: config.final_model_surface,
         executed_steps: step,
         stop_reason: Some(realized_stop_reason),
         delivered_execution,
@@ -2094,7 +2291,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         machine_contract_satisfied: machine_observation.machine_contract_satisfied,
         baseline_model_id: String::from(PARAMETER_GOLF_BASELINE_MODEL_ID),
         baseline_model_revision: String::from(PARAMETER_GOLF_BASELINE_REVISION),
-        baseline_model_descriptor_digest: current_model.descriptor().stable_digest(),
+        baseline_model_descriptor_digest: final_model.descriptor().stable_digest(),
         optimizer_plan_digest,
         precision_receipt: precision_receipt_from_trainer_state(&trainer_state),
         cuda_training_capability_report_digest: capability_report.report_digest.clone(),
@@ -2173,6 +2370,8 @@ fn refusal_report(
         validation_eval_mode: config.validation_eval_mode.clone(),
         validation_batch_sequences: config.validation_batch_sequences,
         score_first_ttt: config.score_first_ttt.clone(),
+        ema: config.ema.clone(),
+        final_model_surface: config.final_model_surface,
         executed_steps: 0,
         stop_reason: None,
         delivered_execution: DeliveredExecutionContext::new("cuda", None, Vec::new()),
@@ -2648,13 +2847,22 @@ pub(crate) fn materialize_current_model(
     state: &ParameterGolfSingleH100TrainerState,
 ) -> Result<ParameterGolfReferenceModel, ParameterGolfSingleH100TrainingError> {
     let overrides = current_parameter_state_overrides(state);
-    let weights = if uses_banked_runtime_surface(&overrides) {
-        materialize_current_banked_weights(baseline, state)?
+    materialize_model_from_overrides(baseline, &overrides)
+}
+
+fn materialize_model_from_overrides(
+    baseline: &ParameterGolfReferenceModel,
+    overrides: &BTreeMap<String, Vec<f32>>,
+) -> Result<ParameterGolfReferenceModel, ParameterGolfSingleH100TrainingError> {
+    let weights = if uses_banked_runtime_surface(overrides) {
+        baseline
+            .banked_weights()?
+            .with_parameter_overrides(&baseline.descriptor().config, overrides)?
             .to_split(&baseline.descriptor().config)?
     } else {
         baseline
             .weights()
-            .with_parameter_overrides(&baseline.descriptor().config, &overrides)?
+            .with_parameter_overrides(&baseline.descriptor().config, overrides)?
     };
     Ok(ParameterGolfReferenceModel::new(
         baseline.descriptor().model.clone(),
@@ -5307,6 +5515,8 @@ mod tests {
             config.final_validation_mode,
             ParameterGolfSingleH100ValidationMode::Both
         );
+        assert_eq!(config.ema, None);
+        assert_eq!(config.final_model_surface, ParameterGolfFinalModelSurface::Raw);
         assert_eq!(config.hyperparameters.max_wallclock_seconds, Some(600.0));
     }
 
@@ -5326,7 +5536,83 @@ mod tests {
             config.final_validation_mode,
             ParameterGolfSingleH100ValidationMode::RoundtripOnly
         );
+        assert_eq!(config.ema, None);
+        assert_eq!(config.final_model_surface, ParameterGolfFinalModelSurface::Raw);
         assert_eq!(config.hyperparameters.max_wallclock_seconds, None);
+    }
+
+    #[test]
+    fn config_rejects_ema_surface_without_ema_config() -> Result<(), Box<dyn std::error::Error>> {
+        let root = std::env::temp_dir().join(format!(
+            "psionic-pgolf-ema-config-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root)?;
+        let tokenizer_path = root.join("tokenizer.model");
+        std::fs::write(&tokenizer_path, b"stub")?;
+
+        let mut config =
+            ParameterGolfSingleH100TrainingConfig::challenge_defaults(&root, &tokenizer_path);
+        config.final_model_surface = ParameterGolfFinalModelSurface::Ema;
+        let error = config.validate().expect_err("ema export without ema config must fail");
+        assert!(error
+            .to_string()
+            .contains("final_model_surface=ema requires an explicit ema config"));
+        Ok(())
+    }
+
+    #[test]
+    fn ema_state_updates_parameter_values_and_materializes_model(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+        let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
+        let optimizer_plan = parameter_golf_optimizer_plan(model.descriptor(), &hyperparameters)?;
+        let mut trainer_state = seed_parameter_states(&model, &optimizer_plan)?;
+        let mut ema_state = ParameterGolfEmaState::new(
+            ParameterGolfEmaConfig { decay: 0.5 },
+            &trainer_state,
+        );
+        let (parameter_id, original_value) = {
+            let (parameter_id, state) = trainer_state
+                .parameter_states
+                .iter()
+                .next()
+                .expect("trainer state should contain at least one parameter");
+            (parameter_id.clone(), state.values()[0])
+        };
+
+        match trainer_state
+            .parameter_states
+            .get_mut(&parameter_id)
+            .expect("parameter state should still exist")
+        {
+            ParameterGolfParameterState::AdamBf16Master {
+                train_visible_values, ..
+            } => train_visible_values[0] += 2.0,
+            ParameterGolfParameterState::AdamFp32 { values, .. }
+            | ParameterGolfParameterState::MuonBf16 { values, .. } => values[0] += 2.0,
+        }
+        let updated_value = trainer_state
+            .parameter_states
+            .get(&parameter_id)
+            .expect("updated parameter state should still exist")
+            .values()[0];
+
+        ema_state.update(&trainer_state)?;
+        let ema_value = ema_state
+            .parameter_values
+            .get(&parameter_id)
+            .expect("ema parameter should exist")[0];
+        assert_eq!(ema_value, (original_value * 0.5) + (updated_value * 0.5));
+
+        let ema_model = materialize_model_from_overrides(&model, &ema_state.parameter_values)?;
+        let ema_vector = ema_model
+            .all_parameter_vectors()?
+            .into_iter()
+            .find(|vector| vector.parameter_id == parameter_id)
+            .expect("ema model should retain the updated parameter");
+        assert_eq!(ema_vector.values[0], ema_value);
+        Ok(())
     }
 
     #[test]

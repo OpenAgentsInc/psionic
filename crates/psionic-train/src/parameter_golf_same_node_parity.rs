@@ -604,6 +604,8 @@ mod tests {
             validation_eval_mode: crate::ParameterGolfValidationEvalMode::NonOverlapping,
             validation_batch_sequences: 64,
             score_first_ttt: None,
+            ema: None,
+            final_model_surface: crate::ParameterGolfFinalModelSurface::Raw,
             executed_steps: 0,
             stop_reason: None,
             delivered_execution: DeliveredExecutionContext::new("cuda", None, Vec::new()),

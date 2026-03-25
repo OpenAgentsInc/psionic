@@ -1534,6 +1534,8 @@ mod tests {
             validation_eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
             validation_batch_sequences: 64,
             score_first_ttt: None,
+            ema: None,
+            final_model_surface: crate::ParameterGolfFinalModelSurface::Raw,
             executed_steps: 2,
             stop_reason: Some(ParameterGolfSingleH100TrainingStopReason::StepBudgetReached),
             delivered_execution: DeliveredExecutionContext::new("cuda", None, Vec::new()),
@@ -1612,6 +1614,7 @@ mod tests {
             pre_export_final_validation_observed_ms: Some(200),
             final_validation_observed_ms: Some(190),
             final_roundtrip_receipt: Some(ParameterGolfSingleH100RoundtripReceipt {
+                final_model_surface: crate::ParameterGolfFinalModelSurface::Raw,
                 metric_source: String::from("int8_zlib_roundtrip"),
                 validation: ParameterGolfSingleH100ValidationSummary {
                     eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,

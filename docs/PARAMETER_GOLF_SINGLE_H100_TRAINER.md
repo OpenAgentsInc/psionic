@@ -114,6 +114,17 @@ geometry. The default remains the train-geometry batch size for
 `non_overlapping`, but sliding-window evaluation now widens onto the explicit
 scoreboard batch surface instead of inheriting the train token cap implicitly.
 
+The Rust config surface now also carries an explicit optional EMA config and an
+explicit `final_model_surface` selector for the final live-validation and
+exported-artifact path:
+
+- default `final_model_surface=raw`
+- optional `final_model_surface=ema` when `ema.decay` is configured
+
+This first EMA slice is config-level and report-level. The CLI still follows
+the default raw-model export posture unless a caller constructs the config
+programmatically.
+
 The legality boundary now matches the README contract explicitly:
 
 - each validation window is scored before any adaptation can see that chunk
@@ -217,6 +228,9 @@ The command is explicit about what it treats as trainer truth. It binds:
   Psionic path, with an explicit `final_validation_mode` telling the report and
   logs whether the last-step live-model validation, the exported int8+zlib
   roundtrip validation, or both were requested
+- an explicit final-model surface contract for those final passes, so the
+  report and roundtrip receipt now say whether the exported model was the live
+  raw weights or an EMA-materialized surface
 - a device-resident validation runner that keeps the stable parameter surface
   resident on device across validation batches, reuses mutable token buffers,
   runs through the explicit `parameter_golf_baseline_eval_graph_v2` surface
@@ -297,6 +311,10 @@ Today the single-H100 trainer doc does **not** claim:
   execute the legal score-first TTT path, but the shipped bounded
   local-reference exported-folder runtime still refuses that request with a
   typed unsupported-validation error instead of pretending it ran it
+- competitive EMA/SWA closure; the single-H100 trainer now has one explicit EMA
+  final-model surface, but SWA has not landed, the CLI still defaults to raw
+  export, and the distributed `8xH100` score lane does not yet preserve the
+  same averaging contract
 - record-track accounting closure
 - full BF16 activation-kernel closure yet; the current report now records BF16
   graph uploads for the train-visible token-embedding and linear weight path,
