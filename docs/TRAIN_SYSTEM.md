@@ -96,6 +96,18 @@ bindings, startup expectations, finalizer expectations, and projected
 provider-specific step sequences. Resource creation remains provider-specific,
 but the training-facing launch semantics are now typed in one place.
 
+The repo now also owns the first provider-neutral runtime binder in
+`crates/psionic-train/src/cross_provider_runtime_binder.rs`, the binary
+`cross_provider_runtime_binder`, the checker
+`scripts/check-cross-provider-runtime-binder.sh`, the focused reference doc
+`docs/CROSS_PROVIDER_RUNTIME_BINDER_REFERENCE.md`, and the committed fixture
+`fixtures/training/cross_provider_runtime_binder_v1.json`. That surface binds
+the root program manifest, admitted compute sources, shared launch contracts,
+shared runtime env, shared artifact backends, and provider-owned hooks into one
+machine-legible launch-time authority above the current Google, RunPod, and
+local adapters. Resource creation remains provider-specific, but the adapters
+no longer define training-facing runtime truth on their own.
+
 The repo now also owns the first generic dense-rank runtime layer in
 `crates/psionic-train/src/dense_rank_runtime.rs`, the binary
 `dense_rank_runtime_reference_contract`, the checker

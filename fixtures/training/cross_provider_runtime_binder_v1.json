@@ -1,0 +1,870 @@
+{
+  "schema_version": "psionic.cross_provider_runtime_binder.v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "admitted_source_ids": [
+    "google_l4_validator_node",
+    "runpod_8xh100_dense_node",
+    "local_rtx4080_workstation",
+    "local_mlx_mac_workstation"
+  ],
+  "admitted_launch_contract_ids": [
+    "psionic-google-single-node-accelerated-launch-contract-v1",
+    "psionic-google-two-node-swarm-launch-contract-v1",
+    "psionic-runpod-8xh100-launch-contract-v1",
+    "psionic-local-first-swarm-launch-contract-v1"
+  ],
+  "binding_records": [
+    {
+      "binding_id": "psionic-cross-provider-pretraining-program-v1.psionic-google-single-node-accelerated-launch-contract-v1.binding",
+      "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+      "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+      "launch_contract_id": "psionic-google-single-node-accelerated-launch-contract-v1",
+      "launch_contract_digest": "2d614daa49c3ec2b8eb0e55aee8803b62b713a2e70293790d166cd8c3016bff0",
+      "source_id": "google_l4_single_node_training_host",
+      "admitted_source_contract_id": "google_l4_validator_node",
+      "requested_execution_class": "dense_full_model_rank",
+      "adapter_kind": "google_host",
+      "runbook_path": "docs/PSION_GOOGLE_SINGLE_GPU_RUNBOOK.md",
+      "provider_hooks": [
+        {
+          "hook_kind": "preflight",
+          "authority_path": "fixtures/psion/google/psion_google_machine_quota_preflight_v1.json",
+          "detail": "Google single-node quota and machine preflight remain adapter-owned, but the binder now names them explicitly."
+        },
+        {
+          "hook_kind": "launch",
+          "authority_path": "scripts/psion-google-launch-single-node.sh",
+          "detail": "Host creation remains Google-specific, but it is now a provider hook under the shared binder."
+        },
+        {
+          "hook_kind": "startup",
+          "authority_path": "scripts/psion-google-single-node-startup.sh",
+          "detail": "Host startup is still metadata-driven, but the runtime env and artifact roots now come from the shared binder."
+        },
+        {
+          "hook_kind": "runtime_env",
+          "authority_path": "docs/PSION_GOOGLE_SINGLE_GPU_RUNBOOK.md",
+          "detail": "The Google runbook now consumes shared runtime env and finalizer semantics instead of defining them ad hoc."
+        },
+        {
+          "hook_kind": "finalizer",
+          "authority_path": "scripts/psion-google-finalize-run.sh",
+          "detail": "Final evidence sealing remains Google-hosted, but its inputs and outputs now come from the shared binder."
+        }
+      ],
+      "bound_runtime_env": [
+        {
+          "name": "PSION_PROGRAM_MANIFEST_ID",
+          "value_template": "psionic-cross-provider-pretraining-program-v1",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_PROGRAM_MANIFEST_DIGEST",
+          "value_template": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_RUN_ID",
+          "value_template": "psion-xprovider-pretrain-google-single-node-accelerated",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_EXECUTION_CLASS",
+          "value_template": "dense_full_model_rank",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_RUN_ROOT",
+          "value_template": "/var/lib/psion-google/runs/${RUN_ID}",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_LAUNCH_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-google-single-node-accelerated/launch",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_CHECKPOINT_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-google-single-node-accelerated/checkpoints",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_METRICS_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-google-single-node-accelerated/metrics",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_VISUALIZATION_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-google-single-node-accelerated/training_visualization",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_FINAL_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-google-single-node-accelerated/final",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_BUCKET_URL",
+          "value_template": "gs://openagentsgemini-psion-train-us-central1",
+          "phases": [
+            "launch",
+            "startup",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_REPO_GIT_REVISION",
+          "value_template": "workspace@${GIT_REVISION}",
+          "phases": [
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        }
+      ],
+      "bound_artifact_classes": [
+        {
+          "artifact_class": "checkpoint",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects Checkpoint for source `google_l4_validator_node` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "log_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects LogBundle for source `google_l4_validator_node` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "metrics_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects MetricsBundle for source `google_l4_validator_node` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "final_evidence_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects FinalEvidenceBundle for source `google_l4_validator_node` through the provider-neutral remote artifact backend policy."
+        }
+      ],
+      "startup_entrypoint": "scripts/psion-google-single-node-startup.sh",
+      "finalizer_entrypoint": "scripts/psion-google-finalize-run.sh",
+      "projected_step_ids": [
+        "google_single_node_launch",
+        "google_single_node_startup",
+        "google_single_node_finalizer"
+      ],
+      "claim_boundary": "This binding keeps `psionic-google-single-node-accelerated-launch-contract-v1` on one shared runtime contract above the provider adapter. It does not widen the lane beyond its current execution-class and evidence boundary.",
+      "binding_digest": "b6f46f510a2968323b10f146848a5be41f2eac16f1ea6aa8264cbda710d5dca4"
+    },
+    {
+      "binding_id": "psionic-cross-provider-pretraining-program-v1.psionic-google-two-node-swarm-launch-contract-v1.binding",
+      "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+      "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+      "launch_contract_id": "psionic-google-two-node-swarm-launch-contract-v1",
+      "launch_contract_digest": "51c2b3663878154324f4beb613582a3229ec4b083d99b73688054da97b53d7cf",
+      "source_id": "google_l4_validator_node",
+      "admitted_source_contract_id": "google_l4_validator_node",
+      "requested_execution_class": "validated_contributor_window",
+      "adapter_kind": "google_configured_peer_cluster",
+      "runbook_path": "docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md",
+      "provider_hooks": [
+        {
+          "hook_kind": "preflight",
+          "authority_path": "fixtures/psion/google/psion_google_two_node_swarm_preflight_v1.json",
+          "detail": "Dual-node Google network, quota, and identity preflight remain adapter-owned under the shared binder."
+        },
+        {
+          "hook_kind": "launch",
+          "authority_path": "scripts/psion-google-launch-two-node-swarm.sh",
+          "detail": "Cluster bring-up remains Google-specific resource work above the shared binder."
+        },
+        {
+          "hook_kind": "startup",
+          "authority_path": "scripts/psion-google-two-node-swarm-startup.sh",
+          "detail": "Swarm node startup keeps its Google implementation while consuming the shared env and artifact layout."
+        },
+        {
+          "hook_kind": "runtime_env",
+          "authority_path": "docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md",
+          "detail": "The configured-peer runtime now projects cluster namespace, ports, and artifact roots from the shared binder."
+        },
+        {
+          "hook_kind": "evidence_seal",
+          "authority_path": "scripts/psion-google-finalize-two-node-swarm-run.sh",
+          "detail": "Swarm finalization stays provider-owned while using the shared finalizer plan and evidence family."
+        }
+      ],
+      "bound_runtime_env": [
+        {
+          "name": "PSION_PROGRAM_MANIFEST_ID",
+          "value_template": "psionic-cross-provider-pretraining-program-v1",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_PROGRAM_MANIFEST_DIGEST",
+          "value_template": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_RUN_ID",
+          "value_template": "psion-xprovider-pretrain-google-two-node-swarm",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_EXECUTION_CLASS",
+          "value_template": "validated_contributor_window",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_RUN_ROOT",
+          "value_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_LAUNCH_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-google-two-node-swarm/launch",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_CHECKPOINT_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-google-two-node-swarm/checkpoints",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_METRICS_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-google-two-node-swarm/metrics",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_VISUALIZATION_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-google-two-node-swarm/training_visualization",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_FINAL_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-google-two-node-swarm/final",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_CLUSTER_NAMESPACE",
+          "value_template": "cluster.psion.google.configured_peer_swarm",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        }
+      ],
+      "bound_artifact_classes": [
+        {
+          "artifact_class": "checkpoint",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects Checkpoint for source `google_l4_validator_node` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "log_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects LogBundle for source `google_l4_validator_node` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "metrics_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects MetricsBundle for source `google_l4_validator_node` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "final_evidence_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects FinalEvidenceBundle for source `google_l4_validator_node` through the provider-neutral remote artifact backend policy."
+        }
+      ],
+      "startup_entrypoint": "scripts/psion-google-two-node-swarm-startup.sh",
+      "finalizer_entrypoint": "scripts/psion-google-finalize-two-node-swarm-run.sh",
+      "projected_step_ids": [
+        "google_swarm_launch",
+        "google_swarm_startup",
+        "google_swarm_finalizer"
+      ],
+      "claim_boundary": "This binding keeps `psionic-google-two-node-swarm-launch-contract-v1` on one shared runtime contract above the provider adapter. It does not widen the lane beyond its current execution-class and evidence boundary.",
+      "binding_digest": "5f608293fe3382683d1b20a0bd9584e7d1391f75e4949e22e5e4bbdff69c307e"
+    },
+    {
+      "binding_id": "psionic-cross-provider-pretraining-program-v1.psionic-runpod-8xh100-launch-contract-v1.binding",
+      "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+      "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+      "launch_contract_id": "psionic-runpod-8xh100-launch-contract-v1",
+      "launch_contract_digest": "f1f62e7ef9fc1b7c61ba828139b17d91199927cd3f60503345bdb13352c91a63",
+      "source_id": "runpod_8xh100_dense_node",
+      "admitted_source_contract_id": "runpod_8xh100_dense_node",
+      "requested_execution_class": "dense_full_model_rank",
+      "adapter_kind": "run_pod_remote_pod",
+      "runbook_path": "docs/PARAMETER_GOLF_RUNPOD_8XH100_RUNBOOK.md",
+      "provider_hooks": [
+        {
+          "hook_kind": "preflight",
+          "authority_path": "fixtures/parameter_golf/runpod/parameter_golf_runpod_8xh100_operator_preflight_policy_v1.json",
+          "detail": "RunPod operator preflight remains adapter-owned and is now retained explicitly by the shared binder."
+        },
+        {
+          "hook_kind": "launch",
+          "authority_path": "scripts/parameter-golf-runpod-launch-8xh100.sh",
+          "detail": "Pod launch and SSH setup remain RunPod-specific resource work above the binder."
+        },
+        {
+          "hook_kind": "runtime_env",
+          "authority_path": "docs/PARAMETER_GOLF_RUNPOD_8XH100_RUNBOOK.md",
+          "detail": "RunPod runtime env, workspace roots, and visualization roots now come from the shared binder instead of lane-local assumptions."
+        },
+        {
+          "hook_kind": "finalizer",
+          "authority_path": "scripts/parameter-golf-runpod-finalize-8xh100.sh",
+          "detail": "The RunPod finalizer still seals remote evidence, but its inputs and outputs now come from the shared binder."
+        }
+      ],
+      "bound_runtime_env": [
+        {
+          "name": "PSION_PROGRAM_MANIFEST_ID",
+          "value_template": "psionic-cross-provider-pretraining-program-v1",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_PROGRAM_MANIFEST_DIGEST",
+          "value_template": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_RUN_ID",
+          "value_template": "psion-xprovider-pretrain-runpod-8xh100",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_EXECUTION_CLASS",
+          "value_template": "dense_full_model_rank",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_RUN_ROOT",
+          "value_template": "/workspace/parameter-golf-runpod/${RUN_ID}",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_LAUNCH_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-runpod-8xh100/launch",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_CHECKPOINT_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-runpod-8xh100/checkpoints",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_METRICS_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-runpod-8xh100/metrics",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_VISUALIZATION_ROOT",
+          "value_template": "${PSION_RUN_ROOT}/training_visualization",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_FINAL_ROOT",
+          "value_template": "${PSION_RUN_ROOT}",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PGOLF_RUN_ROOT",
+          "value_template": "${PSION_RUN_ROOT}",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PGOLF_SUBMISSION_DIR",
+          "value_template": "${PSION_RUN_ROOT}/exported_submission/records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2",
+          "phases": [
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PGOLF_REPO_DIR",
+          "value_template": "/workspace/psionic",
+          "phases": [
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        }
+      ],
+      "bound_artifact_classes": [
+        {
+          "artifact_class": "checkpoint",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects Checkpoint for source `runpod_8xh100_dense_node` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "log_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects LogBundle for source `runpod_8xh100_dense_node` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "metrics_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects MetricsBundle for source `runpod_8xh100_dense_node` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "final_evidence_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects FinalEvidenceBundle for source `runpod_8xh100_dense_node` through the provider-neutral remote artifact backend policy."
+        }
+      ],
+      "startup_entrypoint": "scripts/parameter-golf-runpod-launch-8xh100.sh",
+      "finalizer_entrypoint": "scripts/parameter-golf-runpod-finalize-8xh100.sh",
+      "projected_step_ids": [
+        "runpod_launch",
+        "runpod_runtime",
+        "runpod_finalizer"
+      ],
+      "claim_boundary": "This binding keeps `psionic-runpod-8xh100-launch-contract-v1` on one shared runtime contract above the provider adapter. It does not widen the lane beyond its current execution-class and evidence boundary.",
+      "binding_digest": "c5728b0bc8d12e8c68741e7daf6db75cf6cf947380899bb7f07e4a05826389d3"
+    },
+    {
+      "binding_id": "psionic-cross-provider-pretraining-program-v1.psionic-local-first-swarm-launch-contract-v1.binding",
+      "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+      "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+      "launch_contract_id": "psionic-local-first-swarm-launch-contract-v1",
+      "launch_contract_digest": "2806a79839fb4a628101341343af52cbea4f702f8652567b453118a81d0f141a",
+      "source_id": "local_mlx_mac_workstation",
+      "admitted_source_contract_id": "local_mlx_mac_workstation",
+      "requested_execution_class": "validated_contributor_window",
+      "adapter_kind": "local_trusted_lan_bundle",
+      "runbook_path": "docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md",
+      "provider_hooks": [
+        {
+          "hook_kind": "preflight",
+          "authority_path": "fixtures/swarm/first_swarm_trusted_lan_topology_contract_v1.json",
+          "detail": "Trusted-LAN topology, stale thresholds, and host identities remain explicit adapter inputs under the shared binder."
+        },
+        {
+          "hook_kind": "launch",
+          "authority_path": "scripts/first-swarm-launch-trusted-lan.sh",
+          "detail": "Local staging and operator launch remain host-owned resource work above the binder."
+        },
+        {
+          "hook_kind": "runtime_env",
+          "authority_path": "docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md",
+          "detail": "The local swarm runbook now projects shared runtime env and final-root semantics instead of lane-local naming."
+        },
+        {
+          "hook_kind": "finalizer",
+          "authority_path": "cargo run -q -p psionic-train --bin first_swarm_trusted_lan_closeout_report",
+          "detail": "Local closeout still stays host-owned, but the binder now names its expected env and evidence outputs."
+        }
+      ],
+      "bound_runtime_env": [
+        {
+          "name": "PSION_PROGRAM_MANIFEST_ID",
+          "value_template": "psionic-cross-provider-pretraining-program-v1",
+          "phases": [
+            "launch",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_PROGRAM_MANIFEST_DIGEST",
+          "value_template": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+          "phases": [
+            "launch",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_RUN_ID",
+          "value_template": "psion-xprovider-pretrain-local-first-swarm",
+          "phases": [
+            "launch",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_EXECUTION_CLASS",
+          "value_template": "validated_contributor_window",
+          "phases": [
+            "launch",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_RUN_ROOT",
+          "value_template": "${HOME}/swarm-runs/${RUN_ID}",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_LAUNCH_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-local-first-swarm/launch",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_CHECKPOINT_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-local-first-swarm/checkpoints",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_METRICS_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-local-first-swarm/metrics",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_VISUALIZATION_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-local-first-swarm/training_visualization",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_FINAL_ROOT",
+          "value_template": "runs/psion-xprovider-pretrain-local-first-swarm/final",
+          "phases": [
+            "launch",
+            "startup",
+            "runtime",
+            "finalizer"
+          ]
+        },
+        {
+          "name": "PSION_BUNDLE_DIR",
+          "value_template": "${PSION_RUN_ROOT}/bundle",
+          "phases": [
+            "launch",
+            "runtime"
+          ]
+        }
+      ],
+      "bound_artifact_classes": [
+        {
+          "artifact_class": "checkpoint",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects Checkpoint for source `local_mlx_mac_workstation` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "log_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects LogBundle for source `local_mlx_mac_workstation` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "metrics_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects MetricsBundle for source `local_mlx_mac_workstation` through the provider-neutral remote artifact backend policy."
+        },
+        {
+          "artifact_class": "final_evidence_bundle",
+          "authoritative_backend_id": "google_train_bucket_backend",
+          "mirror_backend_ids": [
+            "runpod_workspace_backend"
+          ],
+          "finalizer_projection_ids": [
+            "google_remote_projection",
+            "runpod_workspace_projection"
+          ],
+          "detail": "The shared binder projects FinalEvidenceBundle for source `local_mlx_mac_workstation` through the provider-neutral remote artifact backend policy."
+        }
+      ],
+      "startup_entrypoint": "scripts/first-swarm-launch-trusted-lan.sh",
+      "finalizer_entrypoint": "cargo run -q -p psionic-train --bin first_swarm_trusted_lan_closeout_report -- ${PSION_FINAL_ROOT}/first_swarm_trusted_lan_closeout_v1.json",
+      "projected_step_ids": [
+        "local_swarm_launch",
+        "local_swarm_closeout"
+      ],
+      "claim_boundary": "This binding keeps `psionic-local-first-swarm-launch-contract-v1` on one shared runtime contract above the provider adapter. It does not widen the lane beyond its current execution-class and evidence boundary.",
+      "binding_digest": "e7d64ff07fc810a6cf310cc203ca3f606a18f98291919b532f9b54a30ec21cbf"
+    }
+  ],
+  "claim_boundary": "This binder closes one provider-neutral mapping from the cross-provider training-program manifest plus admitted compute sources into concrete launch contracts, runtime env, startup plans, finalizer plans, and provider hooks for the current Google, RunPod, and local lanes. It does not claim dense runtime parity, provider API automation beyond the retained adapter hooks, or same-job mixed-backend dense training.",
+  "contract_digest": "35f92de6cbe0be5d22fc64daa0826595abaca209a04cbd2f682149815f4d6595"
+}
