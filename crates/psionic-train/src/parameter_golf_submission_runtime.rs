@@ -776,9 +776,266 @@ pub fn parameter_golf_submission_runtime_payload_fixture_path() -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{error::Error, fs, path::Path};
+
+    use psionic_eval::{
+        ParameterGolfDistributedChallengeThresholds, ParameterGolfDistributedCommunicationReceipt,
+        ParameterGolfDistributedCommunicationStageReceipt, ParameterGolfDistributedLaneDisposition,
+        ParameterGolfDistributedThroughputReceipt, ParameterGolfDistributedTimingReceipt,
+        ParameterGolfDistributedTopologyReceipt,
+        ParameterGolfDistributedValidationAggregationReceipt,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_BENCHMARK_REF,
+        PARAMETER_GOLF_DISTRIBUTED_8XH100_CLAIM_BOUNDARY,
+    };
+    use psionic_runtime::{
+        BackendSelection, ClusterCommunicationClass, ClusterTransportClass, HealthStatus,
+        RuntimeHealth, TrainingCollectiveKind, TrainingCollectiveQuantization,
+        TrainingDeviceMeshAxis, TrainingDeviceMeshAxisKind,
+    };
+    use tempfile::tempdir;
+
+    use crate::{
+        ParameterGolfBatchGeometry, ParameterGolfDistributed8xH100BringupDisposition,
+        ParameterGolfDistributed8xH100BringupExecutionPosture,
+        ParameterGolfDistributed8xH100BringupReport,
+        ParameterGolfDistributed8xH100RuntimeBootstrapDisposition,
+        ParameterGolfDistributed8xH100RuntimeBootstrapReceipt,
+        ParameterGolfDistributed8xH100RuntimeRequestedBackend,
+        ParameterGolfDistributed8xH100TrainStepReceipt, ParameterGolfDistributedStepObservation,
+        ParameterGolfTrainingHyperparameters,
+    };
 
     use super::*;
+
+    fn sample_distributed_receipt() -> ParameterGolfDistributedThroughputReceipt {
+        ParameterGolfDistributedThroughputReceipt {
+            benchmark_ref: String::from(PARAMETER_GOLF_DISTRIBUTED_8XH100_BENCHMARK_REF),
+            run_id: String::from("parameter-golf-distributed-runtime-test"),
+            model_descriptor_digest: String::from("model-digest"),
+            optimizer_plan_digest: String::from("optimizer-digest"),
+            thresholds: ParameterGolfDistributedChallengeThresholds::challenge_8xh100(),
+            topology: ParameterGolfDistributedTopologyReceipt {
+                backend_selection: BackendSelection::direct(
+                    "cuda",
+                    None,
+                    vec![String::from("parameter_golf_distributed_train")],
+                ),
+                topology_digest: String::from("topology-digest"),
+                selected_device_names: vec![String::from("NVIDIA H100 80GB HBM3"); 8],
+                all_devices_match_required_model: true,
+            },
+            communication: ParameterGolfDistributedCommunicationReceipt {
+                communication_class: ClusterCommunicationClass::TensorCollectiveMesh,
+                transport: ClusterTransportClass::Loopback,
+                mesh_id: String::from("mesh.parameter_golf.8xh100"),
+                axes: vec![TrainingDeviceMeshAxis::new(
+                    "dp",
+                    TrainingDeviceMeshAxisKind::DataParallel,
+                    8,
+                )
+                .with_collective_group_size(8)],
+                stages: vec![ParameterGolfDistributedCommunicationStageReceipt {
+                    stage_id: String::from("ddp_gradient_all_reduce"),
+                    collective_kind: TrainingCollectiveKind::AllReduce,
+                    quantization: TrainingCollectiveQuantization::None,
+                    payload_bytes: 1024,
+                    estimated_wire_bytes: 2048,
+                    worker_count: 8,
+                    detail: String::from("DDP gradient synchronization"),
+                }],
+            },
+            training_capability_report_digest: String::from("coverage-digest"),
+            challenge_kernel_blockers: Vec::new(),
+            disposition: ParameterGolfDistributedLaneDisposition::Measured,
+            timing: Some(ParameterGolfDistributedTimingReceipt {
+                measurement_posture: String::from("observed_step_wallclock"),
+                step_count: 4,
+                total_train_tokens: 1_048_576,
+                training_step_observed_ms: 400,
+                validation_observed_ms: 20,
+                export_observed_ms: 10,
+                total_observed_ms: 430,
+                mean_step_duration_ms: 100,
+                tail_step_duration_ms: 112,
+                train_tokens_per_second: 2_621_440,
+                wallclock_cap_ms: 600_000,
+                within_wallclock_cap: true,
+            }),
+            validation_aggregation: Some(ParameterGolfDistributedValidationAggregationReceipt {
+                measurement_posture: String::from("distributed_validation"),
+                eval_mode: String::from("non_overlapping"),
+                world_size: 8,
+                total_sequence_count: 1024,
+                total_evaluation_unit_count: 1024,
+                local_batch_sequences: 128,
+                aggregated_loss_sum: 3_814.4,
+                aggregated_token_count: 65_536,
+                aggregated_byte_count: 131_072,
+                mean_loss: 3.82,
+                bits_per_byte: 1.91,
+                observed_ms: 20,
+                shards: Vec::new(),
+            }),
+            memory: None,
+            refusal: None,
+            boundary_notes: vec![String::from("boundary")],
+            claim_boundary: String::from(PARAMETER_GOLF_DISTRIBUTED_8XH100_CLAIM_BOUNDARY),
+            receipt_digest: String::new(),
+        }
+        .with_stable_digest()
+    }
+
+    fn sample_bringup_report() -> ParameterGolfDistributed8xH100BringupReport {
+        let mut report = ParameterGolfDistributed8xH100BringupReport {
+            schema_version: 1,
+            run_id: String::from("parameter-golf-distributed-runtime-test"),
+            geometry: ParameterGolfBatchGeometry::challenge_distributed_8xh100_defaults(),
+            hyperparameters: ParameterGolfTrainingHyperparameters::baseline_defaults(),
+            machine_thresholds: ParameterGolfDistributedChallengeThresholds::challenge_8xh100(),
+            observed_cuda_health: RuntimeHealth {
+                status: HealthStatus::Ready,
+                message: String::from("cuda online"),
+            },
+            cuda_discovery_error: None,
+            observed_cuda_devices: Vec::new(),
+            matching_h100_device_count: 8,
+            machine_contract_satisfied: true,
+            psionic_entrypoint: String::from("train_gpt.py"),
+            execution_posture:
+                ParameterGolfDistributed8xH100BringupExecutionPosture::ContractValidationOnly,
+            distributed_receipt: None,
+            disposition: ParameterGolfDistributed8xH100BringupDisposition::ContractReady,
+            refusal: None,
+            drift_notes: Vec::new(),
+            claim_boundary: String::from("bringup boundary"),
+            report_digest: String::new(),
+        };
+        report.report_digest = stable_digest(
+            b"psionic_parameter_golf_distributed_8xh100_bringup_report|",
+            &{
+                let mut digestible = report.clone();
+                digestible.report_digest.clear();
+                digestible
+            },
+        );
+        report
+    }
+
+    fn sample_runtime_bootstrap_receipt(
+        bringup_report_path: &Path,
+        bringup_report: &ParameterGolfDistributed8xH100BringupReport,
+    ) -> ParameterGolfDistributed8xH100RuntimeBootstrapReceipt {
+        let mut receipt = ParameterGolfDistributed8xH100RuntimeBootstrapReceipt {
+            schema_version: 1,
+            run_id: String::from("parameter-golf-distributed-runtime-test"),
+            requested_backend: ParameterGolfDistributed8xH100RuntimeRequestedBackend::Nccl,
+            world_size: 8,
+            bringup_report_path: bringup_report_path.display().to_string(),
+            bringup_report_digest: bringup_report.report_digest.clone(),
+            runtime_payload_path: String::from("runtime/parameter_golf_submission_runtime"),
+            runtime_manifest_path: String::from("runtime/parameter_golf_submission_runtime.json"),
+            rank_launches: Vec::new(),
+            successful_rank_count: 8,
+            disposition: ParameterGolfDistributed8xH100RuntimeBootstrapDisposition::Bootstrapped,
+            refusal: None,
+            drift_notes: Vec::new(),
+            claim_boundary: String::from("bootstrap boundary"),
+            receipt_digest: String::new(),
+        };
+        receipt.receipt_digest = receipt.stable_digest();
+        receipt
+    }
+
+    fn sample_train_step_receipt(
+        root: &Path,
+        distributed_receipt: ParameterGolfDistributedThroughputReceipt,
+    ) -> Result<ParameterGolfDistributed8xH100TrainStepReceipt, Box<dyn Error>> {
+        let benchmark_root = root.join("parameter-golf-distributed-8xh100-run/benchmark");
+        fs::create_dir_all(&benchmark_root)?;
+        let final_model_path = benchmark_root.join("current_model.int8.zlib");
+        fs::write(&final_model_path, b"model-int8")?;
+        let mut receipt = ParameterGolfDistributed8xH100TrainStepReceipt {
+            schema_version: 1,
+            run_id: String::from("parameter-golf-distributed-runtime-test"),
+            world_size: 8,
+            bringup_report_path: benchmark_root
+                .join("parameter_golf_distributed_8xh100_bringup.json")
+                .display()
+                .to_string(),
+            bringup_report_digest: String::from("bringup-digest"),
+            runtime_bootstrap_receipt_path: benchmark_root
+                .join("parameter_golf_distributed_8xh100_runtime_bootstrap.json")
+                .display()
+                .to_string(),
+            runtime_bootstrap_receipt_digest: String::from("bootstrap-digest"),
+            runtime_payload_path: String::from("runtime/parameter_golf_submission_runtime"),
+            runtime_manifest_path: String::from("runtime/parameter_golf_submission_runtime.json"),
+            measurements_path: benchmark_root
+                .join("parameter_golf_distributed_8xh100_measurements.json")
+                .display()
+                .to_string(),
+            distributed_receipt_path: benchmark_root
+                .join("parameter_golf_distributed_8xh100_receipt.json")
+                .display()
+                .to_string(),
+            train_step_receipt_path: benchmark_root
+                .join("parameter_golf_distributed_8xh100_train_step.json")
+                .display()
+                .to_string(),
+            step_scope_root_dir: benchmark_root
+                .join("runtime_step_scopes")
+                .display()
+                .to_string(),
+            executed_step_count: 4,
+            observed_training_time_ms: 400,
+            step_observations: vec![ParameterGolfDistributedStepObservation::new(
+                1,
+                1_742_846_401_000,
+                1_742_846_401_400,
+                1_048_576,
+            )],
+            stop_reason: Some(String::from("validation_completed")),
+            mean_train_loss: 4.12,
+            train_tokens: 1_048_576,
+            observed_step_ms: 400,
+            gradient_sync_ms: 28,
+            optimizer_step_ms: 12,
+            gradient_norm_after_clip: 0.91,
+            clip_applied: true,
+            non_finite_gradient_count: 0,
+            rank_launches: Vec::new(),
+            aggregated_gradient_artifact_path: benchmark_root
+                .join("aggregated_gradients.safetensors")
+                .display()
+                .to_string(),
+            aggregated_gradient_artifact_sha256: String::from("aggregated-gradient-sha"),
+            current_model_artifact_path: benchmark_root
+                .join("current_model.runtime_surface.safetensors")
+                .display()
+                .to_string(),
+            current_model_artifact_sha256: String::from("runtime-surface-sha"),
+            current_model_artifact_surface: String::from("banked_full_precision_v1"),
+            current_model_int8_zlib_artifact_path: final_model_path.display().to_string(),
+            current_model_int8_zlib_artifact_sha256: sha256_bytes(b"model-int8"),
+            current_model_int8_zlib_artifact_size_bytes: b"model-int8".len() as u64,
+            validation_rank_launches: Vec::new(),
+            step_observation: ParameterGolfDistributedStepObservation::new(
+                4,
+                1_742_846_401_000,
+                1_742_846_401_400,
+                1_048_576,
+            ),
+            validation_observed_ms: 20,
+            validation_total_sequence_count: 1024,
+            validation_shard_observations: Vec::new(),
+            score_first_ttt_receipt: None,
+            distributed_receipt,
+            claim_boundary: String::from(PARAMETER_GOLF_DISTRIBUTED_8XH100_CLAIM_BOUNDARY),
+            receipt_digest: String::new(),
+        };
+        receipt.receipt_digest = receipt.stable_digest();
+        Ok(receipt)
+    }
 
     #[test]
     fn local_reference_runtime_refuses_score_first_ttt_requests() {
@@ -825,5 +1082,156 @@ mod tests {
             }
             other => panic!("unexpected error: {other}"),
         }
+    }
+
+    #[test]
+    fn distributed_completion_receipt_binds_validation_and_final_artifact(
+    ) -> Result<(), Box<dyn Error>> {
+        let tempdir = tempdir()?;
+        let root = tempdir.path();
+        let submission_manifest_bytes = b"{\"track\":\"non-record\"}\n";
+        fs::write(root.join("submission.json"), submission_manifest_bytes)?;
+
+        let mut manifest = ParameterGolfSubmissionRuntimeManifest {
+            schema_version: 1,
+            package_version: String::from("test"),
+            run_id: String::from("parameter-golf-distributed-runtime-test"),
+            benchmark_ref: String::from(PARAMETER_GOLF_DISTRIBUTED_8XH100_BENCHMARK_REF),
+            entrypoint_path: String::from("train_gpt.py"),
+            runtime_payload_path: String::from("runtime/parameter_golf_submission_runtime"),
+            submission_manifest_path: String::from("submission.json"),
+            accounting_receipt_path: String::from("parameter_golf_submission_accounting.json"),
+            fixture_path: String::from("runtime/parameter_golf_local_reference_fixture.json"),
+            model_artifact_path: String::from("submission_model.bin.zlib"),
+            runtime_receipt_path: String::from("parameter_golf_submission_runtime_receipt.json"),
+            distributed_bringup_report_path: String::from(
+                "parameter-golf-distributed-8xh100-run/benchmark/parameter_golf_distributed_8xh100_bringup.json",
+            ),
+            sequence_length: 1024,
+            validation_batch_tokens: 524_288,
+            validation_eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
+            validation_batch_sequences: 64,
+            score_first_ttt: None,
+            expected_val_loss: 1.0,
+            expected_val_bpb: 1.0,
+            default_execution_mode: String::from(PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE),
+            real_execution_contracts: Vec::new(),
+            runtime_posture: String::from("distributed_runtime"),
+            claim_boundary: String::from("distributed runtime boundary"),
+            manifest_digest: String::new(),
+        };
+        manifest.manifest_digest = manifest.stable_digest();
+
+        let bringup_report = sample_bringup_report();
+        let bringup_report_path = root.join(&manifest.distributed_bringup_report_path);
+        let bootstrap_receipt =
+            sample_runtime_bootstrap_receipt(&bringup_report_path, &bringup_report);
+        let train_step_receipt = sample_train_step_receipt(root, sample_distributed_receipt())?;
+        let train_step_receipt_path =
+            root.join("parameter-golf-distributed-8xh100-run/benchmark/parameter_golf_distributed_8xh100_train_step.json");
+        let bootstrap_receipt_path =
+            root.join("parameter-golf-distributed-8xh100-run/benchmark/parameter_golf_distributed_8xh100_runtime_bootstrap.json");
+
+        let receipt = build_parameter_golf_distributed_8xh100_completion_receipt(
+            root,
+            &manifest,
+            &bringup_report_path,
+            &bringup_report,
+            &bootstrap_receipt_path,
+            &bootstrap_receipt,
+            &train_step_receipt_path,
+            &train_step_receipt,
+        )?;
+
+        assert_eq!(
+            receipt.final_model_artifact_digest,
+            sha256_bytes(b"model-int8")
+        );
+        assert_eq!(
+            receipt.submission_manifest_digest,
+            sha256_bytes(submission_manifest_bytes)
+        );
+        assert_eq!(receipt.distributed_validation_mean_loss, 3.82);
+        assert_eq!(receipt.distributed_validation_bits_per_byte, 1.91);
+        assert_eq!(receipt.distributed_validation_observed_ms, 20);
+        assert_eq!(receipt.receipt_digest, receipt.stable_digest());
+        Ok(())
+    }
+
+    #[test]
+    fn distributed_completion_receipt_requires_validation_aggregation() -> Result<(), Box<dyn Error>>
+    {
+        let tempdir = tempdir()?;
+        let root = tempdir.path();
+        fs::write(
+            root.join("submission.json"),
+            b"{\"track\":\"non-record\"}\n",
+        )?;
+        let mut manifest = ParameterGolfSubmissionRuntimeManifest {
+            schema_version: 1,
+            package_version: String::from("test"),
+            run_id: String::from("parameter-golf-distributed-runtime-test"),
+            benchmark_ref: String::from(PARAMETER_GOLF_DISTRIBUTED_8XH100_BENCHMARK_REF),
+            entrypoint_path: String::from("train_gpt.py"),
+            runtime_payload_path: String::from("runtime/parameter_golf_submission_runtime"),
+            submission_manifest_path: String::from("submission.json"),
+            accounting_receipt_path: String::from("parameter_golf_submission_accounting.json"),
+            fixture_path: String::from("runtime/parameter_golf_local_reference_fixture.json"),
+            model_artifact_path: String::from("submission_model.bin.zlib"),
+            runtime_receipt_path: String::from("parameter_golf_submission_runtime_receipt.json"),
+            distributed_bringup_report_path: String::from(
+                "parameter-golf-distributed-8xh100-run/benchmark/parameter_golf_distributed_8xh100_bringup.json",
+            ),
+            sequence_length: 1024,
+            validation_batch_tokens: 524_288,
+            validation_eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
+            validation_batch_sequences: 64,
+            score_first_ttt: None,
+            expected_val_loss: 1.0,
+            expected_val_bpb: 1.0,
+            default_execution_mode: String::from(PARAMETER_GOLF_DISTRIBUTED_8XH100_EXECUTION_MODE),
+            real_execution_contracts: Vec::new(),
+            runtime_posture: String::from("distributed_runtime"),
+            claim_boundary: String::from("distributed runtime boundary"),
+            manifest_digest: String::new(),
+        };
+        manifest.manifest_digest = manifest.stable_digest();
+
+        let bringup_report = sample_bringup_report();
+        let bringup_report_path = root.join(&manifest.distributed_bringup_report_path);
+        let bootstrap_receipt =
+            sample_runtime_bootstrap_receipt(&bringup_report_path, &bringup_report);
+        let mut train_step_receipt = sample_train_step_receipt(root, sample_distributed_receipt())?;
+        train_step_receipt
+            .distributed_receipt
+            .validation_aggregation = None;
+        train_step_receipt.distributed_receipt.receipt_digest =
+            train_step_receipt.distributed_receipt.stable_digest();
+        let train_step_receipt_path =
+            root.join("parameter-golf-distributed-8xh100-run/benchmark/parameter_golf_distributed_8xh100_train_step.json");
+        let bootstrap_receipt_path =
+            root.join("parameter-golf-distributed-8xh100-run/benchmark/parameter_golf_distributed_8xh100_runtime_bootstrap.json");
+
+        let error = build_parameter_golf_distributed_8xh100_completion_receipt(
+            root,
+            &manifest,
+            &bringup_report_path,
+            &bringup_report,
+            &bootstrap_receipt_path,
+            &bootstrap_receipt,
+            &train_step_receipt_path,
+            &train_step_receipt,
+        )
+        .expect_err("completion receipt should fail closed without validation aggregation");
+        match error {
+            ParameterGolfSubmissionRuntimeError::Consistency { message } => {
+                assert_eq!(
+                    message,
+                    "distributed completion receipt requires one validation-backed distributed receipt"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+        Ok(())
     }
 }
