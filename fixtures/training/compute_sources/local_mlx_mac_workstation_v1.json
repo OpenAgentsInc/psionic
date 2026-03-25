@@ -1,0 +1,76 @@
+{
+  "schema_version": "psionic.cross_provider_compute_source_contract.v1",
+  "source_id": "local_mlx_mac_workstation",
+  "source_class": "local_workstation",
+  "provider": "local_operator_managed",
+  "locality": {
+    "locality_kind": "single_local_workstation",
+    "zone_or_placement": "Mac.lan",
+    "discovery_posture": "operator_direct_host_selection",
+    "detail": "One operator-managed Apple Silicon workstation retained through the MLX bring-up report on `Mac14,10`."
+  },
+  "accelerators": {
+    "accelerator_vendor": "apple",
+    "accelerator_model": "Apple M2 Pro",
+    "accelerator_count": 1,
+    "per_accelerator_memory_bytes": 17179869184,
+    "unified_memory": true,
+    "require_non_mig": false,
+    "detail": "The retained MLX bring-up report proves one Apple `Apple M2 Pro` chip with 19 GPU cores and 17179869184 bytes of unified memory."
+  },
+  "backend": {
+    "backend_family": "mlx_metal",
+    "runtime_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+    "precision_posture": "f32_reference",
+    "admits_mixed_backend_dense": false,
+    "detail": "The local Apple source currently closes bounded MLX contributor and validator-adjacent work, not dense same-job mixed-backend training."
+  },
+  "network": {
+    "trust_tier": "local_operator_managed",
+    "private_connectivity": true,
+    "cluster_port_bindings": [],
+    "ingress_posture": "operator_owned_local_network",
+    "egress_posture": "operator_owned_local_network",
+    "impairment_posture": "not_retained",
+    "detail": "The retained MLX bring-up report proves the machine contract and bounded backend slice, but it does not yet freeze remote launch or cluster-port authority."
+  },
+  "storage": {
+    "storage_kind": "local_filesystem_only",
+    "workspace_root": "operator_local_workspace",
+    "checkpoint_writer_capable": false,
+    "detail": "The retained Apple source currently keeps local-only artifact truth and does not yet claim shared checkpoint writer authority."
+  },
+  "cost": {
+    "cost_model": "local_operator_owned",
+    "detail": "The retained Apple source does not publish a provider-metered price surface."
+  },
+  "admitted_execution_classes": [
+    "validated_contributor_window",
+    "validator",
+    "eval_worker",
+    "data_builder"
+  ],
+  "refusal_examples": [
+    {
+      "source_id": "local_mlx_mac_workstation",
+      "requested_execution_class": "dense_full_model_rank",
+      "refusal_kind": "source_execution_class_not_admitted",
+      "detail": "source `local_mlx_mac_workstation` does not yet admit `DenseFullModelRank` under backend `MlxMetal` and the current claim boundary refuses widening beyond its retained lane evidence"
+    },
+    {
+      "source_id": "local_mlx_mac_workstation",
+      "requested_execution_class": "checkpoint_writer",
+      "refusal_kind": "source_execution_class_not_admitted",
+      "detail": "source `local_mlx_mac_workstation` does not yet admit `CheckpointWriter` under backend `MlxMetal` and the current claim boundary refuses widening beyond its retained lane evidence"
+    }
+  ],
+  "authority_artifacts": [
+    {
+      "path": "fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json",
+      "sha256": "9d21f4ad23e56c02a5b7e1c220f5fe412a9df389c38041be8600f490747a00a8",
+      "detail": "Local Mac MLX bring-up report that retains the machine thresholds, Metal probe, and bounded overfit gate."
+    }
+  ],
+  "claim_boundary": "This source contract proves one local Apple Silicon workstation can be compared and admitted through the shared training-facing machine contract. It does not claim dense-rank MLX runtime closure, mixed-backend same-job training, or shared checkpoint authority by itself.",
+  "contract_digest": "6eed4f0ba8022909bc3c6320da31341b3c6269e8cfc4b3d935143302fc732142"
+}

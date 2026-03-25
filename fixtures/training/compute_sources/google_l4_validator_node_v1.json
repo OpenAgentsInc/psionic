@@ -1,0 +1,93 @@
+{
+  "schema_version": "psionic.cross_provider_compute_source_contract.v1",
+  "source_id": "google_l4_validator_node",
+  "source_class": "google_cloud",
+  "provider": "google_cloud",
+  "locality": {
+    "locality_kind": "regional_private_cloud_node",
+    "region": "us-central1",
+    "zone_or_placement": "us-central1-a",
+    "cluster_namespace": "cluster.psion.google.configured_peer_swarm",
+    "discovery_posture": "configured_peer_only",
+    "detail": "Google g2 + L4 coordinator node in project `openagentsgemini` on private subnetwork `oa-lightning-us-central1-psion-swarm-coordinator`."
+  },
+  "accelerators": {
+    "accelerator_vendor": "nvidia",
+    "accelerator_model": "nvidia-l4",
+    "accelerator_count": 1,
+    "unified_memory": false,
+    "require_non_mig": false,
+    "detail": "Machine type `g2-standard-8` with one retained L4 accelerator."
+  },
+  "backend": {
+    "backend_family": "cuda",
+    "runtime_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+    "precision_posture": "f32_reference",
+    "admits_mixed_backend_dense": false,
+    "detail": "Google swarm nodes currently retain the CUDA open-adapter backend and do not claim mixed-backend dense participation."
+  },
+  "network": {
+    "trust_tier": "private_cloud_operator_managed",
+    "private_connectivity": true,
+    "cluster_port_bindings": [
+      34100
+    ],
+    "ingress_posture": "configured_peer_only tags=psion-swarm-coordinator-host",
+    "egress_posture": "private VPC regional egress in `us-central1` on `oa-lightning`",
+    "impairment_posture": "admitted_host_side_netem_profiles",
+    "detail": "Cluster traffic stays inside dedicated subnetworks with explicit impairment profiles and no external IPs."
+  },
+  "storage": {
+    "storage_kind": "remote_bucket_plus_local_disk",
+    "workspace_root": "/var/lib/psion",
+    "remote_artifact_root": "gs://openagentsgemini-psion-train-us-central1",
+    "remote_checkpoint_root": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}/checkpoints",
+    "local_disk_budget_bytes": 214748364800,
+    "checkpoint_writer_capable": true,
+    "detail": "Google launch authority keeps shared artifacts in GCS and uses the local boot disk only as node-local staging."
+  },
+  "cost": {
+    "cost_model": "provider_guardrailed",
+    "declared_run_cost_ceiling_usd_cents": 2000,
+    "detail": "The retained Google fixture keeps an explicit per-run ceiling but does not retain a canonical hourly price quote."
+  },
+  "admitted_execution_classes": [
+    "validated_contributor_window",
+    "validator",
+    "checkpoint_writer",
+    "eval_worker",
+    "data_builder"
+  ],
+  "refusal_examples": [
+    {
+      "source_id": "google_l4_validator_node",
+      "requested_execution_class": "dense_full_model_rank",
+      "refusal_kind": "source_execution_class_not_admitted",
+      "detail": "source `google_l4_validator_node` does not yet admit `DenseFullModelRank` under backend `Cuda` and the current claim boundary refuses widening beyond its retained lane evidence"
+    }
+  ],
+  "authority_artifacts": [
+    {
+      "path": "fixtures/psion/google/psion_google_two_node_swarm_contract_v1.json",
+      "sha256": "d85311bfbdd9328e095d62f64b7fc8a821167271e5d93ed2028b8fe98185f235",
+      "detail": "Frozen Google two-node swarm contract that owns the node role, cluster namespace, bucket root, and cluster ports."
+    },
+    {
+      "path": "fixtures/psion/google/psion_google_two_node_swarm_launch_profiles_v1.json",
+      "sha256": "20ee53104f6e7f4e88a68a83963921dec4bef4de0663797b67a87523095afcd3",
+      "detail": "Google launch profile that retains the g2-standard-8 plus L4 machine facts and run-cost ceiling."
+    },
+    {
+      "path": "fixtures/psion/google/psion_google_two_node_swarm_network_posture_v1.json",
+      "sha256": "c88bbd161e1b32a2e6e25ea49441abe391d35d5ec51bd078aebcf56faaac58a9",
+      "detail": "Google network posture that retains the dedicated subnetworks and regional private-network assumptions."
+    },
+    {
+      "path": "fixtures/psion/google/psion_google_two_node_swarm_identity_profile_v1.json",
+      "sha256": "ee1f75ebe4cda79d3b7a6ebea0d6bb4d8f1ac8a19418ddc377e8b58821dea42a",
+      "detail": "Google identity profile that retains the target tags and service-account authority behind the node."
+    }
+  ],
+  "claim_boundary": "This source contract proves one private Google g2 plus L4 node can be compared and admitted through the shared training-facing machine contract. It does not claim provider API automation closure, dense-rank runtime closure, or mixed-backend dense participation by itself.",
+  "contract_digest": "505b459944dc9d645a603add2c6608fb01defac97830b537c3a42da32a76256f"
+}

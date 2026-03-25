@@ -1,0 +1,81 @@
+{
+  "schema_version": "psionic.cross_provider_compute_source_contract.v1",
+  "source_id": "local_rtx4080_workstation",
+  "source_class": "local_workstation",
+  "provider": "local_operator_managed",
+  "locality": {
+    "locality_kind": "single_local_workstation",
+    "zone_or_placement": "trusted_lan_or_local_host",
+    "discovery_posture": "operator_direct_host_selection",
+    "detail": "One operator-managed Linux workstation retained through the first swarm RTX 4080 bring-up report."
+  },
+  "accelerators": {
+    "accelerator_vendor": "nvidia",
+    "accelerator_model": "NVIDIA GeForce RTX 4080",
+    "accelerator_count": 1,
+    "per_accelerator_memory_bytes": 17171480576,
+    "unified_memory": false,
+    "require_non_mig": false,
+    "detail": "The retained workstation report proves one RTX 4080 CUDA device with explicit memory and topology facts."
+  },
+  "backend": {
+    "backend_family": "cuda",
+    "runtime_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+    "precision_posture": "f32_reference",
+    "admits_mixed_backend_dense": false,
+    "detail": "The local RTX source currently closes validated contributor work, eval work, and data building under the CUDA open-adapter backend, not dense distributed training."
+  },
+  "network": {
+    "trust_tier": "local_operator_managed",
+    "private_connectivity": true,
+    "cluster_port_bindings": [],
+    "ingress_posture": "operator_owned_local_network",
+    "egress_posture": "operator_owned_local_network",
+    "impairment_posture": "not_retained",
+    "detail": "The retained workstation bring-up report does not freeze cluster ports or remote artifact transport, so those claims remain refused until a later binder or lane supplies them."
+  },
+  "storage": {
+    "storage_kind": "local_filesystem_only",
+    "workspace_root": "operator_local_workspace",
+    "checkpoint_writer_capable": false,
+    "detail": "The retained workstation source has a truthful local filesystem posture only and does not yet claim shared checkpoint authority."
+  },
+  "cost": {
+    "cost_model": "local_operator_owned",
+    "detail": "The retained local workstation source does not publish a provider-metered price surface."
+  },
+  "admitted_execution_classes": [
+    "validated_contributor_window",
+    "eval_worker",
+    "data_builder"
+  ],
+  "refusal_examples": [
+    {
+      "source_id": "local_rtx4080_workstation",
+      "requested_execution_class": "dense_full_model_rank",
+      "refusal_kind": "source_execution_class_not_admitted",
+      "detail": "source `local_rtx4080_workstation` does not yet admit `DenseFullModelRank` under backend `Cuda` and the current claim boundary refuses widening beyond its retained lane evidence"
+    },
+    {
+      "source_id": "local_rtx4080_workstation",
+      "requested_execution_class": "validator",
+      "refusal_kind": "source_execution_class_not_admitted",
+      "detail": "source `local_rtx4080_workstation` does not yet admit `Validator` under backend `Cuda` and the current claim boundary refuses widening beyond its retained lane evidence"
+    },
+    {
+      "source_id": "local_rtx4080_workstation",
+      "requested_execution_class": "checkpoint_writer",
+      "refusal_kind": "source_execution_class_not_admitted",
+      "detail": "source `local_rtx4080_workstation` does not yet admit `CheckpointWriter` under backend `Cuda` and the current claim boundary refuses widening beyond its retained lane evidence"
+    }
+  ],
+  "authority_artifacts": [
+    {
+      "path": "fixtures/swarm/reports/swarm_linux_rtx4080_bringup_v1.json",
+      "sha256": "6c1ab4bc82d8d0c96f9a0754ae7a80a59f1e385bd21f9732d2147b1d09e770b7",
+      "detail": "Local RTX 4080 bring-up report that retains the source inventory, CUDA health, and bounded parity harness."
+    }
+  ],
+  "claim_boundary": "This source contract proves one local RTX 4080 workstation can be compared and admitted through the shared training-facing machine contract. It does not claim dense-rank runtime closure, shared checkpoint authority, or provider-neutral remote launch by itself.",
+  "contract_digest": "b756ae9e4d35c58a1f5269f64af997f1bf7ea903923eea12dce4c0c01105d52b"
+}

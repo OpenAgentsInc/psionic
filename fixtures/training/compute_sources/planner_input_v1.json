@@ -1,0 +1,44 @@
+{
+  "schema_version": "psionic.cross_provider_compute_source_contract.v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "candidates": [
+    {
+      "source_id": "google_l4_validator_node",
+      "source_contract_digest": "505b459944dc9d645a603add2c6608fb01defac97830b537c3a42da32a76256f",
+      "requested_execution_class": "validator",
+      "expected_disposition": "admitted"
+    },
+    {
+      "source_id": "runpod_8xh100_dense_node",
+      "source_contract_digest": "f4b1b236dd490ad6e1cdfda9538e5f0139a84449d003047332da6599f8c67672",
+      "requested_execution_class": "dense_full_model_rank",
+      "expected_disposition": "admitted"
+    },
+    {
+      "source_id": "local_rtx4080_workstation",
+      "source_contract_digest": "b756ae9e4d35c58a1f5269f64af997f1bf7ea903923eea12dce4c0c01105d52b",
+      "requested_execution_class": "validated_contributor_window",
+      "expected_disposition": "admitted"
+    },
+    {
+      "source_id": "local_mlx_mac_workstation",
+      "source_contract_digest": "6eed4f0ba8022909bc3c6320da31341b3c6269e8cfc4b3d935143302fc732142",
+      "requested_execution_class": "data_builder",
+      "expected_disposition": "admitted"
+    },
+    {
+      "source_id": "local_mlx_mac_workstation",
+      "source_contract_digest": "6eed4f0ba8022909bc3c6320da31341b3c6269e8cfc4b3d935143302fc732142",
+      "requested_execution_class": "dense_full_model_rank",
+      "expected_disposition": "refused",
+      "expected_refusal": {
+        "source_id": "local_mlx_mac_workstation",
+        "requested_execution_class": "dense_full_model_rank",
+        "refusal_kind": "source_execution_class_not_admitted",
+        "detail": "source `local_mlx_mac_workstation` does not yet admit `DenseFullModelRank` under backend `MlxMetal` and the current claim boundary refuses widening beyond its retained lane evidence"
+      }
+    }
+  ],
+  "planner_input_digest": "2f1a9e86b52ca693e271b758ab16e2384d88361178f4089f0f3151c1472db5d2"
+}

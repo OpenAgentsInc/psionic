@@ -1,0 +1,88 @@
+{
+  "schema_version": "psionic.cross_provider_compute_source_contract.v1",
+  "source_id": "runpod_8xh100_dense_node",
+  "source_class": "runpod",
+  "provider": "run_pod",
+  "locality": {
+    "locality_kind": "single_rented_pod",
+    "zone_or_placement": "single_runpod_pod_with_exactly_8_non_mig_h100_devices",
+    "discovery_posture": "single_pod_world_size_fixed",
+    "detail": "One RunPod pod with exactly eight non-MIG H100 devices under the retained Parameter Golf operator lane."
+  },
+  "accelerators": {
+    "accelerator_vendor": "nvidia",
+    "accelerator_model": "nvidia-h100-80gb",
+    "accelerator_count": 8,
+    "per_accelerator_memory_bytes": 85899345920,
+    "unified_memory": false,
+    "require_non_mig": true,
+    "detail": "World size 8 on one pod with explicit H100-only inventory."
+  },
+  "backend": {
+    "backend_family": "cuda",
+    "runtime_backend_label": "cuda",
+    "precision_posture": "provider_runtime_defined",
+    "admits_mixed_backend_dense": false,
+    "detail": "The retained RunPod lane is CUDA-only and is the strongest current dense-rank candidate surface in the repo."
+  },
+  "network": {
+    "trust_tier": "rented_provider_operator_managed",
+    "private_connectivity": false,
+    "cluster_port_bindings": [],
+    "ingress_posture": "single_pod_local_process_mesh",
+    "egress_posture": "provider_egress_with_operator_ssh",
+    "impairment_posture": "not_retained",
+    "detail": "The current RunPod lane assumes one pod-local process mesh rather than a cross-host private cluster fabric. The retained operator preflight keeps 4 required remote commands explicit."
+  },
+  "storage": {
+    "storage_kind": "persistent_provider_workspace",
+    "workspace_root": "persistent_workspace_rooted_at_/workspace",
+    "checkpoint_writer_capable": true,
+    "detail": "The retained RunPod lane writes into the mounted workspace and finalizes artifacts from there."
+  },
+  "cost": {
+    "cost_model": "provider_guardrailed",
+    "declared_run_cost_ceiling_usd_cents": 50000,
+    "declared_hourly_cost_usd_cents": 12500,
+    "detail": "The retained RunPod guardrail caps the run at $500.00 across 4.0 hours."
+  },
+  "admitted_execution_classes": [
+    "dense_full_model_rank",
+    "checkpoint_writer",
+    "eval_worker",
+    "data_builder"
+  ],
+  "refusal_examples": [
+    {
+      "source_id": "runpod_8xh100_dense_node",
+      "requested_execution_class": "validated_contributor_window",
+      "refusal_kind": "source_execution_class_not_admitted",
+      "detail": "source `runpod_8xh100_dense_node` does not yet admit `ValidatedContributorWindow` under backend `Cuda` and the current claim boundary refuses widening beyond its retained lane evidence"
+    },
+    {
+      "source_id": "runpod_8xh100_dense_node",
+      "requested_execution_class": "validator",
+      "refusal_kind": "source_execution_class_not_admitted",
+      "detail": "source `runpod_8xh100_dense_node` does not yet admit `Validator` under backend `Cuda` and the current claim boundary refuses widening beyond its retained lane evidence"
+    }
+  ],
+  "authority_artifacts": [
+    {
+      "path": "fixtures/parameter_golf/runpod/parameter_golf_runpod_8xh100_launch_profiles_v1.json",
+      "sha256": "a1a7b116b8fbab29c1192bd47dfb9c5337f1518dc88baa10eafea9e072edaa3f",
+      "detail": "RunPod launch profile that retains the exact 8xH100 pod shape and runtime envelope."
+    },
+    {
+      "path": "fixtures/parameter_golf/runpod/parameter_golf_runpod_8xh100_cost_guardrails_v1.json",
+      "sha256": "081b447cfc78dc45b8e8e4cbeb72f4989c95a43e2aa49f5023aef894832e49b0",
+      "detail": "RunPod cost guardrails that retain the bounded cost ceiling for the dense lane."
+    },
+    {
+      "path": "fixtures/parameter_golf/runpod/parameter_golf_runpod_8xh100_operator_preflight_policy_v1.json",
+      "sha256": "979d1e33147864fcd443d72817c61f6c9ae9e99ed82964285ae2f6ae94dc0eed",
+      "detail": "RunPod operator preflight policy that retains the required commands and local artifacts."
+    }
+  ],
+  "claim_boundary": "This source contract proves one 8xH100 RunPod pod can be admitted as a dense CUDA source through the shared training-facing machine contract. It does not claim cross-host RunPod cluster closure, mixed-backend dense participation, or provider-neutral finalization by itself.",
+  "contract_digest": "f4b1b236dd490ad6e1cdfda9538e5f0139a84449d003047332da6599f8c67672"
+}

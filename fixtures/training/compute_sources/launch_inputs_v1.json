@@ -1,0 +1,79 @@
+[
+  {
+    "schema_version": "psionic.cross_provider_compute_source_contract.v1",
+    "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+    "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+    "source_id": "google_l4_validator_node",
+    "source_contract_digest": "505b459944dc9d645a603add2c6608fb01defac97830b537c3a42da32a76256f",
+    "requested_execution_class": "validator",
+    "run_id": "psion-xprovider-pretrain-google-validator-example",
+    "environment": {
+      "environment_ref": "psion.pretrain.reference_runtime",
+      "version": "v1"
+    },
+    "launch_root": "runs/psion-xprovider-pretrain-google-validator-example/launch",
+    "checkpoint_root": "runs/psion-xprovider-pretrain-google-validator-example/checkpoints",
+    "metrics_root": "runs/psion-xprovider-pretrain-google-validator-example/metrics",
+    "visualization_root": "runs/psion-xprovider-pretrain-google-validator-example/training_visualization",
+    "final_root": "runs/psion-xprovider-pretrain-google-validator-example/final",
+    "cluster_port_binding": 34100,
+    "launch_input_digest": "e1a8da9c24e48f4bd8661f26026e33756dcb0d8e86bee4c1615c125fa3d4936f"
+  },
+  {
+    "schema_version": "psionic.cross_provider_compute_source_contract.v1",
+    "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+    "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+    "source_id": "runpod_8xh100_dense_node",
+    "source_contract_digest": "f4b1b236dd490ad6e1cdfda9538e5f0139a84449d003047332da6599f8c67672",
+    "requested_execution_class": "dense_full_model_rank",
+    "run_id": "psion-xprovider-pretrain-runpod-dense-example",
+    "environment": {
+      "environment_ref": "psion.pretrain.reference_runtime",
+      "version": "v1"
+    },
+    "launch_root": "runs/psion-xprovider-pretrain-runpod-dense-example/launch",
+    "checkpoint_root": "runs/psion-xprovider-pretrain-runpod-dense-example/checkpoints",
+    "metrics_root": "runs/psion-xprovider-pretrain-runpod-dense-example/metrics",
+    "visualization_root": "runs/psion-xprovider-pretrain-runpod-dense-example/training_visualization",
+    "final_root": "runs/psion-xprovider-pretrain-runpod-dense-example/final",
+    "launch_input_digest": "f21a2d057ac46aa3c61ba5eabe0311cb0c68c64e1c859adab8a57b46b3545cb1"
+  },
+  {
+    "schema_version": "psionic.cross_provider_compute_source_contract.v1",
+    "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+    "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+    "source_id": "local_rtx4080_workstation",
+    "source_contract_digest": "b756ae9e4d35c58a1f5269f64af997f1bf7ea903923eea12dce4c0c01105d52b",
+    "requested_execution_class": "validated_contributor_window",
+    "run_id": "psion-xprovider-pretrain-local-rtx4080-window-example",
+    "environment": {
+      "environment_ref": "psion.pretrain.reference_runtime",
+      "version": "v1"
+    },
+    "launch_root": "runs/psion-xprovider-pretrain-local-rtx4080-window-example/launch",
+    "checkpoint_root": "runs/psion-xprovider-pretrain-local-rtx4080-window-example/checkpoints",
+    "metrics_root": "runs/psion-xprovider-pretrain-local-rtx4080-window-example/metrics",
+    "visualization_root": "runs/psion-xprovider-pretrain-local-rtx4080-window-example/training_visualization",
+    "final_root": "runs/psion-xprovider-pretrain-local-rtx4080-window-example/final",
+    "launch_input_digest": "3496b5d86918a90ddb019657595b67bc765e0441b3c07384cf3aef6536583819"
+  },
+  {
+    "schema_version": "psionic.cross_provider_compute_source_contract.v1",
+    "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+    "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+    "source_id": "local_mlx_mac_workstation",
+    "source_contract_digest": "6eed4f0ba8022909bc3c6320da31341b3c6269e8cfc4b3d935143302fc732142",
+    "requested_execution_class": "data_builder",
+    "run_id": "psion-xprovider-pretrain-local-mac-data-example",
+    "environment": {
+      "environment_ref": "psion.pretrain.reference_runtime",
+      "version": "v1"
+    },
+    "launch_root": "runs/psion-xprovider-pretrain-local-mac-data-example/launch",
+    "checkpoint_root": "runs/psion-xprovider-pretrain-local-mac-data-example/checkpoints",
+    "metrics_root": "runs/psion-xprovider-pretrain-local-mac-data-example/metrics",
+    "visualization_root": "runs/psion-xprovider-pretrain-local-mac-data-example/training_visualization",
+    "final_root": "runs/psion-xprovider-pretrain-local-mac-data-example/final",
+    "launch_input_digest": "7c7cba541264a617a91b64bd4bdc5ae4916d8c0e430236ee9dfbc82a08788e12"
+  }
+]

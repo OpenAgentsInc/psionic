@@ -71,6 +71,19 @@ reserved final-evidence surface, and it now binds its manifest id and digest
 directly into `TrainingRunState` before the run graph may claim that program
 authority.
 
+The repo now also owns a canonical provider-neutral compute-source contract
+family in `crates/psionic-train/src/cross_provider_compute_source_contract.rs`,
+the binary `cross_provider_compute_source_contracts`, the checker
+`scripts/check-cross-provider-compute-source-contracts.sh`, the focused
+reference doc `docs/COMPUTE_SOURCE_CONTRACT_REFERENCE.md`, and the committed
+fixtures under `fixtures/training/compute_sources/`. That surface freezes one
+training-facing machine contract above the current Google, RunPod, local NVIDIA,
+and local Apple artifacts with explicit provider, locality, accelerator,
+backend, network, storage, cost, admitted execution classes, typed refusal
+examples, and provider-neutral planner plus launch inputs. It keeps unsupported
+role claims fail-closed instead of letting each provider lane widen its own
+machine semantics.
+
 The first local mixed-hardware swarm lane now also has a canonical machine-
 legible contract in `crates/psionic-train/src/swarm_open_adapter.rs` plus the
 committed fixture `fixtures/swarm/first_swarm_run_contract_v1.json`. That
