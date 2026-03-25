@@ -36,6 +36,7 @@ use crate::{
     parameter_golf_runpod_8xh100_capability_profile,
     parameter_golf_single_h100_training::{
         refresh_parameter_golf_cuda_training_sessions_from_state, ParameterGolfCudaTrainingSession,
+        ParameterGolfSingleH100TrainingRuntimeReceipt,
     },
     restore_parameter_golf_banked_weights_from_safetensors,
     restore_parameter_golf_model_from_safetensors, seed_parameter_states, zero_gradients,
@@ -250,6 +251,9 @@ pub struct ParameterGolfDistributed8xH100TrainStepRankReceipt {
     pub loss: f32,
     /// Rank-local phase timings.
     pub phase_timings: ParameterGolfSingleH100PhaseTimings,
+    /// Explicit resident train-runtime receipt when the hot path used the device-resident surface.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_receipt: Option<ParameterGolfSingleH100TrainingRuntimeReceipt>,
     /// Rank-local wallclock for the executed gradient batch.
     pub observed_wallclock_ms: u64,
     /// In-memory gradient synchronization wallclock.
@@ -1241,6 +1245,22 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
             input_model_artifact_sha256: None,
             loss: gradient_batch.loss,
             phase_timings: gradient_batch.phase_timings,
+            runtime_receipt: gradient_batch.runtime.as_ref().map(|runtime| {
+                ParameterGolfSingleH100TrainingRuntimeReceipt {
+                    path: String::from("device_resident_cuda_training_graph_v1"),
+                    graph_surface: String::from("parameter_golf_baseline_training_graph_v2"),
+                    session_count: self.training_session_cache.len(),
+                    persistent_parameter_buffer_count: runtime.persistent_parameter_buffer_count,
+                    persistent_parameter_value_count: runtime.persistent_parameter_value_count,
+                    resident_parameter_upload_us: runtime.resident_parameter_upload_us,
+                    parameter_refresh_us: runtime.parameter_refresh_us,
+                    reusable_input_token_buffer: true,
+                    reusable_target_token_buffer: true,
+                    total_input_token_write_us: runtime.input_token_write_us,
+                    total_target_token_write_us: runtime.target_token_write_us,
+                    resident_parameter_buffers_reused: runtime.resident_parameter_buffers_reused,
+                }
+            }),
             observed_wallclock_ms: duration_ms(step_started),
             gradient_sync_ms,
             optimizer_step_ms,
@@ -3099,6 +3119,22 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step_child(
         input_model_artifact_sha256,
         loss: gradient_batch.loss,
         phase_timings: gradient_batch.phase_timings,
+        runtime_receipt: gradient_batch.runtime.as_ref().map(|runtime| {
+            ParameterGolfSingleH100TrainingRuntimeReceipt {
+                path: String::from("device_resident_cuda_training_graph_v1"),
+                graph_surface: String::from("parameter_golf_baseline_training_graph_v2"),
+                session_count: 0,
+                persistent_parameter_buffer_count: runtime.persistent_parameter_buffer_count,
+                persistent_parameter_value_count: runtime.persistent_parameter_value_count,
+                resident_parameter_upload_us: runtime.resident_parameter_upload_us,
+                parameter_refresh_us: runtime.parameter_refresh_us,
+                reusable_input_token_buffer: false,
+                reusable_target_token_buffer: false,
+                total_input_token_write_us: runtime.input_token_write_us,
+                total_target_token_write_us: runtime.target_token_write_us,
+                resident_parameter_buffers_reused: runtime.resident_parameter_buffers_reused,
+            }
+        }),
         observed_wallclock_ms,
         gradient_sync_ms: 0,
         optimizer_step_ms: 0,

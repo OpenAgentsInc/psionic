@@ -250,6 +250,13 @@ also records:
   and `observed_ms`
 - one aggregated `mean_loss` and `bits_per_byte`
 - one honest distributed validation wallclock as the slowest participating rank
+
+The resident worker train-step receipts now also preserve the rank-local
+`runtime_receipt` from the device-resident train runner when that hot path is
+active. That makes the retained `8xH100` proof explicit about resident buffer
+counts, resident upload cost, parameter-refresh cost, and mutable token-write
+cost instead of forcing later audits to infer those facts only from phase
+timings.
 - one aggregated `total_evaluation_unit_count` beside
   `total_sequence_count`
 

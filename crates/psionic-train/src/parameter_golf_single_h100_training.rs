@@ -1054,15 +1054,15 @@ struct ParameterGolfScoreFirstTttParameterState {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct ParameterGolfTrainingBatchRuntime {
-    resident_parameter_upload_us: u64,
-    parameter_refresh_us: u64,
-    input_token_write_us: u64,
-    target_token_write_us: u64,
-    forward_loss_cuda_ms: u64,
-    backward_cuda_ms: u64,
-    persistent_parameter_buffer_count: usize,
-    persistent_parameter_value_count: u64,
-    resident_parameter_buffers_reused: bool,
+    pub(crate) resident_parameter_upload_us: u64,
+    pub(crate) parameter_refresh_us: u64,
+    pub(crate) input_token_write_us: u64,
+    pub(crate) target_token_write_us: u64,
+    pub(crate) forward_loss_cuda_ms: u64,
+    pub(crate) backward_cuda_ms: u64,
+    pub(crate) persistent_parameter_buffer_count: usize,
+    pub(crate) persistent_parameter_value_count: u64,
+    pub(crate) resident_parameter_buffers_reused: bool,
 }
 
 #[derive(Clone, Debug)]
