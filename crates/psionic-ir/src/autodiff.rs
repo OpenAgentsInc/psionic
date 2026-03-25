@@ -125,8 +125,6 @@ pub enum AutodiffUnsupportedGradientReason {
     /// Backend-extension op families still require dedicated reverse-mode
     /// contracts.
     BackendExtensionFamily,
-    /// Dtype-cast ops are not yet part of the bounded reverse-mode surface.
-    CastFamily,
 }
 
 /// Returns the reverse-mode support posture for one graph op.
@@ -140,15 +138,13 @@ pub const fn gradient_support_for_op(op: &OpKind) -> AutodiffGradientSupport {
         | OpKind::Mul
         | OpKind::Matmul
         | OpKind::Reshape
+        | OpKind::Cast { .. }
         | OpKind::Permute { .. }
         | OpKind::Slice { .. }
         | OpKind::Select { .. }
         | OpKind::Concat { .. }
         | OpKind::Expand { .. }
         | OpKind::ReduceSum { .. } => AutodiffGradientSupport::Implemented,
-        OpKind::Cast { .. } => AutodiffGradientSupport::Unsupported {
-            reason: AutodiffUnsupportedGradientReason::CastFamily,
-        },
         OpKind::BackendExtension { op } => match op {
             BackendExtensionOp::ParameterGolfTokenEmbeddingLookup
             | BackendExtensionOp::ReluSquared
@@ -1916,10 +1912,34 @@ impl AutodiffGraph {
             }
 
             match node.op() {
-                OpKind::Input { .. }
-                | OpKind::Constant { .. }
-                | OpKind::Detach
-                | OpKind::Cast { .. } => {}
+                OpKind::Input { .. } | OpKind::Constant { .. } | OpKind::Detach => {}
+                OpKind::Cast { .. } => {
+                    let input_id = node.inputs()[0];
+                    if self.requires_grad(input_id) {
+                        let input_dtype = self
+                            .graph
+                            .node(input_id)
+                            .ok_or(AutodiffError::UnknownTensor {
+                                tensor_id: input_id,
+                            })?
+                            .tensor()
+                            .spec()
+                            .dtype();
+                        let contribution = if current_gradient.spec().dtype() == input_dtype {
+                            current_gradient.clone()
+                        } else {
+                            backward_builder
+                                .cast(&current_gradient, input_dtype)
+                                .map_err(map_graph_error)?
+                        };
+                        accumulate_gradient(
+                            &mut backward_builder,
+                            &mut gradients,
+                            input_id,
+                            contribution,
+                        )?;
+                    }
+                }
                 OpKind::Add => {
                     for input_id in node.inputs() {
                         if self.requires_grad(*input_id) {
@@ -6839,7 +6859,8 @@ mod tests {
     }
 
     #[test]
-    fn autodiff_support_matrix_marks_primitives_rms_norm_and_other_extensions_explicitly() {
+    fn autodiff_support_matrix_marks_primitives_float_casts_rms_norm_and_other_extensions_explicitly(
+    ) {
         let mut builder =
             AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
         let input = builder.input("x", Shape::new(vec![2, 2]), DType::F32, true);
@@ -6853,7 +6874,8 @@ mod tests {
             .expand(&combined, Shape::new(vec![2, 2]))
             .expect("expand");
         let permuted = builder.permute(&expanded, vec![1, 0]).expect("permute");
-        let reduced = builder.reduce_sum_axis(&permuted, 0).expect("axis reduce");
+        let casted = builder.cast(&permuted, DType::BF16).expect("float cast");
+        let reduced = builder.reduce_sum_axis(&casted, 0).expect("axis reduce");
         let loss = builder.reduce_sum(&reduced);
         let graph = builder.finish(vec![loss]);
 
@@ -7092,6 +7114,35 @@ mod tests {
         )?;
 
         assert_eq!(dense_gradient(&result, x.id()), vec![6.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn reverse_mode_autodiff_propagates_float_cast_gradients() -> Result<(), Box<dyn Error>> {
+        let mut f32_to_bf16_builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let x = f32_to_bf16_builder.input("x", Shape::new(vec![2]), DType::F32, true);
+        let lowered = f32_to_bf16_builder.cast(&x, DType::BF16)?;
+        let lowered_loss = f32_to_bf16_builder.reduce_sum(&lowered);
+        let lowered_graph = f32_to_bf16_builder.finish(vec![lowered_loss.clone()]);
+        let lowered_result = lowered_graph.backward_materialized(
+            lowered_loss.id(),
+            &BTreeMap::from([(x.id(), TensorData::F32(vec![1.5, -2.5]))]),
+        )?;
+        assert_eq!(dense_gradient(&lowered_result, x.id()), vec![1.0, 1.0]);
+
+        let mut bf16_to_f32_builder =
+            AutodiffGraphBuilder::with_context(Device::cpu(), AutodiffContext::training());
+        let y = bf16_to_f32_builder.input("y", Shape::new(vec![2]), DType::BF16, true);
+        let widened = bf16_to_f32_builder.cast(&y, DType::F32)?;
+        let widened_loss = bf16_to_f32_builder.reduce_sum(&widened);
+        let widened_graph = bf16_to_f32_builder.finish(vec![widened_loss.clone()]);
+        let widened_result = widened_graph.backward_materialized(
+            widened_loss.id(),
+            &BTreeMap::from([(y.id(), TensorData::BF16(vec![0.25, -0.75]))]),
+        )?;
+        assert_eq!(dense_gradient(&widened_result, y.id()), vec![1.0, 1.0]);
+
         Ok(())
     }
 
