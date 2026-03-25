@@ -140,6 +140,78 @@ impl ScaledDotProductAttentionBackwardCachedOutputs {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ScaledDotProductAttentionForwardGemmLayout {
+    batch_count: usize,
+    group_rows: usize,
+    query_stride_elements: usize,
+    kv_stride_elements: usize,
+    score_stride_elements: usize,
+    output_stride_elements: usize,
+    total_score_rows: usize,
+}
+
+fn scaled_dot_product_attention_forward_gemm_layout(
+    batch_size: usize,
+    query_heads: usize,
+    kv_heads: usize,
+    sequence_length: usize,
+    head_dim: usize,
+) -> Result<ScaledDotProductAttentionForwardGemmLayout, RuntimeError> {
+    let group_size = query_heads.checked_div(kv_heads).ok_or_else(|| {
+        RuntimeError::Backend(String::from(
+            "cuda scaled_dot_product_attention received zero kv head count on the GEMM lane",
+        ))
+    })?;
+    let batch_count = batch_size.checked_mul(kv_heads).ok_or_else(|| {
+        RuntimeError::Backend(String::from(
+            "cuda scaled_dot_product_attention GEMM batch-count overflow",
+        ))
+    })?;
+    let group_rows = group_size.checked_mul(sequence_length).ok_or_else(|| {
+        RuntimeError::Backend(String::from(
+            "cuda scaled_dot_product_attention GEMM row-count overflow",
+        ))
+    })?;
+    let query_stride_elements = group_rows.checked_mul(head_dim).ok_or_else(|| {
+        RuntimeError::Backend(String::from(
+            "cuda scaled_dot_product_attention GEMM query stride overflow",
+        ))
+    })?;
+    let kv_stride_elements = sequence_length.checked_mul(head_dim).ok_or_else(|| {
+        RuntimeError::Backend(String::from(
+            "cuda scaled_dot_product_attention GEMM kv stride overflow",
+        ))
+    })?;
+    let score_stride_elements = group_rows.checked_mul(sequence_length).ok_or_else(|| {
+        RuntimeError::Backend(String::from(
+            "cuda scaled_dot_product_attention GEMM score stride overflow",
+        ))
+    })?;
+    let output_stride_elements = group_rows.checked_mul(head_dim).ok_or_else(|| {
+        RuntimeError::Backend(String::from(
+            "cuda scaled_dot_product_attention GEMM output stride overflow",
+        ))
+    })?;
+    let total_score_rows = batch_size
+        .checked_mul(query_heads)
+        .and_then(|value| value.checked_mul(sequence_length))
+        .ok_or_else(|| {
+            RuntimeError::Backend(String::from(
+                "cuda scaled_dot_product_attention GEMM total row-count overflow",
+            ))
+        })?;
+    Ok(ScaledDotProductAttentionForwardGemmLayout {
+        batch_count,
+        group_rows,
+        query_stride_elements,
+        kv_stride_elements,
+        score_stride_elements,
+        output_stride_elements,
+        total_score_rows,
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ReduceSumCudaStrategy {
     Rows {
         row_count: usize,
@@ -1797,6 +1869,25 @@ impl CudaSubmission {
             sequence_length,
             head_dim,
             &output.platform,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Applies one in-place causal row-softmax over contiguous `f32`
+    /// `[row_count, sequence_length]` logits.
+    pub fn attention_causal_row_softmax_in_place_f32(
+        &mut self,
+        logits: &CudaBuffer,
+        row_count: usize,
+        sequence_length: usize,
+        scale: f32,
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_attention_causal_row_softmax_in_place_f32(
+            &logits.platform,
+            row_count,
+            sequence_length,
+            scale,
         )?;
         self.encoded_operations += 1;
         Ok(())
@@ -4327,7 +4418,8 @@ impl AvailableCudaBackend {
                 )?;
             }
             (DType::BF16, DType::BF16, DType::BF16, DType::BF16) => {
-                submission.attention_causal_sequence_bf16(
+                self.execute_scaled_dot_product_attention_bf16_gemm_forward(
+                    submission,
                     query,
                     key,
                     value,
@@ -4336,6 +4428,7 @@ impl AvailableCudaBackend {
                     kv_heads,
                     sequence_length,
                     head_dim,
+                    scale,
                     &output,
                 )?;
             }
@@ -4346,6 +4439,103 @@ impl AvailableCudaBackend {
             }
         }
         Ok(output)
+    }
+
+    fn finish_scaled_dot_product_attention_gemm_forward(
+        &self,
+        submission: &mut CudaSubmission,
+        scores: &CudaBuffer,
+        value: &CudaBuffer,
+        layout: ScaledDotProductAttentionForwardGemmLayout,
+        sequence_length: usize,
+        head_dim: usize,
+        scale: f32,
+        output: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        submission.attention_causal_row_softmax_in_place_f32(
+            scores,
+            layout.total_score_rows,
+            sequence_length,
+            scale,
+        )?;
+        submission.matmul_f32_bf16_strided_batched_to_f32_with_strides(
+            scores,
+            value,
+            output,
+            layout.group_rows,
+            sequence_length,
+            head_dim,
+            layout.batch_count,
+            layout.score_stride_elements,
+            layout.kv_stride_elements,
+            layout.output_stride_elements,
+            false,
+            false,
+        )?;
+        Ok(())
+    }
+
+    fn execute_scaled_dot_product_attention_bf16_gemm_forward(
+        &self,
+        submission: &mut CudaSubmission,
+        query: &CudaBuffer,
+        key: &CudaBuffer,
+        value: &CudaBuffer,
+        batch_size: usize,
+        query_heads: usize,
+        kv_heads: usize,
+        sequence_length: usize,
+        head_dim: usize,
+        scale: f32,
+        output: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        let layout = scaled_dot_product_attention_forward_gemm_layout(
+            batch_size,
+            query_heads,
+            kv_heads,
+            sequence_length,
+            head_dim,
+        )?;
+        let score_spec = TensorSpec::new(
+            Shape::new(vec![layout.batch_count, layout.group_rows, sequence_length]),
+            DType::F32,
+            query.spec().device().clone(),
+        );
+        let scores = self.allocate(&score_spec)?;
+        let output_f32_spec = TensorSpec::from_layout(
+            output.spec().layout().clone(),
+            DType::F32,
+            output.spec().device().clone(),
+        );
+        let output_f32 = self.allocate(&output_f32_spec)?;
+        submission.matmul_bf16_strided_batched_to_f32_with_strides(
+            query,
+            key,
+            &scores,
+            layout.group_rows,
+            head_dim,
+            sequence_length,
+            layout.batch_count,
+            layout.query_stride_elements,
+            layout.kv_stride_elements,
+            layout.score_stride_elements,
+            false,
+            true,
+        )?;
+        self.finish_scaled_dot_product_attention_gemm_forward(
+            submission,
+            &scores,
+            value,
+            layout,
+            sequence_length,
+            head_dim,
+            scale,
+            &output_f32,
+        )?;
+        submission.cast_f32_to_bf16(&output_f32, output, output.spec().storage_size())?;
+        submission.retained_buffers.push(scores);
+        submission.retained_buffers.push(output_f32);
+        Ok(())
     }
 
     fn execute_rotary_embedding_backward_step(
@@ -7993,6 +8183,13 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_attention_causal_row_softmax_in_place_f32(
+            logits: *mut c_void,
+            row_count: c_int,
+            sequence_length: c_int,
+            scale: f32,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_attention_causal_sequence_backward_f32(
             query: *const c_void,
             key: *const c_void,
@@ -11437,6 +11634,38 @@ mod platform {
             )
         }
 
+        pub(super) fn encode_attention_causal_row_softmax_in_place_f32(
+            &mut self,
+            logits: &PlatformBuffer,
+            row_count: usize,
+            sequence_length: usize,
+            scale: f32,
+        ) -> Result<(), RuntimeError> {
+            let row_count = c_int::try_from(row_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention row-softmax row count exceeds c_int",
+                ))
+            })?;
+            let sequence_length = c_int::try_from(sequence_length).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda causal attention row-softmax sequence length exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_attention_causal_row_softmax_in_place_f32(
+                        logits.inner.device_ptr.cast(),
+                        row_count,
+                        sequence_length,
+                        scale,
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_attention_causal_row_softmax_in_place_f32",
+            )
+        }
+
         #[allow(clippy::too_many_arguments)]
         pub(super) fn encode_attention_causal_sequence_backward_f32(
             &mut self,
@@ -13502,6 +13731,18 @@ mod platform {
             _sequence_length: usize,
             _head_dim: usize,
             _output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        pub(super) fn encode_attention_causal_row_softmax_in_place_f32(
+            &mut self,
+            _logits: &PlatformBuffer,
+            _row_count: usize,
+            _sequence_length: usize,
+            _scale: f32,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "cuda quantized text-generation kernels require Linux CUDA support",
@@ -16624,6 +16865,52 @@ mod tests {
         assert_close(
             &output.read_f32()?,
             &[1.0, 2.0, 3.0, 4.0, 0.0, 0.0, 16.0, 17.0, 22.0, 23.0],
+            1e-5,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_executes_attention_causal_row_softmax_in_place_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let logits = backend.input_buffer(
+            Shape::new(vec![4, 4]),
+            vec![
+                10.0_f32, -1.0, -2.0, -3.0, 0.0, 0.0, 5.0, 6.0, -1.0, 0.0, 1.0, 2.0, 1.0, 2.0,
+                3.0, 4.0,
+            ],
+        )?;
+
+        let mut submission = backend.begin_submission()?;
+        submission.attention_causal_row_softmax_in_place_f32(&logits, 4, 4, 1.0)?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.status, CudaCommandStatus::Completed);
+        assert_close(
+            &logits.read_f32()?,
+            &[
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.5,
+                0.5,
+                0.0,
+                0.0,
+                0.09003057,
+                0.24472848,
+                0.66524094,
+                0.0,
+                0.0320586,
+                0.08714432,
+                0.23688284,
+                0.6439143,
+            ],
             1e-5,
         );
         Ok(())

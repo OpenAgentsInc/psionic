@@ -2014,6 +2014,46 @@ __global__ void attention_causal_sequence_kernel(
     }
 }
 
+__global__ void attention_causal_row_softmax_in_place_f32_kernel(
+    float *logits,
+    int row_count,
+    int sequence_length,
+    float scale
+) {
+    const int row_index = static_cast<int>(blockIdx.x);
+    if (row_index >= row_count) {
+        return;
+    }
+
+    __shared__ float reduction_scratch[kAttentionBlockSize];
+
+    const int position = row_index % sequence_length;
+    float *row = logits + static_cast<size_t>(row_index) * static_cast<size_t>(sequence_length);
+
+    float local_max = -INFINITY;
+    for (int token_index = static_cast<int>(threadIdx.x); token_index <= position;
+         token_index += blockDim.x) {
+        local_max = fmaxf(local_max, row[token_index] * scale);
+    }
+    const float max_value = reduce_block_max(local_max, reduction_scratch);
+
+    float local_denom = 0.0f;
+    for (int token_index = static_cast<int>(threadIdx.x); token_index <= position;
+         token_index += blockDim.x) {
+        local_denom += expf(row[token_index] * scale - max_value);
+    }
+    const float denom = fmaxf(reduce_block_sum(local_denom, reduction_scratch), 1e-20f);
+
+    for (int token_index = static_cast<int>(threadIdx.x); token_index < sequence_length;
+         token_index += blockDim.x) {
+        if (token_index <= position) {
+            row[token_index] = expf(row[token_index] * scale - max_value) / denom;
+        } else {
+            row[token_index] = 0.0f;
+        }
+    }
+}
+
 template <typename QueryT, typename KeyT, typename ValueT, typename GradOutputT>
 __global__ void attention_causal_sequence_backward_to_f32_kernel(
     const QueryT *query,
@@ -6637,6 +6677,30 @@ extern "C" int psionic_cuda_moe_gate_up_swiglu(
         static_cast<const float *>(gate_bias),
         static_cast<const float *>(up_bias),
         static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_attention_causal_row_softmax_in_place_f32(
+    void *logits,
+    int row_count,
+    int sequence_length,
+    float scale,
+    void *stream
+) {
+    if (row_count <= 0 || sequence_length <= 0 || sequence_length > kAttentionMaxPositions) {
+        return static_cast<int>(cudaErrorInvalidValue);
+    }
+    attention_causal_row_softmax_in_place_f32_kernel<<<
+        row_count,
+        kAttentionBlockSize,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<float *>(logits),
+        row_count,
+        sequence_length,
+        scale
     );
     return static_cast<int>(cudaGetLastError());
 }

@@ -110,6 +110,23 @@ runtime-surface gap for the `#562` forward replacement work so the next score
 lane can encode QK and AV batches without falling back to one-position-at-a-
 time kernels or one-GEMM-at-a-time host orchestration.
 
+Current `main` now also moves the admitted BF16 full-sequence PGOLF attention
+forward lane onto that batched scorepath:
+
+- bounded BF16 `scaled_dot_product_attention` now computes grouped-query
+  `QK^T` through the strided-batched cuBLAS lane over `(batch, kv_head)`
+  batches with the query-head group folded into the row dimension
+- causal masking and row-softmax now run through one explicit CUDA
+  row-softmax kernel over the retained score matrix instead of the old
+  per-position scalar-loop forward kernel
+- the attended value pass now runs through the same batched GEMM surface as
+  `softmax(QK^T) @ V`, followed by the existing on-device `f32 -> bf16` cast
+  back onto the graph surface
+
+That retires the old naive full-sequence forward kernel from the admitted BF16
+score lane. The compatibility `f32` full-sequence attention lane still exists,
+but it is no longer the hot scoreboard path.
+
 `psionic-train` now also owns one bounded public CUDA Muon step over the same
 matrix-shaped parameter groups used by the baseline optimizer split:
 
