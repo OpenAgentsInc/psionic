@@ -132,6 +132,19 @@ reserved dual-node operator artifact paths, the admitted network-impairment
 profile ids, and the exact bounded result classes before later launch, runbook,
 or live-run issues claim the full operator path exists.
 
+The repo now also owns the first Google dual-node operator-preflight surfaces
+for that lane in
+`fixtures/psion/google/psion_google_two_node_swarm_network_posture_v1.json`,
+`fixtures/psion/google/psion_google_two_node_swarm_identity_profile_v1.json`,
+`fixtures/psion/google/psion_google_two_node_swarm_operator_preflight_policy_v1.json`,
+`scripts/psion-google-ensure-two-node-swarm-network.sh`,
+`scripts/psion-google-ensure-two-node-swarm-service-account.sh`,
+`scripts/psion-google-quota-preflight-two-node-swarm.sh`, and
+`scripts/psion-google-operator-preflight-two-node-swarm.sh`. That surface
+freezes two dedicated subnetworks, one swarm service account, one zone-pair
+quota gate, and one operator preflight that rejects missing network, identity,
+or pair-level headroom before the later launcher spends money.
+
 The repo now also owns one rehearsal-grade bottleneck report for that lane in
 `crates/psionic-train/src/swarm_trusted_lan_rehearsal.rs`, the binary
 `first_swarm_trusted_lan_rehearsal_report`, the checker

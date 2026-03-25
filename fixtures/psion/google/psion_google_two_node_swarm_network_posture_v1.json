@@ -1,0 +1,67 @@
+{
+  "schema_version": "psion.google_two_node_swarm_network_posture.v1",
+  "posture_id": "openagentsgemini-psion-google-two-node-swarm-network-v1",
+  "project_id": "openagentsgemini",
+  "region": "us-central1",
+  "network": "oa-lightning",
+  "subnetworks": [
+    {
+      "role_id": "psion.google_swarm.coordinator_validator_aggregator_contributor",
+      "subnetwork_name": "oa-lightning-us-central1-psion-swarm-coordinator",
+      "ip_cidr_range": "10.42.10.0/24",
+      "target_tags": [
+        "psion-swarm-coordinator-host"
+      ]
+    },
+    {
+      "role_id": "psion.google_swarm.contributor",
+      "subnetwork_name": "oa-lightning-us-central1-psion-swarm-contributor",
+      "ip_cidr_range": "10.42.11.0/24",
+      "target_tags": [
+        "psion-swarm-contributor-host"
+      ]
+    }
+  ],
+  "egress_posture": {
+    "class": "private_vm_via_cloud_nat",
+    "router": "oa-nat-router-us-central1",
+    "nat": "oa-nat-us-central1",
+    "external_ip_required": false
+  },
+  "ssh_posture": {
+    "class": "iap_tcp_forwarding",
+    "firewall_rule_name": "oa-allow-psion-swarm-iap-ssh",
+    "source_ranges": [
+      "35.235.240.0/20"
+    ],
+    "allowed": [
+      "tcp:22"
+    ],
+    "target_tags": [
+      "psion-swarm-coordinator-host",
+      "psion-swarm-contributor-host"
+    ],
+    "os_login_required": true
+  },
+  "cluster_transport_posture": {
+    "class": "configured_peer_private_vpc_ingress",
+    "firewall_rule_name": "oa-allow-psion-swarm-cluster",
+    "source_ranges": [
+      "10.42.10.0/24",
+      "10.42.11.0/24"
+    ],
+    "allowed": [
+      "tcp:34100-34101"
+    ],
+    "target_tags": [
+      "psion-swarm-coordinator-host",
+      "psion-swarm-contributor-host"
+    ],
+    "require_explicit_private_endpoints": true
+  },
+  "notes": [
+    "The first Google two-node swarm lane keeps both hosts on private subnetworks and relies on Cloud NAT for egress.",
+    "The subnetworks are distinct on purpose so the configured-peer topology stays explicit and does not inherit the single-node posture by accident.",
+    "The cluster firewall rule is limited to the dedicated swarm subnet CIDRs and the reserved cluster ports."
+  ]
+}

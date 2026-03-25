@@ -1,0 +1,59 @@
+{
+  "schema_version": "psion.google_two_node_swarm_identity_profile.v1",
+  "profile_id": "openagentsgemini-psion-google-two-node-swarm-v1",
+  "project_id": "openagentsgemini",
+  "service_account_email": "psion-train-swarm@openagentsgemini.iam.gserviceaccount.com",
+  "service_account_display_name": "Psion Google two-node swarm runtime",
+  "service_account_description": "Bounded Psion Google two-node configured-peer swarm runtime.",
+  "project_label_updates": {
+    "environment": "development",
+    "psion_lane": "google_two_node_swarm"
+  },
+  "bucket_label_updates": {
+    "environment": "development",
+    "lane": "psion",
+    "profile": "two-node-swarm",
+    "purpose": "train"
+  },
+  "recommended_instance_labels": {
+    "environment": "development",
+    "lane": "psion",
+    "profile": "two-node-swarm",
+    "workload": "train"
+  },
+  "required_project_roles": [
+    "roles/bigquery.dataViewer",
+    "roles/bigquery.jobUser",
+    "roles/logging.logWriter",
+    "roles/monitoring.metricWriter"
+  ],
+  "required_bucket_roles": [
+    "roles/storage.objectAdmin",
+    "roles/storage.legacyBucketReader"
+  ],
+  "bucket_url": "gs://openagentsgemini-psion-train-us-central1",
+  "node_roles": [
+    {
+      "role_id": "psion.google_swarm.coordinator_validator_aggregator_contributor",
+      "subnetwork_name": "oa-lightning-us-central1-psion-swarm-coordinator",
+      "target_tags": [
+        "psion-swarm-coordinator-host"
+      ],
+      "instance_labels": {
+        "swarm_role": "coordinator",
+        "cluster_posture": "configured-peer"
+      }
+    },
+    {
+      "role_id": "psion.google_swarm.contributor",
+      "subnetwork_name": "oa-lightning-us-central1-psion-swarm-contributor",
+      "target_tags": [
+        "psion-swarm-contributor-host"
+      ],
+      "instance_labels": {
+        "swarm_role": "contributor",
+        "cluster_posture": "configured-peer"
+      }
+    }
+  ]
+}
