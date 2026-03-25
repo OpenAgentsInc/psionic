@@ -284,6 +284,7 @@ use psionic_serve::{
     default_decoder_kv_cache_encoding_policy, default_decoder_kv_cache_policy,
     default_embeddings_execution_profile, default_prefix_cache_policy,
     served_artifact_identity_for_decoder_model, served_artifact_identity_for_embedding_model,
+    supported_decoder_kv_cache_encoding_policies,
 };
 
 /// Human-readable crate ownership summary.
@@ -3240,6 +3241,9 @@ pub struct TextGenerationCapabilityEnvelope {
     /// Explicit KV-cache encoding policy when the served path uses KV state.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kv_cache_encoding_policy: Option<KvCacheEncodingPolicy>,
+    /// Declared KV-cache encoding capabilities for the served path.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub supported_kv_cache_encoding_policies: Vec<KvCacheEncodingPolicy>,
     /// Explicit shared prompt-prefix reuse policy.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix_cache_policy: Option<PrefixCacheReusePolicy>,
@@ -3302,6 +3306,11 @@ impl TextGenerationCapabilityEnvelope {
                 .then(|| default_decoder_kv_cache_policy(model)),
             kv_cache_encoding_policy: (kv_cache_mode == KvCacheMode::Paged)
                 .then(|| default_decoder_kv_cache_encoding_policy(model, runtime_backend.as_str())),
+            supported_kv_cache_encoding_policies: (kv_cache_mode == KvCacheMode::Paged)
+                .then(|| {
+                    supported_decoder_kv_cache_encoding_policies(model, runtime_backend.as_str())
+                })
+                .unwrap_or_default(),
             prefix_cache_policy: Some(default_prefix_cache_policy()),
             kv_cache_mode,
             execution_profile,
@@ -5288,6 +5297,15 @@ mod tests {
                     "host_bytes_per_token": 80,
                     "detail": "host-resident dense rows remain the active KV representation"
                 },
+                "supported_kv_cache_encoding_policies": [{
+                    "family": "dense_f32",
+                    "objective": "none",
+                    "bits_per_channel": 32,
+                    "model_family_bound": "fixture_decoder",
+                    "context_length_bound": 8,
+                    "host_bytes_per_token": 80,
+                    "detail": "host-resident dense rows remain the active KV representation"
+                }],
                 "prefix_cache_policy": {
                     "shared_across_sessions": true,
                     "shared_across_users": false,
@@ -5351,6 +5369,10 @@ mod tests {
                 .map(|value| value.family),
             Some(KvCacheEncodingFamily::DenseF16Mirror)
         );
+        assert!(envelope
+            .supported_kv_cache_encoding_policies
+            .iter()
+            .any(|value| value.family == KvCacheEncodingFamily::DenseF16Mirror));
         Ok(())
     }
 

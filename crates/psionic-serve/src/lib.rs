@@ -248,6 +248,22 @@ pub fn default_decoder_kv_cache_encoding_policy(
     )
 }
 
+/// Returns all declared KV-cache encoding capabilities for one decoder descriptor.
+#[must_use]
+pub fn supported_decoder_kv_cache_encoding_policies(
+    model: &DecoderModelDescriptor,
+    runtime_backend: &str,
+) -> Vec<KvCacheEncodingPolicy> {
+    let mut policies = vec![default_decoder_kv_cache_encoding_policy(model, runtime_backend)];
+    if let Some(turboquant_policy) =
+        supported_turboquant_decoder_kv_cache_encoding_policy(model, runtime_backend)
+        && !policies.iter().any(|existing| existing == &turboquant_policy)
+    {
+        policies.push(turboquant_policy);
+    }
+    policies
+}
+
 /// Returns the default paged-KV policy for a loaded generation model handle.
 #[must_use]
 pub fn default_generation_kv_cache_policy<M>(model: &M) -> KvCachePolicy

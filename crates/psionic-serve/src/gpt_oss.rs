@@ -365,6 +365,30 @@ where
     )
 }
 
+/// Returns the TurboQuant KV-cache encoding policy when the current GPT-OSS CUDA
+/// geometry and environment publish it as supported.
+#[must_use]
+pub fn supported_turboquant_decoder_kv_cache_encoding_policy(
+    model: &DecoderModelDescriptor,
+    runtime_backend: &str,
+) -> Option<KvCacheEncodingPolicy> {
+    if !experimental_turboquant_kv_enabled() {
+        return None;
+    }
+    let selection = select_cuda_kv_cache_encoding_for_geometry(
+        true,
+        model.model.family.as_str(),
+        runtime_backend,
+        model.config.max_context,
+        model.config.kv_width(),
+        model.config.block.attention.head_dim,
+    );
+    match selection.encoding {
+        CudaKvCacheEncoding::TurboQuantQ81 => Some(selection.accounting.active),
+        CudaKvCacheEncoding::DenseF16 => None,
+    }
+}
+
 fn can_use_hybrid_cuda_hidden_residency_layer(layer: &GptOssCudaLayer, hidden_size: usize) -> bool {
     can_use_q8_1_norm_fusion(hidden_size)
         && layer.attention_norm_device.is_some()

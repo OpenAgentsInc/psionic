@@ -80,7 +80,10 @@ pub use tool_loop::{
     ToolResultVisibility,
 };
 
-use psionic_runtime::{ExecutionCapabilityProfile, GenerationSchedulerPolicy, HealthStatus};
+use psionic_runtime::{
+    ExecutionCapabilityProfile, GenerationSchedulerPolicy, HealthStatus, KvCacheEncodingFamily,
+    KvCacheEncodingPolicy,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, hash_map::DefaultHasher},
@@ -146,6 +149,28 @@ impl RoutingCapabilityFilters {
     }
 }
 
+/// Request-side KV-cache encoding constraints for routed served generation.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoutingKvCacheEncodingPreferences {
+    /// Require one explicit KV-cache encoding capability family.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub require: Option<KvCacheEncodingFamily>,
+    /// Prefer one explicit KV-cache encoding capability family when available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prefer: Option<KvCacheEncodingFamily>,
+    /// Exclude any route advertising these KV-cache encoding families.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<KvCacheEncodingFamily>,
+}
+
+impl RoutingKvCacheEncodingPreferences {
+    /// Returns whether no KV-cache encoding constraints were requested.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.require.is_none() && self.prefer.is_none() && self.exclude.is_empty()
+    }
+}
+
 /// Request-side placement hints used by cache-aware and warm-aware policies.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RoutingPolicyHints {
@@ -193,6 +218,9 @@ pub struct RoutedCacheEntry {
     /// Optional topology or route-pinning scope required for reuse.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub topology_scope: Option<String>,
+    /// Explicit cache-encoding policy required for safe prefix reuse.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kv_cache_encoding_policy: Option<KvCacheEncodingPolicy>,
     /// Approximate reusable token count represented by the cache entry.
     pub reusable_tokens: usize,
 }
@@ -209,6 +237,7 @@ impl RoutedCacheEntry {
             cache_key: cache_key.into(),
             tenant_scope: tenant_scope.into(),
             topology_scope: None,
+            kv_cache_encoding_policy: None,
             reusable_tokens,
         }
     }
@@ -217,6 +246,16 @@ impl RoutedCacheEntry {
     #[must_use]
     pub fn with_topology_scope(mut self, topology_scope: impl Into<String>) -> Self {
         self.topology_scope = Some(topology_scope.into());
+        self
+    }
+
+    /// Pins the cache entry to one explicit KV-cache encoding policy.
+    #[must_use]
+    pub fn with_kv_cache_encoding_policy(
+        mut self,
+        kv_cache_encoding_policy: KvCacheEncodingPolicy,
+    ) -> Self {
+        self.kv_cache_encoding_policy = Some(kv_cache_encoding_policy);
         self
     }
 }
@@ -242,6 +281,8 @@ pub struct RoutingRequest {
     pub target: RoutingTarget,
     /// Required capabilities.
     pub capability_filters: RoutingCapabilityFilters,
+    /// Explicit KV-cache encoding placement constraints.
+    pub kv_cache_encoding_preferences: RoutingKvCacheEncodingPreferences,
     /// Policy hints for warm/cache-aware routing.
     pub policy_hints: RoutingPolicyHints,
     /// Ordered preferred worker identifiers.
@@ -260,6 +301,7 @@ impl RoutingRequest {
             endpoint,
             target: RoutingTarget::Default,
             capability_filters: RoutingCapabilityFilters::default(),
+            kv_cache_encoding_preferences: RoutingKvCacheEncodingPreferences::default(),
             policy_hints: RoutingPolicyHints::default(),
             preferred_worker_ids: Vec::new(),
             preferred_family: None,
@@ -298,6 +340,29 @@ impl RoutingRequest {
     #[must_use]
     pub fn require_response_state(mut self) -> Self {
         self.capability_filters.response_state = true;
+        self
+    }
+
+    /// Requires one explicit KV-cache encoding capability family.
+    #[must_use]
+    pub fn require_kv_cache_encoding(mut self, family: KvCacheEncodingFamily) -> Self {
+        self.kv_cache_encoding_preferences.require = Some(family);
+        self
+    }
+
+    /// Prefers one explicit KV-cache encoding capability family when available.
+    #[must_use]
+    pub fn prefer_kv_cache_encoding(mut self, family: KvCacheEncodingFamily) -> Self {
+        self.kv_cache_encoding_preferences.prefer = Some(family);
+        self
+    }
+
+    /// Excludes any route that advertises one explicit KV-cache encoding capability family.
+    #[must_use]
+    pub fn exclude_kv_cache_encoding(mut self, family: KvCacheEncodingFamily) -> Self {
+        if !self.kv_cache_encoding_preferences.exclude.contains(&family) {
+            self.kv_cache_encoding_preferences.exclude.push(family);
+        }
         self
     }
 
@@ -361,6 +426,12 @@ pub struct RoutedModelInventory {
     /// Optional scheduler policy surfaced by the worker.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scheduler_policy: Option<GenerationSchedulerPolicy>,
+    /// Active KV-cache encoding policy for the routed lane, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kv_cache_encoding_policy: Option<KvCacheEncodingPolicy>,
+    /// Declared KV-cache encoding capabilities for this routed lane.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub supported_kv_cache_encoding_policies: Vec<KvCacheEncodingPolicy>,
     /// Whether structured outputs are supported.
     pub structured_outputs: bool,
     /// Whether tool calling is supported.
@@ -394,6 +465,8 @@ impl RoutedModelInventory {
             supported_endpoints: Vec::new(),
             execution_profile,
             scheduler_policy: None,
+            kv_cache_encoding_policy: None,
+            supported_kv_cache_encoding_policies: Vec::new(),
             structured_outputs: false,
             tool_calling: false,
             response_state: false,
@@ -425,6 +498,33 @@ impl RoutedModelInventory {
     #[must_use]
     pub fn with_scheduler_policy(mut self, policy: GenerationSchedulerPolicy) -> Self {
         self.scheduler_policy = Some(policy);
+        self
+    }
+
+    /// Publishes the active KV-cache encoding policy for the routed lane.
+    #[must_use]
+    pub fn with_kv_cache_encoding_policy(
+        mut self,
+        kv_cache_encoding_policy: KvCacheEncodingPolicy,
+    ) -> Self {
+        self.kv_cache_encoding_policy = Some(kv_cache_encoding_policy);
+        self
+    }
+
+    /// Appends one declared KV-cache encoding capability when it is not already present.
+    #[must_use]
+    pub fn with_supported_kv_cache_encoding_policy(
+        mut self,
+        kv_cache_encoding_policy: KvCacheEncodingPolicy,
+    ) -> Self {
+        if !self
+            .supported_kv_cache_encoding_policies
+            .iter()
+            .any(|existing| existing == &kv_cache_encoding_policy)
+        {
+            self.supported_kv_cache_encoding_policies
+                .push(kv_cache_encoding_policy);
+        }
         self
     }
 
@@ -580,6 +680,12 @@ pub struct RouteSelection {
     /// Routed scheduler policy when one exists.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scheduler_policy: Option<GenerationSchedulerPolicy>,
+    /// Active KV-cache encoding policy for the selected route, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kv_cache_encoding_policy: Option<KvCacheEncodingPolicy>,
+    /// Declared KV-cache encoding capabilities for the selected route.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub supported_kv_cache_encoding_policies: Vec<KvCacheEncodingPolicy>,
     /// Inspectable metrics for the selection.
     pub metrics: RouteSelectionMetrics,
     /// Plain-language route notes explaining tie-breaks and filters.
@@ -599,6 +705,7 @@ struct EligibleRoute {
     active_requests: usize,
     warm: bool,
     cache_match_tokens: usize,
+    preferred_kv_cache_encoding_match: bool,
     selection: RouteSelection,
 }
 
@@ -771,6 +878,32 @@ impl FleetRouter {
                 ));
                 continue;
             }
+            if let Some(required_family) = request.kv_cache_encoding_preferences.require
+                && !model_supports_kv_cache_encoding(model, required_family)
+            {
+                refusal_notes.push(format!(
+                    "worker `{}` model `{}` lacks required kv-cache encoding support `{}`",
+                    worker.worker_id,
+                    model.canonical_name,
+                    required_family.as_str()
+                ));
+                continue;
+            }
+            if let Some(excluded_family) = request
+                .kv_cache_encoding_preferences
+                .exclude
+                .iter()
+                .copied()
+                .find(|family| model_supports_kv_cache_encoding(model, *family))
+            {
+                refusal_notes.push(format!(
+                    "worker `{}` model `{}` advertises excluded kv-cache encoding support `{}`",
+                    worker.worker_id,
+                    model.canonical_name,
+                    excluded_family.as_str()
+                ));
+                continue;
+            }
 
             let preference_rank = request
                 .preferred_worker_ids
@@ -782,6 +915,10 @@ impl FleetRouter {
                 active_requests: model.runtime_state.active_requests,
                 warm: model.runtime_state.warm_state.is_warm(),
                 cache_match_tokens: cache_match_tokens(model, request),
+                preferred_kv_cache_encoding_match: request
+                    .kv_cache_encoding_preferences
+                    .prefer
+                    .is_some_and(|family| model_supports_kv_cache_encoding(model, family)),
                 selection: self.selection_for(worker, model, request.endpoint, &request.target),
             });
         }
@@ -820,6 +957,37 @@ impl FleetRouter {
                 "capability filters were satisfied by the selected worker route",
             ));
         }
+        if let Some(required_family) = request.kv_cache_encoding_preferences.require {
+            selection.routing_notes.push(format!(
+                "required kv-cache encoding support `{}` matched routed capability publication",
+                required_family.as_str()
+            ));
+        }
+        if let Some(preferred_family) = request.kv_cache_encoding_preferences.prefer {
+            if route_supports_kv_cache_encoding(&selection, preferred_family) {
+                selection.routing_notes.push(format!(
+                    "preferred kv-cache encoding support `{}` matched routed capability publication",
+                    preferred_family.as_str()
+                ));
+            } else {
+                selection.routing_notes.push(format!(
+                    "preferred kv-cache encoding support `{}` was unavailable, so placement continued on the remaining eligible pool",
+                    preferred_family.as_str()
+                ));
+            }
+        }
+        if !request.kv_cache_encoding_preferences.exclude.is_empty() {
+            let excluded = request
+                .kv_cache_encoding_preferences
+                .exclude
+                .iter()
+                .map(|family| family.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            selection.routing_notes.push(format!(
+                "excluded kv-cache encoding support filters were applied: {excluded}"
+            ));
+        }
         Ok(selection)
     }
 
@@ -836,14 +1004,29 @@ impl FleetRouter {
         }
         sort_candidates(eligible.as_mut_slice());
 
+        let preferred_eligible = if request.kv_cache_encoding_preferences.prefer.is_some() {
+            let preferred = eligible
+                .iter()
+                .filter(|candidate| candidate.preferred_kv_cache_encoding_match)
+                .cloned()
+                .collect::<Vec<_>>();
+            if preferred.is_empty() {
+                eligible.clone()
+            } else {
+                preferred
+            }
+        } else {
+            eligible.clone()
+        };
+
         let mut fallback_reason = None;
         let mut pool_reason = "eligible";
-        let cache_pool = eligible
+        let cache_pool = preferred_eligible
             .iter()
             .filter(|candidate| candidate.cache_match_tokens > 0)
             .cloned()
             .collect::<Vec<_>>();
-        let warm_pool = eligible
+        let warm_pool = preferred_eligible
             .iter()
             .filter(|candidate| candidate.warm)
             .cloned()
@@ -862,7 +1045,7 @@ impl FleetRouter {
                 pool_reason = "warm";
                 warm_pool
             } else {
-                eligible.clone()
+                preferred_eligible.clone()
             }
         } else if request.policy_hints.cache_key.is_some() {
             fallback_reason = Some(String::from(
@@ -872,7 +1055,7 @@ impl FleetRouter {
                 pool_reason = "warm";
                 warm_pool
             } else {
-                eligible.clone()
+                preferred_eligible.clone()
             }
         } else if !warm_pool.is_empty() {
             pool_reason = "warm";
@@ -881,7 +1064,7 @@ impl FleetRouter {
             fallback_reason = Some(String::from(
                 "no warm or cache-compatible worker route was available, so placement fell back to first-ready",
             ));
-            eligible.clone()
+            preferred_eligible.clone()
         };
 
         let mut pool = selected_pool;
@@ -994,6 +1177,10 @@ impl FleetRouter {
             execution_engine_label: worker.execution_engine_label.clone(),
             execution_profile: model.execution_profile.clone(),
             scheduler_policy: model.scheduler_policy.clone(),
+            kv_cache_encoding_policy: model.kv_cache_encoding_policy.clone(),
+            supported_kv_cache_encoding_policies: model
+                .supported_kv_cache_encoding_policies
+                .clone(),
             metrics: RouteSelectionMetrics {
                 eligible_workers: 0,
                 warm_workers: 0,
@@ -1343,6 +1530,9 @@ fn cache_match_tokens(model: &RoutedModelInventory, request: &RoutingRequest) ->
             {
                 return best;
             }
+            if !cache_entry_matches_kv_cache_encoding(entry, model, request) {
+                return best;
+            }
             best.max(entry.reusable_tokens)
         })
 }
@@ -1373,9 +1563,24 @@ fn power_of_two_sample<'a>(
     request.endpoint.path().hash(&mut hasher);
     target_label(&request.target, default_model).hash(&mut hasher);
     request.policy_hints.cache_key.hash(&mut hasher);
+    request
+        .kv_cache_encoding_preferences
+        .require
+        .map(KvCacheEncodingFamily::as_str)
+        .hash(&mut hasher);
+    request
+        .kv_cache_encoding_preferences
+        .prefer
+        .map(KvCacheEncodingFamily::as_str)
+        .hash(&mut hasher);
+    for family in &request.kv_cache_encoding_preferences.exclude {
+        family.as_str().hash(&mut hasher);
+    }
     request.policy_hints.tenant_scope.hash(&mut hasher);
     request.policy_hints.topology_scope.hash(&mut hasher);
     request.policy_hints.request_key.hash(&mut hasher);
+    request.preferred_worker_ids.hash(&mut hasher);
+    request.preferred_family.hash(&mut hasher);
     let first_index = (hasher.finish() as usize) % candidates.len();
     let mut second_index = (first_index + (candidates.len() / 2).max(1)) % candidates.len();
     if second_index == first_index {
@@ -1392,6 +1597,91 @@ fn target_label(target: &RoutingTarget, default_model: &str) -> String {
     }
 }
 
+fn route_supports_kv_cache_encoding(
+    selection: &RouteSelection,
+    family: KvCacheEncodingFamily,
+) -> bool {
+    selection
+        .kv_cache_encoding_policy
+        .as_ref()
+        .is_some_and(|policy| policy.family == family)
+        || selection
+            .supported_kv_cache_encoding_policies
+            .iter()
+            .any(|policy| policy.family == family)
+}
+
+fn model_supports_kv_cache_encoding(
+    model: &RoutedModelInventory,
+    family: KvCacheEncodingFamily,
+) -> bool {
+    model.kv_cache_encoding_policy
+        .as_ref()
+        .is_some_and(|policy| policy.family == family)
+        || model
+            .supported_kv_cache_encoding_policies
+            .iter()
+            .any(|policy| policy.family == family)
+}
+
+fn model_kv_cache_encoding_policy_for_family<'a>(
+    model: &'a RoutedModelInventory,
+    family: KvCacheEncodingFamily,
+) -> Option<&'a KvCacheEncodingPolicy> {
+    model.supported_kv_cache_encoding_policies
+        .iter()
+        .find(|policy| policy.family == family)
+        .or_else(|| {
+            model.kv_cache_encoding_policy
+                .as_ref()
+                .filter(|policy| policy.family == family)
+        })
+}
+
+fn requested_route_kv_cache_encoding_policy<'a>(
+    model: &'a RoutedModelInventory,
+    request: &RoutingRequest,
+) -> Option<&'a KvCacheEncodingPolicy> {
+    if let Some(required_family) = request.kv_cache_encoding_preferences.require {
+        return model_kv_cache_encoding_policy_for_family(model, required_family);
+    }
+    if let Some(preferred_family) = request.kv_cache_encoding_preferences.prefer
+        && let Some(policy) = model_kv_cache_encoding_policy_for_family(model, preferred_family)
+    {
+        return Some(policy);
+    }
+    model.kv_cache_encoding_policy.as_ref()
+}
+
+fn kv_cache_encoding_policies_compatible(
+    left: &KvCacheEncodingPolicy,
+    right: &KvCacheEncodingPolicy,
+) -> bool {
+    left.family == right.family
+        && left.objective == right.objective
+        && left.bits_per_channel == right.bits_per_channel
+        && left.block_shape == right.block_shape
+        && left.outlier_policy == right.outlier_policy
+        && left.projection_id == right.projection_id
+        && left.codebook_id == right.codebook_id
+}
+
+fn cache_entry_matches_kv_cache_encoding(
+    entry: &RoutedCacheEntry,
+    model: &RoutedModelInventory,
+    request: &RoutingRequest,
+) -> bool {
+    let route_policy = requested_route_kv_cache_encoding_policy(model, request);
+    match (entry.kv_cache_encoding_policy.as_ref(), route_policy) {
+        (Some(entry_policy), Some(route_policy)) => {
+            kv_cache_encoding_policies_compatible(entry_policy, route_policy)
+        }
+        (Some(_), None) => false,
+        (None, Some(route_policy)) => route_policy.family != KvCacheEncodingFamily::TurboQuant,
+        (None, None) => true,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -1400,11 +1690,35 @@ mod tests {
         RoutedWarmState, RoutedWorkerInventory, RoutingEndpoint, RoutingError, RoutingRequest,
         WorkerCircuitState,
     };
-    use psionic_runtime::{ExecutionCapabilityProfile, HealthStatus, PrefillDecodeCapability};
+    use psionic_runtime::{
+        ExecutionCapabilityProfile, HealthStatus, KvCacheEncodingFamily,
+        KvCacheEncodingObjective, KvCacheEncodingPolicy, PrefillDecodeCapability,
+    };
 
     fn sample_profile() -> ExecutionCapabilityProfile {
         ExecutionCapabilityProfile::single_request_latency_optimized()
             .with_prefill_decode_capability(PrefillDecodeCapability::colocated_split())
+    }
+
+    fn dense_f16_kv_policy() -> KvCacheEncodingPolicy {
+        KvCacheEncodingPolicy::dense_f16_mirror(80, 40, "gpt-oss", 131_072)
+    }
+
+    fn turboquant_kv_policy() -> KvCacheEncodingPolicy {
+        KvCacheEncodingPolicy {
+            family: KvCacheEncodingFamily::TurboQuant,
+            objective: Some(KvCacheEncodingObjective::MeanSquaredError),
+            bits_per_channel: Some(8),
+            block_shape: Some(String::from("32")),
+            outlier_policy: None,
+            projection_id: None,
+            codebook_id: Some(String::from("ggml_q8_1")),
+            model_family_bound: Some(String::from("gpt-oss")),
+            context_length_bound: Some(131_072),
+            host_bytes_per_token: Some(80),
+            device_bytes_per_token: Some(18),
+            detail: Some(String::from("test turboquant capability")),
+        }
     }
 
     #[test]
@@ -1614,6 +1928,172 @@ mod tests {
                 .any(|note| note.contains("cache-aware placement fell back")),
             "routing notes should preserve the explicit fallback trace"
         );
+    }
+
+    #[test]
+    fn router_can_require_specific_kv_cache_encoding_support() {
+        let dense_only =
+            RoutedModelInventory::new("gpt-oss", "gpt-oss", "gpt-oss", sample_profile())
+                .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                .with_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(dense_f16_kv_policy());
+        let turboquant_capable =
+            RoutedModelInventory::new("gpt-oss", "gpt-oss", "gpt-oss", sample_profile())
+                .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                .with_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(turboquant_kv_policy());
+        let router = FleetRouter::new(
+            "gpt-oss",
+            vec![
+                RoutedWorkerInventory::new("worker-a", "cuda", "native", "psionic")
+                    .with_model(dense_only),
+                RoutedWorkerInventory::new("worker-b", "cuda", "native", "psionic")
+                    .with_model(turboquant_capable),
+            ],
+        )
+        .expect("router should build");
+
+        let selection = router
+            .resolve(
+                &RoutingRequest::new(RoutingEndpoint::ChatCompletions)
+                    .require_kv_cache_encoding(KvCacheEncodingFamily::TurboQuant),
+            )
+            .expect("turboquant-capable route should resolve");
+        assert_eq!(selection.worker_id, "worker-b");
+        assert!(selection
+            .supported_kv_cache_encoding_policies
+            .iter()
+            .any(|policy| policy.family == KvCacheEncodingFamily::TurboQuant));
+        assert!(selection.routing_notes.iter().any(|note| {
+            note.contains("required kv-cache encoding support `turboquant` matched")
+        }));
+    }
+
+    #[test]
+    fn router_prefers_specific_kv_cache_encoding_support_when_available() {
+        let dense_only =
+            RoutedModelInventory::new("gpt-oss", "gpt-oss", "gpt-oss", sample_profile())
+                .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                .with_warm_state(RoutedWarmState::Warm)
+                .with_active_requests(0)
+                .with_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(dense_f16_kv_policy());
+        let turboquant_capable =
+            RoutedModelInventory::new("gpt-oss", "gpt-oss", "gpt-oss", sample_profile())
+                .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                .with_active_requests(4)
+                .with_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(turboquant_kv_policy());
+        let router = FleetRouter::new(
+            "gpt-oss",
+            vec![
+                RoutedWorkerInventory::new("worker-a", "cuda", "native", "psionic")
+                    .with_model(dense_only),
+                RoutedWorkerInventory::new("worker-b", "cuda", "native", "psionic")
+                    .with_model(turboquant_capable),
+            ],
+        )
+        .expect("router should build");
+
+        let selection = router
+            .resolve(
+                &RoutingRequest::new(RoutingEndpoint::ChatCompletions)
+                    .prefer_kv_cache_encoding(KvCacheEncodingFamily::TurboQuant),
+            )
+            .expect("preferred turboquant route should resolve");
+        assert_eq!(selection.worker_id, "worker-b");
+        assert!(selection.routing_notes.iter().any(|note| {
+            note.contains("preferred kv-cache encoding support `turboquant` matched")
+        }));
+    }
+
+    #[test]
+    fn router_can_exclude_specific_kv_cache_encoding_support() {
+        let turboquant_capable =
+            RoutedModelInventory::new("gpt-oss", "gpt-oss", "gpt-oss", sample_profile())
+                .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                .with_warm_state(RoutedWarmState::Warm)
+                .with_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(turboquant_kv_policy());
+        let dense_only =
+            RoutedModelInventory::new("gpt-oss", "gpt-oss", "gpt-oss", sample_profile())
+                .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                .with_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(dense_f16_kv_policy());
+        let router = FleetRouter::new(
+            "gpt-oss",
+            vec![
+                RoutedWorkerInventory::new("worker-a", "cuda", "native", "psionic")
+                    .with_model(turboquant_capable),
+                RoutedWorkerInventory::new("worker-b", "cuda", "native", "psionic")
+                    .with_model(dense_only),
+            ],
+        )
+        .expect("router should build");
+
+        let selection = router
+            .resolve(
+                &RoutingRequest::new(RoutingEndpoint::ChatCompletions)
+                    .exclude_kv_cache_encoding(KvCacheEncodingFamily::TurboQuant),
+            )
+            .expect("dense-only route should resolve");
+        assert_eq!(selection.worker_id, "worker-b");
+        assert!(selection
+            .routing_notes
+            .iter()
+            .any(|note| note.contains("excluded kv-cache encoding support filters were applied")));
+    }
+
+    #[test]
+    fn router_only_reuses_shared_prefixes_across_matching_kv_cache_codecs() {
+        let turboquant_policy = turboquant_kv_policy();
+        let dense_entry = RoutedCacheEntry::new("prefix-hello", "tenant-a", 192)
+            .with_kv_cache_encoding_policy(dense_f16_kv_policy());
+        let turboquant_entry = RoutedCacheEntry::new("prefix-hello", "tenant-a", 192)
+            .with_kv_cache_encoding_policy(turboquant_policy.clone());
+        let mismatched_cache =
+            RoutedModelInventory::new("gpt-oss", "gpt-oss", "gpt-oss", sample_profile())
+                .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                .with_warm_state(RoutedWarmState::Warm)
+                .with_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(turboquant_policy.clone())
+                .with_cache_entry(dense_entry);
+        let matching_cache =
+            RoutedModelInventory::new("gpt-oss", "gpt-oss", "gpt-oss", sample_profile())
+                .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                .with_warm_state(RoutedWarmState::Warm)
+                .with_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(dense_f16_kv_policy())
+                .with_supported_kv_cache_encoding_policy(turboquant_policy.clone())
+                .with_cache_entry(turboquant_entry);
+        let router = FleetRouter::new(
+            "gpt-oss",
+            vec![
+                RoutedWorkerInventory::new("worker-a", "cuda", "native", "psionic")
+                    .with_model(mismatched_cache),
+                RoutedWorkerInventory::new("worker-b", "cuda", "native", "psionic")
+                    .with_model(matching_cache),
+            ],
+        )
+        .expect("router should build");
+
+        let selection = router
+            .resolve(
+                &RoutingRequest::new(RoutingEndpoint::ChatCompletions)
+                    .require_kv_cache_encoding(KvCacheEncodingFamily::TurboQuant)
+                    .with_cache_affinity("prefix-hello", "tenant-a"),
+            )
+            .expect("matching turboquant cache should resolve");
+        assert_eq!(selection.worker_id, "worker-b");
+        assert_eq!(selection.metrics.cache_matches, 1);
+        assert!(matches!(
+            selection.metrics.strategy,
+            RouteSelectionStrategy::CacheAware
+        ));
     }
 
     #[test]

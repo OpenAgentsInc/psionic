@@ -971,6 +971,7 @@ impl OpenAiCompatServer {
             routed_models.push(routed_inventory_for_loaded_model(
                 &loaded_model,
                 accepted_names.into_iter().collect(),
+                config.backend.label(),
             ));
             if default_model_key.is_none() {
                 default_model_key = Some(loaded_model.model_key.clone());
@@ -4271,6 +4272,7 @@ fn union_supported_endpoint_paths(state: &OpenAiCompatState) -> Vec<&'static str
 fn routed_inventory_for_loaded_model(
     model: &OpenAiCompatLoadedModel,
     accepted_names: Vec<String>,
+    runtime_backend: &str,
 ) -> RoutedModelInventory {
     let mut inventory = RoutedModelInventory::new(
         model.model_key.clone(),
@@ -4288,7 +4290,18 @@ fn routed_inventory_for_loaded_model(
         inventory = inventory.with_scheduler_policy(policy.clone());
     }
     inventory = inventory.with_warm_state(RoutedWarmState::Warm);
-    if model.decoder().is_some() {
+    if let Some(decoder) = model.decoder() {
+        inventory = inventory.with_kv_cache_encoding_policy(
+            super::default_decoder_kv_cache_encoding_policy(
+                &decoder.descriptor,
+                runtime_backend,
+            ),
+        );
+        for policy in
+            super::supported_decoder_kv_cache_encoding_policies(&decoder.descriptor, runtime_backend)
+        {
+            inventory = inventory.with_supported_kv_cache_encoding_policy(policy);
+        }
         inventory = inventory
             .with_structured_outputs()
             .with_tool_calling()
