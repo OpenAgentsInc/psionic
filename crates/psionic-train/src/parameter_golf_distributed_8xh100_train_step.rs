@@ -55,7 +55,8 @@ use crate::{
         ParameterGolfScoreFirstTttChunkExecutionPlan, ParameterGolfScoreFirstTttChunkPlan,
         ParameterGolfScoreFirstTttChunkReceipt, ParameterGolfScoreFirstTttConfig,
         ParameterGolfScoreFirstTttParameterState, ParameterGolfScoreFirstTttReceipt,
-        ParameterGolfSingleH100TrainingRuntimeReceipt, ParameterGolfSingleH100ValidationSummary,
+        ParameterGolfSingleH100TrainingRuntimeReceipt,
+        ParameterGolfSingleH100ValidationRuntimeReceipt, ParameterGolfSingleH100ValidationSummary,
     },
     restore_parameter_golf_banked_weights_from_safetensors,
     restore_parameter_golf_model_from_safetensors, seed_parameter_states, zero_gradients,
@@ -499,6 +500,9 @@ pub struct ParameterGolfDistributed8xH100ValidationRankReceipt {
     pub bits_per_byte: f64,
     /// Rank-local wallclock for the executed validation shard.
     pub observed_wallclock_ms: u64,
+    /// Optional rank-local validation runtime receipt emitted by the CUDA eval lane.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_receipt: Option<ParameterGolfSingleH100ValidationRuntimeReceipt>,
     /// Worker PID that owned this resident rank runtime.
     #[serde(default)]
     pub worker_pid: u32,
@@ -2546,6 +2550,7 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
             mean_loss: validation_summary.mean_loss,
             bits_per_byte: validation_summary.bits_per_byte,
             observed_wallclock_ms: duration_ms(started),
+            runtime_receipt: validation_summary.runtime_receipt,
             worker_pid: std::process::id(),
             claim_boundary: String::from(
                 "This receipt proves one resident distributed worker evaluated its assigned validation shard against the synchronized resident model state without respawning a new runtime.",
@@ -5065,6 +5070,7 @@ pub fn execute_parameter_golf_distributed_8xh100_validation_child(
         mean_loss: validation_summary.mean_loss,
         bits_per_byte: validation_summary.bits_per_byte,
         observed_wallclock_ms,
+        runtime_receipt: validation_summary.runtime_receipt,
         worker_pid: std::process::id(),
         claim_boundary: String::from(
             "This child receipt proves one rank-local distributed validation shard executed against the reconstructed post-step Parameter Golf model on one explicit H100 binding. It does not yet claim final artifact closure or full record-track completion.",
@@ -5319,6 +5325,7 @@ mod tests {
         unflatten_non_parallel_muon_gradients_from_worker_mesh,
         worker_mesh_gradient_sync_outcome_from_surfaces, write_gradient_artifact,
         ParameterGolfDistributed8xH100ParallelMuonBankShardReceipt,
+        ParameterGolfDistributed8xH100ValidationRankReceipt,
         ParameterGolfDistributed8xH100ScoreFirstTttRankAccumulator,
         VALIDATION_BATCH_SEQUENCES_ENV_VAR,
     };
@@ -5795,6 +5802,46 @@ mod tests {
         prune_step_scope_for_next_step(&step_dir)?;
 
         assert!(!step_dir.exists());
+        Ok(())
+    }
+
+    #[test]
+    fn validation_rank_receipt_defaults_runtime_receipt_to_none_for_older_reports(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let receipt: ParameterGolfDistributed8xH100ValidationRankReceipt = serde_json::from_str(
+            r#"{
+                "schema_version": 1,
+                "run_id": "run_123",
+                "rank": 0,
+                "local_rank": 0,
+                "world_size": 8,
+                "cuda_visible_devices": "0",
+                "selected_device_label": "NVIDIA H100",
+                "log_path": "rank_0.log",
+                "shard_path": "rank_0.json",
+                "aggregated_gradient_artifact_path": "aggregated_step_1.safetensors",
+                "aggregated_gradient_artifact_sha256": "abc",
+                "current_model_artifact_sha256": "def",
+                "eval_mode": { "mode": "sliding_window", "stride": 64 },
+                "sequence_start": 0,
+                "sequence_count": 8,
+                "evaluation_unit_start": 0,
+                "evaluation_unit_count": 16,
+                "scored_token_start": 0,
+                "scored_token_count": 8192,
+                "local_batch_sequences": 64,
+                "loss_sum": 123.5,
+                "token_count": 8192,
+                "byte_count": 6144,
+                "mean_loss": 0.01507568359375,
+                "bits_per_byte": 1.2345,
+                "observed_wallclock_ms": 777,
+                "worker_pid": 42,
+                "claim_boundary": "test",
+                "receipt_digest": "digest"
+            }"#,
+        )?;
+        assert!(receipt.runtime_receipt.is_none());
         Ok(())
     }
 }

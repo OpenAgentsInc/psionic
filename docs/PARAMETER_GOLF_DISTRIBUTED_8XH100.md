@@ -318,6 +318,9 @@ also records:
 - per-rank `scored_token_start`, `scored_token_count`
 - per-rank `local_batch_sequences`, `loss_sum`, `token_count`, `byte_count`,
   and `observed_ms`
+- optional per-rank validation `runtime_receipt` when the CUDA eval lane emits
+  one, so retained validation proofs keep the resident parameter-buffer and
+  token-write facts instead of collapsing them into wallclock only
 - one aggregated `mean_loss` and `bits_per_byte`
 - one honest distributed validation wallclock as the slowest participating rank
 - optional legal `score_first_ttt` chunk receipts layered over that same global
@@ -391,6 +394,8 @@ the finalizer-owned run root:
 - optional ordered distributed validation shard observations lifted from
   `distributed_validation_rank_complete ...` log lines when the runtime emits
   them
+- retained per-rank validation receipt files now also preserve the optional
+  CUDA eval `runtime_receipt` when present
 - optional aggregated `score_first_ttt_receipt` when the resident worker mesh
   executes the legal chunk-ordered overlay
 
