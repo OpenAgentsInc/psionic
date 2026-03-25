@@ -1183,6 +1183,24 @@ impl ParameterGolfWeights {
 }
 
 impl ParameterGolfBankedWeights {
+    /// Returns a rebuilt banked bundle with the supplied named tensor overrides.
+    pub fn with_parameter_overrides(
+        &self,
+        config: &ParameterGolfConfig,
+        overrides: &BTreeMap<String, Vec<f32>>,
+    ) -> Result<Self, ParameterGolfModelError> {
+        let mut updated = self.clone();
+        for (parameter_id, values) in overrides {
+            apply_banked_parameter_override(
+                &mut updated,
+                parameter_id.as_str(),
+                values.as_slice(),
+            )?;
+        }
+        let _ = updated.to_split(config)?;
+        Ok(updated)
+    }
+
     /// Rebuilds the split logical bundle from the banked matrix surface.
     pub fn to_split(
         &self,
@@ -1566,6 +1584,36 @@ impl ParameterGolfReferenceModel {
         self.weights.banked(&self.descriptor.config)
     }
 
+    /// Returns the stable descriptor for the upstream-style banked matrix surface.
+    pub fn banked_descriptor(
+        &self,
+    ) -> Result<ParameterGolfModelDescriptor, ParameterGolfModelError> {
+        Ok(ParameterGolfModelDescriptor {
+            model: self.descriptor.model.clone(),
+            config: self.descriptor.config.clone(),
+            weights: self
+                .banked_weights()?
+                .weight_bundle_metadata(&self.descriptor.config),
+        })
+    }
+
+    /// Returns the union of the split and banked parameter surfaces in stable name order.
+    pub fn all_parameter_vectors(
+        &self,
+    ) -> Result<Vec<ParameterGolfParameterVector>, ParameterGolfModelError> {
+        let config = &self.descriptor.config;
+        let mut vectors = self
+            .weights
+            .parameter_vectors(config)
+            .into_iter()
+            .map(|vector| (vector.parameter_id.clone(), vector))
+            .collect::<BTreeMap<_, _>>();
+        for vector in self.banked_weights()?.parameter_vectors(config) {
+            vectors.insert(vector.parameter_id.clone(), vector);
+        }
+        Ok(vectors.into_values().collect())
+    }
+
     /// Returns the final normalized hidden states before the LM head.
     pub fn forward_hidden(
         &self,
@@ -1923,6 +1971,86 @@ fn apply_parameter_override(
             "attn_scale" => assign_parameter_values(&mut block.attn_scale, parameter_id, values)?,
             "mlp_scale" => assign_parameter_values(&mut block.mlp_scale, parameter_id, values)?,
             "resid_mix" => assign_parameter_values(&mut block.resid_mix, parameter_id, values)?,
+            _ => {
+                return Err(ParameterGolfModelError::UnknownParameter {
+                    parameter_id: String::from(parameter_id),
+                });
+            }
+        }
+        return Ok(());
+    }
+    Err(ParameterGolfModelError::UnknownParameter {
+        parameter_id: String::from(parameter_id),
+    })
+}
+
+fn apply_banked_parameter_override(
+    bundle: &mut ParameterGolfBankedWeights,
+    parameter_id: &str,
+    values: &[f32],
+) -> Result<(), ParameterGolfModelError> {
+    if parameter_id == "tok_emb.weight" {
+        assign_parameter_values(&mut bundle.token_embedding, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == "skip_weights" {
+        assign_parameter_values(&mut bundle.skip_weights, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == PARAMETER_GOLF_QO_BANK_NAME {
+        assign_parameter_values(&mut bundle.qo_bank.weight, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == PARAMETER_GOLF_KV_BANK_NAME {
+        assign_parameter_values(&mut bundle.kv_bank.weight, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == PARAMETER_GOLF_MLP_UP_BANK_NAME {
+        assign_parameter_values(&mut bundle.mlp_up_bank.weight, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == PARAMETER_GOLF_MLP_DOWN_BANK_NAME {
+        assign_parameter_values(&mut bundle.mlp_down_bank.weight, parameter_id, values)?;
+        return Ok(());
+    }
+    if parameter_id == "lm_head.weight" {
+        let Some(lm_head) = &mut bundle.lm_head else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        assign_parameter_values(&mut lm_head.weight, parameter_id, values)?;
+        return Ok(());
+    }
+    if let Some(rest) = parameter_id.strip_prefix("blocks.") {
+        let Some((layer_text, tail)) = rest.split_once('.') else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        let Ok(layer_index) = layer_text.parse::<usize>() else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        let Some(block_controls) = bundle.block_controls.get_mut(layer_index) else {
+            return Err(ParameterGolfModelError::UnknownParameter {
+                parameter_id: String::from(parameter_id),
+            });
+        };
+        match tail {
+            "attn.q_gain" => {
+                assign_parameter_values(&mut block_controls.q_gain, parameter_id, values)?
+            }
+            "attn_scale" => {
+                assign_parameter_values(&mut block_controls.attn_scale, parameter_id, values)?
+            }
+            "mlp_scale" => {
+                assign_parameter_values(&mut block_controls.mlp_scale, parameter_id, values)?
+            }
+            "resid_mix" => {
+                assign_parameter_values(&mut block_controls.resid_mix, parameter_id, values)?
+            }
             _ => {
                 return Err(ParameterGolfModelError::UnknownParameter {
                     parameter_id: String::from(parameter_id),
@@ -2743,6 +2871,52 @@ mod tests {
         assert_eq!(kv_bank.shape.dims(), &[18, 256, 512]);
         assert_eq!(mlp_up_bank.shape.dims(), &[9, 1024, 512]);
         assert_eq!(mlp_down_bank.shape.dims(), &[9, 512, 1024]);
+    }
+
+    #[test]
+    fn banked_weights_accept_parameter_overrides_and_roundtrip_to_split() {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())
+            .expect("baseline fixture model should build");
+        let mut overrides = BTreeMap::new();
+        let mut qo_bank = model
+            .banked_weights()
+            .expect("banked weights should materialize")
+            .parameter_vectors(&model.descriptor().config)
+            .into_iter()
+            .find(|vector| vector.parameter_id == PARAMETER_GOLF_QO_BANK_NAME)
+            .expect("qo bank should exist")
+            .values;
+        qo_bank[0] += 0.25;
+        overrides.insert(String::from(PARAMETER_GOLF_QO_BANK_NAME), qo_bank.clone());
+
+        let updated = model
+            .banked_weights()
+            .expect("banked weights should materialize")
+            .with_parameter_overrides(&model.descriptor().config, &overrides)
+            .expect("banked overrides should apply");
+        let restored = updated
+            .to_split(&model.descriptor().config)
+            .expect("banked weights should restore the split bundle");
+        assert_eq!(updated.qo_bank.weight, qo_bank);
+        assert_eq!(restored.blocks[0].attention.q_proj.weight[0], qo_bank[0]);
+    }
+
+    #[test]
+    fn reference_model_all_parameter_vectors_include_split_and_banked_surfaces() {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())
+            .expect("baseline fixture model should build");
+        let vectors = model
+            .all_parameter_vectors()
+            .expect("combined parameter vectors should materialize");
+        assert!(vectors
+            .iter()
+            .any(|vector| vector.parameter_id == "blocks.0.attn.c_q.weight"));
+        assert!(vectors
+            .iter()
+            .any(|vector| vector.parameter_id == PARAMETER_GOLF_QO_BANK_NAME));
+        assert!(vectors
+            .iter()
+            .any(|vector| vector.parameter_id == PARAMETER_GOLF_KV_BANK_NAME));
     }
 
     #[test]

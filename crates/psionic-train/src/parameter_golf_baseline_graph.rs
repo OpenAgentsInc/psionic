@@ -9,6 +9,8 @@ use psionic_models::{
     ParameterGolfConfig, ParameterGolfConfigError, ParameterGolfExecutionError,
     ParameterGolfModelDescriptor, ParameterGolfModelError, ParameterGolfReferenceModel,
     ParameterGolfTensor3, ParameterGolfTensorError, PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON,
+    PARAMETER_GOLF_KV_BANK_NAME, PARAMETER_GOLF_MLP_DOWN_BANK_NAME,
+    PARAMETER_GOLF_MLP_UP_BANK_NAME, PARAMETER_GOLF_QO_BANK_NAME,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -354,8 +356,7 @@ fn bind_parameter_golf_graph_inputs(
     validate_token_batch(input_ids, config.vocab_size)?;
 
     let parameter_vectors = model
-        .weights()
-        .parameter_vectors(config)
+        .all_parameter_vectors()?
         .into_iter()
         .map(|parameter| (parameter.parameter_id.clone(), parameter))
         .collect::<BTreeMap<_, _>>();
@@ -805,16 +806,37 @@ fn attention_forward_graph(
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
     let head_dim = config.head_dim()?;
     let kv_dim = config.kv_dim()?;
+    let q_weight = parameter_tensor_or_matrix_bank_slice_graph(
+        builder,
+        parameters,
+        &format!("blocks.{layer_index}.attn.c_q.weight"),
+        PARAMETER_GOLF_QO_BANK_NAME,
+        layer_index,
+        config.model_dim,
+        config.model_dim,
+    )?;
+    let k_weight = parameter_tensor_or_matrix_bank_slice_graph(
+        builder,
+        parameters,
+        &format!("blocks.{layer_index}.attn.c_k.weight"),
+        PARAMETER_GOLF_KV_BANK_NAME,
+        layer_index,
+        kv_dim,
+        config.model_dim,
+    )?;
+    let v_weight = parameter_tensor_or_matrix_bank_slice_graph(
+        builder,
+        parameters,
+        &format!("blocks.{layer_index}.attn.c_v.weight"),
+        PARAMETER_GOLF_KV_BANK_NAME,
+        config.num_layers + layer_index,
+        kv_dim,
+        config.model_dim,
+    )?;
     let q_proj = linear_3d(
         builder,
         input,
-        parameters
-            .get(format!("blocks.{layer_index}.attn.c_q.weight").as_str())
-            .ok_or_else(
-                || ParameterGolfBaselineGraphError::MissingParameterBinding {
-                    parameter_id: format!("blocks.{layer_index}.attn.c_q.weight"),
-                },
-            )?,
+        &q_weight,
         batch_size,
         sequence_length,
         config.model_dim,
@@ -823,13 +845,7 @@ fn attention_forward_graph(
     let k_proj = linear_3d(
         builder,
         input,
-        parameters
-            .get(format!("blocks.{layer_index}.attn.c_k.weight").as_str())
-            .ok_or_else(
-                || ParameterGolfBaselineGraphError::MissingParameterBinding {
-                    parameter_id: format!("blocks.{layer_index}.attn.c_k.weight"),
-                },
-            )?,
+        &k_weight,
         batch_size,
         sequence_length,
         config.model_dim,
@@ -838,13 +854,7 @@ fn attention_forward_graph(
     let v_proj = linear_3d(
         builder,
         input,
-        parameters
-            .get(format!("blocks.{layer_index}.attn.c_v.weight").as_str())
-            .ok_or_else(
-                || ParameterGolfBaselineGraphError::MissingParameterBinding {
-                    parameter_id: format!("blocks.{layer_index}.attn.c_v.weight"),
-                },
-            )?,
+        &v_weight,
         batch_size,
         sequence_length,
         config.model_dim,
@@ -911,16 +921,19 @@ fn attention_forward_graph(
         &merged,
         Shape::new(vec![batch_size, sequence_length, config.model_dim]),
     )?;
+    let out_weight = parameter_tensor_or_matrix_bank_slice_graph(
+        builder,
+        parameters,
+        &format!("blocks.{layer_index}.attn.proj.weight"),
+        PARAMETER_GOLF_QO_BANK_NAME,
+        config.num_layers + layer_index,
+        config.model_dim,
+        config.model_dim,
+    )?;
     linear_3d(
         builder,
         &merged,
-        parameters
-            .get(format!("blocks.{layer_index}.attn.proj.weight").as_str())
-            .ok_or_else(
-                || ParameterGolfBaselineGraphError::MissingParameterBinding {
-                    parameter_id: format!("blocks.{layer_index}.attn.proj.weight"),
-                },
-            )?,
+        &out_weight,
         batch_size,
         sequence_length,
         config.model_dim,
@@ -938,32 +951,38 @@ fn mlp_forward_graph(
     layer_index: usize,
 ) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
     let hidden_dim = config.mlp_hidden_dim()?;
+    let fc_weight = parameter_tensor_or_matrix_bank_slice_graph(
+        builder,
+        parameters,
+        &format!("blocks.{layer_index}.mlp.fc.weight"),
+        PARAMETER_GOLF_MLP_UP_BANK_NAME,
+        layer_index,
+        hidden_dim,
+        config.model_dim,
+    )?;
     let hidden = linear_3d(
         builder,
         input,
-        parameters
-            .get(format!("blocks.{layer_index}.mlp.fc.weight").as_str())
-            .ok_or_else(
-                || ParameterGolfBaselineGraphError::MissingParameterBinding {
-                    parameter_id: format!("blocks.{layer_index}.mlp.fc.weight"),
-                },
-            )?,
+        &fc_weight,
         batch_size,
         sequence_length,
         config.model_dim,
         hidden_dim,
     )?;
     let activated = builder.relu_squared(&hidden)?;
+    let proj_weight = parameter_tensor_or_matrix_bank_slice_graph(
+        builder,
+        parameters,
+        &format!("blocks.{layer_index}.mlp.proj.weight"),
+        PARAMETER_GOLF_MLP_DOWN_BANK_NAME,
+        layer_index,
+        config.model_dim,
+        hidden_dim,
+    )?;
     linear_3d(
         builder,
         &activated,
-        parameters
-            .get(format!("blocks.{layer_index}.mlp.proj.weight").as_str())
-            .ok_or_else(
-                || ParameterGolfBaselineGraphError::MissingParameterBinding {
-                    parameter_id: format!("blocks.{layer_index}.mlp.proj.weight"),
-                },
-            )?,
+        &proj_weight,
         batch_size,
         sequence_length,
         hidden_dim,
@@ -1022,6 +1041,26 @@ fn linear_3d(
         &output,
         Shape::new(vec![batch_size, sequence_length, out_features]),
     )?)
+}
+
+fn parameter_tensor_or_matrix_bank_slice_graph(
+    builder: &mut AutodiffGraphBuilder,
+    parameters: &BTreeMap<String, AutodiffTensor>,
+    parameter_id: &str,
+    bank_parameter_id: &str,
+    bank_index: usize,
+    out_features: usize,
+    in_features: usize,
+) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
+    if let Some(parameter) = parameters.get(parameter_id) {
+        return Ok(parameter.clone());
+    }
+    let bank = parameters.get(bank_parameter_id).ok_or_else(|| {
+        ParameterGolfBaselineGraphError::MissingParameterBinding {
+            parameter_id: String::from(parameter_id),
+        }
+    })?;
+    select_parameter_matrix_slice_graph(builder, bank, bank_index, out_features, in_features)
 }
 
 fn reshape_to_attention_heads(
@@ -1128,6 +1167,50 @@ fn select_parameter_row_graph(
     let selected = builder.matmul(&selector, parameter)?;
     builder
         .reshape(&selected, Shape::new(vec![row_width]))
+        .map_err(Into::into)
+}
+
+fn select_parameter_matrix_slice_graph(
+    builder: &mut AutodiffGraphBuilder,
+    parameter: &AutodiffTensor,
+    bank_index: usize,
+    out_features: usize,
+    in_features: usize,
+) -> Result<AutodiffTensor, ParameterGolfBaselineGraphError> {
+    let dims = parameter.spec().shape().dims();
+    if dims.len() != 3 {
+        return Err(ParameterGolfBaselineGraphError::Graph(
+            GraphError::InvalidOperatorInputs {
+                op: String::from("select_parameter_matrix_slice_graph"),
+                message: format!(
+                    "expected rank-3 bank parameter [bank_len, out_features, in_features], found shape {:?}",
+                    dims
+                ),
+            },
+        ));
+    }
+    if dims[1] != out_features || dims[2] != in_features {
+        return Err(ParameterGolfBaselineGraphError::Graph(
+            GraphError::InvalidOperatorInputs {
+                op: String::from("select_parameter_matrix_slice_graph"),
+                message: format!(
+                    "expected bank slice shape [{out_features}, {in_features}], found [{}, {}]",
+                    dims[1], dims[2]
+                ),
+            },
+        ));
+    }
+    if bank_index >= dims[0] {
+        return Err(ParameterGolfBaselineGraphError::Graph(
+            GraphError::InvalidOperatorInputs {
+                op: String::from("select_parameter_matrix_slice_graph"),
+                message: format!("bank index {bank_index} exceeds bank length {}", dims[0]),
+            },
+        ));
+    }
+    let slice = builder.slice(parameter, 0, bank_index, bank_index + 1)?;
+    builder
+        .reshape(&slice, Shape::new(vec![out_features, in_features]))
         .map_err(Into::into)
 }
 
@@ -1592,6 +1675,62 @@ mod tests {
             ),
             Some(TensorData::F32(_))
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_banked_training_graph_matches_split_surface_loss(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = load_baseline_fixture();
+        let model = baseline_model()?;
+        let banked_descriptor = model.banked_descriptor()?;
+        let split_graph = build_parameter_golf_baseline_training_graph(
+            Device::cpu(),
+            model.descriptor(),
+            fixture.input_ids.len(),
+            fixture.input_ids[0].len(),
+        )?;
+        let banked_graph = build_parameter_golf_baseline_training_graph(
+            Device::cpu(),
+            &banked_descriptor,
+            fixture.input_ids.len(),
+            fixture.input_ids[0].len(),
+        )?;
+
+        assert!(banked_graph.parameter_binding("qo_bank").is_some());
+        assert!(banked_graph.parameter_binding("kv_bank").is_some());
+        assert!(banked_graph
+            .parameter_binding("blocks.0.attn.c_q.weight")
+            .is_none());
+
+        let split_inputs = bind_parameter_golf_baseline_training_graph_inputs(
+            &split_graph,
+            &model,
+            fixture.input_ids.as_slice(),
+            fixture.target_ids.as_slice(),
+        )?;
+        let banked_inputs = bind_parameter_golf_baseline_training_graph_inputs(
+            &banked_graph,
+            &model,
+            fixture.input_ids.as_slice(),
+            fixture.target_ids.as_slice(),
+        )?;
+        let split_forward = evaluate_graph(split_graph.graph.graph(), &split_inputs)?;
+        let banked_forward = evaluate_graph(banked_graph.graph.graph(), &banked_inputs)?;
+        let split_loss = split_forward
+            .get(&split_graph.loss_tensor_id)
+            .ok_or("missing split loss tensor")?
+            .as_f32_slice()
+            .ok_or("split loss tensor should be dense f32")?[0];
+        let banked_loss = banked_forward
+            .get(&banked_graph.loss_tensor_id)
+            .ok_or("missing banked loss tensor")?
+            .as_f32_slice()
+            .ok_or("banked loss tensor should be dense f32")?[0];
+        assert!(
+            (split_loss - banked_loss).abs() < 5e-5,
+            "banked graph loss drift exceeded tolerance: split={split_loss} banked={banked_loss}"
+        );
         Ok(())
     }
 

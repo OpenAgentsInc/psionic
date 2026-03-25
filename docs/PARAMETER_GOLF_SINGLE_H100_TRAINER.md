@@ -173,6 +173,11 @@ The command is explicit about what it treats as trainer truth. It binds:
 - the public single-device batch geometry from
   `ParameterGolfBatchGeometry::challenge_single_device_defaults()`
 - the public baseline `9x512` model contract and optimizer-plan digest
+- the upstream-style four-bank matrix runtime descriptor
+  (`qo_bank`, `kv_bank`, `mlp_up_bank`, `mlp_down_bank`) for the train-visible
+  matrix surface, so the lowered graph can now bind the same bank vocabulary
+  cited by the public top records instead of only the fully split per-layer
+  matrix tensor list
 - integer token ids directly into the lowered graph, where token embedding
   lookup now happens on-device rather than through a host-owned embedded-input
   `Vec<f32>` gather before each train or validation batch
@@ -189,6 +194,9 @@ The command is explicit about what it treats as trainer truth. It binds:
   single-H100 backward launcher now binds retained BF16 primal values and BF16
   seed or gradient tensors through the graph-declared dtype instead of
   silently forcing the hot path back to dense `f32`
+- slice-wise Muon updates over that banked matrix surface, so rank-3 bank
+  tensors are now treated as stacks of equal-shaped matrices rather than
+  forcing the optimizer path back to the split surface before every update
 - the same single-device warmup-and-restore, repeated-step, periodic
   validation, train-log, and wallclock-stop control-loop shape the public
   `train_gpt.py` path uses

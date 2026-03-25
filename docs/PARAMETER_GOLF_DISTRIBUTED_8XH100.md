@@ -91,7 +91,9 @@ Psionic now encodes that exact posture explicitly instead of treating
   surface under `ParameterGolfBankedWeights`, with the exact public bank tensor
   ids `qo_bank`, `kv_bank`, `mlp_up_bank`, and `mlp_down_bank`; the optimizer
   planner now classifies those `3D` matrix banks as Muon-owned tensors instead
-  of forcing the runtime to stay on the fully split per-layer matrix surface
+  of forcing the runtime to stay on the fully split per-layer matrix surface,
+  and the baseline graph plus trainer state now execute that banked runtime
+  descriptor directly instead of treating it as metadata only
 - `psionic-eval` now exposes
   `ParameterGolfDistributedThroughputReceipt` plus the supporting topology,
   communication, timing, memory, threshold, and refusal types
@@ -184,10 +186,20 @@ record:
 - `mlp_up_bank`
 - `mlp_down_bank`
 
-That banked surface is explicit and machine-legible, but it is not yet the
-default runtime hot path. Until later score-path issues land, most retained
-train receipts still come from the older split matrix surface and parent-side
-proof topology. Receipts and issue comments must keep that distinction explicit.
+That banked surface is no longer metadata only. The single-H100 and runtime
+train-step code now admit:
+
+- banked graph bindings for `q/k/v/out/fc/proj`
+- trainer-state seeding and materialization from bank tensor ids
+- slice-wise Muon updates over rank-3 bank tensors
+
+What is still missing is the scoreboard-grade proof:
+
+- no fresh `1xH100` or `8xH100` receipt yet proves that the banked path
+  materially improves real train or validation wallclock
+- the later score-path issues still need to combine this surface with the
+  persistent worker mesh, legal score-first TTT, and the remaining hot-kernel
+  work before the repo can claim competitive scoreboard posture
 
 ## Timing And Memory Receipts
 

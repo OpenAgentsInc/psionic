@@ -1444,8 +1444,9 @@ fn build_parameter_golf_single_h100_training_report_inner(
     )?;
     let machine_observation = inspect_local_single_h100_machine();
     let initial_model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+    let runtime_descriptor = initial_model.banked_descriptor()?;
     let optimizer_plan =
-        parameter_golf_optimizer_plan(initial_model.descriptor(), &config.hyperparameters)?;
+        parameter_golf_optimizer_plan(&runtime_descriptor, &config.hyperparameters)?;
     let optimizer_plan_digest =
         stable_digest(b"psionic_parameter_golf_optimizer_plan|", &optimizer_plan);
     let precision_receipt = precision_receipt_from_optimizer_plan(&optimizer_plan);
@@ -2167,8 +2168,7 @@ pub(crate) fn seed_parameter_states(
     optimizer_plan: &crate::ParameterGolfOptimizerPlan,
 ) -> Result<ParameterGolfSingleH100TrainerState, ParameterGolfSingleH100TrainingError> {
     let parameter_vectors = model
-        .weights()
-        .parameter_vectors(&model.descriptor().config)
+        .all_parameter_vectors()?
         .into_iter()
         .map(|vector| (vector.parameter_id.clone(), vector))
         .collect::<BTreeMap<_, _>>();
@@ -2213,15 +2213,15 @@ pub(crate) fn seed_parameter_states(
                     }
                 },
                 ParameterGolfOptimizerExecution::Muon { optimizer } => {
-                    let rows = vector.shape.dims().first().copied().unwrap_or(0);
-                    let cols = vector.shape.dims().get(1).copied().unwrap_or(0);
                     let mut values = vector.values.clone();
                     round_values_to_bf16(values.as_mut_slice());
                     ParameterGolfParameterState::MuonBf16 {
                         shape: vector.shape.dims().to_vec(),
                         values,
                         optimizer: optimizer.clone(),
-                        optimizer_state: crate::ParameterGolfMuonState::zeros(rows, cols),
+                        optimizer_state: crate::ParameterGolfMuonState::zeros_for_len(
+                            vector.values.len(),
+                        ),
                     }
                 }
             };
@@ -2445,9 +2445,18 @@ pub(crate) fn materialize_current_model(
         .iter()
         .map(|(parameter_id, state)| (parameter_id.clone(), state.values().to_vec()))
         .collect::<BTreeMap<_, _>>();
-    let weights = baseline
-        .weights()
-        .with_parameter_overrides(&baseline.descriptor().config, &overrides)?;
+    let weights = if overrides.keys().any(|parameter_id| {
+        psionic_models::PARAMETER_GOLF_MATRIX_BANK_NAMES.contains(&parameter_id.as_str())
+    }) {
+        baseline
+            .banked_weights()?
+            .with_parameter_overrides(&baseline.descriptor().config, &overrides)?
+            .to_split(&baseline.descriptor().config)?
+    } else {
+        baseline
+            .weights()
+            .with_parameter_overrides(&baseline.descriptor().config, &overrides)?
+    };
     Ok(ParameterGolfReferenceModel::new(
         baseline.descriptor().model.clone(),
         baseline.descriptor().config.clone(),
@@ -2483,7 +2492,6 @@ fn execute_parameter_golf_training_gradient_batch_from_examples(
                 cuda_backend,
                 graph_cache,
                 device.clone(),
-                current_model.descriptor(),
                 current_model,
                 batch_size,
                 sequence_length,
@@ -2501,7 +2509,7 @@ fn execute_parameter_golf_training_gradient_batch_from_examples(
             let graph = training_graph_for_batch(
                 graph_cache,
                 device.clone(),
-                current_model.descriptor(),
+                current_model,
                 batch_size,
                 sequence_length,
             )?;
@@ -3414,7 +3422,7 @@ fn training_batch_from_flat_tokens(
 fn evaluate_validation_batch_plans_on_cuda(
     cuda_backend: &mut CudaBackend,
     device: &psionic_core::Device,
-    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    _descriptor: &psionic_models::ParameterGolfModelDescriptor,
     model: &ParameterGolfReferenceModel,
     sequence_length: usize,
     eval_mode: &ParameterGolfValidationEvalMode,
@@ -3455,7 +3463,6 @@ fn evaluate_validation_batch_plans_on_cuda(
             cuda_backend,
             graph_cache,
             device.clone(),
-            descriptor,
             model,
             batch_plan.batch_sequences,
             sequence_length,
@@ -3573,7 +3580,7 @@ fn evaluate_validation_batch_plans_on_cuda(
 fn evaluate_validation_on_cuda_legacy(
     cuda_backend: &mut CudaBackend,
     device: &psionic_core::Device,
-    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    _descriptor: &psionic_models::ParameterGolfModelDescriptor,
     model: &ParameterGolfReferenceModel,
     validation_tokens: &[u16],
     byte_luts: &ParameterGolfSentencePieceByteLuts,
@@ -3635,7 +3642,7 @@ fn evaluate_validation_on_cuda_legacy(
         let graph = training_graph_for_batch(
             graph_cache,
             device.clone(),
-            descriptor,
+            model,
             input_ids.len(),
             sequence_length,
         )?;
@@ -3937,20 +3944,14 @@ fn validation_session_for_batch<'a>(
     cuda_backend: &mut CudaBackend,
     graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
     device: psionic_core::Device,
-    descriptor: &psionic_models::ParameterGolfModelDescriptor,
     model: &ParameterGolfReferenceModel,
     batch_sequences: usize,
     sequence_length: usize,
 ) -> Result<&'a mut ParameterGolfCudaValidationSession, ParameterGolfSingleH100TrainingError> {
     if !cache.contains_key(&batch_sequences) {
-        let graph = eval_graph_for_batch(
-            graph_cache,
-            device,
-            descriptor,
-            batch_sequences,
-            sequence_length,
-        )?
-        .clone();
+        let graph =
+            eval_graph_for_batch(graph_cache, device, model, batch_sequences, sequence_length)?
+                .clone();
         let session = ParameterGolfCudaValidationSession::new(
             cuda_backend,
             graph,
@@ -3974,20 +3975,14 @@ fn training_session_for_batch<'a>(
     cuda_backend: &mut CudaBackend,
     graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineTrainingGraph>,
     device: psionic_core::Device,
-    descriptor: &psionic_models::ParameterGolfModelDescriptor,
     model: &ParameterGolfReferenceModel,
     batch_sequences: usize,
     sequence_length: usize,
 ) -> Result<&'a mut ParameterGolfCudaTrainingSession, ParameterGolfSingleH100TrainingError> {
     if !cache.contains_key(&batch_sequences) {
-        let graph = training_graph_for_batch(
-            graph_cache,
-            device,
-            descriptor,
-            batch_sequences,
-            sequence_length,
-        )?
-        .clone();
+        let graph =
+            training_graph_for_batch(graph_cache, device, model, batch_sequences, sequence_length)?
+                .clone();
         let session = ParameterGolfCudaTrainingSession::new(
             cuda_backend,
             graph,
@@ -4019,14 +4014,15 @@ fn refresh_parameter_golf_cuda_training_sessions(
 fn training_graph_for_batch<'a>(
     cache: &'a mut BTreeMap<usize, ParameterGolfBaselineTrainingGraph>,
     device: psionic_core::Device,
-    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
     batch_size: usize,
     sequence_length: usize,
 ) -> Result<&'a ParameterGolfBaselineTrainingGraph, ParameterGolfSingleH100TrainingError> {
     if !cache.contains_key(&batch_size) {
+        let descriptor = model.banked_descriptor()?;
         let graph = build_parameter_golf_baseline_training_graph(
             device,
-            descriptor,
+            &descriptor,
             batch_size,
             sequence_length,
         )?;
@@ -4042,14 +4038,15 @@ fn training_graph_for_batch<'a>(
 fn eval_graph_for_batch<'a>(
     cache: &'a mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
     device: psionic_core::Device,
-    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
     batch_size: usize,
     sequence_length: usize,
 ) -> Result<&'a ParameterGolfBaselineEvalGraph, ParameterGolfSingleH100TrainingError> {
     if !cache.contains_key(&batch_size) {
+        let descriptor = model.banked_descriptor()?;
         let graph = build_parameter_golf_baseline_eval_graph(
             device,
-            descriptor,
+            &descriptor,
             batch_size,
             sequence_length,
         )?;
@@ -4070,10 +4067,8 @@ impl ParameterGolfCudaValidationSession {
         batch_sequences: usize,
         sequence_length: usize,
     ) -> Result<Self, ParameterGolfSingleH100TrainingError> {
-        let config = &model.descriptor().config;
         let parameter_vectors = model
-            .weights()
-            .parameter_vectors(config)
+            .all_parameter_vectors()?
             .into_iter()
             .map(|parameter| (parameter.parameter_id.clone(), parameter))
             .collect::<BTreeMap<_, _>>();
@@ -4206,10 +4201,8 @@ impl ParameterGolfCudaTrainingSession {
         batch_sequences: usize,
         sequence_length: usize,
     ) -> Result<Self, ParameterGolfSingleH100TrainingError> {
-        let config = &model.descriptor().config;
         let parameter_vectors = model
-            .weights()
-            .parameter_vectors(config)
+            .all_parameter_vectors()?
             .into_iter()
             .map(|parameter| (parameter.parameter_id.clone(), parameter))
             .collect::<BTreeMap<_, _>>();
@@ -4274,10 +4267,8 @@ impl ParameterGolfCudaTrainingSession {
         &mut self,
         model: &ParameterGolfReferenceModel,
     ) -> Result<(), ParameterGolfSingleH100TrainingError> {
-        let config = &model.descriptor().config;
         let parameter_vectors = model
-            .weights()
-            .parameter_vectors(config)
+            .all_parameter_vectors()?
             .into_iter()
             .map(|parameter| (parameter.parameter_id.clone(), parameter))
             .collect::<BTreeMap<_, _>>();
@@ -5231,6 +5222,60 @@ mod tests {
             .parameter_vector(&model.descriptor().config, "blocks.0.attn_scale")
             .ok_or("missing blocks.0.attn_scale source vector")?;
         assert_eq!(control.values(), control_source.values.as_slice());
+
+        Ok(())
+    }
+
+    #[test]
+    fn seed_parameter_states_and_materialize_current_model_support_banked_optimizer_surface(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+        let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
+        let runtime_descriptor = model.banked_descriptor()?;
+        let optimizer_plan = parameter_golf_optimizer_plan(&runtime_descriptor, &hyperparameters)?;
+        let mut trainer_state = seed_parameter_states(&model, &optimizer_plan)?;
+
+        let qo_bank_state = trainer_state
+            .parameter_states
+            .get("qo_bank")
+            .ok_or("missing qo_bank state")?;
+        assert!(matches!(
+            qo_bank_state,
+            ParameterGolfParameterState::MuonBf16 { .. }
+        ));
+
+        let original_qo_bank = model
+            .banked_weights()?
+            .parameter_vectors(&model.descriptor().config)
+            .into_iter()
+            .find(|vector| vector.parameter_id == "qo_bank")
+            .ok_or("missing qo_bank vector")?;
+
+        let updated_qo_bank_first = {
+            let ParameterGolfParameterState::MuonBf16 { values, .. } = trainer_state
+                .parameter_states
+                .get_mut("qo_bank")
+                .ok_or("missing mutable qo_bank state")?
+            else {
+                return Err("expected MuonBf16 qo_bank state".into());
+            };
+            values[0] = bf16::from_f32(values[0] + 0.5).to_f32();
+            values[0]
+        };
+
+        let materialized = materialize_current_model(&model, &trainer_state)?;
+        let materialized_qo_bank = materialized
+            .banked_weights()?
+            .parameter_vectors(&materialized.descriptor().config)
+            .into_iter()
+            .find(|vector| vector.parameter_id == "qo_bank")
+            .ok_or("missing materialized qo_bank vector")?;
+        assert_ne!(materialized_qo_bank.values[0], original_qo_bank.values[0]);
+        assert_eq!(materialized_qo_bank.values[0], updated_qo_bank_first);
+        assert_eq!(
+            materialized.weights().blocks[0].attention.q_proj.weight[0],
+            updated_qo_bank_first
+        );
 
         Ok(())
     }

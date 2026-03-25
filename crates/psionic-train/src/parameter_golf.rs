@@ -224,8 +224,10 @@ pub enum ParameterGolfTrainError {
         /// Actual element count.
         actual_len: usize,
     },
-    /// Muon only supports matrix-shaped tensors.
-    #[error("parameter golf Muon requires a 2D matrix shape, found {shape:?}")]
+    /// Muon only supports one matrix or one bank of equal-shaped matrices.
+    #[error(
+        "parameter golf Muon requires a 2D matrix shape or 3D matrix-bank shape, found {shape:?}"
+    )]
     MuonRequiresMatrix {
         /// Invalid tensor shape.
         shape: Vec<usize>,
@@ -480,6 +482,14 @@ impl ParameterGolfMuonState {
             momentum_buffer: vec![0.0; rows * cols],
         }
     }
+
+    /// Creates zeroed Muon state for one logical tensor by flat element count.
+    #[must_use]
+    pub fn zeros_for_len(element_count: usize) -> Self {
+        Self {
+            momentum_buffer: vec![0.0; element_count],
+        }
+    }
 }
 
 /// Inspectable result of one Muon update.
@@ -629,16 +639,11 @@ fn apply_parameter_golf_muon_step_with_orthogonalizer<F>(
     gradient_values: &[f32],
     optimizer: &ParameterGolfMuonConfig,
     optimizer_state: &mut ParameterGolfMuonState,
-    orthogonalize: F,
+    mut orthogonalize: F,
 ) -> Result<ParameterGolfMuonStepReceipt, ParameterGolfTrainError>
 where
-    F: FnOnce(&[f32], usize, usize, usize, f32) -> Result<Vec<f32>, ParameterGolfTrainError>,
+    F: FnMut(&[f32], usize, usize, usize, f32) -> Result<Vec<f32>, ParameterGolfTrainError>,
 {
-    if parameter_shape.len() != 2 {
-        return Err(ParameterGolfTrainError::MuonRequiresMatrix {
-            shape: parameter_shape.to_vec(),
-        });
-    }
     if parameter_values.len() != gradient_values.len() {
         return Err(ParameterGolfTrainError::MuonGradientLengthMismatch {
             parameter_len: parameter_values.len(),
@@ -651,8 +656,26 @@ where
             actual_len: optimizer_state.momentum_buffer.len(),
         });
     }
-    let rows = parameter_shape[0];
-    let cols = parameter_shape[1];
+    let (bank_len, rows, cols) = match parameter_shape {
+        [rows, cols] => (1, *rows, *cols),
+        [bank_len, rows, cols] => (*bank_len, *rows, *cols),
+        _ => {
+            return Err(ParameterGolfTrainError::MuonRequiresMatrix {
+                shape: parameter_shape.to_vec(),
+            })
+        }
+    };
+    let stride = rows.saturating_mul(cols);
+    if bank_len == 0 || rows == 0 || cols == 0 || stride == 0 {
+        return Err(ParameterGolfTrainError::MuonRequiresMatrix {
+            shape: parameter_shape.to_vec(),
+        });
+    }
+    if parameter_values.len() != bank_len.saturating_mul(stride) {
+        return Err(ParameterGolfTrainError::MuonRequiresMatrix {
+            shape: parameter_shape.to_vec(),
+        });
+    }
     let mut effective_gradient = vec![0.0_f32; parameter_values.len()];
     for index in 0..parameter_values.len() {
         optimizer_state.momentum_buffer[index] =
@@ -660,13 +683,21 @@ where
         effective_gradient[index] =
             gradient_values[index] + (optimizer.momentum * optimizer_state.momentum_buffer[index]);
     }
-    let orthogonalized_update = orthogonalize(
-        effective_gradient.as_slice(),
-        rows,
-        cols,
-        optimizer.backend_steps as usize,
-        optimizer.epsilon,
-    )?;
+    let mut orthogonalized_update = Vec::with_capacity(parameter_values.len());
+    for bank_index in 0..bank_len {
+        let start = bank_index.saturating_mul(stride);
+        let end = start.saturating_add(stride);
+        orthogonalized_update.extend_from_slice(
+            orthogonalize(
+                &effective_gradient[start..end],
+                rows,
+                cols,
+                optimizer.backend_steps as usize,
+                optimizer.epsilon,
+            )?
+            .as_slice(),
+        );
+    }
     let scale_correction = (rows as f32 / cols as f32).max(1.0).sqrt();
     let scaled_update = orthogonalized_update
         .iter()
@@ -1244,6 +1275,62 @@ mod tests {
             &expected_receipt.update_values,
             5e-4,
         );
+    }
+
+    #[test]
+    fn muon_step_matches_independent_slice_updates_for_banked_matrix_surface() {
+        let optimizer = ParameterGolfMuonConfig::new(0.05, 0.9, 5);
+        let bank_shape = [2, 2, 2];
+        let mut bank_parameter = vec![0.5, -0.25, 0.75, 1.0, -0.5, 0.25, 0.125, -0.875];
+        let bank_gradient = vec![0.1, -0.2, 0.05, 0.3, -0.15, 0.4, -0.05, 0.2];
+        let mut bank_state = ParameterGolfMuonState::zeros_for_len(bank_parameter.len());
+
+        let bank_receipt = apply_parameter_golf_muon_step(
+            bank_parameter.as_mut_slice(),
+            &bank_shape,
+            bank_gradient.as_slice(),
+            &optimizer,
+            &mut bank_state,
+        )
+        .expect("banked muon step should compute");
+
+        let mut expected_parameter = vec![0.5, -0.25, 0.75, 1.0, -0.5, 0.25, 0.125, -0.875];
+        let mut expected_state = ParameterGolfMuonState::zeros_for_len(expected_parameter.len());
+        let mut expected_orthogonalized = Vec::new();
+        let mut expected_updates = Vec::new();
+        for slice_index in 0..2 {
+            let start = slice_index * 4;
+            let end = start + 4;
+            let mut slice_state = ParameterGolfMuonState {
+                momentum_buffer: expected_state.momentum_buffer[start..end].to_vec(),
+            };
+            let slice_receipt = apply_parameter_golf_muon_step(
+                &mut expected_parameter[start..end],
+                &[2, 2],
+                &bank_gradient[start..end],
+                &optimizer,
+                &mut slice_state,
+            )
+            .expect("per-slice muon step should compute");
+            expected_state.momentum_buffer[start..end]
+                .copy_from_slice(slice_state.momentum_buffer.as_slice());
+            expected_orthogonalized
+                .extend_from_slice(slice_receipt.orthogonalized_update.as_slice());
+            expected_updates.extend_from_slice(slice_receipt.update_values.as_slice());
+        }
+
+        assert_close(&bank_parameter, &expected_parameter, 5e-4);
+        assert_close(
+            &bank_state.momentum_buffer,
+            &expected_state.momentum_buffer,
+            1e-6,
+        );
+        assert_close(
+            &bank_receipt.orthogonalized_update,
+            &expected_orthogonalized,
+            5e-4,
+        );
+        assert_close(&bank_receipt.update_values, &expected_updates, 5e-4);
     }
 
     #[test]

@@ -659,19 +659,19 @@ fn remove_path_recursively(
         return Ok(());
     }
     if path.is_dir() {
-        fs::remove_dir_all(path).map_err(
-            |error| ParameterGolfDistributed8xH100TrainStepError::Write {
+        fs::remove_dir_all(path).map_err(|error| {
+            ParameterGolfDistributed8xH100TrainStepError::Write {
                 path: path.display().to_string(),
                 error,
-            },
-        )?;
+            }
+        })?;
     } else {
-        fs::remove_file(path).map_err(
-            |error| ParameterGolfDistributed8xH100TrainStepError::Write {
+        fs::remove_file(path).map_err(|error| {
+            ParameterGolfDistributed8xH100TrainStepError::Write {
                 path: path.display().to_string(),
                 error,
-            },
-        )?;
+            }
+        })?;
     }
     Ok(())
 }
@@ -683,18 +683,16 @@ fn prune_step_scope_for_next_step(
         return Ok(());
     }
     let retained_model_path = step_dir.join("current_model.safetensors");
-    for entry in fs::read_dir(step_dir).map_err(
-        |error| ParameterGolfDistributed8xH100TrainStepError::Read {
+    for entry in fs::read_dir(step_dir).map_err(|error| {
+        ParameterGolfDistributed8xH100TrainStepError::Read {
             path: step_dir.display().to_string(),
             error,
-        },
-    )? {
-        let entry = entry.map_err(
-            |error| ParameterGolfDistributed8xH100TrainStepError::Read {
-                path: step_dir.display().to_string(),
-                error,
-            },
-        )?;
+        }
+    })? {
+        let entry = entry.map_err(|error| ParameterGolfDistributed8xH100TrainStepError::Read {
+            path: step_dir.display().to_string(),
+            error,
+        })?;
         let path = entry.path();
         if path == retained_model_path {
             continue;
@@ -852,13 +850,17 @@ fn execute_parameter_golf_distributed_8xh100_step(
         if let Some(model_artifact_path) = input_model_artifact_path {
             command.env(CHILD_MODEL_ARTIFACT_PATH_ENV_VAR, model_artifact_path);
         }
-        let child = command.spawn().map_err(
-            |error| ParameterGolfDistributed8xH100TrainStepError::ChildSpawn {
-                rank,
-                error,
-            },
-        )?;
-        children.push((rank, window_path, gradient_artifact_path, receipt_path, log_path, child));
+        let child = command.spawn().map_err(|error| {
+            ParameterGolfDistributed8xH100TrainStepError::ChildSpawn { rank, error }
+        })?;
+        children.push((
+            rank,
+            window_path,
+            gradient_artifact_path,
+            receipt_path,
+            log_path,
+            child,
+        ));
     }
 
     let mut rank_launches = Vec::with_capacity(CHALLENGE_WORLD_SIZE);
@@ -930,8 +932,10 @@ fn execute_parameter_golf_distributed_8xh100_step(
     }
     let gradient_sync_ms = duration_ms(sync_started);
 
-    let clip_observation =
-        clip_gradients(accumulated_gradients.as_mut_slice(), hyperparameters.grad_clip_norm);
+    let clip_observation = clip_gradients(
+        accumulated_gradients.as_mut_slice(),
+        hyperparameters.grad_clip_norm,
+    );
     let aggregated_gradient_artifact_path = step_dir.join("aggregated_gradients.safetensors");
     let aggregated_gradient_artifact_sha256 = write_gradient_artifact(
         &aggregated_gradient_artifact_path,
@@ -980,7 +984,9 @@ fn execute_parameter_golf_distributed_8xh100_step(
         observed_step_ms,
         gradient_sync_ms,
         optimizer_step_ms,
-        gradient_norm_after_clip: clip_observation.gradient_norm_after_clip.unwrap_or_default(),
+        gradient_norm_after_clip: clip_observation
+            .gradient_norm_after_clip
+            .unwrap_or_default(),
         clip_applied: clip_observation.clip_applied,
         non_finite_gradient_count: u64::from(clip_observation.non_finite_count),
         rank_launches,
@@ -1004,8 +1010,10 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
     bootstrap_receipt_path: &Path,
     bootstrap_receipt: &ParameterGolfDistributed8xH100RuntimeBootstrapReceipt,
     mut live_visualization_writer: Option<&mut ParameterGolfDistributedLiveVisualizationWriter>,
-) -> Result<ParameterGolfDistributed8xH100TrainStepReceipt, ParameterGolfDistributed8xH100TrainStepError>
-{
+) -> Result<
+    ParameterGolfDistributed8xH100TrainStepReceipt,
+    ParameterGolfDistributed8xH100TrainStepError,
+> {
     if bootstrap_receipt.successful_rank_count != CHALLENGE_WORLD_SIZE {
         return Err(ParameterGolfDistributed8xH100TrainStepError::Aggregate {
             message: format!(
@@ -1030,10 +1038,11 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
         parameter_golf_distributed_8xh100_step_scope_root_dir(root, &bringup_report_relpath);
     let model_artifacts_dir =
         parameter_golf_distributed_8xh100_model_artifacts_dir(root, &bringup_report_relpath);
-    let validation_rank_receipts_dir = parameter_golf_distributed_8xh100_validation_rank_receipts_dir(
-        root,
-        &bringup_report_relpath,
-    );
+    let validation_rank_receipts_dir =
+        parameter_golf_distributed_8xh100_validation_rank_receipts_dir(
+            root,
+            &bringup_report_relpath,
+        );
     let validation_rank_logs_dir =
         parameter_golf_distributed_8xh100_validation_rank_logs_dir(root, &bringup_report_relpath);
     let validation_rank_shards_dir =
@@ -1045,20 +1054,20 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
         &validation_rank_logs_dir,
         &validation_rank_shards_dir,
     ] {
-        fs::create_dir_all(directory).map_err(
-            |error| ParameterGolfDistributed8xH100TrainStepError::Write {
+        fs::create_dir_all(directory).map_err(|error| {
+            ParameterGolfDistributed8xH100TrainStepError::Write {
                 path: directory.display().to_string(),
                 error,
-            },
-        )?;
+            }
+        })?;
     }
     if let Some(parent) = train_step_receipt_path.parent() {
-        fs::create_dir_all(parent).map_err(
-            |error| ParameterGolfDistributed8xH100TrainStepError::Write {
+        fs::create_dir_all(parent).map_err(|error| {
+            ParameterGolfDistributed8xH100TrainStepError::Write {
                 path: parent.display().to_string(),
                 error,
-            },
-        )?;
+            }
+        })?;
     }
 
     let dataset_root = PathBuf::from(required_env(
@@ -1088,7 +1097,8 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
     )?;
     let initial_model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
     let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
-    let optimizer_plan = parameter_golf_optimizer_plan(initial_model.descriptor(), &hyperparameters)?;
+    let runtime_descriptor = initial_model.banked_descriptor()?;
+    let optimizer_plan = parameter_golf_optimizer_plan(&runtime_descriptor, &hyperparameters)?;
     let mut trainer_state = seed_parameter_states(&initial_model, &optimizer_plan)?;
     let mut cursor = ParameterGolfTokenStreamCursor::new(PARAMETER_GOLF_TRAIN_SPLIT_NAME);
     let train_contract = ParameterGolfTokenStreamContract::new(
@@ -1097,12 +1107,11 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
     )
     .with_mode(DatasetIterationMode::Repeat);
     let requested_train_tokens = geometry.local_train_batch_tokens().saturating_add(1) as u64;
-    let current_exe = env::current_exe().map_err(|error| {
-        ParameterGolfDistributed8xH100TrainStepError::Read {
+    let current_exe =
+        env::current_exe().map_err(|error| ParameterGolfDistributed8xH100TrainStepError::Read {
             path: String::from("current_exe"),
             error,
-        }
-    })?;
+        })?;
     let runtime_payload_path = current_exe.display().to_string();
     let manifest_path = manifest_path
         .canonicalize()
@@ -1192,8 +1201,11 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
         }
     })?;
     let current_model = final_step_execution.current_model.clone();
-    let current_model_int8_zlib_artifact =
-        export_parameter_golf_int8_zlib_model_artifact(&current_model, run_id, executed_step_count)?;
+    let current_model_int8_zlib_artifact = export_parameter_golf_int8_zlib_model_artifact(
+        &current_model,
+        run_id,
+        executed_step_count,
+    )?;
     let current_model_int8_zlib_artifact_path = model_artifacts_dir.join(format!(
         "post_step_{executed_step_count}_final_model.int8.ptz"
     ));
@@ -1799,8 +1811,9 @@ pub fn execute_parameter_golf_distributed_8xh100_validation_child(
         None => {
             let aggregated_gradients = load_gradient_artifact(&aggregated_gradient_artifact_path)?;
             let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
+            let runtime_descriptor = baseline_model.banked_descriptor()?;
             let optimizer_plan =
-                parameter_golf_optimizer_plan(baseline_model.descriptor(), &hyperparameters)?;
+                parameter_golf_optimizer_plan(&runtime_descriptor, &hyperparameters)?;
             let mut trainer_state = seed_parameter_states(&baseline_model, &optimizer_plan)?;
             let learning_rate_multiplier = hyperparameters.learning_rate_multiplier(0, 0.0);
             let muon_momentum = hyperparameters.muon_momentum_at_step(0);
@@ -2286,16 +2299,21 @@ mod tests {
     }
 
     #[test]
-    fn distributed_step_scope_prune_keeps_only_current_model() -> Result<(), Box<dyn std::error::Error>>
-    {
+    fn distributed_step_scope_prune_keeps_only_current_model(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = tempfile::tempdir()?;
         let step_dir = temp_dir.path().join("step_00001");
         std::fs::create_dir_all(step_dir.join("runtime_train_step_gradients"))?;
         std::fs::create_dir_all(step_dir.join("runtime_train_step_logs"))?;
-        std::fs::write(step_dir.join("aggregated_gradients.safetensors"), b"gradients")?;
+        std::fs::write(
+            step_dir.join("aggregated_gradients.safetensors"),
+            b"gradients",
+        )?;
         std::fs::write(step_dir.join("current_model.safetensors"), b"model")?;
         std::fs::write(
-            step_dir.join("runtime_train_step_gradients").join("rank_0.safetensors"),
+            step_dir
+                .join("runtime_train_step_gradients")
+                .join("rank_0.safetensors"),
             b"rank-gradients",
         )?;
         std::fs::write(
