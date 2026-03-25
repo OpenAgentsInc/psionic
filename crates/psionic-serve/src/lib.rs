@@ -21,14 +21,14 @@ mod conformance;
 mod gguf;
 mod gpt_oss;
 mod openai_http;
-mod psion_capability_withdrawal;
 mod psion_capability_matrix;
+mod psion_capability_withdrawal;
 mod psion_served_evidence;
 mod psion_served_output_claim_posture;
 mod tassadar;
-mod tassadar_article_transformer_minimal_frontier;
 mod tassadar_article_cross_machine_reproducibility_publication;
 mod tassadar_article_route_minimality_publication_verdict;
+mod tassadar_article_transformer_minimal_frontier;
 mod tassadar_broad_internal_compute_profile_publication;
 mod tassadar_broad_internal_compute_publication_gate;
 mod tassadar_direct_model_weight_execution_proof;
@@ -48,8 +48,8 @@ mod tassadar_quantization_truth_envelope;
 mod tassadar_rust_only_article_acceptance_gate_v2;
 mod tassadar_rust_only_article_reproduction;
 mod tassadar_semantic_window_publication_policy;
-mod tokio_runtime_telemetry_axum;
 mod tassadar_universality_verdict_publication;
+mod tokio_runtime_telemetry_axum;
 
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -61,8 +61,8 @@ pub use conformance::*;
 pub use gguf::*;
 pub use gpt_oss::*;
 pub use openai_http::*;
-pub use psion_capability_withdrawal::*;
 pub use psion_capability_matrix::*;
+pub use psion_capability_withdrawal::*;
 pub use psion_served_evidence::*;
 pub use psion_served_output_claim_posture::*;
 pub use psionic_adapters::*;
@@ -71,30 +71,29 @@ use psionic_backend_cuda::{
     CudaBackend, EMBEDDINGS_SUPPORTED_OPS as CUDA_EMBEDDINGS_SUPPORTED_OPS,
 };
 use psionic_backend_metal::{
-    MetalBackend, EMBEDDINGS_SUPPORTED_OPS, TEXT_GENERATION_SUPPORTED_OPS,
+    EMBEDDINGS_SUPPORTED_OPS, MetalBackend, TEXT_GENERATION_SUPPORTED_OPS,
 };
-use psionic_compiler::{compile_graph, CompileError};
+use psionic_compiler::{CompileError, compile_graph};
 pub use psionic_core::QuantizationMode;
 use psionic_core::{DType, Device, Shape, TensorId};
 use psionic_ir::{Graph, GraphBuilder, GraphError};
 pub use psionic_models::{
-    apply_context_window, digest_generation_defaults, ArtifactWordDecoder, ByteProjectionEmbedder,
-    ContextOverflowPolicy, ContextWindowAccounting, ContextWindowError, DecoderFixtureWeights,
-    DecoderModelDescriptor, DecoderWeightLoader, EmbeddingModelDescriptor, EmbeddingNormalization,
-    EmbeddingWeights, FixtureDecoderLoader, FixtureWordTokenizer, GgufDecoderAdapter,
-    GgufDecoderAdapterLoader, GgufDecoderFamily, GgufDecoderFamilyMetadata,
-    GgufDecoderLayerTensorLayout, GgufDecoderTensorLayout, GgufEmbeddingAdapter,
-    GgufEmbeddingAdapterLoader, GgufEmbeddingFamily, GgufEmbeddingFamilyMetadata,
-    GgufEmbeddingLayerTensorLayout, GgufEmbeddingPooling, GgufEmbeddingTensorLayout,
-    GgufPromptTemplateFamily, GgufPromptTemplateRenderer, GptOssHarmonyParsedOutput,
-    ModelArtifactGovernance, ModelArtifactLicenseEntry, ModelArtifactLicenseFacts,
-    ModelArtifactProvenance, ModelArtifactProvenanceKind, ModelDescriptor, ModelLoadError,
-    PromptMessage, PromptMessageRole, PromptRenderError, ReferenceWordDecoder, RenderedPrompt,
-    SmokeByteEmbedder, TokenId, TokenSequence, TokenVocabulary, TokenizerBoundary,
-    WeightArtifactMetadata, WeightBundleMetadata, WeightFormat, WeightSource, WeightTensorMetadata,
+    ArtifactWordDecoder, ByteProjectionEmbedder, ContextOverflowPolicy, ContextWindowAccounting,
+    ContextWindowError, DecoderFixtureWeights, DecoderModelDescriptor, DecoderWeightLoader,
+    EmbeddingModelDescriptor, EmbeddingNormalization, EmbeddingWeights, FixtureDecoderLoader,
+    FixtureWordTokenizer, GgufDecoderAdapter, GgufDecoderAdapterLoader, GgufDecoderFamily,
+    GgufDecoderFamilyMetadata, GgufDecoderLayerTensorLayout, GgufDecoderTensorLayout,
+    GgufEmbeddingAdapter, GgufEmbeddingAdapterLoader, GgufEmbeddingFamily,
+    GgufEmbeddingFamilyMetadata, GgufEmbeddingLayerTensorLayout, GgufEmbeddingPooling,
+    GgufEmbeddingTensorLayout, GgufPromptTemplateFamily, GgufPromptTemplateRenderer,
+    GptOssHarmonyParsedOutput, ModelArtifactGovernance, ModelArtifactLicenseEntry,
+    ModelArtifactLicenseFacts, ModelArtifactProvenance, ModelArtifactProvenanceKind,
+    ModelDescriptor, ModelLoadError, PromptMessage, PromptMessageRole, PromptRenderError,
+    ReferenceWordDecoder, RenderedPrompt, SmokeByteEmbedder, TokenId, TokenSequence,
+    TokenVocabulary, TokenizerBoundary, WeightArtifactMetadata, WeightBundleMetadata, WeightFormat,
+    WeightSource, WeightTensorMetadata, apply_context_window, digest_generation_defaults,
 };
 use psionic_runtime::{
-    default_cache_invalidation_policy, plan_model_admission, select_argmax_token,
     BackendHealthTracker, BackendSelection, BackendSelectionState, BackendToolchainIdentity,
     CacheAction, CacheInvalidationPolicy, CacheInvalidationTrigger, CacheKind, CacheObservation,
     ClusterExecutionContext, CompilePathEvidence, DeviceDiscovery, ExecutionCapabilityProfile,
@@ -114,7 +113,8 @@ use psionic_runtime::{
     SamplingPolicy, SamplingStrategy, ServedArtifactIdentity, ShardedModelManifest,
     ShardedModelManifestError, StructuredOutputError, StructuredOutputExecutionReport,
     StructuredOutputMatchStatus, StructuredOutputMatcher, StructuredOutputRequest,
-    StructuredOutputValue, TokenSampler,
+    StructuredOutputValue, TokenSampler, default_cache_invalidation_policy, plan_model_admission,
+    select_argmax_token,
 };
 pub use psionic_transformer::{
     ActivationFunction, DecoderAttentionConfig, DecoderBlockConfig, DecoderConfig,
@@ -123,9 +123,9 @@ pub use psionic_transformer::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use tassadar::*;
-pub use tassadar_article_transformer_minimal_frontier::*;
 pub use tassadar_article_cross_machine_reproducibility_publication::*;
 pub use tassadar_article_route_minimality_publication_verdict::*;
+pub use tassadar_article_transformer_minimal_frontier::*;
 pub use tassadar_broad_internal_compute_profile_publication::*;
 pub use tassadar_broad_internal_compute_publication_gate::*;
 pub use tassadar_direct_model_weight_execution_proof::*;
@@ -3008,6 +3008,71 @@ impl InMemoryKvCache {
                 self.reclaim_events[checkpoint.reclaim_cursor..].to_vec(),
             )
         })
+    }
+
+    fn ownership_since_with_device_tokens(
+        &self,
+        checkpoint: &KvCacheLedgerCheckpoint,
+        current_tokens: usize,
+    ) -> Option<KvCacheOwnershipAccounting> {
+        let current_state = KvCacheState::paged(self.page_layout(), current_tokens);
+        if current_tokens <= self.len() {
+            return self.ownership_since_with_current_state(checkpoint, current_state);
+        }
+        self.owner.clone().map(|owner| {
+            KvCacheOwnershipAccounting::new(
+                owner,
+                checkpoint.previous_state.clone(),
+                current_state,
+                self.predicted_allocated_pages_for_device_tokens(current_tokens),
+                self.reclaim_events[checkpoint.reclaim_cursor..].to_vec(),
+            )
+        })
+    }
+
+    fn predicted_allocated_pages_for_device_tokens(
+        &self,
+        current_tokens: usize,
+    ) -> Vec<KvCachePageSpan> {
+        if current_tokens <= self.len() {
+            return Vec::new();
+        }
+
+        let mut pages = self.pages.clone();
+        let mut next_page_index = self.next_page_index;
+        let mut logical_position = self.len();
+        let mut remaining = current_tokens.saturating_sub(self.len());
+        let mut allocated_pages = Vec::new();
+
+        while remaining > 0 {
+            let needs_new_page = pages
+                .last()
+                .is_none_or(|page| page.token_count >= self.page_layout().tokens_per_page);
+            if needs_new_page {
+                let page = KvCacheLogicalPage {
+                    page_index: next_page_index,
+                    start_position: logical_position,
+                    token_count: 0,
+                };
+                next_page_index = next_page_index.saturating_add(1);
+                allocated_pages.push(page.span(self.page_layout()));
+                pages.push(page);
+            }
+
+            let Some(page) = pages.last_mut() else {
+                break;
+            };
+            let free_slots = self
+                .page_layout()
+                .tokens_per_page
+                .saturating_sub(page.token_count);
+            let appended = remaining.min(free_slots);
+            page.token_count = page.token_count.saturating_add(appended);
+            logical_position = logical_position.saturating_add(appended);
+            remaining = remaining.saturating_sub(appended);
+        }
+
+        allocated_pages
     }
 
     /// Returns the current paged-KV snapshot for the cache.
@@ -9117,31 +9182,31 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        current_time_millis, default_generation_streaming_policy, finalize_embedding_values,
+        ADAPTER_TEXT_GENERATION_PRODUCT_ID, AdapterArtifactFormat, AdapterArtifactIdentity,
+        AdapterArtifactKind, AdapterResidencyMode, AdapterServingBinding, AdapterTargetFamily,
+        ContextOverflowPolicy, ContextWindowError, CpuGenerationStream,
+        CpuReferenceTextGenerationService, CpuWordGenerationModel, DEFAULT_MODEL_KEEPALIVE_MILLIS,
+        EmbeddingNormalization, EmbeddingRequest, EmbeddingResponse, EmbeddingVector,
+        EmbeddingsExecutor, FixtureWordTokenizer, GenerationEventStream, GenerationLoadState,
+        GenerationModelHandle, GenerationOptions, GenerationRequest, GenerationResponse,
+        GenerationStreamEvent, GenerationStreamStatus, InMemoryGenerationModelRegistry,
+        InMemoryGenerationSessionStore, InMemoryKvCache, KvCacheError, ListModelsObservation,
+        LoadedModelRegistryError, LocalModelCatalog, ModelDescriptor, ModelSummary,
+        PsionicLocalRuntime, ReferenceTextGenerationError, ReferenceWordDecoder, SessionId,
+        SharedPrefixCompatibility, SharedPrefixStore, ShowObservation, SmokeByteEmbedder,
+        SmokeEmbeddingsService, StreamingTextGenerationExecutor, TerminationReason,
+        TextGenerationExecutor, TokenId, WeightBundleMetadata, WeightFormat, WeightSource,
+        WeightTensorMetadata, WordDecoderExecutionModel, current_time_millis,
+        default_generation_streaming_policy, finalize_embedding_values,
         generation_product_supported, load_sharded_model_manifest_json, prefix_compatibility,
         prefix_compatibility_for_request, recommended_generation_quantization_dispatch,
-        request_kv_owner, served_artifact_identity_for_decoder_model, AdapterArtifactFormat,
-        AdapterArtifactIdentity, AdapterArtifactKind, AdapterResidencyMode, AdapterServingBinding,
-        AdapterTargetFamily, ContextOverflowPolicy, ContextWindowError, CpuGenerationStream,
-        CpuReferenceTextGenerationService, CpuWordGenerationModel, EmbeddingNormalization,
-        EmbeddingRequest, EmbeddingResponse, EmbeddingVector, EmbeddingsExecutor,
-        FixtureWordTokenizer, GenerationEventStream, GenerationLoadState, GenerationModelHandle,
-        GenerationOptions, GenerationRequest, GenerationResponse, GenerationStreamEvent,
-        GenerationStreamStatus, InMemoryGenerationModelRegistry, InMemoryGenerationSessionStore,
-        InMemoryKvCache, KvCacheError, ListModelsObservation, LoadedModelRegistryError,
-        LocalModelCatalog, ModelDescriptor, ModelSummary, PsionicLocalRuntime,
-        ReferenceTextGenerationError, ReferenceWordDecoder, SessionId, SharedPrefixCompatibility,
-        SharedPrefixStore, ShowObservation, SmokeByteEmbedder, SmokeEmbeddingsService,
-        StreamingTextGenerationExecutor, TerminationReason, TextGenerationExecutor, TokenId,
-        WeightBundleMetadata, WeightFormat, WeightSource, WeightTensorMetadata,
-        WordDecoderExecutionModel, ADAPTER_TEXT_GENERATION_PRODUCT_ID,
-        DEFAULT_MODEL_KEEPALIVE_MILLIS,
+        request_kv_owner, served_artifact_identity_for_decoder_model,
     };
     use crate::{DecoderBlockConfig, DecoderConfig, DecoderModelDescriptor};
     use psionic_models::{
-        assert_prompt_window_case, assert_rendered_prompt_case, golden_prompt_fixture,
-        golden_prompt_fixtures, golden_tokenizer_fixture, DecoderFixtureWeights, TokenSequence,
-        TokenizerBoundary,
+        DecoderFixtureWeights, TokenSequence, TokenizerBoundary, assert_prompt_window_case,
+        assert_rendered_prompt_case, golden_prompt_fixture, golden_prompt_fixtures,
+        golden_tokenizer_fixture,
     };
     use psionic_transformer::{
         ActivationFunction, DecoderAttentionConfig, DecoderFeedForwardConfig,
@@ -9322,8 +9387,8 @@ mod tests {
     }
 
     #[test]
-    fn generation_request_with_adapter_serving_switches_product_and_preserves_binding(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn generation_request_with_adapter_serving_switches_product_and_preserves_binding()
+    -> Result<(), Box<dyn std::error::Error>> {
         let binding = sample_adapter_serving_binding();
         let request = GenerationRequest::new_text(
             "gen-adapter-request",
@@ -9346,8 +9411,8 @@ mod tests {
     }
 
     #[test]
-    fn adapter_generation_prefix_compatibility_uses_binding_digest(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn adapter_generation_prefix_compatibility_uses_binding_digest()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model = CpuWordGenerationModel::new(ReferenceWordDecoder::new())?;
         let binding = sample_adapter_serving_binding();
 
@@ -9517,8 +9582,8 @@ mod tests {
     }
 
     #[test]
-    fn psionic_local_runtime_forwards_catalog_lifecycle_generation_and_embeddings(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn psionic_local_runtime_forwards_catalog_lifecycle_generation_and_embeddings()
+    -> Result<(), Box<dyn std::error::Error>> {
         let generation = CpuReferenceTextGenerationService::new()?;
         let embeddings = SmokeEmbeddingsService::new()?;
         let decoder_descriptor = generation.model_descriptor().clone();
@@ -9569,10 +9634,12 @@ mod tests {
             runtime.isolation_policy(),
             LocalServingIsolationPolicy::in_process_runtime()
         );
-        assert!(observability
-            .recent_transitions
-            .iter()
-            .any(|event| event.kind == RuntimeTransitionKind::ModelLoadedCold));
+        assert!(
+            observability
+                .recent_transitions
+                .iter()
+                .any(|event| event.kind == RuntimeTransitionKind::ModelLoadedCold)
+        );
 
         let warmed = runtime.warm_model(ReferenceWordDecoder::MODEL_ID, 0)?;
         assert_eq!(warmed.summary.model, ReferenceWordDecoder::MODEL_ID);
@@ -9789,8 +9856,8 @@ mod tests {
     }
 
     #[test]
-    fn paged_kv_cache_tracks_owner_bound_page_eviction_and_reclaim(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn paged_kv_cache_tracks_owner_bound_page_eviction_and_reclaim()
+    -> Result<(), Box<dyn std::error::Error>> {
         let policy = KvCachePolicy {
             device_scope: KvCacheDeviceScope::SameDeviceOnly,
             spill_policy: KvCacheSpillPolicy::EvictOldestPages,
@@ -9832,10 +9899,82 @@ mod tests {
         assert_eq!(reclaim.current.tokens, 1);
         assert_eq!(reclaim.current.pages, 1);
         assert_eq!(reclaim.reclaimed_pages.len(), 2);
-        assert!(reclaim
-            .reclaimed_pages
-            .iter()
-            .any(|page| page.token_count == 1));
+        assert!(
+            reclaim
+                .reclaimed_pages
+                .iter()
+                .any(|page| page.token_count == 1)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn paged_kv_cache_predicts_device_resident_growth_from_empty_seed()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let policy = KvCachePolicy {
+            device_scope: KvCacheDeviceScope::SameDeviceOnly,
+            spill_policy: KvCacheSpillPolicy::RefuseNewPages,
+            page_layout: KvCachePageLayout::new(4, 2, 32),
+        };
+        let mut cache = InMemoryKvCache::with_policy(4, 2, policy);
+        cache.bind_owner(request_kv_owner(
+            &GenerationRequest::new_text(
+                "req-device-seed",
+                sample_named_decoder_descriptor("device-seed"),
+                None,
+                "hello",
+                GenerationOptions::greedy(1),
+            ),
+            psionic_runtime::BatchExecutionPosture::SingleRequestOnly,
+            None,
+        ));
+        let checkpoint = cache.checkpoint();
+
+        let ownership = cache
+            .ownership_since_with_device_tokens(&checkpoint, 3)
+            .expect("device-resident ownership accounting");
+        assert_eq!(ownership.previous.tokens, 0);
+        assert_eq!(ownership.current.tokens, 3);
+        assert_eq!(ownership.current.pages, 2);
+        assert_eq!(ownership.growth.tokens, 3);
+        assert_eq!(ownership.allocated_pages.len(), 2);
+        assert_eq!(ownership.allocated_pages[0].page_index, 0);
+        assert_eq!(ownership.allocated_pages[1].page_index, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn paged_kv_cache_predicts_device_resident_growth_from_existing_seed()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let policy = KvCachePolicy {
+            device_scope: KvCacheDeviceScope::SameDeviceOnly,
+            spill_policy: KvCacheSpillPolicy::RefuseNewPages,
+            page_layout: KvCachePageLayout::new(6, 2, 32),
+        };
+        let mut cache = InMemoryKvCache::with_policy(6, 2, policy);
+        cache.bind_owner(request_kv_owner(
+            &GenerationRequest::new_text(
+                "req-device-grow",
+                sample_named_decoder_descriptor("device-grow"),
+                None,
+                "hello",
+                GenerationOptions::greedy(1),
+            ),
+            psionic_runtime::BatchExecutionPosture::SingleRequestOnly,
+            None,
+        ));
+        cache.append(TokenId(1), vec![0.0; 2], vec![1.0; 2])?;
+        let checkpoint = cache.checkpoint();
+
+        let ownership = cache
+            .ownership_since_with_device_tokens(&checkpoint, 4)
+            .expect("device-resident growth accounting");
+        assert_eq!(ownership.previous.tokens, 1);
+        assert_eq!(ownership.current.tokens, 4);
+        assert_eq!(ownership.current.pages, 2);
+        assert_eq!(ownership.growth.tokens, 3);
+        assert_eq!(ownership.allocated_pages.len(), 1);
+        assert_eq!(ownership.allocated_pages[0].page_index, 1);
         Ok(())
     }
 
@@ -9974,8 +10113,8 @@ mod tests {
     }
 
     #[test]
-    fn shared_prefix_store_preserves_exact_hit_for_exact_only_logit_receipts(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn shared_prefix_store_preserves_exact_hit_for_exact_only_logit_receipts()
+    -> Result<(), Box<dyn std::error::Error>> {
         let decoder = ReferenceWordDecoder::new();
         let compatibility = SharedPrefixCompatibility {
             served_artifact_digest: String::from("artifact"),
@@ -10029,8 +10168,8 @@ mod tests {
     }
 
     #[test]
-    fn shared_prefix_store_reports_tenant_and_sampler_boundary_refusals(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn shared_prefix_store_reports_tenant_and_sampler_boundary_refusals()
+    -> Result<(), Box<dyn std::error::Error>> {
         let loaded_model = CpuWordGenerationModel::new(ReferenceWordDecoder::new())?;
         let mut compatibility = prefix_compatibility(&loaded_model);
         compatibility.tenant_id = Some(String::from("tenant-a"));
@@ -10144,28 +10283,32 @@ mod tests {
             descriptor: sample_named_decoder_descriptor("beta"),
         };
 
-        assert!(registry
-            .warm_with_metadata(
-                alpha,
-                1_000,
-                5_000,
-                Some(64),
-                Some(String::from("cpu")),
-                None
-            )
-            .expect("warm alpha")
-            .is_none());
-        assert!(registry
-            .warm_with_metadata(
-                beta,
-                2_000,
-                2_000,
-                Some(32),
-                Some(String::from("cpu")),
-                None
-            )
-            .expect("warm beta")
-            .is_none());
+        assert!(
+            registry
+                .warm_with_metadata(
+                    alpha,
+                    1_000,
+                    5_000,
+                    Some(64),
+                    Some(String::from("cpu")),
+                    None
+                )
+                .expect("warm alpha")
+                .is_none()
+        );
+        assert!(
+            registry
+                .warm_with_metadata(
+                    beta,
+                    2_000,
+                    2_000,
+                    Some(32),
+                    Some(String::from("cpu")),
+                    None
+                )
+                .expect("warm beta")
+                .is_none()
+        );
 
         let views = registry.loaded_model_views();
         assert_eq!(views.len(), 2);
@@ -10214,10 +10357,12 @@ mod tests {
             descriptor: sample_named_decoder_descriptor("gamma"),
         };
 
-        assert!(registry
-            .warm_with_metadata(gamma, 10_000, 5_000, None, Some(String::from("cpu")), None)
-            .expect("warm gamma")
-            .is_none());
+        assert!(
+            registry
+                .warm_with_metadata(gamma, 10_000, 5_000, None, Some(String::from("cpu")), None)
+                .expect("warm gamma")
+                .is_none()
+        );
         let warmed = registry
             .warm_loaded("gamma", 10_100, 0)
             .expect("warm gamma with zero keepalive");
@@ -10263,8 +10408,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_reference_observability_reports_sessions_memory_and_transitions(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_observability_reports_sessions_memory_and_transitions()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let initial = service.observability_at(1_000);
         assert_eq!(initial.queue_depth, 0);
@@ -10294,16 +10439,18 @@ mod tests {
 
         let after_generate = service.observability_at(1_200);
         assert_eq!(after_generate.active_requests, 0);
-        assert!(after_generate
-            .recent_transitions
-            .iter()
-            .any(|event| event.kind == RuntimeTransitionKind::ModelBecameWarm));
+        assert!(
+            after_generate
+                .recent_transitions
+                .iter()
+                .any(|event| event.kind == RuntimeTransitionKind::ModelBecameWarm)
+        );
         Ok(())
     }
 
     #[test]
-    fn cpu_reference_continuous_batch_scheduler_mixes_prefill_and_decode(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_continuous_batch_scheduler_mixes_prefill_and_decode()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let descriptor = service.model_descriptor().clone();
         let long_prompt_len = descriptor
@@ -10460,8 +10607,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_reference_generation_stream_emits_chunks_then_terminal(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_generation_stream_emits_chunks_then_terminal()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let request = GenerationRequest::new_text(
             "stream-1",
@@ -10505,8 +10652,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_reference_generation_stream_cancellation_discards_uncommitted_session_output(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_generation_stream_cancellation_discards_uncommitted_session_output()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let session = service.create_session(ReferenceWordDecoder::MODEL_ID)?;
         let request = GenerationRequest::new_text(
@@ -10540,8 +10687,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_reference_generation_stream_disconnect_returns_terminal(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_generation_stream_disconnect_returns_terminal()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let request = GenerationRequest::new_text(
             "stream-disconnect-1",
@@ -10593,8 +10740,8 @@ mod tests {
     }
 
     #[test]
-    fn generation_stream_reports_runtime_failure_after_stream_start(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn generation_stream_reports_runtime_failure_after_stream_start()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CpuBackend::new();
         let mut models = InMemoryGenerationModelRegistry::new();
         let failing_model = FailingStreamWordDecoder {
@@ -10745,8 +10892,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_reference_text_generation_replays_seeded_sampling_options(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_text_generation_replays_seeded_sampling_options()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut left = CpuReferenceTextGenerationService::new()?;
         let mut right = CpuReferenceTextGenerationService::new()?;
         let options = GenerationOptions {
@@ -10823,15 +10970,17 @@ mod tests {
         assert_eq!(first.output.text, "open agents");
         assert_eq!(first.termination, TerminationReason::EndOfSequence);
         assert_eq!(first.usage.input_tokens, 2);
-        assert!(service
-            .plan_digest(ReferenceWordDecoder::MODEL_ID)
-            .is_some());
+        assert!(
+            service
+                .plan_digest(ReferenceWordDecoder::MODEL_ID)
+                .is_some()
+        );
         Ok(())
     }
 
     #[test]
-    fn cpu_reference_text_generation_reports_cold_then_warm_provenance(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_text_generation_reports_cold_then_warm_provenance()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let request = GenerationRequest::new_text(
             "gen-ref-metrics-1",
@@ -10872,11 +11021,13 @@ mod tests {
                 .map(|value| value.execution_plan_digest.as_str()),
             Some(expected_plan_digest.as_str())
         );
-        assert!(first
-            .provenance
-            .as_ref()
-            .and_then(|value| value.delivery_proof.as_ref())
-            .is_some_and(|value| value.kernel_count > 0 && value.bytes_moved > 0));
+        assert!(
+            first
+                .provenance
+                .as_ref()
+                .and_then(|value| value.delivery_proof.as_ref())
+                .is_some_and(|value| value.kernel_count > 0 && value.bytes_moved > 0)
+        );
         assert_eq!(
             first
                 .provenance
@@ -10925,24 +11076,30 @@ mod tests {
                 .map(|value| value.growth.pages),
             Some(1)
         );
-        assert!(first
-            .metrics
-            .kv_residency
-            .as_ref()
-            .is_some_and(|value| value.has_tier(KvResidencyTier::Host)));
-        assert!(first
-            .provenance
-            .as_ref()
-            .and_then(|value| value.delivery_proof.as_ref())
-            .and_then(|value| value.kv_residency.as_ref())
-            .is_some_and(|value| value.has_tier(KvResidencyTier::Host)));
+        assert!(
+            first
+                .metrics
+                .kv_residency
+                .as_ref()
+                .is_some_and(|value| value.has_tier(KvResidencyTier::Host))
+        );
+        assert!(
+            first
+                .provenance
+                .as_ref()
+                .and_then(|value| value.delivery_proof.as_ref())
+                .and_then(|value| value.kv_residency.as_ref())
+                .is_some_and(|value| value.has_tier(KvResidencyTier::Host))
+        );
         assert!(first.metrics.total_duration_ns.is_some());
         assert!(first.metrics.load_duration_ns.is_some());
-        assert!(first
-            .provenance
-            .as_ref()
-            .and_then(|value| value.kv_cache_policy.as_ref())
-            .is_some());
+        assert!(
+            first
+                .provenance
+                .as_ref()
+                .and_then(|value| value.kv_cache_policy.as_ref())
+                .is_some()
+        );
 
         let second = service.generate(&GenerationRequest::new_text(
             "gen-ref-metrics-2",
@@ -10977,11 +11134,13 @@ mod tests {
                 .map(|value| value.execution_plan_digest.as_str()),
             Some(expected_plan_digest.as_str())
         );
-        assert!(second
-            .provenance
-            .as_ref()
-            .and_then(|value| value.delivery_proof.as_ref())
-            .is_some_and(|value| value.kernel_count > 0 && value.plan_cache_hits > 0));
+        assert!(
+            second
+                .provenance
+                .as_ref()
+                .and_then(|value| value.delivery_proof.as_ref())
+                .is_some_and(|value| value.kernel_count > 0 && value.plan_cache_hits > 0)
+        );
         assert_eq!(
             second.metrics.prompt_eval_count,
             Some(second.usage.input_tokens)
@@ -11005,19 +11164,21 @@ mod tests {
                 .map(|value| value.current.tokens),
             Some(second.usage.cache_tokens)
         );
-        assert!(second
-            .metrics
-            .kv_residency
-            .as_ref()
-            .is_some_and(|value| value.has_tier(KvResidencyTier::Host)));
+        assert!(
+            second
+                .metrics
+                .kv_residency
+                .as_ref()
+                .is_some_and(|value| value.has_tier(KvResidencyTier::Host))
+        );
         assert!(second.metrics.total_duration_ns.is_some());
         assert_eq!(second.metrics.load_duration_ns, Some(0));
         Ok(())
     }
 
     #[test]
-    fn cpu_reference_text_generation_reports_prefix_hits_and_bypasses(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_text_generation_reports_prefix_hits_and_bypasses()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let shared_tenant = PrefixCacheControl {
             mode: PrefixCacheMode::Auto,
@@ -11142,8 +11303,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_reference_text_generation_reports_prefix_control_refusals_and_invalidations(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_text_generation_reports_prefix_control_refusals_and_invalidations()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let tenant = String::from("tenant-a");
 
@@ -11244,14 +11405,16 @@ mod tests {
                 .and_then(|value| value.prefix_cache_refusal_reason),
             Some(PrefixCacheRefusalReason::ForcedInvalidation)
         );
-        assert!(invalidated
-            .provenance
-            .as_ref()
-            .map(|value| value.cache_observations.iter().any(|observation| {
-                observation.kind == CacheKind::PrefixCache
-                    && observation.trigger == Some(CacheInvalidationTrigger::ExplicitReset)
-            }))
-            .unwrap_or(false));
+        assert!(
+            invalidated
+                .provenance
+                .as_ref()
+                .map(|value| value.cache_observations.iter().any(|observation| {
+                    observation.kind == CacheKind::PrefixCache
+                        && observation.trigger == Some(CacheInvalidationTrigger::ExplicitReset)
+                }))
+                .unwrap_or(false)
+        );
 
         let rehit = service.generate(
             &GenerationRequest::new_text(
@@ -11307,8 +11470,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_reference_text_generation_can_truncate_oldest_prompt_tokens(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_text_generation_can_truncate_oldest_prompt_tokens()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let request = GenerationRequest::new_tokens(
             "gen-ref-context-truncate",
@@ -11364,8 +11527,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_reference_text_generation_session_budget_counts_existing_context(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_text_generation_session_budget_counts_existing_context()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let session = service.create_session(ReferenceWordDecoder::MODEL_ID)?;
         service.generate(&GenerationRequest::new_text(
@@ -11404,8 +11567,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_reference_text_generation_reuses_and_resets_sessions(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_text_generation_reuses_and_resets_sessions()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let session = service.create_session(ReferenceWordDecoder::MODEL_ID)?;
 
@@ -11470,8 +11633,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_reference_text_generation_truncates_stop_sequences(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_text_generation_truncates_stop_sequences()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let request = GenerationRequest::new_text(
             "gen-ref-stop",
@@ -11495,8 +11658,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_reference_text_generation_updates_loaded_model_residency(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn cpu_reference_text_generation_updates_loaded_model_residency()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut service = CpuReferenceTextGenerationService::new()?;
         let warmed = service.warm_model(ReferenceWordDecoder::MODEL_ID, 0)?;
         assert_eq!(warmed.residency.keep_alive_millis, 0);
@@ -11609,8 +11772,8 @@ mod tests {
     }
 
     #[test]
-    fn sharded_model_manifest_loader_round_trips_valid_manifest(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn sharded_model_manifest_loader_round_trips_valid_manifest()
+    -> Result<(), Box<dyn std::error::Error>> {
         let manifest = ShardedModelManifest::new(
             "layer-manifest",
             served_artifact_identity_for_decoder_model(

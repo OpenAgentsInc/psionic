@@ -1573,10 +1573,7 @@ fn run_cuda_generation_request(
             prefix_identity = Some(hit.identity);
             last_logits = hit.last_logits;
             exact_prompt_token = hit.greedy_token.map(TokenId);
-            super::InMemoryKvCache::new(
-                loaded_model.descriptor().config.max_context,
-                expected_kv_width,
-            )
+            hit.cache
         } else if shared_prefix_eligible {
             let lookup = super::controlled_prefix_lookup(
                 shared_prefixes,
@@ -1635,6 +1632,11 @@ fn run_cuda_generation_request(
                 kv_width: cache.width(),
             });
         }
+        let prompt_materialization_tokens = if request.session_id.is_some() {
+            prompt_tokens.as_slice().to_vec()
+        } else {
+            prompt_tokens.as_slice()[prefix_tokens_reused..].to_vec()
+        };
         let reserve_tokens = request.options.max_output_tokens.saturating_add(1);
         let mut cuda_cache = if shared_prefix_eligible && prefix_tokens_reused > 0 {
             if let Some(cache) = exact_cuda_cache {
@@ -1682,7 +1684,7 @@ fn run_cuda_generation_request(
                     ))
                 })?,
                 CudaStepOutputMode::FullLogits,
-                shared_prefix_eligible || request.session_id.is_some(),
+                false,
             );
             let step = step?;
             let perf = gpt_oss_perf.get_or_insert_with(GptOssPerformanceMetrics::default);
@@ -1693,9 +1695,6 @@ fn run_cuda_generation_request(
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
             super::accumulate_optional_gpt_oss_perf(&mut gpt_oss_perf, step.perf.as_ref());
-            if !step.key.is_empty() {
-                cache.append(*token, step.key.clone(), step.value.clone())?;
-            }
             token_history.push(token.as_u32());
             last_logits = step.logits;
             prompt_logits.push(last_logits.clone());
@@ -1703,7 +1702,6 @@ fn run_cuda_generation_request(
         let should_record_prompt_prefix = shared_prefix_eligible
             && prefix_tokens_reused != prompt_tokens.len()
             && super::prefix_recording_allowed(request);
-        let prompt_cache = should_record_prompt_prefix.then(|| cache.clone());
         let prompt_cuda_cache = should_record_prompt_prefix.then(|| cuda_cache.clone());
 
         let mut sampler = super::GenerationSampler::new(&request.options)?;
@@ -1773,7 +1771,7 @@ fn run_cuda_generation_request(
                 } else {
                     CudaStepOutputMode::FullLogits
                 },
-                request.session_id.is_some(),
+                false,
             );
             let step = step?;
             let perf = gpt_oss_perf.get_or_insert_with(GptOssPerformanceMetrics::default);
@@ -1784,9 +1782,6 @@ fn run_cuda_generation_request(
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
             super::accumulate_optional_gpt_oss_perf(&mut gpt_oss_perf, step.perf.as_ref());
-            if !step.key.is_empty() {
-                cache.append(pending_token, step.key.clone(), step.value.clone())?;
-            }
             token_history.push(pending_token.as_u32());
             let emitted_at = Instant::now();
             if first_token_emitted_at.is_none() {
@@ -1834,23 +1829,6 @@ fn run_cuda_generation_request(
             }
         };
 
-        if should_record_prompt_prefix {
-            if let (Some(prompt_cache), Some(prompt_cuda_cache)) =
-                (prompt_cache.as_ref(), prompt_cuda_cache.as_ref())
-            {
-                let recorded_identity = shared_prefixes.record(
-                    compatibility.clone(),
-                    &prompt_tokens,
-                    &prompt_logits,
-                    prompt_cache,
-                );
-                cuda_shared_prefixes.record(compatibility, &prompt_tokens, prompt_cuda_cache);
-                if prefix_state != super::PrefixCacheState::Hit || prefix_identity.is_none() {
-                    prefix_identity = Some(recorded_identity);
-                }
-            }
-        }
-
         let prompt_eval_duration_ns = prompt_eval_start
             .elapsed()
             .as_nanos()
@@ -1858,6 +1836,23 @@ fn run_cuda_generation_request(
             .unwrap_or(u64::MAX);
 
         let generated = TokenSequence::new(generated_tokens);
+        let mut final_materialization_tokens = Vec::with_capacity(
+            prompt_materialization_tokens
+                .len()
+                .saturating_add(generated.len()),
+        );
+        final_materialization_tokens.extend_from_slice(prompt_materialization_tokens.as_slice());
+        final_materialization_tokens.extend_from_slice(generated.as_slice());
+        let need_final_host_cache = request.session_id.is_some() || should_record_prompt_prefix;
+        let final_cache = need_final_host_cache
+            .then(|| {
+                materialize_cuda_cache_growth(
+                    &cache,
+                    &cuda_cache,
+                    final_materialization_tokens.as_slice(),
+                )
+            })
+            .transpose()?;
         if let Some(session_id) = &request.session_id {
             session_tokens.extend_from_slice(prompt_tokens.as_slice());
             session_tokens.extend_from_slice(generated.as_slice());
@@ -1865,7 +1860,11 @@ fn run_cuda_generation_request(
                 session_id,
                 loaded_model.descriptor(),
                 served_artifact.served_artifact_digest.as_str(),
-                cache.clone(),
+                final_cache.clone().ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(super::RuntimeError::Backend(
+                        String::from("missing materialized final host cache for session update"),
+                    ))
+                })?,
                 TokenSequence::new(session_tokens),
             )?;
         }
@@ -1884,10 +1883,11 @@ fn run_cuda_generation_request(
         );
         let device_kv_state =
             psionic_runtime::KvCacheState::paged(cache.page_layout(), cuda_cache.len());
+        let host_cache = final_cache.as_ref().unwrap_or(&cache);
         let kv_residency = super::host_device_kv_residency(
-            cache.policy(),
-            cache.state(),
-            device_kv_state,
+            host_cache.policy(),
+            host_cache.state(),
+            device_kv_state.clone(),
             previous_kv_state.tokens > 0 || prefix_tokens_reused > 0,
             Some(kv_cache.growth.clone()),
         );
@@ -1926,6 +1926,24 @@ fn run_cuda_generation_request(
         let delivery_plan_digest = execution_plan_digest
             .clone()
             .unwrap_or_else(|| loaded_model.plan_digest().to_string());
+        if should_record_prompt_prefix {
+            if let (Some(final_cache), Some(prompt_cuda_cache)) =
+                (final_cache.as_ref(), prompt_cuda_cache.as_ref())
+            {
+                let mut prompt_cache = final_cache.clone();
+                prompt_cache.truncate(prompt_tokens.len());
+                let recorded_identity = shared_prefixes.record(
+                    compatibility.clone(),
+                    &prompt_tokens,
+                    &prompt_logits,
+                    &prompt_cache,
+                );
+                cuda_shared_prefixes.record(compatibility, &prompt_tokens, prompt_cuda_cache);
+                if prefix_state != super::PrefixCacheState::Hit || prefix_identity.is_none() {
+                    prefix_identity = Some(recorded_identity);
+                }
+            }
+        }
         let provenance = super::GenerationProvenance {
             served_artifact,
             adapter_serving: None,
@@ -1937,11 +1955,21 @@ fn run_cuda_generation_request(
             memory_plan,
             residency_policy,
             residency_snapshot,
-            kv_cache_policy: Some(cache.policy().clone()),
-            kv_ownership: cache.ownership_since_with_current_state(
-                &request_kv_checkpoint,
-                psionic_runtime::KvCacheState::paged(cache.page_layout(), cuda_cache.len()),
-            ),
+            kv_cache_policy: Some(host_cache.policy().clone()),
+            kv_ownership: final_cache
+                .as_ref()
+                .and_then(|value| {
+                    value.ownership_since_with_current_state(
+                        &request_kv_checkpoint,
+                        device_kv_state.clone(),
+                    )
+                })
+                .or_else(|| {
+                    cache.ownership_since_with_device_tokens(
+                        &request_kv_checkpoint,
+                        device_kv_state.tokens,
+                    )
+                }),
             prefix_cache_control: Some(request.prefix_cache_control.clone()),
             prefix_cache_state: Some(prefix_state),
             prefix_cache_refusal_reason,
@@ -2135,6 +2163,11 @@ fn run_cuda_hybrid_generation_request(
                 kv_width: cache.width(),
             });
         }
+        let prompt_materialization_tokens = if request.session_id.is_some() {
+            prompt_tokens.as_slice().to_vec()
+        } else {
+            prompt_tokens.as_slice()[prefix_tokens_reused..].to_vec()
+        };
         let reserve_tokens = request.options.max_output_tokens.saturating_add(1);
         let mut cuda_cache = CudaKvCacheMirror::from_host_cache(backend, &cache, reserve_tokens)?;
         cache.bind_owner(super::request_kv_owner(
@@ -2150,11 +2183,11 @@ fn run_cuda_hybrid_generation_request(
             let step = loaded_model.inner.forward_step_with_output_mode(
                 backend,
                 *token,
-                cache.len(),
+                cuda_cache.len(),
                 &cache,
                 CudaStepOutputMode::FullLogits,
                 Some(&mut cuda_cache),
-                true,
+                false,
             )?;
             let perf = gpt_oss_perf.get_or_insert_with(GptOssPerformanceMetrics::default);
             perf.stage_timings.step_wall_ns = perf
@@ -2167,7 +2200,6 @@ fn run_cuda_hybrid_generation_request(
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
             super::accumulate_optional_gpt_oss_perf(&mut gpt_oss_perf, step.perf.as_ref());
-            cache.append(*token, step.key, step.value)?;
             token_history.push(token.as_u32());
             last_logits = step.logits;
             prompt_logits.push(last_logits.clone());
@@ -2175,7 +2207,6 @@ fn run_cuda_hybrid_generation_request(
         let should_record_prompt_prefix = shared_prefix_eligible
             && prefix_tokens_reused != prompt_tokens.len()
             && super::prefix_recording_allowed(request);
-        let prompt_cache = should_record_prompt_prefix.then(|| cache.clone());
 
         let mut sampler = super::GenerationSampler::new(&request.options)?;
         let mut generated_tokens = Vec::new();
@@ -2196,12 +2227,7 @@ fn run_cuda_hybrid_generation_request(
             .stage_timings
             .sampling_ns
             .saturating_add(duration_ns(sampling_start));
-        let can_skip_host_kv_materialization = request.session_id.is_none()
-            && use_cuda_argmax_fast_path
-            && loaded_model
-                .inner
-                .supports_hybrid_cuda_device_argmax_fast_path();
-        let mut generated_cache_tokens = cache.len();
+        let mut generated_cache_tokens = cuda_cache.len();
         let prefill_handoff_state =
             psionic_runtime::KvCacheState::paged(cache.page_layout(), generated_cache_tokens);
         let termination = loop {
@@ -2228,7 +2254,7 @@ fn run_cuda_hybrid_generation_request(
                     CudaStepOutputMode::FullLogits
                 },
                 Some(&mut cuda_cache),
-                !can_skip_host_kv_materialization,
+                false,
             )?;
             let perf = gpt_oss_perf.get_or_insert_with(GptOssPerformanceMetrics::default);
             perf.stage_timings.step_wall_ns = perf
@@ -2241,12 +2267,7 @@ fn run_cuda_hybrid_generation_request(
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
             super::accumulate_optional_gpt_oss_perf(&mut gpt_oss_perf, step.perf.as_ref());
-            if can_skip_host_kv_materialization {
-                generated_cache_tokens = generated_cache_tokens.saturating_add(1);
-            } else {
-                cache.append(pending_token, step.key.clone(), step.value.clone())?;
-                generated_cache_tokens = cache.len();
-            }
+            generated_cache_tokens = cuda_cache.len();
             token_history.push(pending_token.as_u32());
             let emitted_at = Instant::now();
             if first_token_emitted_at.is_none() {
@@ -2294,20 +2315,6 @@ fn run_cuda_hybrid_generation_request(
             }
         };
 
-        if should_record_prompt_prefix {
-            if let Some(prompt_cache) = prompt_cache.as_ref() {
-                let recorded_identity = shared_prefixes.record(
-                    compatibility,
-                    &prompt_tokens,
-                    &prompt_logits,
-                    prompt_cache,
-                );
-                if prefix_state != super::PrefixCacheState::Hit || prefix_identity.is_none() {
-                    prefix_identity = Some(recorded_identity);
-                }
-            }
-        }
-
         let prompt_eval_duration_ns = prompt_eval_start
             .elapsed()
             .as_nanos()
@@ -2315,6 +2322,23 @@ fn run_cuda_hybrid_generation_request(
             .unwrap_or(u64::MAX);
 
         let generated = TokenSequence::new(generated_tokens);
+        let mut final_materialization_tokens = Vec::with_capacity(
+            prompt_materialization_tokens
+                .len()
+                .saturating_add(generated.len()),
+        );
+        final_materialization_tokens.extend_from_slice(prompt_materialization_tokens.as_slice());
+        final_materialization_tokens.extend_from_slice(generated.as_slice());
+        let need_final_host_cache = request.session_id.is_some() || should_record_prompt_prefix;
+        let final_cache = need_final_host_cache
+            .then(|| {
+                materialize_cuda_cache_growth(
+                    &cache,
+                    &cuda_cache,
+                    final_materialization_tokens.as_slice(),
+                )
+            })
+            .transpose()?;
         if let Some(session_id) = &request.session_id {
             session_tokens.extend_from_slice(prompt_tokens.as_slice());
             session_tokens.extend_from_slice(generated.as_slice());
@@ -2322,7 +2346,11 @@ fn run_cuda_hybrid_generation_request(
                 session_id,
                 loaded_model.descriptor(),
                 served_artifact.served_artifact_digest.as_str(),
-                cache.clone(),
+                final_cache.clone().ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(super::RuntimeError::Backend(
+                        String::from("missing materialized final host cache for session update"),
+                    ))
+                })?,
                 TokenSequence::new(session_tokens),
             )?;
         }
@@ -2338,10 +2366,11 @@ fn run_cuda_hybrid_generation_request(
         );
         let device_kv_state =
             psionic_runtime::KvCacheState::paged(cache.page_layout(), generated_cache_tokens);
+        let host_cache = final_cache.as_ref().unwrap_or(&cache);
         let kv_residency = super::host_device_kv_residency(
-            cache.policy(),
-            cache.state(),
-            device_kv_state,
+            host_cache.policy(),
+            host_cache.state(),
+            device_kv_state.clone(),
             previous_kv_state.tokens > 0 || prefix_tokens_reused > 0,
             Some(kv_cache.growth.clone()),
         );
@@ -2380,6 +2409,21 @@ fn run_cuda_hybrid_generation_request(
         let delivery_plan_digest = execution_plan_digest
             .clone()
             .unwrap_or_else(|| loaded_model.plan_digest().to_string());
+        if should_record_prompt_prefix {
+            if let Some(final_cache) = final_cache.as_ref() {
+                let mut prompt_cache = final_cache.clone();
+                prompt_cache.truncate(prompt_tokens.len());
+                let recorded_identity = shared_prefixes.record(
+                    compatibility,
+                    &prompt_tokens,
+                    &prompt_logits,
+                    &prompt_cache,
+                );
+                if prefix_state != super::PrefixCacheState::Hit || prefix_identity.is_none() {
+                    prefix_identity = Some(recorded_identity);
+                }
+            }
+        }
         let provenance = super::GenerationProvenance {
             served_artifact,
             adapter_serving: None,
@@ -2391,11 +2435,21 @@ fn run_cuda_hybrid_generation_request(
             memory_plan,
             residency_policy,
             residency_snapshot,
-            kv_cache_policy: Some(cache.policy().clone()),
-            kv_ownership: cache.ownership_since_with_current_state(
-                &request_kv_checkpoint,
-                psionic_runtime::KvCacheState::paged(cache.page_layout(), generated_cache_tokens),
-            ),
+            kv_cache_policy: Some(host_cache.policy().clone()),
+            kv_ownership: final_cache
+                .as_ref()
+                .and_then(|value| {
+                    value.ownership_since_with_current_state(
+                        &request_kv_checkpoint,
+                        device_kv_state.clone(),
+                    )
+                })
+                .or_else(|| {
+                    cache.ownership_since_with_device_tokens(
+                        &request_kv_checkpoint,
+                        device_kv_state.tokens,
+                    )
+                }),
             prefix_cache_control: Some(request.prefix_cache_control.clone()),
             prefix_cache_state: Some(prefix_state),
             prefix_cache_refusal_reason,
@@ -4341,22 +4395,6 @@ impl GptOssCudaModelInner {
 
     fn supports_cuda_decode_plan(&self) -> bool {
         !self.uses_host_backed_weights()
-    }
-
-    fn supports_hybrid_cuda_device_argmax_fast_path(&self) -> bool {
-        self.family_metadata.expert_used_count == Some(4)
-            && self.layers.iter().any(|layer| {
-                layer.feed_forward_gate_up_experts_weight.host.is_some()
-                    && layer.feed_forward_down_experts_weight.host.is_some()
-            })
-            && self.layers.iter().all(|layer| {
-                can_use_hybrid_cuda_hidden_residency_layer(
-                    layer,
-                    self.descriptor.config.hidden_size,
-                )
-            })
-            && self.output.storage.is_some()
-            && self.output_norm_device.is_some()
     }
 
     fn cache_width(&self) -> usize {
@@ -11971,6 +12009,77 @@ impl CudaKvCacheMirror {
     fn len(&self) -> usize {
         self.len
     }
+}
+
+fn append_cuda_cache_growth_to_host_cache(
+    cache: &mut super::InMemoryKvCache,
+    cuda_cache: &CudaKvCacheMirror,
+    tokens: &[TokenId],
+) -> Result<(), ReferenceTextGenerationError> {
+    if tokens.is_empty() {
+        return Ok(());
+    }
+    if cache.width() != cuda_cache.width {
+        return Err(ReferenceTextGenerationError::UnsupportedCacheGeometry {
+            expected_kv_width: cache.width(),
+            kv_width: cuda_cache.width,
+        });
+    }
+
+    let start_index = cache.len();
+    let end_index = start_index.saturating_add(tokens.len());
+    if end_index > cuda_cache.len() {
+        return Err(ReferenceTextGenerationError::Runtime(
+            super::RuntimeError::Backend(format!(
+                "cannot materialize host cache beyond cuda cache length: start={} requested={} len={}",
+                start_index,
+                tokens.len(),
+                cuda_cache.len(),
+            )),
+        ));
+    }
+
+    let byte_offset = start_index
+        .saturating_mul(cuda_cache.width)
+        .saturating_mul(std::mem::size_of::<u16>());
+    let byte_len = tokens
+        .len()
+        .saturating_mul(cuda_cache.width)
+        .saturating_mul(std::mem::size_of::<u16>());
+    let keys = f16_bytes_to_f32_vec(
+        cuda_cache
+            .key_buffer
+            .read_bytes_at_offset(byte_offset, byte_len)?
+            .as_slice(),
+    )
+    .map_err(ReferenceTextGenerationError::Runtime)?;
+    let values = f16_bytes_to_f32_vec(
+        cuda_cache
+            .value_buffer
+            .read_bytes_at_offset(byte_offset, byte_len)?
+            .as_slice(),
+    )
+    .map_err(ReferenceTextGenerationError::Runtime)?;
+
+    for ((token, key), value) in tokens
+        .iter()
+        .copied()
+        .zip(keys.chunks_exact(cuda_cache.width))
+        .zip(values.chunks_exact(cuda_cache.width))
+    {
+        cache.append(token, key.to_vec(), value.to_vec())?;
+    }
+    Ok(())
+}
+
+fn materialize_cuda_cache_growth(
+    cache: &super::InMemoryKvCache,
+    cuda_cache: &CudaKvCacheMirror,
+    tokens: &[TokenId],
+) -> Result<super::InMemoryKvCache, ReferenceTextGenerationError> {
+    let mut materialized = cache.clone();
+    append_cuda_cache_growth_to_host_cache(&mut materialized, cuda_cache, tokens)?;
+    Ok(materialized)
 }
 
 #[derive(Clone, Debug)]

@@ -27,13 +27,19 @@ than just run tensor math.
 
 ## KV Cache Requirements
 
-The phase 0 bootstrap does not implement KV cache support. The architecture must
-leave room for:
+Psionic now has served KV-cache support. The remaining completion bar is not
+"whether KV cache exists." The remaining bar is whether the runtime can publish
+truthful ownership, residency, reuse, and refusal behavior across host and
+device paths.
+
+The architecture must support:
 
 - in-memory KV cache
 - paged KV cache
 - tiered KV cache
 - concurrency-safe session ownership
+- device-resident active decode state
+- deferred host materialization for persistence, replay, and fallback paths
 
 ## Phase 0 Definition
 
