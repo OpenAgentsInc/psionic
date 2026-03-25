@@ -33,6 +33,12 @@ Run the harness from the repo root:
 scripts/release/check-psionic-train-checkpoint-recovery.sh
 ```
 
+The repo now also ships the distributed extension checker:
+
+```bash
+scripts/check-sharded-distributed-checkpoint-contract.sh
+```
+
 ## Workload Shape
 
 The current reference path proves one bounded but real checkpoint-control
@@ -85,3 +91,17 @@ This issue intentionally does not claim:
 
 Those remain later issues. This issue makes checkpoint pointer and manifest
 discipline, explicit recovery modes, and restore receipts real first.
+
+## Distributed Extension
+
+`XTRAIN-7` extends this older pointer-first contract with one explicit
+distributed layer in
+`crates/psionic-train/src/distributed_checkpoint_contract.rs`, the generator
+binary `sharded_distributed_checkpoint_contract`, the checker
+`scripts/check-sharded-distributed-checkpoint-contract.sh`, the focused
+reference doc `docs/SHARDED_DISTRIBUTED_CHECKPOINT_REFERENCE.md`, and the
+fixture `fixtures/training/sharded_distributed_checkpoint_contract_v1.json`.
+That layer keeps the old `CheckpointManifest` and `CheckpointPointer` authority
+objects, but it adds provider-neutral parameter-shard and optimizer-shard
+placements, typed shard upload receipts including refused partial uploads, and
+deterministic dense-rank restore assignments.

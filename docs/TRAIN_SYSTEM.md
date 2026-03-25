@@ -121,6 +121,17 @@ one dataset family and one checkpoint family. It keeps work classes explicit
 instead of flattening contributor windows into dense ranks or inventing
 provider-specific planner vocabularies.
 
+The repo now also owns the first provider-neutral distributed checkpoint
+contract in `crates/psionic-train/src/distributed_checkpoint_contract.rs`, the
+binary `sharded_distributed_checkpoint_contract`, the checker
+`scripts/check-sharded-distributed-checkpoint-contract.sh`, the focused
+reference doc `docs/SHARDED_DISTRIBUTED_CHECKPOINT_REFERENCE.md`, and the
+fixture `fixtures/training/sharded_distributed_checkpoint_contract_v1.json`.
+That surface extends the older pointer-first checkpoint recovery layer with
+typed parameter-shard and optimizer-shard placements, durable and refused shard
+upload receipts, and deterministic dense-rank restore assignments under one
+provider-neutral checkpoint family.
+
 The first local mixed-hardware swarm lane now also has a canonical machine-
 legible contract in `crates/psionic-train/src/swarm_open_adapter.rs` plus the
 committed fixture `fixtures/swarm/first_swarm_run_contract_v1.json`. That

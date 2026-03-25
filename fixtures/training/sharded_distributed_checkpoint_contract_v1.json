@@ -1,0 +1,1031 @@
+{
+  "schema_version": "psionic.sharded_distributed_checkpoint_contract.v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "checkpoint_manifest": {
+    "scope": {
+      "kind": "run",
+      "scope_id": "psion-xprovider-pretrain-step-2048"
+    },
+    "checkpoint_family": "psion.cross_provider.pretrain.v1",
+    "checkpoint": {
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "stream_id": "stream-psion-xprovider-pretrain-step-2048",
+      "manifest_digest": "manifest-psion-xprovider-pretrain-step-2048",
+      "object_digest": "object-psion-xprovider-pretrain-step-2048",
+      "writer_node_id": "runpod-rank-0",
+      "membership_epoch": 12,
+      "cluster_state_digest": "cluster-state-digest-psion-xprovider-step-2048",
+      "topology_digest": "xtrain-dense-topology-step-2048",
+      "started_at_ms": 1742705060000,
+      "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+      "step": 2048,
+      "durable_at_ms": 1742705120000
+    },
+    "shards": [
+      {
+        "shard_id": "parameter-shard-0",
+        "manifest": {
+          "stream_id": "stream-parameter-shard-0",
+          "manifest_digest": "385727e19dce434c80ee76da129bcb3a48ee5df3e15bfce52b12349b627a5139",
+          "subject": "checkpoint",
+          "object_digest": "2ad2643fc5834e01243de4338b51149cebe95737d6bec5b34bd0d9a21af52e1f",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-0"
+      },
+      {
+        "shard_id": "optimizer-shard-0",
+        "manifest": {
+          "stream_id": "stream-optimizer-shard-0",
+          "manifest_digest": "28cf6de5ed32be0d51939089d6f491a441b7c8667a37a064d0ca1250dcb8679b",
+          "subject": "checkpoint",
+          "object_digest": "1aeb2c00d5737dffa61c0c0db0e2daa780f0fc77bc469880a2afc04f7971de54",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-0"
+      },
+      {
+        "shard_id": "parameter-shard-1",
+        "manifest": {
+          "stream_id": "stream-parameter-shard-1",
+          "manifest_digest": "fb22c75358695ae7d64044b91bbceb431538e6e010e85230a5536335a0c511b8",
+          "subject": "checkpoint",
+          "object_digest": "199860def68daa61ac33cc1212644cf2c5bbcf2c5509672cbe101be8531faebf",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-1"
+      },
+      {
+        "shard_id": "optimizer-shard-1",
+        "manifest": {
+          "stream_id": "stream-optimizer-shard-1",
+          "manifest_digest": "0eeda4dc6f5e768b140ae01f7bea1f442aff6ed38c9aac88d2be40b63a6da79f",
+          "subject": "checkpoint",
+          "object_digest": "9f62298839e4c032d0418cf59d0361ff25546fa26994abe156aabdcef7b86802",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-1"
+      },
+      {
+        "shard_id": "parameter-shard-2",
+        "manifest": {
+          "stream_id": "stream-parameter-shard-2",
+          "manifest_digest": "55f1eacead422525b22164982e2a77bb38d85824521a0d115a1681ac51196c71",
+          "subject": "checkpoint",
+          "object_digest": "5a891d4a53270fbe63a59dbb1901025dab77a2a423fc4cf8f3310831d3c26300",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-2"
+      },
+      {
+        "shard_id": "optimizer-shard-2",
+        "manifest": {
+          "stream_id": "stream-optimizer-shard-2",
+          "manifest_digest": "250edc45ee0384ad4bb189fc1bf779b81ad4507fad17e65f4ba6fa80cc581ce5",
+          "subject": "checkpoint",
+          "object_digest": "65873388a5b092aa60cfa6e2c646f59797f2fd3ff1d815fb5e561355d28ae7ee",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-2"
+      },
+      {
+        "shard_id": "parameter-shard-3",
+        "manifest": {
+          "stream_id": "stream-parameter-shard-3",
+          "manifest_digest": "ff7dc3073e7f8693bc9519a0e55f6d2eec0687b888489e45864cff79ce172202",
+          "subject": "checkpoint",
+          "object_digest": "83bad225ceecb078b77e7bd89a4f3870e8149196b8f88b18015ad54274801d51",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-3"
+      },
+      {
+        "shard_id": "optimizer-shard-3",
+        "manifest": {
+          "stream_id": "stream-optimizer-shard-3",
+          "manifest_digest": "5e3ecff154a4de598ef694cbac9218f691fb89b8559d1b111525ec91dc08e543",
+          "subject": "checkpoint",
+          "object_digest": "33cfe28582c6cf9a92f39d4b5c050027bb1954f13750b16984b5e308309d7ed7",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-3"
+      },
+      {
+        "shard_id": "parameter-shard-4",
+        "manifest": {
+          "stream_id": "stream-parameter-shard-4",
+          "manifest_digest": "ac54b16a223c553493a94055ad4d4b9ee6049559367f6dc201c12d1f377457e5",
+          "subject": "checkpoint",
+          "object_digest": "e551cd6052b2667432c165cd510344ff7adca7d5458058ecbb8ed1e6f9ca9c85",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-4"
+      },
+      {
+        "shard_id": "optimizer-shard-4",
+        "manifest": {
+          "stream_id": "stream-optimizer-shard-4",
+          "manifest_digest": "0e7315028095eebc5a8d1f131ccd1df5931183bcfbd9ed142f01ccc12f163e6b",
+          "subject": "checkpoint",
+          "object_digest": "f15e028e658e606653e49db182d291edf46d2ea231b1126216120edcf89a22c6",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-4"
+      },
+      {
+        "shard_id": "parameter-shard-5",
+        "manifest": {
+          "stream_id": "stream-parameter-shard-5",
+          "manifest_digest": "6dcc72a2235abccee5a4a8d714a1a681ecb8065c05b0148f7aabe5f53f6bba5a",
+          "subject": "checkpoint",
+          "object_digest": "8b76941335551388ca1f09e234917e3e9532194ec9ed36583a337461039d4c6a",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-5"
+      },
+      {
+        "shard_id": "optimizer-shard-5",
+        "manifest": {
+          "stream_id": "stream-optimizer-shard-5",
+          "manifest_digest": "c246ff2f3f8b107737026b26be954ff8acb5b35f5a0a3ae30c5633c5133ea490",
+          "subject": "checkpoint",
+          "object_digest": "cb6acdc7eba1b3a83e5f74175b5c9d4985d672d7191bb7c48c315f686849df30",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-5"
+      },
+      {
+        "shard_id": "parameter-shard-6",
+        "manifest": {
+          "stream_id": "stream-parameter-shard-6",
+          "manifest_digest": "eda4c77a5d912d8025ed549051b781a296bfaaa76ba2643f9f7344d8aa3e6860",
+          "subject": "checkpoint",
+          "object_digest": "9b95bc0cd97e3981909cce376ef15ee7e4ec83b950b4db690bd6aa1f8f291f36",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-6"
+      },
+      {
+        "shard_id": "optimizer-shard-6",
+        "manifest": {
+          "stream_id": "stream-optimizer-shard-6",
+          "manifest_digest": "b6050d2fb69b1c359d14f6634a029f78f61cf56fad1ac2335bedc1f20b74e68b",
+          "subject": "checkpoint",
+          "object_digest": "107721192ffbb30d566b2e0600e62b0eaab27d7d27d3cc0e410dc902b4ee1245",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-6"
+      },
+      {
+        "shard_id": "parameter-shard-7",
+        "manifest": {
+          "stream_id": "stream-parameter-shard-7",
+          "manifest_digest": "65336463ab53d26904d175310470a835b474c9358347294bee73d189d404b5b3",
+          "subject": "checkpoint",
+          "object_digest": "49aefecc6a25d7f20d00f979196664daf3b1ec7d77c3ceee5768792d312b0905",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-7"
+      },
+      {
+        "shard_id": "optimizer-shard-7",
+        "manifest": {
+          "stream_id": "stream-optimizer-shard-7",
+          "manifest_digest": "ab3df110c4e91b04315ac06c6746a27d0dbf09aedb251e82074e1ff8be2675ab",
+          "subject": "checkpoint",
+          "object_digest": "ea133af610782584c8fb1d38546941c2c9cad781ee28e15ea076b9f62d5f33f2",
+          "total_bytes": 90,
+          "chunk_count": 6,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+            "step": 2048
+          }
+        },
+        "writer_node_id": "runpod-rank-7"
+      }
+    ],
+    "durability": "durable",
+    "created_at_ms": 1742705120000,
+    "manifest_digest": "802aa997400ce2259031a375c1cd38c472ede21accee09809c2befe93eeb494f"
+  },
+  "checkpoint_pointer": {
+    "scope": {
+      "kind": "run",
+      "scope_id": "psion-xprovider-pretrain-step-2048"
+    },
+    "checkpoint_family": "psion.cross_provider.pretrain.v1",
+    "checkpoint": {
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "stream_id": "stream-psion-xprovider-pretrain-step-2048",
+      "manifest_digest": "manifest-psion-xprovider-pretrain-step-2048",
+      "object_digest": "object-psion-xprovider-pretrain-step-2048",
+      "writer_node_id": "runpod-rank-0",
+      "membership_epoch": 12,
+      "cluster_state_digest": "cluster-state-digest-psion-xprovider-step-2048",
+      "topology_digest": "xtrain-dense-topology-step-2048",
+      "started_at_ms": 1742705060000,
+      "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+      "step": 2048,
+      "durable_at_ms": 1742705120000
+    },
+    "manifest_digest": "802aa997400ce2259031a375c1cd38c472ede21accee09809c2befe93eeb494f",
+    "updated_at_ms": 1742705120600,
+    "pointer_digest": "65fe61fcbc7d2fa054b316aea46fb9216678b72a98653a51c4ac0e8987e77e1b"
+  },
+  "shard_placements": [
+    {
+      "shard_id": "parameter-shard-0",
+      "shard_role": "parameter_state",
+      "dense_rank": 0,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-0",
+      "lineage_slot_id": "lineage.checkpoint.parameter.0",
+      "manifest": {
+        "stream_id": "stream-parameter-shard-0",
+        "manifest_digest": "385727e19dce434c80ee76da129bcb3a48ee5df3e15bfce52b12349b627a5139",
+        "subject": "checkpoint",
+        "object_digest": "2ad2643fc5834e01243de4338b51149cebe95737d6bec5b34bd0d9a21af52e1f",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "optimizer-shard-0",
+      "shard_role": "optimizer_state",
+      "dense_rank": 0,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-0",
+      "lineage_slot_id": "lineage.checkpoint.optimizer.0",
+      "manifest": {
+        "stream_id": "stream-optimizer-shard-0",
+        "manifest_digest": "28cf6de5ed32be0d51939089d6f491a441b7c8667a37a064d0ca1250dcb8679b",
+        "subject": "checkpoint",
+        "object_digest": "1aeb2c00d5737dffa61c0c0db0e2daa780f0fc77bc469880a2afc04f7971de54",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "parameter-shard-1",
+      "shard_role": "parameter_state",
+      "dense_rank": 1,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-1",
+      "lineage_slot_id": "lineage.checkpoint.parameter.1",
+      "manifest": {
+        "stream_id": "stream-parameter-shard-1",
+        "manifest_digest": "fb22c75358695ae7d64044b91bbceb431538e6e010e85230a5536335a0c511b8",
+        "subject": "checkpoint",
+        "object_digest": "199860def68daa61ac33cc1212644cf2c5bbcf2c5509672cbe101be8531faebf",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "optimizer-shard-1",
+      "shard_role": "optimizer_state",
+      "dense_rank": 1,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-1",
+      "lineage_slot_id": "lineage.checkpoint.optimizer.1",
+      "manifest": {
+        "stream_id": "stream-optimizer-shard-1",
+        "manifest_digest": "0eeda4dc6f5e768b140ae01f7bea1f442aff6ed38c9aac88d2be40b63a6da79f",
+        "subject": "checkpoint",
+        "object_digest": "9f62298839e4c032d0418cf59d0361ff25546fa26994abe156aabdcef7b86802",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "parameter-shard-2",
+      "shard_role": "parameter_state",
+      "dense_rank": 2,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-2",
+      "lineage_slot_id": "lineage.checkpoint.parameter.2",
+      "manifest": {
+        "stream_id": "stream-parameter-shard-2",
+        "manifest_digest": "55f1eacead422525b22164982e2a77bb38d85824521a0d115a1681ac51196c71",
+        "subject": "checkpoint",
+        "object_digest": "5a891d4a53270fbe63a59dbb1901025dab77a2a423fc4cf8f3310831d3c26300",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "optimizer-shard-2",
+      "shard_role": "optimizer_state",
+      "dense_rank": 2,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-2",
+      "lineage_slot_id": "lineage.checkpoint.optimizer.2",
+      "manifest": {
+        "stream_id": "stream-optimizer-shard-2",
+        "manifest_digest": "250edc45ee0384ad4bb189fc1bf779b81ad4507fad17e65f4ba6fa80cc581ce5",
+        "subject": "checkpoint",
+        "object_digest": "65873388a5b092aa60cfa6e2c646f59797f2fd3ff1d815fb5e561355d28ae7ee",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "parameter-shard-3",
+      "shard_role": "parameter_state",
+      "dense_rank": 3,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-3",
+      "lineage_slot_id": "lineage.checkpoint.parameter.3",
+      "manifest": {
+        "stream_id": "stream-parameter-shard-3",
+        "manifest_digest": "ff7dc3073e7f8693bc9519a0e55f6d2eec0687b888489e45864cff79ce172202",
+        "subject": "checkpoint",
+        "object_digest": "83bad225ceecb078b77e7bd89a4f3870e8149196b8f88b18015ad54274801d51",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "optimizer-shard-3",
+      "shard_role": "optimizer_state",
+      "dense_rank": 3,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-3",
+      "lineage_slot_id": "lineage.checkpoint.optimizer.3",
+      "manifest": {
+        "stream_id": "stream-optimizer-shard-3",
+        "manifest_digest": "5e3ecff154a4de598ef694cbac9218f691fb89b8559d1b111525ec91dc08e543",
+        "subject": "checkpoint",
+        "object_digest": "33cfe28582c6cf9a92f39d4b5c050027bb1954f13750b16984b5e308309d7ed7",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "parameter-shard-4",
+      "shard_role": "parameter_state",
+      "dense_rank": 4,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-4",
+      "lineage_slot_id": "lineage.checkpoint.parameter.4",
+      "manifest": {
+        "stream_id": "stream-parameter-shard-4",
+        "manifest_digest": "ac54b16a223c553493a94055ad4d4b9ee6049559367f6dc201c12d1f377457e5",
+        "subject": "checkpoint",
+        "object_digest": "e551cd6052b2667432c165cd510344ff7adca7d5458058ecbb8ed1e6f9ca9c85",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "optimizer-shard-4",
+      "shard_role": "optimizer_state",
+      "dense_rank": 4,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-4",
+      "lineage_slot_id": "lineage.checkpoint.optimizer.4",
+      "manifest": {
+        "stream_id": "stream-optimizer-shard-4",
+        "manifest_digest": "0e7315028095eebc5a8d1f131ccd1df5931183bcfbd9ed142f01ccc12f163e6b",
+        "subject": "checkpoint",
+        "object_digest": "f15e028e658e606653e49db182d291edf46d2ea231b1126216120edcf89a22c6",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "parameter-shard-5",
+      "shard_role": "parameter_state",
+      "dense_rank": 5,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-5",
+      "lineage_slot_id": "lineage.checkpoint.parameter.5",
+      "manifest": {
+        "stream_id": "stream-parameter-shard-5",
+        "manifest_digest": "6dcc72a2235abccee5a4a8d714a1a681ecb8065c05b0148f7aabe5f53f6bba5a",
+        "subject": "checkpoint",
+        "object_digest": "8b76941335551388ca1f09e234917e3e9532194ec9ed36583a337461039d4c6a",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "optimizer-shard-5",
+      "shard_role": "optimizer_state",
+      "dense_rank": 5,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-5",
+      "lineage_slot_id": "lineage.checkpoint.optimizer.5",
+      "manifest": {
+        "stream_id": "stream-optimizer-shard-5",
+        "manifest_digest": "c246ff2f3f8b107737026b26be954ff8acb5b35f5a0a3ae30c5633c5133ea490",
+        "subject": "checkpoint",
+        "object_digest": "cb6acdc7eba1b3a83e5f74175b5c9d4985d672d7191bb7c48c315f686849df30",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "parameter-shard-6",
+      "shard_role": "parameter_state",
+      "dense_rank": 6,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-6",
+      "lineage_slot_id": "lineage.checkpoint.parameter.6",
+      "manifest": {
+        "stream_id": "stream-parameter-shard-6",
+        "manifest_digest": "eda4c77a5d912d8025ed549051b781a296bfaaa76ba2643f9f7344d8aa3e6860",
+        "subject": "checkpoint",
+        "object_digest": "9b95bc0cd97e3981909cce376ef15ee7e4ec83b950b4db690bd6aa1f8f291f36",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "optimizer-shard-6",
+      "shard_role": "optimizer_state",
+      "dense_rank": 6,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-6",
+      "lineage_slot_id": "lineage.checkpoint.optimizer.6",
+      "manifest": {
+        "stream_id": "stream-optimizer-shard-6",
+        "manifest_digest": "b6050d2fb69b1c359d14f6634a029f78f61cf56fad1ac2335bedc1f20b74e68b",
+        "subject": "checkpoint",
+        "object_digest": "107721192ffbb30d566b2e0600e62b0eaab27d7d27d3cc0e410dc902b4ee1245",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "parameter-shard-7",
+      "shard_role": "parameter_state",
+      "dense_rank": 7,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-7",
+      "lineage_slot_id": "lineage.checkpoint.parameter.7",
+      "manifest": {
+        "stream_id": "stream-parameter-shard-7",
+        "manifest_digest": "65336463ab53d26904d175310470a835b474c9358347294bee73d189d404b5b3",
+        "subject": "checkpoint",
+        "object_digest": "49aefecc6a25d7f20d00f979196664daf3b1ec7d77c3ceee5768792d312b0905",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    },
+    {
+      "shard_id": "optimizer-shard-7",
+      "shard_role": "optimizer_state",
+      "dense_rank": 7,
+      "producing_source_id": "runpod_8xh100_dense_node",
+      "writer_node_id": "runpod-rank-7",
+      "lineage_slot_id": "lineage.checkpoint.optimizer.7",
+      "manifest": {
+        "stream_id": "stream-optimizer-shard-7",
+        "manifest_digest": "ab3df110c4e91b04315ac06c6746a27d0dbf09aedb251e82074e1ff8be2675ab",
+        "subject": "checkpoint",
+        "object_digest": "ea133af610782584c8fb1d38546941c2c9cad781ee28e15ea076b9f62d5f33f2",
+        "total_bytes": 90,
+        "chunk_count": 6,
+        "chunk_bytes": 16,
+        "encoding": "safetensors",
+        "checkpoint_binding": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "checkpoint_ref": "checkpoint://psion/xprovider/pretrain/2048",
+          "step": 2048
+        }
+      }
+    }
+  ],
+  "shard_upload_receipts": [
+    {
+      "receipt_id": "upload-optimizer-shard-0-1",
+      "shard_id": "optimizer-shard-0",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "google_l4_validator_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "d6db594f283738584e2999b58ba64f2d6245e70f959be9fc74fe2ba42661e902"
+    },
+    {
+      "receipt_id": "upload-optimizer-shard-1-1",
+      "shard_id": "optimizer-shard-1",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "runpod_8xh100_dense_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "64ced06e37c259676e9282fc7f7e5a36c8888d1b41c4a8478b9cf1dd76cf177c"
+    },
+    {
+      "receipt_id": "upload-optimizer-shard-2-1",
+      "shard_id": "optimizer-shard-2",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "google_l4_validator_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "a9da38ee7b25045288c6286a5909d0c0f292fcf725fc2770c025d40c8ba39cee"
+    },
+    {
+      "receipt_id": "upload-optimizer-shard-3-1",
+      "shard_id": "optimizer-shard-3",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "runpod_8xh100_dense_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "120f75ef31d65c8fcf9107adbc25fcbb33dde51ae91d7eb77a742f870aaa6d5e"
+    },
+    {
+      "receipt_id": "upload-optimizer-shard-4-1",
+      "shard_id": "optimizer-shard-4",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "google_l4_validator_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "fa50b1e59f31d4dfe1b04b03e570c2086ff780547855f40cea9c98bffebac733"
+    },
+    {
+      "receipt_id": "upload-optimizer-shard-5-1",
+      "shard_id": "optimizer-shard-5",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "runpod_8xh100_dense_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "3e0ed17b11ab7b0208f42cb21993ed5ea8b4fdebc1674fda3a6dbccbc2c6bcd9"
+    },
+    {
+      "receipt_id": "upload-optimizer-shard-6-0",
+      "shard_id": "optimizer-shard-6",
+      "attempt_ordinal": 0,
+      "uploader_source_id": "google_l4_validator_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "partial_upload_refused",
+      "bytes_committed": 45,
+      "detail": "partial optimizer upload was refused before pointer promotion",
+      "receipt_digest": "7ed718de5bbaadef8dfb3448fe9750acf98d88f7951acb3b78585909a4a172a2"
+    },
+    {
+      "receipt_id": "upload-optimizer-shard-6-1",
+      "shard_id": "optimizer-shard-6",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "google_l4_validator_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "cec1d6a2a75135258401729373d61b21714fd30a49809feb99ef3e6b1086e0b0"
+    },
+    {
+      "receipt_id": "upload-optimizer-shard-7-1",
+      "shard_id": "optimizer-shard-7",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "runpod_8xh100_dense_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "a4485eea3265b5ae246610537d007473da63d0bc3e663b16758c6b689ffc8229"
+    },
+    {
+      "receipt_id": "upload-parameter-shard-0-1",
+      "shard_id": "parameter-shard-0",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "google_l4_validator_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "5b59f901a39beaeeeb9f41f435df2e62541594ba15c654e79dc01c08ed4259d3"
+    },
+    {
+      "receipt_id": "upload-parameter-shard-1-1",
+      "shard_id": "parameter-shard-1",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "runpod_8xh100_dense_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "e82a477b4fa36331db3d28d3a99a115e10ffc95a7493c05ba4d8d336c58365ab"
+    },
+    {
+      "receipt_id": "upload-parameter-shard-2-1",
+      "shard_id": "parameter-shard-2",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "google_l4_validator_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "44a53be553129c7e8d89149671b122f410b14ec2c581b91f8c0388ce8083b859"
+    },
+    {
+      "receipt_id": "upload-parameter-shard-3-1",
+      "shard_id": "parameter-shard-3",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "runpod_8xh100_dense_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "ecdbc6bf191cf7850407292736310e2a0fe58b699f7447d8bfdae49694b2c214"
+    },
+    {
+      "receipt_id": "upload-parameter-shard-4-1",
+      "shard_id": "parameter-shard-4",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "google_l4_validator_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "56943e3b8571d5a3651951e50ef705d1972ba0bd6c3dcbcc1d7e879783278849"
+    },
+    {
+      "receipt_id": "upload-parameter-shard-5-1",
+      "shard_id": "parameter-shard-5",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "runpod_8xh100_dense_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "b59499c0386359e24f1c21424a3487e971569e1cdfb9893c2dcf73368acc8986"
+    },
+    {
+      "receipt_id": "upload-parameter-shard-6-1",
+      "shard_id": "parameter-shard-6",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "google_l4_validator_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "8404be189bf9eba6f6b1cab505e1da25fba3950df6f442476b2183add0cfaac1"
+    },
+    {
+      "receipt_id": "upload-parameter-shard-7-1",
+      "shard_id": "parameter-shard-7",
+      "attempt_ordinal": 1,
+      "uploader_source_id": "runpod_8xh100_dense_node",
+      "storage_root": "runs/psion-xprovider-pretrain-step-2048/checkpoints",
+      "upload_disposition": "durable",
+      "bytes_committed": 90,
+      "detail": "durable shard upload is explicit and provider-neutral",
+      "receipt_digest": "19fdd7c41f12012b81b127496de3a43378cd5d940376488f477bb3a0d99f01ed"
+    }
+  ],
+  "restore_plan": {
+    "recovery_mode": "resume_from_last_stable_checkpoint",
+    "manifest_authority_source_id": "google_l4_validator_node",
+    "assignments": [
+      {
+        "assignment_id": "restore-rank-0",
+        "dense_rank": 0,
+        "restore_source_id": "runpod_8xh100_dense_node",
+        "requested_execution_class": "dense_full_model_rank",
+        "parameter_shard_id": "parameter-shard-0",
+        "optimizer_shard_id": "optimizer-shard-0",
+        "load_order": [
+          "parameter-shard-0",
+          "optimizer-shard-0"
+        ],
+        "detail": "restore stays parameter-first and loads one optimizer shard immediately after the matching parameter shard"
+      },
+      {
+        "assignment_id": "restore-rank-1",
+        "dense_rank": 1,
+        "restore_source_id": "runpod_8xh100_dense_node",
+        "requested_execution_class": "dense_full_model_rank",
+        "parameter_shard_id": "parameter-shard-1",
+        "optimizer_shard_id": "optimizer-shard-1",
+        "load_order": [
+          "parameter-shard-1",
+          "optimizer-shard-1"
+        ],
+        "detail": "restore stays parameter-first and loads one optimizer shard immediately after the matching parameter shard"
+      },
+      {
+        "assignment_id": "restore-rank-2",
+        "dense_rank": 2,
+        "restore_source_id": "runpod_8xh100_dense_node",
+        "requested_execution_class": "dense_full_model_rank",
+        "parameter_shard_id": "parameter-shard-2",
+        "optimizer_shard_id": "optimizer-shard-2",
+        "load_order": [
+          "parameter-shard-2",
+          "optimizer-shard-2"
+        ],
+        "detail": "restore stays parameter-first and loads one optimizer shard immediately after the matching parameter shard"
+      },
+      {
+        "assignment_id": "restore-rank-3",
+        "dense_rank": 3,
+        "restore_source_id": "runpod_8xh100_dense_node",
+        "requested_execution_class": "dense_full_model_rank",
+        "parameter_shard_id": "parameter-shard-3",
+        "optimizer_shard_id": "optimizer-shard-3",
+        "load_order": [
+          "parameter-shard-3",
+          "optimizer-shard-3"
+        ],
+        "detail": "restore stays parameter-first and loads one optimizer shard immediately after the matching parameter shard"
+      },
+      {
+        "assignment_id": "restore-rank-4",
+        "dense_rank": 4,
+        "restore_source_id": "runpod_8xh100_dense_node",
+        "requested_execution_class": "dense_full_model_rank",
+        "parameter_shard_id": "parameter-shard-4",
+        "optimizer_shard_id": "optimizer-shard-4",
+        "load_order": [
+          "parameter-shard-4",
+          "optimizer-shard-4"
+        ],
+        "detail": "restore stays parameter-first and loads one optimizer shard immediately after the matching parameter shard"
+      },
+      {
+        "assignment_id": "restore-rank-5",
+        "dense_rank": 5,
+        "restore_source_id": "runpod_8xh100_dense_node",
+        "requested_execution_class": "dense_full_model_rank",
+        "parameter_shard_id": "parameter-shard-5",
+        "optimizer_shard_id": "optimizer-shard-5",
+        "load_order": [
+          "parameter-shard-5",
+          "optimizer-shard-5"
+        ],
+        "detail": "restore stays parameter-first and loads one optimizer shard immediately after the matching parameter shard"
+      },
+      {
+        "assignment_id": "restore-rank-6",
+        "dense_rank": 6,
+        "restore_source_id": "runpod_8xh100_dense_node",
+        "requested_execution_class": "dense_full_model_rank",
+        "parameter_shard_id": "parameter-shard-6",
+        "optimizer_shard_id": "optimizer-shard-6",
+        "load_order": [
+          "parameter-shard-6",
+          "optimizer-shard-6"
+        ],
+        "detail": "restore stays parameter-first and loads one optimizer shard immediately after the matching parameter shard"
+      },
+      {
+        "assignment_id": "restore-rank-7",
+        "dense_rank": 7,
+        "restore_source_id": "runpod_8xh100_dense_node",
+        "requested_execution_class": "dense_full_model_rank",
+        "parameter_shard_id": "parameter-shard-7",
+        "optimizer_shard_id": "optimizer-shard-7",
+        "load_order": [
+          "parameter-shard-7",
+          "optimizer-shard-7"
+        ],
+        "detail": "restore stays parameter-first and loads one optimizer shard immediately after the matching parameter shard"
+      }
+    ],
+    "restore_plan_digest": "af099916ca83092d90355d1c3040bb6d554ce571678893bb3060cd481a3dde0f"
+  },
+  "claim_boundary": "This contract closes provider-neutral distributed checkpoint manifests, shard upload receipts, and deterministic restore planning over the current cross-provider training substrate. It does not yet claim same-job mixed-backend dense restore or a generic multi-store replication layer.",
+  "contract_digest": "53386fdd8fc1f9b157df000ea869260905589469468feaf2cb596b6ba8053810"
+}
