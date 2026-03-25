@@ -189,10 +189,17 @@ rank owned, which explicit `validation_batch_sequences` contract was active,
 and how the aggregated `loss_sum`, `token_count`, and `byte_count` were reduced
 back into one distributed validation result.
 
-This is still score-only sliding-window parity. The legal score-first TTT path
-now exists on the single-H100 CUDA trainer, but the distributed `8xH100`
-runtime does not yet claim chunk-local adaptation, adaptation-step receipts, or
-README-grade score-first TTT equivalence.
+The distributed runtime now also admits the same legal `score_first_ttt`
+contract that the single-H100 CUDA lane already owned. The worker mesh keeps
+global sliding-window shard ownership per rank, scores each score-first chunk
+on the subset of windows owned by that rank, then runs the chunk-local
+adaptation step on every resident worker so the mesh stays synchronized without
+introducing a second optimizer surface. The resulting train-step receipt can
+now preserve one aggregated `score_first_ttt_receipt` beside the existing
+distributed validation observations.
+
+What is still missing is retained real `8xH100` evidence for that path under
+the public wallclock bar. The code path exists. The scoreboard proof does not.
 
 ## Current Matrix Banking Boundary
 
@@ -234,6 +241,8 @@ The lane now preserves:
 - observed validation duration
 - optional typed rank-local validation shard receipts plus aggregated
   `loss_sum`, `token_count`, and `byte_count`
+- optional aggregated legal `score_first_ttt_receipt` with ordered chunk
+  receipts and adaptation-step facts when the shipped manifest requests it
 - observed export or roundtrip duration
 - total wallclock versus the declared challenge cap
 - either:
@@ -261,6 +270,8 @@ also records:
   and `observed_ms`
 - one aggregated `mean_loss` and `bits_per_byte`
 - one honest distributed validation wallclock as the slowest participating rank
+- optional legal `score_first_ttt` chunk receipts layered over that same global
+  shard layout instead of a second incompatible validation accounting surface
 
 The resident worker train-step receipts now also preserve the rank-local
 `runtime_receipt` from the device-resident train runner when that hot path is
@@ -330,6 +341,8 @@ the finalizer-owned run root:
 - optional ordered distributed validation shard observations lifted from
   `distributed_validation_rank_complete ...` log lines when the runtime emits
   them
+- optional aggregated `score_first_ttt_receipt` when the resident worker mesh
+  executes the legal chunk-ordered overlay
 
 The device inventory and capability profile are derived by Psionic itself from
 the run-root inventory contract plus the canonical RunPod `8xH100` lane

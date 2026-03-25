@@ -1897,10 +1897,7 @@ mod tests {
             measurements_path: measurements_path.display().to_string(),
             distributed_receipt_path: distributed_receipt_path.display().to_string(),
             train_step_receipt_path: train_step_receipt_path.display().to_string(),
-            step_scope_root_dir: run_root
-                .join("runtime_step_scopes")
-                .display()
-                .to_string(),
+            step_scope_root_dir: run_root.join("runtime_step_scopes").display().to_string(),
             executed_step_count: 1,
             observed_training_time_ms: 400,
             step_observations: vec![ParameterGolfDistributedStepObservation::new(
@@ -1937,6 +1934,7 @@ mod tests {
             validation_observed_ms: 20,
             validation_total_sequence_count: 1024,
             validation_shard_observations: Vec::new(),
+            score_first_ttt_receipt: None,
             distributed_receipt,
             claim_boundary: String::from(PARAMETER_GOLF_DISTRIBUTED_8XH100_CLAIM_BOUNDARY),
             receipt_digest: String::new(),

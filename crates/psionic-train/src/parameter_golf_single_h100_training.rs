@@ -320,7 +320,10 @@ impl ParameterGolfValidationEvalMode {
         }
     }
 
-    fn validate(&self, sequence_length: usize) -> Result<(), ParameterGolfSingleH100TrainingError> {
+    pub(crate) fn validate(
+        &self,
+        sequence_length: usize,
+    ) -> Result<(), ParameterGolfSingleH100TrainingError> {
         match self {
             Self::NonOverlapping => Ok(()),
             Self::SlidingWindow { stride } => {
@@ -507,7 +510,10 @@ impl ParameterGolfScoreFirstTttConfig {
         "legal_score_first_ttt"
     }
 
-    fn validate(&self, sequence_length: usize) -> Result<(), ParameterGolfSingleH100TrainingError> {
+    pub(crate) fn validate(
+        &self,
+        sequence_length: usize,
+    ) -> Result<(), ParameterGolfSingleH100TrainingError> {
         if self.stride == 0 || self.stride > sequence_length {
             return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
                 message: format!(
@@ -1041,15 +1047,15 @@ struct ParameterGolfValidationBatchRuntime {
 }
 
 #[derive(Clone, Debug)]
-struct ParameterGolfScoreFirstTttChunkExecutionPlan {
-    receipt_plan: ParameterGolfScoreFirstTttChunkPlan,
-    window_starts: Vec<usize>,
+pub(crate) struct ParameterGolfScoreFirstTttChunkExecutionPlan {
+    pub(crate) receipt_plan: ParameterGolfScoreFirstTttChunkPlan,
+    pub(crate) window_starts: Vec<usize>,
 }
 
 #[derive(Clone, Debug)]
-struct ParameterGolfScoreFirstTttParameterState {
-    values: Vec<f32>,
-    momentum_buffer: Vec<f32>,
+pub(crate) struct ParameterGolfScoreFirstTttParameterState {
+    pub(crate) values: Vec<f32>,
+    pub(crate) momentum_buffer: Vec<f32>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -2558,7 +2564,7 @@ fn uses_banked_runtime_surface(overrides: &BTreeMap<String, Vec<f32>>) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn execute_parameter_golf_training_gradient_batch_from_examples(
+pub(crate) fn execute_parameter_golf_training_gradient_batch_from_examples(
     cuda_backend: &mut CudaBackend,
     device: &psionic_core::Device,
     current_model: &ParameterGolfReferenceModel,
@@ -3045,7 +3051,7 @@ pub(crate) fn evaluate_validation_window_starts_on_cuda(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn evaluate_validation_with_optional_score_first_ttt_on_cuda(
+pub(crate) fn evaluate_validation_with_optional_score_first_ttt_on_cuda(
     cuda_backend: &mut CudaBackend,
     device: &psionic_core::Device,
     descriptor: &psionic_models::ParameterGolfModelDescriptor,
@@ -3199,12 +3205,11 @@ fn evaluate_score_first_ttt_on_cuda(
         let chunk_start = chunk_plan.receipt_plan.chunk_start_token;
         let chunk_end = chunk_plan.receipt_plan.chunk_end_token;
         let chunk_sequence_count = chunk_end.saturating_sub(chunk_start) / sequence_length;
-        let chunk_learning_rate = score_first_ttt.learning_rate
-            * 0.5
-            * (1.0
-                + (std::f32::consts::PI * chunk_plan.receipt_plan.chunk_index as f32
-                    / total_chunks.saturating_sub(1).max(1) as f32)
-                    .cos());
+        let chunk_learning_rate = parameter_golf_score_first_ttt_chunk_learning_rate(
+            score_first_ttt,
+            chunk_plan.receipt_plan.chunk_index,
+            total_chunks,
+        );
         if !is_last_chunk && score_first_ttt.epochs > 0 && chunk_sequence_count > 0 {
             for epoch_index in 0..score_first_ttt.epochs {
                 for (batch_index, batch_sequence_start) in (0..chunk_sequence_count)
@@ -3345,7 +3350,7 @@ fn evaluate_score_first_ttt_on_cuda(
     })
 }
 
-fn build_parameter_golf_score_first_ttt_chunk_plans(
+pub(crate) fn build_parameter_golf_score_first_ttt_chunk_plans(
     total_tokens: usize,
     sequence_length: usize,
     score_first_ttt: &ParameterGolfScoreFirstTttConfig,
@@ -3391,7 +3396,20 @@ fn build_parameter_golf_score_first_ttt_chunk_plans(
         .collect()
 }
 
-fn seed_parameter_golf_score_first_ttt_states(
+pub(crate) fn parameter_golf_score_first_ttt_chunk_learning_rate(
+    score_first_ttt: &ParameterGolfScoreFirstTttConfig,
+    chunk_index: usize,
+    total_chunks: usize,
+) -> f32 {
+    score_first_ttt.learning_rate
+        * 0.5
+        * (1.0
+            + (std::f32::consts::PI * chunk_index as f32
+                / total_chunks.saturating_sub(1).max(1) as f32)
+                .cos())
+}
+
+pub(crate) fn seed_parameter_golf_score_first_ttt_states(
     model: &ParameterGolfReferenceModel,
     freeze_blocks: usize,
 ) -> BTreeMap<String, ParameterGolfScoreFirstTttParameterState> {
@@ -3425,7 +3443,7 @@ fn parameter_golf_score_first_ttt_parameter_is_frozen(
         .any(|block_index| parameter_id.starts_with(&format!("blocks.{block_index}.")))
 }
 
-fn materialize_parameter_golf_score_first_ttt_model(
+pub(crate) fn materialize_parameter_golf_score_first_ttt_model(
     baseline_model: &ParameterGolfReferenceModel,
     trainable_states: &BTreeMap<String, ParameterGolfScoreFirstTttParameterState>,
 ) -> Result<ParameterGolfReferenceModel, ParameterGolfSingleH100TrainingError> {
@@ -3443,7 +3461,7 @@ fn materialize_parameter_golf_score_first_ttt_model(
     )?)
 }
 
-fn apply_parameter_golf_score_first_ttt_gradients(
+pub(crate) fn apply_parameter_golf_score_first_ttt_gradients(
     trainable_states: &mut BTreeMap<String, ParameterGolfScoreFirstTttParameterState>,
     gradients: &[(String, Vec<f32>)],
     learning_rate: f32,
@@ -3479,7 +3497,7 @@ fn apply_parameter_golf_score_first_ttt_gradients(
     Ok(())
 }
 
-fn training_batch_from_flat_tokens(
+pub(crate) fn training_batch_from_flat_tokens(
     tokens: &[u16],
     sequence_length: usize,
 ) -> Result<(Vec<Vec<u32>>, Vec<Vec<u32>>), ParameterGolfSingleH100TrainingError> {

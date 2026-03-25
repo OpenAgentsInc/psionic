@@ -553,6 +553,7 @@ fn execute_parameter_golf_submission_distributed_8xh100_bootstrap(
         &report,
         &manifest.validation_eval_mode,
         manifest.validation_batch_sequences,
+        manifest.score_first_ttt.as_ref(),
         Some(&mut live_visualization_writer),
     )?;
     let bootstrap_receipt_path = PathBuf::from(&runtime.bootstrap_receipt_path);
