@@ -27,9 +27,9 @@ use crate::{
     build_parameter_golf_validation_window_starts, build_tokenizer_digest,
     build_validation_observation_plan, clip_gradients, evaluate_validation_on_cuda,
     evaluate_validation_window_starts_on_cuda, execute_parameter_golf_training_gradient_batch,
-    export_parameter_golf_full_precision_model_bytes,
+    export_parameter_golf_banked_full_precision_weights_bytes,
     export_parameter_golf_int8_zlib_model_artifact, inspect_local_distributed_8xh100_machine,
-    materialize_current_model, parameter_golf_optimizer_plan,
+    materialize_current_banked_weights, materialize_current_model, parameter_golf_optimizer_plan,
     parameter_golf_runpod_8xh100_capability_profile, restore_parameter_golf_model_from_safetensors,
     seed_parameter_states, zero_gradients, ParameterGolfBatchGeometry,
     ParameterGolfDistributed8xH100BringupReport,
@@ -148,6 +148,8 @@ pub struct ParameterGolfDistributed8xH100TrainStepReceipt {
     pub current_model_artifact_path: String,
     /// Stable SHA-256 over the full-precision model checkpoint.
     pub current_model_artifact_sha256: String,
+    /// Explicit runtime surface stored in the retained full-precision artifact.
+    pub current_model_artifact_surface: String,
     /// Retained exact post-step int8+zlib model artifact path.
     pub current_model_int8_zlib_artifact_path: String,
     /// Stable SHA-256 over the post-step int8+zlib model artifact.
@@ -682,7 +684,7 @@ fn prune_step_scope_for_next_step(
     if !step_dir.is_dir() {
         return Ok(());
     }
-    let retained_model_path = step_dir.join("current_model.safetensors");
+    let retained_model_path = step_dir.join("current_model.runtime_surface.safetensors");
     for entry in fs::read_dir(step_dir).map_err(|error| {
         ParameterGolfDistributed8xH100TrainStepError::Read {
             path: step_dir.display().to_string(),
@@ -720,7 +722,7 @@ struct ParameterGolfDistributed8xH100StepExecution {
     aggregated_gradient_artifact_sha256: String,
     current_model_artifact_path: PathBuf,
     current_model_artifact_sha256: String,
-    current_model: ParameterGolfReferenceModel,
+    current_model_artifact_surface: String,
     step_observation: ParameterGolfDistributedStepObservation,
 }
 
@@ -955,11 +957,14 @@ fn execute_parameter_golf_distributed_8xh100_step(
         muon_momentum,
         step_index,
     )?;
-    let current_model = materialize_current_model(initial_model, trainer_state)?;
-    let current_model_artifact_path = step_dir.join("current_model.safetensors");
+    let current_banked_weights = materialize_current_banked_weights(initial_model, trainer_state)?;
+    let current_model_artifact_path = step_dir.join("current_model.runtime_surface.safetensors");
     let current_model_artifact_sha256 = write_bytes_artifact(
         &current_model_artifact_path,
-        &export_parameter_golf_full_precision_model_bytes(&current_model)?,
+        &export_parameter_golf_banked_full_precision_weights_bytes(
+            initial_model,
+            &current_banked_weights,
+        )?,
     )?;
     let optimizer_step_ms = duration_ms(optimizer_started);
     let observed_step_ms = duration_ms(step_started);
@@ -994,7 +999,7 @@ fn execute_parameter_golf_distributed_8xh100_step(
         aggregated_gradient_artifact_sha256,
         current_model_artifact_path,
         current_model_artifact_sha256,
-        current_model,
+        current_model_artifact_surface: String::from("banked_full_precision_v1"),
         step_observation,
     })
 }
@@ -1200,7 +1205,7 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
             ),
         }
     })?;
-    let current_model = final_step_execution.current_model.clone();
+    let current_model = materialize_current_model(&initial_model, &trainer_state)?;
     let current_model_int8_zlib_artifact = export_parameter_golf_int8_zlib_model_artifact(
         &current_model,
         run_id,
@@ -1530,6 +1535,7 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
             .display()
             .to_string(),
         current_model_artifact_sha256: final_step_execution.current_model_artifact_sha256,
+        current_model_artifact_surface: final_step_execution.current_model_artifact_surface,
         current_model_int8_zlib_artifact_path: current_model_int8_zlib_artifact_path
             .display()
             .to_string(),
@@ -2309,7 +2315,10 @@ mod tests {
             step_dir.join("aggregated_gradients.safetensors"),
             b"gradients",
         )?;
-        std::fs::write(step_dir.join("current_model.safetensors"), b"model")?;
+        std::fs::write(
+            step_dir.join("current_model.runtime_surface.safetensors"),
+            b"model",
+        )?;
         std::fs::write(
             step_dir
                 .join("runtime_train_step_gradients")
@@ -2326,7 +2335,10 @@ mod tests {
         let retained = std::fs::read_dir(&step_dir)?
             .map(|entry| entry.map(|entry| entry.file_name().to_string_lossy().into_owned()))
             .collect::<Result<Vec<_>, _>>()?;
-        assert_eq!(retained, vec![String::from("current_model.safetensors")]);
+        assert_eq!(
+            retained,
+            vec![String::from("current_model.runtime_surface.safetensors")]
+        );
         Ok(())
     }
 }

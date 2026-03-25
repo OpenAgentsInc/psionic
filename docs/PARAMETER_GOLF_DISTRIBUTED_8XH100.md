@@ -79,9 +79,9 @@ Psionic now encodes that exact posture explicitly instead of treating
   `step_observations` plus the honest loop stop reason in the aggregate
   train receipt instead of pretending the final retained step was the whole
   run. Once a successor step starts, the previous input step is pruned down to
-  the retained `current_model.safetensors` checkpoint so repeated runs do not
-  exhaust local disk on RunPod while still keeping the exact runtime-owned
-  model handoff surface explicit.
+  the retained `current_model.runtime_surface.safetensors` banked runtime
+  checkpoint so repeated runs do not exhaust local disk on RunPod while still
+  keeping the exact runtime-owned model handoff surface explicit.
 - `psionic-train` now also ships retained per-rank distributed validation
   receipts plus one completion receipt bound to the trained runtime-produced
   int8+zlib artifact, so the exported-folder `distributed_8xh100_train` mode

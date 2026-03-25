@@ -1769,7 +1769,7 @@ mod tests {
             run_root.join("parameter_golf_distributed_8xh100_receipt.json");
         let measurements_path =
             run_root.join("parameter_golf_distributed_8xh100_measurements.json");
-        let model_artifact_path = run_root.join("current_model.safetensors");
+        let model_artifact_path = run_root.join("current_model.runtime_surface.safetensors");
         let model_int8_artifact_path = run_root.join("current_model.int8.zlib");
         let gradient_path = run_root.join("aggregated_gradients.safetensors");
         fs::write(
@@ -1915,6 +1915,7 @@ mod tests {
             aggregated_gradient_artifact_sha256: String::from("aggregated-gradient-sha"),
             current_model_artifact_path: model_artifact_path.display().to_string(),
             current_model_artifact_sha256: String::from("model-sha"),
+            current_model_artifact_surface: String::from("banked_full_precision_v1"),
             current_model_int8_zlib_artifact_path: model_int8_artifact_path.display().to_string(),
             current_model_int8_zlib_artifact_sha256: String::from("model-int8-sha"),
             current_model_int8_zlib_artifact_size_bytes: 9,

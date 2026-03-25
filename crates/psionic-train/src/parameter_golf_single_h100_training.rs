@@ -2440,18 +2440,9 @@ pub(crate) fn materialize_current_model(
     baseline: &ParameterGolfReferenceModel,
     state: &ParameterGolfSingleH100TrainerState,
 ) -> Result<ParameterGolfReferenceModel, ParameterGolfSingleH100TrainingError> {
-    let overrides = state
-        .parameter_states
-        .iter()
-        .map(|(parameter_id, state)| (parameter_id.clone(), state.values().to_vec()))
-        .collect::<BTreeMap<_, _>>();
-    let weights = if overrides.keys().any(|parameter_id| {
-        psionic_models::PARAMETER_GOLF_MATRIX_BANK_NAMES.contains(&parameter_id.as_str())
-    }) {
-        baseline
-            .banked_weights()?
-            .with_parameter_overrides(&baseline.descriptor().config, &overrides)?
-            .to_split(&baseline.descriptor().config)?
+    let overrides = current_parameter_state_overrides(state);
+    let weights = if uses_banked_runtime_surface(&overrides) {
+        materialize_current_banked_weights(baseline, state)?.to_split(&baseline.descriptor().config)?
     } else {
         baseline
             .weights()
@@ -2462,6 +2453,42 @@ pub(crate) fn materialize_current_model(
         baseline.descriptor().config.clone(),
         weights,
     )?)
+}
+
+pub(crate) fn materialize_current_banked_weights(
+    baseline: &ParameterGolfReferenceModel,
+    state: &ParameterGolfSingleH100TrainerState,
+) -> Result<psionic_models::ParameterGolfBankedWeights, ParameterGolfSingleH100TrainingError> {
+    let config = &baseline.descriptor().config;
+    let banked_weights = baseline.banked_weights()?;
+    let allowed_parameter_ids = banked_weights
+        .parameter_vectors(config)
+        .into_iter()
+        .map(|vector| vector.parameter_id)
+        .collect::<std::collections::BTreeSet<_>>();
+    let overrides = current_parameter_state_overrides(state)
+        .into_iter()
+        .filter(|(parameter_id, _)| allowed_parameter_ids.contains(parameter_id))
+        .collect::<BTreeMap<_, _>>();
+    banked_weights
+        .with_parameter_overrides(config, &overrides)
+        .map_err(Into::into)
+}
+
+fn current_parameter_state_overrides(
+    state: &ParameterGolfSingleH100TrainerState,
+) -> BTreeMap<String, Vec<f32>> {
+    state
+        .parameter_states
+        .iter()
+        .map(|(parameter_id, state)| (parameter_id.clone(), state.values().to_vec()))
+        .collect::<BTreeMap<_, _>>()
+}
+
+fn uses_banked_runtime_surface(overrides: &BTreeMap<String, Vec<f32>>) -> bool {
+    overrides.keys().any(|parameter_id| {
+        psionic_models::PARAMETER_GOLF_MATRIX_BANK_NAMES.contains(&parameter_id.as_str())
+    })
 }
 
 #[allow(clippy::too_many_arguments)]

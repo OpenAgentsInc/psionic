@@ -15,8 +15,8 @@ use psionic_eval::{
     ParameterGolfValidationEvalReport,
 };
 use psionic_models::{
-    ParameterGolfExecutionError, ParameterGolfModelError, ParameterGolfParameterVector,
-    ParameterGolfReferenceModel,
+    ParameterGolfBankedWeights, ParameterGolfExecutionError, ParameterGolfModelError,
+    ParameterGolfParameterVector, ParameterGolfReferenceModel,
 };
 use psionic_runtime::TrainingCheckpointReference;
 use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
@@ -36,6 +36,9 @@ use crate::{
 };
 
 const PARAMETER_GOLF_CHECKPOINT_MANIFEST_KEY: &str = "psionic.parameter_golf.checkpoint_manifest";
+const PARAMETER_GOLF_WEIGHT_SURFACE_KEY: &str = "psionic.parameter_golf.weight_surface";
+const PARAMETER_GOLF_SPLIT_WEIGHT_SURFACE: &str = "split_f32_v1";
+const PARAMETER_GOLF_BANKED_WEIGHT_SURFACE: &str = "banked_f32_v1";
 const PARAMETER_GOLF_INT8_ZLIB_FORMAT: &str = "int8_clean_per_row_v1";
 const PARAMETER_GOLF_INT8_KEEP_FLOAT_MAX_NUMEL: usize = 65_536;
 const PARAMETER_GOLF_INT8_CLIP_Q: f32 = 0.999_998_4;
@@ -1634,12 +1637,42 @@ pub fn restore_parameter_golf_model_from_safetensors(
     baseline_model: &ParameterGolfReferenceModel,
     weights_bytes: &[u8],
 ) -> Result<ParameterGolfReferenceModel, ParameterGolfReferenceTrainingError> {
+    let (_, metadata) = SafeTensors::read_metadata(weights_bytes).map_err(|error| {
+        ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf raw safetensors restore",
+            message: error.to_string(),
+        }
+    })?;
     let safetensors = SafeTensors::deserialize(weights_bytes).map_err(|error| {
         ParameterGolfReferenceTrainingError::Serialization {
             context: "parameter golf raw safetensors restore",
             message: error.to_string(),
         }
     })?;
+    let weight_surface = metadata
+        .metadata()
+        .as_ref()
+        .and_then(|metadata| metadata.get(PARAMETER_GOLF_WEIGHT_SURFACE_KEY))
+        .map(String::as_str)
+        .unwrap_or(PARAMETER_GOLF_SPLIT_WEIGHT_SURFACE);
+    match weight_surface {
+        PARAMETER_GOLF_SPLIT_WEIGHT_SURFACE => {
+            restore_parameter_golf_model_from_split_safetensors(baseline_model, &safetensors)
+        }
+        PARAMETER_GOLF_BANKED_WEIGHT_SURFACE => {
+            restore_parameter_golf_model_from_banked_safetensors_impl(baseline_model, &safetensors)
+        }
+        other => Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf raw safetensors restore",
+            message: format!("unsupported parameter golf weight surface `{other}`"),
+        }),
+    }
+}
+
+fn restore_parameter_golf_model_from_split_safetensors(
+    baseline_model: &ParameterGolfReferenceModel,
+    safetensors: &SafeTensors<'_>,
+) -> Result<ParameterGolfReferenceModel, ParameterGolfReferenceTrainingError> {
     let mut overrides = BTreeMap::new();
     for parameter in baseline_model
         .weights()
@@ -1673,6 +1706,46 @@ pub fn restore_parameter_golf_model_from_safetensors(
     Ok(ParameterGolfReferenceModel::new(
         baseline_model.descriptor().model.clone(),
         baseline_model.descriptor().config.clone(),
+        weights,
+    )?)
+}
+
+fn restore_parameter_golf_model_from_banked_safetensors_impl(
+    baseline_model: &ParameterGolfReferenceModel,
+    safetensors: &SafeTensors<'_>,
+) -> Result<ParameterGolfReferenceModel, ParameterGolfReferenceTrainingError> {
+    let config = &baseline_model.descriptor().config;
+    let banked_weights = baseline_model.banked_weights()?;
+    let mut overrides = BTreeMap::new();
+    for parameter in banked_weights.parameter_vectors(config) {
+        let tensor = safetensors
+            .tensor(parameter.parameter_id.as_str())
+            .map_err(
+                |_| ParameterGolfReferenceTrainingError::MissingArtifactTensor {
+                    parameter_id: parameter.parameter_id.clone(),
+                },
+            )?;
+        validate_tensor_shape(
+            parameter.parameter_id.as_str(),
+            tensor.shape(),
+            parameter.shape.dims(),
+        )?;
+        overrides.insert(
+            parameter.parameter_id.clone(),
+            decode_float_tensor(
+                parameter.parameter_id.as_str(),
+                tensor.dtype(),
+                tensor.data(),
+                tensor.shape(),
+            )?,
+        );
+    }
+    let weights = banked_weights
+        .with_parameter_overrides(config, &overrides)?
+        .to_split(config)?;
+    Ok(ParameterGolfReferenceModel::new(
+        baseline_model.descriptor().model.clone(),
+        config.clone(),
         weights,
     )?)
 }
@@ -2062,6 +2135,10 @@ fn export_full_precision_model_bytes(
         String::from(PARAMETER_GOLF_CHECKPOINT_MANIFEST_KEY),
         model.descriptor().stable_digest(),
     );
+    metadata.insert(
+        String::from(PARAMETER_GOLF_WEIGHT_SURFACE_KEY),
+        String::from(PARAMETER_GOLF_SPLIT_WEIGHT_SURFACE),
+    );
     let raw_tensors = model
         .weights()
         .parameter_vectors(&model.descriptor().config)
@@ -2155,6 +2232,49 @@ pub fn export_parameter_golf_full_precision_model_bytes(
     model: &ParameterGolfReferenceModel,
 ) -> Result<Vec<u8>, ParameterGolfReferenceTrainingError> {
     export_full_precision_model_bytes(model)
+}
+
+/// Exports one Parameter Golf model into the upstream-style banked full-precision
+/// safetensors surface used by the distributed score path.
+pub fn export_parameter_golf_banked_full_precision_model_bytes(
+    model: &ParameterGolfReferenceModel,
+) -> Result<Vec<u8>, ParameterGolfReferenceTrainingError> {
+    let banked_weights = model.banked_weights()?;
+    export_parameter_golf_banked_full_precision_weights_bytes(model, &banked_weights)
+}
+
+/// Exports one explicit banked runtime-weight surface into the canonical
+/// safetensors bytes used by the distributed score path.
+pub fn export_parameter_golf_banked_full_precision_weights_bytes(
+    baseline_model: &ParameterGolfReferenceModel,
+    banked_weights: &ParameterGolfBankedWeights,
+) -> Result<Vec<u8>, ParameterGolfReferenceTrainingError> {
+    let mut metadata = HashMap::new();
+    metadata.insert(
+        String::from(PARAMETER_GOLF_CHECKPOINT_MANIFEST_KEY),
+        baseline_model.descriptor().stable_digest(),
+    );
+    metadata.insert(
+        String::from(PARAMETER_GOLF_WEIGHT_SURFACE_KEY),
+        String::from(PARAMETER_GOLF_BANKED_WEIGHT_SURFACE),
+    );
+    let raw_tensors = banked_weights
+        .parameter_vectors(&baseline_model.descriptor().config)
+        .into_iter()
+        .map(|parameter| {
+            (
+                parameter.parameter_id,
+                SafeTensorsDType::F32,
+                parameter.shape.dims().to_vec(),
+                encode_f32_bytes(parameter.values.as_slice()),
+            )
+        })
+        .collect::<Vec<_>>();
+    serialize_tensors(
+        raw_tensors,
+        Some(metadata),
+        "parameter golf raw banked safetensors export",
+    )
 }
 
 fn serialize_tensors(
@@ -2420,6 +2540,8 @@ mod tests {
 
     use super::{
         checkpoint_async_writeback_payload, read_parameter_golf_checkpoint_from_directory,
+        export_parameter_golf_banked_full_precision_model_bytes,
+        export_parameter_golf_full_precision_model_bytes,
         restore_parameter_golf_local_reference_checkpoint,
         restore_parameter_golf_model_from_int8_zlib, restore_parameter_golf_model_from_safetensors,
         train_parameter_golf_local_reference,
@@ -2427,6 +2549,7 @@ mod tests {
         train_parameter_golf_local_reference_with_metric_sink, ParameterGolfLocalReferenceFixture,
         ParameterGolfReferenceTrainingConfig, ParameterGolfReferenceTrainingRunner,
     };
+    use psionic_models::ParameterGolfReferenceModel;
 
     #[derive(Clone, Default)]
     struct SharedWriter(Arc<Mutex<Vec<u8>>>);
@@ -2677,6 +2800,26 @@ mod tests {
                 && matches!(event.value, LocalTrainMetricValue::F32(_))));
         assert!(progress.contents().contains("mean_microbatch_loss"));
         assert!(structured.contents().starts_with("metric_event {"));
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_split_full_precision_safetensors_roundtrip_restores_model(
+    ) -> Result<(), Box<dyn Error>> {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+        let bytes = export_parameter_golf_full_precision_model_bytes(&model)?;
+        let restored = restore_parameter_golf_model_from_safetensors(&model, bytes.as_slice())?;
+        assert_eq!(restored, model);
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_banked_full_precision_safetensors_roundtrip_restores_model(
+    ) -> Result<(), Box<dyn Error>> {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+        let bytes = export_parameter_golf_banked_full_precision_model_bytes(&model)?;
+        let restored = restore_parameter_golf_model_from_safetensors(&model, bytes.as_slice())?;
+        assert_eq!(restored, model);
         Ok(())
     }
 }
