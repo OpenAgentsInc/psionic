@@ -195,7 +195,7 @@ gcloud compute ssh "<coordinator-instance>" \
   --project=openagentsgemini \
   --zone="<coordinator-zone>" \
   --tunnel-through-iap \
-  --command='cd ~/code/psionic && sudo scripts/psion-google-two-node-swarm-impair.sh --action apply --profile mild_wan --host-role coordinator --run-id "'"${RUN_ID}"'" --interface ens4 --receipt-out /tmp/psion_google_two_node_swarm_impairment_receipt.json && gcloud storage cp /tmp/psion_google_two_node_swarm_impairment_receipt.json gs://openagentsgemini-psion-train-us-central1/runs/'"${RUN_ID}"'/host/coordinator/psion_google_two_node_swarm_impairment_receipt.json'
+  --command='cd /var/lib/psion-google-two-node-swarm/runs/'"${RUN_ID}"'/coordinator/repo && sudo scripts/psion-google-two-node-swarm-impair.sh --action apply --profile mild_wan --host-role coordinator --run-id "'"${RUN_ID}"'" --interface ens4 --receipt-out /tmp/psion_google_two_node_swarm_impairment_receipt.json && gcloud storage cp /tmp/psion_google_two_node_swarm_impairment_receipt.json gs://openagentsgemini-psion-train-us-central1/runs/'"${RUN_ID}"'/host/coordinator/psion_google_two_node_swarm_impairment_receipt.json'
 ```
 
 Apply the impairment on the contributor node and upload the receipt:
@@ -205,7 +205,7 @@ gcloud compute ssh "<contributor-instance>" \
   --project=openagentsgemini \
   --zone="<contributor-zone>" \
   --tunnel-through-iap \
-  --command='cd ~/code/psionic && sudo scripts/psion-google-two-node-swarm-impair.sh --action apply --profile mild_wan --host-role contributor --run-id "'"${RUN_ID}"'" --interface ens4 --receipt-out /tmp/psion_google_two_node_swarm_impairment_receipt.json && gcloud storage cp /tmp/psion_google_two_node_swarm_impairment_receipt.json gs://openagentsgemini-psion-train-us-central1/runs/'"${RUN_ID}"'/host/contributor/psion_google_two_node_swarm_impairment_receipt.json'
+  --command='cd /var/lib/psion-google-two-node-swarm/runs/'"${RUN_ID}"'/contributor/repo && sudo scripts/psion-google-two-node-swarm-impair.sh --action apply --profile mild_wan --host-role contributor --run-id "'"${RUN_ID}"'" --interface ens4 --receipt-out /tmp/psion_google_two_node_swarm_impairment_receipt.json && gcloud storage cp /tmp/psion_google_two_node_swarm_impairment_receipt.json gs://openagentsgemini-psion-train-us-central1/runs/'"${RUN_ID}"'/host/contributor/psion_google_two_node_swarm_impairment_receipt.json'
 ```
 
 Clear the impairment after the bounded drill:
@@ -215,13 +215,13 @@ gcloud compute ssh "<coordinator-instance>" \
   --project=openagentsgemini \
   --zone="<coordinator-zone>" \
   --tunnel-through-iap \
-  --command='cd ~/code/psionic && sudo scripts/psion-google-two-node-swarm-impair.sh --action clear --profile mild_wan --host-role coordinator --run-id "'"${RUN_ID}"'" --interface ens4'
+  --command='cd /var/lib/psion-google-two-node-swarm/runs/'"${RUN_ID}"'/coordinator/repo && sudo scripts/psion-google-two-node-swarm-impair.sh --action clear --profile mild_wan --host-role coordinator --run-id "'"${RUN_ID}"'" --interface ens4'
 
 gcloud compute ssh "<contributor-instance>" \
   --project=openagentsgemini \
   --zone="<contributor-zone>" \
   --tunnel-through-iap \
-  --command='cd ~/code/psionic && sudo scripts/psion-google-two-node-swarm-impair.sh --action clear --profile mild_wan --host-role contributor --run-id "'"${RUN_ID}"'" --interface ens4'
+  --command='cd /var/lib/psion-google-two-node-swarm/runs/'"${RUN_ID}"'/contributor/repo && sudo scripts/psion-google-two-node-swarm-impair.sh --action clear --profile mild_wan --host-role contributor --run-id "'"${RUN_ID}"'" --interface ens4'
 ```
 
 Use `temporary_partition` only for a short explicit drill. Apply it briefly and

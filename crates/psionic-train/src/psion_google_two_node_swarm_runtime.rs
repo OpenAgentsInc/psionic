@@ -1090,8 +1090,8 @@ fn build_coordinator_plan(
     let mut protocol = AdapterWorkerProtocolState::from_window_record(
         &window_record,
         AdapterWorkerProtocolPolicy {
-            heartbeat_timeout_ms: 2_500,
-            claim_ttl_ms: 15_000,
+            heartbeat_timeout_ms: 60_000,
+            claim_ttl_ms: 300_000,
         },
     );
     protocol.activate_window()?;
