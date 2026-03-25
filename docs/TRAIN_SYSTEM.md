@@ -323,6 +323,18 @@ master-weight broadcast, mirrored fp32 AdamW state, and one explicit refusal
 set for BF16 mixed precision, fp16 loss scaling, direct NCCL claims by MLX
 ranks, split master-weight authority, and checkpointless optimizer migration.
 
+The repo now also owns the first mixed-backend checkpoint and restore contract
+in `crates/psionic-train/src/mixed_backend_checkpoint_contract.rs`, the binary
+`mixed_backend_checkpoint_contract`, the checker
+`scripts/check-mixed-backend-checkpoint-contract.sh`, the focused reference doc
+`docs/MIXED_BACKEND_CHECKPOINT_REFERENCE.md`, and the committed fixture
+`fixtures/training/mixed_backend_checkpoint_contract_v1.json`. That surface
+freezes one shared checkpoint manifest and pointer, one portable fp32
+safetensors-backed state receipt per backend, one restore ladder that covers
+same-backend resume plus CUDA-to-MLX and MLX-to-CUDA restore, and one explicit
+refusal set for BF16 optimizer-state migration, quantized checkpoint resume,
+checkpointless migration, and incomplete portable group selection.
+
 The Linux node now also has a dedicated RTX 4080 bring-up seam in
 `crates/psionic-train/src/swarm_cuda_bringup.rs`, the binary
 `swarm_linux_cuda_bringup`, the verification runner

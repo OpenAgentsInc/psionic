@@ -1,0 +1,232 @@
+{
+  "schema_version": "psionic.mixed_backend_checkpoint_contract.v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "mixed_mesh_contract_digest": "0c9f38ed08082bc0a0f8d06160c54e6075e61fee92a42f05e451f8d22f6579d1",
+  "checkpoint_manifest": {
+    "scope": {
+      "kind": "run",
+      "scope_id": "psion-xprovider-mixed-backend-4096"
+    },
+    "checkpoint_family": "psion.cross_provider.pretrain.v1",
+    "checkpoint": {
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "stream_id": "stream-psion-xprovider-mixed-backend-step-4096",
+      "manifest_digest": "manifest-digest-psion-xprovider-mixed-backend-step-4096",
+      "object_digest": "object-digest-psion-xprovider-mixed-backend-step-4096",
+      "writer_node_id": "coordinator-rank-0",
+      "membership_epoch": 2,
+      "cluster_state_digest": "cluster-state-digest-psion-xprovider-mixed-backend-step-4096",
+      "topology_digest": "topology-digest-psion-xprovider-mixed-backend-step-4096",
+      "started_at_ms": 1742900800000,
+      "checkpoint_ref": "checkpoint://psion/xprovider/mixed_backend/4096",
+      "step": 4096,
+      "durable_at_ms": 1742900800880
+    },
+    "shards": [
+      {
+        "shard_id": "cuda-parameters",
+        "manifest": {
+          "stream_id": "stream-cuda-parameters",
+          "manifest_digest": "9634230bd9cb224f5935533c9a4a2e613dbdd43bf346a425baf71cb04aea5234",
+          "subject": "checkpoint",
+          "object_digest": "b7770dde4367d16019bfbc01bc362b9f9c2e0ebc4407cb09aae9fd705c301c14",
+          "total_bytes": 58,
+          "chunk_count": 4,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/mixed_backend/4096",
+            "step": 4096
+          }
+        },
+        "writer_node_id": "cuda-rank-0"
+      },
+      {
+        "shard_id": "cuda-optimizer-state",
+        "manifest": {
+          "stream_id": "stream-cuda-optimizer-state",
+          "manifest_digest": "227570119aff4921a34bee87b1361612ce25fc793c8f7111871df1e9f06abd63",
+          "subject": "checkpoint",
+          "object_digest": "a58d19971b219cf5ffcc9d001ba769863d4df0691e2d3d04736c2995bf1c164e",
+          "total_bytes": 63,
+          "chunk_count": 4,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/mixed_backend/4096",
+            "step": 4096
+          }
+        },
+        "writer_node_id": "cuda-rank-0"
+      },
+      {
+        "shard_id": "mlx-parameters",
+        "manifest": {
+          "stream_id": "stream-mlx-parameters",
+          "manifest_digest": "3249dc0e7b17465e44c08ad6f709ff49b68c2896579c21c605491fe4b18c2489",
+          "subject": "checkpoint",
+          "object_digest": "fcef28f29b0409e913178f874e64ce97a43e5b50f9b0b9f3544c1d2e00b35388",
+          "total_bytes": 57,
+          "chunk_count": 4,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/mixed_backend/4096",
+            "step": 4096
+          }
+        },
+        "writer_node_id": "mlx-rank-0"
+      },
+      {
+        "shard_id": "mlx-optimizer-state",
+        "manifest": {
+          "stream_id": "stream-mlx-optimizer-state",
+          "manifest_digest": "7084b4b797d8581f5e0a135d0fb08bed14acaeac0e86844a4f39815c9aaa539a",
+          "subject": "checkpoint",
+          "object_digest": "67cdfb1a3c16048f0c678ac9d43eebe6a92b7e180b3eea715e12c037ac0a997b",
+          "total_bytes": 62,
+          "chunk_count": 4,
+          "chunk_bytes": 16,
+          "encoding": "safetensors",
+          "checkpoint_binding": {
+            "checkpoint_family": "psion.cross_provider.pretrain.v1",
+            "checkpoint_ref": "checkpoint://psion/xprovider/mixed_backend/4096",
+            "step": 4096
+          }
+        },
+        "writer_node_id": "mlx-rank-0"
+      }
+    ],
+    "durability": "durable",
+    "created_at_ms": 1742900800880,
+    "manifest_digest": "48a368d647e51e725316858b29bfc24f50fce26548dd150e5166e4e276f0b269"
+  },
+  "checkpoint_pointer": {
+    "scope": {
+      "kind": "run",
+      "scope_id": "psion-xprovider-mixed-backend-4096"
+    },
+    "checkpoint_family": "psion.cross_provider.pretrain.v1",
+    "checkpoint": {
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "stream_id": "stream-psion-xprovider-mixed-backend-step-4096",
+      "manifest_digest": "manifest-digest-psion-xprovider-mixed-backend-step-4096",
+      "object_digest": "object-digest-psion-xprovider-mixed-backend-step-4096",
+      "writer_node_id": "coordinator-rank-0",
+      "membership_epoch": 2,
+      "cluster_state_digest": "cluster-state-digest-psion-xprovider-mixed-backend-step-4096",
+      "topology_digest": "topology-digest-psion-xprovider-mixed-backend-step-4096",
+      "started_at_ms": 1742900800000,
+      "checkpoint_ref": "checkpoint://psion/xprovider/mixed_backend/4096",
+      "step": 4096,
+      "durable_at_ms": 1742900800880
+    },
+    "manifest_digest": "48a368d647e51e725316858b29bfc24f50fce26548dd150e5166e4e276f0b269",
+    "updated_at_ms": 1742900800892,
+    "pointer_digest": "4dc1bc14d362c646d30724e077f660c2a720bc6f1780177dc13adb14abb31f1e"
+  },
+  "portable_state_receipts": [
+    {
+      "receipt_id": "cuda-portable-state",
+      "backend_family": "cuda",
+      "artifact_format": "safetensors",
+      "state_dict_digest": "state-dict-digest-cuda-mixed-backend-4096",
+      "tokenizer_contract_digest": "978a733f8b8f48aa9d77ea658fd640b6d61a40c18bd3f692cad93065237fff51",
+      "tensor_count": 96,
+      "parameter_precision": "fp32",
+      "optimizer_state_precision": "fp32",
+      "detail": "The CUDA rank exports one canonical fp32 safetensors state dict plus fp32 optimizer state under the shared mixed-backend checkpoint family."
+    },
+    {
+      "receipt_id": "mlx-portable-state",
+      "backend_family": "mlx_metal",
+      "artifact_format": "safetensors",
+      "state_dict_digest": "state-dict-digest-mlx-mixed-backend-4096",
+      "tokenizer_contract_digest": "978a733f8b8f48aa9d77ea658fd640b6d61a40c18bd3f692cad93065237fff51",
+      "tensor_count": 96,
+      "parameter_precision": "fp32",
+      "optimizer_state_precision": "fp32",
+      "detail": "The MLX rank exports the same canonical fp32 safetensors state dict layout so later CUDA restores do not depend on backend-local conversion scripts."
+    }
+  ],
+  "restore_receipts": [
+    {
+      "receipt_id": "restore-cuda-to-cuda",
+      "source_backend_family": "cuda",
+      "target_backend_family": "cuda",
+      "recovery_mode": "resume_from_last_stable_checkpoint",
+      "checkpoint_pointer_digest": "4dc1bc14d362c646d30724e077f660c2a720bc6f1780177dc13adb14abb31f1e",
+      "optimizer_state_portability_rule": "native_backend_resume_from_canonical_fp32_portable_state",
+      "disposition": "recovered",
+      "detail": "restore stays on the native CUDA backend and reuses the canonical portable fp32 state dict without conversion."
+    },
+    {
+      "receipt_id": "restore-mlx-to-mlx",
+      "source_backend_family": "mlx_metal",
+      "target_backend_family": "mlx_metal",
+      "recovery_mode": "resume_from_last_stable_checkpoint",
+      "checkpoint_pointer_digest": "4dc1bc14d362c646d30724e077f660c2a720bc6f1780177dc13adb14abb31f1e",
+      "optimizer_state_portability_rule": "native_backend_resume_from_canonical_fp32_portable_state",
+      "disposition": "recovered",
+      "detail": "restore stays on the native MLX backend and reuses the canonical portable fp32 state dict without conversion."
+    },
+    {
+      "receipt_id": "restore-cuda-to-mlx",
+      "source_backend_family": "cuda",
+      "target_backend_family": "mlx_metal",
+      "recovery_mode": "resume_from_last_stable_checkpoint",
+      "checkpoint_pointer_digest": "4dc1bc14d362c646d30724e077f660c2a720bc6f1780177dc13adb14abb31f1e",
+      "optimizer_state_portability_rule": "cross_backend_restore_through_canonical_fp32_portable_state",
+      "disposition": "restored_with_canonical_cast",
+      "detail": "restore accepts the CUDA portable fp32 state dict and rehydrates the MLX rank through the same safetensors-backed portable state family with no manual conversion step."
+    },
+    {
+      "receipt_id": "restore-mlx-to-cuda",
+      "source_backend_family": "mlx_metal",
+      "target_backend_family": "cuda",
+      "recovery_mode": "resume_from_last_stable_checkpoint",
+      "checkpoint_pointer_digest": "4dc1bc14d362c646d30724e077f660c2a720bc6f1780177dc13adb14abb31f1e",
+      "optimizer_state_portability_rule": "cross_backend_restore_through_canonical_fp32_portable_state",
+      "disposition": "restored_with_canonical_cast",
+      "detail": "restore accepts the MLX portable fp32 state dict and rehydrates the CUDA rank through the same safetensors-backed portable state family with no manual conversion step."
+    },
+    {
+      "receipt_id": "restore-cuda-bf16-to-mlx-refused",
+      "source_backend_family": "cuda",
+      "target_backend_family": "mlx_metal",
+      "recovery_mode": "resume_from_last_stable_checkpoint",
+      "checkpoint_pointer_digest": "4dc1bc14d362c646d30724e077f660c2a720bc6f1780177dc13adb14abb31f1e",
+      "optimizer_state_portability_rule": "mixed_backend_restore_refused",
+      "disposition": "refused",
+      "detail": "restore refuses when the checkpoint was authored under a BF16 optimizer-state posture because the shared mixed-backend checkpoint family is still fp32-only."
+    }
+  ],
+  "refusal_set": [
+    {
+      "refusal_id": "mixed_backend_checkpoint.bf16_optimizer_state_migration",
+      "refusal_kind": "bf16_optimizer_state_migration",
+      "detail": "The mixed-backend checkpoint contract refuses BF16 optimizer-state migration until the shared CUDA-plus-MLX mesh stops using the fp32-only reference law."
+    },
+    {
+      "refusal_id": "mixed_backend_checkpoint.quantized_checkpoint_resume",
+      "refusal_kind": "quantized_checkpoint_resume",
+      "detail": "The mixed-backend checkpoint contract refuses quantized checkpoint resume because the canonical portable state family remains dense fp32 safetensors."
+    },
+    {
+      "refusal_id": "mixed_backend_checkpoint.checkpointless_migration",
+      "refusal_kind": "checkpointless_migration",
+      "detail": "The mixed-backend checkpoint contract refuses checkpointless migration. Backend changes must go through the canonical mixed-backend checkpoint pointer and manifest."
+    },
+    {
+      "refusal_id": "mixed_backend_checkpoint.incomplete_portable_group_selection",
+      "refusal_kind": "incomplete_portable_group_selection",
+      "detail": "The mixed-backend checkpoint contract refuses partial portable group selection so optimizer-state portability cannot silently drop one tensor out of a training-group assignment."
+    }
+  ],
+  "claim_boundary": "This contract closes one typed mixed-backend checkpoint family for CUDA plus MLX dense runs: canonical fp32 safetensors-backed portable state, a shared checkpoint manifest and pointer, same-backend resume, cross-backend restore through canonical portable state, and one explicit refusal set for unsupported migrations. It does not claim low-precision mixed-backend portability or a real proof run by itself.",
+  "contract_digest": "b9f4c3e4889b8cc701f0b44082e7b2e1ab72c5bb77d34a6fd178e4128609d062"
+}
