@@ -102,6 +102,8 @@ fn run() -> Result<(), ParameterGolfSubmissionRuntimeError> {
             bootstrap_receipt,
             train_step_receipt_path,
             train_step_receipt,
+            dense_rank_execution_receipt_path,
+            dense_rank_execution_receipt,
         } => {
             eprintln!(
                 "psionic_parameter_golf_distributed_8xh100_bringup matching_h100_device_count={} machine_contract_satisfied={} report_path={}",
@@ -120,11 +122,13 @@ fn run() -> Result<(), ParameterGolfSubmissionRuntimeError> {
                 train_step_receipt.observed_step_ms as f64,
             );
             eprintln!(
-                "psionic_parameter_golf_distributed_8xh100_train_step receipt_path={} distributed_receipt_path={} gradient_sync_ms={} optimizer_step_ms={}",
+                "psionic_parameter_golf_distributed_8xh100_train_step receipt_path={} distributed_receipt_path={} gradient_sync_ms={} optimizer_step_ms={} dense_rank_execution_receipt_path={} dense_rank_runtime_family={}",
                 train_step_receipt_path,
                 train_step_receipt.distributed_receipt_path,
                 train_step_receipt.gradient_sync_ms,
                 train_step_receipt.optimizer_step_ms,
+                dense_rank_execution_receipt_path,
+                dense_rank_execution_receipt.runtime.runtime_family_id,
             );
             for observation in &train_step_receipt.validation_shard_observations {
                 println!(

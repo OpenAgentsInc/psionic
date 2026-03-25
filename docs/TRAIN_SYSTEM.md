@@ -96,6 +96,18 @@ bindings, startup expectations, finalizer expectations, and projected
 provider-specific step sequences. Resource creation remains provider-specific,
 but the training-facing launch semantics are now typed in one place.
 
+The repo now also owns the first generic dense-rank runtime layer in
+`crates/psionic-train/src/dense_rank_runtime.rs`, the binary
+`dense_rank_runtime_reference_contract`, the checker
+`scripts/check-dense-rank-runtime-reference-contract.sh`, the focused reference
+doc `docs/DENSE_RANK_RUNTIME_REFERENCE.md`, and the committed fixture
+`fixtures/training/dense_rank_runtime_reference_contract_v1.json`. That surface
+promotes the real PGOLF CUDA `8xH100` bootstrap and train-step path into one
+shared dense-rank runtime receipt family with explicit runtime identity,
+validation-hook contract, checkpoint-hook contract, and generic execution
+receipt semantics. PGOLF remains one consumer lane, but it no longer owns the
+only dense distributed runtime receipt model in the repo.
+
 The first local mixed-hardware swarm lane now also has a canonical machine-
 legible contract in `crates/psionic-train/src/swarm_open_adapter.rs` plus the
 committed fixture `fixtures/swarm/first_swarm_run_contract_v1.json`. That

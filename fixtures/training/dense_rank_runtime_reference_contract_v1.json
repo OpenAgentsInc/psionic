@@ -1,0 +1,24 @@
+{
+  "schema_version": "psionic.dense_rank_runtime_reference_contract.v1",
+  "runtime": {
+    "runtime_family_id": "psionic.dense_rank_runtime.cuda.v1",
+    "consumer_lane_id": "psion.cross_provider_pretraining_dense_reference",
+    "checkpoint_family": "psion.cross_provider.pretrain.v1",
+    "dataset_family_id": "psion.curated_pretrain.dataset_family.v1",
+    "requested_backend": "nccl",
+    "world_size": 8
+  },
+  "validation_hook": {
+    "hook_id": "dense_rank_runtime.validation.post_train_eval",
+    "posture": "lane_owned_post_train_validation_deferred",
+    "detail": "The generic dense-rank runtime now owns the validation hook contract even though the promoted PGOLF consumer still stops after one measured train step."
+  },
+  "checkpoint_hook": {
+    "hook_id": "dense_rank_runtime.checkpoint.materialization",
+    "posture": "checkpoint_contract_owned_no_materialized_dense_checkpoint_yet",
+    "detail": "The generic dense-rank runtime now owns the checkpoint hook contract even though the promoted PGOLF consumer does not yet emit a dense distributed checkpoint shard set."
+  },
+  "generic_execution_receipt_name": "dense_rank_runtime_execution_receipt_v1.json",
+  "claim_boundary": "This reference contract promotes the CUDA dense-rank runtime substrate above Parameter Golf. It does not claim mixed-backend dense training, distributed checkpoint closure, or post-train validation closure by itself.",
+  "contract_digest": "d7c4fe2ab61dfa7da6bebfd44f0622e7365a19e23c9770ece03dfc85cde428d0"
+}
