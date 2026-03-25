@@ -119,6 +119,19 @@ heartbeat and stale-worker thresholds, per-host bring-up commands, and the
 required stale-worker, upload-disagreement, contributor-loss, and skew drills
 before the later rehearsal and live-run issues claim anything broader.
 
+The Google follow-on now also has one exact configured-peer topology and
+manifest contract in
+`crates/psionic-train/src/psion_google_two_node_swarm_contract.rs`, the binary
+`psion_google_two_node_swarm_contract`, the checker
+`scripts/check-psion-google-two-node-swarm-contract.sh`, and the committed
+fixture `fixtures/psion/google/psion_google_two_node_swarm_contract_v1.json`.
+That surface freezes the first Google swarm lane to two CUDA-backed `g2` plus
+`L4` nodes in `openagentsgemini`, one configured-peer cluster namespace, one
+explicit zone-pair fallback order, distinct dedicated training subnetworks, the
+reserved dual-node operator artifact paths, the admitted network-impairment
+profile ids, and the exact bounded result classes before later launch, runbook,
+or live-run issues claim the full operator path exists.
+
 The repo now also owns one rehearsal-grade bottleneck report for that lane in
 `crates/psionic-train/src/swarm_trusted_lan_rehearsal.rs`, the binary
 `first_swarm_trusted_lan_rehearsal_report`, the checker

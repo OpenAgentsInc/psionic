@@ -1,0 +1,137 @@
+{
+  "schema_version": "psion.google_two_node_swarm_contract.v1",
+  "contract_id": "openagentsgemini-psion-google-two-node-swarm-contract-v1",
+  "scope_window": "psion_google_two_node_swarm_contract_v1",
+  "run_family_id": "psion.google.configured_peer_two_node_swarm.v1",
+  "project_id": "openagentsgemini",
+  "region_family": "us-central1",
+  "bucket_url": "gs://openagentsgemini-psion-train-us-central1",
+  "network": "oa-lightning",
+  "cluster_namespace": "cluster.psion.google.configured_peer_swarm",
+  "cluster_admission_posture": "authenticated_configured_peers.operator_manifest",
+  "discovery_posture": "configured_peer_only",
+  "training_command_id": "psion_google_two_node_configured_peer_open_adapter_swarm",
+  "external_ip_permitted": false,
+  "artifact_authority": {
+    "contract_fixture_path": "fixtures/psion/google/psion_google_two_node_swarm_contract_v1.json",
+    "check_script_path": "scripts/check-psion-google-two-node-swarm-contract.sh",
+    "launch_profiles_path": "fixtures/psion/google/psion_google_two_node_swarm_launch_profiles_v1.json",
+    "network_posture_path": "fixtures/psion/google/psion_google_two_node_swarm_network_posture_v1.json",
+    "identity_profile_path": "fixtures/psion/google/psion_google_two_node_swarm_identity_profile_v1.json",
+    "operator_preflight_policy_path": "fixtures/psion/google/psion_google_two_node_swarm_operator_preflight_policy_v1.json",
+    "impairment_policy_path": "fixtures/psion/google/psion_google_two_node_swarm_impairment_policy_v1.json",
+    "operator_preflight_script_path": "scripts/psion-google-operator-preflight-two-node-swarm.sh",
+    "launch_script_path": "scripts/psion-google-launch-two-node-swarm.sh",
+    "startup_script_path": "scripts/psion-google-two-node-swarm-startup.sh",
+    "delete_script_path": "scripts/psion-google-delete-two-node-swarm.sh",
+    "finalize_script_path": "scripts/psion-google-finalize-two-node-swarm-run.sh",
+    "runbook_path": "docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md"
+  },
+  "baseline_single_node_artifacts": [
+    {
+      "path": "fixtures/psion/google/psion_google_single_node_launch_profiles_v1.json",
+      "sha256": "6a057490ef3128b31ffa1672ea8275963cbe29ca21b602647b7e9134616543b2",
+      "detail": "The dual-node lane still depends on the existing single-node launch authority as the starting Google machine-shape substrate."
+    },
+    {
+      "path": "fixtures/psion/google/psion_google_network_posture_v1.json",
+      "sha256": "56d6ab5ecc32b44d3576d7c83a1d51754117cb5a7b51142d6bc7f94491dde7a2",
+      "detail": "The dual-node lane still depends on the existing private-egress plus IAP SSH Google network posture and widens it explicitly rather than replacing it implicitly."
+    },
+    {
+      "path": "fixtures/psion/google/psion_google_training_identity_profile_v1.json",
+      "sha256": "b881bae175913b484d5c39d4dccb3fc9f1fa8db754b030009d59e466cf5087b6",
+      "detail": "The dual-node lane still depends on the existing Google training identity posture and widens it to a role-aware swarm identity contract later."
+    },
+    {
+      "path": "fixtures/psion/google/psion_google_training_storage_profile_v1.json",
+      "sha256": "c37c02ab818ff70daf95a88d47dd3c08f3a27bc614de5f7ff5d0d3757520b5bb",
+      "detail": "The dual-node lane still uses the existing dedicated training bucket and durable prefix layout as its storage authority."
+    }
+  ],
+  "admitted_zone_pairs": [
+    {
+      "pair_id": "us-central1-a__us-central1-b",
+      "coordinator_zone": "us-central1-a",
+      "contributor_zone": "us-central1-b",
+      "detail": "Primary dual-zone pair for the first Google swarm rehearsal."
+    },
+    {
+      "pair_id": "us-central1-a__us-central1-c",
+      "coordinator_zone": "us-central1-a",
+      "contributor_zone": "us-central1-c",
+      "detail": "First fallback pair when `us-central1-b` is quota-constrained or unavailable."
+    },
+    {
+      "pair_id": "us-central1-b__us-central1-c",
+      "coordinator_zone": "us-central1-b",
+      "contributor_zone": "us-central1-c",
+      "detail": "Second fallback pair when the primary coordinator zone is unavailable."
+    }
+  ],
+  "nodes": [
+    {
+      "node_id": "psion-google-swarm-coordinator-a",
+      "role_id": "psion.google_swarm.coordinator_validator_aggregator_contributor",
+      "role_kind": "coordinator_validator_aggregator_contributor",
+      "launch_profile_id": "g2_l4_two_node_swarm_coordinator",
+      "preferred_zone": "us-central1-a",
+      "subnetwork": "oa-lightning-us-central1-psion-swarm-coordinator",
+      "backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+      "logical_device_label": "cuda:0",
+      "machine_type": "g2-standard-8",
+      "accelerator_type": "nvidia-l4",
+      "accelerator_count": 1,
+      "cluster_port": 34100,
+      "endpoint_manifest_object": "manifests/psion_google_two_node_swarm_coordinator_endpoint_manifest.json",
+      "detail": "The coordinator node owns configured-peer authority, validator visibility, aggregation authority, and one CUDA contributor slot."
+    },
+    {
+      "node_id": "psion-google-swarm-contributor-b",
+      "role_id": "psion.google_swarm.contributor",
+      "role_kind": "contributor",
+      "launch_profile_id": "g2_l4_two_node_swarm_contributor",
+      "preferred_zone": "us-central1-b",
+      "subnetwork": "oa-lightning-us-central1-psion-swarm-contributor",
+      "backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+      "logical_device_label": "cuda:0",
+      "machine_type": "g2-standard-8",
+      "accelerator_type": "nvidia-l4",
+      "accelerator_count": 1,
+      "cluster_port": 34101,
+      "endpoint_manifest_object": "manifests/psion_google_two_node_swarm_contributor_endpoint_manifest.json",
+      "detail": "The contributor node owns one CUDA contributor slot and no validator or aggregation authority."
+    }
+  ],
+  "bucket_authority": {
+    "run_prefix_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}",
+    "cluster_manifest_object": "launch/psion_google_two_node_swarm_cluster_manifest.json",
+    "coordinator_bringup_report_object": "host/coordinator/psion_google_two_node_swarm_bringup_report.json",
+    "contributor_bringup_report_object": "host/contributor/psion_google_two_node_swarm_bringup_report.json",
+    "cluster_evidence_bundle_object": "final/psion_google_two_node_swarm_evidence_bundle.json",
+    "final_manifest_object": "final/psion_google_two_node_swarm_final_manifest.json"
+  },
+  "admitted_impairment_profile_ids": [
+    "clean_baseline",
+    "mild_wan",
+    "asymmetric_degraded",
+    "temporary_partition"
+  ],
+  "result_classifications": [
+    "configured_peer_launch_failure",
+    "cluster_membership_failure",
+    "network_impairment_gate_failure",
+    "contributor_execution_failure",
+    "validator_refusal",
+    "aggregation_failure",
+    "bounded_success"
+  ],
+  "non_goals": [
+    "trusted-cluster full-model Google training",
+    "cross-region or public-internet cluster execution",
+    "wider-network discovery rollout",
+    "mixed-backend or mixed-hardware math parity closure"
+  ],
+  "claim_boundary": "This contract freezes one bounded Google two-node configured-peer swarm rehearsal: two GCE L4 nodes in one project and one region family, distinct zones, distinct dedicated subnetworks, no external IPs, explicit configured-peer admission, explicit impairment profile ids, and one CUDA open-adapter adapter-delta lane. It does not claim trusted-cluster full-model training, wider-network discovery, cross-region rollout, or internet-wide swarm compute.",
+  "contract_digest": "b279e935039f6a7a26cc34f1c189c4d804f6cc33491cb0ae47976dbf62e88ef8"
+}
