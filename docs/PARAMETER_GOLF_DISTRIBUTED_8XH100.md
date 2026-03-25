@@ -110,7 +110,10 @@ Psionic now encodes that exact posture explicitly instead of treating
   can reflect real parallel rank execution instead of accidental rank-serial
   receipt collection; the resident workers now also preload the fixed
   validation token surface once at startup instead of reopening the full
-  validation shards inside every validation call
+  validation shards inside every validation call; the non-score-first-TTT
+  validation path now also reuses the resident train-session parameter buffers
+  directly instead of materializing a second post-step model and reuploading a
+  second parameter surface per rank-local validation batch shape
 - `psionic-models` now also ships the upstream-style banked PGOLF matrix
   surface under `ParameterGolfBankedWeights`, with the exact public bank tensor
   ids `qo_bank`, `kv_bank`, `mlp_up_bank`, and `mlp_down_bank`; the optimizer
@@ -221,6 +224,12 @@ surface: which windows each rank evaluated, which scored-token interval each
 rank owned, which explicit `validation_batch_sequences` contract was active,
 and how the aggregated `loss_sum`, `token_count`, and `byte_count` were reduced
 back into one distributed validation result.
+
+For the resident non-TTT path, rank-local validation now binds those eval
+graphs against the already refreshed train-session parameter buffers. That
+keeps the validation parameter surface on device after each optimizer step and
+removes the extra post-step model materialization plus eval-only parameter
+upload from the per-rank validation startup path.
 
 The distributed runtime now also admits the same legal `score_first_ttt`
 contract that the single-H100 CUDA lane already owned. The worker mesh keeps

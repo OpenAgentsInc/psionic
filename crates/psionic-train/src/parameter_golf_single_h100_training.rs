@@ -42,10 +42,9 @@ use crate::{
     inspect_local_single_h100_machine, materialize_parameter_golf_baseline_training_gradients,
     parameter_golf_optimizer_plan, parameter_golf_parameter_values_for_bindings,
     restore_parameter_golf_model_from_quantized_artifact, training_batch_from_window_tokens,
-    ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph,
-    ParameterGolfBatchGeometry, ParameterGolfBf16MasterWeightStepReceipt,
-    ParameterGolfFinalArtifactConfig, ParameterGolfOptimizerExecution,
-    ParameterGolfOptimizerGroupKind, ParameterGolfOptimizerPlan,
+    ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph, ParameterGolfBatchGeometry,
+    ParameterGolfBf16MasterWeightStepReceipt, ParameterGolfFinalArtifactConfig,
+    ParameterGolfOptimizerExecution, ParameterGolfOptimizerGroupKind, ParameterGolfOptimizerPlan,
     ParameterGolfReferenceTrainingError, ParameterGolfSingleH100BringupError,
     ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100MachineObservation,
     ParameterGolfTrainError, ParameterGolfTrainingHyperparameters, TrainingOptimizerConfig,
@@ -248,24 +247,18 @@ impl ParameterGolfSingleH100TrainingConfig {
             swa.validate()?;
             if swa.source_surface == ParameterGolfSwaSourceSurface::Ema && self.ema.is_none() {
                 return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
-                    message: String::from(
-                        "swa source_surface=ema requires an explicit ema config",
-                    ),
+                    message: String::from("swa source_surface=ema requires an explicit ema config"),
                 });
             }
         }
         if self.final_model_surface == ParameterGolfFinalModelSurface::Ema && self.ema.is_none() {
             return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
-                message: String::from(
-                    "final_model_surface=ema requires an explicit ema config",
-                ),
+                message: String::from("final_model_surface=ema requires an explicit ema config"),
             });
         }
         if self.final_model_surface == ParameterGolfFinalModelSurface::Swa && self.swa.is_none() {
             return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
-                message: String::from(
-                    "final_model_surface=swa requires an explicit swa config",
-                ),
+                message: String::from("final_model_surface=swa requires an explicit swa config"),
             });
         }
         Ok(())
@@ -1214,10 +1207,7 @@ struct ParameterGolfEmaState {
 }
 
 impl ParameterGolfEmaState {
-    fn new(
-        config: ParameterGolfEmaConfig,
-        state: &ParameterGolfSingleH100TrainerState,
-    ) -> Self {
+    fn new(config: ParameterGolfEmaConfig, state: &ParameterGolfSingleH100TrainerState) -> Self {
         Self {
             config,
             parameter_values: current_parameter_state_overrides(state),
@@ -1230,11 +1220,14 @@ impl ParameterGolfEmaState {
     ) -> Result<(), ParameterGolfSingleH100TrainingError> {
         let current_values = current_parameter_state_overrides(state);
         for (parameter_id, values) in current_values {
-            let ema_values = self.parameter_values.get_mut(&parameter_id).ok_or_else(|| {
-                ParameterGolfSingleH100TrainingError::MissingParameterState {
-                    parameter_id: parameter_id.clone(),
-                }
-            })?;
+            let ema_values = self
+                .parameter_values
+                .get_mut(&parameter_id)
+                .ok_or_else(
+                    || ParameterGolfSingleH100TrainingError::MissingParameterState {
+                        parameter_id: parameter_id.clone(),
+                    },
+                )?;
             if ema_values.len() != values.len() {
                 return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
                     message: format!(
@@ -1245,8 +1238,8 @@ impl ParameterGolfEmaState {
                 });
             }
             for (ema_value, current_value) in ema_values.iter_mut().zip(values) {
-                *ema_value = (*ema_value * self.config.decay)
-                    + (current_value * (1.0 - self.config.decay));
+                *ema_value =
+                    (*ema_value * self.config.decay) + (current_value * (1.0 - self.config.decay));
             }
         }
         Ok(())
@@ -1286,9 +1279,11 @@ impl ParameterGolfSwaState {
         }
         for (parameter_id, values) in overrides {
             let Some(sums) = self.parameter_sums.get_mut(parameter_id) else {
-                return Err(ParameterGolfSingleH100TrainingError::MissingParameterState {
-                    parameter_id: parameter_id.clone(),
-                });
+                return Err(
+                    ParameterGolfSingleH100TrainingError::MissingParameterState {
+                        parameter_id: parameter_id.clone(),
+                    },
+                );
             };
             if sums.len() != values.len() {
                 return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
@@ -2421,7 +2416,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
         emit_progress_line(format!(
             "{}_exact val_loss:{:.8} val_bpb:{:.8}",
             final_roundtrip_metric_source,
-            roundtrip_validation.mean_loss, roundtrip_validation.bits_per_byte,
+            roundtrip_validation.mean_loss,
+            roundtrip_validation.bits_per_byte,
         ));
         final_validation_observed_ms = Some(roundtrip_observed_ms);
         final_validation = Some(roundtrip_validation.clone());
@@ -2430,13 +2426,12 @@ fn build_parameter_golf_single_h100_training_report_inner(
             ema: match config.final_model_surface {
                 ParameterGolfFinalModelSurface::Raw => None,
                 ParameterGolfFinalModelSurface::Ema => config.ema.clone(),
-                ParameterGolfFinalModelSurface::Swa => {
-                    (config.swa.as_ref().is_some_and(|swa| {
-                        swa.source_surface == ParameterGolfSwaSourceSurface::Ema
-                    }))
-                    .then(|| config.ema.clone())
-                    .flatten()
-                }
+                ParameterGolfFinalModelSurface::Swa => (config
+                    .swa
+                    .as_ref()
+                    .is_some_and(|swa| swa.source_surface == ParameterGolfSwaSourceSurface::Ema))
+                .then(|| config.ema.clone())
+                .flatten(),
             },
             swa: (config.final_model_surface == ParameterGolfFinalModelSurface::Swa)
                 .then(|| final_swa_receipt.clone())
@@ -3578,6 +3573,72 @@ pub(crate) fn evaluate_validation_on_cuda(
     stage_label: &str,
     live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
 ) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    evaluate_validation_on_cuda_with_parameter_buffers(
+        cuda_backend,
+        device,
+        descriptor,
+        model,
+        None,
+        validation_tokens,
+        byte_luts,
+        sequence_length,
+        batch_sequences,
+        eval_mode,
+        graph_cache,
+        stage_label,
+        live_visualization_writer,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn evaluate_validation_on_cuda_with_resident_training_parameters(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
+    resident_training_sessions: &BTreeMap<usize, ParameterGolfCudaTrainingSession>,
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    eval_mode: &ParameterGolfValidationEvalMode,
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
+    stage_label: &str,
+    live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    evaluate_validation_on_cuda_with_parameter_buffers(
+        cuda_backend,
+        device,
+        descriptor,
+        model,
+        Some(resident_training_sessions),
+        validation_tokens,
+        byte_luts,
+        sequence_length,
+        batch_sequences,
+        eval_mode,
+        graph_cache,
+        stage_label,
+        live_visualization_writer,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn evaluate_validation_on_cuda_with_parameter_buffers(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
+    resident_training_sessions: Option<&BTreeMap<usize, ParameterGolfCudaTrainingSession>>,
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    eval_mode: &ParameterGolfValidationEvalMode,
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
+    stage_label: &str,
+    live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
     eval_mode.validate(sequence_length)?;
     if validation_tokens.len() <= sequence_length {
         return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
@@ -3610,6 +3671,7 @@ pub(crate) fn evaluate_validation_on_cuda(
         total_units,
         total_byte_accounting_us,
         batch_plans,
+        resident_training_sessions,
     )
 }
 
@@ -3618,6 +3680,76 @@ pub(crate) fn evaluate_validation_window_starts_on_cuda(
     device: &psionic_core::Device,
     descriptor: &psionic_models::ParameterGolfModelDescriptor,
     model: &ParameterGolfReferenceModel,
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    stride: usize,
+    window_starts: &[usize],
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
+    stage_label: &str,
+    live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    evaluate_validation_window_starts_on_cuda_with_parameter_buffers(
+        cuda_backend,
+        device,
+        descriptor,
+        model,
+        None,
+        validation_tokens,
+        byte_luts,
+        sequence_length,
+        batch_sequences,
+        stride,
+        window_starts,
+        graph_cache,
+        stage_label,
+        live_visualization_writer,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn evaluate_validation_window_starts_on_cuda_with_resident_training_parameters(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
+    resident_training_sessions: &BTreeMap<usize, ParameterGolfCudaTrainingSession>,
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    stride: usize,
+    window_starts: &[usize],
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
+    stage_label: &str,
+    live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    evaluate_validation_window_starts_on_cuda_with_parameter_buffers(
+        cuda_backend,
+        device,
+        descriptor,
+        model,
+        Some(resident_training_sessions),
+        validation_tokens,
+        byte_luts,
+        sequence_length,
+        batch_sequences,
+        stride,
+        window_starts,
+        graph_cache,
+        stage_label,
+        live_visualization_writer,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn evaluate_validation_window_starts_on_cuda_with_parameter_buffers(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
+    resident_training_sessions: Option<&BTreeMap<usize, ParameterGolfCudaTrainingSession>>,
     validation_tokens: &[u16],
     byte_luts: &ParameterGolfSentencePieceByteLuts,
     sequence_length: usize,
@@ -3661,6 +3793,7 @@ pub(crate) fn evaluate_validation_window_starts_on_cuda(
         window_starts.len(),
         total_byte_accounting_us,
         batch_plans,
+        resident_training_sessions,
     )
 }
 
@@ -4169,6 +4302,7 @@ fn evaluate_validation_batch_plans_on_cuda(
     total_units: usize,
     total_byte_accounting_us: u64,
     batch_plans: Vec<ParameterGolfValidationBatchPlan>,
+    resident_training_sessions: Option<&BTreeMap<usize, ParameterGolfCudaTrainingSession>>,
 ) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
     let mut total_loss_sum = 0.0_f64;
     let mut total_token_count = 0_u64;
@@ -4201,6 +4335,7 @@ fn evaluate_validation_batch_plans_on_cuda(
             graph_cache,
             device.clone(),
             model,
+            resident_training_sessions,
             batch_plan.batch_sequences,
             sequence_length,
         )?;
@@ -4687,6 +4822,7 @@ fn validation_session_for_batch<'a>(
     graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
     device: psionic_core::Device,
     model: &ParameterGolfReferenceModel,
+    resident_training_sessions: Option<&BTreeMap<usize, ParameterGolfCudaTrainingSession>>,
     batch_sequences: usize,
     sequence_length: usize,
 ) -> Result<&'a mut ParameterGolfCudaValidationSession, ParameterGolfSingleH100TrainingError> {
@@ -4694,13 +4830,25 @@ fn validation_session_for_batch<'a>(
         let graph =
             eval_graph_for_batch(graph_cache, device, model, batch_sequences, sequence_length)?
                 .clone();
-        let session = ParameterGolfCudaValidationSession::new(
-            cuda_backend,
-            graph,
-            model,
-            batch_sequences,
-            sequence_length,
-        )?;
+        let session = match resident_validation_parameter_source_session(resident_training_sessions)
+        {
+            Some(training_session) => {
+                ParameterGolfCudaValidationSession::new_from_resident_training_session(
+                    cuda_backend,
+                    graph,
+                    training_session,
+                    batch_sequences,
+                    sequence_length,
+                )?
+            }
+            None => ParameterGolfCudaValidationSession::new(
+                cuda_backend,
+                graph,
+                model,
+                batch_sequences,
+                sequence_length,
+            )?,
+        };
         cache.insert(batch_sequences, session);
     }
     cache.get_mut(&batch_sequences).ok_or_else(|| {
@@ -4710,6 +4858,12 @@ fn validation_session_for_batch<'a>(
             ),
         }
     })
+}
+
+fn resident_validation_parameter_source_session(
+    resident_training_sessions: Option<&BTreeMap<usize, ParameterGolfCudaTrainingSession>>,
+) -> Option<&ParameterGolfCudaTrainingSession> {
+    resident_training_sessions.and_then(|sessions| sessions.values().next())
 }
 
 fn training_session_for_batch<'a>(
@@ -4874,6 +5028,71 @@ impl ParameterGolfCudaValidationSession {
             input_token_staging: vec![0_i32; token_element_count],
             target_token_staging: vec![0_i32; token_element_count],
             resident_parameter_upload_us,
+            persistent_parameter_buffer_count,
+            persistent_parameter_value_count,
+        })
+    }
+
+    fn new_from_resident_training_session(
+        cuda_backend: &mut CudaBackend,
+        graph: ParameterGolfBaselineEvalGraph,
+        training_session: &ParameterGolfCudaTrainingSession,
+        batch_sequences: usize,
+        sequence_length: usize,
+    ) -> Result<Self, ParameterGolfSingleH100TrainingError> {
+        let token_element_count = batch_sequences.saturating_mul(sequence_length);
+        let token_shape = Shape::new(vec![batch_sequences, sequence_length]);
+        let mut static_inputs = BTreeMap::new();
+        let mut persistent_parameter_buffer_count = 0_usize;
+        let mut persistent_parameter_value_count = 0_u64;
+        for binding in &graph.parameter_bindings {
+            let training_binding = training_session
+                .graph
+                .parameter_binding(&binding.parameter_id)
+                .ok_or_else(|| ParameterGolfSingleH100TrainingError::Serialization {
+                    message: format!(
+                        "resident validation session could not find training binding for `{}`",
+                        binding.parameter_id
+                    ),
+                })?;
+            if training_binding.shape != binding.shape
+                || training_binding.graph_input_dtype != binding.graph_input_dtype
+            {
+                return Err(ParameterGolfSingleH100TrainingError::Serialization {
+                    message: format!(
+                        "resident validation session expected `{}` to match training binding shape {:?} dtype {:?} but observed shape {:?} dtype {:?}",
+                        binding.parameter_id,
+                        binding.shape,
+                        binding.graph_input_dtype,
+                        training_binding.shape,
+                        training_binding.graph_input_dtype,
+                    ),
+                });
+            }
+            let buffer = training_session
+                .static_inputs
+                .get(&training_binding.graph_input_tensor_id)
+                .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphTensor {
+                    tensor_id: training_binding.graph_input_tensor_id,
+                })?
+                .clone();
+            persistent_parameter_buffer_count = persistent_parameter_buffer_count.saturating_add(1);
+            persistent_parameter_value_count = persistent_parameter_value_count
+                .saturating_add(buffer.spec().shape().element_count() as u64);
+            static_inputs.insert(binding.graph_input_tensor_id, buffer);
+        }
+        let input_token_buffer =
+            cuda_backend.input_i32_buffer(token_shape.clone(), vec![0_i32; token_element_count])?;
+        let target_token_buffer =
+            cuda_backend.input_i32_buffer(token_shape, vec![0_i32; token_element_count])?;
+        Ok(Self {
+            graph,
+            static_inputs,
+            input_token_buffer,
+            target_token_buffer,
+            input_token_staging: vec![0_i32; token_element_count],
+            target_token_staging: vec![0_i32; token_element_count],
+            resident_parameter_upload_us: 0,
             persistent_parameter_buffer_count,
             persistent_parameter_value_count,
         })
@@ -5787,7 +6006,10 @@ mod tests {
         );
         assert_eq!(config.ema, None);
         assert_eq!(config.swa, None);
-        assert_eq!(config.final_model_surface, ParameterGolfFinalModelSurface::Raw);
+        assert_eq!(
+            config.final_model_surface,
+            ParameterGolfFinalModelSurface::Raw
+        );
         assert_eq!(
             config.final_artifact_config,
             ParameterGolfFinalArtifactConfig::default()
@@ -5813,7 +6035,10 @@ mod tests {
         );
         assert_eq!(config.ema, None);
         assert_eq!(config.swa, None);
-        assert_eq!(config.final_model_surface, ParameterGolfFinalModelSurface::Raw);
+        assert_eq!(
+            config.final_model_surface,
+            ParameterGolfFinalModelSurface::Raw
+        );
         assert_eq!(
             config.final_artifact_config,
             ParameterGolfFinalArtifactConfig::default()
@@ -5823,10 +6048,8 @@ mod tests {
 
     #[test]
     fn config_rejects_ema_surface_without_ema_config() -> Result<(), Box<dyn std::error::Error>> {
-        let root = std::env::temp_dir().join(format!(
-            "psionic-pgolf-ema-config-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("psionic-pgolf-ema-config-{}", std::process::id()));
         std::fs::create_dir_all(&root)?;
         let tokenizer_path = root.join("tokenizer.model");
         std::fs::write(&tokenizer_path, b"stub")?;
@@ -5834,7 +6057,9 @@ mod tests {
         let mut config =
             ParameterGolfSingleH100TrainingConfig::challenge_defaults(&root, &tokenizer_path);
         config.final_model_surface = ParameterGolfFinalModelSurface::Ema;
-        let error = config.validate().expect_err("ema export without ema config must fail");
+        let error = config
+            .validate()
+            .expect_err("ema export without ema config must fail");
         assert!(error
             .to_string()
             .contains("final_model_surface=ema requires an explicit ema config"));
@@ -5843,10 +6068,8 @@ mod tests {
 
     #[test]
     fn config_rejects_swa_surface_without_swa_config() -> Result<(), Box<dyn std::error::Error>> {
-        let root = std::env::temp_dir().join(format!(
-            "psionic-pgolf-swa-config-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("psionic-pgolf-swa-config-{}", std::process::id()));
         std::fs::create_dir_all(&root)?;
         let tokenizer_path = root.join("tokenizer.model");
         std::fs::write(&tokenizer_path, b"stub")?;
@@ -5854,7 +6077,9 @@ mod tests {
         let mut config =
             ParameterGolfSingleH100TrainingConfig::challenge_defaults(&root, &tokenizer_path);
         config.final_model_surface = ParameterGolfFinalModelSurface::Swa;
-        let error = config.validate().expect_err("swa export without swa config must fail");
+        let error = config
+            .validate()
+            .expect_err("swa export without swa config must fail");
         assert!(error
             .to_string()
             .contains("final_model_surface=swa requires an explicit swa config"));
@@ -5862,8 +6087,8 @@ mod tests {
     }
 
     #[test]
-    fn config_rejects_ema_backed_swa_without_ema_config(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn config_rejects_ema_backed_swa_without_ema_config() -> Result<(), Box<dyn std::error::Error>>
+    {
         let root = std::env::temp_dir().join(format!(
             "psionic-pgolf-swa-ema-config-{}",
             std::process::id()
@@ -5894,10 +6119,8 @@ mod tests {
         let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
         let optimizer_plan = parameter_golf_optimizer_plan(model.descriptor(), &hyperparameters)?;
         let mut trainer_state = seed_parameter_states(&model, &optimizer_plan)?;
-        let mut ema_state = ParameterGolfEmaState::new(
-            ParameterGolfEmaConfig { decay: 0.5 },
-            &trainer_state,
-        );
+        let mut ema_state =
+            ParameterGolfEmaState::new(ParameterGolfEmaConfig { decay: 0.5 }, &trainer_state);
         let (parameter_id, original_value) = {
             let (parameter_id, state) = trainer_state
                 .parameter_states
@@ -5913,7 +6136,8 @@ mod tests {
             .expect("parameter state should still exist")
         {
             ParameterGolfParameterState::AdamBf16Master {
-                train_visible_values, ..
+                train_visible_values,
+                ..
             } => train_visible_values[0] += 2.0,
             ParameterGolfParameterState::AdamFp32 { values, .. }
             | ParameterGolfParameterState::MuonBf16 { values, .. } => values[0] += 2.0,
@@ -5971,7 +6195,8 @@ mod tests {
             .expect("parameter state should still exist")
         {
             ParameterGolfParameterState::AdamBf16Master {
-                train_visible_values, ..
+                train_visible_values,
+                ..
             } => train_visible_values[0] += 2.0,
             ParameterGolfParameterState::AdamFp32 { values, .. }
             | ParameterGolfParameterState::MuonBf16 { values, .. } => values[0] += 2.0,
@@ -6228,6 +6453,160 @@ mod tests {
         )?;
         assert_eq!(state_refreshed_runtime.resident_parameter_upload_us, 0);
         assert!(state_refreshed_runtime.parameter_refresh_us > 0);
+        Ok(())
+    }
+
+    #[test]
+    fn device_resident_validation_session_reuses_training_parameter_buffers_across_batch_sizes(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut cuda_backend = CudaBackend::new();
+        let Some(selected_device) = cuda_backend.selected_device().cloned() else {
+            return Ok(());
+        };
+
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+        let descriptor = model.banked_descriptor()?;
+        let banked_weights = model.banked_weights()?;
+        let sequence_length = 16;
+        let training_graph = build_parameter_golf_baseline_training_graph(
+            selected_device.device.clone(),
+            &descriptor,
+            1,
+            sequence_length,
+        )?;
+        let training_session = ParameterGolfCudaTrainingSession::new(
+            &mut cuda_backend,
+            training_graph,
+            &model,
+            Some(&banked_weights),
+            1,
+            sequence_length,
+        )?;
+        let validation_graph = build_parameter_golf_baseline_eval_graph(
+            selected_device.device.clone(),
+            &descriptor,
+            2,
+            sequence_length,
+        )?;
+        let validation_session =
+            ParameterGolfCudaValidationSession::new_from_resident_training_session(
+                &mut cuda_backend,
+                validation_graph,
+                &training_session,
+                2,
+                sequence_length,
+            )?;
+
+        assert_eq!(validation_session.resident_parameter_upload_us, 0);
+        assert_eq!(
+            validation_session.persistent_parameter_buffer_count,
+            training_session.persistent_parameter_buffer_count
+        );
+        for binding in &validation_session.graph.parameter_bindings {
+            let training_binding = training_session
+                .graph
+                .parameter_binding(&binding.parameter_id)
+                .ok_or("missing matching training binding")?;
+            let training_buffer = training_session
+                .static_inputs
+                .get(&training_binding.graph_input_tensor_id)
+                .ok_or("missing resident training buffer")?;
+            let validation_buffer = validation_session
+                .static_inputs
+                .get(&binding.graph_input_tensor_id)
+                .ok_or("missing resident validation buffer")?;
+            assert_eq!(
+                validation_buffer.allocation_identity(),
+                training_buffer.allocation_identity()
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn device_resident_validation_reuses_training_parameter_buffers_for_resident_eval(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut cuda_backend = CudaBackend::new();
+        let Some(selected_device) = cuda_backend.selected_device().cloned() else {
+            return Ok(());
+        };
+
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+        let banked_weights = model.banked_weights()?;
+        let sequence_length = 16;
+        let mut training_graph_cache = BTreeMap::new();
+        let mut training_session_cache = BTreeMap::new();
+        training_session_for_batch(
+            &mut training_session_cache,
+            &mut cuda_backend,
+            &mut training_graph_cache,
+            selected_device.device.clone(),
+            &model,
+            Some(&banked_weights),
+            1,
+            sequence_length,
+        )?;
+
+        let byte_luts = ParameterGolfSentencePieceByteLuts {
+            base_bytes_lut: vec![1; 8],
+            has_leading_space_lut: vec![false; 8],
+            is_boundary_token_lut: vec![false; 8],
+        };
+        let validation_tokens = (0..33).map(|index| (index % 8) as u16).collect::<Vec<_>>();
+        let mut eval_graph_cache = BTreeMap::new();
+        let eager_summary = evaluate_validation_on_cuda(
+            &mut cuda_backend,
+            &selected_device.device,
+            model.descriptor(),
+            &model,
+            validation_tokens.as_slice(),
+            &byte_luts,
+            sequence_length,
+            2,
+            &ParameterGolfValidationEvalMode::NonOverlapping,
+            &mut eval_graph_cache,
+            "resident_eval_eager",
+            None,
+        )?;
+        let mut resident_eval_graph_cache = BTreeMap::new();
+        let resident_summary = evaluate_validation_on_cuda_with_resident_training_parameters(
+            &mut cuda_backend,
+            &selected_device.device,
+            model.descriptor(),
+            &model,
+            &training_session_cache,
+            validation_tokens.as_slice(),
+            &byte_luts,
+            sequence_length,
+            2,
+            &ParameterGolfValidationEvalMode::NonOverlapping,
+            &mut resident_eval_graph_cache,
+            "resident_eval_reused",
+            None,
+        )?;
+
+        let eager_runtime = eager_summary
+            .runtime_receipt
+            .ok_or("missing eager validation runtime receipt")?;
+        let resident_runtime = resident_summary
+            .runtime_receipt
+            .ok_or("missing resident validation runtime receipt")?;
+        assert_eq!(
+            eager_summary.evaluated_token_count,
+            resident_summary.evaluated_token_count
+        );
+        assert_eq!(
+            eager_summary.evaluated_byte_count,
+            resident_summary.evaluated_byte_count
+        );
+        assert!((eager_summary.mean_loss - resident_summary.mean_loss).abs() < 1.0e-6);
+        assert!((eager_summary.bits_per_byte - resident_summary.bits_per_byte).abs() < 1.0e-6);
+        assert!(eager_runtime.resident_parameter_upload_us > 0);
+        assert_eq!(resident_runtime.resident_parameter_upload_us, 0);
+        assert_eq!(
+            eager_runtime.persistent_parameter_buffer_count,
+            resident_runtime.persistent_parameter_buffer_count
+        );
         Ok(())
     }
 

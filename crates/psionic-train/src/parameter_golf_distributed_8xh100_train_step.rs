@@ -28,7 +28,10 @@ use crate::{
     apply_gradients_to_state, benchmark_parameter_golf_distributed_8xh100,
     build_parameter_golf_validation_window_starts, build_tokenizer_digest,
     build_validation_observation_plan, clip_gradients, evaluate_validation_on_cuda,
-    evaluate_validation_window_starts_on_cuda, execute_parameter_golf_training_gradient_batch,
+    evaluate_validation_on_cuda_with_resident_training_parameters,
+    evaluate_validation_window_starts_on_cuda,
+    evaluate_validation_window_starts_on_cuda_with_resident_training_parameters,
+    execute_parameter_golf_training_gradient_batch,
     export_parameter_golf_banked_full_precision_weights_bytes,
     export_parameter_golf_int8_zlib_model_artifact, inspect_local_distributed_8xh100_machine,
     materialize_current_banked_weights, materialize_current_model,
@@ -1871,8 +1874,6 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
         ParameterGolfDistributed8xH100ValidationRankReceipt,
         ParameterGolfDistributed8xH100TrainStepError,
     > {
-        self.ensure_current_model_materialized()?;
-        let validation_tokens = self.validation_tokens.as_slice();
         let validation_batch_sequences = distributed_validation_batch_sequences(
             shard.local_batch_sequences as usize,
             &self.geometry,
@@ -1921,6 +1922,8 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
                     score_first_ttt_receipt: None,
                 }
             } else {
+                self.ensure_current_model_materialized()?;
+                let validation_tokens = self.validation_tokens.as_slice();
                 evaluate_validation_window_starts_on_cuda(
                     &mut self.cuda_backend,
                     &self.selected_device,
@@ -1938,7 +1941,7 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
                 )?
             }
         } else {
-            let total_sequence_count = (validation_tokens.len().saturating_sub(1)
+            let total_sequence_count = (self.validation_tokens.len().saturating_sub(1)
                 / self.geometry.train_sequence_length)
                 as u64;
             let expected_shards = build_validation_observation_plan(
@@ -1979,23 +1982,44 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
                     let raw_end = raw_start
                         + shard.sequence_count as usize * self.geometry.train_sequence_length
                         + 1;
-                    evaluate_validation_on_cuda(
-                        &mut self.cuda_backend,
-                        &self.selected_device,
-                        self.current_model.descriptor(),
-                        &self.current_model,
-                        &validation_tokens[raw_start..raw_end],
-                        &self.byte_luts,
-                        self.geometry.train_sequence_length,
-                        validation_batch_sequences,
-                        &shard.eval_mode,
-                        &mut self.validation_graph_cache,
-                        &format!("distributed_validation_rank_{}", self.rank),
-                        None,
-                    )?
+                    if self.training_session_cache.is_empty() {
+                        self.ensure_current_model_materialized()?;
+                        let validation_tokens = self.validation_tokens.as_slice();
+                        evaluate_validation_on_cuda(
+                            &mut self.cuda_backend,
+                            &self.selected_device,
+                            self.current_model.descriptor(),
+                            &self.current_model,
+                            &validation_tokens[raw_start..raw_end],
+                            &self.byte_luts,
+                            self.geometry.train_sequence_length,
+                            validation_batch_sequences,
+                            &shard.eval_mode,
+                            &mut self.validation_graph_cache,
+                            &format!("distributed_validation_rank_{}", self.rank),
+                            None,
+                        )?
+                    } else {
+                        let validation_tokens = self.validation_tokens.as_slice();
+                        evaluate_validation_on_cuda_with_resident_training_parameters(
+                            &mut self.cuda_backend,
+                            &self.selected_device,
+                            self.baseline_model.descriptor(),
+                            &self.baseline_model,
+                            &self.training_session_cache,
+                            &validation_tokens[raw_start..raw_end],
+                            &self.byte_luts,
+                            self.geometry.train_sequence_length,
+                            validation_batch_sequences,
+                            &shard.eval_mode,
+                            &mut self.validation_graph_cache,
+                            &format!("distributed_validation_rank_{}", self.rank),
+                            None,
+                        )?
+                    }
                 }
                 ParameterGolfValidationEvalMode::SlidingWindow { stride } => {
-                    let total_tokens = validation_tokens.len().saturating_sub(1);
+                    let total_tokens = self.validation_tokens.len().saturating_sub(1);
                     let window_starts = build_parameter_golf_validation_window_starts(
                         total_tokens,
                         self.geometry.train_sequence_length,
@@ -2003,21 +2027,43 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
                     );
                     let shard_window_starts = &window_starts[shard.evaluation_unit_start as usize
                         ..(shard.evaluation_unit_start + shard.evaluation_unit_count) as usize];
-                    evaluate_validation_window_starts_on_cuda(
-                        &mut self.cuda_backend,
-                        &self.selected_device,
-                        self.current_model.descriptor(),
-                        &self.current_model,
-                        validation_tokens,
-                        &self.byte_luts,
-                        self.geometry.train_sequence_length,
-                        validation_batch_sequences,
-                        *stride,
-                        shard_window_starts,
-                        &mut self.validation_graph_cache,
-                        &format!("distributed_validation_rank_{}", self.rank),
-                        None,
-                    )?
+                    if self.training_session_cache.is_empty() {
+                        self.ensure_current_model_materialized()?;
+                        let validation_tokens = self.validation_tokens.as_slice();
+                        evaluate_validation_window_starts_on_cuda(
+                            &mut self.cuda_backend,
+                            &self.selected_device,
+                            self.current_model.descriptor(),
+                            &self.current_model,
+                            validation_tokens,
+                            &self.byte_luts,
+                            self.geometry.train_sequence_length,
+                            validation_batch_sequences,
+                            *stride,
+                            shard_window_starts,
+                            &mut self.validation_graph_cache,
+                            &format!("distributed_validation_rank_{}", self.rank),
+                            None,
+                        )?
+                    } else {
+                        let validation_tokens = self.validation_tokens.as_slice();
+                        evaluate_validation_window_starts_on_cuda_with_resident_training_parameters(
+                            &mut self.cuda_backend,
+                            &self.selected_device,
+                            self.baseline_model.descriptor(),
+                            &self.baseline_model,
+                            &self.training_session_cache,
+                            validation_tokens,
+                            &self.byte_luts,
+                            self.geometry.train_sequence_length,
+                            validation_batch_sequences,
+                            *stride,
+                            shard_window_starts,
+                            &mut self.validation_graph_cache,
+                            &format!("distributed_validation_rank_{}", self.rank),
+                            None,
+                        )?
+                    }
                 }
             }
         };
