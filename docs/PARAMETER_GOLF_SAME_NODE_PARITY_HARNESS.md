@@ -84,6 +84,13 @@ bash scripts/parameter-golf-runpod-run-train-gpt-reference.sh \
   --log /workspace/parameter_golf_train_gpt_reference.log
 ```
 
+The upstream runner now prefers `/workspace/parameter-golf/.venv/bin/python`
+when it exists. If the current Python environment cannot import the required
+packages or cannot execute `scaled_dot_product_attention(..., enable_gqa=...)`,
+the runner bootstraps or upgrades `repo-root/.venv` from
+`requirements.txt` before it launches `train_gpt.py`. That keeps the same-node
+parity path reproducible on pods whose system Python ships an older `torch`.
+
 Build one parity report:
 
 ```bash
