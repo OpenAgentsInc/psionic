@@ -255,9 +255,9 @@ The command is explicit about what it treats as trainer truth. It binds:
   silently forcing the hot path back to dense `f32`
 - a narrowed backward-output and retained-primal surface on the shared CUDA
   train path, so the trainer now only materializes parameter-input gradients
-  back to host and only keeps backward-live primal bindings instead of reading
-  every gradient-bearing tensor and retaining every primal value that the full
-  autodiff plan can expose
+  back to host, only keeps backward-live primal bindings, and now sources
+  graph-input primals straight from the original input buffers instead of
+  retaining that input-bound parameter surface as extra forward outputs
 - slice-wise Muon updates over that banked matrix surface, so rank-3 bank
   tensors are now treated as stacks of equal-shaped matrices rather than
   forcing the optimizer path back to the split surface before every update

@@ -3232,14 +3232,22 @@ pub(crate) fn execute_parameter_golf_training_gradient_batch_from_examples(
             )?;
             let backward_plan = parameter_only_backward_plan(graph)?;
             let retained_graph = retained_forward_graph(graph, &backward_plan);
+            let input_buffers = cuda_graph_input_buffers(cuda_backend, &retained_graph, &inputs)?;
             let forward_started = Instant::now();
-            let forward_outputs =
-                execute_cuda_graph_output_buffers(cuda_backend, &retained_graph, &inputs)?;
+            let forward_outputs = execute_cuda_graph_output_buffers_from_buffers(
+                cuda_backend,
+                &retained_graph,
+                &input_buffers,
+            )?;
             let forward_loss_cuda_ms = duration_ms(forward_started);
             let loss = scalar_float_cuda_buffer_output(&forward_outputs, graph.loss_tensor_id)?;
             let backward_started = Instant::now();
-            let backward_outputs =
-                execute_backward_plan(cuda_backend, &backward_plan, &forward_outputs)?;
+            let backward_outputs = execute_backward_plan(
+                cuda_backend,
+                &backward_plan,
+                &input_buffers,
+                &forward_outputs,
+            )?;
             let backward_cuda_ms = duration_ms(backward_started);
             (
                 graph.clone(),
@@ -3265,11 +3273,10 @@ pub(crate) fn execute_parameter_golf_training_gradient_batch_from_examples(
     phase_timings.backward_cuda_ms = runtime
         .as_ref()
         .map_or(0, |receipt| receipt.backward_cuda_ms);
-    phase_timings.retained_binding_tensor_count = backward_plan.primal_bindings.len() as u32;
-    phase_timings.retained_binding_f32_count = count_output_elements(
-        &retained_forward_graph(&graph, &backward_plan),
-        &backward_plan.primal_bindings,
-    )?;
+    let retained_binding_tensor_ids = retained_forward_tensor_ids(&graph, &backward_plan);
+    phase_timings.retained_binding_tensor_count = retained_binding_tensor_ids.len() as u32;
+    phase_timings.retained_binding_f32_count =
+        count_retained_tensor_elements(&graph, retained_binding_tensor_ids.as_slice())?;
     phase_timings.gradient_tensor_count = backward_plan.gradient_targets.len() as u32;
     phase_timings.gradient_f32_count = count_gradient_elements(&backward_plan)?;
 
@@ -5407,7 +5414,7 @@ impl ParameterGolfCudaTrainingSession {
         let loss = scalar_float_cuda_buffer_output(&forward_outputs, self.graph.loss_tensor_id)?;
         let backward_started = Instant::now();
         let backward_outputs =
-            execute_backward_plan(cuda_backend, &self.backward_plan, &forward_outputs)?;
+            execute_backward_plan(cuda_backend, &self.backward_plan, &inputs, &forward_outputs)?;
         let backward_cuda_ms = duration_ms(backward_started);
         Ok((
             loss,
@@ -5435,13 +5442,23 @@ fn retained_forward_graph(
     backward_plan: &psionic_ir::AutodiffBackwardPlan,
 ) -> psionic_ir::Graph {
     let mut outputs = vec![graph.loss_tensor_id];
-    outputs.extend(
-        backward_plan
-            .primal_bindings
-            .iter()
-            .map(|binding| binding.primal_tensor),
-    );
+    outputs.extend(retained_forward_tensor_ids(graph, backward_plan));
     graph.graph.graph().with_outputs(unique_tensor_ids(outputs))
+}
+
+fn retained_forward_tensor_ids(
+    graph: &ParameterGolfBaselineTrainingGraph,
+    backward_plan: &psionic_ir::AutodiffBackwardPlan,
+) -> Vec<TensorId> {
+    backward_plan
+        .primal_bindings
+        .iter()
+        .filter_map(|binding| {
+            let node = graph.graph.graph().node(binding.primal_tensor)?;
+            (!matches!(node.op(), psionic_ir::OpKind::Input { .. }))
+                .then_some(binding.primal_tensor)
+        })
+        .collect()
 }
 
 fn parameter_only_backward_plan(
@@ -5508,15 +5525,17 @@ fn live_tensor_ids_for_outputs(graph: &psionic_ir::Graph) -> std::collections::B
 fn execute_backward_plan(
     cuda_backend: &mut CudaBackend,
     backward_plan: &psionic_ir::AutodiffBackwardPlan,
+    forward_inputs: &BTreeMap<TensorId, CudaBuffer>,
     forward_outputs: &BTreeMap<TensorId, CudaBuffer>,
 ) -> Result<Vec<(TensorId, TensorData)>, ParameterGolfSingleH100TrainingError> {
     let mut inputs = Vec::new();
     for binding in &backward_plan.primal_bindings {
-        let values = forward_outputs.get(&binding.primal_tensor).ok_or(
-            ParameterGolfSingleH100TrainingError::MissingGraphOutput {
+        let values = forward_outputs
+            .get(&binding.primal_tensor)
+            .or_else(|| forward_inputs.get(&binding.primal_tensor))
+            .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphOutput {
                 tensor_id: binding.primal_tensor,
-            },
-        )?;
+            })?;
         let input_dtype = backward_plan
             .gradient_graph
             .node(binding.gradient_graph_input)
@@ -5687,7 +5706,7 @@ fn execute_cuda_graph_outputs(
     execute_cuda_graph_outputs_from_buffers(cuda_backend, graph, &buffers)
 }
 
-fn execute_cuda_graph_output_buffers(
+fn cuda_graph_input_buffers(
     cuda_backend: &mut CudaBackend,
     graph: &psionic_ir::Graph,
     inputs: &BTreeMap<TensorId, TensorData>,
@@ -5705,7 +5724,7 @@ fn execute_cuda_graph_output_buffers(
             cuda_input_buffer_from_tensor_data(cuda_backend, spec.spec(), *tensor_id, data)?;
         buffers.insert(*tensor_id, buffer);
     }
-    execute_cuda_graph_output_buffers_from_buffers(cuda_backend, graph, &buffers)
+    Ok(buffers)
 }
 
 fn execute_cuda_graph_output_buffers_from_buffers(
@@ -5854,18 +5873,20 @@ fn split_token_count(bundle: &ParameterGolfDatasetBundle, split_name: &str) -> u
         .unwrap_or(0)
 }
 
-fn count_output_elements(
-    retained_graph: &psionic_ir::Graph,
-    bindings: &[psionic_ir::AutodiffPrimalBinding],
+fn count_retained_tensor_elements(
+    graph: &ParameterGolfBaselineTrainingGraph,
+    retained_tensor_ids: &[TensorId],
 ) -> Result<u64, ParameterGolfSingleH100TrainingError> {
-    bindings.iter().try_fold(0_u64, |sum, binding| {
-        let node = retained_graph.node(binding.primal_tensor).ok_or(
-            ParameterGolfSingleH100TrainingError::MissingGraphTensor {
-                tensor_id: binding.primal_tensor,
-            },
-        )?;
-        Ok(sum.saturating_add(node.tensor().spec().shape().element_count() as u64))
-    })
+    retained_tensor_ids
+        .iter()
+        .try_fold(0_u64, |sum, tensor_id| {
+            let node = graph.graph.graph().node(*tensor_id).ok_or(
+                ParameterGolfSingleH100TrainingError::MissingGraphTensor {
+                    tensor_id: *tensor_id,
+                },
+            )?;
+            Ok(sum.saturating_add(node.tensor().spec().shape().element_count() as u64))
+        })
 }
 
 fn count_gradient_elements(
@@ -6283,10 +6304,18 @@ mod tests {
         )?;
         let backward_plan = graph.graph.backward_plan(graph.loss_tensor_id)?;
         let retained_graph = retained_forward_graph(&graph, &backward_plan);
-        let forward_outputs =
-            execute_cuda_graph_output_buffers(&mut cuda_backend, &retained_graph, &inputs)?;
-        let backward_outputs =
-            execute_backward_plan(&mut cuda_backend, &backward_plan, &forward_outputs)?;
+        let input_buffers = cuda_graph_input_buffers(&mut cuda_backend, &retained_graph, &inputs)?;
+        let forward_outputs = execute_cuda_graph_output_buffers_from_buffers(
+            &mut cuda_backend,
+            &retained_graph,
+            &input_buffers,
+        )?;
+        let backward_outputs = execute_backward_plan(
+            &mut cuda_backend,
+            &backward_plan,
+            &input_buffers,
+            &forward_outputs,
+        )?;
         let backward_result =
             backward_result_from_outputs(&backward_plan, backward_outputs.as_slice())?;
         let gradients = materialize_parameter_golf_baseline_training_gradients(
@@ -6337,6 +6366,15 @@ mod tests {
             .iter()
             .all(|binding| live_tensor_ids.contains(&binding.gradient_graph_input)));
         assert!(full_plan.primal_bindings.len() >= filtered_plan.primal_bindings.len());
+        let retained_tensor_ids = retained_forward_tensor_ids(&graph, &filtered_plan);
+        assert!(retained_tensor_ids.len() < filtered_plan.primal_bindings.len());
+        assert!(retained_tensor_ids.iter().all(|tensor_id| {
+            graph
+                .graph
+                .graph()
+                .node(*tensor_id)
+                .is_some_and(|node| !matches!(node.op(), psionic_ir::OpKind::Input { .. }))
+        }));
         Ok(())
     }
 
@@ -6368,12 +6406,21 @@ mod tests {
         )?;
         let backward_plan = graph.graph.backward_plan(graph.loss_tensor_id)?;
         let retained_graph = retained_forward_graph(&graph, &backward_plan);
-        let legacy_forward_outputs =
-            execute_cuda_graph_output_buffers(&mut cuda_backend, &retained_graph, &legacy_inputs)?;
+        let legacy_input_buffers =
+            cuda_graph_input_buffers(&mut cuda_backend, &retained_graph, &legacy_inputs)?;
+        let legacy_forward_outputs = execute_cuda_graph_output_buffers_from_buffers(
+            &mut cuda_backend,
+            &retained_graph,
+            &legacy_input_buffers,
+        )?;
         let legacy_loss =
             scalar_float_cuda_buffer_output(&legacy_forward_outputs, graph.loss_tensor_id)?;
-        let legacy_backward_outputs =
-            execute_backward_plan(&mut cuda_backend, &backward_plan, &legacy_forward_outputs)?;
+        let legacy_backward_outputs = execute_backward_plan(
+            &mut cuda_backend,
+            &backward_plan,
+            &legacy_input_buffers,
+            &legacy_forward_outputs,
+        )?;
         let legacy_backward_result =
             backward_result_from_outputs(&backward_plan, legacy_backward_outputs.as_slice())?;
         let legacy_gradients = materialize_parameter_golf_baseline_training_gradients(
@@ -6484,15 +6531,21 @@ mod tests {
         )?;
         let backward_plan = graph.graph.backward_plan(graph.loss_tensor_id)?;
         let retained_graph = retained_forward_graph(&graph, &backward_plan);
-        let reference_forward = execute_cuda_graph_output_buffers(
+        let reference_input_buffers =
+            cuda_graph_input_buffers(&mut cuda_backend, &retained_graph, &reference_inputs)?;
+        let reference_forward = execute_cuda_graph_output_buffers_from_buffers(
             &mut cuda_backend,
             &retained_graph,
-            &reference_inputs,
+            &reference_input_buffers,
         )?;
         let reference_loss =
             scalar_float_cuda_buffer_output(&reference_forward, graph.loss_tensor_id)?;
-        let reference_backward_outputs =
-            execute_backward_plan(&mut cuda_backend, &backward_plan, &reference_forward)?;
+        let reference_backward_outputs = execute_backward_plan(
+            &mut cuda_backend,
+            &backward_plan,
+            &reference_input_buffers,
+            &reference_forward,
+        )?;
         let reference_backward =
             backward_result_from_outputs(&backward_plan, reference_backward_outputs.as_slice())?;
         let reference_gradients = materialize_parameter_golf_baseline_training_gradients(

@@ -96,9 +96,10 @@ Psionic now encodes that exact posture explicitly instead of treating
   staging for BF16-visible parameter banks instead of repacking those large
   tensors on every optimizer step. The shared CUDA train path now also narrows
   both the backward graph output surface and the retained primal-binding
-  surface to the parameter-only backward-live subset, instead of reading every
-  gradient-bearing tensor and retaining every primal value the full autodiff
-  plan can expose.
+  surface to the parameter-only backward-live subset, binds graph-input
+  primals back into backward directly from the original input buffers, and no
+  longer counts those input-bound parameter tensors as retained forward
+  outputs.
 - `psionic-train` now also ships retained per-rank distributed validation
   receipts plus one completion receipt bound to the trained runtime-produced
   int8+zlib artifact, so the exported-folder `distributed_8xh100_train` mode
