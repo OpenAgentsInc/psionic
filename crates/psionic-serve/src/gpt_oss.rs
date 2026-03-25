@@ -28,12 +28,13 @@ use std::{
 };
 
 use psionic_backend_cpu::{
-    CpuBackend, decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot,
+    decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot, CpuBackend,
 };
 use psionic_backend_cuda::{
-    CudaBackend, CudaBuffer, CudaGraphExec, CudaHostBuffer, CudaQuantizedMatvecResult,
-    CudaQuantizedMatvecStats, CudaSubmission, CudaSubmissionReport,
-    TEXT_GENERATION_SUPPORTED_OPS as CUDA_TEXT_GENERATION_SUPPORTED_OPS, ggml_q8_1_storage_bytes,
+    ggml_q8_1_storage_bytes, CudaBackend, CudaBuffer, CudaGraphExec, CudaHostBuffer,
+    CudaQuantizedMatvecResult, CudaQuantizedMatvecStats, CudaSubmission, CudaSubmissionReport,
+    GGML_Q8_1_BLOCK_BYTES, GGML_Q8_1_BLOCK_ELEMENTS,
+    TEXT_GENERATION_SUPPORTED_OPS as CUDA_TEXT_GENERATION_SUPPORTED_OPS,
 };
 use psionic_backend_metal::{
     MetalAttentionGraphReserve, MetalAttentionGraphRuntime, MetalBackend, MetalBuffer,
@@ -46,28 +47,27 @@ use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_core::Shape;
 use psionic_models::{GgufBlobArtifact, GptOssTokenizer, PagedTensorStorage};
 use psionic_runtime::{
-    BackendRuntimeResources, CacheAction, CacheKind, CacheObservation, CompilePathEvidence,
-    CompilePathTemperature, DeviceDiscovery, GptOssDecodeGraph, HealthStatus,
-    KvCacheEncodingAccounting, KvCachePageLayout, KvCachePolicy, PrefixCacheIdentity,
-    build_gpt_oss_decode_graph,
+    build_gpt_oss_decode_graph, BackendRuntimeResources, CacheAction, CacheKind, CacheObservation,
+    CompilePathEvidence, CompilePathTemperature, DeviceDiscovery, GptOssDecodeGraph, HealthStatus,
+    KvCacheEncodingAccounting, KvCacheEncodingFamily, KvCacheEncodingObjective,
+    KvCacheEncodingPolicy, KvCachePageLayout, KvCachePolicy, PrefixCacheIdentity,
 };
 use sha2::{Digest, Sha256};
 
 use super::{
-    BackendHealthTracker, CompiledWordGenerationModel, ContinuousBatchGenerationResult,
-    DecodeStrategy, DecoderModelDescriptor, GenerationEventStream, GenerationModelHandle,
-    GenerationOptions, GenerationResponse, GenerationStreamEvent, GenerationStreamStatus,
-    GenerationStreamTerminal, GgufDecoderAdapterLoader, GgufDecoderFamily,
+    continuous_batch_text_generation_execution_profile, current_time_millis,
+    default_generation_scheduler_policy, default_prefix_cache_policy,
+    generation_runtime_observability, run_continuous_batch_generation_requests,
+    run_generation_request, BackendHealthTracker, CompiledWordGenerationModel,
+    ContinuousBatchGenerationResult, DecodeStrategy, DecoderModelDescriptor, GenerationEventStream,
+    GenerationModelHandle, GenerationOptions, GenerationResponse, GenerationStreamEvent,
+    GenerationStreamStatus, GenerationStreamTerminal, GgufDecoderAdapterLoader, GgufDecoderFamily,
     GgufDecoderFamilyMetadata, GgufDecoderLayerTensorLayout, GptOssMetalDecodeLogitsMetrics,
     GptOssMetalLogitsOutputMode, GptOssPerformanceMetrics, InMemoryGenerationModelRegistry,
     InMemoryGenerationSessionStore, LoadedModelRegistryError, LoadedModelView,
     LocalRuntimeObservability, ManagedTextGenerationRuntime, ModelLoadError, PrefixCacheMode,
     PrefixCacheRefusalReason, QuantizationMode, ReferenceTextGenerationError, SharedPrefixStore,
     TextGenerationExecutor, TokenId, TokenSequence, TokenizerBoundary,
-    continuous_batch_text_generation_execution_profile, current_time_millis,
-    default_generation_scheduler_policy, default_prefix_cache_policy,
-    generation_runtime_observability, run_continuous_batch_generation_requests,
-    run_generation_request,
 };
 use thiserror::Error;
 
@@ -96,6 +96,12 @@ fn experimental_fused_selected4_moe_down_enabled() -> bool {
         .unwrap_or(false)
 }
 
+fn experimental_turboquant_kv_enabled() -> bool {
+    env::var("PSIONIC_GPT_OSS_EXPERIMENTAL_CUDA_TURBOQUANT_KV")
+        .map(|value| value == "1")
+        .unwrap_or(false)
+}
+
 const HYBRID_SELECTED4_LAYER_CACHE_SLOTS: usize = 5;
 const HYBRID_SELECTED4_LAYER_CACHE_REDUCED_SLOTS: usize = 4;
 const HYBRID_SELECTED4_LAYER_CACHE_EXPANDED_SLOTS: usize = 6;
@@ -118,6 +124,18 @@ enum CudaStepOutputMode {
 enum MetalStepOutputMode {
     SkipLogits,
     Logits(MetalLogitsOutputMode),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CudaKvCacheEncoding {
+    DenseF16,
+    TurboQuantQ81,
+}
+
+#[derive(Clone, Debug)]
+struct CudaKvCacheEncodingSelection {
+    encoding: CudaKvCacheEncoding,
+    accounting: KvCacheEncodingAccounting,
 }
 
 fn duration_ns(start: Instant) -> u64 {
@@ -234,6 +252,117 @@ fn can_use_q8_1_attention_output_fusion(
     head_dim % 32 == 0
         && attention_output_columns == head_count.saturating_mul(head_dim)
         && attention_output_columns % 32 == 0
+}
+
+fn cuda_kv_cache_host_bytes_per_token(width: usize) -> u64 {
+    width
+        .saturating_mul(2)
+        .saturating_mul(std::mem::size_of::<f32>())
+        .try_into()
+        .unwrap_or(u64::MAX)
+}
+
+fn turboquant_cuda_kv_cache_encoding_policy(
+    model_family: &str,
+    max_context: usize,
+    width: usize,
+) -> KvCacheEncodingPolicy {
+    let device_bytes_per_token = ggml_q8_1_storage_bytes(1, width)
+        .ok()
+        .and_then(|row_bytes| row_bytes.checked_mul(2))
+        .map(|bytes| bytes.try_into().unwrap_or(u64::MAX));
+    KvCacheEncodingPolicy {
+        family: KvCacheEncodingFamily::TurboQuant,
+        objective: Some(KvCacheEncodingObjective::MeanSquaredError),
+        bits_per_channel: Some(8),
+        block_shape: Some(GGML_Q8_1_BLOCK_ELEMENTS.to_string()),
+        outlier_policy: None,
+        projection_id: None,
+        codebook_id: Some(String::from("ggml_q8_1")),
+        model_family_bound: Some(model_family.to_string()),
+        context_length_bound: Some(max_context),
+        host_bytes_per_token: Some(cuda_kv_cache_host_bytes_per_token(width)),
+        device_bytes_per_token,
+        detail: Some(String::from(
+            "experimental CUDA TurboQuant prototype backed by ggml_q8_1 device KV rows",
+        )),
+    }
+}
+
+fn select_cuda_kv_cache_encoding_for_geometry(
+    requested_turboquant: bool,
+    model_family: &str,
+    runtime_backend: &str,
+    max_context: usize,
+    width: usize,
+    head_dim: usize,
+) -> CudaKvCacheEncodingSelection {
+    let dense_policy =
+        super::default_kv_cache_encoding_policy(model_family, max_context, width, runtime_backend);
+    if !requested_turboquant {
+        return CudaKvCacheEncodingSelection {
+            encoding: CudaKvCacheEncoding::DenseF16,
+            accounting: KvCacheEncodingAccounting::active(dense_policy),
+        };
+    }
+
+    let requested_policy =
+        turboquant_cuda_kv_cache_encoding_policy(model_family, max_context, width);
+    let fallback = |reason: String| CudaKvCacheEncodingSelection {
+        encoding: CudaKvCacheEncoding::DenseF16,
+        accounting: KvCacheEncodingAccounting {
+            requested: Some(requested_policy.clone()),
+            active: dense_policy.clone(),
+            downgraded: true,
+            refusal_reason: Some(reason),
+        },
+    };
+
+    if !runtime_backend.starts_with(GPT_OSS_CUDA_BACKEND) {
+        return fallback(format!(
+            "TurboQuant KV only runs on CUDA GPT-OSS decode paths, active backend `{runtime_backend}`",
+        ));
+    }
+    if width == 0 || width % GGML_Q8_1_BLOCK_ELEMENTS != 0 {
+        return fallback(format!(
+            "TurboQuant KV requires cache width divisible by {}, actual {width}",
+            GGML_Q8_1_BLOCK_ELEMENTS,
+        ));
+    }
+    if head_dim == 0 || head_dim % GGML_Q8_1_BLOCK_ELEMENTS != 0 {
+        return fallback(format!(
+            "TurboQuant KV requires head dim divisible by {}, actual {head_dim}",
+            GGML_Q8_1_BLOCK_ELEMENTS,
+        ));
+    }
+    if requested_policy.device_bytes_per_token.is_none() {
+        return fallback(String::from(
+            "TurboQuant KV could not derive a block-aligned CUDA device footprint",
+        ));
+    }
+
+    CudaKvCacheEncodingSelection {
+        encoding: CudaKvCacheEncoding::TurboQuantQ81,
+        accounting: KvCacheEncodingAccounting::active(requested_policy.clone())
+            .with_requested(requested_policy),
+    }
+}
+
+fn select_cuda_generation_kv_cache_encoding<M>(
+    model: &M,
+    runtime_backend: &str,
+) -> CudaKvCacheEncodingSelection
+where
+    M: GenerationModelHandle,
+{
+    select_cuda_kv_cache_encoding_for_geometry(
+        experimental_turboquant_kv_enabled(),
+        model.descriptor().model.family.as_str(),
+        runtime_backend,
+        model.descriptor().config.max_context,
+        model.cache_width(),
+        model.descriptor().config.block.attention.head_dim,
+    )
 }
 
 fn can_use_hybrid_cuda_hidden_residency_layer(layer: &GptOssCudaLayer, hidden_size: usize) -> bool {
@@ -1133,12 +1262,14 @@ impl CudaSharedPrefixStore {
         &self,
         compatibility: &super::SharedPrefixCompatibility,
         prompt_tokens: &TokenSequence,
+        encoding: CudaKvCacheEncoding,
     ) -> Option<CudaKvCacheMirror> {
         self.entries
             .iter()
             .find(|entry| {
                 &entry.compatibility == compatibility
                     && entry.prompt_tokens.as_slice() == prompt_tokens.as_slice()
+                    && entry.cache.encoding == encoding
                     && entry.cache.len() >= prompt_tokens.len()
             })
             .map(|entry| entry.cache.truncated(prompt_tokens.len()))
@@ -1148,12 +1279,16 @@ impl CudaSharedPrefixStore {
         &mut self,
         compatibility: &super::SharedPrefixCompatibility,
         prompt_tokens: &TokenSequence,
+        encoding: CudaKvCacheEncoding,
     ) -> Option<CudaKvCacheMirror> {
         let compatible_indices: Vec<usize> = self
             .entries
             .iter()
             .enumerate()
-            .filter_map(|(index, entry)| (&entry.compatibility == compatibility).then_some(index))
+            .filter_map(|(index, entry)| {
+                (&entry.compatibility == compatibility && entry.cache.encoding == encoding)
+                    .then_some(index)
+            })
             .collect();
         if compatible_indices.is_empty() {
             return None;
@@ -1551,6 +1686,8 @@ fn run_cuda_generation_request(
         let mut gpt_oss_perf: Option<GptOssPerformanceMetrics> = None;
         let mut decode_step_plan = None;
         let use_cuda_argmax_fast_path = can_use_cuda_argmax_fast_path(&request.options);
+        let kv_cache_encoding =
+            select_cuda_generation_kv_cache_encoding(&loaded_model, GPT_OSS_CUDA_BACKEND);
         let mut exact_prompt_token = None;
         let exact_prefix_hit = if shared_prefix_eligible && request.session_id.is_none() {
             super::controlled_exact_prefix_lookup(
@@ -1563,7 +1700,11 @@ fn run_cuda_generation_request(
             None
         };
         let exact_cuda_cache = if exact_prefix_hit.is_some() {
-            cuda_shared_prefixes.lookup_exact_prompt(&compatibility, &prompt_tokens)
+            cuda_shared_prefixes.lookup_exact_prompt(
+                &compatibility,
+                &prompt_tokens,
+                kv_cache_encoding.encoding,
+            )
         } else {
             None
         };
@@ -1642,27 +1783,39 @@ fn run_cuda_generation_request(
         let mut cuda_cache = if shared_prefix_eligible && prefix_tokens_reused > 0 {
             if let Some(cache) = exact_cuda_cache {
                 cache
-            } else if let Some(cache) = cuda_shared_prefixes.lookup(&compatibility, &prompt_tokens)
-            {
+            } else if let Some(cache) = cuda_shared_prefixes.lookup(
+                &compatibility,
+                &prompt_tokens,
+                kv_cache_encoding.encoding,
+            ) {
                 cache.detached_with_reserve(
                     backend,
                     reserve_tokens,
                     loaded_model.descriptor().config.max_context,
                 )?
             } else {
-                CudaKvCacheMirror::from_host_cache(backend, &cache, reserve_tokens)?
+                CudaKvCacheMirror::from_host_cache_with_encoding(
+                    backend,
+                    &cache,
+                    reserve_tokens,
+                    kv_cache_encoding.encoding,
+                )?
             }
         } else {
-            CudaKvCacheMirror::from_host_cache(backend, &cache, reserve_tokens)?
+            CudaKvCacheMirror::from_host_cache_with_encoding(
+                backend,
+                &cache,
+                reserve_tokens,
+                kv_cache_encoding.encoding,
+            )?
         };
         cache.bind_owner(super::request_kv_owner(
             request,
             psionic_runtime::BatchExecutionPosture::SingleRequestOnly,
             None,
         ));
-        let request_kv_checkpoint = cache.checkpoint_with_state(
-            psionic_runtime::KvCacheState::paged(cache.page_layout(), cuda_cache.len()),
-        );
+        let request_kv_checkpoint =
+            cache.checkpoint_with_state(cuda_cache.state(cache.page_layout()));
         for token in &prompt_tokens.as_slice()[prefix_tokens_reused..] {
             ensure_cuda_decode_step_plan(
                 &loaded_model,
@@ -1707,8 +1860,7 @@ fn run_cuda_generation_request(
 
         let mut sampler = super::GenerationSampler::new(&request.options)?;
         let mut generated_tokens = Vec::new();
-        let prefill_handoff_state =
-            psionic_runtime::KvCacheState::paged(cache.page_layout(), cuda_cache.len());
+        let prefill_handoff_state = cuda_cache.state(cache.page_layout());
         let mut first_token_emitted_at = None;
         let mut last_token_emitted_at = None;
         let mut pending_token = if exact_prompt_cache_hit
@@ -1878,15 +2030,12 @@ fn run_cuda_generation_request(
             output_tokens: generated.len(),
             cache_tokens: cuda_cache.len(),
         };
-        let kv_cache = psionic_runtime::KvCacheAccounting::from_states(
-            &previous_kv_state,
-            psionic_runtime::KvCacheState::paged(cache.page_layout(), cuda_cache.len()),
-        );
-        let device_kv_state =
+        let logical_kv_state =
             psionic_runtime::KvCacheState::paged(cache.page_layout(), cuda_cache.len());
+        let device_kv_state = cuda_cache.state(cache.page_layout());
+        let kv_cache =
+            psionic_runtime::KvCacheAccounting::from_states(&previous_kv_state, logical_kv_state);
         let host_cache = final_cache.as_ref().unwrap_or(&cache);
-        let kv_cache_encoding_policy =
-            super::default_generation_kv_cache_encoding_policy(&loaded_model, GPT_OSS_CUDA_BACKEND);
         let kv_residency = super::host_device_kv_residency(
             host_cache.policy(),
             host_cache.state(),
@@ -1923,9 +2072,7 @@ fn run_cuda_generation_request(
             inter_token_latency_ns,
             kv_cache: Some(kv_cache),
             kv_residency: kv_residency.clone(),
-            kv_cache_encoding: Some(KvCacheEncodingAccounting::active(
-                kv_cache_encoding_policy.clone(),
-            )),
+            kv_cache_encoding: Some(kv_cache_encoding.accounting.clone()),
             prefix_tokens_reused: Some(prefix_tokens_reused),
             gpt_oss_perf: gpt_oss_perf.filter(|perf| !perf.is_zero()),
         };
@@ -1962,7 +2109,7 @@ fn run_cuda_generation_request(
             residency_policy,
             residency_snapshot,
             kv_cache_policy: Some(host_cache.policy().clone()),
-            kv_cache_encoding_policy: Some(kv_cache_encoding_policy),
+            kv_cache_encoding_policy: Some(kv_cache_encoding.accounting.active.clone()),
             kv_ownership: final_cache
                 .as_ref()
                 .and_then(|value| {
@@ -2127,6 +2274,10 @@ fn run_cuda_hybrid_generation_request(
         let plan_cache_misses = 0usize;
         let mut gpt_oss_perf: Option<GptOssPerformanceMetrics> = None;
         let use_cuda_argmax_fast_path = can_use_cuda_argmax_fast_path(&request.options);
+        let kv_cache_encoding = select_cuda_generation_kv_cache_encoding(
+            &loaded_model,
+            GPT_OSS_CUDA_HYBRID_MOE_BACKEND,
+        );
         let mut cache = if shared_prefix_eligible {
             let lookup = super::controlled_prefix_lookup(
                 shared_prefixes,
@@ -2176,15 +2327,19 @@ fn run_cuda_hybrid_generation_request(
             prompt_tokens.as_slice()[prefix_tokens_reused..].to_vec()
         };
         let reserve_tokens = request.options.max_output_tokens.saturating_add(1);
-        let mut cuda_cache = CudaKvCacheMirror::from_host_cache(backend, &cache, reserve_tokens)?;
+        let mut cuda_cache = CudaKvCacheMirror::from_host_cache_with_encoding(
+            backend,
+            &cache,
+            reserve_tokens,
+            kv_cache_encoding.encoding,
+        )?;
         cache.bind_owner(super::request_kv_owner(
             request,
             psionic_runtime::BatchExecutionPosture::SingleRequestOnly,
             None,
         ));
-        let request_kv_checkpoint = cache.checkpoint_with_state(
-            psionic_runtime::KvCacheState::paged(cache.page_layout(), cuda_cache.len()),
-        );
+        let request_kv_checkpoint =
+            cache.checkpoint_with_state(cuda_cache.state(cache.page_layout()));
         for token in &prompt_tokens.as_slice()[prefix_tokens_reused..] {
             let step_start = Instant::now();
             let step = loaded_model.inner.forward_step_with_output_mode(
@@ -2235,8 +2390,7 @@ fn run_cuda_hybrid_generation_request(
             .sampling_ns
             .saturating_add(duration_ns(sampling_start));
         let mut generated_cache_tokens = cuda_cache.len();
-        let prefill_handoff_state =
-            psionic_runtime::KvCacheState::paged(cache.page_layout(), generated_cache_tokens);
+        let prefill_handoff_state = cuda_cache.state(cache.page_layout());
         let termination = loop {
             if generated_tokens.len() >= request.options.max_output_tokens {
                 break super::TerminationReason::MaxOutputTokens;
@@ -2367,17 +2521,12 @@ fn run_cuda_hybrid_generation_request(
             output_tokens: generated.len(),
             cache_tokens: generated_cache_tokens,
         };
-        let kv_cache = psionic_runtime::KvCacheAccounting::from_states(
-            &previous_kv_state,
-            psionic_runtime::KvCacheState::paged(cache.page_layout(), generated_cache_tokens),
-        );
-        let device_kv_state =
+        let logical_kv_state =
             psionic_runtime::KvCacheState::paged(cache.page_layout(), generated_cache_tokens);
+        let device_kv_state = cuda_cache.state(cache.page_layout());
+        let kv_cache =
+            psionic_runtime::KvCacheAccounting::from_states(&previous_kv_state, logical_kv_state);
         let host_cache = final_cache.as_ref().unwrap_or(&cache);
-        let kv_cache_encoding_policy = super::default_generation_kv_cache_encoding_policy(
-            &loaded_model,
-            GPT_OSS_CUDA_HYBRID_MOE_BACKEND,
-        );
         let kv_residency = super::host_device_kv_residency(
             host_cache.policy(),
             host_cache.state(),
@@ -2414,9 +2563,7 @@ fn run_cuda_hybrid_generation_request(
             inter_token_latency_ns,
             kv_cache: Some(kv_cache),
             kv_residency: kv_residency.clone(),
-            kv_cache_encoding: Some(KvCacheEncodingAccounting::active(
-                kv_cache_encoding_policy.clone(),
-            )),
+            kv_cache_encoding: Some(kv_cache_encoding.accounting.clone()),
             prefix_tokens_reused: Some(prefix_tokens_reused),
             gpt_oss_perf: gpt_oss_perf.filter(|perf| !perf.is_zero()),
         };
@@ -2450,7 +2597,7 @@ fn run_cuda_hybrid_generation_request(
             residency_policy,
             residency_snapshot,
             kv_cache_policy: Some(host_cache.policy().clone()),
-            kv_cache_encoding_policy: Some(kv_cache_encoding_policy),
+            kv_cache_encoding_policy: Some(kv_cache_encoding.accounting.active.clone()),
             kv_ownership: final_cache
                 .as_ref()
                 .and_then(|value| {
@@ -4339,7 +4486,7 @@ struct GptOssCudaStepPlan {
     argmax_state_host_buffer: CudaHostBuffer,
     argmax_state_buffer: CudaBuffer,
     decode_graph_exec: Option<CudaGraphExec>,
-    decode_graph_cache_identity: Option<(usize, usize)>,
+    decode_graph_cache_identity: Option<(usize, usize, CudaKvCacheEncoding)>,
 }
 
 #[derive(Debug)]
@@ -4980,14 +5127,15 @@ impl GptOssCudaModelInner {
             }
 
             let layer_start = Instant::now();
-            let use_q8_1_attention_output_fusion =
-                layer.attention_output_weight.transposed_f16.is_none()
-                    && can_use_q8_1_mmvq(layer.attention_output_weight.mode)
-                    && can_use_q8_1_attention_output_fusion(
-                        layer.attention_output_weight.columns,
-                        head_count,
-                        head_dim,
-                    );
+            let use_turboquant_kv = cuda_cache.encoding == CudaKvCacheEncoding::TurboQuantQ81;
+            let use_q8_1_attention_output_fusion = !use_turboquant_kv
+                && layer.attention_output_weight.transposed_f16.is_none()
+                && can_use_q8_1_mmvq(layer.attention_output_weight.mode)
+                && can_use_q8_1_attention_output_fusion(
+                    layer.attention_output_weight.columns,
+                    head_count,
+                    head_dim,
+                );
             if let Some(transposed_f16) = layer.attention_qkv_weight.transposed_f16.as_ref() {
                 submission.rms_norm(
                     current_hidden,
@@ -5133,7 +5281,30 @@ impl GptOssCudaModelInner {
                 )?;
             }
             if use_graph_attention {
-                if use_q8_1_attention_output_fusion {
+                if use_turboquant_kv {
+                    submission.attention_decode_rope_cache_turboquant_kv_graph(
+                        &layer_plan.qkv_buffer,
+                        0,
+                        q_rows,
+                        q_rows.saturating_add(k_rows),
+                        &cuda_cache.key_buffer,
+                        &cuda_cache.value_buffer,
+                        cuda_cache.width,
+                        layer_offset,
+                        &plan.decode_params_buffer,
+                        self.family_metadata.sliding_window.unwrap_or(0),
+                        head_count,
+                        kv_head_count,
+                        head_dim,
+                        rotary_dim,
+                        freq_scale,
+                        ext_factor,
+                        corr_dims,
+                        theta_scale,
+                        layer.attention_sinks_device.as_ref(),
+                        &layer_plan.attention_buffer,
+                    )?;
+                } else if use_q8_1_attention_output_fusion {
                     submission.attention_decode_rope_cache_f16_kv_graph_q8_1(
                         &layer_plan.qkv_buffer,
                         0,
@@ -5181,7 +5352,31 @@ impl GptOssCudaModelInner {
                     )?;
                 }
             } else {
-                if use_q8_1_attention_output_fusion {
+                if use_turboquant_kv {
+                    submission.attention_decode_rope_cache_turboquant_kv(
+                        &layer_plan.qkv_buffer,
+                        0,
+                        q_rows,
+                        q_rows.saturating_add(k_rows),
+                        &cuda_cache.key_buffer,
+                        &cuda_cache.value_buffer,
+                        cuda_cache.width,
+                        layer_offset,
+                        cache_write_index,
+                        self.family_metadata.sliding_window.unwrap_or(0),
+                        head_count,
+                        kv_head_count,
+                        head_dim,
+                        rotary_dim,
+                        position,
+                        freq_scale,
+                        ext_factor,
+                        corr_dims,
+                        theta_scale,
+                        layer.attention_sinks_device.as_ref(),
+                        &layer_plan.attention_buffer,
+                    )?;
+                } else if use_q8_1_attention_output_fusion {
                     submission.attention_decode_rope_cache_f16_kv_q8_1(
                         &layer_plan.qkv_buffer,
                         0,
@@ -5861,6 +6056,7 @@ impl GptOssCudaModelInner {
         let decode_graph_cache_identity = Some((
             cuda_cache.key_buffer.allocation_identity(),
             cuda_cache.value_buffer.allocation_identity(),
+            cuda_cache.encoding,
         ));
         let submission_report = if use_decode_graph_fast_path {
             if plan.decode_graph_cache_identity == decode_graph_cache_identity {
@@ -5986,11 +6182,10 @@ impl GptOssCudaModelInner {
 
         let (cache_key, cache_value) = if materialize_host_kv {
             let (key, value) = cuda_cache.read_entry(cache_write_index)?;
-            let readback_bytes = cache_key_value_byte_len(cuda_cache.width);
             perf.cuda.device_to_host_bytes = perf
                 .cuda
                 .device_to_host_bytes
-                .saturating_add(readback_bytes);
+                .saturating_add(cuda_cache.read_entry_byte_len());
             (key, value)
         } else {
             (Vec::new(), Vec::new())
@@ -6106,13 +6301,15 @@ impl GptOssCudaModelInner {
                         ));
                     }
                     let cache_offset = layer_index.saturating_mul(kv_width);
-                    let use_q8_1_attention_output_fusion =
-                        can_use_q8_1_mmvq(layer.attention_output_weight.mode)
-                            && can_use_q8_1_attention_output_fusion(
-                                layer.attention_output_weight.columns,
-                                head_count,
-                                head_dim,
-                            );
+                    let use_turboquant_kv =
+                        cuda_cache.encoding == CudaKvCacheEncoding::TurboQuantQ81;
+                    let use_q8_1_attention_output_fusion = !use_turboquant_kv
+                        && can_use_q8_1_mmvq(layer.attention_output_weight.mode)
+                        && can_use_q8_1_attention_output_fusion(
+                            layer.attention_output_weight.columns,
+                            head_count,
+                            head_dim,
+                        );
                     let layer_start = Instant::now();
                     let dense_start = Instant::now();
                     let mut dense_submission = backend.begin_submission()?;
@@ -6186,7 +6383,67 @@ impl GptOssCudaModelInner {
                             layer.attention_qkv_weight.total_rows(),
                         )?;
                     }
-                    if use_q8_1_attention_output_fusion {
+                    if use_turboquant_kv {
+                        dense_submission.attention_decode_rope_cache_turboquant_kv(
+                            &plan.qkv_buffer,
+                            0,
+                            q_rows,
+                            q_rows.saturating_add(k_rows),
+                            &cuda_cache.key_buffer,
+                            &cuda_cache.value_buffer,
+                            cuda_cache.width,
+                            cache_offset,
+                            cache_write_index,
+                            self.family_metadata.sliding_window.unwrap_or(0),
+                            head_count,
+                            kv_head_count,
+                            head_dim,
+                            rotary_dim,
+                            position,
+                            freq_scale,
+                            ext_factor,
+                            corr_dims,
+                            theta_scale,
+                            layer.attention_sinks_device.as_ref(),
+                            &plan.attention_input_buffer,
+                        )?;
+                        if can_use_q8_1_mmvq(layer.attention_output_weight.mode) {
+                            dense_submission.quantize_f32_to_q8_1(
+                                &plan.attention_input_buffer,
+                                1,
+                                layer.attention_output_weight.columns,
+                                &plan.hidden_input_q8_1_buffer,
+                            )?;
+                            dense_submission.quantized_matvec_q8_1(
+                                layer
+                                    .attention_output_weight
+                                    .storage
+                                    .as_ref()
+                                    .expect("checked above"),
+                                0,
+                                layer.attention_output_weight.mode,
+                                layer.attention_output_weight.rows,
+                                layer.attention_output_weight.columns,
+                                &plan.hidden_input_q8_1_buffer,
+                                None,
+                                &plan.output_buffer,
+                            )?;
+                        } else {
+                            dense_submission.quantized_matvec(
+                                layer
+                                    .attention_output_weight
+                                    .storage
+                                    .as_ref()
+                                    .expect("checked above"),
+                                0,
+                                layer.attention_output_weight.mode,
+                                layer.attention_output_weight.rows,
+                                layer.attention_output_weight.columns,
+                                &plan.attention_input_buffer,
+                                &plan.output_buffer,
+                            )?;
+                        }
+                    } else if use_q8_1_attention_output_fusion {
                         dense_submission.attention_decode_rope_cache_f16_kv_q8_1(
                             &plan.qkv_buffer,
                             0,
@@ -8252,7 +8509,7 @@ impl GptOssCudaModelInner {
                     perf.cuda.device_to_host_bytes = perf
                         .cuda
                         .device_to_host_bytes
-                        .saturating_add(cache_key_value_byte_len(cuda_cache.width));
+                        .saturating_add(cuda_cache.read_entry_byte_len());
                     cache_key = key;
                     cache_value = value;
                 }
@@ -11858,6 +12115,7 @@ struct CudaKvCacheMirror {
     width: usize,
     len: usize,
     capacity_tokens: usize,
+    encoding: CudaKvCacheEncoding,
 }
 
 impl CudaKvCacheMirror {
@@ -11876,27 +12134,40 @@ impl CudaKvCacheMirror {
             .min(max_context.max(1))
     }
 
-    fn from_host_cache(
+    fn key_token_byte_len_for_encoding(
+        width: usize,
+        encoding: CudaKvCacheEncoding,
+    ) -> Result<usize, super::RuntimeError> {
+        match encoding {
+            CudaKvCacheEncoding::DenseF16 => Ok(width.saturating_mul(std::mem::size_of::<u16>())),
+            CudaKvCacheEncoding::TurboQuantQ81 => ggml_q8_1_storage_bytes(1, width)
+                .map_err(|error| super::RuntimeError::Backend(error.to_string())),
+        }
+    }
+
+    fn key_token_byte_len(&self) -> Result<usize, super::RuntimeError> {
+        Self::key_token_byte_len_for_encoding(self.width, self.encoding)
+    }
+
+    fn read_entry_byte_len(&self) -> u64 {
+        self.key_token_byte_len()
+            .map(|key_bytes| key_bytes.saturating_mul(2).try_into().unwrap_or(u64::MAX))
+            .unwrap_or(u64::MAX)
+    }
+
+    fn from_host_cache_with_encoding(
         backend: &mut CudaBackend,
         cache: &super::InMemoryKvCache,
         reserve_tokens: usize,
+        encoding: CudaKvCacheEncoding,
     ) -> Result<Self, super::RuntimeError> {
         let capacity_tokens =
             Self::capacity_for_request(cache.len(), reserve_tokens, cache.max_context());
+        let token_byte_len = Self::key_token_byte_len_for_encoding(cache.width(), encoding)?;
         let mut key_buffer =
-            backend.byte_buffer(&vec![
-                0_u8;
-                capacity_tokens
-                    .saturating_mul(cache.width())
-                    .saturating_mul(std::mem::size_of::<u16>())
-            ])?;
+            backend.byte_buffer(&vec![0_u8; capacity_tokens.saturating_mul(token_byte_len)])?;
         let mut value_buffer =
-            backend.byte_buffer(&vec![
-                0_u8;
-                capacity_tokens
-                    .saturating_mul(cache.width())
-                    .saturating_mul(std::mem::size_of::<u16>())
-            ])?;
+            backend.byte_buffer(&vec![0_u8; capacity_tokens.saturating_mul(token_byte_len)])?;
         if !cache.is_empty() {
             let mut keys = Vec::with_capacity(cache.len().saturating_mul(cache.width()));
             let mut values = Vec::with_capacity(cache.len().saturating_mul(cache.width()));
@@ -11904,10 +12175,24 @@ impl CudaKvCacheMirror {
                 keys.extend_from_slice(entry.key.as_slice());
                 values.extend_from_slice(entry.value.as_slice());
             }
-            key_buffer
-                .write_bytes_at_offset(0, f32_slice_to_f16_bytes(keys.as_slice()).as_slice())?;
-            value_buffer
-                .write_bytes_at_offset(0, f32_slice_to_f16_bytes(values.as_slice()).as_slice())?;
+            match encoding {
+                CudaKvCacheEncoding::DenseF16 => {
+                    key_buffer.write_bytes_at_offset(
+                        0,
+                        f32_slice_to_f16_bytes(keys.as_slice()).as_slice(),
+                    )?;
+                    value_buffer.write_bytes_at_offset(
+                        0,
+                        f32_slice_to_f16_bytes(values.as_slice()).as_slice(),
+                    )?;
+                }
+                CudaKvCacheEncoding::TurboQuantQ81 => {
+                    let encoded_keys = f32_slice_to_q8_1_bytes(keys.as_slice(), cache.width())?;
+                    let encoded_values = f32_slice_to_q8_1_bytes(values.as_slice(), cache.width())?;
+                    key_buffer.write_bytes_at_offset(0, encoded_keys.as_slice())?;
+                    value_buffer.write_bytes_at_offset(0, encoded_values.as_slice())?;
+                }
+            }
         }
         Ok(Self {
             key_buffer,
@@ -11915,6 +12200,7 @@ impl CudaKvCacheMirror {
             width: cache.width(),
             len: cache.len(),
             capacity_tokens,
+            encoding,
         })
     }
 
@@ -11926,37 +12212,22 @@ impl CudaKvCacheMirror {
         if required_tokens <= self.capacity_tokens {
             return Ok(());
         }
+        let token_byte_len = self.key_token_byte_len()?;
         let new_capacity = required_tokens
             .max(self.capacity_tokens.saturating_mul(2))
             .checked_next_power_of_two()
             .unwrap_or(required_tokens);
         let mut new_keys =
-            backend.byte_buffer(&vec![
-                0_u8;
-                new_capacity
-                    .saturating_mul(self.width)
-                    .saturating_mul(std::mem::size_of::<u16>())
-            ])?;
+            backend.byte_buffer(&vec![0_u8; new_capacity.saturating_mul(token_byte_len)])?;
         let mut new_values =
-            backend.byte_buffer(&vec![
-                0_u8;
-                new_capacity
-                    .saturating_mul(self.width)
-                    .saturating_mul(std::mem::size_of::<u16>())
-            ])?;
+            backend.byte_buffer(&vec![0_u8; new_capacity.saturating_mul(token_byte_len)])?;
         if self.len > 0 {
-            let existing_keys = self.key_buffer.read_bytes_at_offset(
-                0,
-                self.len
-                    .saturating_mul(self.width)
-                    .saturating_mul(std::mem::size_of::<u16>()),
-            )?;
-            let existing_values = self.value_buffer.read_bytes_at_offset(
-                0,
-                self.len
-                    .saturating_mul(self.width)
-                    .saturating_mul(std::mem::size_of::<u16>()),
-            )?;
+            let existing_keys = self
+                .key_buffer
+                .read_bytes_at_offset(0, self.len.saturating_mul(token_byte_len))?;
+            let existing_values = self
+                .value_buffer
+                .read_bytes_at_offset(0, self.len.saturating_mul(token_byte_len))?;
             new_keys.write_bytes_at_offset(0, existing_keys.as_slice())?;
             new_values.write_bytes_at_offset(0, existing_values.as_slice())?;
         }
@@ -11973,17 +12244,13 @@ impl CudaKvCacheMirror {
         max_context: usize,
     ) -> Result<Self, super::RuntimeError> {
         let capacity_tokens = Self::capacity_for_request(self.len, reserve_tokens, max_context);
-        let key_bytes = capacity_tokens
-            .saturating_mul(self.width)
-            .saturating_mul(std::mem::size_of::<u16>());
+        let token_byte_len = self.key_token_byte_len()?;
+        let key_bytes = capacity_tokens.saturating_mul(token_byte_len);
         let value_bytes = key_bytes;
         let key_buffer = backend.byte_buffer(&vec![0_u8; key_bytes])?;
         let value_buffer = backend.byte_buffer(&vec![0_u8; value_bytes])?;
         if self.len > 0 {
-            let copy_bytes = self
-                .len
-                .saturating_mul(self.width)
-                .saturating_mul(std::mem::size_of::<u16>());
+            let copy_bytes = self.len.saturating_mul(token_byte_len);
             let mut submission = backend.begin_submission()?;
             submission.copy_buffer_region(&self.key_buffer, 0, &key_buffer, 0, copy_bytes)?;
             submission.copy_buffer_region(&self.value_buffer, 0, &value_buffer, 0, copy_bytes)?;
@@ -11995,6 +12262,7 @@ impl CudaKvCacheMirror {
             width: self.width,
             len: self.len,
             capacity_tokens,
+            encoding: self.encoding,
         })
     }
 
@@ -12005,22 +12273,21 @@ impl CudaKvCacheMirror {
                 token_index, self.len
             )));
         }
-        let byte_offset = token_index
-            .saturating_mul(self.width)
-            .saturating_mul(std::mem::size_of::<u16>());
-        let byte_len = self.width.saturating_mul(std::mem::size_of::<u16>());
-        Ok((
-            f16_bytes_to_f32_vec(
-                self.key_buffer
-                    .read_bytes_at_offset(byte_offset, byte_len)?
-                    .as_slice(),
-            )?,
-            f16_bytes_to_f32_vec(
-                self.value_buffer
-                    .read_bytes_at_offset(byte_offset, byte_len)?
-                    .as_slice(),
-            )?,
-        ))
+        let byte_len = self.key_token_byte_len()?;
+        let byte_offset = token_index.saturating_mul(byte_len);
+        let key_bytes = self
+            .key_buffer
+            .read_bytes_at_offset(byte_offset, byte_len)?;
+        let value_bytes = self
+            .value_buffer
+            .read_bytes_at_offset(byte_offset, byte_len)?;
+        let decode = |bytes: Vec<u8>| match self.encoding {
+            CudaKvCacheEncoding::DenseF16 => f16_bytes_to_f32_vec(bytes.as_slice()),
+            CudaKvCacheEncoding::TurboQuantQ81 => {
+                q8_1_bytes_to_f32_vec(bytes.as_slice(), self.width)
+            }
+        };
+        Ok((decode(key_bytes)?, decode(value_bytes)?))
     }
 
     fn truncated(&self, len: usize) -> Self {
@@ -12031,6 +12298,23 @@ impl CudaKvCacheMirror {
 
     fn len(&self) -> usize {
         self.len
+    }
+
+    fn state(&self, layout: &KvCachePageLayout) -> psionic_runtime::KvCacheState {
+        let bytes = self
+            .key_token_byte_len()
+            .map(|key_bytes| {
+                self.len
+                    .saturating_mul(key_bytes.saturating_mul(2))
+                    .try_into()
+                    .unwrap_or(u64::MAX)
+            })
+            .unwrap_or(u64::MAX);
+        psionic_runtime::KvCacheState {
+            tokens: self.len,
+            bytes,
+            pages: layout.page_count_for_tokens(self.len),
+        }
     }
 }
 
@@ -12061,36 +12345,11 @@ fn append_cuda_cache_growth_to_host_cache(
             )),
         ));
     }
-
-    let byte_offset = start_index
-        .saturating_mul(cuda_cache.width)
-        .saturating_mul(std::mem::size_of::<u16>());
-    let byte_len = tokens
-        .len()
-        .saturating_mul(cuda_cache.width)
-        .saturating_mul(std::mem::size_of::<u16>());
-    let keys = f16_bytes_to_f32_vec(
-        cuda_cache
-            .key_buffer
-            .read_bytes_at_offset(byte_offset, byte_len)?
-            .as_slice(),
-    )
-    .map_err(ReferenceTextGenerationError::Runtime)?;
-    let values = f16_bytes_to_f32_vec(
-        cuda_cache
-            .value_buffer
-            .read_bytes_at_offset(byte_offset, byte_len)?
-            .as_slice(),
-    )
-    .map_err(ReferenceTextGenerationError::Runtime)?;
-
-    for ((token, key), value) in tokens
-        .iter()
-        .copied()
-        .zip(keys.chunks_exact(cuda_cache.width))
-        .zip(values.chunks_exact(cuda_cache.width))
-    {
-        cache.append(token, key.to_vec(), value.to_vec())?;
+    for (offset, token) in tokens.iter().copied().enumerate() {
+        let (key, value) = cuda_cache
+            .read_entry(start_index.saturating_add(offset))
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        cache.append(token, key, value)?;
     }
     Ok(())
 }
@@ -13394,14 +13653,6 @@ fn metal_decode_step_plan_compile_path(plan_cache_hit: bool) -> CompilePathEvide
     }
 }
 
-fn cache_key_value_byte_len(width: usize) -> u64 {
-    width
-        .saturating_mul(2)
-        .saturating_mul(std::mem::size_of::<u16>())
-        .try_into()
-        .unwrap_or(u64::MAX)
-}
-
 fn write_metal_buffer_prefix(
     buffer: &mut MetalBuffer,
     values: &[f32],
@@ -13441,6 +13692,46 @@ fn f32_slice_to_f16_bytes(values: &[f32]) -> Vec<u8> {
     bytes
 }
 
+fn f32_slice_to_q8_1_bytes(values: &[f32], width: usize) -> Result<Vec<u8>, super::RuntimeError> {
+    if width == 0 || values.len() % width != 0 {
+        return Err(super::RuntimeError::Backend(format!(
+            "q8_1 row encode requires a positive row width, got width={} values={}",
+            width,
+            values.len(),
+        )));
+    }
+    let row_byte_len = ggml_q8_1_storage_bytes(1, width)
+        .map_err(|error| super::RuntimeError::Backend(error.to_string()))?;
+    let block_count = width / GGML_Q8_1_BLOCK_ELEMENTS;
+    let mut bytes = Vec::with_capacity(values.len() / width * row_byte_len);
+    for row in values.chunks_exact(width) {
+        for block in row.chunks_exact(GGML_Q8_1_BLOCK_ELEMENTS) {
+            let mut max_abs = 0.0_f32;
+            let mut sum = 0.0_f32;
+            for &value in block {
+                max_abs = max_abs.max(value.abs());
+                sum += value;
+            }
+            let scale = if max_abs == 0.0 { 0.0 } else { max_abs / 127.0 };
+            bytes.extend_from_slice(&f32_to_f16_bits(scale).to_le_bytes());
+            bytes.extend_from_slice(&f32_to_f16_bits(sum).to_le_bytes());
+            for &value in block {
+                let quantized = if scale == 0.0 {
+                    0.0
+                } else {
+                    (value / scale).round().clamp(-127.0, 127.0)
+                };
+                bytes.push((quantized as i8) as u8);
+            }
+        }
+    }
+    debug_assert_eq!(
+        bytes.len(),
+        values.len() / width * block_count * GGML_Q8_1_BLOCK_BYTES
+    );
+    Ok(bytes)
+}
+
 fn f16_bytes_to_f32_vec(bytes: &[u8]) -> Result<Vec<f32>, super::RuntimeError> {
     if bytes.len() % std::mem::size_of::<u16>() != 0 {
         return Err(super::RuntimeError::Backend(format!(
@@ -13451,6 +13742,26 @@ fn f16_bytes_to_f32_vec(bytes: &[u8]) -> Result<Vec<f32>, super::RuntimeError> {
     let mut values = Vec::with_capacity(bytes.len() / std::mem::size_of::<u16>());
     for chunk in bytes.chunks_exact(std::mem::size_of::<u16>()) {
         values.push(f16_bits_to_f32(u16::from_le_bytes([chunk[0], chunk[1]])));
+    }
+    Ok(values)
+}
+
+fn q8_1_bytes_to_f32_vec(bytes: &[u8], width: usize) -> Result<Vec<f32>, super::RuntimeError> {
+    let expected = ggml_q8_1_storage_bytes(1, width)
+        .map_err(|error| super::RuntimeError::Backend(error.to_string()))?;
+    if bytes.len() != expected {
+        return Err(super::RuntimeError::Backend(format!(
+            "invalid q8_1 byte length {}, expected {}",
+            bytes.len(),
+            expected,
+        )));
+    }
+    let mut values = Vec::with_capacity(width);
+    for block in bytes.chunks_exact(GGML_Q8_1_BLOCK_BYTES) {
+        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        for &quantized in &block[4..4 + GGML_Q8_1_BLOCK_ELEMENTS] {
+            values.push((quantized as i8) as f32 * scale);
+        }
     }
     Ok(values)
 }
@@ -13770,11 +14081,12 @@ mod tests {
     #[cfg(target_os = "macos")]
     use super::CpuGgufGptOssTextGenerationService;
     use super::{
-        MetalGgufGptOssTextGenerationService, build_gpt_oss_decode_graph, can_use_q8_1_mmvq,
+        build_gpt_oss_decode_graph, can_use_q8_1_mmvq,
         decode_quantized_matrix_bytes_transposed_f16, decode_quantized_matrix_bytes_transposed_f32,
         decode_quantized_row_into, digest_gpt_oss_cuda_step_plan, f16_bits_to_f32,
         f32_slice_to_f16_bytes, f32_to_f16_bits, pack_quantized_expert_projection_bytes,
         pack_quantized_projection_bytes, split_projection_outputs,
+        MetalGgufGptOssTextGenerationService,
     };
     use crate::QuantizationMode;
     #[cfg(target_os = "macos")]
@@ -13788,7 +14100,7 @@ mod tests {
     use psionic_models::{GgufMetadataValue, GgufTensorType};
     use psionic_runtime::{
         CacheAction, CacheKind, CompilePathTemperature, DeviceDiscovery, HealthStatus,
-        PrefixCacheState,
+        KvCacheEncodingFamily, PrefixCacheState,
     };
     use std::{fs, path::Path, path::PathBuf, time::Instant};
     #[cfg(target_os = "macos")]
@@ -13862,6 +14174,51 @@ mod tests {
     }
 
     #[test]
+    fn cuda_kv_cache_encoding_selection_activates_turboquant_when_supported() {
+        let selection = super::select_cuda_kv_cache_encoding_for_geometry(
+            true, "gpt-oss", "cuda", 131_072, 4096, 128,
+        );
+
+        assert_eq!(
+            selection.encoding,
+            super::CudaKvCacheEncoding::TurboQuantQ81
+        );
+        assert_eq!(
+            selection.accounting.active.family,
+            KvCacheEncodingFamily::TurboQuant
+        );
+        assert!(!selection.accounting.downgraded);
+        assert_eq!(
+            selection
+                .accounting
+                .requested
+                .as_ref()
+                .map(|policy| policy.family),
+            Some(KvCacheEncodingFamily::TurboQuant)
+        );
+    }
+
+    #[test]
+    fn cuda_kv_cache_encoding_selection_downgrades_unsupported_geometry() {
+        let selection = super::select_cuda_kv_cache_encoding_for_geometry(
+            true, "gpt-oss", "cuda", 131_072, 4100, 96,
+        );
+
+        assert_eq!(selection.encoding, super::CudaKvCacheEncoding::DenseF16);
+        assert_eq!(
+            selection.accounting.active.family,
+            KvCacheEncodingFamily::DenseF16Mirror
+        );
+        assert!(selection.accounting.downgraded);
+        assert!(selection
+            .accounting
+            .refusal_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("cache width divisible by 32"));
+    }
+
+    #[test]
     fn quantized_matrix_transpose_decode_preserves_row_values() {
         let row = std::iter::once(128_u8)
             .chain(
@@ -13911,8 +14268,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_matches_cpu_reference_on_synthetic_fixture()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_matches_cpu_reference_on_synthetic_fixture(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny-gpt-oss.gguf");
         write_test_gpt_oss_gguf(&path)?;
@@ -13948,8 +14305,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_reuses_device_prefix_and_reports_graph_metrics()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_reuses_device_prefix_and_reports_graph_metrics(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny-gpt-oss-device-kv.gguf");
         write_test_gpt_oss_gguf(&path)?;
@@ -13980,18 +14337,16 @@ mod tests {
                 .map(|value| value.temperature),
             Some(CompilePathTemperature::WarmReuse | CompilePathTemperature::ColdCompile)
         ));
-        assert!(
-            first
-                .provenance
-                .as_ref()
-                .map(|value| {
-                    value.cache_observations.iter().any(|observation| {
-                        observation.kind == CacheKind::KvState
-                            && observation.detail.contains("device-resident kv state")
-                    })
+        assert!(first
+            .provenance
+            .as_ref()
+            .map(|value| {
+                value.cache_observations.iter().any(|observation| {
+                    observation.kind == CacheKind::KvState
+                        && observation.detail.contains("device-resident kv state")
                 })
-                .unwrap_or(false)
-        );
+            })
+            .unwrap_or(false));
 
         let second = metal.generate(&request)?;
         assert_eq!(
@@ -14017,19 +14372,17 @@ mod tests {
                 .map(|value| value.temperature),
             Some(CompilePathTemperature::WarmReuse)
         );
-        assert!(
-            second
-                .provenance
-                .as_ref()
-                .map(|value| {
-                    value.cache_observations.iter().any(|observation| {
-                        observation.kind == CacheKind::KvState
-                            && observation.action == CacheAction::Reuse
-                            && observation.detail == "device-resident kv state was reused"
-                    })
+        assert!(second
+            .provenance
+            .as_ref()
+            .map(|value| {
+                value.cache_observations.iter().any(|observation| {
+                    observation.kind == CacheKind::KvState
+                        && observation.action == CacheAction::Reuse
+                        && observation.detail == "device-resident kv state was reused"
                 })
-                .unwrap_or(false)
-        );
+            })
+            .unwrap_or(false));
         Ok(())
     }
 
@@ -14059,8 +14412,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_batches_decode_kernels_into_fewer_submissions()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_batches_decode_kernels_into_fewer_submissions(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let perf =
             metal_perf_for_options("tiny-gpt-oss-metal-step-plan", GenerationOptions::greedy(1))?;
 
@@ -14087,8 +14440,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_reports_greedy_decode_logits_mode()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_reports_greedy_decode_logits_mode(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let metrics = metal_decode_logits_metrics_for_options(
             "tiny-gpt-oss-metal-greedy-logits",
             GenerationOptions::greedy(1),
@@ -14106,8 +14459,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_reports_bounded_top_k_decode_logits_mode()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_reports_bounded_top_k_decode_logits_mode(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut options = GenerationOptions::sample(1);
         options.top_k = Some(2);
         options.seed = Some(7);
@@ -14129,8 +14482,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_reports_raw_decode_logits_mode_when_required()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_reports_raw_decode_logits_mode_when_required(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut options = GenerationOptions::greedy(1);
         options.repeat_penalty = Some(1.1);
         let metrics =
@@ -14599,8 +14952,8 @@ mod tests {
     }
 
     #[test]
-    fn q8_0_transposed_f16_mirror_matches_quantized_projection_for_subnormal_scales_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn q8_0_transposed_f16_mirror_matches_quantized_projection_for_subnormal_scales_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);

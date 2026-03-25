@@ -251,6 +251,35 @@ __device__ __forceinline__ float dot_query_half_key_pairwise(
     return dot;
 }
 
+__device__ __forceinline__ float q81_block_value(const Q81Block *block, int lane) {
+    const float scale = half_to_float(load_u16_le(block->bytes));
+    const int8_t quantized = reinterpret_cast<const int8_t *>(block->bytes + 4)[lane];
+    return static_cast<float>(quantized) * scale;
+}
+
+__device__ __forceinline__ float dot_query_q81_key(
+    const float *query,
+    const Q81Block *key_blocks,
+    int head_dim
+) {
+    float dot = 0.0f;
+    const int block_count = head_dim / kQ81ElementsPerBlock;
+    for (int block_index = 0; block_index < block_count; ++block_index) {
+        const Q81Block *block = key_blocks + block_index;
+        const float scale = half_to_float(load_u16_le(block->bytes));
+        const int8_t *quantized = reinterpret_cast<const int8_t *>(block->bytes + 4);
+#pragma unroll
+        for (int lane = 0; lane < kQ81ElementsPerBlock; ++lane) {
+            dot = fmaf(
+                query[block_index * kQ81ElementsPerBlock + lane],
+                static_cast<float>(quantized[lane]) * scale,
+                dot
+            );
+        }
+    }
+    return dot;
+}
+
 constexpr int kQ80Q81MmvqVdr = 2;
 constexpr int kQ80Qi = kQ81ElementsPerBlock / 4;
 constexpr int kMxfp4Q81MmvqVdr = 2;
@@ -2566,6 +2595,325 @@ __global__ void attention_decode_rope_cache_f16_kv_graph_kernel(
             sum += __half2float(value_head[threadIdx.x]) * weights[index];
         }
         sum += current_value_head[threadIdx.x] * weights[window_tokens];
+        output[head_index * head_dim + threadIdx.x] = sum;
+    }
+}
+
+__global__ void attention_decode_rope_cache_turboquant_kv_kernel(
+    const float *qkv,
+    int query_offset,
+    int key_offset,
+    int value_offset,
+    Q81Block *cache_keys,
+    Q81Block *cache_values,
+    int cache_width,
+    int layer_offset,
+    int past_tokens,
+    int sliding_window,
+    int head_count,
+    int kv_head_count,
+    int head_dim,
+    int rotary_dim,
+    int position,
+    float freq_scale,
+    float ext_factor,
+    float corr_low,
+    float corr_high,
+    float theta_scale,
+    const float *attention_sinks,
+    float *output
+) {
+    const int head_index = blockIdx.x;
+    if (head_index >= head_count || head_dim % kQ81ElementsPerBlock != 0 ||
+        cache_width % kQ81ElementsPerBlock != 0 || layer_offset % kQ81ElementsPerBlock != 0) {
+        return;
+    }
+
+    extern __shared__ float head_state[];
+    float *query_rotated = head_state;
+    float *current_key_rotated = head_state + head_dim;
+
+    __shared__ float logits[kAttentionMaxPositions];
+    __shared__ float weights[kAttentionMaxPositions];
+    __shared__ float reduction_scratch[kAttentionBlockSize];
+
+    int window_tokens = past_tokens;
+    if (sliding_window > 0 && window_tokens > sliding_window) {
+        window_tokens = sliding_window;
+    }
+    if (window_tokens > kAttentionMaxPositions - 1) {
+        window_tokens = kAttentionMaxPositions - 1;
+    }
+    const int start = past_tokens - window_tokens;
+    const int group_size = max(head_count / max(kv_head_count, 1), 1);
+    const int kv_head = min(head_index / group_size, kv_head_count - 1);
+    const bool cache_writer = (head_index % group_size) == 0;
+    const int cache_row_blocks = cache_width / kQ81ElementsPerBlock;
+    const int layer_block_offset =
+        (layer_offset + kv_head * head_dim) / kQ81ElementsPerBlock;
+    const int cache_token_block_offset = past_tokens * cache_row_blocks + layer_block_offset;
+    const float scale = rsqrtf(static_cast<float>(head_dim));
+
+    const float *query_head = qkv + query_offset + head_index * head_dim;
+    const float *current_key_head = qkv + key_offset + kv_head * head_dim;
+    const float *current_value_head = qkv + value_offset + kv_head * head_dim;
+
+    for (int dim = threadIdx.x; dim < head_dim; dim += blockDim.x) {
+        query_rotated[dim] = rope_neox_component(
+            query_head,
+            dim,
+            head_dim,
+            rotary_dim,
+            position,
+            freq_scale,
+            ext_factor,
+            corr_low,
+            corr_high,
+            theta_scale
+        );
+        current_key_rotated[dim] = rope_neox_component(
+            current_key_head,
+            dim,
+            head_dim,
+            rotary_dim,
+            position,
+            freq_scale,
+            ext_factor,
+            corr_low,
+            corr_high,
+            theta_scale
+        );
+    }
+    __syncthreads();
+
+    if (cache_writer && threadIdx.x < head_dim) {
+        const int block_offset = static_cast<int>(threadIdx.x) / kQ81ElementsPerBlock;
+        const int lane = static_cast<int>(threadIdx.x) % kQ81ElementsPerBlock;
+        quantize_q8_1_shared_block(
+            current_key_rotated + block_offset * kQ81ElementsPerBlock,
+            cache_keys + cache_token_block_offset + block_offset,
+            lane
+        );
+        quantize_q8_1_shared_block(
+            current_value_head + block_offset * kQ81ElementsPerBlock,
+            cache_values + cache_token_block_offset + block_offset,
+            lane
+        );
+    }
+    __syncthreads();
+
+    if (threadIdx.x < window_tokens) {
+        const Q81Block *key_blocks =
+            cache_keys + (start + threadIdx.x) * cache_row_blocks + layer_block_offset;
+        logits[threadIdx.x] = dot_query_q81_key(query_rotated, key_blocks, head_dim) * scale;
+    }
+    if (threadIdx.x == 0) {
+        float dot = 0.0f;
+        for (int dim = 0; dim < head_dim; ++dim) {
+            dot += query_rotated[dim] * current_key_rotated[dim];
+        }
+        logits[window_tokens] = dot * scale;
+    }
+    __syncthreads();
+
+    float local_max = -INFINITY;
+    for (int index = static_cast<int>(threadIdx.x); index <= window_tokens; index += blockDim.x) {
+        local_max = fmaxf(local_max, logits[index]);
+    }
+    if (threadIdx.x == 0 && attention_sinks != nullptr) {
+        local_max = fmaxf(local_max, attention_sinks[head_index]);
+    }
+    const float max_value = reduce_block_max(local_max, reduction_scratch);
+
+    float local_denom = 0.0f;
+    for (int index = static_cast<int>(threadIdx.x); index <= window_tokens; index += blockDim.x) {
+        const float weight = expf(logits[index] - max_value);
+        weights[index] = weight;
+        local_denom += weight;
+    }
+    if (threadIdx.x == 0 && attention_sinks != nullptr) {
+        local_denom += expf(attention_sinks[head_index] - max_value);
+    }
+    const float denom = reduce_block_sum(local_denom, reduction_scratch);
+    for (int index = static_cast<int>(threadIdx.x); index <= window_tokens; index += blockDim.x) {
+        weights[index] = denom != 0.0f ? weights[index] / denom : 0.0f;
+    }
+    __syncthreads();
+
+    if (threadIdx.x < head_dim) {
+        float sum = 0.0f;
+        const int block_offset = static_cast<int>(threadIdx.x) / kQ81ElementsPerBlock;
+        const int lane = static_cast<int>(threadIdx.x) % kQ81ElementsPerBlock;
+        for (int index = 0; index < window_tokens; ++index) {
+            const Q81Block *value_blocks =
+                cache_values + (start + index) * cache_row_blocks + layer_block_offset;
+            sum = fmaf(
+                q81_block_value(value_blocks + block_offset, lane),
+                weights[index],
+                sum
+            );
+        }
+        sum = fmaf(current_value_head[threadIdx.x], weights[window_tokens], sum);
+        output[head_index * head_dim + threadIdx.x] = sum;
+    }
+}
+
+__global__ void attention_decode_rope_cache_turboquant_kv_graph_kernel(
+    const float *qkv,
+    int query_offset,
+    int key_offset,
+    int value_offset,
+    Q81Block *cache_keys,
+    Q81Block *cache_values,
+    int cache_width,
+    int layer_offset,
+    const int *decode_params,
+    int sliding_window,
+    int head_count,
+    int kv_head_count,
+    int head_dim,
+    int rotary_dim,
+    float freq_scale,
+    float ext_factor,
+    float corr_low,
+    float corr_high,
+    float theta_scale,
+    const float *attention_sinks,
+    float *output
+) {
+    const int past_tokens = decode_params[0];
+    const int position = decode_params[1];
+    const int head_index = blockIdx.x;
+    if (head_index >= head_count || head_dim % kQ81ElementsPerBlock != 0 ||
+        cache_width % kQ81ElementsPerBlock != 0 || layer_offset % kQ81ElementsPerBlock != 0) {
+        return;
+    }
+
+    extern __shared__ float head_state[];
+    float *query_rotated = head_state;
+    float *current_key_rotated = head_state + head_dim;
+
+    __shared__ float logits[kAttentionMaxPositions];
+    __shared__ float weights[kAttentionMaxPositions];
+    __shared__ float reduction_scratch[kAttentionBlockSize];
+
+    int window_tokens = past_tokens;
+    if (sliding_window > 0 && window_tokens > sliding_window) {
+        window_tokens = sliding_window;
+    }
+    if (window_tokens > kAttentionMaxPositions - 1) {
+        window_tokens = kAttentionMaxPositions - 1;
+    }
+    const int start = past_tokens - window_tokens;
+    const int group_size = max(head_count / max(kv_head_count, 1), 1);
+    const int kv_head = min(head_index / group_size, kv_head_count - 1);
+    const bool cache_writer = (head_index % group_size) == 0;
+    const int cache_row_blocks = cache_width / kQ81ElementsPerBlock;
+    const int layer_block_offset =
+        (layer_offset + kv_head * head_dim) / kQ81ElementsPerBlock;
+    const int cache_token_block_offset = past_tokens * cache_row_blocks + layer_block_offset;
+    const float scale = rsqrtf(static_cast<float>(head_dim));
+
+    const float *query_head = qkv + query_offset + head_index * head_dim;
+    const float *current_key_head = qkv + key_offset + kv_head * head_dim;
+    const float *current_value_head = qkv + value_offset + kv_head * head_dim;
+
+    for (int dim = threadIdx.x; dim < head_dim; dim += blockDim.x) {
+        query_rotated[dim] = rope_neox_component(
+            query_head,
+            dim,
+            head_dim,
+            rotary_dim,
+            position,
+            freq_scale,
+            ext_factor,
+            corr_low,
+            corr_high,
+            theta_scale
+        );
+        current_key_rotated[dim] = rope_neox_component(
+            current_key_head,
+            dim,
+            head_dim,
+            rotary_dim,
+            position,
+            freq_scale,
+            ext_factor,
+            corr_low,
+            corr_high,
+            theta_scale
+        );
+    }
+    __syncthreads();
+
+    if (cache_writer && threadIdx.x < head_dim) {
+        const int block_offset = static_cast<int>(threadIdx.x) / kQ81ElementsPerBlock;
+        const int lane = static_cast<int>(threadIdx.x) % kQ81ElementsPerBlock;
+        quantize_q8_1_shared_block(
+            current_key_rotated + block_offset * kQ81ElementsPerBlock,
+            cache_keys + cache_token_block_offset + block_offset,
+            lane
+        );
+        quantize_q8_1_shared_block(
+            current_value_head + block_offset * kQ81ElementsPerBlock,
+            cache_values + cache_token_block_offset + block_offset,
+            lane
+        );
+    }
+    __syncthreads();
+
+    if (threadIdx.x < window_tokens) {
+        const Q81Block *key_blocks =
+            cache_keys + (start + threadIdx.x) * cache_row_blocks + layer_block_offset;
+        logits[threadIdx.x] = dot_query_q81_key(query_rotated, key_blocks, head_dim) * scale;
+    }
+    if (threadIdx.x == 0) {
+        float dot = 0.0f;
+        for (int dim = 0; dim < head_dim; ++dim) {
+            dot += query_rotated[dim] * current_key_rotated[dim];
+        }
+        logits[window_tokens] = dot * scale;
+    }
+    __syncthreads();
+
+    float local_max = -INFINITY;
+    for (int index = static_cast<int>(threadIdx.x); index <= window_tokens; index += blockDim.x) {
+        local_max = fmaxf(local_max, logits[index]);
+    }
+    if (threadIdx.x == 0 && attention_sinks != nullptr) {
+        local_max = fmaxf(local_max, attention_sinks[head_index]);
+    }
+    const float max_value = reduce_block_max(local_max, reduction_scratch);
+
+    float local_denom = 0.0f;
+    for (int index = static_cast<int>(threadIdx.x); index <= window_tokens; index += blockDim.x) {
+        const float weight = expf(logits[index] - max_value);
+        weights[index] = weight;
+        local_denom += weight;
+    }
+    if (threadIdx.x == 0 && attention_sinks != nullptr) {
+        local_denom += expf(attention_sinks[head_index] - max_value);
+    }
+    const float denom = reduce_block_sum(local_denom, reduction_scratch);
+    for (int index = static_cast<int>(threadIdx.x); index <= window_tokens; index += blockDim.x) {
+        weights[index] = denom != 0.0f ? weights[index] / denom : 0.0f;
+    }
+    __syncthreads();
+
+    if (threadIdx.x < head_dim) {
+        float sum = 0.0f;
+        const int block_offset = static_cast<int>(threadIdx.x) / kQ81ElementsPerBlock;
+        const int lane = static_cast<int>(threadIdx.x) % kQ81ElementsPerBlock;
+        for (int index = 0; index < window_tokens; ++index) {
+            const Q81Block *value_blocks =
+                cache_values + (start + index) * cache_row_blocks + layer_block_offset;
+            sum = fmaf(
+                q81_block_value(value_blocks + block_offset, lane),
+                weights[index],
+                sum
+            );
+        }
+        sum = fmaf(current_value_head[threadIdx.x], weights[window_tokens], sum);
         output[head_index * head_dim + threadIdx.x] = sum;
     }
 }
@@ -5685,6 +6033,64 @@ extern "C" int psionic_cuda_attention_decode_rope_cache_f16_kv(
     return static_cast<int>(cudaGetLastError());
 }
 
+extern "C" int psionic_cuda_attention_decode_rope_cache_turboquant_kv(
+    const void *qkv,
+    int query_offset,
+    int key_offset,
+    int value_offset,
+    void *cache_keys,
+    void *cache_values,
+    int cache_width,
+    int layer_offset,
+    int past_tokens,
+    int sliding_window,
+    int head_count,
+    int kv_head_count,
+    int head_dim,
+    int rotary_dim,
+    int position,
+    float freq_scale,
+    float ext_factor,
+    float corr_low,
+    float corr_high,
+    float theta_scale,
+    const void *attention_sinks,
+    void *output,
+    void *stream
+) {
+    const size_t shared_bytes = static_cast<size_t>(head_dim) * 2 * sizeof(float);
+    attention_decode_rope_cache_turboquant_kv_kernel<<<
+        head_count,
+        kAttentionBlockSize,
+        shared_bytes,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const float *>(qkv),
+        query_offset,
+        key_offset,
+        value_offset,
+        static_cast<Q81Block *>(cache_keys),
+        static_cast<Q81Block *>(cache_values),
+        cache_width,
+        layer_offset,
+        past_tokens,
+        sliding_window,
+        head_count,
+        kv_head_count,
+        head_dim,
+        rotary_dim,
+        position,
+        freq_scale,
+        ext_factor,
+        corr_low,
+        corr_high,
+        theta_scale,
+        static_cast<const float *>(attention_sinks),
+        static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
 extern "C" int psionic_cuda_attention_decode_rope_cache_f16_kv_q8_1(
     const void *qkv,
     int query_offset,
@@ -5780,6 +6186,62 @@ extern "C" int psionic_cuda_attention_decode_rope_cache_f16_kv_graph(
         value_offset,
         static_cast<__half *>(cache_keys),
         static_cast<__half *>(cache_values),
+        cache_width,
+        layer_offset,
+        static_cast<const int *>(decode_params),
+        sliding_window,
+        head_count,
+        kv_head_count,
+        head_dim,
+        rotary_dim,
+        freq_scale,
+        ext_factor,
+        corr_low,
+        corr_high,
+        theta_scale,
+        static_cast<const float *>(attention_sinks),
+        static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_attention_decode_rope_cache_turboquant_kv_graph(
+    const void *qkv,
+    int query_offset,
+    int key_offset,
+    int value_offset,
+    void *cache_keys,
+    void *cache_values,
+    int cache_width,
+    int layer_offset,
+    const void *decode_params,
+    int sliding_window,
+    int head_count,
+    int kv_head_count,
+    int head_dim,
+    int rotary_dim,
+    float freq_scale,
+    float ext_factor,
+    float corr_low,
+    float corr_high,
+    float theta_scale,
+    const void *attention_sinks,
+    void *output,
+    void *stream
+) {
+    const size_t shared_bytes = static_cast<size_t>(head_dim) * 2 * sizeof(float);
+    attention_decode_rope_cache_turboquant_kv_graph_kernel<<<
+        head_count,
+        kAttentionBlockSize,
+        shared_bytes,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const float *>(qkv),
+        query_offset,
+        key_offset,
+        value_offset,
+        static_cast<Q81Block *>(cache_keys),
+        static_cast<Q81Block *>(cache_values),
         cache_width,
         layer_offset,
         static_cast<const int *>(decode_params),

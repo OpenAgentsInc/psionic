@@ -1540,20 +1540,21 @@ impl CudaSubmission {
         key_gradient: &CudaBuffer,
         value_gradient: &CudaBuffer,
     ) -> Result<(), RuntimeError> {
-        self.platform.encode_attention_causal_sequence_backward_f32(
-            &query.platform,
-            &key.platform,
-            &value.platform,
-            &grad_output.platform,
-            batch_size,
-            head_count,
-            kv_head_count,
-            sequence_length,
-            head_dim,
-            &query_gradient.platform,
-            &key_gradient.platform,
-            &value_gradient.platform,
-        )?;
+        self.platform
+            .encode_attention_causal_sequence_backward_f32(
+                &query.platform,
+                &key.platform,
+                &value.platform,
+                &grad_output.platform,
+                batch_size,
+                head_count,
+                kv_head_count,
+                sequence_length,
+                head_dim,
+                &query_gradient.platform,
+                &key_gradient.platform,
+                &value_gradient.platform,
+            )?;
         self.encoded_operations += 1;
         Ok(())
     }
@@ -1666,6 +1667,79 @@ impl CudaSubmission {
         Ok(())
     }
 
+    /// Variant of fused GPT-OSS decode attention that reads one TurboQuant
+    /// prototype KV cache encoded as contiguous GGML `Q8_1` rows.
+    #[allow(clippy::too_many_arguments)]
+    pub fn attention_decode_rope_cache_turboquant_kv(
+        &mut self,
+        qkv: &CudaBuffer,
+        query_offset: usize,
+        key_offset: usize,
+        value_offset: usize,
+        cache_keys: &CudaBuffer,
+        cache_values: &CudaBuffer,
+        cache_width: usize,
+        layer_offset: usize,
+        past_tokens: usize,
+        sliding_window: usize,
+        head_count: usize,
+        kv_head_count: usize,
+        head_dim: usize,
+        rotary_dim: usize,
+        position: usize,
+        freq_scale: f32,
+        ext_factor: f32,
+        corr_dims: [f32; 2],
+        theta_scale: f32,
+        attention_sinks: Option<&CudaBuffer>,
+        output: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        if cache_width % GGML_Q8_1_BLOCK_ELEMENTS != 0 {
+            return Err(RuntimeError::Backend(format!(
+                "cuda TurboQuant KV cache width must be divisible by {}, actual {cache_width}",
+                GGML_Q8_1_BLOCK_ELEMENTS,
+            )));
+        }
+        if layer_offset % GGML_Q8_1_BLOCK_ELEMENTS != 0 {
+            return Err(RuntimeError::Backend(format!(
+                "cuda TurboQuant KV layer offset must be divisible by {}, actual {layer_offset}",
+                GGML_Q8_1_BLOCK_ELEMENTS,
+            )));
+        }
+        if head_dim % GGML_Q8_1_BLOCK_ELEMENTS != 0 {
+            return Err(RuntimeError::Backend(format!(
+                "cuda TurboQuant KV head dim must be divisible by {}, actual {head_dim}",
+                GGML_Q8_1_BLOCK_ELEMENTS,
+            )));
+        }
+        self.platform
+            .encode_attention_decode_rope_cache_turboquant_kv(
+                &qkv.platform,
+                query_offset,
+                key_offset,
+                value_offset,
+                &cache_keys.platform,
+                &cache_values.platform,
+                cache_width,
+                layer_offset,
+                past_tokens,
+                sliding_window,
+                head_count,
+                kv_head_count,
+                head_dim,
+                rotary_dim,
+                position,
+                freq_scale,
+                ext_factor,
+                corr_dims,
+                theta_scale,
+                attention_sinks.map(|buffer| &buffer.platform),
+                &output.platform,
+            )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
     /// Variant of fused GPT-OSS decode attention that writes the attention
     /// output directly into contiguous GGML `Q8_1` blocks.
     #[allow(clippy::too_many_arguments)]
@@ -1761,6 +1835,78 @@ impl CudaSubmission {
     ) -> Result<(), RuntimeError> {
         self.platform
             .encode_attention_decode_rope_cache_f16_kv_graph(
+                &qkv.platform,
+                query_offset,
+                key_offset,
+                value_offset,
+                &cache_keys.platform,
+                &cache_values.platform,
+                cache_width,
+                layer_offset,
+                &decode_params.platform,
+                sliding_window,
+                head_count,
+                kv_head_count,
+                head_dim,
+                rotary_dim,
+                freq_scale,
+                ext_factor,
+                corr_dims,
+                theta_scale,
+                attention_sinks.map(|buffer| &buffer.platform),
+                &output.platform,
+            )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Graph-capture-friendly variant of TurboQuant KV decode attention that
+    /// reads the dynamic `past_tokens` and `position` values from device
+    /// memory.
+    #[allow(clippy::too_many_arguments)]
+    pub fn attention_decode_rope_cache_turboquant_kv_graph(
+        &mut self,
+        qkv: &CudaBuffer,
+        query_offset: usize,
+        key_offset: usize,
+        value_offset: usize,
+        cache_keys: &CudaBuffer,
+        cache_values: &CudaBuffer,
+        cache_width: usize,
+        layer_offset: usize,
+        decode_params: &CudaBuffer,
+        sliding_window: usize,
+        head_count: usize,
+        kv_head_count: usize,
+        head_dim: usize,
+        rotary_dim: usize,
+        freq_scale: f32,
+        ext_factor: f32,
+        corr_dims: [f32; 2],
+        theta_scale: f32,
+        attention_sinks: Option<&CudaBuffer>,
+        output: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        if cache_width % GGML_Q8_1_BLOCK_ELEMENTS != 0 {
+            return Err(RuntimeError::Backend(format!(
+                "cuda TurboQuant KV cache width must be divisible by {}, actual {cache_width}",
+                GGML_Q8_1_BLOCK_ELEMENTS,
+            )));
+        }
+        if layer_offset % GGML_Q8_1_BLOCK_ELEMENTS != 0 {
+            return Err(RuntimeError::Backend(format!(
+                "cuda TurboQuant KV layer offset must be divisible by {}, actual {layer_offset}",
+                GGML_Q8_1_BLOCK_ELEMENTS,
+            )));
+        }
+        if head_dim % GGML_Q8_1_BLOCK_ELEMENTS != 0 {
+            return Err(RuntimeError::Backend(format!(
+                "cuda TurboQuant KV head dim must be divisible by {}, actual {head_dim}",
+                GGML_Q8_1_BLOCK_ELEMENTS,
+            )));
+        }
+        self.platform
+            .encode_attention_decode_rope_cache_turboquant_kv_graph(
                 &qkv.platform,
                 query_offset,
                 key_offset,
@@ -4225,9 +4371,8 @@ impl AvailableCudaBackend {
                             }
                             Some(ReduceSumCudaStrategy::Axis1Rank3 { dim0, dim1, dim2 }) => {
                                 let output = self.allocate(&step.spec)?;
-                                submission.reduce_sum_axis1_rank3_f32(
-                                    input, &output, dim0, dim1, dim2,
-                                )?;
+                                submission
+                                    .reduce_sum_axis1_rank3_f32(input, &output, dim0, dim1, dim2)?;
                                 output
                             }
                             None => execute_profiled_host_fallback(
@@ -4608,9 +4753,7 @@ impl AvailableCudaBackend {
                         let cache_key =
                             scaled_dot_product_attention_backward_cache_key(step, scale, *causal)?;
                         let use_device_path =
-                            supports_cuda_scaled_dot_product_attention_backward_f32(
-                                step, &values,
-                            )?;
+                            supports_cuda_scaled_dot_product_attention_backward_f32(step, &values)?;
                         let output = if let Some(cached) = attention_backward_cache.get(&cache_key)
                         {
                             cached.output(ScaledDotProductAttentionBackwardTarget::Query)
@@ -4648,9 +4791,7 @@ impl AvailableCudaBackend {
                         let cache_key =
                             scaled_dot_product_attention_backward_cache_key(step, scale, *causal)?;
                         let use_device_path =
-                            supports_cuda_scaled_dot_product_attention_backward_f32(
-                                step, &values,
-                            )?;
+                            supports_cuda_scaled_dot_product_attention_backward_f32(step, &values)?;
                         let output = if let Some(cached) = attention_backward_cache.get(&cache_key)
                         {
                             cached.output(ScaledDotProductAttentionBackwardTarget::Key)
@@ -4691,9 +4832,7 @@ impl AvailableCudaBackend {
                         let cache_key =
                             scaled_dot_product_attention_backward_cache_key(step, scale, *causal)?;
                         let use_device_path =
-                            supports_cuda_scaled_dot_product_attention_backward_f32(
-                                step, &values,
-                            )?;
+                            supports_cuda_scaled_dot_product_attention_backward_f32(step, &values)?;
                         let output = if let Some(cached) = attention_backward_cache.get(&cache_key)
                         {
                             cached.output(ScaledDotProductAttentionBackwardTarget::Value)
@@ -6294,12 +6433,10 @@ fn supports_cuda_scaled_dot_product_attention_backward_f32(
     let key = step_input(step, values, 1)?;
     let value = step_input(step, values, 2)?;
     let grad_output = step_input(step, values, 3)?;
-    Ok(
-        query.spec().dtype() == DType::F32
-            && key.spec().dtype() == DType::F32
-            && value.spec().dtype() == DType::F32
-            && grad_output.spec().dtype() == DType::F32,
-    )
+    Ok(query.spec().dtype() == DType::F32
+        && key.spec().dtype() == DType::F32
+        && value.spec().dtype() == DType::F32
+        && grad_output.spec().dtype() == DType::F32)
 }
 
 fn supports_cuda_rank2_transpose(input_shape: &[usize], axes: &[usize]) -> bool {
@@ -7243,6 +7380,31 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_attention_decode_rope_cache_turboquant_kv(
+            qkv: *const c_void,
+            query_offset: c_int,
+            key_offset: c_int,
+            value_offset: c_int,
+            cache_keys: *mut c_void,
+            cache_values: *mut c_void,
+            cache_width: c_int,
+            layer_offset: c_int,
+            past_tokens: c_int,
+            sliding_window: c_int,
+            head_count: c_int,
+            kv_head_count: c_int,
+            head_dim: c_int,
+            rotary_dim: c_int,
+            position: c_int,
+            freq_scale: f32,
+            ext_factor: f32,
+            corr_low: f32,
+            corr_high: f32,
+            theta_scale: f32,
+            attention_sinks: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_attention_decode_rope_cache_f16_kv_q8_1(
             qkv: *const c_void,
             query_offset: c_int,
@@ -7269,6 +7431,30 @@ mod platform {
             stream: CudaStream,
         ) -> CudaError;
         fn psionic_cuda_attention_decode_rope_cache_f16_kv_graph(
+            qkv: *const c_void,
+            query_offset: c_int,
+            key_offset: c_int,
+            value_offset: c_int,
+            cache_keys: *mut c_void,
+            cache_values: *mut c_void,
+            cache_width: c_int,
+            layer_offset: c_int,
+            decode_params: *const c_void,
+            sliding_window: c_int,
+            head_count: c_int,
+            kv_head_count: c_int,
+            head_dim: c_int,
+            rotary_dim: c_int,
+            freq_scale: f32,
+            ext_factor: f32,
+            corr_low: f32,
+            corr_high: f32,
+            theta_scale: f32,
+            attention_sinks: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_attention_decode_rope_cache_turboquant_kv_graph(
             qkv: *const c_void,
             query_offset: c_int,
             key_offset: c_int,
@@ -9636,6 +9822,126 @@ mod platform {
         }
 
         #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_decode_rope_cache_turboquant_kv(
+            &mut self,
+            qkv: &PlatformBuffer,
+            query_offset: usize,
+            key_offset: usize,
+            value_offset: usize,
+            cache_keys: &PlatformBuffer,
+            cache_values: &PlatformBuffer,
+            cache_width: usize,
+            layer_offset: usize,
+            past_tokens: usize,
+            sliding_window: usize,
+            head_count: usize,
+            kv_head_count: usize,
+            head_dim: usize,
+            rotary_dim: usize,
+            position: usize,
+            freq_scale: f32,
+            ext_factor: f32,
+            corr_dims: [f32; 2],
+            theta_scale: f32,
+            attention_sinks: Option<&PlatformBuffer>,
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let query_offset = c_int::try_from(query_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) query offset exceeds c_int",
+                ))
+            })?;
+            let key_offset = c_int::try_from(key_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) key offset exceeds c_int",
+                ))
+            })?;
+            let value_offset = c_int::try_from(value_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) value offset exceeds c_int",
+                ))
+            })?;
+            let cache_width = c_int::try_from(cache_width).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) cache width exceeds c_int",
+                ))
+            })?;
+            let layer_offset = c_int::try_from(layer_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) layer offset exceeds c_int",
+                ))
+            })?;
+            let past_tokens = c_int::try_from(past_tokens).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) past token count exceeds c_int",
+                ))
+            })?;
+            let sliding_window = c_int::try_from(sliding_window).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) sliding window exceeds c_int",
+                ))
+            })?;
+            let head_count = c_int::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) head count exceeds c_int",
+                ))
+            })?;
+            let kv_head_count = c_int::try_from(kv_head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) kv head count exceeds c_int",
+                ))
+            })?;
+            let head_dim = c_int::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) head dim exceeds c_int",
+                ))
+            })?;
+            let rotary_dim = c_int::try_from(rotary_dim).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) rotary dim exceeds c_int",
+                ))
+            })?;
+            let position = c_int::try_from(position).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(TurboQuant kv) position exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_attention_decode_rope_cache_turboquant_kv(
+                        qkv.inner.device_ptr.cast(),
+                        query_offset,
+                        key_offset,
+                        value_offset,
+                        cache_keys.inner.device_ptr.cast(),
+                        cache_values.inner.device_ptr.cast(),
+                        cache_width,
+                        layer_offset,
+                        past_tokens,
+                        sliding_window,
+                        head_count,
+                        kv_head_count,
+                        head_dim,
+                        rotary_dim,
+                        position,
+                        freq_scale,
+                        ext_factor,
+                        corr_dims[0],
+                        corr_dims[1],
+                        theta_scale,
+                        attention_sinks
+                            .map(|buffer| buffer.inner.device_ptr.cast())
+                            .unwrap_or(std::ptr::null_mut()),
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_attention_decode_rope_cache_turboquant_kv",
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
         pub(super) fn encode_attention_decode_rope_cache_f16_kv_q8_1(
             &mut self,
             qkv: &PlatformBuffer,
@@ -9860,6 +10166,114 @@ mod platform {
                     )
                 },
                 "psionic_cuda_attention_decode_rope_cache_f16_kv_graph",
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_decode_rope_cache_turboquant_kv_graph(
+            &mut self,
+            qkv: &PlatformBuffer,
+            query_offset: usize,
+            key_offset: usize,
+            value_offset: usize,
+            cache_keys: &PlatformBuffer,
+            cache_values: &PlatformBuffer,
+            cache_width: usize,
+            layer_offset: usize,
+            decode_params: &PlatformBuffer,
+            sliding_window: usize,
+            head_count: usize,
+            kv_head_count: usize,
+            head_dim: usize,
+            rotary_dim: usize,
+            freq_scale: f32,
+            ext_factor: f32,
+            corr_dims: [f32; 2],
+            theta_scale: f32,
+            attention_sinks: Option<&PlatformBuffer>,
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let query_offset = c_int::try_from(query_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(graph, TurboQuant kv) query offset exceeds c_int",
+                ))
+            })?;
+            let key_offset = c_int::try_from(key_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(graph, TurboQuant kv) key offset exceeds c_int",
+                ))
+            })?;
+            let value_offset = c_int::try_from(value_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(graph, TurboQuant kv) value offset exceeds c_int",
+                ))
+            })?;
+            let cache_width = c_int::try_from(cache_width).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(graph, TurboQuant kv) cache width exceeds c_int",
+                ))
+            })?;
+            let layer_offset = c_int::try_from(layer_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(graph, TurboQuant kv) layer offset exceeds c_int",
+                ))
+            })?;
+            let sliding_window = c_int::try_from(sliding_window).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(graph, TurboQuant kv) sliding window exceeds c_int",
+                ))
+            })?;
+            let head_count = c_int::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(graph, TurboQuant kv) head count exceeds c_int",
+                ))
+            })?;
+            let kv_head_count = c_int::try_from(kv_head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(graph, TurboQuant kv) kv head count exceeds c_int",
+                ))
+            })?;
+            let head_dim = c_int::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(graph, TurboQuant kv) head dim exceeds c_int",
+                ))
+            })?;
+            let rotary_dim = c_int::try_from(rotary_dim).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fused attention(graph, TurboQuant kv) rotary dim exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_attention_decode_rope_cache_turboquant_kv_graph(
+                        qkv.inner.device_ptr.cast(),
+                        query_offset,
+                        key_offset,
+                        value_offset,
+                        cache_keys.inner.device_ptr.cast(),
+                        cache_values.inner.device_ptr.cast(),
+                        cache_width,
+                        layer_offset,
+                        decode_params.inner.device_ptr.cast(),
+                        sliding_window,
+                        head_count,
+                        kv_head_count,
+                        head_dim,
+                        rotary_dim,
+                        freq_scale,
+                        ext_factor,
+                        corr_dims[0],
+                        corr_dims[1],
+                        theta_scale,
+                        attention_sinks
+                            .map(|buffer| buffer.inner.device_ptr.cast())
+                            .unwrap_or(std::ptr::null_mut()),
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_attention_decode_rope_cache_turboquant_kv_graph",
             )
         }
 
@@ -11900,6 +12314,36 @@ mod platform {
         }
 
         #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_decode_rope_cache_turboquant_kv(
+            &mut self,
+            _qkv: &PlatformBuffer,
+            _query_offset: usize,
+            _key_offset: usize,
+            _value_offset: usize,
+            _cache_keys: &PlatformBuffer,
+            _cache_values: &PlatformBuffer,
+            _cache_width: usize,
+            _layer_offset: usize,
+            _past_tokens: usize,
+            _sliding_window: usize,
+            _head_count: usize,
+            _kv_head_count: usize,
+            _head_dim: usize,
+            _rotary_dim: usize,
+            _position: usize,
+            _freq_scale: f32,
+            _ext_factor: f32,
+            _corr_dims: [f32; 2],
+            _theta_scale: f32,
+            _attention_sinks: Option<&PlatformBuffer>,
+            _output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
         pub(super) fn encode_attention_decode_rope_cache_f16_kv_q8_1(
             &mut self,
             _qkv: &PlatformBuffer,
@@ -11931,6 +12375,35 @@ mod platform {
 
         #[allow(clippy::too_many_arguments)]
         pub(super) fn encode_attention_decode_rope_cache_f16_kv_graph(
+            &mut self,
+            _qkv: &PlatformBuffer,
+            _query_offset: usize,
+            _key_offset: usize,
+            _value_offset: usize,
+            _cache_keys: &PlatformBuffer,
+            _cache_values: &PlatformBuffer,
+            _cache_width: usize,
+            _layer_offset: usize,
+            _decode_params: &PlatformBuffer,
+            _sliding_window: usize,
+            _head_count: usize,
+            _kv_head_count: usize,
+            _head_dim: usize,
+            _rotary_dim: usize,
+            _freq_scale: f32,
+            _ext_factor: f32,
+            _corr_dims: [f32; 2],
+            _theta_scale: f32,
+            _attention_sinks: Option<&PlatformBuffer>,
+            _output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_decode_rope_cache_turboquant_kv_graph(
             &mut self,
             _qkv: &PlatformBuffer,
             _query_offset: usize,
@@ -15278,6 +15751,267 @@ mod tests {
             cache_values_fused.read_bytes()?,
             cache_values_separate.read_bytes()?
         );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_fused_attention_turboquant_kv_matches_f16_kv_reference_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let head_count = 2usize;
+        let kv_head_count = 1usize;
+        let head_dim = 32usize;
+        let rotary_dim = 32usize;
+        let q_rows = head_count * head_dim;
+        let k_rows = kv_head_count * head_dim;
+        let v_rows = kv_head_count * head_dim;
+        let exact_block = sample_q8_1_exact_vector()
+            .into_iter()
+            .map(|value| value * 0.125)
+            .collect::<Vec<_>>();
+        let reversed_block = exact_block.iter().copied().rev().collect::<Vec<_>>();
+        let query = exact_block
+            .iter()
+            .copied()
+            .chain(reversed_block.iter().copied())
+            .collect::<Vec<_>>();
+        let qkv = query
+            .iter()
+            .copied()
+            .chain(reversed_block.iter().copied())
+            .chain(exact_block.iter().copied())
+            .collect::<Vec<_>>();
+        let previous_keys = exact_block.clone();
+        let previous_values = reversed_block.clone();
+        let cache_token_capacity = 2usize;
+        let mut cache_keys_bytes =
+            vec![0_u8; cache_token_capacity * k_rows * std::mem::size_of::<u16>()];
+        let mut cache_values_bytes =
+            vec![0_u8; cache_token_capacity * v_rows * std::mem::size_of::<u16>()];
+        let previous_key_bytes = f32_slice_to_f16_le_bytes(&previous_keys);
+        let previous_value_bytes = f32_slice_to_f16_le_bytes(&previous_values);
+        cache_keys_bytes[..previous_key_bytes.len()].copy_from_slice(&previous_key_bytes);
+        cache_values_bytes[..previous_value_bytes.len()].copy_from_slice(&previous_value_bytes);
+
+        let qkv_buffer = backend.input_buffer(Shape::new(vec![qkv.len()]), qkv)?;
+        let cache_keys_dense = backend.byte_buffer(&cache_keys_bytes)?;
+        let cache_values_dense = backend.byte_buffer(&cache_values_bytes)?;
+        let output_dense = backend.f32_buffer(q_rows)?;
+
+        let q8_1_row_bytes = crate::ggml_q8_1_storage_bytes(1, k_rows)?;
+        let cache_keys_turbo =
+            backend.byte_buffer(&vec![0_u8; cache_token_capacity * q8_1_row_bytes])?;
+        let cache_values_turbo =
+            backend.byte_buffer(&vec![0_u8; cache_token_capacity * q8_1_row_bytes])?;
+        let previous_keys_buffer =
+            backend.input_buffer(Shape::new(vec![previous_keys.len()]), previous_keys)?;
+        let previous_values_buffer =
+            backend.input_buffer(Shape::new(vec![previous_values.len()]), previous_values)?;
+        let mut init = backend.begin_submission()?;
+        init.quantize_f32_to_q8_1(&previous_keys_buffer, 1, k_rows, &cache_keys_turbo)?;
+        init.quantize_f32_to_q8_1(&previous_values_buffer, 1, v_rows, &cache_values_turbo)?;
+        let init_report = init.commit(CudaCommandWait::Completed)?;
+        assert_eq!(init_report.encoded_operations, 2);
+
+        let output_turbo = backend.f32_buffer(q_rows)?;
+        let freq_scale = 1.0_f32;
+        let ext_factor = 0.0_f32;
+        let corr_dims = [0.0_f32, 0.0_f32];
+        let theta_scale = 0.5_f32;
+
+        let mut dense = backend.begin_submission()?;
+        dense.attention_decode_rope_cache_f16_kv(
+            &qkv_buffer,
+            0,
+            q_rows,
+            q_rows + k_rows,
+            &cache_keys_dense,
+            &cache_values_dense,
+            k_rows,
+            0,
+            1,
+            0,
+            head_count,
+            kv_head_count,
+            head_dim,
+            rotary_dim,
+            5,
+            freq_scale,
+            ext_factor,
+            corr_dims,
+            theta_scale,
+            None,
+            &output_dense,
+        )?;
+        let dense_report = dense.commit(CudaCommandWait::Completed)?;
+        assert_eq!(dense_report.encoded_operations, 1);
+
+        let mut turbo = backend.begin_submission()?;
+        turbo.attention_decode_rope_cache_turboquant_kv(
+            &qkv_buffer,
+            0,
+            q_rows,
+            q_rows + k_rows,
+            &cache_keys_turbo,
+            &cache_values_turbo,
+            k_rows,
+            0,
+            1,
+            0,
+            head_count,
+            kv_head_count,
+            head_dim,
+            rotary_dim,
+            5,
+            freq_scale,
+            ext_factor,
+            corr_dims,
+            theta_scale,
+            None,
+            &output_turbo,
+        )?;
+        let turbo_report = turbo.commit(CudaCommandWait::Completed)?;
+        assert_eq!(turbo_report.encoded_operations, 1);
+
+        assert_close(&output_turbo.read_f32()?, &output_dense.read_f32()?, 1e-4);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_fused_attention_graph_turboquant_kv_matches_f16_kv_reference_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let head_count = 2usize;
+        let kv_head_count = 1usize;
+        let head_dim = 32usize;
+        let rotary_dim = 32usize;
+        let q_rows = head_count * head_dim;
+        let k_rows = kv_head_count * head_dim;
+        let v_rows = kv_head_count * head_dim;
+        let exact_block = sample_q8_1_exact_vector()
+            .into_iter()
+            .map(|value| value * 0.125)
+            .collect::<Vec<_>>();
+        let reversed_block = exact_block.iter().copied().rev().collect::<Vec<_>>();
+        let query = exact_block
+            .iter()
+            .copied()
+            .chain(reversed_block.iter().copied())
+            .collect::<Vec<_>>();
+        let qkv = query
+            .iter()
+            .copied()
+            .chain(exact_block.iter().copied())
+            .chain(reversed_block.iter().copied())
+            .collect::<Vec<_>>();
+        let previous_keys = reversed_block.clone();
+        let previous_values = exact_block.clone();
+        let cache_token_capacity = 2usize;
+        let mut cache_keys_bytes =
+            vec![0_u8; cache_token_capacity * k_rows * std::mem::size_of::<u16>()];
+        let mut cache_values_bytes =
+            vec![0_u8; cache_token_capacity * v_rows * std::mem::size_of::<u16>()];
+        let previous_key_bytes = f32_slice_to_f16_le_bytes(&previous_keys);
+        let previous_value_bytes = f32_slice_to_f16_le_bytes(&previous_values);
+        cache_keys_bytes[..previous_key_bytes.len()].copy_from_slice(&previous_key_bytes);
+        cache_values_bytes[..previous_value_bytes.len()].copy_from_slice(&previous_value_bytes);
+
+        let qkv_buffer = backend.input_buffer(Shape::new(vec![qkv.len()]), qkv)?;
+        let cache_keys_dense = backend.byte_buffer(&cache_keys_bytes)?;
+        let cache_values_dense = backend.byte_buffer(&cache_values_bytes)?;
+        let output_dense = backend.f32_buffer(q_rows)?;
+
+        let q8_1_row_bytes = crate::ggml_q8_1_storage_bytes(1, k_rows)?;
+        let cache_keys_turbo =
+            backend.byte_buffer(&vec![0_u8; cache_token_capacity * q8_1_row_bytes])?;
+        let cache_values_turbo =
+            backend.byte_buffer(&vec![0_u8; cache_token_capacity * q8_1_row_bytes])?;
+        let previous_keys_buffer =
+            backend.input_buffer(Shape::new(vec![previous_keys.len()]), previous_keys)?;
+        let previous_values_buffer =
+            backend.input_buffer(Shape::new(vec![previous_values.len()]), previous_values)?;
+        let mut init = backend.begin_submission()?;
+        init.quantize_f32_to_q8_1(&previous_keys_buffer, 1, k_rows, &cache_keys_turbo)?;
+        init.quantize_f32_to_q8_1(&previous_values_buffer, 1, v_rows, &cache_values_turbo)?;
+        let init_report = init.commit(CudaCommandWait::Completed)?;
+        assert_eq!(init_report.encoded_operations, 2);
+
+        let output_turbo = backend.f32_buffer(q_rows)?;
+        let decode_params = backend.byte_buffer(&i32_slice_to_bytes(&[1_i32, 6_i32]))?;
+        let freq_scale = 1.0_f32;
+        let ext_factor = 0.0_f32;
+        let corr_dims = [0.0_f32, 0.0_f32];
+        let theta_scale = 0.5_f32;
+
+        let mut dense = backend.begin_submission()?;
+        dense.attention_decode_rope_cache_f16_kv_graph(
+            &qkv_buffer,
+            0,
+            q_rows,
+            q_rows + k_rows,
+            &cache_keys_dense,
+            &cache_values_dense,
+            k_rows,
+            0,
+            &decode_params,
+            0,
+            head_count,
+            kv_head_count,
+            head_dim,
+            rotary_dim,
+            freq_scale,
+            ext_factor,
+            corr_dims,
+            theta_scale,
+            None,
+            &output_dense,
+        )?;
+        let dense_report = dense.commit(CudaCommandWait::Completed)?;
+        assert_eq!(dense_report.encoded_operations, 1);
+
+        let mut turbo = backend.begin_submission()?;
+        turbo.attention_decode_rope_cache_turboquant_kv_graph(
+            &qkv_buffer,
+            0,
+            q_rows,
+            q_rows + k_rows,
+            &cache_keys_turbo,
+            &cache_values_turbo,
+            k_rows,
+            0,
+            &decode_params,
+            0,
+            head_count,
+            kv_head_count,
+            head_dim,
+            rotary_dim,
+            freq_scale,
+            ext_factor,
+            corr_dims,
+            theta_scale,
+            None,
+            &output_turbo,
+        )?;
+        let turbo_report = turbo.commit(CudaCommandWait::Completed)?;
+        assert_eq!(turbo_report.encoded_operations, 1);
+
+        assert_close(&output_turbo.read_f32()?, &output_dense.read_f32()?, 1e-4);
         Ok(())
     }
 

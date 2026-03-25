@@ -851,6 +851,57 @@ int psionic_cuda_attention_decode_rope_cache_f16_kv(
     return 1;
 }
 
+int psionic_cuda_attention_decode_rope_cache_turboquant_kv(
+    const void *qkv,
+    int query_offset,
+    int key_offset,
+    int value_offset,
+    void *cache_keys,
+    void *cache_values,
+    int cache_width,
+    int layer_offset,
+    int past_tokens,
+    int sliding_window,
+    int head_count,
+    int kv_head_count,
+    int head_dim,
+    int rotary_dim,
+    int position,
+    float freq_scale,
+    float ext_factor,
+    float corr_low,
+    float corr_high,
+    float theta_scale,
+    const void *attention_sinks,
+    void *output,
+    void *stream
+) {
+    (void)qkv;
+    (void)query_offset;
+    (void)key_offset;
+    (void)value_offset;
+    (void)cache_keys;
+    (void)cache_values;
+    (void)cache_width;
+    (void)layer_offset;
+    (void)past_tokens;
+    (void)sliding_window;
+    (void)head_count;
+    (void)kv_head_count;
+    (void)head_dim;
+    (void)rotary_dim;
+    (void)position;
+    (void)freq_scale;
+    (void)ext_factor;
+    (void)corr_low;
+    (void)corr_high;
+    (void)theta_scale;
+    (void)attention_sinks;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
 int psionic_cuda_attention_decode_rope_cache_f16_kv_q8_1(
     const void *qkv,
     int query_offset,
@@ -903,6 +954,55 @@ int psionic_cuda_attention_decode_rope_cache_f16_kv_q8_1(
 }
 
 int psionic_cuda_attention_decode_rope_cache_f16_kv_graph(
+    const void *qkv,
+    int query_offset,
+    int key_offset,
+    int value_offset,
+    void *cache_keys,
+    void *cache_values,
+    int cache_width,
+    int layer_offset,
+    const void *decode_params,
+    int sliding_window,
+    int head_count,
+    int kv_head_count,
+    int head_dim,
+    int rotary_dim,
+    float freq_scale,
+    float ext_factor,
+    float corr_low,
+    float corr_high,
+    float theta_scale,
+    const void *attention_sinks,
+    void *output,
+    void *stream
+) {
+    (void)qkv;
+    (void)query_offset;
+    (void)key_offset;
+    (void)value_offset;
+    (void)cache_keys;
+    (void)cache_values;
+    (void)cache_width;
+    (void)layer_offset;
+    (void)decode_params;
+    (void)sliding_window;
+    (void)head_count;
+    (void)kv_head_count;
+    (void)head_dim;
+    (void)rotary_dim;
+    (void)freq_scale;
+    (void)ext_factor;
+    (void)corr_low;
+    (void)corr_high;
+    (void)theta_scale;
+    (void)attention_sinks;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
+int psionic_cuda_attention_decode_rope_cache_turboquant_kv_graph(
     const void *qkv,
     int query_offset,
     int key_offset,
