@@ -143,6 +143,17 @@ role-placement policy with score breakdowns across trust, network, storage,
 cost, backend, and binder alignment instead of leaving source admission to
 runbook prose or operator instinct.
 
+The repo now also owns the first contributor program-lineage bridge in
+`crates/psionic-train/src/contributor_program_lineage.rs`, the binary
+`contributor_program_lineage`, the checker
+`scripts/check-contributor-program-lineage.sh`, the focused reference doc
+`docs/CONTRIBUTOR_PROGRAM_LINEAGE_REFERENCE.md`, and the committed fixture
+`fixtures/training/contributor_program_lineage_v1.json`. That surface binds the
+current validated contributor windows to the same canonical dataset family,
+checkpoint family, and shared policy revision used by the hybrid dense program,
+and it freezes one promotion contract per contributor window so later accepted
+and no-promotion outcomes stay machine-legible under one program identity.
+
 The repo now also owns the first generic dense-rank runtime layer in
 `crates/psionic-train/src/dense_rank_runtime.rs`, the binary
 `dense_rank_runtime_reference_contract`, the checker

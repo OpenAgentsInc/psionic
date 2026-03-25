@@ -1,0 +1,237 @@
+{
+  "schema_version": "psionic.contributor_program_lineage.v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "dataset_family_id": "psion.curated_pretrain.dataset_family.v1",
+  "checkpoint_family": "psion.cross_provider.pretrain.v1",
+  "input_policy_revision": {
+    "policy_family": "psion.cross_provider.pretrain.v1",
+    "revision_id": "pretrain-policy-r7",
+    "revision_number": 7,
+    "policy_digest": "pretrain-policy-r7-digest",
+    "parent_revision_id": "pretrain-policy-r6",
+    "produced_at_ms": 1710000700000
+  },
+  "dense_lineage_anchors": [
+    {
+      "lineage_slot_id": "lineage.dense_rank.0",
+      "source_id": "runpod_8xh100_dense_node",
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "policy_revision_id": "pretrain-policy-r7",
+      "detail": "Contributor windows inherit the same checkpoint family and current shared policy revision as the dense anchors they later validate against."
+    },
+    {
+      "lineage_slot_id": "lineage.dense_rank.1",
+      "source_id": "runpod_8xh100_dense_node",
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "policy_revision_id": "pretrain-policy-r7",
+      "detail": "Contributor windows inherit the same checkpoint family and current shared policy revision as the dense anchors they later validate against."
+    }
+  ],
+  "contributor_window_bindings": [
+    {
+      "window_id": "contributor-window-mac-1",
+      "source_id": "local_mlx_mac_workstation",
+      "lineage_slot_id": "lineage.contributor_window.mac.1",
+      "dataset_family_id": "psion.curated_pretrain.dataset_family.v1",
+      "dataset_slice_id": "contributor-slice-mac-0",
+      "dataset_slice_digest": "2a0aa2b4fe781bd213b95712249f9d939b702ce715b91674a0613f6d36dbf306",
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "input_policy_revision_id": "pretrain-policy-r7",
+      "promotion_contract_id": "promotion.contributor-window-mac-1",
+      "authority_paths": [
+        "fixtures/swarm/first_swarm_run_contract_v1.json",
+        "fixtures/swarm/first_swarm_open_adapter_receipt_contract_v1.json"
+      ],
+      "detail": "This contributor window now binds back to the canonical pretraining checkpoint family and shared policy revision instead of floating as a standalone bounded window."
+    },
+    {
+      "window_id": "contributor-window-rtx4080-1",
+      "source_id": "local_rtx4080_workstation",
+      "lineage_slot_id": "lineage.contributor_window.rtx4080.1",
+      "dataset_family_id": "psion.curated_pretrain.dataset_family.v1",
+      "dataset_slice_id": "contributor-slice-rtx4080-1",
+      "dataset_slice_digest": "a2e7a91527d1be5cc11859dfd4e50b2d2e879445ea2a605a09b9dadc4d7588ea",
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "input_policy_revision_id": "pretrain-policy-r7",
+      "promotion_contract_id": "promotion.contributor-window-rtx4080-1",
+      "authority_paths": [
+        "fixtures/swarm/first_swarm_run_contract_v1.json",
+        "fixtures/swarm/first_swarm_open_adapter_receipt_contract_v1.json"
+      ],
+      "detail": "This contributor window now binds back to the canonical pretraining checkpoint family and shared policy revision instead of floating as a standalone bounded window."
+    },
+    {
+      "window_id": "contributor-window-google-1",
+      "source_id": "google_l4_validator_node",
+      "lineage_slot_id": "lineage.contributor_window.google.1",
+      "dataset_family_id": "psion.curated_pretrain.dataset_family.v1",
+      "dataset_slice_id": "contributor-slice-google-2",
+      "dataset_slice_digest": "3760c7c1aa51331677d2e1bbaf3007e0ef9c955ef3629bf412fd360da315eaa6",
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "input_policy_revision_id": "pretrain-policy-r7",
+      "promotion_contract_id": "promotion.contributor-window-google-1",
+      "authority_paths": [
+        "fixtures/training/google_training_binder_projection_v1.json"
+      ],
+      "detail": "This contributor window now binds back to the canonical pretraining checkpoint family and shared policy revision instead of floating as a standalone bounded window."
+    }
+  ],
+  "promotion_contracts": [
+    {
+      "promotion_contract_id": "promotion.contributor-window-mac-1",
+      "window_id": "contributor-window-mac-1",
+      "input_policy_revision": {
+        "policy_family": "psion.cross_provider.pretrain.v1",
+        "revision_id": "pretrain-policy-r7",
+        "revision_number": 7,
+        "policy_digest": "pretrain-policy-r7-digest",
+        "parent_revision_id": "pretrain-policy-r6",
+        "produced_at_ms": 1710000700000
+      },
+      "candidate_policy_revision": {
+        "policy_family": "psion.cross_provider.pretrain.v1",
+        "revision_id": "contributor-window-mac-1-candidate-r8",
+        "revision_number": 8,
+        "policy_digest": "contributor-window-mac-1-candidate-r8-digest",
+        "parent_revision_id": "pretrain-policy-r7",
+        "checkpoint": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "stream_id": "checkpoint.contributor-window-mac-1",
+          "manifest_digest": "manifest-digest.contributor-window-mac-1",
+          "object_digest": "object-digest.contributor-window-mac-1",
+          "writer_node_id": "writer.local_mlx_mac_workstation",
+          "membership_epoch": 8,
+          "cluster_state_digest": "cluster-state.contributor-window-mac-1",
+          "topology_digest": "topology.contributor-window-mac-1",
+          "started_at_ms": 1710000800000
+        },
+        "produced_at_ms": 1710000800000
+      },
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "candidate_checkpoint": {
+        "checkpoint_family": "psion.cross_provider.pretrain.v1",
+        "stream_id": "checkpoint.contributor-window-mac-1",
+        "manifest_digest": "manifest-digest.contributor-window-mac-1",
+        "object_digest": "object-digest.contributor-window-mac-1",
+        "writer_node_id": "writer.local_mlx_mac_workstation",
+        "membership_epoch": 8,
+        "cluster_state_digest": "cluster-state.contributor-window-mac-1",
+        "topology_digest": "topology.contributor-window-mac-1",
+        "started_at_ms": 1710000800000
+      },
+      "promotion_posture": "candidate_program_revision",
+      "admitted_validator_dispositions": [
+        "accepted",
+        "quarantined",
+        "rejected",
+        "replay_required"
+      ],
+      "detail": "Accepted contributor windows may mint a candidate shared pretraining policy revision under the canonical checkpoint family, while quarantine, reject, and replay-required outcomes remain explicit no-promotion paths."
+    },
+    {
+      "promotion_contract_id": "promotion.contributor-window-rtx4080-1",
+      "window_id": "contributor-window-rtx4080-1",
+      "input_policy_revision": {
+        "policy_family": "psion.cross_provider.pretrain.v1",
+        "revision_id": "pretrain-policy-r7",
+        "revision_number": 7,
+        "policy_digest": "pretrain-policy-r7-digest",
+        "parent_revision_id": "pretrain-policy-r6",
+        "produced_at_ms": 1710000700000
+      },
+      "candidate_policy_revision": {
+        "policy_family": "psion.cross_provider.pretrain.v1",
+        "revision_id": "contributor-window-rtx4080-1-candidate-r8",
+        "revision_number": 8,
+        "policy_digest": "contributor-window-rtx4080-1-candidate-r8-digest",
+        "parent_revision_id": "pretrain-policy-r7",
+        "checkpoint": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "stream_id": "checkpoint.contributor-window-rtx4080-1",
+          "manifest_digest": "manifest-digest.contributor-window-rtx4080-1",
+          "object_digest": "object-digest.contributor-window-rtx4080-1",
+          "writer_node_id": "writer.local_rtx4080_workstation",
+          "membership_epoch": 8,
+          "cluster_state_digest": "cluster-state.contributor-window-rtx4080-1",
+          "topology_digest": "topology.contributor-window-rtx4080-1",
+          "started_at_ms": 1710000800000
+        },
+        "produced_at_ms": 1710000800000
+      },
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "candidate_checkpoint": {
+        "checkpoint_family": "psion.cross_provider.pretrain.v1",
+        "stream_id": "checkpoint.contributor-window-rtx4080-1",
+        "manifest_digest": "manifest-digest.contributor-window-rtx4080-1",
+        "object_digest": "object-digest.contributor-window-rtx4080-1",
+        "writer_node_id": "writer.local_rtx4080_workstation",
+        "membership_epoch": 8,
+        "cluster_state_digest": "cluster-state.contributor-window-rtx4080-1",
+        "topology_digest": "topology.contributor-window-rtx4080-1",
+        "started_at_ms": 1710000800000
+      },
+      "promotion_posture": "candidate_program_revision",
+      "admitted_validator_dispositions": [
+        "accepted",
+        "quarantined",
+        "rejected",
+        "replay_required"
+      ],
+      "detail": "Accepted contributor windows may mint a candidate shared pretraining policy revision under the canonical checkpoint family, while quarantine, reject, and replay-required outcomes remain explicit no-promotion paths."
+    },
+    {
+      "promotion_contract_id": "promotion.contributor-window-google-1",
+      "window_id": "contributor-window-google-1",
+      "input_policy_revision": {
+        "policy_family": "psion.cross_provider.pretrain.v1",
+        "revision_id": "pretrain-policy-r7",
+        "revision_number": 7,
+        "policy_digest": "pretrain-policy-r7-digest",
+        "parent_revision_id": "pretrain-policy-r6",
+        "produced_at_ms": 1710000700000
+      },
+      "candidate_policy_revision": {
+        "policy_family": "psion.cross_provider.pretrain.v1",
+        "revision_id": "contributor-window-google-1-candidate-r8",
+        "revision_number": 8,
+        "policy_digest": "contributor-window-google-1-candidate-r8-digest",
+        "parent_revision_id": "pretrain-policy-r7",
+        "checkpoint": {
+          "checkpoint_family": "psion.cross_provider.pretrain.v1",
+          "stream_id": "checkpoint.contributor-window-google-1",
+          "manifest_digest": "manifest-digest.contributor-window-google-1",
+          "object_digest": "object-digest.contributor-window-google-1",
+          "writer_node_id": "writer.google_l4_validator_node",
+          "membership_epoch": 8,
+          "cluster_state_digest": "cluster-state.contributor-window-google-1",
+          "topology_digest": "topology.contributor-window-google-1",
+          "started_at_ms": 1710000800000
+        },
+        "produced_at_ms": 1710000800000
+      },
+      "checkpoint_family": "psion.cross_provider.pretrain.v1",
+      "candidate_checkpoint": {
+        "checkpoint_family": "psion.cross_provider.pretrain.v1",
+        "stream_id": "checkpoint.contributor-window-google-1",
+        "manifest_digest": "manifest-digest.contributor-window-google-1",
+        "object_digest": "object-digest.contributor-window-google-1",
+        "writer_node_id": "writer.google_l4_validator_node",
+        "membership_epoch": 8,
+        "cluster_state_digest": "cluster-state.contributor-window-google-1",
+        "topology_digest": "topology.contributor-window-google-1",
+        "started_at_ms": 1710000800000
+      },
+      "promotion_posture": "candidate_program_revision",
+      "admitted_validator_dispositions": [
+        "accepted",
+        "quarantined",
+        "rejected",
+        "replay_required"
+      ],
+      "detail": "Accepted contributor windows may mint a candidate shared pretraining policy revision under the canonical checkpoint family, while quarantine, reject, and replay-required outcomes remain explicit no-promotion paths."
+    }
+  ],
+  "claim_boundary": "This contract binds the current validated contributor windows to the same canonical pretraining dataset family, checkpoint family, and shared policy revision used by the hybrid dense program. It does not claim that every existing bounded local swarm lane has already been migrated onto this dataset family or that contributor windows replace dense-rank training.",
+  "contract_digest": "7c5c23684ae1277cef8e892dfdc6824ca628a13b93820aabe902b74bc6e7a902"
+}
