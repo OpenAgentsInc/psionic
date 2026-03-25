@@ -38,12 +38,13 @@ use crate::{
     bind_parameter_golf_baseline_training_graph_inputs_with_banked_weights,
     build_parameter_golf_baseline_eval_graph, build_parameter_golf_baseline_training_graph,
     build_tokenizer_digest, builtin_parameter_golf_cuda_training_capability_report,
-    device_matches_single_h100, export_parameter_golf_int8_zlib_model_artifact,
+    device_matches_single_h100, export_parameter_golf_quantized_model_artifact,
     inspect_local_single_h100_machine, materialize_parameter_golf_baseline_training_gradients,
     parameter_golf_optimizer_plan, parameter_golf_parameter_values_for_bindings,
-    restore_parameter_golf_model_from_int8_zlib, training_batch_from_window_tokens,
-    ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph, ParameterGolfBatchGeometry,
-    ParameterGolfBf16MasterWeightStepReceipt, ParameterGolfOptimizerExecution,
+    restore_parameter_golf_model_from_quantized_artifact, training_batch_from_window_tokens,
+    ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph,
+    ParameterGolfBatchGeometry, ParameterGolfBf16MasterWeightStepReceipt,
+    ParameterGolfFinalArtifactConfig, ParameterGolfOptimizerExecution,
     ParameterGolfOptimizerGroupKind, ParameterGolfOptimizerPlan,
     ParameterGolfReferenceTrainingError, ParameterGolfSingleH100BringupError,
     ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100MachineObservation,
@@ -98,6 +99,9 @@ pub struct ParameterGolfSingleH100TrainingConfig {
     /// Explicit final model surface to validate and export after training.
     #[serde(default)]
     pub final_model_surface: ParameterGolfFinalModelSurface,
+    /// Explicit final-artifact quantization and compression posture.
+    #[serde(default)]
+    pub final_artifact_config: ParameterGolfFinalArtifactConfig,
 }
 
 impl ParameterGolfSingleH100TrainingConfig {
@@ -132,6 +136,7 @@ impl ParameterGolfSingleH100TrainingConfig {
             ema: None,
             swa: None,
             final_model_surface: ParameterGolfFinalModelSurface::Raw,
+            final_artifact_config: ParameterGolfFinalArtifactConfig::default(),
             hyperparameters,
         }
     }
@@ -154,6 +159,7 @@ impl ParameterGolfSingleH100TrainingConfig {
         config.ema = None;
         config.swa = None;
         config.final_model_surface = ParameterGolfFinalModelSurface::Raw;
+        config.final_artifact_config = ParameterGolfFinalArtifactConfig::default();
         config.hyperparameters.max_wallclock_seconds = None;
         config
     }
@@ -962,6 +968,8 @@ pub struct ParameterGolfSingleH100RoundtripReceipt {
     pub ema: Option<ParameterGolfEmaConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swa: Option<ParameterGolfSwaReceipt>,
+    #[serde(default)]
+    pub artifact_config: ParameterGolfFinalArtifactConfig,
     pub metric_source: String,
     pub validation: ParameterGolfSingleH100ValidationSummary,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1036,6 +1044,8 @@ pub struct ParameterGolfSingleH100TrainingReport {
     pub swa: Option<ParameterGolfSwaConfig>,
     #[serde(default)]
     pub final_model_surface: ParameterGolfFinalModelSurface,
+    #[serde(default)]
+    pub final_artifact_config: ParameterGolfFinalArtifactConfig,
     pub executed_steps: u64,
     pub stop_reason: Option<ParameterGolfSingleH100TrainingStopReason>,
     pub delivered_execution: DeliveredExecutionContext,
@@ -2355,21 +2365,28 @@ fn build_parameter_golf_single_h100_training_report_inner(
         }
     }
 
-    let compressed_model_artifact =
-        export_parameter_golf_int8_zlib_model_artifact(&final_model, &config.run_id, step)?;
+    let compressed_model_artifact = export_parameter_golf_quantized_model_artifact(
+        &final_model,
+        &config.final_artifact_config,
+        &config.run_id,
+        step,
+    )?;
     let mut final_validation = pre_export_final_validation.clone();
     let mut final_validation_observed_ms = pre_export_final_validation_observed_ms;
     let mut final_roundtrip_receipt = None;
+    let final_roundtrip_metric_source = config.final_artifact_config.metric_source();
+    let final_roundtrip_stage_label = format!("final_{final_roundtrip_metric_source}");
     if config.final_validation_mode.runs_roundtrip_validation() {
         emit_progress_line(format!(
-            "final_int8_zlib_roundtrip_start sequences={} batch_sequences={} compressed_model_bytes={} artifact_ref={} artifact_digest={}",
+            "{}_start sequences={} batch_sequences={} compressed_model_bytes={} artifact_ref={} artifact_digest={}",
+            final_roundtrip_metric_source,
             (validation_tokens.len() - 1) / config.geometry.train_sequence_length,
             config.validation_batch_sequences,
             compressed_model_artifact.bytes.len(),
             compressed_model_artifact.artifact_ref,
             compressed_model_artifact.artifact_digest,
         ));
-        let roundtrip_model = restore_parameter_golf_model_from_int8_zlib(
+        let roundtrip_model = restore_parameter_golf_model_from_quantized_artifact(
             &initial_model,
             compressed_model_artifact.bytes.as_slice(),
         )?;
@@ -2387,12 +2404,13 @@ fn build_parameter_golf_single_h100_training_report_inner(
             config.score_first_ttt.as_ref(),
             &mut eval_graph_cache,
             &mut train_graph_cache,
-            "final_int8_zlib_roundtrip",
+            final_roundtrip_metric_source,
             live_visualization_writer.as_mut(),
         )?;
         let roundtrip_observed_ms = duration_ms(roundtrip_validation_started);
         emit_progress_line(format!(
-            "final_int8_zlib_roundtrip val_loss:{:.4} val_bpb:{:.4} eval_time:{}ms compressed_model_bytes={} artifact_ref={} artifact_digest={}",
+            "{} val_loss:{:.4} val_bpb:{:.4} eval_time:{}ms compressed_model_bytes={} artifact_ref={} artifact_digest={}",
+            final_roundtrip_metric_source,
             roundtrip_validation.mean_loss,
             roundtrip_validation.bits_per_byte,
             roundtrip_observed_ms,
@@ -2401,7 +2419,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
             compressed_model_artifact.artifact_digest,
         ));
         emit_progress_line(format!(
-            "final_int8_zlib_roundtrip_exact val_loss:{:.8} val_bpb:{:.8}",
+            "{}_exact val_loss:{:.8} val_bpb:{:.8}",
+            final_roundtrip_metric_source,
             roundtrip_validation.mean_loss, roundtrip_validation.bits_per_byte,
         ));
         final_validation_observed_ms = Some(roundtrip_observed_ms);
@@ -2422,7 +2441,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
             swa: (config.final_model_surface == ParameterGolfFinalModelSurface::Swa)
                 .then(|| final_swa_receipt.clone())
                 .flatten(),
-            metric_source: String::from("int8_zlib_roundtrip"),
+            artifact_config: config.final_artifact_config.clone(),
+            metric_source: String::from(final_roundtrip_metric_source),
             validation: roundtrip_validation,
             pre_ttt_validation: None,
             observed_eval_ms: roundtrip_observed_ms,
@@ -2438,7 +2458,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
             )?;
             writer.record_validation_checkpoint(
                 ParameterGolfSingleH100ValidationCheckpoint {
-                    stage_label: String::from("final_roundtrip"),
+                    stage_label: final_roundtrip_stage_label.clone(),
                     trigger_step: step,
                     observed_training_time_ms: training_time_ms,
                     observed_validation_ms: roundtrip_observed_ms,
@@ -2451,7 +2471,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
         }
     } else {
         emit_progress_line(format!(
-            "final_int8_zlib_roundtrip_skipped mode={} reason=explicit_final_validation_mode compressed_model_bytes={} artifact_ref={} artifact_digest={}",
+            "{}_skipped mode={} reason=explicit_final_validation_mode compressed_model_bytes={} artifact_ref={} artifact_digest={}",
+            final_roundtrip_metric_source,
             config.final_validation_mode.as_str(),
             compressed_model_artifact.bytes.len(),
             compressed_model_artifact.artifact_ref,
@@ -2460,9 +2481,10 @@ fn build_parameter_golf_single_h100_training_report_inner(
         if let Some(writer) = live_visualization_writer.as_mut() {
             writer.record_event(
                 crate::RemoteTrainingEventSeverity::Info,
-                "final_roundtrip_skipped",
+                &format!("{final_roundtrip_stage_label}_skipped"),
                 format!(
-                    "The final int8+zlib roundtrip validation was skipped because final_validation_mode={}.",
+                    "The final {} validation was skipped because final_validation_mode={}.",
+                    final_roundtrip_metric_source,
                     config.final_validation_mode.as_str()
                 ),
             );
@@ -2475,13 +2497,13 @@ fn build_parameter_golf_single_h100_training_report_inner(
         stop_reason.unwrap_or(ParameterGolfSingleH100TrainingStopReason::StepBudgetReached);
     let final_metric_surface = match config.final_validation_mode {
         ParameterGolfSingleH100ValidationMode::LiveOnly => {
-            "reported final live-model validation metrics without running the exported int8+zlib roundtrip validation"
+            "reported final live-model validation metrics without running the exported quantized roundtrip validation"
         }
         ParameterGolfSingleH100ValidationMode::RoundtripOnly => {
-            "reported canonical final contest metrics from the exported int8+zlib roundtrip artifact without also replaying the live-model final validation"
+            "reported canonical final contest metrics from the exported quantized roundtrip artifact without also replaying the live-model final validation"
         }
         ParameterGolfSingleH100ValidationMode::Both => {
-            "preserved the pre-export live-model validation separately and reported canonical final contest metrics from the exported int8+zlib roundtrip artifact"
+            "preserved the pre-export live-model validation separately and reported canonical final contest metrics from the exported quantized roundtrip artifact"
         }
     };
     let summary = format!(
@@ -2523,6 +2545,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         ema: config.ema.clone(),
         swa: config.swa.clone(),
         final_model_surface: config.final_model_surface,
+        final_artifact_config: config.final_artifact_config.clone(),
         executed_steps: step,
         stop_reason: Some(realized_stop_reason),
         delivered_execution,
@@ -2617,6 +2640,7 @@ fn refusal_report(
         ema: config.ema.clone(),
         swa: config.swa.clone(),
         final_model_surface: config.final_model_surface,
+        final_artifact_config: config.final_artifact_config.clone(),
         executed_steps: 0,
         stop_reason: None,
         delivered_execution: DeliveredExecutionContext::new("cuda", None, Vec::new()),
@@ -5764,6 +5788,10 @@ mod tests {
         assert_eq!(config.ema, None);
         assert_eq!(config.swa, None);
         assert_eq!(config.final_model_surface, ParameterGolfFinalModelSurface::Raw);
+        assert_eq!(
+            config.final_artifact_config,
+            ParameterGolfFinalArtifactConfig::default()
+        );
         assert_eq!(config.hyperparameters.max_wallclock_seconds, Some(600.0));
     }
 
@@ -5786,6 +5814,10 @@ mod tests {
         assert_eq!(config.ema, None);
         assert_eq!(config.swa, None);
         assert_eq!(config.final_model_surface, ParameterGolfFinalModelSurface::Raw);
+        assert_eq!(
+            config.final_artifact_config,
+            ParameterGolfFinalArtifactConfig::default()
+        );
         assert_eq!(config.hyperparameters.max_wallclock_seconds, None);
     }
 

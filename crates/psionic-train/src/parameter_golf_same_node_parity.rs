@@ -607,6 +607,7 @@ mod tests {
             ema: None,
             swa: None,
             final_model_surface: crate::ParameterGolfFinalModelSurface::Raw,
+            final_artifact_config: crate::ParameterGolfFinalArtifactConfig::default(),
             executed_steps: 0,
             stop_reason: None,
             delivered_execution: DeliveredExecutionContext::new("cuda", None, Vec::new()),

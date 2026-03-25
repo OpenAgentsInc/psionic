@@ -1537,6 +1537,7 @@ mod tests {
             ema: None,
             swa: None,
             final_model_surface: crate::ParameterGolfFinalModelSurface::Raw,
+            final_artifact_config: crate::ParameterGolfFinalArtifactConfig::default(),
             executed_steps: 2,
             stop_reason: Some(ParameterGolfSingleH100TrainingStopReason::StepBudgetReached),
             delivered_execution: DeliveredExecutionContext::new("cuda", None, Vec::new()),
@@ -1619,6 +1620,7 @@ mod tests {
                 final_model_surface: crate::ParameterGolfFinalModelSurface::Raw,
                 ema: None,
                 swa: None,
+                artifact_config: crate::ParameterGolfFinalArtifactConfig::default(),
                 metric_source: String::from("int8_zlib_roundtrip"),
                 validation: ParameterGolfSingleH100ValidationSummary {
                     eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,

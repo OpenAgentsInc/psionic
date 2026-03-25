@@ -139,6 +139,17 @@ expressible without inventing a vague combined export label:
 The CLI still follows the default raw-model export posture unless a caller
 constructs the config programmatically.
 
+The same config surface now also carries an explicit `final_artifact_config`
+for the post-train export and roundtrip lane:
+
+- default `quantization=int8_clean_per_row` plus `compression=zlib`
+- optional competitive candidate `quantization=int6_gptq_lite_per_row` plus
+  `compression=zstd`
+
+The default remains the older `int8+zlib` posture for compatibility, but the
+single-H100 lane can now preserve the stronger public candidate artifact path
+programmatically instead of hardcoding one export surface forever.
+
 That same shared PGOLF config surface now also admits four public
 architecture-pack selectors programmatically:
 
@@ -164,7 +175,7 @@ The legality boundary now matches the README contract explicitly:
 - chunk adaptation happens only after the score phase for that chunk completes
 - the final chunk is scored but never trained
 - adaptation mutates a cloned validation model and does not change the trained
-  live-model weights or the exported `int8+zlib` artifact
+  live-model weights or the exported quantized artifact
 
 The final validation summary now carries a machine-readable
 `score_first_ttt_receipt` with:
@@ -257,12 +268,16 @@ The command is explicit about what it treats as trainer truth. It binds:
   contracts are satisfied
 - preserved initial, periodic, and final validation receipts directly from the
   Psionic path, with an explicit `final_validation_mode` telling the report and
-  logs whether the last-step live-model validation, the exported int8+zlib
+  logs whether the last-step live-model validation, the exported quantized
   roundtrip validation, or both were requested
 - an explicit final-model surface contract for those final passes, so the
   report and roundtrip receipt now say whether the exported model was the live
   raw weights, an EMA-materialized surface, or an SWA-materialized surface
   with explicit `swa.source_surface` and `sample_count` receipt truth
+- an explicit final-artifact contract for those same passes, so the report and
+  roundtrip receipt now preserve the quantization and compression posture used
+  by the exported artifact instead of collapsing every score lane back to one
+  `int8+zlib` label
 - a device-resident validation runner that keeps the stable parameter surface
   resident on device across validation batches, reuses mutable token buffers,
   runs through the explicit `parameter_golf_baseline_eval_graph_v2` surface
@@ -283,8 +298,8 @@ The command is explicit about what it treats as trainer truth. It binds:
 - preserved initial, periodic, and final validation receipts directly from the
   Psionic path, with the pre-export live-model validation retained separately
   whenever that posture is requested
-- post-step int8-plus-zlib artifact bytes, artifact ref, and artifact digest
-- canonical final contest metrics from the exported int8-plus-zlib roundtrip
+- post-step quantized artifact bytes, artifact ref, and artifact digest
+- canonical final contest metrics from the exported quantized roundtrip
   artifact, including the preserved roundtrip eval time, when the requested
   final-validation mode includes the roundtrip pass
 - stop reason plus measured warmup, training, validation, and per-step timing
@@ -348,13 +363,17 @@ Today the single-H100 trainer doc does **not** claim:
   `EMA -> SWA` posture, but the CLI still defaults to raw export and the
   distributed `8xH100` score lane does not yet preserve the same averaging
   contract
+- competitive final-artifact closure; the single-H100 trainer now has an
+  explicit final-artifact config plus a local `int6_gptq_lite_per_row + zstd`
+  roundtrip candidate, but the CLI still defaults to `int8+zlib` and the
+  distributed `8xH100` score lane still uses the older artifact contract
 - record-track accounting closure
 - full BF16 activation-kernel closure yet; the current report now records BF16
   graph uploads for the train-visible token-embedding and linear weight path,
   but scalar/control tensors and retained activations remain explicit `f32`
   until the wider BF16 graph-runtime slice lands
 - challenge-speed closure; the trainer now reports final contest metrics from
-  the exported int8+zlib roundtrip artifact like `train_gpt.py`, but that does
+  the exported quantized roundtrip artifact like `train_gpt.py`, but that does
   not by itself make the lane competitive yet
 
 Instead, it gives the repo one narrower but important thing:
@@ -362,7 +381,7 @@ Instead, it gives the repo one narrower but important thing:
 - a real Rust-owned single-H100 baseline training command that binds the
   challenge dataset, tokenizer, machine contract, challenge-style control
   loop, validation cadence, stop reason, pre-export live-model validation,
-  canonical final int8+zlib roundtrip metrics, and compressed-model accounting
+  canonical final quantized roundtrip metrics, and compressed-model accounting
   surfaces into one machine-readable report
 - one real bounded RunPod H100 proof that the same Rust trainer can complete
   remotely outside the local review host; see

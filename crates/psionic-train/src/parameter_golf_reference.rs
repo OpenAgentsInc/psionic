@@ -23,6 +23,7 @@ use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, Safe
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
+use zstd::stream::{decode_all as zstd_decode_all, encode_all as zstd_encode_all};
 
 use crate::{
     apply_parameter_golf_muon_step, parameter_golf_optimizer_plan, AsyncCheckpointWritebackError,
@@ -40,8 +41,158 @@ const PARAMETER_GOLF_WEIGHT_SURFACE_KEY: &str = "psionic.parameter_golf.weight_s
 const PARAMETER_GOLF_SPLIT_WEIGHT_SURFACE: &str = "split_f32_v1";
 const PARAMETER_GOLF_BANKED_WEIGHT_SURFACE: &str = "banked_f32_v1";
 const PARAMETER_GOLF_INT8_ZLIB_FORMAT: &str = "int8_clean_per_row_v1";
+const PARAMETER_GOLF_INT6_GPTQ_LITE_FORMAT: &str = "int6_gptq_lite_per_row_v1";
+const PARAMETER_GOLF_ZLIB_COMPRESSION_FORMAT: &str = "zlib_v1";
+const PARAMETER_GOLF_ZSTD_COMPRESSION_FORMAT: &str = "zstd_v1";
 const PARAMETER_GOLF_INT8_KEEP_FLOAT_MAX_NUMEL: usize = 65_536;
 const PARAMETER_GOLF_INT8_CLIP_Q: f32 = 0.999_998_4;
+const PARAMETER_GOLF_INT6_GPTQ_LITE_CLIP_CANDIDATES: &[f32] =
+    &[0.999, 0.9995, 0.9999, 0.99999, 1.0];
+const PARAMETER_GOLF_COMPETITIVE_ZSTD_LEVEL: i32 = 22;
+
+/// Explicit final-artifact quantization posture for the PGOLF score lane.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfFinalArtifactQuantizationFormat {
+    #[default]
+    Int8CleanPerRow,
+    Int6GptqLitePerRow,
+}
+
+impl ParameterGolfFinalArtifactQuantizationFormat {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Int8CleanPerRow => PARAMETER_GOLF_INT8_ZLIB_FORMAT,
+            Self::Int6GptqLitePerRow => PARAMETER_GOLF_INT6_GPTQ_LITE_FORMAT,
+        }
+    }
+}
+
+/// Explicit final-artifact compression posture for the PGOLF score lane.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfFinalArtifactCompressionFormat {
+    #[default]
+    Zlib,
+    Zstd,
+}
+
+impl ParameterGolfFinalArtifactCompressionFormat {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Zlib => PARAMETER_GOLF_ZLIB_COMPRESSION_FORMAT,
+            Self::Zstd => PARAMETER_GOLF_ZSTD_COMPRESSION_FORMAT,
+        }
+    }
+}
+
+/// Typed final-artifact export contract for the PGOLF score lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterGolfFinalArtifactConfig {
+    #[serde(default)]
+    pub quantization: ParameterGolfFinalArtifactQuantizationFormat,
+    #[serde(default)]
+    pub compression: ParameterGolfFinalArtifactCompressionFormat,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compression_level: Option<i32>,
+}
+
+impl Default for ParameterGolfFinalArtifactConfig {
+    fn default() -> Self {
+        Self {
+            quantization: ParameterGolfFinalArtifactQuantizationFormat::Int8CleanPerRow,
+            compression: ParameterGolfFinalArtifactCompressionFormat::Zlib,
+            compression_level: None,
+        }
+    }
+}
+
+impl ParameterGolfFinalArtifactConfig {
+    #[must_use]
+    pub const fn competitive_defaults() -> Self {
+        Self {
+            quantization: ParameterGolfFinalArtifactQuantizationFormat::Int6GptqLitePerRow,
+            compression: ParameterGolfFinalArtifactCompressionFormat::Zstd,
+            compression_level: Some(PARAMETER_GOLF_COMPETITIVE_ZSTD_LEVEL),
+        }
+    }
+
+    #[must_use]
+    pub const fn metric_source(&self) -> &'static str {
+        match (self.quantization, self.compression) {
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int8CleanPerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zlib,
+            ) => "int8_zlib_roundtrip",
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int8CleanPerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zstd,
+            ) => "int8_zstd_roundtrip",
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int6GptqLitePerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zlib,
+            ) => "int6_zlib_roundtrip",
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int6GptqLitePerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zstd,
+            ) => "int6_zstd_roundtrip",
+        }
+    }
+
+    #[must_use]
+    pub const fn artifact_kind(&self) -> &'static str {
+        match (self.quantization, self.compression) {
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int8CleanPerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zlib,
+            ) => "parameter_golf_model_int8_zlib",
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int8CleanPerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zstd,
+            ) => "parameter_golf_model_int8_zstd",
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int6GptqLitePerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zlib,
+            ) => "parameter_golf_model_int6_zlib",
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int6GptqLitePerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zstd,
+            ) => "parameter_golf_model_int6_zstd",
+        }
+    }
+
+    #[must_use]
+    pub const fn artifact_extension(&self) -> &'static str {
+        match (self.quantization, self.compression) {
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int8CleanPerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zlib,
+            ) => "int8.ptz",
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int8CleanPerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zstd,
+            ) => "int8.zst",
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int6GptqLitePerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zlib,
+            ) => "int6.ptz",
+            (
+                ParameterGolfFinalArtifactQuantizationFormat::Int6GptqLitePerRow,
+                ParameterGolfFinalArtifactCompressionFormat::Zstd,
+            ) => "int6.zst",
+        }
+    }
+
+    #[must_use]
+    pub const fn resolved_compression_level(&self) -> Option<i32> {
+        match self.compression {
+            ParameterGolfFinalArtifactCompressionFormat::Zlib => None,
+            ParameterGolfFinalArtifactCompressionFormat::Zstd => self.compression_level,
+        }
+    }
+}
 
 /// Stable single-device batch geometry for the Parameter Golf lane.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1107,7 +1258,7 @@ impl ParameterGolfReferenceTrainingRunner {
             self.config.geometry.local_validation_batch_tokens(),
             &self.byte_luts,
         )?;
-        let int8_zlib_model_artifact = export_int8_zlib_model_artifact(
+        let int8_zlib_model_artifact = export_parameter_golf_int8_zlib_model_artifact(
             &self.current_model,
             self.config.run_id.as_str(),
             self.completed_steps,
@@ -1796,20 +1947,22 @@ fn restore_parameter_golf_banked_weights_from_banked_safetensors_impl(
     Ok(banked_weights.with_parameter_overrides(config, &overrides)?)
 }
 
-/// Restores one int8+zlib model export back into the full-precision reference family.
-pub fn restore_parameter_golf_model_from_int8_zlib(
+/// Restores one typed quantized PGOLF artifact back into the full-precision
+/// reference family.
+pub fn restore_parameter_golf_model_from_quantized_artifact(
     baseline_model: &ParameterGolfReferenceModel,
     artifact_bytes: &[u8],
 ) -> Result<ParameterGolfReferenceModel, ParameterGolfReferenceTrainingError> {
-    let mut decoder = ZlibDecoder::new(artifact_bytes);
-    let mut raw_bytes = Vec::new();
-    decoder.read_to_end(&mut raw_bytes)?;
+    let (detected_compression, raw_bytes) = decode_quantized_artifact_bytes(artifact_bytes)?;
+    let metadata = read_safetensors_metadata(raw_bytes.as_slice())?;
     let safetensors = SafeTensors::deserialize(raw_bytes.as_slice()).map_err(|error| {
         ParameterGolfReferenceTrainingError::Serialization {
-            context: "parameter golf int8+zlib restore",
+            context: "parameter golf quantized artifact restore",
             message: error.to_string(),
         }
     })?;
+    let artifact_config =
+        quantized_artifact_config_from_metadata(metadata.as_ref(), detected_compression)?;
     let mut overrides = BTreeMap::new();
     for parameter in baseline_model
         .weights()
@@ -1834,15 +1987,30 @@ pub fn restore_parameter_golf_model_from_int8_zlib(
                         parameter_id: scale_name.clone(),
                     }
                 })?;
-                validate_tensor_shape(parameter_id, quantized.shape(), parameter.shape.dims())?;
-                dequantize_int8_tensor(
-                    parameter_id,
-                    parameter.shape.dims(),
-                    quantized.data(),
-                    scale.dtype(),
-                    scale.data(),
-                    scale.shape(),
-                )?
+                match artifact_config.quantization {
+                    ParameterGolfFinalArtifactQuantizationFormat::Int8CleanPerRow => {
+                        validate_tensor_shape(parameter_id, quantized.shape(), parameter.shape.dims())?;
+                        dequantize_int8_tensor(
+                            parameter_id,
+                            parameter.shape.dims(),
+                            quantized.data(),
+                            scale.dtype(),
+                            scale.data(),
+                            scale.shape(),
+                        )?
+                    }
+                    ParameterGolfFinalArtifactQuantizationFormat::Int6GptqLitePerRow => {
+                        validate_tensor_shape(parameter_id, quantized.shape(), parameter.shape.dims())?;
+                        dequantize_int6_tensor(
+                            parameter_id,
+                            parameter.shape.dims(),
+                            quantized.data(),
+                            scale.dtype(),
+                            scale.data(),
+                            scale.shape(),
+                        )?
+                    }
+                }
             }
         };
         overrides.insert(parameter.parameter_id.clone(), restored);
@@ -1855,6 +2023,14 @@ pub fn restore_parameter_golf_model_from_int8_zlib(
         baseline_model.descriptor().config.clone(),
         weights,
     )?)
+}
+
+/// Restores one int8+zlib model export back into the full-precision reference family.
+pub fn restore_parameter_golf_model_from_int8_zlib(
+    baseline_model: &ParameterGolfReferenceModel,
+    artifact_bytes: &[u8],
+) -> Result<ParameterGolfReferenceModel, ParameterGolfReferenceTrainingError> {
+    restore_parameter_golf_model_from_quantized_artifact(baseline_model, artifact_bytes)
 }
 
 fn coordinate_map(
@@ -2205,8 +2381,9 @@ fn export_full_precision_model_bytes(
     )
 }
 
-fn export_int8_zlib_model_artifact(
+fn export_quantized_model_artifact(
     model: &ParameterGolfReferenceModel,
+    artifact_config: &ParameterGolfFinalArtifactConfig,
     run_id: &str,
     step: u64,
 ) -> Result<ParameterGolfTrainingArtifact, ParameterGolfReferenceTrainingError> {
@@ -2214,8 +2391,18 @@ fn export_int8_zlib_model_artifact(
     let mut metadata = HashMap::new();
     metadata.insert(
         String::from("psionic.parameter_golf.quant_format"),
-        String::from(PARAMETER_GOLF_INT8_ZLIB_FORMAT),
+        String::from(artifact_config.quantization.as_str()),
     );
+    metadata.insert(
+        String::from("psionic.parameter_golf.compression_format"),
+        String::from(artifact_config.compression.as_str()),
+    );
+    if let Some(level) = artifact_config.resolved_compression_level() {
+        metadata.insert(
+            String::from("psionic.parameter_golf.compression_level"),
+            level.to_string(),
+        );
+    }
     for parameter in model
         .weights()
         .parameter_vectors(&model.descriptor().config)
@@ -2242,24 +2429,53 @@ fn export_int8_zlib_model_artifact(
 
         let quantized_name = format!("{}.__q", parameter.parameter_id);
         let scale_name = format!("{}.__scale", parameter.parameter_id);
-        let (quantized_bytes, scale_bytes, scale_shape) =
-            quantize_int8_tensor(parameter.values.as_slice(), shape.as_slice());
+        let (quantized_bytes, scale_bytes, scale_shape) = match artifact_config.quantization {
+            ParameterGolfFinalArtifactQuantizationFormat::Int8CleanPerRow => {
+                quantize_int8_tensor(parameter.values.as_slice(), shape.as_slice())
+            }
+            ParameterGolfFinalArtifactQuantizationFormat::Int6GptqLitePerRow => {
+                quantize_int6_gptq_lite_tensor(parameter.values.as_slice(), shape.as_slice())
+            }
+        };
         encoded_tensors.push((quantized_name, SafeTensorsDType::I8, shape, quantized_bytes));
         encoded_tensors.push((scale_name, SafeTensorsDType::F16, scale_shape, scale_bytes));
     }
     let raw = serialize_tensors(
         encoded_tensors,
         Some(metadata),
-        "parameter golf int8 safetensors export",
+        "parameter golf quantized safetensors export",
     )?;
-    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::best());
-    encoder.write_all(raw.as_slice())?;
-    let compressed = encoder.finish()?;
+    let compressed = match artifact_config.compression {
+        ParameterGolfFinalArtifactCompressionFormat::Zlib => {
+            let mut encoder = ZlibEncoder::new(Vec::new(), Compression::best());
+            encoder.write_all(raw.as_slice())?;
+            encoder.finish()?
+        }
+        ParameterGolfFinalArtifactCompressionFormat::Zstd => zstd_encode_all(
+            raw.as_slice(),
+            artifact_config
+                .resolved_compression_level()
+                .unwrap_or(PARAMETER_GOLF_COMPETITIVE_ZSTD_LEVEL),
+        )?,
+    };
     Ok(ParameterGolfTrainingArtifact::new(
-        "parameter_golf_model_int8_zlib",
-        format!("{run_id}/step-{step:05}/final_model.int8.ptz"),
+        artifact_config.artifact_kind(),
+        format!(
+            "{run_id}/step-{step:05}/final_model.{}",
+            artifact_config.artifact_extension()
+        ),
         compressed,
     ))
+}
+
+/// Exports one Parameter Golf model into an explicit quantized artifact surface.
+pub fn export_parameter_golf_quantized_model_artifact(
+    model: &ParameterGolfReferenceModel,
+    artifact_config: &ParameterGolfFinalArtifactConfig,
+    run_id: &str,
+    step: u64,
+) -> Result<ParameterGolfTrainingArtifact, ParameterGolfReferenceTrainingError> {
+    export_quantized_model_artifact(model, artifact_config, run_id, step)
 }
 
 /// Exports one Parameter Golf model into the canonical int8-plus-zlib artifact
@@ -2269,7 +2485,12 @@ pub fn export_parameter_golf_int8_zlib_model_artifact(
     run_id: &str,
     step: u64,
 ) -> Result<ParameterGolfTrainingArtifact, ParameterGolfReferenceTrainingError> {
-    export_int8_zlib_model_artifact(model, run_id, step)
+    export_quantized_model_artifact(
+        model,
+        &ParameterGolfFinalArtifactConfig::default(),
+        run_id,
+        step,
+    )
 }
 
 /// Exports one Parameter Golf model into the canonical raw safetensors bytes
@@ -2355,6 +2576,127 @@ fn keep_float_tensor(parameter_id: &str, parameter_len: usize) -> bool {
         || parameter_len <= PARAMETER_GOLF_INT8_KEEP_FLOAT_MAX_NUMEL
 }
 
+fn decode_quantized_artifact_bytes(
+    artifact_bytes: &[u8],
+) -> Result<
+    (ParameterGolfFinalArtifactCompressionFormat, Vec<u8>),
+    ParameterGolfReferenceTrainingError,
+> {
+    let mut zlib_decoder = ZlibDecoder::new(artifact_bytes);
+    let mut zlib_bytes = Vec::new();
+    match zlib_decoder.read_to_end(&mut zlib_bytes) {
+        Ok(_) => Ok((ParameterGolfFinalArtifactCompressionFormat::Zlib, zlib_bytes)),
+        Err(zlib_error) => {
+            let zstd_bytes =
+                zstd_decode_all(artifact_bytes).map_err(|zstd_error| {
+                    ParameterGolfReferenceTrainingError::Serialization {
+                        context: "parameter golf quantized artifact decode",
+                        message: format!(
+                            "failed zlib decode: {zlib_error}; failed zstd decode: {zstd_error}"
+                        ),
+                    }
+                })?;
+            Ok((ParameterGolfFinalArtifactCompressionFormat::Zstd, zstd_bytes))
+        }
+    }
+}
+
+fn read_safetensors_metadata(
+    raw_bytes: &[u8],
+) -> Result<Option<HashMap<String, String>>, ParameterGolfReferenceTrainingError> {
+    if raw_bytes.len() < 8 {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf safetensors metadata",
+            message: String::from("missing safetensors header length prefix"),
+        });
+    }
+    let header_len =
+        u64::from_le_bytes(raw_bytes[..8].try_into().expect("slice length already checked"))
+            as usize;
+    if raw_bytes.len() < 8 + header_len {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf safetensors metadata",
+            message: format!(
+                "header length {} exceeds artifact bytes {}",
+                header_len,
+                raw_bytes.len()
+            ),
+        });
+    }
+    let header_json = serde_json::from_slice::<serde_json::Value>(&raw_bytes[8..8 + header_len])
+        .map_err(|error| ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf safetensors metadata",
+            message: error.to_string(),
+        })?;
+    Ok(header_json
+        .get("__metadata__")
+        .and_then(serde_json::Value::as_object)
+        .map(|metadata| {
+            metadata
+                .iter()
+                .filter_map(|(key, value)| value.as_str().map(|value| (key.clone(), value.into())))
+                .collect::<HashMap<_, _>>()
+        }))
+}
+
+fn quantized_artifact_config_from_metadata(
+    metadata: Option<&HashMap<String, String>>,
+    detected_compression: ParameterGolfFinalArtifactCompressionFormat,
+) -> Result<ParameterGolfFinalArtifactConfig, ParameterGolfReferenceTrainingError> {
+    let quantization = match metadata
+        .and_then(|metadata| metadata.get("psionic.parameter_golf.quant_format"))
+        .map(String::as_str)
+        .unwrap_or(PARAMETER_GOLF_INT8_ZLIB_FORMAT)
+    {
+        PARAMETER_GOLF_INT8_ZLIB_FORMAT => {
+            ParameterGolfFinalArtifactQuantizationFormat::Int8CleanPerRow
+        }
+        PARAMETER_GOLF_INT6_GPTQ_LITE_FORMAT => {
+            ParameterGolfFinalArtifactQuantizationFormat::Int6GptqLitePerRow
+        }
+        actual => {
+            return Err(ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf quantized artifact metadata",
+                message: format!("unsupported quantization format `{actual}`"),
+            });
+        }
+    };
+    let compression = match metadata
+        .and_then(|metadata| metadata.get("psionic.parameter_golf.compression_format"))
+        .map(String::as_str)
+    {
+        Some(PARAMETER_GOLF_ZLIB_COMPRESSION_FORMAT) => {
+            ParameterGolfFinalArtifactCompressionFormat::Zlib
+        }
+        Some(PARAMETER_GOLF_ZSTD_COMPRESSION_FORMAT) => {
+            ParameterGolfFinalArtifactCompressionFormat::Zstd
+        }
+        Some(actual) => {
+            return Err(ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf quantized artifact metadata",
+                message: format!("unsupported compression format `{actual}`"),
+            });
+        }
+        None => detected_compression,
+    };
+    let compression_level = metadata
+        .and_then(|metadata| metadata.get("psionic.parameter_golf.compression_level"))
+        .map(|value| {
+            value.parse::<i32>().map_err(|error| {
+                ParameterGolfReferenceTrainingError::Serialization {
+                    context: "parameter golf quantized artifact metadata",
+                    message: format!("invalid compression level `{value}`: {error}"),
+                }
+            })
+        })
+        .transpose()?;
+    Ok(ParameterGolfFinalArtifactConfig {
+        quantization,
+        compression,
+        compression_level,
+    })
+}
+
 fn is_control_tensor_name(parameter_id: &str) -> bool {
     PARAMETER_GOLF_CONTROL_TENSOR_NAME_PATTERNS
         .iter()
@@ -2401,6 +2743,61 @@ fn quantize_int8_tensor(values: &[f32], shape: &[usize]) -> (Vec<u8>, Vec<u8>, V
     (quantized, encode_f16_bytes(&[scale]), vec![1])
 }
 
+fn quantize_int6_gptq_lite_tensor(
+    values: &[f32],
+    shape: &[usize],
+) -> (Vec<u8>, Vec<u8>, Vec<usize>) {
+    if shape.len() == 2 {
+        let rows = shape[0];
+        let cols = shape[1];
+        let mut quantized = Vec::with_capacity(values.len());
+        let mut scales = Vec::with_capacity(rows);
+        for row in 0..rows {
+            let row_values = &values[row * cols..(row + 1) * cols];
+            let (best_quantized, best_scale) = quantize_int6_row_gptq_lite(row_values);
+            quantized.extend_from_slice(best_quantized.as_slice());
+            scales.push(best_scale);
+        }
+        return (quantized, encode_f16_bytes(scales.as_slice()), vec![rows]);
+    }
+
+    let (quantized, scale) = quantize_int6_row_gptq_lite(values);
+    (quantized, encode_f16_bytes(&[scale]), vec![1])
+}
+
+fn quantize_int6_row_gptq_lite(values: &[f32]) -> (Vec<u8>, f32) {
+    let mut best_quantized = Vec::new();
+    let mut best_scale = 1.0_f32;
+    let mut best_mse = f32::INFINITY;
+    for &clip_quantile in PARAMETER_GOLF_INT6_GPTQ_LITE_CLIP_CANDIDATES {
+        let clip_abs = quantile_abs(values, clip_quantile);
+        let scale = if clip_abs > 0.0 { clip_abs / 31.0 } else { 1.0 };
+        let quantized = values
+            .iter()
+            .map(|value| {
+                let clipped = value.clamp(-clip_abs, clip_abs);
+                (clipped / scale).round().clamp(-31.0, 31.0) as i8 as u8
+            })
+            .collect::<Vec<_>>();
+        let mse = values
+            .iter()
+            .zip(quantized.iter())
+            .map(|(value, quantized)| {
+                let restored = (*quantized as i8 as f32) * scale;
+                let error = restored - *value;
+                error * error
+            })
+            .sum::<f32>()
+            / values.len().max(1) as f32;
+        if mse < best_mse {
+            best_mse = mse;
+            best_scale = scale;
+            best_quantized = quantized;
+        }
+    }
+    (best_quantized, best_scale)
+}
+
 fn dequantize_int8_tensor(
     parameter_id: &str,
     expected_shape: &[usize],
@@ -2427,6 +2824,55 @@ fn dequantize_int8_tensor(
         if scales.len() != rows {
             return Err(ParameterGolfReferenceTrainingError::Serialization {
                 context: "parameter golf int8 restore",
+                message: format!(
+                    "tensor `{parameter_id}` expected {rows} row scales, found {}",
+                    scales.len()
+                ),
+            });
+        }
+        let mut output = vec![0.0_f32; element_count];
+        for row in 0..rows {
+            let scale = scales[row];
+            for col in 0..cols {
+                let index = row * cols + col;
+                output[index] = (quantized_bytes[index] as i8 as f32) * scale;
+            }
+        }
+        return Ok(output);
+    }
+    let scale = scales.first().copied().unwrap_or(1.0);
+    Ok(quantized_bytes
+        .iter()
+        .map(|value| (*value as i8 as f32) * scale)
+        .collect())
+}
+
+fn dequantize_int6_tensor(
+    parameter_id: &str,
+    expected_shape: &[usize],
+    quantized_bytes: &[u8],
+    scale_dtype: SafeTensorsDType,
+    scale_bytes: &[u8],
+    scale_shape: &[usize],
+) -> Result<Vec<f32>, ParameterGolfReferenceTrainingError> {
+    let element_count = expected_shape.iter().product::<usize>();
+    if quantized_bytes.len() != element_count {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf int6 restore",
+            message: format!(
+                "tensor `{parameter_id}` had {} int6 bytes for {} elements",
+                quantized_bytes.len(),
+                element_count
+            ),
+        });
+    }
+    let scales = decode_float_tensor(parameter_id, scale_dtype, scale_bytes, scale_shape)?;
+    if expected_shape.len() == 2 {
+        let rows = expected_shape[0];
+        let cols = expected_shape[1];
+        if scales.len() != rows {
+            return Err(ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf int6 restore",
                 message: format!(
                     "tensor `{parameter_id}` expected {rows} row scales, found {}",
                     scales.len()
@@ -2588,13 +3034,16 @@ mod tests {
         checkpoint_async_writeback_payload, read_parameter_golf_checkpoint_from_directory,
         export_parameter_golf_banked_full_precision_model_bytes,
         export_parameter_golf_full_precision_model_bytes,
+        export_parameter_golf_quantized_model_artifact,
         restore_parameter_golf_banked_weights_from_safetensors,
         restore_parameter_golf_local_reference_checkpoint,
-        restore_parameter_golf_model_from_int8_zlib, restore_parameter_golf_model_from_safetensors,
-        train_parameter_golf_local_reference,
+        restore_parameter_golf_model_from_int8_zlib,
+        restore_parameter_golf_model_from_quantized_artifact,
+        restore_parameter_golf_model_from_safetensors, train_parameter_golf_local_reference,
         train_parameter_golf_local_reference_with_async_checkpoint_writeback,
         train_parameter_golf_local_reference_with_metric_sink, ParameterGolfLocalReferenceFixture,
-        ParameterGolfReferenceTrainingConfig, ParameterGolfReferenceTrainingRunner,
+        ParameterGolfFinalArtifactConfig, ParameterGolfReferenceTrainingConfig,
+        ParameterGolfReferenceTrainingRunner,
     };
     use psionic_models::ParameterGolfReferenceModel;
 
@@ -2698,6 +3147,37 @@ mod tests {
         assert_eq!(int8_eval, outcome.int8_zlib_roundtrip_validation_eval);
         assert!(int8_eval.mean_loss.is_finite());
         assert!(int8_eval.bits_per_byte.is_finite());
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_competitive_quantized_artifact_roundtrips() -> Result<(), Box<dyn Error>> {
+        let fixture = ParameterGolfLocalReferenceFixture::reference()?;
+        let config = ParameterGolfReferenceTrainingConfig::local_reference();
+        let outcome = train_parameter_golf_local_reference(&fixture, &config)?;
+        let artifact_config = ParameterGolfFinalArtifactConfig::competitive_defaults();
+
+        let artifact = export_parameter_golf_quantized_model_artifact(
+            &outcome.trained_model,
+            &artifact_config,
+            "parameter-golf-competitive-artifact-test",
+            config.max_steps,
+        )?;
+        assert_eq!(artifact.artifact_kind, "parameter_golf_model_int6_zstd");
+
+        let restored_model = restore_parameter_golf_model_from_quantized_artifact(
+            &outcome.initial_model,
+            artifact.bytes.as_slice(),
+        )?;
+        let restored_eval = psionic_eval::evaluate_parameter_golf_validation(
+            &restored_model,
+            fixture.validation_tokens.as_slice(),
+            config.geometry.train_sequence_length,
+            config.geometry.local_validation_batch_tokens(),
+            &fixture.byte_luts()?,
+        )?;
+        assert!(restored_eval.mean_loss.is_finite());
+        assert!(restored_eval.bits_per_byte.is_finite());
         Ok(())
     }
 

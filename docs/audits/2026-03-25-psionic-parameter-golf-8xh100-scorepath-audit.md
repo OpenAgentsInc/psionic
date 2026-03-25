@@ -304,7 +304,7 @@ that were not tracked when this audit was first written:
 The stale feature-surface issues for `LeakyReLU(0.5)^2` and `BigramHash` were
 closed once local review confirmed those paths were already landed in the repo.
 
-Since the initial audit pass, Psionic has landed the code-local halves of seven of
+Since the initial audit pass, Psionic has landed the code-local halves of nine of
 those gaps:
 
 - `LeakyReLU(0.5)^2` now exists across the reference-model, graph, IR, CPU, and
@@ -325,10 +325,9 @@ those gaps:
 - EMA and SWA now exist on the single-H100 score lane as explicit config,
   report, and roundtrip-receipt surfaces, including the public stacked
   `EMA -> SWA` posture via `swa.source_surface=ema`
-  PGOLF config surface, CPU reference model, and lowered baseline graph
-- VE-style late-layer value features now exist in the shared PGOLF config
-  surface, parameter accounting, CPU reference model, optimizer or graph
-  classification surface, and lowered baseline graph
+- competitive final-artifact export now exists on the single-H100 score lane
+  as an explicit typed contract, with a local `int6_gptq_lite_per_row + zstd`
+  roundtrip candidate beside the older `int8+zlib` surface
 
 The remaining score-path issues stay open because the retained `H100` or
 `8xH100` receipts either do not exist yet or do not yet prove the stronger

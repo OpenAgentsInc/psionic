@@ -105,13 +105,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     if let Some(ref roundtrip_receipt) = report.final_roundtrip_receipt {
         println!(
-            "final_int8_zlib_roundtrip val_loss:{:.4} val_bpb:{:.4} eval_time:{}ms",
+            "{} val_loss:{:.4} val_bpb:{:.4} eval_time:{}ms",
+            roundtrip_receipt.metric_source,
             roundtrip_receipt.validation.mean_loss,
             roundtrip_receipt.validation.bits_per_byte,
             roundtrip_receipt.observed_eval_ms,
         );
         println!(
-            "final_int8_zlib_roundtrip_exact val_loss:{:.8} val_bpb:{:.8}",
+            "{}_exact val_loss:{:.8} val_bpb:{:.8}",
+            roundtrip_receipt.metric_source,
             roundtrip_receipt.validation.mean_loss, roundtrip_receipt.validation.bits_per_byte
         );
     } else if let Some(final_validation) = report.final_validation {
