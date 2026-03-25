@@ -92,6 +92,9 @@ pub struct ParameterGolfSingleH100TrainingConfig {
     /// Optional EMA posture for the final exported model surface.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ema: Option<ParameterGolfEmaConfig>,
+    /// Optional SWA posture for the final exported model surface.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swa: Option<ParameterGolfSwaConfig>,
     /// Explicit final model surface to validate and export after training.
     #[serde(default)]
     pub final_model_surface: ParameterGolfFinalModelSurface,
@@ -127,6 +130,7 @@ impl ParameterGolfSingleH100TrainingConfig {
             ),
             score_first_ttt: None,
             ema: None,
+            swa: None,
             final_model_surface: ParameterGolfFinalModelSurface::Raw,
             hyperparameters,
         }
@@ -148,6 +152,7 @@ impl ParameterGolfSingleH100TrainingConfig {
         config.validation_eval_mode = ParameterGolfValidationEvalMode::NonOverlapping;
         config.score_first_ttt = None;
         config.ema = None;
+        config.swa = None;
         config.final_model_surface = ParameterGolfFinalModelSurface::Raw;
         config.hyperparameters.max_wallclock_seconds = None;
         config
@@ -233,10 +238,27 @@ impl ParameterGolfSingleH100TrainingConfig {
         if let Some(ema) = self.ema.as_ref() {
             ema.validate()?;
         }
+        if let Some(swa) = self.swa.as_ref() {
+            swa.validate()?;
+            if swa.source_surface == ParameterGolfSwaSourceSurface::Ema && self.ema.is_none() {
+                return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                    message: String::from(
+                        "swa source_surface=ema requires an explicit ema config",
+                    ),
+                });
+            }
+        }
         if self.final_model_surface == ParameterGolfFinalModelSurface::Ema && self.ema.is_none() {
             return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
                 message: String::from(
                     "final_model_surface=ema requires an explicit ema config",
+                ),
+            });
+        }
+        if self.final_model_surface == ParameterGolfFinalModelSurface::Swa && self.swa.is_none() {
+            return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: String::from(
+                    "final_model_surface=swa requires an explicit swa config",
                 ),
             });
         }
@@ -250,6 +272,7 @@ impl ParameterGolfSingleH100TrainingConfig {
 pub enum ParameterGolfFinalModelSurface {
     Raw,
     Ema,
+    Swa,
 }
 
 impl Default for ParameterGolfFinalModelSurface {
@@ -264,6 +287,7 @@ impl ParameterGolfFinalModelSurface {
         match self {
             Self::Raw => "raw",
             Self::Ema => "ema",
+            Self::Swa => "swa",
         }
     }
 }
@@ -292,6 +316,72 @@ impl ParameterGolfEmaConfig {
         }
         Ok(())
     }
+}
+
+/// Explicit source surface used by SWA snapshot collection.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfSwaSourceSurface {
+    #[default]
+    Raw,
+    Ema,
+}
+
+impl ParameterGolfSwaSourceSurface {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Raw => "raw",
+            Self::Ema => "ema",
+        }
+    }
+}
+
+/// Explicit SWA posture for the PGOLF final exported model surface.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfSwaConfig {
+    pub every_steps: u64,
+    pub max_learning_rate_multiplier: f32,
+    #[serde(default)]
+    pub source_surface: ParameterGolfSwaSourceSurface,
+}
+
+impl Default for ParameterGolfSwaConfig {
+    fn default() -> Self {
+        Self {
+            every_steps: 50,
+            max_learning_rate_multiplier: 0.2,
+            source_surface: ParameterGolfSwaSourceSurface::Raw,
+        }
+    }
+}
+
+impl ParameterGolfSwaConfig {
+    fn validate(&self) -> Result<(), ParameterGolfSingleH100TrainingError> {
+        if self.every_steps == 0 {
+            return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: String::from("swa every_steps must be positive"),
+            });
+        }
+        if !self.max_learning_rate_multiplier.is_finite()
+            || !(0.0..=1.0).contains(&self.max_learning_rate_multiplier)
+        {
+            return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: format!(
+                    "swa max_learning_rate_multiplier must be finite and inside [0, 1], observed {}",
+                    self.max_learning_rate_multiplier
+                ),
+            });
+        }
+        Ok(())
+    }
+}
+
+/// One machine-readable SWA outcome.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfSwaReceipt {
+    pub config: ParameterGolfSwaConfig,
+    pub sample_count: u64,
 }
 
 /// Observed current-state disposition for the bounded single-H100 trainer.
@@ -868,6 +958,10 @@ pub struct ParameterGolfSingleH100ValidationCheckpoint {
 pub struct ParameterGolfSingleH100RoundtripReceipt {
     #[serde(default)]
     pub final_model_surface: ParameterGolfFinalModelSurface,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ema: Option<ParameterGolfEmaConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swa: Option<ParameterGolfSwaReceipt>,
     pub metric_source: String,
     pub validation: ParameterGolfSingleH100ValidationSummary,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -938,6 +1032,8 @@ pub struct ParameterGolfSingleH100TrainingReport {
     pub score_first_ttt: Option<ParameterGolfScoreFirstTttConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ema: Option<ParameterGolfEmaConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swa: Option<ParameterGolfSwaConfig>,
     #[serde(default)]
     pub final_model_surface: ParameterGolfFinalModelSurface,
     pub executed_steps: u64,
@@ -964,6 +1060,8 @@ pub struct ParameterGolfSingleH100TrainingReport {
     pub observed_training_time_ms: u64,
     pub pre_export_final_validation_observed_ms: Option<u64>,
     pub final_validation_observed_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub final_swa_receipt: Option<ParameterGolfSwaReceipt>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub final_roundtrip_receipt: Option<ParameterGolfSingleH100RoundtripReceipt>,
     pub compressed_model_bytes: Option<u64>,
@@ -1142,6 +1240,90 @@ impl ParameterGolfEmaState {
             }
         }
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ParameterGolfSwaState {
+    config: ParameterGolfSwaConfig,
+    parameter_sums: BTreeMap<String, Vec<f32>>,
+    sample_count: u64,
+}
+
+impl ParameterGolfSwaState {
+    fn new(config: ParameterGolfSwaConfig) -> Self {
+        Self {
+            config,
+            parameter_sums: BTreeMap::new(),
+            sample_count: 0,
+        }
+    }
+
+    fn should_sample(&self, step: u64, learning_rate_multiplier: f32) -> bool {
+        step > 0
+            && step % self.config.every_steps == 0
+            && learning_rate_multiplier < self.config.max_learning_rate_multiplier
+    }
+
+    fn update_from_overrides(
+        &mut self,
+        overrides: &BTreeMap<String, Vec<f32>>,
+    ) -> Result<(), ParameterGolfSingleH100TrainingError> {
+        if self.sample_count == 0 {
+            self.parameter_sums = overrides.clone();
+            self.sample_count = 1;
+            return Ok(());
+        }
+        for (parameter_id, values) in overrides {
+            let Some(sums) = self.parameter_sums.get_mut(parameter_id) else {
+                return Err(ParameterGolfSingleH100TrainingError::MissingParameterState {
+                    parameter_id: parameter_id.clone(),
+                });
+            };
+            if sums.len() != values.len() {
+                return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                    message: format!(
+                        "swa state length mismatch for `{parameter_id}`: {} vs {}",
+                        sums.len(),
+                        values.len()
+                    ),
+                });
+            }
+            for (sum, value) in sums.iter_mut().zip(values) {
+                *sum += *value;
+            }
+        }
+        self.sample_count += 1;
+        Ok(())
+    }
+
+    fn averaged_parameter_values(
+        &self,
+    ) -> Result<BTreeMap<String, Vec<f32>>, ParameterGolfSingleH100TrainingError> {
+        if self.sample_count == 0 {
+            return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: String::from("swa final surface requested without any live swa samples"),
+            });
+        }
+        Ok(self
+            .parameter_sums
+            .iter()
+            .map(|(parameter_id, sums)| {
+                (
+                    parameter_id.clone(),
+                    sums.iter()
+                        .map(|value| *value / self.sample_count as f32)
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<BTreeMap<_, _>>())
+    }
+
+    fn receipt(&self) -> Option<ParameterGolfSwaReceipt> {
+        (self.sample_count > 0).then(|| ParameterGolfSwaReceipt {
+            config: self.config.clone(),
+            sample_count: self.sample_count,
+        })
     }
 }
 
@@ -1759,6 +1941,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         .ema
         .clone()
         .map(|ema| ParameterGolfEmaState::new(ema, &trainer_state));
+    let mut swa_state = config.swa.clone().map(ParameterGolfSwaState::new);
     let mut step_metrics = Vec::new();
     let mut validation_checkpoints = Vec::new();
     let mut aggregate_phase_timings = ParameterGolfSingleH100PhaseTimings::default();
@@ -2040,6 +2223,34 @@ fn build_parameter_golf_single_h100_training_report_inner(
         if let Some(ema_state) = ema_state.as_mut() {
             ema_state.update(&trainer_state)?;
         }
+        if let Some(swa_state) = swa_state.as_mut() {
+            if swa_state.should_sample(step, learning_rate_multiplier) {
+                if swa_state.sample_count == 0 {
+                    emit_progress_line(format!(
+                        "swa:start step:{} source_surface={} every_steps={} max_learning_rate_multiplier={:.4}",
+                        step,
+                        swa_state.config.source_surface.as_str(),
+                        swa_state.config.every_steps,
+                        swa_state.config.max_learning_rate_multiplier,
+                    ));
+                }
+                let snapshot = match swa_state.config.source_surface {
+                    ParameterGolfSwaSourceSurface::Raw => {
+                        current_parameter_state_overrides(&trainer_state)
+                    }
+                    ParameterGolfSwaSourceSurface::Ema => ema_state
+                        .as_ref()
+                        .ok_or_else(|| ParameterGolfSingleH100TrainingError::InvalidConfig {
+                            message: String::from(
+                                "swa source_surface=ema requested without one live ema state",
+                            ),
+                        })?
+                        .parameter_values
+                        .clone(),
+                };
+                swa_state.update_from_overrides(&snapshot)?;
+            }
+        }
 
         let should_log_train = config.train_log_every > 0
             && (step <= 10 || step % config.train_log_every == 0 || stop_reason.is_some());
@@ -2064,6 +2275,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         }
     }
 
+    let final_swa_receipt = swa_state.as_ref().and_then(ParameterGolfSwaState::receipt);
     let final_model = match config.final_model_surface {
         ParameterGolfFinalModelSurface::Raw => current_model.clone(),
         ParameterGolfFinalModelSurface::Ema => {
@@ -2079,6 +2291,22 @@ fn build_parameter_golf_single_h100_training_report_inner(
                 ema_state.config.decay
             ));
             materialize_model_from_overrides(&initial_model, &ema_state.parameter_values)?
+        }
+        ParameterGolfFinalModelSurface::Swa => {
+            let swa_state = swa_state.as_ref().ok_or_else(|| {
+                ParameterGolfSingleH100TrainingError::InvalidConfig {
+                    message: String::from(
+                        "final_model_surface=swa requested without one live swa state",
+                    ),
+                }
+            })?;
+            let averaged_values = swa_state.averaged_parameter_values()?;
+            emit_progress_line(format!(
+                "final_model_surface_apply surface=swa source_surface={} sample_count={}",
+                swa_state.config.source_surface.as_str(),
+                swa_state.sample_count,
+            ));
+            materialize_model_from_overrides(&initial_model, &averaged_values)?
         }
     };
 
@@ -2180,6 +2408,20 @@ fn build_parameter_golf_single_h100_training_report_inner(
         final_validation = Some(roundtrip_validation.clone());
         final_roundtrip_receipt = Some(ParameterGolfSingleH100RoundtripReceipt {
             final_model_surface: config.final_model_surface,
+            ema: match config.final_model_surface {
+                ParameterGolfFinalModelSurface::Raw => None,
+                ParameterGolfFinalModelSurface::Ema => config.ema.clone(),
+                ParameterGolfFinalModelSurface::Swa => {
+                    (config.swa.as_ref().is_some_and(|swa| {
+                        swa.source_surface == ParameterGolfSwaSourceSurface::Ema
+                    }))
+                    .then(|| config.ema.clone())
+                    .flatten()
+                }
+            },
+            swa: (config.final_model_surface == ParameterGolfFinalModelSurface::Swa)
+                .then(|| final_swa_receipt.clone())
+                .flatten(),
             metric_source: String::from("int8_zlib_roundtrip"),
             validation: roundtrip_validation,
             pre_ttt_validation: None,
@@ -2279,6 +2521,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         validation_batch_sequences: config.validation_batch_sequences,
         score_first_ttt: config.score_first_ttt.clone(),
         ema: config.ema.clone(),
+        swa: config.swa.clone(),
         final_model_surface: config.final_model_surface,
         executed_steps: step,
         stop_reason: Some(realized_stop_reason),
@@ -2304,6 +2547,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         observed_training_time_ms: training_time_ms,
         pre_export_final_validation_observed_ms,
         final_validation_observed_ms,
+        final_swa_receipt,
         final_roundtrip_receipt,
         compressed_model_bytes: Some(compressed_model_artifact.bytes.len() as u64),
         compressed_model_artifact_ref: Some(compressed_model_artifact.artifact_ref.clone()),
@@ -2371,6 +2615,7 @@ fn refusal_report(
         validation_batch_sequences: config.validation_batch_sequences,
         score_first_ttt: config.score_first_ttt.clone(),
         ema: config.ema.clone(),
+        swa: config.swa.clone(),
         final_model_surface: config.final_model_surface,
         executed_steps: 0,
         stop_reason: None,
@@ -2396,6 +2641,7 @@ fn refusal_report(
         observed_training_time_ms: 0,
         pre_export_final_validation_observed_ms: None,
         final_validation_observed_ms: None,
+        final_swa_receipt: None,
         final_roundtrip_receipt: None,
         compressed_model_bytes: None,
         compressed_model_artifact_ref: None,
@@ -5516,6 +5762,7 @@ mod tests {
             ParameterGolfSingleH100ValidationMode::Both
         );
         assert_eq!(config.ema, None);
+        assert_eq!(config.swa, None);
         assert_eq!(config.final_model_surface, ParameterGolfFinalModelSurface::Raw);
         assert_eq!(config.hyperparameters.max_wallclock_seconds, Some(600.0));
     }
@@ -5537,6 +5784,7 @@ mod tests {
             ParameterGolfSingleH100ValidationMode::RoundtripOnly
         );
         assert_eq!(config.ema, None);
+        assert_eq!(config.swa, None);
         assert_eq!(config.final_model_surface, ParameterGolfFinalModelSurface::Raw);
         assert_eq!(config.hyperparameters.max_wallclock_seconds, None);
     }
@@ -5558,6 +5806,52 @@ mod tests {
         assert!(error
             .to_string()
             .contains("final_model_surface=ema requires an explicit ema config"));
+        Ok(())
+    }
+
+    #[test]
+    fn config_rejects_swa_surface_without_swa_config() -> Result<(), Box<dyn std::error::Error>> {
+        let root = std::env::temp_dir().join(format!(
+            "psionic-pgolf-swa-config-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root)?;
+        let tokenizer_path = root.join("tokenizer.model");
+        std::fs::write(&tokenizer_path, b"stub")?;
+
+        let mut config =
+            ParameterGolfSingleH100TrainingConfig::challenge_defaults(&root, &tokenizer_path);
+        config.final_model_surface = ParameterGolfFinalModelSurface::Swa;
+        let error = config.validate().expect_err("swa export without swa config must fail");
+        assert!(error
+            .to_string()
+            .contains("final_model_surface=swa requires an explicit swa config"));
+        Ok(())
+    }
+
+    #[test]
+    fn config_rejects_ema_backed_swa_without_ema_config(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let root = std::env::temp_dir().join(format!(
+            "psionic-pgolf-swa-ema-config-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root)?;
+        let tokenizer_path = root.join("tokenizer.model");
+        std::fs::write(&tokenizer_path, b"stub")?;
+
+        let mut config =
+            ParameterGolfSingleH100TrainingConfig::challenge_defaults(&root, &tokenizer_path);
+        config.swa = Some(ParameterGolfSwaConfig {
+            source_surface: ParameterGolfSwaSourceSurface::Ema,
+            ..Default::default()
+        });
+        let error = config
+            .validate()
+            .expect_err("ema-backed swa without ema config must fail");
+        assert!(error
+            .to_string()
+            .contains("swa source_surface=ema requires an explicit ema config"));
         Ok(())
     }
 
@@ -5612,6 +5906,64 @@ mod tests {
             .find(|vector| vector.parameter_id == parameter_id)
             .expect("ema model should retain the updated parameter");
         assert_eq!(ema_vector.values[0], ema_value);
+        Ok(())
+    }
+
+    #[test]
+    fn swa_state_accumulates_parameter_values_and_materializes_model(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+        let hyperparameters = ParameterGolfTrainingHyperparameters::baseline_defaults();
+        let optimizer_plan = parameter_golf_optimizer_plan(model.descriptor(), &hyperparameters)?;
+        let mut trainer_state = seed_parameter_states(&model, &optimizer_plan)?;
+        let mut swa_state = ParameterGolfSwaState::new(ParameterGolfSwaConfig {
+            every_steps: 2,
+            max_learning_rate_multiplier: 0.2,
+            source_surface: ParameterGolfSwaSourceSurface::Raw,
+        });
+        let (parameter_id, original_value) = {
+            let (parameter_id, state) = trainer_state
+                .parameter_states
+                .iter()
+                .next()
+                .expect("trainer state should contain at least one parameter");
+            (parameter_id.clone(), state.values()[0])
+        };
+
+        let first_snapshot = current_parameter_state_overrides(&trainer_state);
+        swa_state.update_from_overrides(&first_snapshot)?;
+
+        match trainer_state
+            .parameter_states
+            .get_mut(&parameter_id)
+            .expect("parameter state should still exist")
+        {
+            ParameterGolfParameterState::AdamBf16Master {
+                train_visible_values, ..
+            } => train_visible_values[0] += 2.0,
+            ParameterGolfParameterState::AdamFp32 { values, .. }
+            | ParameterGolfParameterState::MuonBf16 { values, .. } => values[0] += 2.0,
+        }
+        let second_snapshot = current_parameter_state_overrides(&trainer_state);
+        let updated_value = second_snapshot
+            .get(&parameter_id)
+            .expect("updated parameter should exist")[0];
+        swa_state.update_from_overrides(&second_snapshot)?;
+        assert_eq!(swa_state.sample_count, 2);
+
+        let averaged_values = swa_state.averaged_parameter_values()?;
+        let swa_value = averaged_values
+            .get(&parameter_id)
+            .expect("swa parameter should exist")[0];
+        assert_eq!(swa_value, (original_value + updated_value) / 2.0);
+
+        let swa_model = materialize_model_from_overrides(&model, &averaged_values)?;
+        let swa_vector = swa_model
+            .all_parameter_vectors()?
+            .into_iter()
+            .find(|vector| vector.parameter_id == parameter_id)
+            .expect("swa model should retain the averaged parameter");
+        assert_eq!(swa_vector.values[0], swa_value);
         Ok(())
     }
 

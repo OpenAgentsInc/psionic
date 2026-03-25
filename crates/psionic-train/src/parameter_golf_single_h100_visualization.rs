@@ -1535,6 +1535,7 @@ mod tests {
             validation_batch_sequences: 64,
             score_first_ttt: None,
             ema: None,
+            swa: None,
             final_model_surface: crate::ParameterGolfFinalModelSurface::Raw,
             executed_steps: 2,
             stop_reason: Some(ParameterGolfSingleH100TrainingStopReason::StepBudgetReached),
@@ -1613,8 +1614,11 @@ mod tests {
             observed_training_time_ms: 2_100,
             pre_export_final_validation_observed_ms: Some(200),
             final_validation_observed_ms: Some(190),
+            final_swa_receipt: None,
             final_roundtrip_receipt: Some(ParameterGolfSingleH100RoundtripReceipt {
                 final_model_surface: crate::ParameterGolfFinalModelSurface::Raw,
+                ema: None,
+                swa: None,
                 metric_source: String::from("int8_zlib_roundtrip"),
                 validation: ParameterGolfSingleH100ValidationSummary {
                     eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,

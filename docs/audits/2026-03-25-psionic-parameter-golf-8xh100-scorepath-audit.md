@@ -319,6 +319,13 @@ those gaps:
   graph
 - GQA-aware XSA on the deepest `xsa_last_n` layers now exists in the shared
   PGOLF config surface, CPU reference model, and lowered baseline graph
+- VE-style shared value embeddings now exist in the shared PGOLF config
+  surface, parameter accounting, CPU reference model, optimizer classification,
+  and lowered baseline graph
+- EMA and SWA now exist on the single-H100 score lane as explicit config,
+  report, and roundtrip-receipt surfaces, including the public stacked
+  `EMA -> SWA` posture via `swa.source_surface=ema`
+  PGOLF config surface, CPU reference model, and lowered baseline graph
 - VE-style late-layer value features now exist in the shared PGOLF config
   surface, parameter accounting, CPU reference model, optimizer or graph
   classification surface, and lowered baseline graph

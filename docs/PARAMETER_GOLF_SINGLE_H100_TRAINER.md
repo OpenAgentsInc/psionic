@@ -114,16 +114,30 @@ geometry. The default remains the train-geometry batch size for
 `non_overlapping`, but sliding-window evaluation now widens onto the explicit
 scoreboard batch surface instead of inheriting the train token cap implicitly.
 
-The Rust config surface now also carries an explicit optional EMA config and an
-explicit `final_model_surface` selector for the final live-validation and
-exported-artifact path:
+The Rust config surface now also carries explicit optional EMA and SWA configs
+plus an explicit `final_model_surface` selector for the final live-validation
+and exported-artifact path:
 
 - default `final_model_surface=raw`
 - optional `final_model_surface=ema` when `ema.decay` is configured
+- optional `final_model_surface=swa` when `swa.every_steps` is configured
 
-This first EMA slice is config-level and report-level. The CLI still follows
-the default raw-model export posture unless a caller constructs the config
-programmatically.
+SWA is explicit about which parameter surface it averages:
+
+- `swa.source_surface=raw` snapshots the live train-visible weights
+- `swa.source_surface=ema` snapshots the EMA materialized weights
+
+That means the public `EMA(0.997) + Tight SWA(every 50)` posture is now
+expressible without inventing a vague combined export label:
+
+- `ema.decay=0.997`
+- `swa.every_steps=50`
+- `swa.max_learning_rate_multiplier=0.2`
+- `swa.source_surface=ema`
+- `final_model_surface=swa`
+
+The CLI still follows the default raw-model export posture unless a caller
+constructs the config programmatically.
 
 That same shared PGOLF config surface now also admits four public
 architecture-pack selectors programmatically:
@@ -247,7 +261,8 @@ The command is explicit about what it treats as trainer truth. It binds:
   roundtrip validation, or both were requested
 - an explicit final-model surface contract for those final passes, so the
   report and roundtrip receipt now say whether the exported model was the live
-  raw weights or an EMA-materialized surface
+  raw weights, an EMA-materialized surface, or an SWA-materialized surface
+  with explicit `swa.source_surface` and `sample_count` receipt truth
 - a device-resident validation runner that keeps the stable parameter surface
   resident on device across validation batches, reuses mutable token buffers,
   runs through the explicit `parameter_golf_baseline_eval_graph_v2` surface
@@ -328,10 +343,11 @@ Today the single-H100 trainer doc does **not** claim:
   execute the legal score-first TTT path, but the shipped bounded
   local-reference exported-folder runtime still refuses that request with a
   typed unsupported-validation error instead of pretending it ran it
-- competitive EMA/SWA closure; the single-H100 trainer now has one explicit EMA
-  final-model surface, but SWA has not landed, the CLI still defaults to raw
-  export, and the distributed `8xH100` score lane does not yet preserve the
-  same averaging contract
+- competitive EMA/SWA closure; the single-H100 trainer now has explicit EMA
+  and SWA final-model surfaces, including the public stacked
+  `EMA -> SWA` posture, but the CLI still defaults to raw export and the
+  distributed `8xH100` score lane does not yet preserve the same averaging
+  contract
 - record-track accounting closure
 - full BF16 activation-kernel closure yet; the current report now records BF16
   graph uploads for the train-visible token-embedding and linear weight path,
