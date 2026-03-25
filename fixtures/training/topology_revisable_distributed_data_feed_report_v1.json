@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "current_scope_window": "psionic_topology_revisable_distributed_data_feed_v1",
+  "cases": [
+    {
+      "case_id": "dense_rank.provider_loss.replace_rank2",
+      "action_kind": "replace_rank",
+      "reason_kind": "provider_loss",
+      "status": "supported",
+      "departing_rank": 2,
+      "departing_node_id": "google-l4-rank2",
+      "requested_world_size": 4,
+      "reassigned_shard_keys": [
+        "shard-6",
+        "shard-3"
+      ],
+      "baseline_global_order_digest": "d26252d593443f937725f4c3f4604c24761eb5ae03b10ee3ef498cb042bc723e",
+      "revised_global_order_digest": "d26252d593443f937725f4c3f4604c24761eb5ae03b10ee3ef498cb042bc723e",
+      "replay_continuity_digest": "e112b9d3f1015a84712657484e8354b28285286c7a493b8cae3b6995781e9c54",
+      "bounded_scope": "Current scope supports replacing one departed dense rank with one new node at the same rank while preserving the replay-safe global shard order."
+    },
+    {
+      "case_id": "dense_rank.node_loss.replace_rank1",
+      "action_kind": "replace_rank",
+      "reason_kind": "node_loss",
+      "status": "supported",
+      "departing_rank": 1,
+      "departing_node_id": "google-l4-rank1",
+      "requested_world_size": 4,
+      "reassigned_shard_keys": [
+        "shard-5",
+        "shard-1"
+      ],
+      "baseline_global_order_digest": "d26252d593443f937725f4c3f4604c24761eb5ae03b10ee3ef498cb042bc723e",
+      "revised_global_order_digest": "d26252d593443f937725f4c3f4604c24761eb5ae03b10ee3ef498cb042bc723e",
+      "replay_continuity_digest": "2739e83e5d97b8a588cf5c6ac31045b63e098067cecf5f736d28a9df13c3d366",
+      "bounded_scope": "Current scope supports same-provider node replacement at the same dense rank without changing replay order or world size."
+    },
+    {
+      "case_id": "dense_rank.shrink_world.refused",
+      "action_kind": "shrink_world",
+      "reason_kind": "provider_loss",
+      "status": "refused",
+      "departing_rank": 3,
+      "departing_node_id": "runpod-h100-rank3",
+      "requested_world_size": 3,
+      "reassigned_shard_keys": [],
+      "bounded_scope": "Current scope still refuses shrink-world revisions because the existing dense data-feed substrate does not yet admit world-size changes.",
+      "refusal": "topology-revisable data feed requires requested_world_size 4 for current revision action, found 3"
+    }
+  ],
+  "report_digest": "c5a5f99ad63c036d79faa000cd898c2453102a10fa51593300bc2e9537a816b0"
+}
