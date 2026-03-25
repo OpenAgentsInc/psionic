@@ -1,14 +1,14 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     path::Path,
+    sync::Arc,
 };
 
 use psionic_core::{DType, Device, QuantizedTensorData, TensorData, TensorSpec};
 use psionic_data::{TokenizerDigest, TokenizerFamily};
 use psionic_models::{
-    GgufContent, GgufMetadataValue, GgufTensorType, GgufTokenizerMetadata, GgufTokenizerModel,
-    GgufVersion, GgufWeightBundleLoader, LocalWeightBundleLoader, ModelLoadError,
-    WeightTensorStorage,
+    GgufContent, GgufTokenizerMetadata, GgufTokenizerModel, GgufWeightBundleLoader,
+    LocalWeightBundleLoader, ModelLoadError, WeightTensorStorage,
 };
 use safetensors::{
     serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensorError, SafeTensors,
@@ -21,7 +21,7 @@ use crate::{
     core_loop::TrainingCoreError, OptimizerStateResidency, TrainingOptimizerConfig,
     TrainingOptimizerKind, TrainingOptimizerResidencyPolicy, TrainingOptimizerState,
     TrainingParameterClass, TrainingParameterGroupSemantics, TrainingParameterGroupState,
-    TrainingSchedulerBinding, TrainingSchedulerConfig, TrainingTensorBuffer,
+    TrainingSchedulerBinding, TrainingTensorBuffer,
 };
 
 const SAFETENSORS_MANIFEST_KEY: &str = "psionic.model_io.bundle_manifest";
@@ -149,6 +149,40 @@ pub enum ModelIoError {
         expected: DType,
         /// Actual safetensors dtype.
         actual: String,
+    },
+    /// One explicit import include key did not exist in the source artifact.
+    #[error("state-dict import include key `{state_key}` is missing from the source artifact")]
+    MissingImportSelectionTensor {
+        /// Stable source tensor key.
+        state_key: String,
+    },
+    /// One key remap referenced a tensor that does not exist in the source artifact.
+    #[error("state-dict import remap source `{state_key}` is missing from the source artifact")]
+    MissingImportRemapSource {
+        /// Stable source tensor key.
+        state_key: String,
+    },
+    /// Two selected source tensors remapped to the same target key.
+    #[error(
+        "state-dict import remap collision at target `{target_state_key}` between source tensors `{first_source_state_key}` and `{second_source_state_key}`"
+    )]
+    ImportRemapCollision {
+        /// Colliding target tensor key.
+        target_state_key: String,
+        /// First source tensor key.
+        first_source_state_key: String,
+        /// Second source tensor key.
+        second_source_state_key: String,
+    },
+    /// One selection dropped part of a training-group assignment while keeping another part.
+    #[error(
+        "state-dict import selection for group `{group_id}` is incomplete; missing source tensors {missing_state_keys:?}"
+    )]
+    IncompleteImportGroupSelection {
+        /// Stable training-group identifier.
+        group_id: String,
+        /// Source tensor keys required to keep the group structurally valid.
+        missing_state_keys: Vec<String>,
     },
     /// The current adapter operation requires dense `f32` parameter tensors.
     #[error("state dict tensor `{state_key}` must be dense `f32` for this operation")]
@@ -1079,6 +1113,335 @@ impl PortableModelStateDict {
             })
             .collect()
     }
+
+    /// Builds a filtered and optionally remapped clone of the state dict.
+    pub fn select_and_remap(
+        &self,
+        request: &PortableModelImportRequest,
+    ) -> Result<Self, ModelIoError> {
+        let source_tensors = self
+            .tensors
+            .iter()
+            .map(|(key, entry)| (key.clone(), entry.manifest.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let selection =
+            select_and_remap_state_dict_manifest(&self.groups, &source_tensors, request)?;
+
+        let mut tensors = BTreeMap::new();
+        for binding in selection.tensor_bindings.values() {
+            let entry = self
+                .tensors
+                .get(binding.source_state_key.as_str())
+                .ok_or_else(|| ModelIoError::MissingTensor {
+                    state_key: binding.source_state_key.clone(),
+                })?;
+            tensors.insert(
+                binding.target_state_key.clone(),
+                ModelStateTensorEntry {
+                    manifest: binding.manifest.clone(),
+                    data: entry.data.clone(),
+                },
+            );
+        }
+
+        Self::new(
+            self.model_family.clone(),
+            self.revision.clone(),
+            self.checkpoint_family.clone(),
+            self.checkpoint_ref.clone(),
+            self.source_format,
+            selection.groups,
+            tensors,
+        )
+    }
+}
+
+/// Whether import should eagerly materialize tensor payloads or defer that work.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TensorMaterializationPolicy {
+    /// Decode tensor payloads immediately during import.
+    #[default]
+    Eager,
+    /// Keep supported tensor payloads deferred until the caller materializes them.
+    Deferred,
+}
+
+/// Explicit subset-selection policy for state-dict import.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PortableTensorImportSelection {
+    /// Optional explicit include set over source state keys.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub include_state_keys: BTreeSet<String>,
+    /// Explicit exclude set over source state keys.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub exclude_state_keys: BTreeSet<String>,
+}
+
+impl PortableTensorImportSelection {
+    /// Creates an empty selection, which means "include everything".
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Adds one source state key to the include set.
+    #[must_use]
+    pub fn include(mut self, state_key: impl Into<String>) -> Self {
+        self.include_state_keys.insert(state_key.into());
+        self
+    }
+
+    /// Adds one source state key to the exclude set.
+    #[must_use]
+    pub fn exclude(mut self, state_key: impl Into<String>) -> Self {
+        self.exclude_state_keys.insert(state_key.into());
+        self
+    }
+}
+
+/// Explicit source-to-target state-key remapping for import.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PortableTensorKeyRemap {
+    /// Source-to-target state-key remap table.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub source_to_target: BTreeMap<String, String>,
+}
+
+impl PortableTensorKeyRemap {
+    /// Creates an empty remap table.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Adds one source-to-target remap entry.
+    #[must_use]
+    pub fn map(
+        mut self,
+        source_state_key: impl Into<String>,
+        target_state_key: impl Into<String>,
+    ) -> Self {
+        self.source_to_target
+            .insert(source_state_key.into(), target_state_key.into());
+        self
+    }
+
+    fn target_for<'a>(&'a self, source_state_key: &'a str) -> &'a str {
+        self.source_to_target
+            .get(source_state_key)
+            .map(String::as_str)
+            .unwrap_or(source_state_key)
+    }
+}
+
+/// Complete request for one bounded model-IO import operation.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PortableModelImportRequest {
+    /// Tensor-subset selection.
+    pub selection: PortableTensorImportSelection,
+    /// Optional source-to-target state-key remap.
+    pub key_remap: PortableTensorKeyRemap,
+    /// Eager versus deferred tensor materialization policy.
+    pub materialization_policy: TensorMaterializationPolicy,
+}
+
+impl PortableModelImportRequest {
+    /// Creates the default "import everything eagerly with no remap" request.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Replaces the tensor selection.
+    #[must_use]
+    pub fn with_selection(mut self, selection: PortableTensorImportSelection) -> Self {
+        self.selection = selection;
+        self
+    }
+
+    /// Replaces the key-remap table.
+    #[must_use]
+    pub fn with_key_remap(mut self, key_remap: PortableTensorKeyRemap) -> Self {
+        self.key_remap = key_remap;
+        self
+    }
+
+    /// Sets the tensor materialization policy.
+    #[must_use]
+    pub fn with_materialization_policy(
+        mut self,
+        materialization_policy: TensorMaterializationPolicy,
+    ) -> Self {
+        self.materialization_policy = materialization_policy;
+        self
+    }
+}
+
+/// Deferred tensor payload owned by an import plan.
+#[derive(Clone, Debug)]
+pub enum DeferredTensorData {
+    /// Dense `f32` bytes stored as little-endian raw payload.
+    DenseF32Bytes {
+        /// Owned artifact bytes retained by the import plan.
+        bytes: Arc<[u8]>,
+        /// Byte range carrying the tensor payload.
+        byte_range: std::ops::Range<usize>,
+    },
+}
+
+impl DeferredTensorData {
+    fn materialize(&self, state_key: &str) -> Result<TensorData, ModelIoError> {
+        match self {
+            Self::DenseF32Bytes { bytes, byte_range } => {
+                let values = decode_f32_bytes(state_key, &bytes[byte_range.clone()])?;
+                Ok(TensorData::F32(values))
+            }
+        }
+    }
+
+    fn payload_digest(&self) -> String {
+        match self {
+            Self::DenseF32Bytes { bytes, byte_range } => {
+                tensor_payload_digest_from_raw_f32_bytes(&bytes[byte_range.clone()])
+            }
+        }
+    }
+}
+
+/// Materialized or deferred tensor payload tracked by an import plan.
+#[derive(Clone, Debug)]
+pub enum PortableImportedTensorPayload {
+    /// Tensor payload is already materialized.
+    Materialized(TensorData),
+    /// Tensor payload is deferred until the caller requests materialization.
+    Deferred(DeferredTensorData),
+}
+
+impl PortableImportedTensorPayload {
+    /// Returns whether the payload is currently deferred.
+    #[must_use]
+    pub const fn is_deferred(&self) -> bool {
+        matches!(self, Self::Deferred(_))
+    }
+
+    fn materialize(&self, state_key: &str) -> Result<TensorData, ModelIoError> {
+        match self {
+            Self::Materialized(data) => Ok(data.clone()),
+            Self::Deferred(data) => data.materialize(state_key),
+        }
+    }
+
+    fn payload_digest(&self) -> String {
+        match self {
+            Self::Materialized(data) => tensor_payload_digest(data),
+            Self::Deferred(data) => data.payload_digest(),
+        }
+    }
+}
+
+/// One admitted tensor inside a model import plan.
+#[derive(Clone, Debug)]
+pub struct PortableImportedTensorEntry {
+    /// Source state key in the origin artifact.
+    pub source_state_key: String,
+    /// Target manifest inside the admitted plan.
+    pub manifest: ModelStateTensorManifest,
+    /// Materialized or deferred payload.
+    pub payload: PortableImportedTensorPayload,
+}
+
+/// One admitted bundle import plan, optionally carrying deferred tensor payloads.
+#[derive(Clone, Debug)]
+pub struct PortableModelBundleImportPlan {
+    /// Artifact surface the plan was built from.
+    pub source_format: ModelArtifactFormat,
+    /// Materialization policy used by the plan.
+    pub materialization_policy: TensorMaterializationPolicy,
+    /// Metadata-only manifest for the admitted bundle.
+    pub manifest: PortableModelBundleManifest,
+    /// Admitted tensor entries keyed by target state key.
+    pub tensors: BTreeMap<String, PortableImportedTensorEntry>,
+    /// Stable digest over the admitted import plan.
+    pub plan_digest: String,
+}
+
+impl PortableModelBundleImportPlan {
+    /// Returns the number of admitted tensors.
+    #[must_use]
+    pub fn tensor_count(&self) -> usize {
+        self.tensors.len()
+    }
+
+    /// Returns the number of deferred tensors still owned by the plan.
+    #[must_use]
+    pub fn deferred_tensor_count(&self) -> usize {
+        self.tensors
+            .values()
+            .filter(|entry| entry.payload.is_deferred())
+            .count()
+    }
+
+    /// Returns stable signature lines suitable for fixtures or audits.
+    #[must_use]
+    pub fn stable_signature_lines(&self) -> Vec<String> {
+        let mut lines = vec![
+            format!("source_format={:?}", self.source_format),
+            format!("materialization_policy={:?}", self.materialization_policy),
+            format!("plan_digest={}", self.plan_digest),
+            format!("state_dict_digest={}", self.manifest.state_dict.digest),
+        ];
+        for (state_key, entry) in &self.tensors {
+            lines.push(format!(
+                "{state_key}|source={}|deferred={}",
+                entry.source_state_key,
+                entry.payload.is_deferred()
+            ));
+        }
+        lines
+    }
+
+    /// Materializes one admitted tensor by target state key.
+    pub fn materialize_tensor(&self, state_key: &str) -> Result<TensorData, ModelIoError> {
+        let entry = self
+            .tensors
+            .get(state_key)
+            .ok_or_else(|| ModelIoError::MissingTensor {
+                state_key: String::from(state_key),
+            })?;
+        entry.payload.materialize(state_key)
+    }
+
+    /// Materializes the full admitted bundle.
+    pub fn materialize_bundle(&self) -> Result<PortableModelBundle, ModelIoError> {
+        let mut tensors = BTreeMap::new();
+        for (state_key, entry) in &self.tensors {
+            tensors.insert(
+                state_key.clone(),
+                ModelStateTensorEntry {
+                    manifest: entry.manifest.clone(),
+                    data: entry.payload.materialize(state_key.as_str())?,
+                },
+            );
+        }
+
+        let state_dict = PortableModelStateDict::new(
+            self.manifest.state_dict.model_family.clone(),
+            self.manifest.state_dict.revision.clone(),
+            self.manifest.state_dict.checkpoint_family.clone(),
+            self.manifest.state_dict.checkpoint_ref.clone(),
+            self.source_format,
+            self.manifest.state_dict.groups.clone(),
+            tensors,
+        )?;
+
+        Ok(PortableModelBundle {
+            state_dict,
+            tokenizer: self.manifest.tokenizer.clone(),
+            chat_template_digest: self.manifest.chat_template_digest.clone(),
+            preferred_serving_formats: self.manifest.preferred_serving_formats.clone(),
+        })
+    }
 }
 
 /// Metadata-only form embedded inside safetensors artifacts.
@@ -1241,6 +1604,19 @@ impl PortableModelBundle {
         )
     }
 
+    /// Builds a filtered and optionally remapped clone of the bundle.
+    pub fn select_and_remap(
+        &self,
+        request: &PortableModelImportRequest,
+    ) -> Result<Self, ModelIoError> {
+        Ok(Self {
+            state_dict: self.state_dict.select_and_remap(request)?,
+            tokenizer: self.tokenizer.clone(),
+            chat_template_digest: self.chat_template_digest.clone(),
+            preferred_serving_formats: self.preferred_serving_formats.clone(),
+        })
+    }
+
     /// Exports the bundle as a JSON torch-style state-dict compatibility artifact.
     pub fn export_torch_state_dict_json(
         &self,
@@ -1264,6 +1640,15 @@ impl PortableModelBundle {
 
     /// Imports the bundle from a JSON torch-style state-dict compatibility artifact.
     pub fn import_torch_state_dict_json(bytes: &[u8]) -> Result<Self, ModelIoError> {
+        Self::import_torch_state_dict_json_with_request(bytes, &PortableModelImportRequest::new())
+    }
+
+    /// Imports the bundle from a JSON torch-style state-dict compatibility artifact
+    /// with explicit selection and remap control.
+    pub fn import_torch_state_dict_json_with_request(
+        bytes: &[u8],
+        request: &PortableModelImportRequest,
+    ) -> Result<Self, ModelIoError> {
         let artifact: Self = serde_json::from_slice(bytes).map_err(|error| {
             serialization_error("torch state-dict json import", error.to_string())
         })?;
@@ -1276,12 +1661,13 @@ impl PortableModelBundle {
             artifact.state_dict.groups,
             artifact.state_dict.tensors,
         )?;
-        Ok(Self {
+        Self {
             state_dict,
             tokenizer: artifact.tokenizer,
             chat_template_digest: artifact.chat_template_digest,
             preferred_serving_formats: artifact.preferred_serving_formats,
-        })
+        }
+        .select_and_remap(request)
     }
 
     /// Exports the bundle as dense safetensors with embedded Psionic metadata.
@@ -1334,6 +1720,24 @@ impl PortableModelBundle {
 
     /// Imports a bundle from a safetensors artifact emitted by this crate.
     pub fn import_safetensors(bytes: &[u8]) -> Result<Self, ModelIoError> {
+        Self::import_safetensors_with_request(bytes, &PortableModelImportRequest::new())
+    }
+
+    /// Imports a bundle from a safetensors artifact emitted by this crate with
+    /// explicit selection, remap, and materialization control.
+    pub fn import_safetensors_with_request(
+        bytes: &[u8],
+        request: &PortableModelImportRequest,
+    ) -> Result<Self, ModelIoError> {
+        Self::plan_safetensors_import(bytes, request)?.materialize_bundle()
+    }
+
+    /// Builds a bounded safetensors import plan without forcing eager tensor
+    /// materialization when the request allows a deferred path.
+    pub fn plan_safetensors_import(
+        bytes: &[u8],
+        request: &PortableModelImportRequest,
+    ) -> Result<PortableModelBundleImportPlan, ModelIoError> {
         let (_, metadata) = SafeTensors::read_metadata(bytes).map_err(safetensors_error)?;
         let metadata = metadata
             .metadata()
@@ -1347,51 +1751,121 @@ impl PortableModelBundle {
                 serialization_error("safetensors manifest import", error.to_string())
             })?;
 
-        let safetensors = SafeTensors::deserialize(bytes).map_err(safetensors_error)?;
+        let selection = select_and_remap_state_dict_manifest(
+            &manifest.state_dict.groups,
+            &manifest.state_dict.tensors,
+            request,
+        )?;
+        let owned_bytes: Arc<[u8]> = Arc::from(bytes.to_vec());
+        let safetensors =
+            SafeTensors::deserialize(owned_bytes.as_ref()).map_err(safetensors_error)?;
+        let buffer_start = owned_bytes.as_ptr() as usize;
         let mut tensors = BTreeMap::new();
-        for (state_key, tensor_manifest) in &manifest.state_dict.tensors {
+        for binding in selection.tensor_bindings.values() {
             let view = safetensors
-                .tensor(state_key.as_str())
+                .tensor(binding.source_state_key.as_str())
                 .map_err(safetensors_error)?;
-            if view.shape() != tensor_manifest.spec.shape().dims() {
+            if view.shape() != binding.manifest.spec.shape().dims() {
                 return Err(ModelIoError::SafetensorsShapeMismatch {
-                    state_key: state_key.clone(),
-                    expected: tensor_manifest.spec.shape().dims().to_vec(),
+                    state_key: binding.target_state_key.clone(),
+                    expected: binding.manifest.spec.shape().dims().to_vec(),
                     actual: view.shape().to_vec(),
                 });
             }
-            if view.dtype() != SafeTensorsDType::F32 || tensor_manifest.spec.dtype() != DType::F32 {
+            if view.dtype() != SafeTensorsDType::F32 || binding.manifest.spec.dtype() != DType::F32
+            {
                 return Err(ModelIoError::SafetensorsDTypeMismatch {
-                    state_key: state_key.clone(),
-                    expected: tensor_manifest.spec.dtype(),
+                    state_key: binding.target_state_key.clone(),
+                    expected: binding.manifest.spec.dtype(),
                     actual: view.dtype().to_string(),
                 });
             }
-            let values = decode_f32_bytes(state_key.as_str(), view.data().as_ref())?;
+            let payload = match request.materialization_policy {
+                TensorMaterializationPolicy::Eager => {
+                    PortableImportedTensorPayload::Materialized(TensorData::F32(decode_f32_bytes(
+                        binding.target_state_key.as_str(),
+                        view.data().as_ref(),
+                    )?))
+                }
+                TensorMaterializationPolicy::Deferred => {
+                    let start = (view.data().as_ptr() as usize).saturating_sub(buffer_start);
+                    let end = start + view.data().len();
+                    PortableImportedTensorPayload::Deferred(DeferredTensorData::DenseF32Bytes {
+                        bytes: owned_bytes.clone(),
+                        byte_range: start..end,
+                    })
+                }
+            };
             tensors.insert(
-                state_key.clone(),
-                ModelStateTensorEntry {
-                    manifest: tensor_manifest.clone(),
-                    data: TensorData::F32(values),
+                binding.target_state_key.clone(),
+                PortableImportedTensorEntry {
+                    source_state_key: binding.source_state_key.clone(),
+                    manifest: binding.manifest.clone(),
+                    payload,
                 },
             );
         }
 
-        let state_dict = PortableModelStateDict::new(
-            manifest.state_dict.model_family,
-            manifest.state_dict.revision,
-            manifest.state_dict.checkpoint_family,
-            manifest.state_dict.checkpoint_ref,
-            ModelArtifactFormat::Safetensors,
-            manifest.state_dict.groups,
-            tensors,
-        )?;
-
-        Ok(Self {
-            state_dict,
+        let state_dict_digest = digest_selected_state_dict_payloads(
+            manifest.state_dict.model_family.as_str(),
+            manifest.state_dict.revision.as_str(),
+            manifest.state_dict.checkpoint_family.as_str(),
+            manifest.state_dict.checkpoint_ref.as_deref(),
+            selection.groups.as_slice(),
+            tensors
+                .iter()
+                .map(|(state_key, entry)| {
+                    (
+                        state_key.as_str(),
+                        entry.manifest.clone(),
+                        entry.payload.payload_digest(),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .as_slice(),
+        );
+        let state_dict_manifest = PortableModelStateDictManifest {
+            model_family: manifest.state_dict.model_family,
+            revision: manifest.state_dict.revision,
+            checkpoint_family: manifest.state_dict.checkpoint_family,
+            checkpoint_ref: manifest.state_dict.checkpoint_ref,
+            source_format: ModelArtifactFormat::Safetensors,
+            groups: selection.groups,
+            tensors: tensors
+                .iter()
+                .map(|(state_key, entry)| (state_key.clone(), entry.manifest.clone()))
+                .collect(),
+            digest: state_dict_digest,
+        };
+        let plan_manifest = PortableModelBundleManifest {
+            state_dict: state_dict_manifest,
             tokenizer: manifest.tokenizer,
             chat_template_digest: manifest.chat_template_digest,
             preferred_serving_formats: manifest.preferred_serving_formats,
+        };
+        let plan_digest = stable_import_plan_digest(
+            ModelArtifactFormat::Safetensors,
+            request.materialization_policy,
+            &plan_manifest.state_dict.digest,
+            tensors
+                .iter()
+                .map(|(state_key, entry)| {
+                    (
+                        state_key.as_str(),
+                        entry.source_state_key.as_str(),
+                        entry.payload.payload_digest(),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .as_slice(),
+        );
+
+        Ok(PortableModelBundleImportPlan {
+            source_format: ModelArtifactFormat::Safetensors,
+            materialization_policy: request.materialization_policy,
+            manifest: plan_manifest,
+            tensors,
+            plan_digest,
         })
     }
 
@@ -1649,6 +2123,142 @@ fn validate_state_groups(
     Ok(())
 }
 
+#[derive(Clone, Debug)]
+struct SelectedTensorBinding {
+    source_state_key: String,
+    target_state_key: String,
+    manifest: ModelStateTensorManifest,
+}
+
+#[derive(Clone, Debug)]
+struct StateDictImportSelectionPlan {
+    groups: Vec<ModelStateGroupAssignment>,
+    tensor_bindings: BTreeMap<String, SelectedTensorBinding>,
+}
+
+fn select_and_remap_state_dict_manifest(
+    groups: &[ModelStateGroupAssignment],
+    tensors: &BTreeMap<String, ModelStateTensorManifest>,
+    request: &PortableModelImportRequest,
+) -> Result<StateDictImportSelectionPlan, ModelIoError> {
+    for state_key in &request.selection.include_state_keys {
+        if !tensors.contains_key(state_key.as_str()) {
+            return Err(ModelIoError::MissingImportSelectionTensor {
+                state_key: state_key.clone(),
+            });
+        }
+    }
+    for state_key in request.key_remap.source_to_target.keys() {
+        if !tensors.contains_key(state_key.as_str()) {
+            return Err(ModelIoError::MissingImportRemapSource {
+                state_key: state_key.clone(),
+            });
+        }
+    }
+
+    let selected_sources = if request.selection.include_state_keys.is_empty() {
+        tensors.keys().cloned().collect::<BTreeSet<_>>()
+    } else {
+        request.selection.include_state_keys.clone()
+    };
+
+    let mut selected_sources = selected_sources
+        .into_iter()
+        .filter(|state_key| !request.selection.exclude_state_keys.contains(state_key))
+        .collect::<BTreeSet<_>>();
+
+    let mut tensor_bindings = BTreeMap::new();
+    let mut remap_targets = BTreeMap::new();
+    for source_state_key in selected_sources.iter() {
+        let target_state_key = request
+            .key_remap
+            .target_for(source_state_key.as_str())
+            .to_string();
+        if let Some(previous) =
+            remap_targets.insert(target_state_key.clone(), source_state_key.clone())
+        {
+            return Err(ModelIoError::ImportRemapCollision {
+                target_state_key,
+                first_source_state_key: previous,
+                second_source_state_key: source_state_key.clone(),
+            });
+        }
+        let mut manifest = tensors
+            .get(source_state_key.as_str())
+            .cloned()
+            .ok_or_else(|| ModelIoError::MissingTensor {
+                state_key: source_state_key.clone(),
+            })?;
+        manifest.state_key = target_state_key.clone();
+        tensor_bindings.insert(
+            target_state_key.clone(),
+            SelectedTensorBinding {
+                source_state_key: source_state_key.clone(),
+                target_state_key,
+                manifest,
+            },
+        );
+    }
+
+    let mut selected_groups = Vec::new();
+    for group in groups {
+        let group_keys = group_state_keys(group);
+        let missing = group_keys
+            .iter()
+            .filter(|state_key| !selected_sources.contains((*state_key).as_str()))
+            .cloned()
+            .collect::<Vec<_>>();
+        if missing.len() == group_keys.len() {
+            continue;
+        }
+        if !missing.is_empty() {
+            return Err(ModelIoError::IncompleteImportGroupSelection {
+                group_id: group.group_id.clone(),
+                missing_state_keys: missing,
+            });
+        }
+
+        let mut mapped = group.clone();
+        mapped.parameter_key = request
+            .key_remap
+            .target_for(group.parameter_key.as_str())
+            .to_string();
+        mapped.momentum_buffer_key = group
+            .momentum_buffer_key
+            .as_ref()
+            .map(|state_key| request.key_remap.target_for(state_key.as_str()).to_string());
+        mapped.first_moment_key = group
+            .first_moment_key
+            .as_ref()
+            .map(|state_key| request.key_remap.target_for(state_key.as_str()).to_string());
+        mapped.second_moment_key = group
+            .second_moment_key
+            .as_ref()
+            .map(|state_key| request.key_remap.target_for(state_key.as_str()).to_string());
+        selected_groups.push(mapped);
+    }
+
+    selected_sources.clear();
+    Ok(StateDictImportSelectionPlan {
+        groups: selected_groups,
+        tensor_bindings,
+    })
+}
+
+fn group_state_keys(group: &ModelStateGroupAssignment) -> Vec<String> {
+    let mut keys = vec![group.parameter_key.clone()];
+    if let Some(state_key) = &group.momentum_buffer_key {
+        keys.push(state_key.clone());
+    }
+    if let Some(state_key) = &group.first_moment_key {
+        keys.push(state_key.clone());
+    }
+    if let Some(state_key) = &group.second_moment_key {
+        keys.push(state_key.clone());
+    }
+    keys
+}
+
 fn validate_assignment_tensor(
     group_id: &str,
     state_key: &str,
@@ -1852,6 +2462,66 @@ fn tensor_payload_digest(data: &TensorData) -> String {
     hex::encode(hasher.finalize())
 }
 
+fn tensor_payload_digest_from_raw_f32_bytes(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"f32|");
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
+}
+
+fn digest_selected_state_dict_payloads(
+    model_family: &str,
+    revision: &str,
+    checkpoint_family: &str,
+    checkpoint_ref: Option<&str>,
+    groups: &[ModelStateGroupAssignment],
+    tensors: &[(&str, ModelStateTensorManifest, String)],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"psionic_model_state_dict|");
+    hasher.update(model_family.as_bytes());
+    hasher.update(b"|");
+    hasher.update(revision.as_bytes());
+    hasher.update(b"|");
+    hasher.update(checkpoint_family.as_bytes());
+    if let Some(checkpoint_ref) = checkpoint_ref {
+        hasher.update(b"|checkpoint_ref|");
+        hasher.update(checkpoint_ref.as_bytes());
+    }
+    for group in groups {
+        hasher.update(stable_json_bytes(group));
+    }
+    for (state_key, manifest, payload_digest) in tensors {
+        hasher.update(state_key.as_bytes());
+        hasher.update(stable_json_bytes(manifest));
+        hasher.update(payload_digest.as_bytes());
+    }
+    hex::encode(hasher.finalize())
+}
+
+fn stable_import_plan_digest(
+    source_format: ModelArtifactFormat,
+    materialization_policy: TensorMaterializationPolicy,
+    state_dict_digest: &str,
+    tensors: &[(&str, &str, String)],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"psionic_model_import_plan|");
+    hasher.update(format!("{source_format:?}").as_bytes());
+    hasher.update(b"|");
+    hasher.update(format!("{materialization_policy:?}").as_bytes());
+    hasher.update(b"|");
+    hasher.update(state_dict_digest.as_bytes());
+    for (target_state_key, source_state_key, payload_digest) in tensors {
+        hasher.update(target_state_key.as_bytes());
+        hasher.update(b"|");
+        hasher.update(source_state_key.as_bytes());
+        hasher.update(b"|");
+        hasher.update(payload_digest.as_bytes());
+    }
+    hex::encode(hasher.finalize())
+}
+
 fn safetensors_surface_compatibility(
     state_dict: &PortableModelStateDict,
 ) -> ModelInteropSurfaceCompatibility {
@@ -2008,9 +2678,11 @@ mod tests {
     use std::{error::Error, fs};
 
     use psionic_core::{QuantizationMode, QuantizedBlockLayout, Shape};
+    use psionic_models::{GgufMetadataValue, GgufTensorType, GgufVersion};
     use tempfile::tempdir;
 
     use super::*;
+    use crate::TrainingSchedulerConfig;
 
     #[test]
     fn portable_model_bundle_roundtrips_training_groups_through_torch_json(
@@ -2080,6 +2752,230 @@ mod tests {
         assert_eq!(imported.to_training_groups()?, groups);
         assert_eq!(imported.tokenizer, bundle.tokenizer);
         assert_eq!(imported.chat_template_digest, bundle.chat_template_digest);
+        Ok(())
+    }
+
+    #[test]
+    fn portable_model_bundle_select_and_remap_keeps_complete_groups_only(
+    ) -> Result<(), Box<dyn Error>> {
+        let groups = sample_training_groups()?;
+        let bundle = PortableModelBundle::from_training_groups(
+            "weather-agent",
+            "r1",
+            "weather-checkpoints",
+            Some(String::from("checkpoint://weather/7")),
+            groups.as_slice(),
+            sample_tokenizer_binding(),
+            Some(String::from("chat-template-digest")),
+        )?;
+
+        let request = PortableModelImportRequest::new()
+            .with_selection(
+                PortableTensorImportSelection::new()
+                    .include("model.decoder.head.parameter")
+                    .include("optimizer.decoder.head.first_moment")
+                    .include("optimizer.decoder.head.second_moment"),
+            )
+            .with_key_remap(
+                PortableTensorKeyRemap::new()
+                    .map(
+                        "model.decoder.head.parameter",
+                        "model.decoder.output.parameter",
+                    )
+                    .map(
+                        "optimizer.decoder.head.first_moment",
+                        "optimizer.decoder.output.first_moment",
+                    )
+                    .map(
+                        "optimizer.decoder.head.second_moment",
+                        "optimizer.decoder.output.second_moment",
+                    ),
+            );
+
+        let selected = bundle.select_and_remap(&request)?;
+        assert_eq!(selected.state_dict.tensors.len(), 3);
+        assert_eq!(selected.state_dict.groups.len(), 1);
+        assert!(selected
+            .state_dict
+            .tensors
+            .contains_key("model.decoder.output.parameter"));
+        assert!(selected
+            .state_dict
+            .tensors
+            .contains_key("optimizer.decoder.output.first_moment"));
+        assert!(selected
+            .state_dict
+            .tensors
+            .contains_key("optimizer.decoder.output.second_moment"));
+        assert_eq!(selected.to_training_groups()?.len(), 1);
+        assert_eq!(selected.to_training_groups()?[0].group_id, "decoder.head");
+        Ok(())
+    }
+
+    #[test]
+    fn portable_model_bundle_import_selection_refuses_incomplete_group(
+    ) -> Result<(), Box<dyn Error>> {
+        let groups = sample_training_groups()?;
+        let bundle = PortableModelBundle::from_training_groups(
+            "weather-agent",
+            "r1",
+            "weather-checkpoints",
+            Some(String::from("checkpoint://weather/7")),
+            groups.as_slice(),
+            sample_tokenizer_binding(),
+            Some(String::from("chat-template-digest")),
+        )?;
+        let (bytes, _) = bundle.export_safetensors()?;
+        let request = PortableModelImportRequest::new().with_selection(
+            PortableTensorImportSelection::new().include("model.embedding.parameter"),
+        );
+
+        let error = PortableModelBundle::plan_safetensors_import(bytes.as_slice(), &request)
+            .expect_err("incomplete embedding group should refuse");
+        match error {
+            ModelIoError::IncompleteImportGroupSelection {
+                group_id,
+                missing_state_keys,
+            } => {
+                assert_eq!(group_id, "embedding");
+                assert_eq!(
+                    missing_state_keys,
+                    vec![String::from("optimizer.embedding.momentum_buffer")]
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn portable_model_bundle_import_selection_refuses_remap_collisions(
+    ) -> Result<(), Box<dyn Error>> {
+        let groups = sample_training_groups()?;
+        let bundle = PortableModelBundle::from_training_groups(
+            "weather-agent",
+            "r1",
+            "weather-checkpoints",
+            Some(String::from("checkpoint://weather/7")),
+            groups.as_slice(),
+            sample_tokenizer_binding(),
+            Some(String::from("chat-template-digest")),
+        )?;
+        let request = PortableModelImportRequest::new()
+            .with_selection(
+                PortableTensorImportSelection::new()
+                    .include("model.decoder.head.parameter")
+                    .include("optimizer.decoder.head.first_moment")
+                    .include("optimizer.decoder.head.second_moment"),
+            )
+            .with_key_remap(
+                PortableTensorKeyRemap::new()
+                    .map("model.decoder.head.parameter", "model.decoder.shared")
+                    .map(
+                        "optimizer.decoder.head.first_moment",
+                        "model.decoder.shared",
+                    ),
+            );
+
+        let error = bundle
+            .select_and_remap(&request)
+            .expect_err("collision should refuse");
+        match error {
+            ModelIoError::ImportRemapCollision {
+                target_state_key,
+                first_source_state_key,
+                second_source_state_key,
+            } => {
+                assert_eq!(target_state_key, "model.decoder.shared");
+                assert_eq!(first_source_state_key, "model.decoder.head.parameter");
+                assert_eq!(
+                    second_source_state_key,
+                    "optimizer.decoder.head.first_moment"
+                );
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn portable_model_bundle_plan_safetensors_import_can_defer_materialization(
+    ) -> Result<(), Box<dyn Error>> {
+        let groups = sample_training_groups()?;
+        let bundle = PortableModelBundle::from_training_groups(
+            "weather-agent",
+            "r1",
+            "weather-checkpoints",
+            Some(String::from("checkpoint://weather/7")),
+            groups.as_slice(),
+            sample_tokenizer_binding(),
+            Some(String::from("chat-template-digest")),
+        )?;
+        let (bytes, _) = bundle.export_safetensors()?;
+        let request = PortableModelImportRequest::new()
+            .with_selection(
+                PortableTensorImportSelection::new()
+                    .include("model.decoder.head.parameter")
+                    .include("optimizer.decoder.head.first_moment")
+                    .include("optimizer.decoder.head.second_moment"),
+            )
+            .with_materialization_policy(TensorMaterializationPolicy::Deferred);
+
+        let plan = PortableModelBundle::plan_safetensors_import(bytes.as_slice(), &request)?;
+        assert_eq!(plan.tensor_count(), 3);
+        assert_eq!(plan.deferred_tensor_count(), 3);
+        assert!(plan
+            .stable_signature_lines()
+            .iter()
+            .any(|line| line.starts_with("plan_digest=")));
+
+        let TensorData::F32(values) = plan.materialize_tensor("model.decoder.head.parameter")?
+        else {
+            panic!("expected dense f32 decoder parameter");
+        };
+        assert_eq!(values, vec![0.5, -0.5]);
+
+        let materialized = plan.materialize_bundle()?;
+        let eager = bundle.select_and_remap(&request)?;
+        assert_eq!(materialized.state_dict.digest, eager.state_dict.digest);
+        assert_eq!(
+            materialized.to_training_groups()?,
+            eager.to_training_groups()?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn portable_model_bundle_import_torch_json_with_request_matches_select_and_remap(
+    ) -> Result<(), Box<dyn Error>> {
+        let groups = sample_training_groups()?;
+        let bundle = PortableModelBundle::from_training_groups(
+            "weather-agent",
+            "r1",
+            "weather-checkpoints",
+            Some(String::from("checkpoint://weather/7")),
+            groups.as_slice(),
+            sample_tokenizer_binding(),
+            Some(String::from("chat-template-digest")),
+        )?;
+        let request = PortableModelImportRequest::new().with_selection(
+            PortableTensorImportSelection::new()
+                .include("model.decoder.head.parameter")
+                .include("optimizer.decoder.head.first_moment")
+                .include("optimizer.decoder.head.second_moment"),
+        );
+        let (bytes, _) = bundle.export_torch_state_dict_json()?;
+
+        let imported = PortableModelBundle::import_torch_state_dict_json_with_request(
+            bytes.as_slice(),
+            &request,
+        )?;
+        let expected = bundle.select_and_remap(&request)?;
+        assert_eq!(imported.state_dict.digest, expected.state_dict.digest);
+        assert_eq!(
+            imported.to_training_groups()?,
+            expected.to_training_groups()?
+        );
         Ok(())
     }
 
