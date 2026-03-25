@@ -132,6 +132,17 @@ typed parameter-shard and optimizer-shard placements, durable and refused shard
 upload receipts, and deterministic dense-rank restore assignments under one
 provider-neutral checkpoint family.
 
+The repo now also owns the first provider-neutral remote artifact backend layer
+in `crates/psionic-train/src/remote_artifact_backend_contract.rs`, the binary
+`remote_train_artifact_backend_contract`, the checker
+`scripts/check-remote-train-artifact-backend-contract.sh`, the focused
+reference doc `docs/REMOTE_TRAIN_ARTIFACT_BACKEND_REFERENCE.md`, and the
+fixture `fixtures/training/remote_train_artifact_backend_contract_v1.json`.
+That surface adds one shared remote backend trait, concrete Google and RunPod
+backends, byte-accounted placement policy, restore policy, and finalizer
+projections for checkpoints, logs, metrics bundles, and final evidence
+bundles.
+
 The first local mixed-hardware swarm lane now also has a canonical machine-
 legible contract in `crates/psionic-train/src/swarm_open_adapter.rs` plus the
 committed fixture `fixtures/swarm/first_swarm_run_contract_v1.json`. That

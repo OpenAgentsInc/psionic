@@ -71,3 +71,16 @@ implement:
 What it does do is give Psionic one Rust-owned storage lifecycle surface for
 artifact retention, deduplication, archival, garbage collection, and
 cold-restore truth.
+
+## Remote Backend Extension
+
+`XTRAIN-8` extends the older local controller with one provider-neutral remote
+backend layer in
+`crates/psionic-train/src/remote_artifact_backend_contract.rs`, the generator
+binary `remote_train_artifact_backend_contract`, the checker
+`scripts/check-remote-train-artifact-backend-contract.sh`, the focused
+reference doc `docs/REMOTE_TRAIN_ARTIFACT_BACKEND_REFERENCE.md`, and the
+fixture `fixtures/training/remote_train_artifact_backend_contract_v1.json`.
+That layer adds a shared remote backend trait, concrete Google and RunPod
+backends, byte-accounted placement policy, typed restore policy, and finalizer
+projections for checkpoints, logs, metrics bundles, and final evidence bundles.

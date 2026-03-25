@@ -1,0 +1,267 @@
+{
+  "schema_version": "psionic.remote_train_artifact_backend_contract.v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "backends": [
+    {
+      "backend_id": "google_train_bucket_backend",
+      "source_id": "google_l4_validator_node",
+      "backend_kind": "cloud_object_store",
+      "authoritative_root_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}",
+      "local_stage_root_template": "/var/lib/psion/runs/${RUN_ID}",
+      "placement_mode": "immediate_remote_mirror",
+      "restore_mode": "direct_remote_hydrate",
+      "class_policies": [
+        {
+          "artifact_class": "checkpoint",
+          "retention_profile": {
+            "hot_retention_ms": 1800000,
+            "warm_retention_ms": 14400000,
+            "archive_class": "restorable",
+            "deduplicate_by_digest": false,
+            "cold_restore_sla_ms": 900000
+          },
+          "authoritative_path_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}/checkpoints",
+          "local_stage_path_template": "/var/lib/psion/runs/${RUN_ID}/checkpoints",
+          "byte_accounting_key": "checkpoint_bytes",
+          "detail": "Checkpoint placement stays restorable and byte-accounted because dense restart and later finalizers depend on exact shard closure."
+        },
+        {
+          "artifact_class": "log_bundle",
+          "retention_profile": {
+            "hot_retention_ms": 900000,
+            "warm_retention_ms": 86400000,
+            "archive_class": "restorable",
+            "deduplicate_by_digest": false,
+            "cold_restore_sla_ms": 600000
+          },
+          "authoritative_path_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}/logs",
+          "local_stage_path_template": "/var/lib/psion/runs/${RUN_ID}/logs",
+          "byte_accounting_key": "log_bytes",
+          "detail": "Log placement stays explicit so finalizers read one typed prefix instead of ad hoc provider-local directories."
+        },
+        {
+          "artifact_class": "metrics_bundle",
+          "retention_profile": {
+            "hot_retention_ms": 300000,
+            "warm_retention_ms": 86400000,
+            "archive_class": "restorable",
+            "deduplicate_by_digest": true,
+            "cold_restore_sla_ms": 300000
+          },
+          "authoritative_path_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}/metrics",
+          "local_stage_path_template": "/var/lib/psion/runs/${RUN_ID}/metrics",
+          "byte_accounting_key": "metrics_bytes",
+          "detail": "Metrics bundles are deduplicated by digest but still keep explicit restore and byte-accounting posture."
+        },
+        {
+          "artifact_class": "final_evidence_bundle",
+          "retention_profile": {
+            "hot_retention_ms": 3600000,
+            "warm_retention_ms": 604800000,
+            "archive_class": "immutable",
+            "deduplicate_by_digest": false,
+            "cold_restore_sla_ms": 1800000
+          },
+          "authoritative_path_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}/evidence",
+          "local_stage_path_template": "/var/lib/psion/runs/${RUN_ID}/evidence",
+          "byte_accounting_key": "final_evidence_bytes",
+          "detail": "Final evidence remains immutable and byte-accounted because accepted run closure should not depend on provider-specific walking after publication."
+        }
+      ],
+      "byte_cost_posture": "Byte accounting stays explicit through bucket-class metering, restore-egress accounting, and per-class cost buckets.",
+      "finalizer_projection_id": "google_remote_projection",
+      "refusal_posture": "Requests that bypass the authoritative remote prefix or omit byte-accounting keys are refused instead of falling back to provider-specific path walking.",
+      "contract_digest": "2dcc80cf63b03d8932b79e0942362670eaa3d1975ffdf39cf6a85f58e445468f"
+    },
+    {
+      "backend_id": "runpod_workspace_backend",
+      "source_id": "runpod_8xh100_dense_node",
+      "backend_kind": "provider_workspace_mirror",
+      "authoritative_root_template": "/workspace/psionic/runs/${RUN_ID}",
+      "local_stage_root_template": "/workspace/psionic/runs/${RUN_ID}",
+      "placement_mode": "workspace_then_finalizer_mirror",
+      "restore_mode": "finalizer_mirrored_hydrate",
+      "class_policies": [
+        {
+          "artifact_class": "checkpoint",
+          "retention_profile": {
+            "hot_retention_ms": 1800000,
+            "warm_retention_ms": 14400000,
+            "archive_class": "restorable",
+            "deduplicate_by_digest": false,
+            "cold_restore_sla_ms": 900000
+          },
+          "authoritative_path_template": "/workspace/psionic/runs/${RUN_ID}/checkpoints",
+          "local_stage_path_template": "/workspace/psionic/runs/${RUN_ID}/checkpoints",
+          "byte_accounting_key": "checkpoint_bytes",
+          "detail": "Checkpoint placement stays restorable and byte-accounted because dense restart and later finalizers depend on exact shard closure."
+        },
+        {
+          "artifact_class": "log_bundle",
+          "retention_profile": {
+            "hot_retention_ms": 900000,
+            "warm_retention_ms": 86400000,
+            "archive_class": "restorable",
+            "deduplicate_by_digest": false,
+            "cold_restore_sla_ms": 600000
+          },
+          "authoritative_path_template": "/workspace/psionic/runs/${RUN_ID}/logs",
+          "local_stage_path_template": "/workspace/psionic/runs/${RUN_ID}/logs",
+          "byte_accounting_key": "log_bytes",
+          "detail": "Log placement stays explicit so finalizers read one typed prefix instead of ad hoc provider-local directories."
+        },
+        {
+          "artifact_class": "metrics_bundle",
+          "retention_profile": {
+            "hot_retention_ms": 300000,
+            "warm_retention_ms": 86400000,
+            "archive_class": "restorable",
+            "deduplicate_by_digest": true,
+            "cold_restore_sla_ms": 300000
+          },
+          "authoritative_path_template": "/workspace/psionic/runs/${RUN_ID}/metrics",
+          "local_stage_path_template": "/workspace/psionic/runs/${RUN_ID}/metrics",
+          "byte_accounting_key": "metrics_bytes",
+          "detail": "Metrics bundles are deduplicated by digest but still keep explicit restore and byte-accounting posture."
+        },
+        {
+          "artifact_class": "final_evidence_bundle",
+          "retention_profile": {
+            "hot_retention_ms": 3600000,
+            "warm_retention_ms": 604800000,
+            "archive_class": "immutable",
+            "deduplicate_by_digest": false,
+            "cold_restore_sla_ms": 1800000
+          },
+          "authoritative_path_template": "/workspace/psionic/runs/${RUN_ID}/evidence",
+          "local_stage_path_template": "/workspace/psionic/runs/${RUN_ID}/evidence",
+          "byte_accounting_key": "final_evidence_bytes",
+          "detail": "Final evidence remains immutable and byte-accounted because accepted run closure should not depend on provider-specific walking after publication."
+        }
+      ],
+      "byte_cost_posture": "Byte accounting stays explicit through workspace-capacity budgets, upload batch size ceilings, and finalizer mirror byte totals.",
+      "finalizer_projection_id": "runpod_workspace_projection",
+      "refusal_posture": "Requests that assume bespoke workspace scans or skip the finalizer mirror manifest are refused instead of silently probing provider-local roots.",
+      "contract_digest": "58530c8d6017b60a6d8040fc7f3fa0e000481b24fb6a00f571c546f1f9e98451"
+    }
+  ],
+  "placement_decisions": [
+    {
+      "artifact_class": "checkpoint",
+      "primary_backend_id": "google_train_bucket_backend",
+      "mirror_backend_ids": [
+        "runpod_workspace_backend"
+      ],
+      "restore_authority_backend_id": "google_train_bucket_backend",
+      "byte_accounting_required": true,
+      "detail": "Checkpoints stay authoritative in the bucket backend while the RunPod workspace keeps a mirrored operator-visible copy."
+    },
+    {
+      "artifact_class": "log_bundle",
+      "primary_backend_id": "google_train_bucket_backend",
+      "mirror_backend_ids": [
+        "runpod_workspace_backend"
+      ],
+      "restore_authority_backend_id": "google_train_bucket_backend",
+      "byte_accounting_required": true,
+      "detail": "Logs stay bucket-authoritative so finalizers and later providers read one shared prefix instead of provider-local folders."
+    },
+    {
+      "artifact_class": "metrics_bundle",
+      "primary_backend_id": "google_train_bucket_backend",
+      "mirror_backend_ids": [
+        "runpod_workspace_backend"
+      ],
+      "restore_authority_backend_id": "google_train_bucket_backend",
+      "byte_accounting_required": true,
+      "detail": "Metrics bundles stay bucket-authoritative so live and final telemetry share one byte-accounted root."
+    },
+    {
+      "artifact_class": "final_evidence_bundle",
+      "primary_backend_id": "google_train_bucket_backend",
+      "mirror_backend_ids": [
+        "runpod_workspace_backend"
+      ],
+      "restore_authority_backend_id": "google_train_bucket_backend",
+      "byte_accounting_required": true,
+      "detail": "Final evidence stays bucket-authoritative and mirrored into the workspace so finalizers no longer infer roots from provider-specific directory walks."
+    }
+  ],
+  "finalizer_projections": [
+    {
+      "projection_id": "google_remote_projection",
+      "source_id": "google_l4_validator_node",
+      "artifact_class": "checkpoint",
+      "authoritative_prefix_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}/checkpoints",
+      "local_stage_prefix_template": "/var/lib/psion/runs/${RUN_ID}/checkpoints",
+      "finalizer_manifest_relpath": "training_artifacts/checkpoint/projection_manifest_v1.json",
+      "detail": "Finalizer projection freezes one provider-neutral authoritative prefix so publication no longer depends on bespoke provider-root walking."
+    },
+    {
+      "projection_id": "google_remote_projection",
+      "source_id": "google_l4_validator_node",
+      "artifact_class": "log_bundle",
+      "authoritative_prefix_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}/logs",
+      "local_stage_prefix_template": "/var/lib/psion/runs/${RUN_ID}/logs",
+      "finalizer_manifest_relpath": "training_artifacts/log_bundle/projection_manifest_v1.json",
+      "detail": "Finalizer projection freezes one provider-neutral authoritative prefix so publication no longer depends on bespoke provider-root walking."
+    },
+    {
+      "projection_id": "google_remote_projection",
+      "source_id": "google_l4_validator_node",
+      "artifact_class": "metrics_bundle",
+      "authoritative_prefix_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}/metrics",
+      "local_stage_prefix_template": "/var/lib/psion/runs/${RUN_ID}/metrics",
+      "finalizer_manifest_relpath": "training_artifacts/metrics_bundle/projection_manifest_v1.json",
+      "detail": "Finalizer projection freezes one provider-neutral authoritative prefix so publication no longer depends on bespoke provider-root walking."
+    },
+    {
+      "projection_id": "google_remote_projection",
+      "source_id": "google_l4_validator_node",
+      "artifact_class": "final_evidence_bundle",
+      "authoritative_prefix_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}/evidence",
+      "local_stage_prefix_template": "/var/lib/psion/runs/${RUN_ID}/evidence",
+      "finalizer_manifest_relpath": "training_artifacts/final_evidence_bundle/projection_manifest_v1.json",
+      "detail": "Finalizer projection freezes one provider-neutral authoritative prefix so publication no longer depends on bespoke provider-root walking."
+    },
+    {
+      "projection_id": "runpod_workspace_projection",
+      "source_id": "runpod_8xh100_dense_node",
+      "artifact_class": "checkpoint",
+      "authoritative_prefix_template": "runs/${RUN_ID}/checkpoints",
+      "local_stage_prefix_template": "/workspace/psionic/runs/${RUN_ID}/checkpoints",
+      "finalizer_manifest_relpath": "training_artifacts/checkpoint/projection_manifest_v1.json",
+      "detail": "Finalizer projection freezes one provider-neutral authoritative prefix so publication no longer depends on bespoke provider-root walking."
+    },
+    {
+      "projection_id": "runpod_workspace_projection",
+      "source_id": "runpod_8xh100_dense_node",
+      "artifact_class": "log_bundle",
+      "authoritative_prefix_template": "runs/${RUN_ID}/logs",
+      "local_stage_prefix_template": "/workspace/psionic/runs/${RUN_ID}/logs",
+      "finalizer_manifest_relpath": "training_artifacts/log_bundle/projection_manifest_v1.json",
+      "detail": "Finalizer projection freezes one provider-neutral authoritative prefix so publication no longer depends on bespoke provider-root walking."
+    },
+    {
+      "projection_id": "runpod_workspace_projection",
+      "source_id": "runpod_8xh100_dense_node",
+      "artifact_class": "metrics_bundle",
+      "authoritative_prefix_template": "runs/${RUN_ID}/metrics",
+      "local_stage_prefix_template": "/workspace/psionic/runs/${RUN_ID}/metrics",
+      "finalizer_manifest_relpath": "training_artifacts/metrics_bundle/projection_manifest_v1.json",
+      "detail": "Finalizer projection freezes one provider-neutral authoritative prefix so publication no longer depends on bespoke provider-root walking."
+    },
+    {
+      "projection_id": "runpod_workspace_projection",
+      "source_id": "runpod_8xh100_dense_node",
+      "artifact_class": "final_evidence_bundle",
+      "authoritative_prefix_template": "runs/${RUN_ID}/evidence",
+      "local_stage_prefix_template": "/workspace/psionic/runs/${RUN_ID}/evidence",
+      "finalizer_manifest_relpath": "training_artifacts/final_evidence_bundle/projection_manifest_v1.json",
+      "detail": "Finalizer projection freezes one provider-neutral authoritative prefix so publication no longer depends on bespoke provider-root walking."
+    }
+  ],
+  "claim_boundary": "This contract closes provider-neutral remote artifact backend identity, placement policy, restore policy, and finalizer projection for the current Google and RunPod lanes. It does not yet claim generic multi-cloud storage clients or same-job mixed-backend checkpoint portability.",
+  "contract_digest": "b32eb8e494bbd043e998bed4d50fa939d47184605ee5ecf7f051205eb6c4be12"
+}

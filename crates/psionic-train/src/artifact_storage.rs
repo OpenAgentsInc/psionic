@@ -78,6 +78,10 @@ pub enum TrainArtifactClass {
     EvalArtifact,
     /// Log or trace bundle.
     LogBundle,
+    /// Metrics bundle or live telemetry rollup.
+    MetricsBundle,
+    /// Final evidence bundle retained after run closure.
+    FinalEvidenceBundle,
 }
 
 /// Storage tier used for one train artifact.
@@ -220,6 +224,16 @@ pub enum TrainArtifactLocator {
         /// Stable log reference.
         log_ref: String,
     },
+    /// Metrics bundle or live telemetry rollup.
+    MetricsBundle {
+        /// Stable metrics reference.
+        metrics_ref: String,
+    },
+    /// Final evidence bundle retained after run closure.
+    FinalEvidenceBundle {
+        /// Stable final evidence reference.
+        evidence_ref: String,
+    },
 }
 
 impl TrainArtifactLocator {
@@ -252,6 +266,8 @@ impl TrainArtifactLocator {
                 artifact_ref,
             } => format!("eval:{artifact_kind}:{artifact_ref}"),
             Self::LogBundle { log_ref } => format!("log:{log_ref}"),
+            Self::MetricsBundle { metrics_ref } => format!("metrics:{metrics_ref}"),
+            Self::FinalEvidenceBundle { evidence_ref } => format!("final_evidence:{evidence_ref}"),
         }
     }
 }
@@ -526,6 +542,50 @@ impl TrainArtifactStorageController {
             TrainArtifactClass::LogBundle,
             TrainArtifactLocator::LogBundle {
                 log_ref: log_ref.into(),
+            },
+            byte_length,
+            created_at_ms,
+        )?;
+        if let Some(record) = self.artifact_mut(artifact_id.as_str()) {
+            record.artifact_digest = artifact_digest.into();
+        }
+        Ok(artifact_id)
+    }
+
+    /// Registers one metrics bundle or live telemetry rollup.
+    pub fn register_metrics_bundle(
+        &mut self,
+        metrics_ref: impl Into<String>,
+        artifact_digest: impl Into<String>,
+        byte_length: u64,
+        created_at_ms: u64,
+    ) -> Result<String, TrainArtifactStorageError> {
+        let artifact_id = self.register_artifact(
+            TrainArtifactClass::MetricsBundle,
+            TrainArtifactLocator::MetricsBundle {
+                metrics_ref: metrics_ref.into(),
+            },
+            byte_length,
+            created_at_ms,
+        )?;
+        if let Some(record) = self.artifact_mut(artifact_id.as_str()) {
+            record.artifact_digest = artifact_digest.into();
+        }
+        Ok(artifact_id)
+    }
+
+    /// Registers one final evidence bundle retained after run closure.
+    pub fn register_final_evidence_bundle(
+        &mut self,
+        evidence_ref: impl Into<String>,
+        artifact_digest: impl Into<String>,
+        byte_length: u64,
+        created_at_ms: u64,
+    ) -> Result<String, TrainArtifactStorageError> {
+        let artifact_id = self.register_artifact(
+            TrainArtifactClass::FinalEvidenceBundle,
+            TrainArtifactLocator::FinalEvidenceBundle {
+                evidence_ref: evidence_ref.into(),
             },
             byte_length,
             created_at_ms,
@@ -862,6 +922,8 @@ fn artifact_class_label(artifact_class: TrainArtifactClass) -> &'static str {
         TrainArtifactClass::Rollout => "rollout",
         TrainArtifactClass::EvalArtifact => "eval_artifact",
         TrainArtifactClass::LogBundle => "log_bundle",
+        TrainArtifactClass::MetricsBundle => "metrics_bundle",
+        TrainArtifactClass::FinalEvidenceBundle => "final_evidence_bundle",
     }
 }
 
@@ -920,8 +982,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn artifact_storage_sweep_moves_checkpoint_through_warm_archive_and_gc()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn artifact_storage_sweep_moves_checkpoint_through_warm_archive_and_gc(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut controller = TrainArtifactStorageController::new(BTreeMap::from([(
             TrainArtifactClass::Checkpoint,
             ArtifactRetentionProfile::new(1_000, 5_000, ArtifactArchiveClass::Restorable, 2_000)
@@ -958,8 +1020,8 @@ mod tests {
     }
 
     #[test]
-    fn artifact_storage_controller_deduplicates_rollout_artifacts_by_digest()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn artifact_storage_controller_deduplicates_rollout_artifacts_by_digest(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut controller = TrainArtifactStorageController::new(BTreeMap::from([(
             TrainArtifactClass::Rollout,
             ArtifactRetentionProfile::new(1_000, 5_000, ArtifactArchiveClass::Ephemeral, 1_000)
@@ -990,8 +1052,8 @@ mod tests {
     }
 
     #[test]
-    fn artifact_storage_controller_plans_and_completes_cold_restore()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn artifact_storage_controller_plans_and_completes_cold_restore(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut controller = TrainArtifactStorageController::new(BTreeMap::from([(
             TrainArtifactClass::EvalArtifact,
             ArtifactRetentionProfile::new(1_000, 3_000, ArtifactArchiveClass::Restorable, 2_500),
