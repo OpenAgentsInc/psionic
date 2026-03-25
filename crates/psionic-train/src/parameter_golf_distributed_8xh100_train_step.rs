@@ -33,6 +33,7 @@ use crate::{
     ParameterGolfDistributed8xH100RuntimeBootstrapReceipt,
     ParameterGolfDistributedStepObservation, ParameterGolfRunPod8xH100Measurements,
     ParameterGolfSingleH100PhaseTimings, ParameterGolfSingleH100TrainingError,
+    ParameterGolfValidationEvalMode,
     ParameterGolfTrainingHyperparameters, PARAMETER_GOLF_SINGLE_H100_VARIANT,
 };
 
@@ -1356,6 +1357,7 @@ pub fn execute_parameter_golf_distributed_8xh100_validation_child(
     let mut graph_cache = BTreeMap::new();
     let validation_summary = if shard.sequence_count == 0 {
         crate::ParameterGolfSingleH100ValidationSummary {
+            eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
             evaluated_sequence_count: 0,
             evaluated_token_count: 0,
             evaluated_byte_count: 0,
@@ -1373,6 +1375,7 @@ pub fn execute_parameter_golf_distributed_8xh100_validation_child(
             &byte_luts,
             geometry.train_sequence_length,
             geometry.local_validation_batch_sequences(),
+            &ParameterGolfValidationEvalMode::NonOverlapping,
             &mut graph_cache,
             &format!("distributed_validation_rank_{rank}"),
             None,

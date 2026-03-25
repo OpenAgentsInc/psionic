@@ -601,6 +601,7 @@ mod tests {
             validation_loss_every: 0,
             train_log_every: 1,
             final_validation_mode: crate::ParameterGolfSingleH100ValidationMode::Both,
+            validation_eval_mode: crate::ParameterGolfValidationEvalMode::NonOverlapping,
             executed_steps: 0,
             stop_reason: None,
             delivered_execution: DeliveredExecutionContext::new("cuda", None, Vec::new()),

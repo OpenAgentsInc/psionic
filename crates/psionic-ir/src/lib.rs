@@ -3895,6 +3895,12 @@ const BUILTIN_OPERATOR_SCHEMAS: &[OperatorSchema] = &[
         OperatorMetaExecutionKind::BuiltinInference,
     ),
     OperatorSchema::new(
+        "parameter_golf_projection_token_losses",
+        OperatorArity::Fixed(2),
+        OperatorImplementationKind::BackendKernel,
+        OperatorMetaExecutionKind::BuiltinInference,
+    ),
+    OperatorSchema::new(
         "parameter_golf_projection_loss_backward",
         OperatorArity::Fixed(3),
         OperatorImplementationKind::BackendKernel,
@@ -4501,6 +4507,12 @@ fn meta_execute_backend_extension(
         BackendExtensionOp::ParameterGolfProjectionLoss { .. } => {
             validate_parameter_golf_projection_loss_spec("parameter_golf_projection_loss", inputs)
         }
+        BackendExtensionOp::ParameterGolfProjectionTokenLosses { .. } => {
+            validate_parameter_golf_projection_token_losses_spec(
+                "parameter_golf_projection_token_losses",
+                inputs,
+            )
+        }
         BackendExtensionOp::ParameterGolfProjectionLossBackward { .. } => {
             validate_parameter_golf_projection_loss_backward_spec(
                 "parameter_golf_projection_loss_backward",
@@ -5047,6 +5059,30 @@ impl GraphBuilder {
         ))
     }
 
+    /// Applies the bounded Parameter Golf tanh-softcap next-token loss to
+    /// rank-3 pre-softcap logits and integer target ids, emitted per token as
+    /// `[batch, seq]`.
+    pub fn parameter_golf_projection_token_losses(
+        &mut self,
+        pre_softcap_logits: &Tensor,
+        target_ids: &Tensor,
+        logit_softcap: f32,
+    ) -> Result<Tensor, GraphError> {
+        let op = BackendExtensionOp::ParameterGolfProjectionTokenLosses {
+            logit_softcap: psionic_core::StableF32::from_f32(logit_softcap),
+        };
+        let spec = self.meta_spec(
+            &ExecutionOp::BackendExtension { op: op.clone() },
+            &[pre_softcap_logits, target_ids],
+            None,
+        )?;
+        Ok(self.register_backend_extension(
+            op,
+            vec![pre_softcap_logits.id(), target_ids.id()],
+            spec,
+        ))
+    }
+
     pub(crate) fn parameter_golf_projection_loss_backward(
         &mut self,
         pre_softcap_logits: &Tensor,
@@ -5548,6 +5584,7 @@ fn format_backend_extension_payload(op: &BackendExtensionOp) -> String {
         | BackendExtensionOp::Silu
         | BackendExtensionOp::SiluBackward => String::new(),
         BackendExtensionOp::ParameterGolfProjectionLoss { logit_softcap }
+        | BackendExtensionOp::ParameterGolfProjectionTokenLosses { logit_softcap }
         | BackendExtensionOp::ParameterGolfProjectionLossBackward { logit_softcap } => {
             format!("logit_softcap_bits={:08x}", logit_softcap.0)
         }
@@ -5935,6 +5972,19 @@ fn validate_parameter_golf_projection_loss_spec(
     }
     Ok(TensorSpec::new(
         Shape::new(vec![]),
+        DType::F32,
+        logits.device().clone(),
+    ))
+}
+
+fn validate_parameter_golf_projection_token_losses_spec(
+    label: &str,
+    inputs: &[TensorSpec],
+) -> Result<TensorSpec, GraphError> {
+    validate_parameter_golf_projection_loss_spec(label, inputs)?;
+    let logits = &inputs[0];
+    Ok(TensorSpec::new(
+        Shape::new(vec![logits.shape().dims()[0], logits.shape().dims()[1]]),
         DType::F32,
         logits.device().clone(),
     ))

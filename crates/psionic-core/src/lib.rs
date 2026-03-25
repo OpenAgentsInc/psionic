@@ -1959,6 +1959,9 @@ pub enum BackendExtensionKind {
     /// Parameter Golf tanh-softcap next-token loss over `[batch, seq, vocab]`
     /// logits plus target ids.
     ParameterGolfProjectionLoss,
+    /// Parameter Golf tanh-softcap next-token loss over `[batch, seq, vocab]`
+    /// logits plus target ids, emitted per token as `[batch, seq]`.
+    ParameterGolfProjectionTokenLosses,
     /// Root-mean-square normalization over the last dimension.
     RmsNorm,
     /// Layer normalization over the last dimension.
@@ -1980,6 +1983,9 @@ impl BackendExtensionKind {
             Self::ReluSquared => "relu_squared",
             Self::Silu => "silu",
             Self::ParameterGolfProjectionLoss => "parameter_golf_projection_loss",
+            Self::ParameterGolfProjectionTokenLosses => {
+                "parameter_golf_projection_token_losses"
+            }
             Self::RmsNorm => "rms_norm",
             Self::LayerNorm => "layer_norm",
             Self::RotaryEmbedding => "rotary_embedding",
@@ -2008,6 +2014,12 @@ pub enum BackendExtensionOp {
     /// Parameter Golf tanh-softcap next-token mean loss over pre-softcap logits
     /// plus target ids encoded as integer token indices.
     ParameterGolfProjectionLoss {
+        /// Positive tanh softcap applied before cross-entropy.
+        logit_softcap: StableF32,
+    },
+    /// Parameter Golf tanh-softcap next-token loss over pre-softcap logits
+    /// plus target ids encoded as integer token indices, emitted per token.
+    ParameterGolfProjectionTokenLosses {
         /// Positive tanh softcap applied before cross-entropy.
         logit_softcap: StableF32,
     },
@@ -2096,6 +2108,9 @@ impl BackendExtensionOp {
             | Self::ParameterGolfProjectionLossBackward { .. } => {
                 BackendExtensionKind::ParameterGolfProjectionLoss
             }
+            Self::ParameterGolfProjectionTokenLosses { .. } => {
+                BackendExtensionKind::ParameterGolfProjectionTokenLosses
+            }
             Self::RmsNorm { .. }
             | Self::RmsNormInputBackward { .. }
             | Self::RmsNormWeightBackward { .. } => BackendExtensionKind::RmsNorm,
@@ -2126,6 +2141,9 @@ impl BackendExtensionOp {
             Self::Silu => "silu",
             Self::SiluBackward => "silu_backward",
             Self::ParameterGolfProjectionLoss { .. } => "parameter_golf_projection_loss",
+            Self::ParameterGolfProjectionTokenLosses { .. } => {
+                "parameter_golf_projection_token_losses"
+            }
             Self::ParameterGolfProjectionLossBackward { .. } => {
                 "parameter_golf_projection_loss_backward"
             }

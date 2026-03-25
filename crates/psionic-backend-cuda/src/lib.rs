@@ -77,6 +77,7 @@ pub const SUPPORTED_OPS: &[&str] = &[
     "parameter_golf_token_embedding_lookup",
     "parameter_golf_token_embedding_lookup_backward",
     "parameter_golf_projection_loss",
+    "parameter_golf_projection_token_losses",
     "parameter_golf_projection_loss_backward",
     "rms_norm",
     "rotary_embedding",
@@ -3106,6 +3107,9 @@ impl DeviceDiscovery for CudaBackend {
             BackendExtensionSupport::backend_specialized(
                 BackendExtensionKind::ParameterGolfProjectionLoss,
             ),
+            BackendExtensionSupport::backend_specialized(
+                BackendExtensionKind::ParameterGolfProjectionTokenLosses,
+            ),
             BackendExtensionSupport::backend_specialized(BackendExtensionKind::RmsNorm),
             BackendExtensionSupport::backend_specialized(BackendExtensionKind::RotaryEmbedding),
             BackendExtensionSupport::backend_specialized(
@@ -3751,6 +3755,52 @@ impl AvailableCudaBackend {
         let vocab_size = logits_dims[2];
         let output = self.allocate(&step.spec)?;
         submission.platform.encode_parameter_golf_projection_loss(
+            &logits.platform,
+            &target_ids.platform,
+            &output.platform,
+            row_count,
+            vocab_size,
+            logit_softcap,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(output)
+    }
+
+    fn execute_parameter_golf_projection_token_losses_step(
+        &self,
+        submission: &mut CudaSubmission,
+        step: &ExecutionStep,
+        values: &BTreeMap<TensorId, CudaBuffer>,
+        logit_softcap: f32,
+    ) -> Result<CudaBuffer, RuntimeError> {
+        let logits = step_input(step, values, 0)?;
+        let target_ids = step_input(step, values, 1)?;
+        let logits_dims = logits.spec().shape().dims();
+        let target_dims = target_ids.spec().shape().dims();
+        if target_ids.spec().dtype() != DType::I32 {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_projection_token_losses requires I32 target_ids",
+            )));
+        }
+        if logits_dims.len() != 3 {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_projection_token_losses requires rank-3 logits [batch, seq, vocab]",
+            )));
+        }
+        if target_dims.len() != 2 {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_projection_token_losses requires rank-2 target_ids [batch, seq]",
+            )));
+        }
+        if logits_dims[0] != target_dims[0] || logits_dims[1] != target_dims[1] {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda parameter_golf_projection_token_losses requires target_ids batch/seq dims to match logits",
+            )));
+        }
+        let row_count = logits_dims[0].saturating_mul(logits_dims[1]);
+        let vocab_size = logits_dims[2];
+        let output = self.allocate(&step.spec)?;
+        submission.platform.encode_parameter_golf_projection_token_losses(
             &logits.platform,
             &target_ids.platform,
             &output.platform,
@@ -4610,6 +4660,15 @@ impl AvailableCudaBackend {
                         )?;
                         values.insert(step.output, output);
                     }
+                    BackendExtensionOp::ParameterGolfProjectionTokenLosses { logit_softcap } => {
+                        let output = self.execute_parameter_golf_projection_token_losses_step(
+                            &mut submission,
+                            step,
+                            &values,
+                            logit_softcap.to_f32(),
+                        )?;
+                        values.insert(step.output, output);
+                    }
                     BackendExtensionOp::ParameterGolfProjectionLossBackward { logit_softcap } => {
                         let output = self.execute_parameter_golf_projection_loss_backward_step(
                             &mut submission,
@@ -5283,6 +5342,14 @@ fn validate_supported_step(step: &ExecutionStep) -> Result<(), RuntimeError> {
                     if step.inputs.len() != 2 {
                         return Err(RuntimeError::Backend(format!(
                             "cuda parameter_golf_projection_loss step {} requires two inputs",
+                            step.output
+                        )));
+                    }
+                }
+                BackendExtensionOp::ParameterGolfProjectionTokenLosses { .. } => {
+                    if step.inputs.len() != 2 {
+                        return Err(RuntimeError::Backend(format!(
+                            "cuda parameter_golf_projection_token_losses step {} requires two inputs",
                             step.output
                         )));
                     }
@@ -7093,6 +7160,15 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_parameter_golf_projection_token_losses(
+            logits: *const c_void,
+            target_ids: *const c_void,
+            row_count: c_int,
+            vocab_size: c_int,
+            logit_softcap: f32,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_parameter_golf_projection_loss_backward(
             logits: *const c_void,
             target_ids: *const c_void,
@@ -8788,6 +8864,42 @@ mod platform {
                     )
                 },
                 "psionic_cuda_parameter_golf_projection_loss",
+            )
+        }
+
+        pub(super) fn encode_parameter_golf_projection_token_losses(
+            &mut self,
+            logits: &PlatformBuffer,
+            target_ids: &PlatformBuffer,
+            output: &PlatformBuffer,
+            row_count: usize,
+            vocab_size: usize,
+            logit_softcap: f32,
+        ) -> Result<(), RuntimeError> {
+            let row_count = c_int::try_from(row_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda parameter_golf_projection_token_losses row count exceeds c_int",
+                ))
+            })?;
+            let vocab_size = c_int::try_from(vocab_size).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda parameter_golf_projection_token_losses vocab size exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_parameter_golf_projection_token_losses(
+                        logits.inner.device_ptr.cast(),
+                        target_ids.inner.device_ptr.cast(),
+                        row_count,
+                        vocab_size,
+                        logit_softcap,
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_parameter_golf_projection_token_losses",
             )
         }
 
@@ -11964,6 +12076,20 @@ mod platform {
             )))
         }
 
+        pub(super) fn encode_parameter_golf_projection_token_losses(
+            &mut self,
+            _logits: &PlatformBuffer,
+            _target_ids: &PlatformBuffer,
+            _output: &PlatformBuffer,
+            _row_count: usize,
+            _vocab_size: usize,
+            _logit_softcap: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
         pub(super) fn encode_parameter_golf_token_embedding_lookup(
             &mut self,
             _token_ids: &PlatformBuffer,
@@ -12948,6 +13074,7 @@ mod tests {
                 "silu",
                 "silu_backward",
                 "parameter_golf_projection_loss",
+                "parameter_golf_projection_token_losses",
                 "parameter_golf_projection_loss_backward",
                 "rms_norm",
                 "rotary_embedding",
@@ -13380,6 +13507,60 @@ mod tests {
             .as_f32_slice()
             .ok_or("reference parameter golf projection loss output should be f32")?;
         assert_close(&output.read_f32()?, expected_loss, 1e-5);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_parameter_golf_projection_token_losses_backend_extension_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let logit_softcap = 30.0_f32;
+        let logits_shape = Shape::new(vec![1, 2, 4]);
+        let target_shape = Shape::new(vec![1, 2]);
+        let logits_values = vec![0.1_f32, -0.2, 0.3, 0.7, -0.4, 0.5, -0.1, 0.2];
+        let target_values = vec![3_i32, 1];
+
+        let mut builder = GraphBuilder::new(selected.device.clone());
+        let logits = builder.input("logits", logits_shape.clone(), DType::F32);
+        let target_ids = builder.input("target_ids", target_shape.clone(), DType::I32);
+        let token_losses =
+            builder.parameter_golf_projection_token_losses(&logits, &target_ids, logit_softcap)?;
+        let graph = builder.finish(vec![token_losses.clone()]);
+
+        let inputs = std::collections::BTreeMap::from([
+            (
+                logits.id(),
+                backend.input_buffer(logits_shape.clone(), logits_values.clone())?,
+            ),
+            (
+                target_ids.id(),
+                backend.input_i32_buffer(target_shape.clone(), target_values.clone())?,
+            ),
+        ]);
+        let result = backend.compile_and_execute(&graph, &inputs)?;
+        let output = result
+            .outputs
+            .get(&token_losses.id())
+            .ok_or("missing cuda parameter golf projection token-loss output")?;
+
+        let expected = evaluate_graph(
+            &graph,
+            &std::collections::BTreeMap::from([
+                (logits.id(), TensorData::F32(logits_values)),
+                (target_ids.id(), TensorData::I32(target_values)),
+            ]),
+        )?;
+        let expected_losses = expected
+            .get(&token_losses.id())
+            .ok_or("missing reference parameter golf projection token-loss output")?
+            .as_f32_slice()
+            .ok_or("reference parameter golf projection token-loss output should be f32")?;
+        assert_close(&output.read_f32()?, expected_losses, 1e-5);
         Ok(())
     }
 

@@ -450,6 +450,7 @@ impl CpuBackend {
             BackendExtensionOp::ParameterGolfTokenEmbeddingLookup
             | BackendExtensionOp::ParameterGolfTokenEmbeddingLookupBackward
             | BackendExtensionOp::ParameterGolfProjectionLoss { .. }
+            | BackendExtensionOp::ParameterGolfProjectionTokenLosses { .. }
             | BackendExtensionOp::ParameterGolfProjectionLossBackward { .. } => {
                 Err(RuntimeError::UnsupportedStep(op.label().to_string()))
             }

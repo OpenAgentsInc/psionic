@@ -123,6 +123,14 @@ The landed communication receipt preserves three concrete stages:
 These stages mirror the current public Python baseline instead of inventing a
 different sharding story.
 
+## Current Validation Boundary
+
+The distributed lane still evaluates retained validation shards with the older
+non-overlapping sequence semantics. The single-H100 trainer now carries an
+explicit sliding-window eval mode, but the `8xH100` lane has not been widened
+to that scoreboard-grade validation contract yet. That gap is tracked
+explicitly in `#541`.
+
 ## Timing And Memory Receipts
 
 The lane now preserves:

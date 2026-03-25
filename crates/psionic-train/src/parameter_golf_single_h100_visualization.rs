@@ -12,7 +12,8 @@ use crate::{
     ParameterGolfBatchGeometry, ParameterGolfSingleH100RoundtripReceipt,
     ParameterGolfSingleH100TrainingReport, ParameterGolfSingleH100TrainingStepMetrics,
     ParameterGolfSingleH100TrainingStopReason, ParameterGolfSingleH100ValidationCheckpoint,
-    ParameterGolfSingleH100ValidationSummary, RemoteTrainingArtifactSourceKind,
+    ParameterGolfSingleH100ValidationSummary, ParameterGolfValidationEvalMode,
+    RemoteTrainingArtifactSourceKind,
     RemoteTrainingEmissionMode, RemoteTrainingEventSample, RemoteTrainingEventSeverity,
     RemoteTrainingGpuSample, RemoteTrainingHeartbeatSample, RemoteTrainingLossSample,
     RemoteTrainingMathSample, RemoteTrainingProvider, RemoteTrainingRefreshContract,
@@ -1051,6 +1052,7 @@ fn state_from_log_fallback(
                     observed_training_time_ms: 0,
                     observed_validation_ms,
                     summary: ParameterGolfSingleH100ValidationSummary {
+                        eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
                         evaluated_sequence_count: 0,
                         evaluated_token_count: token_u64(
                             line,
@@ -1528,6 +1530,7 @@ mod tests {
             validation_loss_every: 1,
             train_log_every: 1,
             final_validation_mode: crate::ParameterGolfSingleH100ValidationMode::Both,
+            validation_eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
             executed_steps: 2,
             stop_reason: Some(ParameterGolfSingleH100TrainingStopReason::StepBudgetReached),
             delivered_execution: DeliveredExecutionContext::new("cuda", None, Vec::new()),
@@ -1570,6 +1573,7 @@ mod tests {
                 observed_training_time_ms: 1050,
                 observed_validation_ms: 210,
                 summary: ParameterGolfSingleH100ValidationSummary {
+                    eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
                     evaluated_sequence_count: 1,
                     evaluated_token_count: 1024,
                     evaluated_byte_count: 980,
@@ -1580,6 +1584,7 @@ mod tests {
             }],
             initial_validation: None,
             pre_export_final_validation: Some(ParameterGolfSingleH100ValidationSummary {
+                eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
                 evaluated_sequence_count: 1,
                 evaluated_token_count: 1024,
                 evaluated_byte_count: 980,
@@ -1588,6 +1593,7 @@ mod tests {
                 runtime_receipt: None,
             }),
             final_validation: Some(ParameterGolfSingleH100ValidationSummary {
+                eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
                 evaluated_sequence_count: 1,
                 evaluated_token_count: 1024,
                 evaluated_byte_count: 980,
@@ -1602,6 +1608,7 @@ mod tests {
             final_roundtrip_receipt: Some(ParameterGolfSingleH100RoundtripReceipt {
                 metric_source: String::from("int8_zlib_roundtrip"),
                 validation: ParameterGolfSingleH100ValidationSummary {
+                    eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
                     evaluated_sequence_count: 1,
                     evaluated_token_count: 1024,
                     evaluated_byte_count: 980,

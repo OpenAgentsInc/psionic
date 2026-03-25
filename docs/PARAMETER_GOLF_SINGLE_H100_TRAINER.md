@@ -40,8 +40,8 @@ cargo run -q -p psionic-train --bin parameter_golf_single_h100_train
 ```
 
 You can also pass the explicit cached-dataset and tokenizer paths, an output
-report path, an explicit bounded proof step count, and an optional explicit
-final-validation mode:
+report path, an explicit bounded proof step count, an optional explicit
+final-validation mode, and an optional explicit validation eval mode:
 
 ```bash
 cargo run -q -p psionic-train --bin parameter_golf_single_h100_train -- \
@@ -49,7 +49,8 @@ cargo run -q -p psionic-train --bin parameter_golf_single_h100_train -- \
   ~/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model \
   /tmp/parameter_golf_single_h100_training.json \
   1 \
-  roundtrip_only
+  roundtrip_only \
+  sliding_window:64
 ```
 
 Passing the final positional step count selects the old bounded proof posture:
@@ -74,6 +75,15 @@ Supported explicit final-validation modes are:
 - `live_only`
 - `roundtrip_only`
 - `both`
+
+Supported explicit validation eval modes are:
+
+- `non_overlapping`
+- `sliding_window:<stride>`
+
+Today the widened trainer CLI accepts sliding-window eval on the single-H100
+lane so the final live or roundtrip validation pass can score only the suffix
+of each full-context window instead of only non-overlapping chunks.
 
 For bounded same-node validation-runtime comparisons, the repo also exposes:
 
@@ -148,11 +158,12 @@ The command is explicit about what it treats as trainer truth. It binds:
   roundtrip validation, or both were requested
 - a device-resident validation runner that keeps the stable parameter surface
   resident on device across validation batches, reuses mutable token buffers,
-  runs through the explicit `parameter_golf_baseline_eval_graph_v1` surface
-  instead of the training-graph surface, and records a machine-readable
+  runs through the explicit `parameter_golf_baseline_eval_graph_v2` surface
+  instead of the training-graph surface, now consumes one per-token projection
+  loss surface on device, and records a machine-readable
   validation runtime receipt with the resident parameter buffer count,
   stable-buffer allocation posture, named eval graph surface, token-write
-  cost, and byte-accounting cost for each validation pass
+  cost, byte-accounting cost, and explicit eval mode for each validation pass
 - preserved initial, periodic, and final validation receipts directly from the
   Psionic path, with the pre-export live-model validation retained separately
   whenever that posture is requested
@@ -209,6 +220,9 @@ Today the single-H100 trainer doc does **not** claim:
 - a Google operator lane
 - `8xH100` distributed closure
 - leaderboard-speed runtime closure
+- distributed sliding-window eval closure yet; the single-H100 lane now
+  accepts explicit sliding-window eval, but the distributed `8xH100` runtime
+  still needs the same scoreboard-grade semantics wired end to end
 - record-track accounting closure
 - full BF16 activation-kernel closure yet; the current report now records BF16
   graph uploads for the train-visible token-embedding and linear weight path,

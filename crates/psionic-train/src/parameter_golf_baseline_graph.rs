@@ -105,6 +105,8 @@ pub struct ParameterGolfBaselineEvalGraph {
     pub input_token_ids_tensor_id: TensorId,
     /// Integer target ids consumed by the projection-loss op.
     pub target_ids_tensor_id: TensorId,
+    /// Per-token loss tensor emitted by the eval graph.
+    pub token_losses_tensor_id: TensorId,
     /// Final scalar mean-loss tensor emitted by the graph.
     pub loss_tensor_id: TensorId,
     /// Parameter bindings in deterministic order.
@@ -265,17 +267,27 @@ pub fn build_parameter_golf_baseline_eval_graph(
         DType::I32,
         false,
     );
-    let loss = builder.parameter_golf_projection_loss(
+    let token_losses = builder.parameter_golf_projection_token_losses(
         &state.pre_softcap_logits,
         &target_ids,
         descriptor.config.logit_softcap,
     )?;
-    let graph = builder.finish(vec![loss.clone()]).graph().clone();
+    let token_loss_sum = builder.reduce_sum(&token_losses);
+    let loss_scale = builder.constant_f32(
+        Shape::scalar(),
+        vec![1.0_f32 / (batch_size.saturating_mul(sequence_length).max(1) as f32)],
+    )?;
+    let loss = builder.mul(&token_loss_sum, &loss_scale)?;
+    let graph = builder
+        .finish(vec![token_losses.clone(), loss.clone()])
+        .graph()
+        .clone();
 
     Ok(ParameterGolfBaselineEvalGraph {
         graph,
         input_token_ids_tensor_id: state.input_token_ids.id(),
         target_ids_tensor_id: target_ids.id(),
+        token_losses_tensor_id: token_losses.id(),
         loss_tensor_id: loss.id(),
         parameter_bindings: state.parameter_bindings,
     })

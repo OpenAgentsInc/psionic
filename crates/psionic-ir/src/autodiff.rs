@@ -159,6 +159,11 @@ pub const fn gradient_support_for_op(op: &OpKind) -> AutodiffGradientSupport {
             | BackendExtensionOp::ScaledDotProductAttention { .. } => {
                 AutodiffGradientSupport::Implemented
             }
+            BackendExtensionOp::ParameterGolfProjectionTokenLosses { .. } => {
+                AutodiffGradientSupport::Unsupported {
+                    reason: AutodiffUnsupportedGradientReason::BackendExtensionFamily,
+                }
+            }
             _ => AutodiffGradientSupport::Unsupported {
                 reason: AutodiffUnsupportedGradientReason::BackendExtensionFamily,
             },
@@ -3880,6 +3885,22 @@ impl AutodiffGraphBuilder {
         Ok(self.wrap(tensor, requires_grad))
     }
 
+    /// Applies the bounded Parameter Golf tanh-softcap next-token loss per
+    /// token as `[batch, seq]`.
+    pub fn parameter_golf_projection_token_losses(
+        &mut self,
+        pre_softcap_logits: &AutodiffTensor,
+        target_ids: &AutodiffTensor,
+        logit_softcap: f32,
+    ) -> Result<AutodiffTensor, GraphError> {
+        let tensor = self.builder.parameter_golf_projection_token_losses(
+            pre_softcap_logits.tensor(),
+            target_ids.tensor(),
+            logit_softcap,
+        )?;
+        Ok(self.wrap(tensor, false))
+    }
+
     /// Registers a quantized matmul.
     pub fn quantized_matmul(
         &mut self,
@@ -4456,6 +4477,38 @@ fn evaluate_backend_extension_reference(
                     logit_softcap.to_f32(),
                 )?,
             ]))
+        }
+        BackendExtensionOp::ParameterGolfProjectionTokenLosses { logit_softcap } => {
+            let logits = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
+            let target_ids = resolve_i32_input(graph, values, node.inputs()[1], node.op().label())?;
+            let logits_shape = graph
+                .node(node.inputs()[0])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[0],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            let target_shape = graph
+                .node(node.inputs()[1])
+                .ok_or(ReferenceEvaluationError::UnknownTensor {
+                    tensor_id: node.inputs()[1],
+                })?
+                .tensor()
+                .spec()
+                .shape()
+                .clone();
+            Ok(TensorData::F32(
+                parameter_golf_projection_token_losses_forward_values(
+                    node.tensor().id(),
+                    logits,
+                    &logits_shape,
+                    target_ids,
+                    &target_shape,
+                    logit_softcap.to_f32(),
+                )?,
+            ))
         }
         BackendExtensionOp::ParameterGolfProjectionLossBackward { logit_softcap } => {
             let logits = resolve_dense_input(graph, values, node.inputs()[0], node.op().label())?;
@@ -5324,6 +5377,63 @@ fn parameter_golf_projection_loss_forward_value(
         }
     }
     Ok(total_loss / (batch * seq).max(1) as f32)
+}
+
+fn parameter_golf_projection_token_losses_forward_values(
+    tensor_id: TensorId,
+    logits: &[f32],
+    logits_shape: &Shape,
+    target_ids: &[i32],
+    target_shape: &Shape,
+    logit_softcap: f32,
+) -> Result<Vec<f32>, ReferenceEvaluationError> {
+    if logit_softcap <= 0.0 || !logit_softcap.is_finite() {
+        return Err(ReferenceEvaluationError::UnsupportedOp {
+            tensor_id,
+            op: String::from("parameter_golf_projection_token_losses_invalid_softcap"),
+        });
+    }
+    if logits_shape.dims().len() != 3 || target_shape.dims().len() != 2 {
+        return Err(ReferenceEvaluationError::UnsupportedOp {
+            tensor_id,
+            op: String::from("parameter_golf_projection_token_losses_shape"),
+        });
+    }
+    let batch = logits_shape.dims()[0];
+    let seq = logits_shape.dims()[1];
+    let vocab = logits_shape.dims()[2];
+    let target_ids = parameter_golf_projection_target_ids(
+        tensor_id,
+        target_ids,
+        target_shape,
+        batch,
+        seq,
+        vocab,
+    )?;
+    let mut output = vec![0.0_f32; batch * seq];
+    for batch_index in 0..batch {
+        for position_index in 0..seq {
+            let row_index = batch_index * seq + position_index;
+            let row_offset = row_index * vocab;
+            let logits_row = &logits[row_offset..row_offset + vocab];
+            let target = target_ids[row_index] as usize;
+            let mut softcapped_row = vec![0.0_f32; vocab];
+            for (destination, source) in softcapped_row.iter_mut().zip(logits_row.iter()) {
+                *destination = logit_softcap * (*source / logit_softcap).tanh();
+            }
+            let max_logit = softcapped_row
+                .iter()
+                .copied()
+                .fold(f32::NEG_INFINITY, f32::max);
+            let mut exp_sum = 0.0_f32;
+            for value in &softcapped_row {
+                exp_sum += (*value - max_logit).exp();
+            }
+            output[row_index] =
+                max_logit + exp_sum.max(f32::EPSILON).ln() - softcapped_row[target];
+        }
+    }
+    Ok(output)
 }
 
 fn parameter_golf_projection_loss_backward_values(

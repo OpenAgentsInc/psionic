@@ -77,6 +77,9 @@ pub struct ParameterGolfSingleH100TrainingConfig {
     /// Explicit final-validation posture for the live-model and roundtrip passes.
     #[serde(default)]
     pub final_validation_mode: ParameterGolfSingleH100ValidationMode,
+    /// Explicit evaluation semantics for live and roundtrip validation.
+    #[serde(default)]
+    pub validation_eval_mode: ParameterGolfValidationEvalMode,
 }
 
 impl ParameterGolfSingleH100TrainingConfig {
@@ -102,6 +105,7 @@ impl ParameterGolfSingleH100TrainingConfig {
             validation_loss_every: 1_000,
             train_log_every: 200,
             final_validation_mode: ParameterGolfSingleH100ValidationMode::Both,
+            validation_eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
             hyperparameters,
         }
     }
@@ -119,6 +123,7 @@ impl ParameterGolfSingleH100TrainingConfig {
         config.validation_loss_every = 0;
         config.train_log_every = 1;
         config.final_validation_mode = ParameterGolfSingleH100ValidationMode::RoundtripOnly;
+        config.validation_eval_mode = ParameterGolfValidationEvalMode::NonOverlapping;
         config.hyperparameters.max_wallclock_seconds = None;
         config
     }
@@ -171,6 +176,8 @@ impl ParameterGolfSingleH100TrainingConfig {
                 expected: String::from("tokenizer file"),
             });
         }
+        self.validation_eval_mode
+            .validate(self.geometry.train_sequence_length)?;
         Ok(())
     }
 }
@@ -227,6 +234,64 @@ impl ParameterGolfSingleH100ValidationMode {
     #[must_use]
     const fn runs_roundtrip_validation(self) -> bool {
         matches!(self, Self::RoundtripOnly | Self::Both)
+    }
+}
+
+/// Explicit evaluation semantics for Parameter Golf validation.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum ParameterGolfValidationEvalMode {
+    #[default]
+    NonOverlapping,
+    SlidingWindow { stride: usize },
+}
+
+impl ParameterGolfValidationEvalMode {
+    /// Parses one CLI-visible validation eval mode label.
+    pub fn parse(value: &str) -> Result<Self, ParameterGolfSingleH100TrainingError> {
+        if value == "non_overlapping" {
+            return Ok(Self::NonOverlapping);
+        }
+        if let Some(stride) = value.strip_prefix("sliding_window:") {
+            return Ok(Self::SlidingWindow {
+                stride: stride.parse::<usize>().map_err(|error| {
+                    ParameterGolfSingleH100TrainingError::InvalidConfig {
+                        message: format!(
+                            "invalid sliding_window stride `{stride}`: {error}"
+                        ),
+                    }
+                })?,
+            });
+        }
+        Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+            message: format!(
+                "unsupported validation eval mode `{value}`, expected non_overlapping or sliding_window:<stride>"
+            ),
+        })
+    }
+
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::NonOverlapping => "non_overlapping",
+            Self::SlidingWindow { .. } => "sliding_window",
+        }
+    }
+
+    fn validate(&self, sequence_length: usize) -> Result<(), ParameterGolfSingleH100TrainingError> {
+        match self {
+            Self::NonOverlapping => Ok(()),
+            Self::SlidingWindow { stride } => {
+                if *stride == 0 || *stride > sequence_length {
+                    return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                        message: format!(
+                            "sliding-window validation stride must be in 1..={sequence_length}, observed {stride}"
+                        ),
+                    });
+                }
+                Ok(())
+            }
+        }
     }
 }
 
@@ -337,6 +402,8 @@ pub struct ParameterGolfSingleH100TrainingStepMetrics {
 /// Machine-readable validation summary for the accelerated single-H100 lane.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfSingleH100ValidationSummary {
+    #[serde(default)]
+    pub eval_mode: ParameterGolfValidationEvalMode,
     pub evaluated_sequence_count: usize,
     pub evaluated_token_count: u64,
     pub evaluated_byte_count: u64,
@@ -351,8 +418,11 @@ pub struct ParameterGolfSingleH100ValidationSummary {
 pub struct ParameterGolfSingleH100ValidationRuntimeReceipt {
     pub path: String,
     pub graph_surface: String,
+    #[serde(default)]
+    pub eval_mode: ParameterGolfValidationEvalMode,
     pub session_count: usize,
     pub total_batches: usize,
+    pub total_units: usize,
     pub persistent_parameter_buffer_count: usize,
     pub persistent_parameter_value_count: u64,
     pub resident_parameter_upload_us: u64,
@@ -437,6 +507,8 @@ pub struct ParameterGolfSingleH100TrainingReport {
     pub train_log_every: u64,
     #[serde(default)]
     pub final_validation_mode: ParameterGolfSingleH100ValidationMode,
+    #[serde(default)]
+    pub validation_eval_mode: ParameterGolfValidationEvalMode,
     pub executed_steps: u64,
     pub stop_reason: Option<ParameterGolfSingleH100TrainingStopReason>,
     pub delivered_execution: DeliveredExecutionContext,
@@ -597,10 +669,18 @@ pub(crate) struct ParameterGolfSingleH100TrainerState {
 }
 
 #[derive(Clone, Debug)]
+struct ParameterGolfValidationSequencePlan {
+    valid_length: usize,
+    score_start: usize,
+}
+
+#[derive(Clone, Debug)]
 struct ParameterGolfValidationBatchPlan {
-    raw_start: usize,
-    raw_end: usize,
     batch_sequences: usize,
+    evaluation_units: usize,
+    input_tokens: Vec<i32>,
+    target_tokens: Vec<i32>,
+    sequence_plans: Vec<ParameterGolfValidationSequencePlan>,
     token_count: u64,
     byte_count: u64,
 }
@@ -927,6 +1007,7 @@ pub fn build_parameter_golf_single_h100_validation_runtime_comparison_receipt(
         &byte_luts,
         config.sequence_length,
         config.batch_sequences,
+        &ParameterGolfValidationEvalMode::NonOverlapping,
         &mut device_resident_graph_cache,
         "device_resident_validation_runtime_comparison",
         None,
@@ -1096,7 +1177,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
     };
 
     emit_progress_line(format!(
-        "single_h100_train_start run_id={} device={} max_steps={} iterations={} warmup_steps={} grad_accum_steps={} val_loss_every={} train_log_every={} final_validation_mode={} local_train_sequences={} local_validation_sequences={} max_wallclock_seconds={}",
+        "single_h100_train_start run_id={} device={} max_steps={} iterations={} warmup_steps={} grad_accum_steps={} val_loss_every={} train_log_every={} final_validation_mode={} validation_eval_mode={} local_train_sequences={} local_validation_sequences={} max_wallclock_seconds={}",
         config.run_id,
         selected_device.device_name.as_deref().unwrap_or("unknown"),
         config.max_steps,
@@ -1106,6 +1187,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         config.validation_loss_every,
         config.train_log_every,
         config.final_validation_mode.as_str(),
+        config.validation_eval_mode.as_str(),
         config.geometry.local_train_batch_sequences(),
         config.geometry.local_validation_batch_sequences(),
         config.hyperparameters.max_wallclock_seconds.unwrap_or(0.0),
@@ -1302,6 +1384,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
                 &byte_luts,
                 config.geometry.train_sequence_length,
                 config.geometry.local_validation_batch_sequences(),
+                &config.validation_eval_mode,
                 &mut eval_graph_cache,
                 &stage_label,
                 live_visualization_writer.as_mut(),
@@ -1464,6 +1547,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
             &byte_luts,
             config.geometry.train_sequence_length,
             config.geometry.local_validation_batch_sequences(),
+            &config.validation_eval_mode,
             &mut eval_graph_cache,
             "final_int8_zlib_roundtrip",
             live_visualization_writer.as_mut(),
@@ -1547,9 +1631,10 @@ fn build_parameter_golf_single_h100_training_report_inner(
         }
     };
     let summary = format!(
-        "The Rust-owned single-H100 trainer executed {} optimizer step(s) with challenge single-device geometry on CUDA, used the widened train_gpt.py-style warmup, validation, and wallclock-stop control loop, ran with final_validation_mode={}, {} before stopping via {:?}.",
+        "The Rust-owned single-H100 trainer executed {} optimizer step(s) with challenge single-device geometry on CUDA, used the widened train_gpt.py-style warmup, validation, and wallclock-stop control loop, ran with final_validation_mode={} and validation_eval_mode={}, {} before stopping via {:?}.",
         step,
         config.final_validation_mode.as_str(),
+        config.validation_eval_mode.as_str(),
         final_metric_surface,
         realized_stop_reason
     );
@@ -1576,6 +1661,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         validation_loss_every: config.validation_loss_every,
         train_log_every: config.train_log_every,
         final_validation_mode: config.final_validation_mode,
+        validation_eval_mode: config.validation_eval_mode.clone(),
         executed_steps: step,
         stop_reason: Some(realized_stop_reason),
         delivered_execution,
@@ -1663,6 +1749,7 @@ fn refusal_report(
         validation_loss_every: config.validation_loss_every,
         train_log_every: config.train_log_every,
         final_validation_mode: config.final_validation_mode,
+        validation_eval_mode: config.validation_eval_mode.clone(),
         executed_steps: 0,
         stop_reason: None,
         delivered_execution: DeliveredExecutionContext::new("cuda", None, Vec::new()),
@@ -2248,10 +2335,12 @@ pub(crate) fn evaluate_validation_on_cuda(
     byte_luts: &ParameterGolfSentencePieceByteLuts,
     sequence_length: usize,
     batch_sequences: usize,
+    eval_mode: &ParameterGolfValidationEvalMode,
     graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
     stage_label: &str,
     live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
 ) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    eval_mode.validate(sequence_length)?;
     if validation_tokens.len() <= sequence_length {
         return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
             message: String::from(
@@ -2259,7 +2348,7 @@ pub(crate) fn evaluate_validation_on_cuda(
             ),
         });
     }
-    let total_sequences = (validation_tokens.len() - 1) / sequence_length;
+    let total_units = validation_unit_count(validation_tokens, sequence_length, eval_mode);
     let mut total_loss_sum = 0.0_f64;
     let mut total_token_count = 0_u64;
     let mut total_byte_count = 0_u64;
@@ -2270,6 +2359,7 @@ pub(crate) fn evaluate_validation_on_cuda(
         byte_luts,
         sequence_length,
         validation_batch_sequences,
+        eval_mode,
     )?;
     let total_byte_accounting_us = duration_us(byte_accounting_started);
     let total_batches = batch_plans.len();
@@ -2281,11 +2371,13 @@ pub(crate) fn evaluate_validation_on_cuda(
     let mut resident_parameter_upload_us = 0_u64;
     let mut persistent_parameter_buffer_count = 0_usize;
     let mut persistent_parameter_value_count = 0_u64;
+    let mut processed_units = 0_usize;
 
     for (batch_index, batch_plan) in batch_plans.iter().enumerate() {
         emit_progress_line(format!(
-            "validation_batch_start stage={} batch={}/{} batch_sequences={} evaluated_tokens={} elapsed_ms={}",
+            "validation_batch_start stage={} eval_mode={} batch={}/{} batch_sequences={} evaluated_tokens={} elapsed_ms={}",
             stage_label,
+            eval_mode.as_str(),
             batch_index + 1,
             total_batches,
             batch_plan.batch_sequences,
@@ -2302,24 +2394,30 @@ pub(crate) fn evaluate_validation_on_cuda(
             batch_plan.batch_sequences,
             sequence_length,
         )?;
-        let (batch_loss, batch_runtime) = session.execute_batch(
+        let (batch_token_losses, batch_runtime) = session.execute_batch(
             cuda_backend,
-            &validation_tokens[batch_plan.raw_start..batch_plan.raw_end],
+            batch_plan,
         )?;
-        total_loss_sum += f64::from(batch_loss) * batch_plan.token_count as f64;
+        total_loss_sum += scored_token_loss_sum(
+            batch_token_losses.as_slice(),
+            batch_plan.sequence_plans.as_slice(),
+            sequence_length,
+        );
         total_token_count = total_token_count.saturating_add(batch_plan.token_count);
         total_byte_count = total_byte_count.saturating_add(batch_plan.byte_count);
         total_input_token_write_us =
             total_input_token_write_us.saturating_add(batch_runtime.input_token_write_us);
         total_target_token_write_us =
             total_target_token_write_us.saturating_add(batch_runtime.target_token_write_us);
+        processed_units = processed_units.saturating_add(batch_plan.evaluation_units);
         if batch_index == 0 || (batch_index + 1) % 32 == 0 || batch_index + 1 == total_batches {
             emit_progress_line(format!(
-                "validation_progress stage={} batch={}/{} sequences={} tokens={} elapsed_ms={}",
+                "validation_progress stage={} eval_mode={} batch={}/{} units={} tokens={} elapsed_ms={}",
                 stage_label,
+                eval_mode.as_str(),
                 batch_index + 1,
                 total_batches,
-                batch_plan.raw_end.saturating_sub(1) / sequence_length,
+                processed_units,
                 total_token_count,
                 duration_ms(validation_started),
             ));
@@ -2355,9 +2453,11 @@ pub(crate) fn evaluate_validation_on_cuda(
         * (total_token_count as f64 / total_byte_count.max(1) as f64);
     let runtime_receipt = ParameterGolfSingleH100ValidationRuntimeReceipt {
         path: String::from("device_resident_cuda_eval_graph_v1"),
-        graph_surface: String::from("parameter_golf_baseline_eval_graph_v1"),
+        graph_surface: String::from("parameter_golf_baseline_eval_graph_v2"),
+        eval_mode: eval_mode.clone(),
         session_count: session_cache.len(),
         total_batches,
+        total_units,
         persistent_parameter_buffer_count,
         persistent_parameter_value_count,
         resident_parameter_upload_us,
@@ -2370,11 +2470,13 @@ pub(crate) fn evaluate_validation_on_cuda(
         total_byte_accounting_us,
     };
     emit_progress_line(format!(
-        "validation_runtime_receipt stage={} path={} graph_surface={} sessions={} stable_parameter_buffers={} stable_parameter_values={} resident_parameter_upload_us={} input_token_write_us={} target_token_write_us={} byte_accounting_us={}",
+        "validation_runtime_receipt stage={} eval_mode={} path={} graph_surface={} sessions={} total_units={} stable_parameter_buffers={} stable_parameter_values={} resident_parameter_upload_us={} input_token_write_us={} target_token_write_us={} byte_accounting_us={}",
         stage_label,
+        eval_mode.as_str(),
         runtime_receipt.path,
         runtime_receipt.graph_surface,
         runtime_receipt.session_count,
+        runtime_receipt.total_units,
         runtime_receipt.persistent_parameter_buffer_count,
         runtime_receipt.persistent_parameter_value_count,
         runtime_receipt.resident_parameter_upload_us,
@@ -2383,8 +2485,9 @@ pub(crate) fn evaluate_validation_on_cuda(
         runtime_receipt.total_byte_accounting_us,
     ));
     emit_progress_line(format!(
-        "validation_complete stage={} mean_loss={:.8} val_bpb={:.8} evaluated_tokens={} evaluated_bytes={} elapsed_ms={}",
+        "validation_complete stage={} eval_mode={} mean_loss={:.8} val_bpb={:.8} evaluated_tokens={} evaluated_bytes={} elapsed_ms={}",
         stage_label,
+        eval_mode.as_str(),
         mean_loss,
         bits_per_byte,
         total_token_count,
@@ -2392,7 +2495,8 @@ pub(crate) fn evaluate_validation_on_cuda(
         duration_ms(validation_started),
     ));
     Ok(ParameterGolfSingleH100ValidationSummary {
-        evaluated_sequence_count: total_sequences,
+        eval_mode: eval_mode.clone(),
+        evaluated_sequence_count: total_units,
         evaluated_token_count: total_token_count,
         evaluated_byte_count: total_byte_count,
         mean_loss,
@@ -2527,8 +2631,9 @@ fn evaluate_validation_on_cuda_legacy(
     let bits_per_byte = (mean_loss / std::f64::consts::LN_2)
         * (total_token_count as f64 / total_byte_count.max(1) as f64);
     emit_progress_line(format!(
-        "validation_complete stage={} mean_loss={:.8} val_bpb={:.8} evaluated_tokens={} evaluated_bytes={} elapsed_ms={}",
+        "validation_complete stage={} eval_mode={} mean_loss={:.8} val_bpb={:.8} evaluated_tokens={} evaluated_bytes={} elapsed_ms={}",
         stage_label,
+        ParameterGolfValidationEvalMode::NonOverlapping.as_str(),
         mean_loss,
         bits_per_byte,
         total_token_count,
@@ -2536,6 +2641,7 @@ fn evaluate_validation_on_cuda_legacy(
         duration_ms(validation_started),
     ));
     Ok(ParameterGolfSingleH100ValidationSummary {
+        eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
         evaluated_sequence_count: total_sequences,
         evaluated_token_count: total_token_count,
         evaluated_byte_count: total_byte_count,
@@ -2550,34 +2656,180 @@ fn build_validation_batch_plans(
     byte_luts: &ParameterGolfSentencePieceByteLuts,
     sequence_length: usize,
     batch_sequences: usize,
+    eval_mode: &ParameterGolfValidationEvalMode,
+) -> Result<Vec<ParameterGolfValidationBatchPlan>, ParameterGolfSingleH100TrainingError> {
+    match eval_mode {
+        ParameterGolfValidationEvalMode::NonOverlapping => build_non_overlapping_validation_batch_plans(
+            validation_tokens,
+            byte_luts,
+            sequence_length,
+            batch_sequences,
+        ),
+        ParameterGolfValidationEvalMode::SlidingWindow { stride } => {
+            build_sliding_window_validation_batch_plans(
+                validation_tokens,
+                byte_luts,
+                sequence_length,
+                batch_sequences,
+                *stride,
+            )
+        }
+    }
+}
+
+fn build_non_overlapping_validation_batch_plans(
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
 ) -> Result<Vec<ParameterGolfValidationBatchPlan>, ParameterGolfSingleH100TrainingError> {
     let total_sequences = (validation_tokens.len() - 1) / sequence_length;
     let mut plans = Vec::new();
     for batch_start in (0..total_sequences).step_by(batch_sequences.max(1)) {
         let batch_end = (batch_start + batch_sequences.max(1)).min(total_sequences);
-        let raw_start = batch_start * sequence_length;
-        let raw_end = batch_end * sequence_length + 1;
-        let local = &validation_tokens[raw_start..raw_end];
-        let batch_token_count = ((batch_end - batch_start) * sequence_length) as u64;
-        let mut previous_tokens = Vec::with_capacity(batch_token_count as usize);
-        let mut target_tokens = Vec::with_capacity(batch_token_count as usize);
-        previous_tokens.extend(
-            local[..local.len() - 1]
-                .iter()
-                .map(|token| u32::from(*token)),
-        );
-        target_tokens.extend(local[1..].iter().map(|token| u32::from(*token)));
-        let byte_count =
-            byte_luts.count_target_bytes(previous_tokens.as_slice(), target_tokens.as_slice())?;
+        let batch_sequence_count = batch_end - batch_start;
+        let mut input_tokens = vec![0_i32; batch_sequence_count * sequence_length];
+        let mut target_tokens = vec![0_i32; batch_sequence_count * sequence_length];
+        let mut previous_tokens = Vec::with_capacity(batch_sequence_count * sequence_length);
+        let mut scored_targets = Vec::with_capacity(batch_sequence_count * sequence_length);
+        let mut sequence_plans = Vec::with_capacity(batch_sequence_count);
+        for (local_index, sequence_index) in (batch_start..batch_end).enumerate() {
+            let raw_start = sequence_index * sequence_length;
+            let local = &validation_tokens[raw_start..raw_start + sequence_length + 1];
+            let row_offset = local_index * sequence_length;
+            for position in 0..sequence_length {
+                let previous = local[position];
+                let target = local[position + 1];
+                input_tokens[row_offset + position] = i32::from(previous);
+                target_tokens[row_offset + position] = i32::from(target);
+                previous_tokens.push(u32::from(previous));
+                scored_targets.push(u32::from(target));
+            }
+            sequence_plans.push(ParameterGolfValidationSequencePlan {
+                valid_length: sequence_length,
+                score_start: 0,
+            });
+        }
         plans.push(ParameterGolfValidationBatchPlan {
-            raw_start,
-            raw_end,
-            batch_sequences: batch_end - batch_start,
-            token_count: batch_token_count,
-            byte_count,
+            batch_sequences: batch_sequence_count,
+            evaluation_units: batch_sequence_count,
+            input_tokens,
+            target_tokens,
+            sequence_plans,
+            token_count: (batch_sequence_count * sequence_length) as u64,
+            byte_count: byte_luts
+                .count_target_bytes(previous_tokens.as_slice(), scored_targets.as_slice())?,
         });
     }
     Ok(plans)
+}
+
+fn build_sliding_window_validation_batch_plans(
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    stride: usize,
+) -> Result<Vec<ParameterGolfValidationBatchPlan>, ParameterGolfSingleH100TrainingError> {
+    let total_tokens = validation_tokens.len().saturating_sub(1);
+    let window_starts = (0..total_tokens)
+        .step_by(stride.max(1))
+        .filter(|window_start| {
+            total_tokens
+                .saturating_sub(*window_start)
+                .min(sequence_length)
+                .saturating_sub(0)
+                >= 1
+        })
+        .collect::<Vec<_>>();
+    let mut plans = Vec::new();
+    for batch_start in (0..window_starts.len()).step_by(batch_sequences.max(1)) {
+        let batch_end = (batch_start + batch_sequences.max(1)).min(window_starts.len());
+        let batch_sequence_count = batch_end - batch_start;
+        let mut input_tokens = vec![0_i32; batch_sequence_count * sequence_length];
+        let mut target_tokens = vec![0_i32; batch_sequence_count * sequence_length];
+        let mut previous_tokens = Vec::new();
+        let mut scored_targets = Vec::new();
+        let mut sequence_plans = Vec::with_capacity(batch_sequence_count);
+        let mut token_count = 0_u64;
+        for (local_index, window_start) in window_starts[batch_start..batch_end].iter().enumerate() {
+            let window_end = (*window_start + sequence_length).min(total_tokens);
+            let valid_length = window_end.saturating_sub(*window_start);
+            let chunk = &validation_tokens[*window_start..window_end + 1];
+            let row_offset = local_index * sequence_length;
+            for position in 0..valid_length {
+                input_tokens[row_offset + position] = i32::from(chunk[position]);
+                target_tokens[row_offset + position] = i32::from(chunk[position + 1]);
+            }
+            let score_start = if *window_start == 0 {
+                0
+            } else {
+                valid_length.saturating_sub(stride)
+            };
+            for position in score_start..valid_length {
+                previous_tokens.push(u32::from(chunk[position]));
+                scored_targets.push(u32::from(chunk[position + 1]));
+            }
+            token_count = token_count.saturating_add(valid_length.saturating_sub(score_start) as u64);
+            sequence_plans.push(ParameterGolfValidationSequencePlan {
+                valid_length,
+                score_start,
+            });
+        }
+        plans.push(ParameterGolfValidationBatchPlan {
+            batch_sequences: batch_sequence_count,
+            evaluation_units: batch_sequence_count,
+            input_tokens,
+            target_tokens,
+            sequence_plans,
+            token_count,
+            byte_count: byte_luts
+                .count_target_bytes(previous_tokens.as_slice(), scored_targets.as_slice())?,
+        });
+    }
+    Ok(plans)
+}
+
+fn validation_unit_count(
+    validation_tokens: &[u16],
+    sequence_length: usize,
+    eval_mode: &ParameterGolfValidationEvalMode,
+) -> usize {
+    match eval_mode {
+        ParameterGolfValidationEvalMode::NonOverlapping => {
+            (validation_tokens.len().saturating_sub(1)) / sequence_length
+        }
+        ParameterGolfValidationEvalMode::SlidingWindow { stride } => (0
+            ..validation_tokens.len().saturating_sub(1))
+            .step_by((*stride).max(1))
+            .filter(|window_start| {
+                validation_tokens
+                    .len()
+                    .saturating_sub(1)
+                    .saturating_sub(*window_start)
+                    .min(sequence_length)
+                    >= 1
+            })
+            .count(),
+    }
+}
+
+fn scored_token_loss_sum(
+    token_losses: &[f32],
+    sequence_plans: &[ParameterGolfValidationSequencePlan],
+    sequence_length: usize,
+) -> f64 {
+    sequence_plans
+        .iter()
+        .enumerate()
+        .map(|(sequence_index, plan)| {
+            let row_offset = sequence_index * sequence_length;
+            token_losses[row_offset + plan.score_start..row_offset + plan.valid_length]
+                .iter()
+                .map(|value| f64::from(*value))
+                .sum::<f64>()
+        })
+        .sum()
 }
 
 fn validation_session_for_batch<'a>(
@@ -2733,40 +2985,43 @@ impl ParameterGolfCudaValidationSession {
     fn execute_batch(
         &mut self,
         cuda_backend: &mut CudaBackend,
-        validation_tokens: &[u16],
-    ) -> Result<(f32, ParameterGolfValidationBatchRuntime), ParameterGolfSingleH100TrainingError>
+        batch_plan: &ParameterGolfValidationBatchPlan,
+    ) -> Result<(Vec<f32>, ParameterGolfValidationBatchRuntime), ParameterGolfSingleH100TrainingError>
     {
-        let expected_len = self.input_token_staging.len().saturating_add(1);
-        if validation_tokens.len() != expected_len {
+        if batch_plan.batch_sequences.saturating_mul(self.input_token_staging.len().max(1))
+            < batch_plan.input_tokens.len()
+        {
             return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
                 message: format!(
-                    "validation session expected {} tokens for one batch, observed {}",
-                    expected_len,
-                    validation_tokens.len()
+                    "validation session staging capacity {} could not fit {} input tokens",
+                    self.input_token_staging.len(),
+                    batch_plan.input_tokens.len()
+                ),
+            });
+        }
+        if batch_plan.input_tokens.len() != self.input_token_staging.len()
+            || batch_plan.target_tokens.len() != self.target_token_staging.len()
+        {
+            return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: format!(
+                    "validation session expected {} tokens per batch but observed {} input and {} target tokens",
+                    self.input_token_staging.len(),
+                    batch_plan.input_tokens.len(),
+                    batch_plan.target_tokens.len(),
                 ),
             });
         }
 
         let input_write_started = Instant::now();
-        for (destination, source) in self
-            .input_token_staging
-            .iter_mut()
-            .zip(validation_tokens[..validation_tokens.len() - 1].iter())
-        {
-            *destination = i32::from(*source);
-        }
+        self.input_token_staging
+            .copy_from_slice(batch_plan.input_tokens.as_slice());
         self.input_token_buffer
             .write_i32(self.input_token_staging.as_slice())?;
         let input_token_write_us = duration_us(input_write_started);
 
         let target_write_started = Instant::now();
-        for (destination, source) in self
-            .target_token_staging
-            .iter_mut()
-            .zip(validation_tokens[1..].iter())
-        {
-            *destination = i32::from(*source);
-        }
+        self.target_token_staging
+            .copy_from_slice(batch_plan.target_tokens.as_slice());
         self.target_token_buffer
             .write_i32(self.target_token_staging.as_slice())?;
         let target_token_write_us = duration_us(target_write_started);
@@ -2782,9 +3037,9 @@ impl ParameterGolfCudaValidationSession {
         );
         let outputs =
             execute_cuda_graph_outputs_from_buffers(cuda_backend, &self.graph.graph, &inputs)?;
-        let batch_loss = scalar_float_graph_output(&outputs, self.graph.loss_tensor_id)?;
+        let batch_token_losses = dense_f32_graph_output(&outputs, self.graph.token_losses_tensor_id)?;
         Ok((
-            batch_loss,
+            batch_token_losses,
             ParameterGolfValidationBatchRuntime {
                 input_token_write_us,
                 target_token_write_us,
@@ -3049,6 +3304,18 @@ fn scalar_float_graph_output(
         .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphOutput { tensor_id })
 }
 
+fn dense_f32_graph_output(
+    outputs: &[(TensorId, TensorData)],
+    tensor_id: TensorId,
+) -> Result<Vec<f32>, ParameterGolfSingleH100TrainingError> {
+    outputs
+        .iter()
+        .find(|(current, _)| *current == tensor_id)
+        .and_then(|(_, values)| values.as_f32_slice())
+        .map(|values| values.to_vec())
+        .ok_or(ParameterGolfSingleH100TrainingError::MissingGraphOutput { tensor_id })
+}
+
 fn split_token_count(bundle: &ParameterGolfDatasetBundle, split_name: &str) -> u64 {
     bundle
         .manifest
@@ -3243,6 +3510,63 @@ mod tests {
         assert_eq!(
             ParameterGolfSingleH100ValidationMode::parse("both")?,
             ParameterGolfSingleH100ValidationMode::Both
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn validation_eval_mode_parser_accepts_supported_labels(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        assert_eq!(
+            ParameterGolfValidationEvalMode::parse("non_overlapping")?,
+            ParameterGolfValidationEvalMode::NonOverlapping
+        );
+        assert_eq!(
+            ParameterGolfValidationEvalMode::parse("sliding_window:64")?,
+            ParameterGolfValidationEvalMode::SlidingWindow { stride: 64 }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sliding_window_validation_batch_plans_score_only_suffix_tokens(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let byte_luts = ParameterGolfSentencePieceByteLuts {
+            base_bytes_lut: vec![1; 8],
+            has_leading_space_lut: vec![false; 8],
+            is_boundary_token_lut: vec![false; 8],
+        };
+        let validation_tokens = vec![0_u16, 1, 2, 3, 4, 5];
+        let plans = build_validation_batch_plans(
+            validation_tokens.as_slice(),
+            &byte_luts,
+            4,
+            2,
+            &ParameterGolfValidationEvalMode::SlidingWindow { stride: 2 },
+        )?;
+
+        assert_eq!(plans.len(), 2);
+        assert_eq!(plans[0].evaluation_units, 2);
+        assert_eq!(plans[0].token_count, 6);
+        assert_eq!(plans[0].byte_count, 6);
+        assert_eq!(
+            plans[0]
+                .sequence_plans
+                .iter()
+                .map(|plan| (plan.valid_length, plan.score_start))
+                .collect::<Vec<_>>(),
+            vec![(4, 0), (3, 1)]
+        );
+        assert_eq!(plans[1].evaluation_units, 1);
+        assert_eq!(plans[1].token_count, 1);
+        assert_eq!(plans[1].byte_count, 1);
+        assert_eq!(
+            plans[1]
+                .sequence_plans
+                .iter()
+                .map(|plan| (plan.valid_length, plan.score_start))
+                .collect::<Vec<_>>(),
+            vec![(1, 0)]
         );
         Ok(())
     }

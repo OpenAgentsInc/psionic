@@ -2,6 +2,7 @@ use std::{env, path::PathBuf};
 
 use psionic_train::{
     ParameterGolfSingleH100TrainingConfig, ParameterGolfSingleH100ValidationMode,
+    ParameterGolfValidationEvalMode,
     write_parameter_golf_single_h100_training_report,
 };
 
@@ -26,7 +27,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .get(3)
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("/tmp/parameter_golf_single_h100_training.json"));
-    let (max_steps, final_validation_mode) =
+    let (max_steps, final_validation_mode, validation_eval_mode) =
         parse_optional_max_steps_and_validation_mode(&args[4..])?;
     let mut config = if let Some(max_steps) = max_steps {
         ParameterGolfSingleH100TrainingConfig::bounded_proof_defaults(
@@ -40,6 +41,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(final_validation_mode) = final_validation_mode {
         config.final_validation_mode = final_validation_mode;
     }
+    if let Some(validation_eval_mode) = validation_eval_mode {
+        config.validation_eval_mode = validation_eval_mode;
+    }
     let report = write_parameter_golf_single_h100_training_report(&output_path, &config)?;
     println!(
         "wrote {} with disposition {:?} executed_steps={} stop_reason={:?}",
@@ -49,12 +53,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         report.stop_reason,
     );
     println!(
-        "warmup_steps={} completed_warmup_steps={} measured_training_time_ms={} validation_checkpoints={} final_validation_mode={}",
+        "warmup_steps={} completed_warmup_steps={} measured_training_time_ms={} validation_checkpoints={} final_validation_mode={} validation_eval_mode={}",
         report.warmup_steps,
         report.completed_warmup_steps,
         report.observed_training_time_ms,
         report.validation_checkpoints.len(),
         report.final_validation_mode.as_str(),
+        report.validation_eval_mode.as_str(),
     );
     if let Some(ref initial_validation) = report.initial_validation {
         println!(
@@ -129,19 +134,45 @@ fn default_tokenizer_path() -> PathBuf {
 
 fn parse_optional_max_steps_and_validation_mode(
     args: &[String],
-) -> Result<(Option<u64>, Option<ParameterGolfSingleH100ValidationMode>), Box<dyn std::error::Error>>
+) -> Result<
+    (
+        Option<u64>,
+        Option<ParameterGolfSingleH100ValidationMode>,
+        Option<ParameterGolfValidationEvalMode>,
+    ),
+    Box<dyn std::error::Error>,
+>
 {
     let Some(first) = args.first().map(String::as_str) else {
-        return Ok((None, None));
+        return Ok((None, None, None));
     };
     if let Ok(max_steps) = first.parse::<u64>() {
         let validation_mode = args
             .get(1)
             .map(String::as_str)
             .map(ParameterGolfSingleH100ValidationMode::parse)
-            .transpose()?;
-        return Ok((Some(max_steps), validation_mode));
+            .transpose();
+        if let Ok(validation_mode) = validation_mode {
+            let validation_eval_mode = args
+                .get(2)
+                .map(String::as_str)
+                .map(ParameterGolfValidationEvalMode::parse)
+                .transpose()?;
+            return Ok((Some(max_steps), validation_mode, validation_eval_mode));
+        }
+        let validation_eval_mode = ParameterGolfValidationEvalMode::parse(
+            args.get(1).map(String::as_str).unwrap_or_default(),
+        )?;
+        return Ok((Some(max_steps), None, Some(validation_eval_mode)));
     }
-    let validation_mode = ParameterGolfSingleH100ValidationMode::parse(first)?;
-    Ok((None, Some(validation_mode)))
+    if let Ok(validation_mode) = ParameterGolfSingleH100ValidationMode::parse(first) {
+        let validation_eval_mode = args
+            .get(1)
+            .map(String::as_str)
+            .map(ParameterGolfValidationEvalMode::parse)
+            .transpose()?;
+        return Ok((None, Some(validation_mode), validation_eval_mode));
+    }
+    let validation_eval_mode = ParameterGolfValidationEvalMode::parse(first)?;
+    Ok((None, None, Some(validation_eval_mode)))
 }
