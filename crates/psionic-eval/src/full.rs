@@ -400,6 +400,8 @@ mod tassadar_wedge_taxonomy;
 mod tassadar_working_memory_tier;
 #[path = "tassadar_workload_capability_frontier.rs"]
 mod tassadar_workload_capability_frontier;
+#[path = "turboquant_benchmark.rs"]
+mod turboquant_benchmark;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -611,6 +613,7 @@ pub use tassadar_weak_supervision_executor::*;
 pub use tassadar_wedge_taxonomy::*;
 pub use tassadar_working_memory_tier::*;
 pub use tassadar_workload_capability_frontier::*;
+pub use turboquant_benchmark::*;
 
 /// Human-readable crate ownership summary.
 pub const CRATE_ROLE: &str = "held-out eval, benchmark packages, and rubric runtime for Psionic";

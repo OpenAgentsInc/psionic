@@ -4258,17 +4258,17 @@ mod tests {
         ExecutionDeliveryProof, ExecutionProofAugmentationPosture, ExecutionProofBundleKind,
         ExecutionTopologyKind, ExecutionTopologyPlan, HealthStatus, KernelCachePolicy,
         KernelCacheReport, KernelCacheState, KvCacheAccounting, KvCacheEncodingAccounting,
-        KvCacheEncodingFamily, KvResidencyAccounting, KvResidencyTier, KvResidencyTierState,
-        LocalRuntimeDiagnostic, LocalRuntimeErrorCode, LocalRuntimeObservability,
-        LocalServingIsolationPolicy, MemoryResidencySnapshot, ModelResidencyPolicy,
-        NvidiaDeviceMetadata, NvidiaRecoveryAction, NvidiaRecoveryProfile, NvidiaRiskLevel,
-        NvidiaRiskProfile, NvidiaTopologyInfo, PrefixCacheIdentity, PrefixCacheState,
-        QuantizationExecution, QuantizationLoadPath, QuantizationSupport, RuntimeTransitionEvent,
-        RuntimeTransitionKind, SandboxExecutionCapabilityProfile, SandboxExecutionEvidence,
-        SandboxExecutionExit, SandboxExecutionExitKind, SandboxExecutionRequestIdentity,
-        SandboxExecutionResourceSummary, ServedProductBackendPolicy, TassadarCpuReferenceRunner,
-        TassadarExactnessPosture, TassadarExactnessRefusalReport, TassadarTraceArtifact,
-        ValidationCoverage,
+        KvCacheEncodingFamily, KvCacheEncodingObjective, KvCacheEncodingPolicy,
+        KvResidencyAccounting, KvResidencyTier, KvResidencyTierState, LocalRuntimeDiagnostic,
+        LocalRuntimeErrorCode, LocalRuntimeObservability, LocalServingIsolationPolicy,
+        MemoryResidencySnapshot, ModelResidencyPolicy, NvidiaDeviceMetadata, NvidiaRecoveryAction,
+        NvidiaRecoveryProfile, NvidiaRiskLevel, NvidiaRiskProfile, NvidiaTopologyInfo,
+        PrefixCacheIdentity, PrefixCacheState, QuantizationExecution, QuantizationLoadPath,
+        QuantizationSupport, RuntimeTransitionEvent, RuntimeTransitionKind,
+        SandboxExecutionCapabilityProfile, SandboxExecutionEvidence, SandboxExecutionExit,
+        SandboxExecutionExitKind, SandboxExecutionRequestIdentity, SandboxExecutionResourceSummary,
+        ServedProductBackendPolicy, TassadarCpuReferenceRunner, TassadarExactnessPosture,
+        TassadarExactnessRefusalReport, TassadarTraceArtifact, ValidationCoverage,
     };
     use psionic_serve::{
         AdapterArtifactFormat, AdapterArtifactIdentity, AdapterArtifactKind, AdapterResidencyMode,
@@ -5344,6 +5344,31 @@ mod tests {
         );
         assert_eq!(envelope.model_family, "gpt-oss");
         assert_eq!(envelope.runtime_backend, "metal");
+        assert_eq!(
+            envelope
+                .kv_cache_encoding_policy
+                .as_ref()
+                .map(|value| value.family),
+            Some(KvCacheEncodingFamily::DenseF16Mirror)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_gpt_oss_text_generation_capability_keeps_turboquant_out_of_default_publication()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let model = sample_gpt_oss_decoder_descriptor();
+        let envelope = TextGenerationCapabilityEnvelope::from_decoder_model(
+            cuda_backend_selection(),
+            &model,
+            default_decoder_memory_plan(&model, None, None),
+            ModelResidencyPolicy::default(),
+            KvCacheMode::Paged,
+            default_text_generation_execution_profile(),
+            ProviderReadiness::ready("cuda backend ready"),
+        );
+
+        assert_eq!(envelope.runtime_backend, "cuda");
         assert_eq!(
             envelope
                 .kv_cache_encoding_policy
@@ -8078,6 +8103,152 @@ mod tests {
             decoded.weight_bundle,
             WeightBundleEvidence::from_metadata(&request.model.weights)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn text_generation_receipt_preserves_explicit_turboquant_downgrade()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let request = GenerationRequest::new_text(
+            "turboquant-downgrade",
+            sample_gpt_oss_decoder_descriptor(),
+            None,
+            "hello",
+            GenerationOptions::greedy(1),
+        );
+        let kv_width = request.model.config.kv_width();
+        let requested_turboquant_policy = KvCacheEncodingPolicy {
+            family: KvCacheEncodingFamily::TurboQuant,
+            objective: Some(KvCacheEncodingObjective::MeanSquaredError),
+            bits_per_channel: Some(8),
+            block_shape: Some(String::from("32")),
+            outlier_policy: None,
+            projection_id: None,
+            codebook_id: Some(String::from("ggml_q8_1")),
+            model_family_bound: Some(request.model.model.family.clone()),
+            context_length_bound: Some(request.model.config.max_context),
+            host_bytes_per_token: Some(
+                kv_width
+                    .saturating_mul(2)
+                    .saturating_mul(std::mem::size_of::<f32>())
+                    .try_into()
+                    .unwrap_or(u64::MAX),
+            ),
+            device_bytes_per_token: Some(
+                kv_width
+                    .saturating_div(32)
+                    .saturating_mul(36)
+                    .saturating_mul(2)
+                    .try_into()
+                    .unwrap_or(u64::MAX),
+            ),
+            detail: Some(String::from(
+                "experimental CUDA TurboQuant prototype backed by ggml_q8_1 device KV rows",
+            )),
+        };
+        let active_dense_policy = default_decoder_kv_cache_encoding_policy(&request.model, "cuda");
+        let response = GenerationResponse::new(
+            &request,
+            None,
+            TokenSequence::new(vec![psionic_serve::FixtureWordTokenizer::OPEN_ID]),
+            "hi",
+            1,
+            1,
+            TerminationReason::EndOfSequence,
+        )
+        .with_metrics_and_provenance(
+            GenerationMetrics {
+                total_duration_ns: Some(25),
+                load_duration_ns: Some(5),
+                prompt_eval_count: Some(1),
+                prompt_eval_duration_ns: Some(10),
+                context_window: None,
+                eval_count: Some(1),
+                eval_duration_ns: Some(15),
+                time_to_first_token_ns: None,
+                inter_token_latency_ns: None,
+                kv_cache: None,
+                kv_residency: None,
+                kv_cache_encoding: Some(KvCacheEncodingAccounting {
+                    requested: Some(requested_turboquant_policy.clone()),
+                    active: active_dense_policy.clone(),
+                    downgraded: true,
+                    refusal_reason: Some(String::from(
+                        "TurboQuant KV only runs on CUDA GPT-OSS decode paths, active backend `cpu`",
+                    )),
+                }),
+                prefix_tokens_reused: None,
+                gpt_oss_perf: None,
+            },
+            GenerationProvenance {
+                served_artifact: served_artifact_identity_for_decoder_model(
+                    &request.model,
+                    &cuda_backend_selection(),
+                ),
+                adapter_serving: None,
+                execution_plan_digest: String::from("turboquant-downgrade-plan"),
+                cluster_execution: None,
+                load_state: GenerationLoadState::Warm,
+                isolation_policy: LocalServingIsolationPolicy::in_process_runtime(),
+                streaming_policy: None,
+                memory_plan: Some(default_decoder_memory_plan(&request.model, None, None)),
+                residency_policy: Some(ModelResidencyPolicy::default()),
+                residency_snapshot: None,
+                kv_cache_policy: Some(default_decoder_kv_cache_policy(&request.model)),
+                kv_cache_encoding_policy: Some(active_dense_policy.clone()),
+                kv_ownership: None,
+                prefix_cache_control: None,
+                prefix_cache_state: None,
+                prefix_cache_refusal_reason: None,
+                prefix_cache_policy: None,
+                prefix_cache_identity: None,
+                compile_path: None,
+                delivery_proof: None,
+                cache_observations: Vec::new(),
+                scheduler: None,
+                structured_output: None,
+                psion_served_evidence: None,
+                psion_served_output_claim_posture: None,
+            },
+        );
+        let receipt = TextGenerationReceipt::succeeded_for_response(
+            cuda_backend_selection(),
+            &request,
+            &response,
+            String::from("plan123"),
+            10,
+            20,
+        );
+
+        assert_eq!(
+            receipt.kv_cache_encoding_policy,
+            Some(active_dense_policy.clone())
+        );
+        assert_eq!(
+            receipt
+                .kv_cache_encoding
+                .as_ref()
+                .and_then(|value| value.requested.as_ref())
+                .map(|value| value.family),
+            Some(KvCacheEncodingFamily::TurboQuant)
+        );
+        assert_eq!(
+            receipt
+                .kv_cache_encoding
+                .as_ref()
+                .map(|value| value.active.family),
+            Some(KvCacheEncodingFamily::DenseF16Mirror)
+        );
+        assert!(receipt
+            .kv_cache_encoding
+            .as_ref()
+            .is_some_and(|value| value.downgraded));
+        assert!(receipt
+            .kv_cache_encoding
+            .as_ref()
+            .and_then(|value| value.refusal_reason.as_deref())
+            .unwrap_or_default()
+            .contains("only runs on CUDA"));
         Ok(())
     }
 

@@ -14219,6 +14219,22 @@ mod tests {
     }
 
     #[test]
+    fn cuda_kv_cache_encoding_selection_downgrades_non_cuda_backend() {
+        let selection = super::select_cuda_kv_cache_encoding_for_geometry(
+            true, "gpt-oss", "cpu", 131_072, 4096, 128,
+        );
+
+        assert_eq!(selection.encoding, super::CudaKvCacheEncoding::DenseF16);
+        assert!(selection.accounting.downgraded);
+        assert!(selection
+            .accounting
+            .refusal_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("only runs on CUDA"));
+    }
+
+    #[test]
     fn quantized_matrix_transpose_decode_preserves_row_values() {
         let row = std::iter::once(128_u8)
             .chain(
