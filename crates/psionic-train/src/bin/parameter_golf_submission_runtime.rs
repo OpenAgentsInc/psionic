@@ -132,10 +132,26 @@ fn run() -> Result<(), ParameterGolfSubmissionRuntimeError> {
             );
             for observation in &train_step_receipt.validation_shard_observations {
                 println!(
-                    "distributed_validation_rank_complete rank={} sequence_start={} sequence_count={} loss_sum={:.8} token_count={} byte_count={} elapsed_ms={}",
+                    "distributed_validation_rank_complete rank={} eval_mode={} batch_sequences={} sequence_start={} sequence_count={} evaluation_unit_start={} evaluation_unit_count={} scored_token_start={} scored_token_count={} loss_sum={:.8} token_count={} byte_count={} elapsed_ms={}",
                     observation.rank,
+                    train_step_receipt
+                        .distributed_receipt
+                        .validation_aggregation
+                        .as_ref()
+                        .map(|validation| validation.eval_mode.as_str())
+                        .unwrap_or("non_overlapping"),
+                    train_step_receipt
+                        .distributed_receipt
+                        .validation_aggregation
+                        .as_ref()
+                        .map(|validation| validation.local_batch_sequences)
+                        .unwrap_or(0),
                     observation.sequence_start,
                     observation.sequence_count,
+                    observation.evaluation_unit_start,
+                    observation.evaluation_unit_count,
+                    observation.scored_token_start,
+                    observation.scored_token_count,
                     observation.loss_sum,
                     observation.token_count,
                     observation.byte_count,
@@ -239,10 +255,16 @@ fn run() -> Result<(), ParameterGolfSubmissionRuntimeError> {
             receipt,
         } => {
             println!(
-                "distributed_validation_rank_complete rank={} sequence_start={} sequence_count={} loss_sum={:.8} token_count={} byte_count={} elapsed_ms={} receipt_path={}",
+                "distributed_validation_rank_complete rank={} eval_mode={} batch_sequences={} sequence_start={} sequence_count={} evaluation_unit_start={} evaluation_unit_count={} scored_token_start={} scored_token_count={} loss_sum={:.8} token_count={} byte_count={} elapsed_ms={} receipt_path={}",
                 receipt.rank,
+                receipt.eval_mode.as_str(),
+                receipt.local_batch_sequences,
                 receipt.sequence_start,
                 receipt.sequence_count,
+                receipt.evaluation_unit_start,
+                receipt.evaluation_unit_count,
+                receipt.scored_token_start,
+                receipt.scored_token_count,
                 receipt.loss_sum,
                 receipt.token_count,
                 receipt.byte_count,

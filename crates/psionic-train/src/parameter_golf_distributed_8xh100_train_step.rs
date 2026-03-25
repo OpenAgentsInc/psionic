@@ -24,7 +24,8 @@ use thiserror::Error;
 
 use crate::{
     apply_gradients_to_state, benchmark_parameter_golf_distributed_8xh100, build_tokenizer_digest,
-    build_validation_shard_plan, clip_gradients, evaluate_validation_on_cuda,
+    build_parameter_golf_validation_window_starts, build_validation_observation_plan,
+    clip_gradients, evaluate_validation_on_cuda, evaluate_validation_window_starts_on_cuda,
     execute_parameter_golf_training_gradient_batch, inspect_local_distributed_8xh100_machine,
     materialize_current_model, parameter_golf_optimizer_plan,
     parameter_golf_runpod_8xh100_capability_profile, seed_parameter_states, zero_gradients,
@@ -234,10 +235,20 @@ pub struct ParameterGolfDistributed8xH100TrainStepRankLaunch {
 pub struct ParameterGolfDistributed8xH100ValidationShardPlan {
     /// Zero-based rank identifier.
     pub rank: usize,
-    /// Zero-based validation sequence offset.
+    /// Validation evaluation mode used by this rank.
+    pub eval_mode: ParameterGolfValidationEvalMode,
+    /// Zero-based validation sequence offset covered by this rank's scored tokens.
     pub sequence_start: u64,
-    /// Number of validation sequences assigned to the rank.
+    /// Number of validation sequences covered by this rank's scored tokens.
     pub sequence_count: u64,
+    /// Zero-based validation evaluation-unit offset owned by this rank.
+    pub evaluation_unit_start: u64,
+    /// Number of validation evaluation units owned by this rank.
+    pub evaluation_unit_count: u64,
+    /// Zero-based scored-token offset owned by this rank.
+    pub scored_token_start: u64,
+    /// Number of scored tokens owned by this rank.
+    pub scored_token_count: u64,
 }
 
 /// Per-rank runtime validation receipt emitted by one child.
@@ -265,10 +276,22 @@ pub struct ParameterGolfDistributed8xH100ValidationRankReceipt {
     pub aggregated_gradient_artifact_path: String,
     /// Stable SHA-256 over the aggregated gradient artifact.
     pub aggregated_gradient_artifact_sha256: String,
-    /// Zero-based validation sequence offset evaluated by this rank.
+    /// Validation evaluation mode used by this rank.
+    pub eval_mode: ParameterGolfValidationEvalMode,
+    /// Zero-based validation sequence offset covered by this rank's scored tokens.
     pub sequence_start: u64,
-    /// Number of validation sequences evaluated by this rank.
+    /// Number of validation sequences covered by this rank's scored tokens.
     pub sequence_count: u64,
+    /// Zero-based validation evaluation-unit offset owned by this rank.
+    pub evaluation_unit_start: u64,
+    /// Number of validation evaluation units owned by this rank.
+    pub evaluation_unit_count: u64,
+    /// Zero-based scored-token offset owned by this rank.
+    pub scored_token_start: u64,
+    /// Number of scored tokens owned by this rank.
+    pub scored_token_count: u64,
+    /// Expected local validation batch size in sequences or windows for this rank.
+    pub local_batch_sequences: u64,
     /// Rank-local summed loss over the shard.
     pub loss_sum: f64,
     /// Rank-local evaluated token count.
@@ -841,6 +864,13 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
     let train_tokens = geometry.train_batch_tokens as u64;
     let step_observation =
         ParameterGolfDistributedStepObservation::new(1, 0, observed_step_ms, train_tokens);
+    let validation_eval_mode = ParameterGolfValidationEvalMode::SlidingWindow { stride: 64 };
+    let validation_batch_sequences = match validation_eval_mode {
+        ParameterGolfValidationEvalMode::NonOverlapping => {
+            geometry.local_validation_batch_sequences() as u64
+        }
+        ParameterGolfValidationEvalMode::SlidingWindow { .. } => 1024,
+    };
     let validation_tokens = load_parameter_golf_validation_tokens_from_paths(
         &bundle
             .validation_shards
@@ -851,8 +881,12 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
     )?;
     let validation_total_sequence_count =
         ((validation_tokens.len().saturating_sub(1)) / geometry.train_sequence_length) as u64;
-    let validation_shard_plan =
-        build_validation_shard_plan(validation_total_sequence_count, CHALLENGE_WORLD_SIZE)?;
+    let validation_shard_plan = build_validation_observation_plan(
+        validation_total_sequence_count,
+        geometry.train_sequence_length,
+        &validation_eval_mode,
+        CHALLENGE_WORLD_SIZE,
+    )?;
     let mut validation_children = Vec::with_capacity(CHALLENGE_WORLD_SIZE);
     for shard in &validation_shard_plan {
         let shard_path = validation_rank_shards_dir.join(format!("rank_{}.json", shard.rank));
@@ -862,8 +896,13 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
                 "{}\n",
                 serde_json::to_string_pretty(&ParameterGolfDistributed8xH100ValidationShardPlan {
                     rank: shard.rank,
+                    eval_mode: validation_eval_mode.clone(),
                     sequence_start: shard.sequence_start,
                     sequence_count: shard.sequence_count,
+                    evaluation_unit_start: shard.evaluation_unit_start,
+                    evaluation_unit_count: shard.evaluation_unit_count,
+                    scored_token_start: shard.scored_token_start,
+                    scored_token_count: shard.scored_token_count,
                 })?
             ),
         )
@@ -1002,6 +1041,10 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
             rank: receipt.rank,
             sequence_start: receipt.sequence_start,
             sequence_count: receipt.sequence_count,
+            evaluation_unit_start: receipt.evaluation_unit_start,
+            evaluation_unit_count: receipt.evaluation_unit_count,
+            scored_token_start: receipt.scored_token_start,
+            scored_token_count: receipt.scored_token_count,
             loss_sum: receipt.loss_sum,
             token_count: receipt.token_count,
             byte_count: receipt.byte_count,
@@ -1014,6 +1057,8 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
     measurements.run_id = Some(String::from(run_id));
     measurements.mesh_id = Some(String::from("mesh.parameter_golf.runpod_8xh100"));
     measurements.step_observations = vec![step_observation.clone()];
+    measurements.validation_eval_mode = validation_eval_mode.clone();
+    measurements.validation_batch_sequences = validation_batch_sequences;
     measurements.validation_observed_ms = validation_observed_ms;
     measurements.validation_total_sequence_count = validation_total_sequence_count;
     measurements.validation_shard_observations = validation_shard_observations.clone();
@@ -1031,6 +1076,8 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step(
     distributed_config.run_id = String::from(run_id);
     distributed_config.mesh_id = String::from("mesh.parameter_golf.runpod_8xh100");
     distributed_config.step_observations = vec![step_observation.clone()];
+    distributed_config.validation_eval_mode = validation_eval_mode;
+    distributed_config.validation_batch_sequences = validation_batch_sequences;
     distributed_config.validation_observed_ms = validation_observed_ms;
     distributed_config.validation_total_sequence_count = validation_total_sequence_count;
     distributed_config.validation_shard_observations = validation_shard_observations.clone();
@@ -1329,11 +1376,32 @@ pub fn execute_parameter_golf_distributed_8xh100_validation_child(
     )?;
     let total_sequence_count =
         (validation_tokens.len().saturating_sub(1) / geometry.train_sequence_length) as u64;
-    if shard.sequence_start.saturating_add(shard.sequence_count) > total_sequence_count {
+    let expected_shards = build_validation_observation_plan(
+        total_sequence_count,
+        geometry.train_sequence_length,
+        &shard.eval_mode,
+        CHALLENGE_WORLD_SIZE,
+    )?;
+    let Some(expected_shard) = expected_shards.iter().find(|candidate| candidate.rank == shard.rank)
+    else {
         return Err(ParameterGolfDistributed8xH100TrainStepError::Aggregate {
             message: format!(
-                "validation shard for rank {} exceeded total sequence count {} (start={} count={})",
-                shard.rank, total_sequence_count, shard.sequence_start, shard.sequence_count
+                "validation shard for rank {} is outside the distributed validation plan",
+                shard.rank
+            ),
+        });
+    };
+    if shard.sequence_start != expected_shard.sequence_start
+        || shard.sequence_count != expected_shard.sequence_count
+        || shard.evaluation_unit_start != expected_shard.evaluation_unit_start
+        || shard.evaluation_unit_count != expected_shard.evaluation_unit_count
+        || shard.scored_token_start != expected_shard.scored_token_start
+        || shard.scored_token_count != expected_shard.scored_token_count
+    {
+        return Err(ParameterGolfDistributed8xH100TrainStepError::Aggregate {
+            message: format!(
+                "validation shard for rank {} did not match the expected {:?} distributed validation plan",
+                shard.rank, shard.eval_mode
             ),
         });
     }
@@ -1351,13 +1419,17 @@ pub fn execute_parameter_golf_distributed_8xh100_validation_child(
         .device_name
         .clone()
         .unwrap_or_else(|| String::from("unknown"));
-    let raw_start = shard.sequence_start as usize * geometry.train_sequence_length;
-    let raw_end = raw_start + shard.sequence_count as usize * geometry.train_sequence_length + 1;
+    let validation_batch_sequences = match shard.eval_mode {
+        ParameterGolfValidationEvalMode::NonOverlapping => {
+            geometry.local_validation_batch_sequences()
+        }
+        ParameterGolfValidationEvalMode::SlidingWindow { .. } => 1024,
+    };
     let started = Instant::now();
     let mut graph_cache = BTreeMap::new();
-    let validation_summary = if shard.sequence_count == 0 {
+    let validation_summary = if shard.evaluation_unit_count == 0 {
         crate::ParameterGolfSingleH100ValidationSummary {
-            eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
+            eval_mode: shard.eval_mode.clone(),
             evaluated_sequence_count: 0,
             evaluated_token_count: 0,
             evaluated_byte_count: 0,
@@ -1366,20 +1438,52 @@ pub fn execute_parameter_golf_distributed_8xh100_validation_child(
             runtime_receipt: None,
         }
     } else {
-        evaluate_validation_on_cuda(
-            &mut cuda_backend,
-            &selected_device.device,
-            current_model.descriptor(),
-            &current_model,
-            &validation_tokens[raw_start..raw_end],
-            &byte_luts,
-            geometry.train_sequence_length,
-            geometry.local_validation_batch_sequences(),
-            &ParameterGolfValidationEvalMode::NonOverlapping,
-            &mut graph_cache,
-            &format!("distributed_validation_rank_{rank}"),
-            None,
-        )?
+        match &shard.eval_mode {
+            ParameterGolfValidationEvalMode::NonOverlapping => {
+                let raw_start = shard.sequence_start as usize * geometry.train_sequence_length;
+                let raw_end =
+                    raw_start + shard.sequence_count as usize * geometry.train_sequence_length + 1;
+                evaluate_validation_on_cuda(
+                    &mut cuda_backend,
+                    &selected_device.device,
+                    current_model.descriptor(),
+                    &current_model,
+                    &validation_tokens[raw_start..raw_end],
+                    &byte_luts,
+                    geometry.train_sequence_length,
+                    validation_batch_sequences,
+                    &shard.eval_mode,
+                    &mut graph_cache,
+                    &format!("distributed_validation_rank_{rank}"),
+                    None,
+                )?
+            }
+            ParameterGolfValidationEvalMode::SlidingWindow { stride } => {
+                let total_tokens = validation_tokens.len().saturating_sub(1);
+                let window_starts = build_parameter_golf_validation_window_starts(
+                    total_tokens,
+                    geometry.train_sequence_length,
+                    *stride,
+                );
+                let shard_window_starts = &window_starts[shard.evaluation_unit_start as usize
+                    ..(shard.evaluation_unit_start + shard.evaluation_unit_count) as usize];
+                evaluate_validation_window_starts_on_cuda(
+                    &mut cuda_backend,
+                    &selected_device.device,
+                    current_model.descriptor(),
+                    &current_model,
+                    validation_tokens.as_slice(),
+                    &byte_luts,
+                    geometry.train_sequence_length,
+                    validation_batch_sequences,
+                    *stride,
+                    shard_window_starts,
+                    &mut graph_cache,
+                    &format!("distributed_validation_rank_{rank}"),
+                    None,
+                )?
+            }
+        }
     };
     let observed_wallclock_ms = duration_ms(started);
     let loss_sum = validation_summary.mean_loss * validation_summary.evaluated_token_count as f64;
@@ -1397,8 +1501,14 @@ pub fn execute_parameter_golf_distributed_8xh100_validation_child(
             .display()
             .to_string(),
         aggregated_gradient_artifact_sha256,
+        eval_mode: shard.eval_mode,
         sequence_start: shard.sequence_start,
         sequence_count: shard.sequence_count,
+        evaluation_unit_start: shard.evaluation_unit_start,
+        evaluation_unit_count: shard.evaluation_unit_count,
+        scored_token_start: shard.scored_token_start,
+        scored_token_count: shard.scored_token_count,
+        local_batch_sequences: validation_batch_sequences as u64,
         loss_sum,
         token_count: validation_summary.evaluated_token_count,
         byte_count: validation_summary.evaluated_byte_count,

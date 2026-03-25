@@ -153,11 +153,19 @@ pub struct ParameterGolfDistributedTimingReceipt {
 pub struct ParameterGolfDistributedValidationShardReceipt {
     /// Zero-based rank identifier.
     pub rank: usize,
-    /// Zero-based global validation-sequence offset owned by this rank.
+    /// Zero-based global validation-sequence offset covered by this rank's scored tokens.
     pub sequence_start: u64,
-    /// Number of validation sequences owned by this rank.
+    /// Number of validation sequences covered by this rank's scored tokens.
     pub sequence_count: u64,
-    /// Expected local batch size in sequences for this rank.
+    /// Zero-based global validation evaluation-unit offset owned by this rank.
+    pub evaluation_unit_start: u64,
+    /// Number of validation evaluation units owned by this rank.
+    pub evaluation_unit_count: u64,
+    /// Zero-based scored-token offset owned by this rank.
+    pub scored_token_start: u64,
+    /// Number of scored tokens owned by this rank.
+    pub scored_token_count: u64,
+    /// Expected local batch size in sequences or windows for this rank.
     pub local_batch_sequences: u64,
     /// Rank-local summed loss over the shard.
     pub loss_sum: f64,
@@ -174,11 +182,15 @@ pub struct ParameterGolfDistributedValidationShardReceipt {
 pub struct ParameterGolfDistributedValidationAggregationReceipt {
     /// Stable description of how the validation facts were collected.
     pub measurement_posture: String,
+    /// Validation evaluation mode used by the lane.
+    pub eval_mode: String,
     /// World size used by the distributed validation lane.
     pub world_size: usize,
     /// Total validation sequence count across all ranks.
     pub total_sequence_count: u64,
-    /// Expected local batch size in sequences for each rank.
+    /// Total validation evaluation-unit count across all ranks.
+    pub total_evaluation_unit_count: u64,
+    /// Expected local batch size in sequences or windows for each rank.
     pub local_batch_sequences: u64,
     /// Aggregated loss sum reduced across ranks.
     pub aggregated_loss_sum: f64,
@@ -425,8 +437,10 @@ mod tests {
                 measurement_posture: String::from(
                     "rank_local_validation_shards_plus_metric_all_reduce",
                 ),
+                eval_mode: String::from("non_overlapping"),
                 world_size: 8,
                 total_sequence_count: 512,
+                total_evaluation_unit_count: 512,
                 local_batch_sequences: 64,
                 aggregated_loss_sum: 96.0,
                 aggregated_token_count: 131_072,
@@ -439,6 +453,10 @@ mod tests {
                         rank: 0,
                         sequence_start: 0,
                         sequence_count: 64,
+                        evaluation_unit_start: 0,
+                        evaluation_unit_count: 64,
+                        scored_token_start: 0,
+                        scored_token_count: 16_384,
                         local_batch_sequences: 64,
                         loss_sum: 12.0,
                         token_count: 16_384,
@@ -449,6 +467,10 @@ mod tests {
                         rank: 1,
                         sequence_start: 64,
                         sequence_count: 64,
+                        evaluation_unit_start: 64,
+                        evaluation_unit_count: 64,
+                        scored_token_start: 16_384,
+                        scored_token_count: 16_384,
                         local_batch_sequences: 64,
                         loss_sum: 12.0,
                         token_count: 16_384,

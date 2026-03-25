@@ -123,13 +123,33 @@ The landed communication receipt preserves three concrete stages:
 These stages mirror the current public Python baseline instead of inventing a
 different sharding story.
 
-## Current Validation Boundary
+## Current Validation Contract
 
-The distributed lane still evaluates retained validation shards with the older
-non-overlapping sequence semantics. The single-H100 trainer now carries an
-explicit sliding-window eval mode, but the `8xH100` lane has not been widened
-to that scoreboard-grade validation contract yet. That gap is tracked
-explicitly in `#541`.
+The distributed lane now carries an explicit validation-eval contract instead
+of treating validation shards as anonymous sequence slices.
+
+The shipped runtime now preserves, validates, and lifts:
+
+- `eval_mode`
+- `local_batch_sequences`
+- `evaluation_unit_start`
+- `evaluation_unit_count`
+- `scored_token_start`
+- `scored_token_count`
+
+For the scoreboard-grade lane, Psionic now uses sliding-window validation with:
+
+- `eval_mode=sliding_window_stride_64`
+- one global ordered `window_starts` list derived from the full validation
+  token stream
+- one contiguous partition of those evaluation windows across ranks
+- `batch_sequences=1024` windows per rank-local forward batch
+- scored-token ranges that match the upstream score-only suffix contract
+
+This matters because the distributed receipt can now defend the real eval
+surface: which windows each rank evaluated, which scored-token interval each
+rank owned, and how the aggregated `loss_sum`, `token_count`, and `byte_count`
+were reduced back into one distributed validation result.
 
 ## Timing And Memory Receipts
 
@@ -159,11 +179,17 @@ which parts remain analytic:
 When the runtime preserves rank-local validation shard facts, the receipt now
 also records:
 
-- one contiguous shard layout across the full validation sequence space
-- per-rank `sequence_start`, `sequence_count`, `loss_sum`, `token_count`,
-  `byte_count`, and `observed_ms`
+- one explicit `eval_mode`
+- one contiguous shard layout across the validation evaluation-unit space
+- per-rank `sequence_start`, `sequence_count`
+- per-rank `evaluation_unit_start`, `evaluation_unit_count`
+- per-rank `scored_token_start`, `scored_token_count`
+- per-rank `local_batch_sequences`, `loss_sum`, `token_count`, `byte_count`,
+  and `observed_ms`
 - one aggregated `mean_loss` and `bits_per_byte`
 - one honest distributed validation wallclock as the slowest participating rank
+- one aggregated `total_evaluation_unit_count` beside
+  `total_sequence_count`
 
 You can now build one distributed receipt directly from JSON-collected runtime
 facts:
@@ -216,6 +242,8 @@ The measurements JSON preserves only the runtime facts that are not already in
 the finalizer-owned run root:
 
 - ordered `step_observations`
+- `validation_eval_mode`
+- `validation_batch_sequences`
 - `validation_observed_ms`
 - `export_observed_ms`
 - optional `memory_observation`

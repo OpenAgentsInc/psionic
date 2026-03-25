@@ -30,7 +30,8 @@ use crate::{
     DistributedOptimizerContract, DistributedOptimizerError, DistributedOptimizerGroupContract,
     DistributedOptimizerRun, DistributedTrainingMemoryBudget, OptimizerStateResidency,
     ParameterGolfBatchGeometry, ParameterGolfOptimizerExecution, ParameterGolfTrainError,
-    ParameterGolfTrainingHyperparameters, TrainingActivationCheckpointPolicy,
+    ParameterGolfTrainingHyperparameters, ParameterGolfValidationEvalMode,
+    TrainingActivationCheckpointPolicy,
     TrainingDistributedOptimizerKind, TrainingGradientAccumulationPolicy,
     TrainingGradientAccumulationReduction, TrainingLoopBudget, TrainingOptimizerConfig,
     TrainingOptimizerResidencyPolicy, TrainingOptimizerShardResidency,
@@ -101,10 +102,22 @@ pub struct ParameterGolfDistributedMemoryObservation {
 pub struct ParameterGolfDistributedValidationShardObservation {
     /// Zero-based rank identifier.
     pub rank: usize,
-    /// Zero-based global validation-sequence offset owned by this rank.
+    /// Zero-based global validation-sequence offset covered by this rank's scored tokens.
     pub sequence_start: u64,
-    /// Number of validation sequences owned by this rank.
+    /// Number of validation sequences covered by this rank's scored tokens.
     pub sequence_count: u64,
+    /// Zero-based global validation evaluation-unit offset owned by this rank.
+    #[serde(default)]
+    pub evaluation_unit_start: u64,
+    /// Number of validation evaluation units owned by this rank.
+    #[serde(default)]
+    pub evaluation_unit_count: u64,
+    /// Zero-based scored-token offset owned by this rank.
+    #[serde(default)]
+    pub scored_token_start: u64,
+    /// Number of scored tokens owned by this rank.
+    #[serde(default)]
+    pub scored_token_count: u64,
     /// Rank-local summed loss over the shard.
     pub loss_sum: f64,
     /// Rank-local evaluated token count.
@@ -128,10 +141,16 @@ pub struct ParameterGolfDistributed8xH100Config {
     pub thresholds: ParameterGolfDistributedChallengeThresholds,
     /// Ordered measured step observations.
     pub step_observations: Vec<ParameterGolfDistributedStepObservation>,
+    /// Validation evaluation mode used by the lane.
+    #[serde(default)]
+    pub validation_eval_mode: ParameterGolfValidationEvalMode,
     /// Observed runtime memory posture when the lane has real execution
     /// telemetry instead of only the analytic optimizer-contract estimate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub memory_observation: Option<ParameterGolfDistributedMemoryObservation>,
+    /// Expected local validation batch size in sequences or windows.
+    #[serde(default = "default_validation_batch_sequences")]
+    pub validation_batch_sequences: u64,
     /// Observed validation duration.
     pub validation_observed_ms: u64,
     /// Total validation sequence count across all ranks when distributed
@@ -155,7 +174,9 @@ impl ParameterGolfDistributed8xH100Config {
             geometry: ParameterGolfBatchGeometry::challenge_distributed_8xh100_defaults(),
             thresholds: ParameterGolfDistributedChallengeThresholds::challenge_8xh100(),
             step_observations: Vec::new(),
+            validation_eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
             memory_observation: None,
+            validation_batch_sequences: default_validation_batch_sequences(),
             validation_observed_ms: 0,
             validation_total_sequence_count: 0,
             validation_shard_observations: Vec::new(),
@@ -168,6 +189,24 @@ impl ParameterGolfDistributed8xH100Config {
             return Err(ParameterGolfDistributedLaneError::MissingRunId);
         }
         validate_distributed_geometry(&self.geometry, &self.thresholds)?;
+        if self.validation_batch_sequences == 0 {
+            return Err(ParameterGolfDistributedLaneError::InvalidConfig {
+                message: String::from(
+                    "validation_batch_sequences must be positive for the distributed validation lane",
+                ),
+            });
+        }
+        if let ParameterGolfValidationEvalMode::SlidingWindow { stride } = self.validation_eval_mode
+        {
+            if stride == 0 || stride > self.geometry.train_sequence_length {
+                return Err(ParameterGolfDistributedLaneError::InvalidConfig {
+                    message: format!(
+                        "sliding-window distributed validation stride must be in 1..={}, observed {}",
+                        self.geometry.train_sequence_length, stride
+                    ),
+                });
+            }
+        }
         for observation in &self.step_observations {
             if observation.global_step == 0 {
                 return Err(ParameterGolfDistributedLaneError::InvalidStepObservation {
@@ -202,8 +241,10 @@ impl ParameterGolfDistributed8xH100Config {
                     ),
                 });
             }
-            let shard_plan = build_validation_shard_plan(
+            let shard_plan = build_validation_observation_plan(
                 self.validation_total_sequence_count,
+                self.geometry.train_sequence_length,
+                &self.validation_eval_mode,
                 self.geometry.world_size,
             )?;
             if self.validation_shard_observations.len() != shard_plan.len() {
@@ -222,11 +263,15 @@ impl ParameterGolfDistributed8xH100Config {
                 if observed.rank != expected.rank
                     || observed.sequence_start != expected.sequence_start
                     || observed.sequence_count != expected.sequence_count
+                    || observed.evaluation_unit_start != expected.evaluation_unit_start
+                    || observed.evaluation_unit_count != expected.evaluation_unit_count
+                    || observed.scored_token_start != expected.scored_token_start
+                    || observed.scored_token_count != expected.scored_token_count
                 {
                     return Err(ParameterGolfDistributedLaneError::InvalidConfig {
                         message: format!(
-                            "validation shard observation for rank {} does not match the expected shard layout start={} count={}",
-                            observed.rank, expected.sequence_start, expected.sequence_count
+                            "validation shard observation for rank {} does not match the expected {:?} shard layout",
+                            observed.rank, self.validation_eval_mode
                         ),
                     });
                 }
@@ -258,6 +303,12 @@ pub struct ParameterGolfRunPod8xH100Measurements {
     /// Ordered measured step observations.
     #[serde(default)]
     pub step_observations: Vec<ParameterGolfDistributedStepObservation>,
+    /// Validation evaluation mode used by the lane.
+    #[serde(default)]
+    pub validation_eval_mode: ParameterGolfValidationEvalMode,
+    /// Expected local validation batch size in sequences or windows.
+    #[serde(default = "default_validation_batch_sequences")]
+    pub validation_batch_sequences: u64,
     /// Observed distributed validation duration.
     pub validation_observed_ms: u64,
     /// Total validation sequence count across all ranks when distributed
@@ -283,6 +334,8 @@ impl ParameterGolfRunPod8xH100Measurements {
             run_id: None,
             mesh_id: None,
             step_observations: Vec::new(),
+            validation_eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
+            validation_batch_sequences: default_validation_batch_sequences(),
             validation_observed_ms: 0,
             validation_total_sequence_count: 0,
             validation_shard_observations: Vec::new(),
@@ -298,6 +351,8 @@ impl ParameterGolfRunPod8xH100Measurements {
             .mesh_id
             .unwrap_or_else(|| String::from("mesh.parameter_golf.runpod_8xh100"));
         config.step_observations = self.step_observations;
+        config.validation_eval_mode = self.validation_eval_mode;
+        config.validation_batch_sequences = self.validation_batch_sequences;
         config.validation_observed_ms = self.validation_observed_ms;
         config.validation_total_sequence_count = self.validation_total_sequence_count;
         config.validation_shard_observations = self.validation_shard_observations;
@@ -305,6 +360,10 @@ impl ParameterGolfRunPod8xH100Measurements {
         config.memory_observation = self.memory_observation;
         config
     }
+}
+
+const fn default_validation_batch_sequences() -> u64 {
+    64
 }
 
 /// Failure while building the distributed `8xH100` Parameter Golf lane.
@@ -637,6 +696,8 @@ pub fn build_parameter_golf_runpod_8xh100_measurements_from_train_log(
     let mut final_roundtrip_eval_ms = None;
     let mut peak_allocated_mib = None;
     let mut peak_reserved_mib = None;
+    let mut validation_eval_mode = ParameterGolfValidationEvalMode::NonOverlapping;
+    let mut validation_batch_sequences = default_validation_batch_sequences();
     let mut validation_shard_observations = Vec::new();
 
     for line in log_text.lines().map(str::trim) {
@@ -715,11 +776,42 @@ pub fn build_parameter_golf_runpod_8xh100_measurements_from_train_log(
                     ),
                 }
             })?;
+            if let Some(raw_mode) = extract_string_after(line, "eval_mode=", " ") {
+                validation_eval_mode = ParameterGolfValidationEvalMode::parse(raw_mode.as_str())
+                    .map_err(|error| ParameterGolfDistributedLaneError::InvalidMeasurements {
+                        message: format!(
+                            "failed to parse distributed validation eval_mode from `{line}`: {error}"
+                        ),
+                    })?;
+            }
+            if let Some(batch_sequences) = extract_u64_after(line, "batch_sequences=", " ") {
+                validation_batch_sequences = batch_sequences;
+            }
             validation_shard_observations.push(
                 ParameterGolfDistributedValidationShardObservation {
                     rank,
                     sequence_start,
                     sequence_count,
+                    evaluation_unit_start: extract_u64_after(
+                        line,
+                        "evaluation_unit_start=",
+                        " ",
+                    )
+                    .unwrap_or(sequence_start),
+                    evaluation_unit_count: extract_u64_after(
+                        line,
+                        "evaluation_unit_count=",
+                        " ",
+                    )
+                    .unwrap_or(sequence_count),
+                    scored_token_start: extract_u64_after(line, "scored_token_start=", " ")
+                        .unwrap_or(sequence_start.saturating_mul(
+                            geometry.train_sequence_length as u64,
+                        )),
+                    scored_token_count: extract_u64_after(line, "scored_token_count=", " ")
+                        .unwrap_or(sequence_count.saturating_mul(
+                            geometry.train_sequence_length as u64,
+                        )),
                     loss_sum,
                     token_count,
                     byte_count,
@@ -786,6 +878,8 @@ pub fn build_parameter_golf_runpod_8xh100_measurements_from_train_log(
     measurements.run_id = run_id.map(String::from);
     measurements.mesh_id = mesh_id.map(String::from);
     measurements.step_observations = step_observations;
+    measurements.validation_eval_mode = validation_eval_mode.clone();
+    measurements.validation_batch_sequences = validation_batch_sequences;
     measurements.validation_observed_ms =
         final_validation_observed_ms.map_or(0, |value| value.saturating_sub(previous_finish_ms));
     if !validation_shard_observations.is_empty() {
@@ -811,10 +905,22 @@ pub fn build_parameter_golf_runpod_8xh100_measurements_from_train_log(
                 ),
             });
         }
-        measurements.validation_total_sequence_count = validation_shard_observations
-            .iter()
-            .map(|observation| observation.sequence_count)
-            .sum();
+        measurements.validation_total_sequence_count = match validation_eval_mode {
+            ParameterGolfValidationEvalMode::NonOverlapping => validation_shard_observations
+                .iter()
+                .map(|observation| observation.sequence_count)
+                .sum(),
+            ParameterGolfValidationEvalMode::SlidingWindow { .. } => validation_shard_observations
+                .iter()
+                .map(|observation| {
+                    observation
+                        .scored_token_start
+                        .saturating_add(observation.scored_token_count)
+                })
+                .max()
+                .unwrap_or(0)
+                .div_ceil(geometry.train_sequence_length as u64),
+        };
         measurements.validation_observed_ms = measurements.validation_observed_ms.max(
             validation_shard_observations
                 .iter()
@@ -1362,36 +1468,114 @@ fn build_timing_receipt(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ValidationShardPlan {
+pub(crate) struct ValidationObservationPlan {
     pub(crate) rank: usize,
     pub(crate) sequence_start: u64,
     pub(crate) sequence_count: u64,
+    pub(crate) evaluation_unit_start: u64,
+    pub(crate) evaluation_unit_count: u64,
+    pub(crate) scored_token_start: u64,
+    pub(crate) scored_token_count: u64,
 }
 
-pub(crate) fn build_validation_shard_plan(
+pub(crate) fn build_validation_observation_plan(
     total_sequence_count: u64,
+    sequence_length: usize,
+    eval_mode: &ParameterGolfValidationEvalMode,
     world_size: usize,
-) -> Result<Vec<ValidationShardPlan>, ParameterGolfDistributedLaneError> {
+) -> Result<Vec<ValidationObservationPlan>, ParameterGolfDistributedLaneError> {
     if world_size == 0 {
         return Err(ParameterGolfDistributedLaneError::InvalidConfig {
             message: String::from("distributed validation requires world_size > 0"),
         });
     }
+    let sequence_length = sequence_length as u64;
     let world_size_u64 = world_size as u64;
-    let base = total_sequence_count / world_size_u64;
-    let remainder = total_sequence_count % world_size_u64;
-    let mut sequence_start = 0_u64;
-    let mut plan = Vec::with_capacity(world_size);
-    for rank in 0..world_size {
-        let sequence_count = base + u64::from((rank as u64) < remainder);
-        plan.push(ValidationShardPlan {
-            rank,
-            sequence_start,
-            sequence_count,
-        });
-        sequence_start = sequence_start.saturating_add(sequence_count);
+    match eval_mode {
+        ParameterGolfValidationEvalMode::NonOverlapping => {
+            let base = total_sequence_count / world_size_u64;
+            let remainder = total_sequence_count % world_size_u64;
+            let mut sequence_start = 0_u64;
+            let mut plan = Vec::with_capacity(world_size);
+            for rank in 0..world_size {
+                let sequence_count = base + u64::from((rank as u64) < remainder);
+                let scored_token_start = sequence_start.saturating_mul(sequence_length);
+                let scored_token_count = sequence_count.saturating_mul(sequence_length);
+                plan.push(ValidationObservationPlan {
+                    rank,
+                    sequence_start,
+                    sequence_count,
+                    evaluation_unit_start: sequence_start,
+                    evaluation_unit_count: sequence_count,
+                    scored_token_start,
+                    scored_token_count,
+                });
+                sequence_start = sequence_start.saturating_add(sequence_count);
+            }
+            Ok(plan)
+        }
+        ParameterGolfValidationEvalMode::SlidingWindow { stride } => {
+            let total_tokens = total_sequence_count.saturating_mul(sequence_length);
+            let window_starts = crate::build_parameter_golf_validation_window_starts(
+                total_tokens as usize,
+                sequence_length as usize,
+                *stride,
+            );
+            let total_units = window_starts.len() as u64;
+            let base = total_units / world_size_u64;
+            let remainder = total_units % world_size_u64;
+            let mut evaluation_unit_start = 0_u64;
+            let mut plan = Vec::with_capacity(world_size);
+            for rank in 0..world_size {
+                let evaluation_unit_count = base + u64::from((rank as u64) < remainder);
+                let (scored_token_start, scored_token_count) = if evaluation_unit_count == 0 {
+                    (total_tokens, 0)
+                } else {
+                    let first_window_start = window_starts[evaluation_unit_start as usize] as u64;
+                    let last_window_start =
+                        window_starts[(evaluation_unit_start + evaluation_unit_count - 1) as usize]
+                            as u64;
+                    let first_valid_length =
+                        (first_window_start + sequence_length).min(total_tokens)
+                            - first_window_start;
+                    let last_valid_length =
+                        (last_window_start + sequence_length).min(total_tokens) - last_window_start;
+                    let first_score_start = if first_window_start == 0 {
+                        0
+                    } else {
+                        first_valid_length.saturating_sub(*stride as u64)
+                    };
+                    let scored_token_start = first_window_start + first_score_start;
+                    let scored_token_end = last_window_start + last_valid_length;
+                    (
+                        scored_token_start,
+                        scored_token_end.saturating_sub(scored_token_start),
+                    )
+                };
+                let sequence_start = scored_token_start / sequence_length;
+                let sequence_count = if scored_token_count == 0 {
+                    0
+                } else {
+                    scored_token_start
+                        .saturating_add(scored_token_count)
+                        .div_ceil(sequence_length)
+                        .saturating_sub(sequence_start)
+                };
+                plan.push(ValidationObservationPlan {
+                    rank,
+                    sequence_start,
+                    sequence_count,
+                    evaluation_unit_start,
+                    evaluation_unit_count,
+                    scored_token_start,
+                    scored_token_count,
+                });
+                evaluation_unit_start =
+                    evaluation_unit_start.saturating_add(evaluation_unit_count);
+            }
+            Ok(plan)
+        }
     }
-    Ok(plan)
 }
 
 fn build_validation_aggregation_receipt(
@@ -1403,11 +1587,13 @@ fn build_validation_aggregation_receipt(
     if config.validation_shard_observations.is_empty() {
         return Ok(None);
     }
-    let shard_plan = build_validation_shard_plan(
+    let shard_plan = build_validation_observation_plan(
         config.validation_total_sequence_count,
+        config.geometry.train_sequence_length,
+        &config.validation_eval_mode,
         config.geometry.world_size,
     )?;
-    let local_batch_sequences = config.geometry.local_validation_batch_sequences() as u64;
+    let local_batch_sequences = config.validation_batch_sequences;
     let mut aggregated_loss_sum = 0.0_f64;
     let mut aggregated_token_count = 0_u64;
     let mut aggregated_byte_count = 0_u64;
@@ -1421,11 +1607,15 @@ fn build_validation_aggregation_receipt(
         if observed.rank != expected.rank
             || observed.sequence_start != expected.sequence_start
             || observed.sequence_count != expected.sequence_count
+            || observed.evaluation_unit_start != expected.evaluation_unit_start
+            || observed.evaluation_unit_count != expected.evaluation_unit_count
+            || observed.scored_token_start != expected.scored_token_start
+            || observed.scored_token_count != expected.scored_token_count
         {
             return Err(ParameterGolfDistributedLaneError::InvalidConfig {
                 message: format!(
-                    "validation shard observation for rank {} does not match the expected shard layout start={} count={}",
-                    observed.rank, expected.sequence_start, expected.sequence_count
+                    "validation shard observation for rank {} does not match the expected {:?} shard layout",
+                    observed.rank, config.validation_eval_mode
                 ),
             });
         }
@@ -1437,6 +1627,10 @@ fn build_validation_aggregation_receipt(
             rank: observed.rank,
             sequence_start: observed.sequence_start,
             sequence_count: observed.sequence_count,
+            evaluation_unit_start: observed.evaluation_unit_start,
+            evaluation_unit_count: observed.evaluation_unit_count,
+            scored_token_start: observed.scored_token_start,
+            scored_token_count: observed.scored_token_count,
             local_batch_sequences,
             loss_sum: observed.loss_sum,
             token_count: observed.token_count,
@@ -1451,8 +1645,13 @@ fn build_validation_aggregation_receipt(
 
     Ok(Some(ParameterGolfDistributedValidationAggregationReceipt {
         measurement_posture: String::from("rank_local_validation_shards_plus_metric_all_reduce"),
+        eval_mode: config.validation_eval_mode.as_str().to_string(),
         world_size: config.geometry.world_size,
         total_sequence_count: config.validation_total_sequence_count,
+        total_evaluation_unit_count: shard_plan
+            .iter()
+            .map(|observation| observation.evaluation_unit_count)
+            .sum(),
         local_batch_sequences,
         aggregated_loss_sum,
         aggregated_token_count,
@@ -1484,6 +1683,10 @@ fn extract_u64_after(line: &str, prefix: &str, suffix: &str) -> Option<u64> {
 
 fn extract_f64_after(line: &str, prefix: &str, suffix: &str) -> Option<f64> {
     extract_token_after(line, prefix, suffix)?.parse().ok()
+}
+
+fn extract_string_after(line: &str, prefix: &str, suffix: &str) -> Option<String> {
+    Some(String::from(extract_token_after(line, prefix, suffix)?))
 }
 
 fn extract_token_after<'a>(line: &'a str, prefix: &str, suffix: &str) -> Option<&'a str> {
@@ -1638,6 +1841,10 @@ mod tests {
                 rank,
                 sequence_start: (rank * 4) as u64,
                 sequence_count: 4,
+                evaluation_unit_start: (rank * 4) as u64,
+                evaluation_unit_count: 4,
+                scored_token_start: (rank * 16) as u64,
+                scored_token_count: 16,
                 loss_sum: 8.0 + rank as f64,
                 token_count: 16,
                 byte_count: 12,
@@ -1928,6 +2135,10 @@ mod tests {
                 rank,
                 sequence_start: (rank * 4) as u64,
                 sequence_count: 4,
+                evaluation_unit_start: (rank * 4) as u64,
+                evaluation_unit_count: 4,
+                scored_token_start: (rank * 16) as u64,
+                scored_token_count: 16,
                 loss_sum: 8.0 + rank as f64,
                 token_count: 16,
                 byte_count: 12,

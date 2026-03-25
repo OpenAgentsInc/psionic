@@ -2349,9 +2349,6 @@ pub(crate) fn evaluate_validation_on_cuda(
         });
     }
     let total_units = validation_unit_count(validation_tokens, sequence_length, eval_mode);
-    let mut total_loss_sum = 0.0_f64;
-    let mut total_token_count = 0_u64;
-    let mut total_byte_count = 0_u64;
     let validation_batch_sequences = batch_sequences.max(1);
     let byte_accounting_started = Instant::now();
     let batch_plans = build_validation_batch_plans(
@@ -2362,6 +2359,91 @@ pub(crate) fn evaluate_validation_on_cuda(
         eval_mode,
     )?;
     let total_byte_accounting_us = duration_us(byte_accounting_started);
+    evaluate_validation_batch_plans_on_cuda(
+        cuda_backend,
+        device,
+        descriptor,
+        model,
+        sequence_length,
+        eval_mode,
+        graph_cache,
+        stage_label,
+        live_visualization_writer,
+        total_units,
+        total_byte_accounting_us,
+        batch_plans,
+    )
+}
+
+pub(crate) fn evaluate_validation_window_starts_on_cuda(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    stride: usize,
+    window_starts: &[usize],
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
+    stage_label: &str,
+    live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    let eval_mode = ParameterGolfValidationEvalMode::SlidingWindow { stride };
+    eval_mode.validate(sequence_length)?;
+    if validation_tokens.len() <= sequence_length {
+        return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+            message: String::from(
+                "validation split is too short for the requested sequence length",
+            ),
+        });
+    }
+    let validation_batch_sequences = batch_sequences.max(1);
+    let byte_accounting_started = Instant::now();
+    let batch_plans = build_sliding_window_validation_batch_plans_from_window_starts(
+        validation_tokens,
+        byte_luts,
+        sequence_length,
+        validation_batch_sequences,
+        stride,
+        window_starts,
+    )?;
+    let total_byte_accounting_us = duration_us(byte_accounting_started);
+    evaluate_validation_batch_plans_on_cuda(
+        cuda_backend,
+        device,
+        descriptor,
+        model,
+        sequence_length,
+        &eval_mode,
+        graph_cache,
+        stage_label,
+        live_visualization_writer,
+        window_starts.len(),
+        total_byte_accounting_us,
+        batch_plans,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn evaluate_validation_batch_plans_on_cuda(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
+    sequence_length: usize,
+    eval_mode: &ParameterGolfValidationEvalMode,
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
+    stage_label: &str,
+    live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+    total_units: usize,
+    total_byte_accounting_us: u64,
+    batch_plans: Vec<ParameterGolfValidationBatchPlan>,
+) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    let mut total_loss_sum = 0.0_f64;
+    let mut total_token_count = 0_u64;
+    let mut total_byte_count = 0_u64;
     let total_batches = batch_plans.len();
     let validation_started = Instant::now();
     let mut session_cache = BTreeMap::new();
@@ -2394,10 +2476,7 @@ pub(crate) fn evaluate_validation_on_cuda(
             batch_plan.batch_sequences,
             sequence_length,
         )?;
-        let (batch_token_losses, batch_runtime) = session.execute_batch(
-            cuda_backend,
-            batch_plan,
-        )?;
+        let (batch_token_losses, batch_runtime) = session.execute_batch(cuda_backend, batch_plan)?;
         total_loss_sum += scored_token_loss_sum(
             batch_token_losses.as_slice(),
             batch_plan.sequence_plans.as_slice(),
@@ -2731,17 +2810,46 @@ fn build_sliding_window_validation_batch_plans(
     batch_sequences: usize,
     stride: usize,
 ) -> Result<Vec<ParameterGolfValidationBatchPlan>, ParameterGolfSingleH100TrainingError> {
-    let total_tokens = validation_tokens.len().saturating_sub(1);
-    let window_starts = (0..total_tokens)
+    let window_starts = build_parameter_golf_validation_window_starts(
+        validation_tokens.len().saturating_sub(1),
+        sequence_length,
+        stride,
+    );
+    build_sliding_window_validation_batch_plans_from_window_starts(
+        validation_tokens,
+        byte_luts,
+        sequence_length,
+        batch_sequences,
+        stride,
+        window_starts.as_slice(),
+    )
+}
+
+pub(crate) fn build_parameter_golf_validation_window_starts(
+    total_tokens: usize,
+    sequence_length: usize,
+    stride: usize,
+) -> Vec<usize> {
+    (0..total_tokens)
         .step_by(stride.max(1))
         .filter(|window_start| {
             total_tokens
                 .saturating_sub(*window_start)
                 .min(sequence_length)
-                .saturating_sub(0)
                 >= 1
         })
-        .collect::<Vec<_>>();
+        .collect()
+}
+
+fn build_sliding_window_validation_batch_plans_from_window_starts(
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    stride: usize,
+    window_starts: &[usize],
+) -> Result<Vec<ParameterGolfValidationBatchPlan>, ParameterGolfSingleH100TrainingError> {
+    let total_tokens = validation_tokens.len().saturating_sub(1);
     let mut plans = Vec::new();
     for batch_start in (0..window_starts.len()).step_by(batch_sequences.max(1)) {
         let batch_end = (batch_start + batch_sequences.max(1)).min(window_starts.len());
