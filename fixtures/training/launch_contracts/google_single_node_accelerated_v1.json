@@ -1,0 +1,268 @@
+{
+  "schema_version": "psionic.cross_provider_launch_contract.v1",
+  "launch_contract_id": "psionic-google-single-node-accelerated-launch-contract-v1",
+  "binder_kind": "google_single_node",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "source_binding": {
+    "source_id": "google_l4_single_node_training_host",
+    "source_class": "google_cloud",
+    "provider": "google_cloud",
+    "backend_family": "cuda",
+    "detail": "This launch contract binds the Google single-node accelerated g2 plus L4 lane directly to the committed single-node launch profile until a dedicated single-node compute-source contract is frozen."
+  },
+  "requested_execution_class": "dense_full_model_rank",
+  "run_id": "psion-xprovider-pretrain-google-single-node-accelerated",
+  "runtime_env": [
+    {
+      "name": "PSION_PROGRAM_MANIFEST_ID",
+      "value_template": "psionic-cross-provider-pretraining-program-v1",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Bind the runtime to the root cross-provider pretraining program."
+    },
+    {
+      "name": "PSION_PROGRAM_MANIFEST_DIGEST",
+      "value_template": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Carry the exact program-manifest digest into startup and finalizer surfaces."
+    },
+    {
+      "name": "PSION_RUN_ID",
+      "value_template": "psion-xprovider-pretrain-google-single-node-accelerated",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Stable run identifier for the Google single-node lane."
+    },
+    {
+      "name": "PSION_EXECUTION_CLASS",
+      "value_template": "dense_full_model_rank",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Carry the dense-rank execution-class identity through all phases."
+    },
+    {
+      "name": "PSION_RUN_ROOT",
+      "value_template": "/var/lib/psion-google/runs/${RUN_ID}",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_LAUNCH_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-google-single-node-accelerated/launch",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_CHECKPOINT_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-google-single-node-accelerated/checkpoints",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_METRICS_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-google-single-node-accelerated/metrics",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_VISUALIZATION_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-google-single-node-accelerated/training_visualization",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_FINAL_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-google-single-node-accelerated/final",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_BUCKET_URL",
+      "value_template": "gs://openagentsgemini-psion-train-us-central1",
+      "phases": [
+        "launch",
+        "startup",
+        "finalizer"
+      ],
+      "detail": "Bucket authority for Google-hosted retained artifacts."
+    },
+    {
+      "name": "PSION_REPO_GIT_REVISION",
+      "value_template": "workspace@${GIT_REVISION}",
+      "phases": [
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Propagate the detached repo revision chosen by the launcher into startup and finalization."
+    }
+  ],
+  "artifact_roots": {
+    "run_root": "/var/lib/psion-google/runs/${RUN_ID}",
+    "launch_root": "runs/psion-xprovider-pretrain-google-single-node-accelerated/launch",
+    "checkpoint_root": "runs/psion-xprovider-pretrain-google-single-node-accelerated/checkpoints",
+    "metrics_root": "runs/psion-xprovider-pretrain-google-single-node-accelerated/metrics",
+    "visualization_root": "runs/psion-xprovider-pretrain-google-single-node-accelerated/training_visualization",
+    "final_root": "runs/psion-xprovider-pretrain-google-single-node-accelerated/final"
+  },
+  "cluster_port_bindings": [],
+  "startup_plan": {
+    "startup_kind": "metadata_startup_script",
+    "startup_entrypoint": "scripts/psion-google-single-node-startup.sh",
+    "required_env_names": [
+      "PSION_RUN_ID",
+      "PSION_RUN_ROOT",
+      "PSION_OUTPUT_DIR",
+      "PSION_LOG_DIR",
+      "PSION_SCRATCH_DIR",
+      "PSION_REPO_DIR"
+    ],
+    "required_artifacts": [
+      "launch_manifest",
+      "input_package_descriptor",
+      "input_package_archive"
+    ],
+    "projected_startup_argv": [
+      "scripts/psion-google-single-node-startup.sh"
+    ],
+    "detail": "The Google single-node startup path remains metadata-driven, but the shared launch contract now owns the runtime env and artifact-root envelope above those metadata bindings."
+  },
+  "finalizer_plan": {
+    "finalizer_kind": "host_finalizer",
+    "finalizer_entrypoint": "scripts/psion-google-finalize-run.sh",
+    "required_env_names": [
+      "PSION_RUN_ID",
+      "PSION_RUN_ROOT",
+      "PSION_REPO_DIR",
+      "PSION_FINAL_ROOT"
+    ],
+    "required_input_artifacts": [
+      "launch_manifest",
+      "stage_receipt",
+      "observability_receipt"
+    ],
+    "expected_output_artifacts": [
+      "final/psion_google_final_manifest.json",
+      "training_visualization/remote_training_run_index_v1.json"
+    ],
+    "admitted_result_classifications": [
+      "bounded_success",
+      "training_runtime_failure",
+      "artifact_upload_failure",
+      "checkpoint_restore_failure"
+    ],
+    "projected_finalizer_argv": [
+      "scripts/psion-google-finalize-run.sh",
+      "--run-root",
+      "${PSION_RUN_ROOT}",
+      "--repo-dir",
+      "${PSION_REPO_DIR}",
+      "--run-id",
+      "${PSION_RUN_ID}",
+      "--launch-manifest-uri",
+      "${PSION_LAUNCH_MANIFEST_URI}"
+    ],
+    "detail": "The finalizer expectations stay explicit for final manifest upload, accelerator evidence sealing, and retained visualization artifacts."
+  },
+  "projected_steps": [
+    {
+      "step_id": "google_single_node_launch",
+      "phase": "launch",
+      "argv_template": [
+        "scripts/psion-google-launch-single-node.sh",
+        "--profile",
+        "g2_l4_single_node_accelerated",
+        "--run-id",
+        "${PSION_RUN_ID}"
+      ],
+      "env_names": [
+        "PSION_RUN_ID",
+        "PSION_PROGRAM_MANIFEST_ID",
+        "PSION_LAUNCH_ROOT"
+      ],
+      "detail": "Provider-specific Google launcher that creates the VM and binds metadata."
+    },
+    {
+      "step_id": "google_single_node_startup",
+      "phase": "startup",
+      "argv_template": [
+        "scripts/psion-google-single-node-startup.sh"
+      ],
+      "env_names": [
+        "PSION_RUN_ID",
+        "PSION_RUN_ROOT",
+        "PSION_REPO_GIT_REVISION"
+      ],
+      "detail": "Metadata-driven startup script that materializes the runtime envelope."
+    },
+    {
+      "step_id": "google_single_node_finalizer",
+      "phase": "finalizer",
+      "argv_template": [
+        "scripts/psion-google-finalize-run.sh",
+        "--run-root",
+        "${PSION_RUN_ROOT}",
+        "--repo-dir",
+        "${PSION_REPO_DIR}",
+        "--run-id",
+        "${PSION_RUN_ID}"
+      ],
+      "env_names": [
+        "PSION_RUN_ID",
+        "PSION_RUN_ROOT",
+        "PSION_FINAL_ROOT"
+      ],
+      "detail": "Host finalizer that seals retained evidence under the shared finalizer contract."
+    }
+  ],
+  "claim_boundary": "This launch contract proves the Google single-node accelerated lane can be described through the same provider-neutral runtime envelope as the other launchers. It does not claim provider API automation closure beyond the existing Google scripts, nor dense multi-node closure by itself.",
+  "launch_contract_digest": "2d614daa49c3ec2b8eb0e55aee8803b62b713a2e70293790d166cd8c3016bff0"
+}

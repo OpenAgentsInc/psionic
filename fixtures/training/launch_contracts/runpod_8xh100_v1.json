@@ -1,0 +1,278 @@
+{
+  "schema_version": "psionic.cross_provider_launch_contract.v1",
+  "launch_contract_id": "psionic-runpod-8xh100-launch-contract-v1",
+  "binder_kind": "run_pod_single_pod",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "source_binding": {
+    "source_id": "runpod_8xh100_dense_node",
+    "source_class": "runpod",
+    "provider": "run_pod",
+    "backend_family": "cuda",
+    "source_contract_digest": "f4b1b236dd490ad6e1cdfda9538e5f0139a84449d003047332da6599f8c67672",
+    "detail": "This launch contract binds directly to the canonical RunPod 8xH100 compute-source contract from XTRAIN-2."
+  },
+  "requested_execution_class": "dense_full_model_rank",
+  "run_id": "psion-xprovider-pretrain-runpod-8xh100",
+  "runtime_env": [
+    {
+      "name": "PSION_PROGRAM_MANIFEST_ID",
+      "value_template": "psionic-cross-provider-pretraining-program-v1",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Bind the RunPod lane to the root cross-provider pretraining program."
+    },
+    {
+      "name": "PSION_PROGRAM_MANIFEST_DIGEST",
+      "value_template": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Carry the exact program-manifest digest into RunPod runtime and finalizer phases."
+    },
+    {
+      "name": "PSION_RUN_ID",
+      "value_template": "psion-xprovider-pretrain-runpod-8xh100",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Stable run id for the RunPod dense lane."
+    },
+    {
+      "name": "PSION_EXECUTION_CLASS",
+      "value_template": "dense_full_model_rank",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Carry the dense-rank execution class through the RunPod lane."
+    },
+    {
+      "name": "PSION_RUN_ROOT",
+      "value_template": "/workspace/parameter-golf-runpod/${RUN_ID}",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_LAUNCH_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-runpod-8xh100/launch",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_CHECKPOINT_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-runpod-8xh100/checkpoints",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_METRICS_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-runpod-8xh100/metrics",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_VISUALIZATION_ROOT",
+      "value_template": "${PSION_RUN_ROOT}/training_visualization",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_FINAL_ROOT",
+      "value_template": "${PSION_RUN_ROOT}",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PGOLF_RUN_ROOT",
+      "value_template": "${PSION_RUN_ROOT}",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Retain compatibility with the existing RunPod operator script surface."
+    },
+    {
+      "name": "PGOLF_SUBMISSION_DIR",
+      "value_template": "${PSION_RUN_ROOT}/exported_submission/records/track_non_record_16mb/2026-03-18_psionic_local_reference_runtime_replay_v2",
+      "phases": [
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Retain compatibility with the existing exported-folder finalizer and runtime paths."
+    },
+    {
+      "name": "PGOLF_REPO_DIR",
+      "value_template": "/workspace/psionic",
+      "phases": [
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Retain compatibility with the existing RunPod repo checkout location."
+    }
+  ],
+  "artifact_roots": {
+    "run_root": "/workspace/parameter-golf-runpod/${RUN_ID}",
+    "launch_root": "runs/psion-xprovider-pretrain-runpod-8xh100/launch",
+    "checkpoint_root": "runs/psion-xprovider-pretrain-runpod-8xh100/checkpoints",
+    "metrics_root": "runs/psion-xprovider-pretrain-runpod-8xh100/metrics",
+    "visualization_root": "${PSION_RUN_ROOT}/training_visualization",
+    "final_root": "${PSION_RUN_ROOT}"
+  },
+  "cluster_port_bindings": [],
+  "startup_plan": {
+    "startup_kind": "remote_phase_chain",
+    "startup_entrypoint": "scripts/parameter-golf-runpod-launch-8xh100.sh",
+    "required_env_names": [
+      "PSION_RUN_ID",
+      "PGOLF_RUN_ROOT",
+      "PGOLF_SUBMISSION_DIR"
+    ],
+    "required_artifacts": [
+      "launch_manifest",
+      "launch_receipt",
+      "remote_preflight.log"
+    ],
+    "projected_startup_argv": [
+      "scripts/parameter-golf-runpod-launch-8xh100.sh",
+      "--profile",
+      "runpod_8xh100_parameter_golf",
+      "--run-id",
+      "${PSION_RUN_ID}"
+    ],
+    "detail": "The RunPod lane keeps its remote preflight, pre-training, execution, and finalizer chain, but the shared launch contract now owns the env and artifact-root envelope above that phase chain."
+  },
+  "finalizer_plan": {
+    "finalizer_kind": "remote_finalizer",
+    "finalizer_entrypoint": "scripts/parameter-golf-runpod-finalize-8xh100.sh",
+    "required_env_names": [
+      "PGOLF_RUN_ROOT",
+      "PGOLF_SUBMISSION_DIR",
+      "PSION_VISUALIZATION_ROOT"
+    ],
+    "required_input_artifacts": [
+      "parameter_golf_runpod_8xh100_launch_manifest.json",
+      "execution.log",
+      "nvidia_smi_inventory.txt"
+    ],
+    "expected_output_artifacts": [
+      "parameter_golf_distributed_8xh100_receipt.json",
+      "parameter_golf_runpod_8xh100_finalizer_report.json",
+      "training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
+      "training_visualization/remote_training_run_index_v1.json"
+    ],
+    "admitted_result_classifications": [
+      "bounded_success",
+      "measurements_missing",
+      "inventory_mismatch"
+    ],
+    "projected_finalizer_argv": [
+      "scripts/parameter-golf-runpod-finalize-8xh100.sh",
+      "--run-root",
+      "${PGOLF_RUN_ROOT}",
+      "--submission-dir",
+      "${PGOLF_SUBMISSION_DIR}",
+      "--output",
+      "${PSION_FINAL_ROOT}/parameter_golf_runpod_8xh100_finalizer_report.json"
+    ],
+    "detail": "The finalizer expectations remain explicit for the distributed receipt, exported-folder evidence, and always-live visualization bundle family."
+  },
+  "projected_steps": [
+    {
+      "step_id": "runpod_launch",
+      "phase": "launch",
+      "argv_template": [
+        "scripts/parameter-golf-runpod-launch-8xh100.sh",
+        "--profile",
+        "runpod_8xh100_parameter_golf",
+        "--run-id",
+        "${PSION_RUN_ID}"
+      ],
+      "env_names": [
+        "PSION_RUN_ID",
+        "PGOLF_RUN_ROOT",
+        "PGOLF_SUBMISSION_DIR"
+      ],
+      "detail": "Provider-specific RunPod launcher that binds SSH, workspace, and manifest roots."
+    },
+    {
+      "step_id": "runpod_runtime",
+      "phase": "runtime",
+      "argv_template": [
+        "python3",
+        "train_gpt.py"
+      ],
+      "env_names": [
+        "PGOLF_RUN_ROOT",
+        "PGOLF_SUBMISSION_DIR",
+        "PSION_EXECUTION_CLASS"
+      ],
+      "detail": "Remote dense runtime entrypoint inside the pod-local phase chain."
+    },
+    {
+      "step_id": "runpod_finalizer",
+      "phase": "finalizer",
+      "argv_template": [
+        "scripts/parameter-golf-runpod-finalize-8xh100.sh",
+        "--run-root",
+        "${PGOLF_RUN_ROOT}",
+        "--submission-dir",
+        "${PGOLF_SUBMISSION_DIR}"
+      ],
+      "env_names": [
+        "PGOLF_RUN_ROOT",
+        "PGOLF_SUBMISSION_DIR",
+        "PSION_VISUALIZATION_ROOT"
+      ],
+      "detail": "Remote finalizer for the distributed receipt and visualization bundle."
+    }
+  ],
+  "claim_boundary": "This launch contract proves the RunPod 8xH100 lane can be projected from the same provider-neutral runtime envelope as the Google and local lanes. It does not claim cross-host RunPod cluster closure or dense mixed-backend training.",
+  "launch_contract_digest": "f1f62e7ef9fc1b7c61ba828139b17d91199927cd3f60503345bdb13352c91a63"
+}

@@ -1,0 +1,250 @@
+{
+  "schema_version": "psionic.cross_provider_launch_contract.v1",
+  "launch_contract_id": "psionic-google-two-node-swarm-launch-contract-v1",
+  "binder_kind": "google_two_node_swarm",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "source_binding": {
+    "source_id": "google_l4_validator_node",
+    "source_class": "google_cloud",
+    "provider": "google_cloud",
+    "backend_family": "cuda",
+    "source_contract_digest": "505b459944dc9d645a603add2c6608fb01defac97830b537c3a42da32a76256f",
+    "detail": "This launch contract binds directly to the canonical Google L4 compute-source contract from XTRAIN-2."
+  },
+  "requested_execution_class": "validated_contributor_window",
+  "run_id": "psion-xprovider-pretrain-google-two-node-swarm",
+  "runtime_env": [
+    {
+      "name": "PSION_PROGRAM_MANIFEST_ID",
+      "value_template": "psionic-cross-provider-pretraining-program-v1",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Bind the Google swarm lane to the root cross-provider pretraining program."
+    },
+    {
+      "name": "PSION_PROGRAM_MANIFEST_DIGEST",
+      "value_template": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Carry the exact program-manifest digest into the swarm lane."
+    },
+    {
+      "name": "PSION_RUN_ID",
+      "value_template": "psion-xprovider-pretrain-google-two-node-swarm",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Stable run id for the Google two-node swarm lane."
+    },
+    {
+      "name": "PSION_EXECUTION_CLASS",
+      "value_template": "validated_contributor_window",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Carry the validated contributor execution class through the swarm lane."
+    },
+    {
+      "name": "PSION_RUN_ROOT",
+      "value_template": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_LAUNCH_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-google-two-node-swarm/launch",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_CHECKPOINT_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-google-two-node-swarm/checkpoints",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_METRICS_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-google-two-node-swarm/metrics",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_VISUALIZATION_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-google-two-node-swarm/training_visualization",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_FINAL_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-google-two-node-swarm/final",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_CLUSTER_NAMESPACE",
+      "value_template": "cluster.psion.google.configured_peer_swarm",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Bind the swarm lane to the committed configured-peer cluster namespace."
+    }
+  ],
+  "artifact_roots": {
+    "run_root": "gs://openagentsgemini-psion-train-us-central1/runs/${RUN_ID}",
+    "launch_root": "runs/psion-xprovider-pretrain-google-two-node-swarm/launch",
+    "checkpoint_root": "runs/psion-xprovider-pretrain-google-two-node-swarm/checkpoints",
+    "metrics_root": "runs/psion-xprovider-pretrain-google-two-node-swarm/metrics",
+    "visualization_root": "runs/psion-xprovider-pretrain-google-two-node-swarm/training_visualization",
+    "final_root": "runs/psion-xprovider-pretrain-google-two-node-swarm/final"
+  },
+  "cluster_port_bindings": [
+    {
+      "binding_id": "configured_peer_cluster_port",
+      "role": "coordinator_listener",
+      "port": 34100,
+      "detail": "Reserved cluster port for the configured-peer Google swarm coordinator."
+    }
+  ],
+  "startup_plan": {
+    "startup_kind": "metadata_startup_script",
+    "startup_entrypoint": "scripts/psion-google-two-node-swarm-startup.sh",
+    "required_env_names": [
+      "PSION_RUN_ID",
+      "PSION_CLUSTER_NAMESPACE",
+      "PSION_RUN_ROOT"
+    ],
+    "required_artifacts": [
+      "cluster_manifest",
+      "endpoint_manifest"
+    ],
+    "projected_startup_argv": [
+      "scripts/psion-google-two-node-swarm-startup.sh"
+    ],
+    "detail": "The swarm startup path stays metadata-driven, but the shared launch contract now owns the cluster namespace, run root, and cluster-port authority above it."
+  },
+  "finalizer_plan": {
+    "finalizer_kind": "host_finalizer",
+    "finalizer_entrypoint": "scripts/psion-google-finalize-two-node-swarm-run.sh",
+    "required_env_names": [
+      "PSION_RUN_ID",
+      "PSION_FINAL_ROOT",
+      "PSION_VISUALIZATION_ROOT"
+    ],
+    "required_input_artifacts": [
+      "cluster_manifest",
+      "launch_receipt",
+      "coordinator_runtime_report",
+      "contributor_runtime_report"
+    ],
+    "expected_output_artifacts": [
+      "psion_google_two_node_swarm_evidence_bundle.json",
+      "psion_google_two_node_swarm_final_manifest.json"
+    ],
+    "admitted_result_classifications": [
+      "configured_peer_launch_failure",
+      "cluster_membership_failure",
+      "bounded_success"
+    ],
+    "projected_finalizer_argv": [
+      "scripts/psion-google-finalize-two-node-swarm-run.sh",
+      "--run-id",
+      "${PSION_RUN_ID}"
+    ],
+    "detail": "The finalizer expectations stay explicit for the cluster-wide evidence bundle and final manifest that the Google swarm lane already retains."
+  },
+  "projected_steps": [
+    {
+      "step_id": "google_swarm_launch",
+      "phase": "launch",
+      "argv_template": [
+        "scripts/psion-google-launch-two-node-swarm.sh",
+        "--run-id",
+        "${PSION_RUN_ID}"
+      ],
+      "env_names": [
+        "PSION_RUN_ID",
+        "PSION_CLUSTER_NAMESPACE",
+        "PSION_LAUNCH_ROOT"
+      ],
+      "detail": "Provider-specific Google swarm launcher that binds the configured-peer nodes."
+    },
+    {
+      "step_id": "google_swarm_startup",
+      "phase": "startup",
+      "argv_template": [
+        "scripts/psion-google-two-node-swarm-startup.sh"
+      ],
+      "env_names": [
+        "PSION_RUN_ID",
+        "PSION_RUN_ROOT",
+        "PSION_CLUSTER_NAMESPACE"
+      ],
+      "detail": "Metadata-driven startup script for the two-node swarm lane."
+    },
+    {
+      "step_id": "google_swarm_finalizer",
+      "phase": "finalizer",
+      "argv_template": [
+        "scripts/psion-google-finalize-two-node-swarm-run.sh",
+        "--run-id",
+        "${PSION_RUN_ID}"
+      ],
+      "env_names": [
+        "PSION_RUN_ID",
+        "PSION_FINAL_ROOT",
+        "PSION_VISUALIZATION_ROOT"
+      ],
+      "detail": "Host finalizer for cluster-wide evidence bundle sealing."
+    }
+  ],
+  "claim_boundary": "This launch contract proves the Google two-node swarm lane can be projected from the same provider-neutral runtime envelope as the other launchers. It does not claim dense full-model Google training closure by itself.",
+  "launch_contract_digest": "51c2b3663878154324f4beb613582a3229ec4b083d99b73688054da97b53d7cf"
+}

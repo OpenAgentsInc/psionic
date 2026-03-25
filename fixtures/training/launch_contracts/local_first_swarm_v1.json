@@ -1,0 +1,237 @@
+{
+  "schema_version": "psionic.cross_provider_launch_contract.v1",
+  "launch_contract_id": "psionic-local-first-swarm-launch-contract-v1",
+  "binder_kind": "local_trusted_lan",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "source_binding": {
+    "source_id": "local_mlx_mac_workstation",
+    "source_class": "trusted_lan_cluster",
+    "provider": "local_operator_managed",
+    "backend_family": "mlx_metal",
+    "source_contract_digest": "6eed4f0ba8022909bc3c6320da31341b3c6269e8cfc4b3d935143302fc732142",
+    "detail": "This launch contract binds the first local trusted-LAN swarm to the canonical local Apple contributor source while keeping the wider cluster posture explicit."
+  },
+  "requested_execution_class": "validated_contributor_window",
+  "run_id": "psion-xprovider-pretrain-local-first-swarm",
+  "runtime_env": [
+    {
+      "name": "PSION_PROGRAM_MANIFEST_ID",
+      "value_template": "psionic-cross-provider-pretraining-program-v1",
+      "phases": [
+        "launch",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Bind the local swarm lane to the root cross-provider pretraining program."
+    },
+    {
+      "name": "PSION_PROGRAM_MANIFEST_DIGEST",
+      "value_template": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+      "phases": [
+        "launch",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Carry the exact program-manifest digest into the local swarm lane."
+    },
+    {
+      "name": "PSION_RUN_ID",
+      "value_template": "psion-xprovider-pretrain-local-first-swarm",
+      "phases": [
+        "launch",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Stable run id for the first local trusted-LAN swarm."
+    },
+    {
+      "name": "PSION_EXECUTION_CLASS",
+      "value_template": "validated_contributor_window",
+      "phases": [
+        "launch",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Carry the validated contributor execution class through the local swarm lane."
+    },
+    {
+      "name": "PSION_RUN_ROOT",
+      "value_template": "${HOME}/swarm-runs/${RUN_ID}",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_LAUNCH_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-local-first-swarm/launch",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_CHECKPOINT_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-local-first-swarm/checkpoints",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_METRICS_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-local-first-swarm/metrics",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_VISUALIZATION_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-local-first-swarm/training_visualization",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_FINAL_ROOT",
+      "value_template": "runs/psion-xprovider-pretrain-local-first-swarm/final",
+      "phases": [
+        "launch",
+        "startup",
+        "runtime",
+        "finalizer"
+      ],
+      "detail": "Shared artifact-root binding in the provider-neutral launch contract."
+    },
+    {
+      "name": "PSION_BUNDLE_DIR",
+      "value_template": "${PSION_RUN_ROOT}/bundle",
+      "phases": [
+        "launch",
+        "runtime"
+      ],
+      "detail": "Local operator-bundle directory retained by the first swarm launcher."
+    }
+  ],
+  "artifact_roots": {
+    "run_root": "${HOME}/swarm-runs/${RUN_ID}",
+    "launch_root": "runs/psion-xprovider-pretrain-local-first-swarm/launch",
+    "checkpoint_root": "runs/psion-xprovider-pretrain-local-first-swarm/checkpoints",
+    "metrics_root": "runs/psion-xprovider-pretrain-local-first-swarm/metrics",
+    "visualization_root": "runs/psion-xprovider-pretrain-local-first-swarm/training_visualization",
+    "final_root": "runs/psion-xprovider-pretrain-local-first-swarm/final"
+  },
+  "cluster_port_bindings": [],
+  "startup_plan": {
+    "startup_kind": "local_bundle_materialization",
+    "startup_entrypoint": "scripts/first-swarm-launch-trusted-lan.sh",
+    "required_env_names": [
+      "PSION_RUN_ID",
+      "PSION_RUN_ROOT",
+      "PSION_BUNDLE_DIR"
+    ],
+    "required_artifacts": [
+      "first_swarm_trusted_lan_topology_contract_v1.json",
+      "first_swarm_live_workflow_plan_v1.json"
+    ],
+    "projected_startup_argv": [
+      "scripts/first-swarm-launch-trusted-lan.sh",
+      "--run-id",
+      "${PSION_RUN_ID}",
+      "--bundle-dir",
+      "${PSION_BUNDLE_DIR}"
+    ],
+    "detail": "The local swarm startup path remains a local operator bundle that reuses the committed topology contract and workflow plan digests `144481e413d4892b375e7b5f2fd8d24b7d98094806506b0e00a34262a2a9aa07` and `573b6df00266981819b8cb08654ac6e6f727418cb5a46768255e8ea27b2f2821`."
+  },
+  "finalizer_plan": {
+    "finalizer_kind": "local_closeout",
+    "finalizer_entrypoint": "cargo run -q -p psionic-train --bin first_swarm_trusted_lan_closeout_report -- ${PSION_FINAL_ROOT}/first_swarm_trusted_lan_closeout_v1.json",
+    "required_env_names": [
+      "PSION_RUN_ID",
+      "PSION_FINAL_ROOT"
+    ],
+    "required_input_artifacts": [
+      "first_swarm_trusted_lan_launch_manifest.json",
+      "first_swarm_trusted_lan_evidence_bundle_v1.json"
+    ],
+    "expected_output_artifacts": [
+      "first_swarm_trusted_lan_closeout_v1.json"
+    ],
+    "admitted_result_classifications": [
+      "no_merge",
+      "publish_refused"
+    ],
+    "projected_finalizer_argv": [
+      "cargo",
+      "run",
+      "-q",
+      "-p",
+      "psionic-train",
+      "--bin",
+      "first_swarm_trusted_lan_closeout_report",
+      "--",
+      "${PSION_FINAL_ROOT}/first_swarm_trusted_lan_closeout_v1.json"
+    ],
+    "detail": "The first local swarm lane still closes through a local closeout report rather than a remote host finalizer, but the expected inputs and output are now explicit in the shared launch contract."
+  },
+  "projected_steps": [
+    {
+      "step_id": "local_swarm_launch",
+      "phase": "launch",
+      "argv_template": [
+        "scripts/first-swarm-launch-trusted-lan.sh",
+        "--run-id",
+        "${PSION_RUN_ID}",
+        "--bundle-dir",
+        "${PSION_BUNDLE_DIR}",
+        "--manifest-only"
+      ],
+      "env_names": [
+        "PSION_RUN_ID",
+        "PSION_BUNDLE_DIR",
+        "PSION_RUN_ROOT"
+      ],
+      "detail": "Provider-specific local launcher that materializes the operator bundle and trusted-LAN manifest."
+    },
+    {
+      "step_id": "local_swarm_closeout",
+      "phase": "finalizer",
+      "argv_template": [
+        "cargo",
+        "run",
+        "-q",
+        "-p",
+        "psionic-train",
+        "--bin",
+        "first_swarm_trusted_lan_closeout_report",
+        "--",
+        "${PSION_FINAL_ROOT}/first_swarm_trusted_lan_closeout_v1.json"
+      ],
+      "env_names": [
+        "PSION_RUN_ID",
+        "PSION_FINAL_ROOT"
+      ],
+      "detail": "Local closeout report path for the first swarm lane."
+    }
+  ],
+  "claim_boundary": "This launch contract proves the first local trusted-LAN swarm can be projected from the same provider-neutral runtime envelope as the Google and RunPod lanes. It does not claim dense-rank closure, public swarm discovery, or same-job mixed-backend dense training.",
+  "launch_contract_digest": "2806a79839fb4a628101341343af52cbea4f702f8652567b453118a81d0f141a"
+}

@@ -84,6 +84,18 @@ examples, and provider-neutral planner plus launch inputs. It keeps unsupported
 role claims fail-closed instead of letting each provider lane widen its own
 machine semantics.
 
+The repo now also owns a canonical provider-neutral launch-contract family in
+`crates/psionic-train/src/cross_provider_launch_contract.rs`, the binary
+`cross_provider_launch_contracts`, the checker
+`scripts/check-cross-provider-launch-contracts.sh`, the focused reference doc
+`docs/LAUNCH_CONTRACT_REFERENCE.md`, and the committed fixtures under
+`fixtures/training/launch_contracts/`. That surface freezes one shared runtime
+envelope above the current Google single-node, Google swarm, RunPod, and local
+trusted-LAN launchers: explicit runtime env, artifact roots, cluster-port
+bindings, startup expectations, finalizer expectations, and projected
+provider-specific step sequences. Resource creation remains provider-specific,
+but the training-facing launch semantics are now typed in one place.
+
 The first local mixed-hardware swarm lane now also has a canonical machine-
 legible contract in `crates/psionic-train/src/swarm_open_adapter.rs` plus the
 committed fixture `fixtures/swarm/first_swarm_run_contract_v1.json`. That
