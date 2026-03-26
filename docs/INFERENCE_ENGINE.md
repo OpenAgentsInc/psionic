@@ -22,8 +22,8 @@ than just run tensor math.
 - Generic OpenAI-compatible GGUF serving may expose different runtime truth per
   loaded model inside the same process. Publication must stay model-specific in
   `/health`, `/v1/models`, and response headers.
-- `qwen35` is `implemented_early` through a dedicated CPU text-only
-  `llama.cpp` proxy runtime.
+- `qwen35` is `implemented_early` through a dedicated CPU `llama.cpp` proxy
+  runtime with prompt-projected image and video inputs.
 - The `qwen35` lane must publish:
   - `backend = cpu`
   - `execution_mode = proxy`
@@ -31,12 +31,19 @@ than just run tensor math.
   - `residency_mode = llama_cpp_proxy`
   - single-request execution posture
   - no scheduler policy claim
+- The `qwen35` lane must also publish:
+  - `multimodal_projection_mode = prompt_projection_only`
+  - accepted projected media = `image`, `video`
+  - the derived `qwen35` multimodal projection config from GGUF family facts
 - The first `qwen35` lane supports prompt-replay response-state flows on
   `/v1/responses`.
+- The first `qwen35` lane supports image and video request projection on
+  `/v1/chat/completions` and `/v1/responses` without claiming a native image or
+  video encoder.
 - The first `qwen35` lane must fail closed for structured outputs and tool
   calling.
-- The first `qwen35` lane must fail closed for image and video request content
-  until dedicated multimodal support lands.
+- The first `qwen35` lane must still fail closed for system-message image and
+  video parts to stay aligned with the real template semantics.
 
 ## Embeddings Requirements
 

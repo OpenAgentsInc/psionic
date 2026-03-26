@@ -29,9 +29,9 @@ use psionic_models::{
     GgufBlobArtifact, GgufDecoderFamily, GgufPromptTemplateRenderer, GptOssHarmonyParseOptions,
     GptOssHarmonyParsedOutput, GptOssHarmonyRenderContext, GptOssTokenizer,
     ParsedReasoningResponse, PromptChannelConfig, PromptMessage, PromptMessageRole,
-    PromptReasoningEffort, PromptRenderOptions, ReasoningParser, parse_gpt_oss_harmony_text,
-    parse_reasoning_response_text_for_decoder_family, reasoning_parser_for_decoder_family,
-    render_gpt_oss_harmony_prompt,
+    PromptReasoningEffort, PromptRenderOptions, Qwen35MultimodalProjectionConfig, ReasoningParser,
+    parse_gpt_oss_harmony_text, parse_reasoning_response_text_for_decoder_family,
+    reasoning_parser_for_decoder_family, render_gpt_oss_harmony_prompt,
 };
 use psionic_router::{
     FleetRouter, ResponseConversationRef, ResponseStateCapability, ResponseStateError,
@@ -841,6 +841,7 @@ enum OpenAiCompatLoadedModelKind {
 struct OpenAiCompatLoadedDecoderModel {
     descriptor: DecoderModelDescriptor,
     family: GgufDecoderFamily,
+    qwen35_multimodal_projection: Option<Qwen35MultimodalProjectionConfig>,
     prompt_renderer: Option<GgufPromptTemplateRenderer>,
     prompt_options: PromptRenderOptions,
     execution_profile: ExecutionCapabilityProfile,
@@ -987,6 +988,23 @@ impl OpenAiCompatLoadedModel {
     fn embedding_normalization(&self) -> Option<EmbeddingNormalization> {
         self.embeddings()
             .map(|model| model.descriptor.normalization)
+    }
+
+    fn multimodal_projection_mode(&self) -> Option<&'static str> {
+        self.decoder()
+            .and_then(|model| model.qwen35_multimodal_projection.as_ref())
+            .map(|_| "prompt_projection_only")
+    }
+
+    fn multimodal_supported_media(&self) -> Option<Vec<&'static str>> {
+        self.decoder()
+            .and_then(|model| model.qwen35_multimodal_projection.as_ref())
+            .map(|_| vec!["image", "video"])
+    }
+
+    fn multimodal_projection_config(&self) -> Option<Qwen35MultimodalProjectionConfig> {
+        self.decoder()
+            .and_then(|model| model.qwen35_multimodal_projection.clone())
     }
 }
 
@@ -1801,6 +1819,12 @@ struct ModelCard {
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_scheduler_policy: Option<GenerationSchedulerPolicy>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_multimodal_projection_mode: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_multimodal_supported_media: Option<Vec<&'static str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_multimodal_projection_config: Option<Qwen35MultimodalProjectionConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     psionic_embedding_dimensions: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_embedding_normalization: Option<EmbeddingNormalization>,
@@ -1828,6 +1852,9 @@ async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<
             psionic_response_state: None,
             psionic_execution_profile: None,
             psionic_scheduler_policy: None,
+            psionic_multimodal_projection_mode: None,
+            psionic_multimodal_supported_media: None,
+            psionic_multimodal_projection_config: None,
             psionic_embedding_dimensions: None,
             psionic_embedding_normalization: None,
         }],
@@ -1865,6 +1892,12 @@ struct GenericHealthResponse {
     execution_profile: ExecutionCapabilityProfile,
     #[serde(skip_serializing_if = "Option::is_none")]
     scheduler_policy: Option<GenerationSchedulerPolicy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    multimodal_projection_mode: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    multimodal_supported_media: Option<Vec<&'static str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    multimodal_projection_config: Option<Qwen35MultimodalProjectionConfig>,
 }
 
 async fn generic_health(
@@ -1900,6 +1933,9 @@ async fn generic_health(
         response_state: default_model.response_state_capability(state.as_ref()),
         execution_profile: default_model.execution_profile().clone(),
         scheduler_policy: default_model.scheduler_policy().cloned(),
+        multimodal_projection_mode: default_model.multimodal_projection_mode(),
+        multimodal_supported_media: default_model.multimodal_supported_media(),
+        multimodal_projection_config: default_model.multimodal_projection_config(),
     })
 }
 
@@ -1930,6 +1966,9 @@ async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Jso
                 psionic_response_state: model.response_state_capability(state.as_ref()),
                 psionic_execution_profile: Some(model.execution_profile().clone()),
                 psionic_scheduler_policy: model.scheduler_policy().cloned(),
+                psionic_multimodal_projection_mode: model.multimodal_projection_mode(),
+                psionic_multimodal_supported_media: model.multimodal_supported_media(),
+                psionic_multimodal_projection_config: model.multimodal_projection_config(),
                 psionic_embedding_dimensions: model.embedding_dimensions(),
                 psionic_embedding_normalization: model.embedding_normalization(),
             })
@@ -2999,7 +3038,7 @@ async fn handle_generic_chat_completions(
     let reasoning_request =
         reasoning_request_for_family(request.psionic_reasoning.as_ref(), model.family)?;
     let prompt_messages = apply_tool_contract_to_prompt_messages(
-        chat_messages_to_prompt_messages_for_family(&request.messages, model.family)?,
+        chat_messages_to_prompt_messages_for_decoder(&request.messages, model)?,
         tool_contract.as_ref(),
     );
     let rendered = render_prompt_for_model(loaded_model, prompt_messages.as_slice())?;
@@ -3329,7 +3368,7 @@ async fn handle_generic_responses(
         reasoning_request_for_family(request.psionic_reasoning.as_ref(), model.family)?;
     let appended_prompt_messages = response_input_to_prompt_messages_with_options(
         &request,
-        model.family,
+        model,
         response_state_context.prompt_history.is_empty(),
         false,
     )?;
@@ -4544,6 +4583,9 @@ fn load_generic_decoder_model(
         kind: OpenAiCompatLoadedModelKind::Decoder(OpenAiCompatLoadedDecoderModel {
             descriptor: descriptor.clone(),
             family,
+            qwen35_multimodal_projection: adapter
+                .family_metadata()
+                .qwen35_multimodal_projection_config(),
             prompt_renderer: (!matches!(family, GgufDecoderFamily::GptOss))
                 .then(|| adapter.prompt_renderer()),
             prompt_options: prompt_options_for_family(family, reasoning_budget),
@@ -4827,7 +4869,7 @@ fn generation_options_from_responses_request(
 
 fn response_input_to_prompt_messages_with_options(
     request: &ResponsesRequest,
-    family: GgufDecoderFamily,
+    model: &OpenAiCompatLoadedDecoderModel,
     include_instructions: bool,
     allow_empty_input: bool,
 ) -> Result<Vec<PromptMessage>, OpenAiCompatHttpError> {
@@ -4852,7 +4894,7 @@ fn response_input_to_prompt_messages_with_options(
             }
         }
     }
-    chat_messages_to_prompt_messages_for_family(messages.as_slice(), family)
+    chat_messages_to_prompt_messages_for_decoder(messages.as_slice(), model)
 }
 
 fn assistant_history_from_response(
@@ -4896,6 +4938,20 @@ fn chat_messages_to_prompt_messages(
     chat_messages_to_prompt_messages_for_family(messages, GgufDecoderFamily::GptOss)
 }
 
+fn chat_messages_to_prompt_messages_for_decoder(
+    messages: &[ChatCompletionMessage],
+    model: &OpenAiCompatLoadedDecoderModel,
+) -> Result<Vec<PromptMessage>, OpenAiCompatHttpError> {
+    if matches!(model.family, GgufDecoderFamily::GptOss) {
+        return chat_messages_to_prompt_messages_gpt_oss(messages);
+    }
+    chat_messages_to_prompt_messages_generic(
+        messages,
+        model.family,
+        model.qwen35_multimodal_projection.as_ref(),
+    )
+}
+
 fn chat_messages_to_prompt_messages_for_family(
     messages: &[ChatCompletionMessage],
     family: GgufDecoderFamily,
@@ -4903,7 +4959,7 @@ fn chat_messages_to_prompt_messages_for_family(
     if matches!(family, GgufDecoderFamily::GptOss) {
         return chat_messages_to_prompt_messages_gpt_oss(messages);
     }
-    chat_messages_to_prompt_messages_generic(messages, family)
+    chat_messages_to_prompt_messages_generic(messages, family, None)
 }
 
 fn chat_messages_to_prompt_messages_gpt_oss(
@@ -4939,7 +4995,12 @@ fn chat_messages_to_prompt_messages_gpt_oss(
         };
         let mut prompt = PromptMessage::new(
             normalized_role,
-            chat_message_content_to_text(&message.content, GgufDecoderFamily::GptOss)?,
+            chat_message_content_to_text(
+                &message.content,
+                GgufDecoderFamily::GptOss,
+                normalized_role,
+                None,
+            )?,
         );
         if normalized_role == PromptMessageRole::Tool {
             let Some(name) = message.name.as_ref() else {
@@ -4957,6 +5018,7 @@ fn chat_messages_to_prompt_messages_gpt_oss(
 fn chat_messages_to_prompt_messages_generic(
     messages: &[ChatCompletionMessage],
     family: GgufDecoderFamily,
+    qwen35_multimodal_projection: Option<&Qwen35MultimodalProjectionConfig>,
 ) -> Result<Vec<PromptMessage>, OpenAiCompatHttpError> {
     if messages.is_empty() {
         return Err(OpenAiCompatHttpError::BadRequest(String::from(
@@ -4979,7 +5041,12 @@ fn chat_messages_to_prompt_messages_generic(
         };
         let mut prompt = PromptMessage::new(
             role,
-            chat_message_content_to_text(&message.content, family)?,
+            chat_message_content_to_text(
+                &message.content,
+                family,
+                role,
+                qwen35_multimodal_projection,
+            )?,
         );
         if role == PromptMessageRole::Tool {
             let Some(name) = message.name.as_ref() else {
@@ -4997,10 +5064,17 @@ fn chat_messages_to_prompt_messages_generic(
 fn chat_message_content_to_text(
     content: &ChatCompletionMessageContent,
     family: GgufDecoderFamily,
+    role: PromptMessageRole,
+    qwen35_multimodal_projection: Option<&Qwen35MultimodalProjectionConfig>,
 ) -> Result<String, OpenAiCompatHttpError> {
     match content {
         ChatCompletionMessageContent::Text(text) => Ok(text.clone()),
         ChatCompletionMessageContent::Parts(parts) => {
+            if matches!(family, GgufDecoderFamily::Qwen35)
+                && let Some(config) = qwen35_multimodal_projection
+            {
+                return project_qwen35_multimodal_content(parts.as_slice(), role, config);
+            }
             let mut text = String::new();
             for part in parts {
                 match part {
@@ -5018,10 +5092,40 @@ fn chat_message_content_to_text(
     }
 }
 
+fn project_qwen35_multimodal_content(
+    parts: &[ChatCompletionContentPart],
+    role: PromptMessageRole,
+    config: &Qwen35MultimodalProjectionConfig,
+) -> Result<String, OpenAiCompatHttpError> {
+    let mut text = String::new();
+    for part in parts {
+        match part {
+            ChatCompletionContentPart::Text { text: part_text } => {
+                text.push_str(part_text);
+            }
+            ChatCompletionContentPart::ImageUrl { .. }
+            | ChatCompletionContentPart::VideoUrl { .. }
+                if matches!(role, PromptMessageRole::System) =>
+            {
+                return Err(OpenAiCompatHttpError::BadRequest(String::from(
+                    "qwen35 system messages cannot contain image or video parts",
+                )));
+            }
+            ChatCompletionContentPart::ImageUrl { .. } => {
+                text.push_str(config.image_marker());
+            }
+            ChatCompletionContentPart::VideoUrl { .. } => {
+                text.push_str(config.video_marker());
+            }
+        }
+    }
+    Ok(text)
+}
+
 fn unsupported_multimodal_content_error(family: GgufDecoderFamily) -> OpenAiCompatHttpError {
     if matches!(family, GgufDecoderFamily::Qwen35) {
         OpenAiCompatHttpError::BadRequest(String::from(
-            "multimodal inputs are unavailable on the qwen35 text-only proxy runtime",
+            "multimodal inputs are unavailable because the loaded qwen35 artifact lacks multimodal projection facts",
         ))
     } else {
         OpenAiCompatHttpError::BadRequest(format!(
@@ -5135,8 +5239,9 @@ mod tests {
     use psionic_models::{
         ByteProjectionEmbedder, GgufDecoderFamily, GgufMetadataValue, GgufTensorType,
         GptOssHarmonyParseOptions, GptOssHarmonyRenderContext, PromptChannelConfig, PromptMessage,
-        PromptMessageRole, PromptReasoningEffort, PromptRenderOptions, ReasoningParser, TokenId,
-        TokenSequence, parse_gpt_oss_harmony_text, render_gpt_oss_harmony_prompt,
+        PromptMessageRole, PromptReasoningEffort, PromptRenderOptions,
+        Qwen35MultimodalProjectionConfig, ReasoningParser, TokenId, TokenSequence,
+        parse_gpt_oss_harmony_text, render_gpt_oss_harmony_prompt,
     };
     use psionic_router::{
         ResponseStateRetentionPolicy, ResponseStateStore, ToolExecutionRequest, ToolGateway,
@@ -5872,6 +5977,24 @@ mod tests {
             ))
         );
         assert!(health.0.response_state.is_some());
+        assert_eq!(
+            health.0.multimodal_projection_mode,
+            Some("prompt_projection_only")
+        );
+        assert_eq!(
+            health.0.multimodal_supported_media,
+            Some(vec!["image", "video"])
+        );
+        assert_eq!(
+            health.0.multimodal_projection_config,
+            Some(Qwen35MultimodalProjectionConfig {
+                vision_block_count: 2,
+                vision_embedding_length: 6,
+                vision_start_token_id: TokenId(900),
+                vision_end_token_id: TokenId(901),
+                image_token_id: TokenId(902),
+            })
+        );
 
         let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
             &server.state,
@@ -5915,6 +6038,24 @@ mod tests {
         );
         assert!(model.psionic_scheduler_policy.is_none());
         assert!(model.psionic_response_state.is_some());
+        assert_eq!(
+            model.psionic_multimodal_projection_mode,
+            Some("prompt_projection_only")
+        );
+        assert_eq!(
+            model.psionic_multimodal_supported_media,
+            Some(vec!["image", "video"])
+        );
+        assert_eq!(
+            model.psionic_multimodal_projection_config,
+            Some(Qwen35MultimodalProjectionConfig {
+                vision_block_count: 2,
+                vision_embedding_length: 6,
+                vision_start_token_id: TokenId(900),
+                vision_end_token_id: TokenId(901),
+                image_token_id: TokenId(902),
+            })
+        );
 
         let response = runtime.block_on(handle_generic_chat_completions(
             std::sync::Arc::clone(&server.state),
@@ -6137,13 +6278,14 @@ mod tests {
     }
 
     #[test]
-    fn generic_server_qwen35_refuses_multimodal_inputs_on_text_only_pilot()
+    fn generic_server_qwen35_projects_multimodal_inputs_through_real_template_markers()
     -> Result<(), Box<dyn std::error::Error>> {
         let _proxy_lock = qwen35_proxy_test_lock()
             .lock()
             .expect("qwen35 proxy test lock should not be poisoned");
         let runtime = tokio::runtime::Runtime::new()?;
-        let (base_url, shutdown_tx, _) = runtime.block_on(start_qwen35_proxy_test_server())?;
+        let (base_url, shutdown_tx, observed_requests) =
+            runtime.block_on(start_qwen35_proxy_test_server())?;
         let temp = tempfile::tempdir()?;
         let qwen35_path = temp.path().join("tiny-qwen35.gguf");
         write_test_gguf(
@@ -6156,7 +6298,7 @@ mod tests {
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
         drop(_proxy_env);
 
-        let image_error = runtime
+        let response = runtime
             .block_on(handle_generic_chat_completions(
                 std::sync::Arc::clone(&server.state),
                 ChatCompletionRequest {
@@ -6164,43 +6306,11 @@ mod tests {
                     messages: vec![ChatCompletionMessage::multimodal(
                         "user",
                         vec![
-                            ChatCompletionContentPart::text("hello"),
+                            ChatCompletionContentPart::text("hello "),
                             ChatCompletionContentPart::image_url(
                                 "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
                             ),
-                        ],
-                    )],
-                    temperature: Some(0.0),
-                    max_tokens: Some(2),
-                    stop: None,
-                    stream: false,
-                    tools: Vec::new(),
-                    tool_choice: None,
-                    response_format: None,
-                    psionic_grammar: None,
-                    psionic_structured_output: None,
-                    psionic_reasoning: None,
-                    psionic_prefix_cache: None,
-                },
-            ))
-            .expect_err("qwen35 image input should fail closed");
-        let image_payload = runtime.block_on(response_json(image_error.into_response()))?;
-        assert_eq!(
-            image_payload["error"]["message"],
-            serde_json::json!(
-                "multimodal inputs are unavailable on the qwen35 text-only proxy runtime"
-            )
-        );
-
-        let video_error = runtime
-            .block_on(handle_generic_chat_completions(
-                std::sync::Arc::clone(&server.state),
-                ChatCompletionRequest {
-                    model: Some(String::from("tiny-qwen35")),
-                    messages: vec![ChatCompletionMessage::multimodal(
-                        "user",
-                        vec![
-                            ChatCompletionContentPart::text("hello"),
+                            ChatCompletionContentPart::text(" compare "),
                             ChatCompletionContentPart::video_url(
                                 "https://example.invalid/pilot.mp4",
                             ),
@@ -6219,14 +6329,119 @@ mod tests {
                     psionic_prefix_cache: None,
                 },
             ))
-            .expect_err("qwen35 video input should fail closed");
-        let video_payload = runtime.block_on(response_json(video_error.into_response()))?;
+            .expect("qwen35 multimodal input should project through the prompt surface");
+        let payload = runtime.block_on(response_json(response))?;
         assert_eq!(
-            video_payload["error"]["message"],
-            serde_json::json!(
-                "multimodal inputs are unavailable on the qwen35 text-only proxy runtime"
-            )
+            payload["choices"][0]["message"]["content"],
+            serde_json::json!("proxy world")
         );
+
+        let observed_requests = observed_requests
+            .lock()
+            .expect("observed qwen35 proxy requests should be readable");
+        assert!(observed_requests.iter().any(|body| {
+            body.get("n_predict") == Some(&serde_json::json!(2))
+                && body["prompt"].as_str().is_some_and(|prompt| {
+                    prompt.contains(
+                        "hello <|vision_start|><|image_pad|><|vision_end|> compare <|vision_start|><|video_pad|><|vision_end|>"
+                    )
+                })
+        }));
+
+        let system_error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(String::from("tiny-qwen35")),
+                    messages: vec![ChatCompletionMessage::multimodal(
+                        "system",
+                        vec![
+                            ChatCompletionContentPart::text("look"),
+                            ChatCompletionContentPart::image_url("https://example.invalid/cat.png"),
+                        ],
+                    )],
+                    temperature: Some(0.0),
+                    max_tokens: Some(2),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    response_format: None,
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                },
+            ))
+            .expect_err("qwen35 system multimodal input should follow template refusal");
+        let system_payload = runtime.block_on(response_json(system_error.into_response()))?;
+        assert_eq!(
+            system_payload["error"]["message"],
+            serde_json::json!("qwen35 system messages cannot contain image or video parts")
+        );
+
+        let _ = shutdown_tx.send(());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_responses_qwen35_projects_multimodal_message_input()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = qwen35_proxy_test_lock()
+            .lock()
+            .expect("qwen35 proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let (base_url, shutdown_tx, observed_requests) =
+            runtime.block_on(start_qwen35_proxy_test_server())?;
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join("tiny-qwen35.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
+            qwen35_decoder_tensors().as_slice(),
+        )?;
+
+        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
+        drop(_proxy_env);
+
+        let response = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&server.state),
+            ResponsesRequest {
+                model: Some(String::from("tiny-qwen35")),
+                instructions: None,
+                conversation: None,
+                input: ResponsesInput::Messages(vec![ChatCompletionMessage::multimodal(
+                    "user",
+                    vec![
+                        ChatCompletionContentPart::text("describe "),
+                        ChatCompletionContentPart::image_url("https://example.invalid/dog.png"),
+                    ],
+                )]),
+                temperature: Some(0.0),
+                max_output_tokens: Some(2),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                previous_response_id: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_response_state: None,
+                psionic_prefix_cache: None,
+            },
+        ))?;
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(payload["output_text"], serde_json::json!("proxy world"));
+
+        let observed_requests = observed_requests
+            .lock()
+            .expect("observed qwen35 proxy requests should be readable");
+        assert!(observed_requests.iter().any(|body| {
+            body["prompt"].as_str().is_some_and(|prompt| {
+                prompt.contains("describe <|vision_start|><|image_pad|><|vision_end|>")
+            })
+        }));
 
         let _ = shutdown_tx.send(());
         Ok(())

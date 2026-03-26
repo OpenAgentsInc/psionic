@@ -22,9 +22,10 @@ Psionic currently supports this row through a bounded `qwen35` CPU proxy lane:
 - the GGUF is admitted as `qwen35`, not mislabeled as `qwen2`
 - the runtime is a `llama.cpp` subprocess proxy
 - the shipped pilot is CPU-only
-- the shipped pilot is text-only
-- the row publishes truthful refusal posture for multimodal, tools, and
-  structured outputs
+- image and video inputs are accepted through prompt projection onto the real
+  `qwen35` marker surface
+- the row publishes truthful prompt-projection posture for multimodal inputs
+- the row still refuses tools and structured outputs
 
 The source artifact itself is not text-only. It carries:
 
@@ -32,8 +33,14 @@ The source artifact itself is not text-only. It carries:
 - vision token ids
 - a multimodal-aware chat template
 
-Psionic admits those facts in the model layer and fixture corpus, but the pilot
-does not claim vision execution yet.
+Psionic now uses those facts to derive one bounded multimodal projection config
+and to project image and video request parts into the real Qwen3.5 template
+markers:
+
+- image: `<|vision_start|><|image_pad|><|vision_end|>`
+- video: `<|vision_start|><|video_pad|><|vision_end|>`
+
+The pilot still does not claim a native image or video encoder.
 
 ## Canonical Runner
 
@@ -57,11 +64,14 @@ The runner executes two evidence layers:
 1. `psionic-models` artifact and fixture evidence
    - real `qwen35` tokenizer facts from the downloaded GGUF
    - real `qwen35` prompt-template digest and render cases
+   - real `qwen35` multimodal projection config from GGUF family facts
    - synthetic tiny `qwen35` loader and hybrid-layout coverage
 2. `psionic-serve` execution evidence
    - direct qwen35 proxy-runtime execution on a deterministic tiny GGUF
    - generic-server publication and request execution
-   - explicit refusal of multimodal inputs on the text-only pilot lane
+   - `/v1/chat/completions` image and video projection through real Qwen markers
+   - `/v1/responses` image projection through the same prompt surface
+   - system-message media refusal that matches the real template rules
 
 ## Pass Criteria
 
@@ -77,10 +87,16 @@ The pilot is green only if all of the following remain true:
   - `execution_engine = llama.cpp`
   - `residency_mode = llama_cpp_proxy`
   - `fallback_policy = proxy_only`
+- the generic server still publishes:
+  - `multimodal_projection_mode = prompt_projection_only`
+  - `multimodal_supported_media = ["image", "video"]`
+  - the derived `qwen35` multimodal projection config
 - the generic server still exposes prompt-replay response-state support on
   `/v1/responses`
-- the generic server still refuses multimodal inputs honestly while the lane is
-  text-only
+- the generic server still accepts image and video request parts through prompt
+  projection on `/v1/chat/completions` and `/v1/responses`
+- the generic server still refuses system-message image and video parts to stay
+  aligned with the real template semantics
 
 ## Current Limitations
 
@@ -88,7 +104,8 @@ The pilot is intentionally bounded:
 
 - it is not a GPU lane
 - it is not native Psionic hybrid execution
-- it does not claim multimodal inference
+- it does not claim native multimodal inference
+- it does not claim a native image or video encoder
 - it does not claim tool calling
 - it does not claim structured-output fallback
 - it does not claim adapter serving
@@ -96,12 +113,13 @@ The pilot is intentionally bounded:
 ## Claim Rule
 
 This pilot is sufficient to claim that Psionic can load and run the downloaded
-`qwen3.5:0.8b` GGUF through a bounded CPU text-generation lane with truthful
-publication.
+`qwen3.5:0.8b` GGUF through a bounded CPU prompt-projection lane with truthful
+publication for text, image, and video request parts.
 
 It is not sufficient to claim:
 
 - Qwen3.5 multimodal parity
+- native image or video understanding
 - video understanding
 - tool-loop support
 - structured-output support

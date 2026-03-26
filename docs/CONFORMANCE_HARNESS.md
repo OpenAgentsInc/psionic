@@ -58,8 +58,8 @@ can map honestly onto `/api/generate`:
 - `add_generation_prompt = true`
 
 That is enough to anchor single-turn families such as `phi3`, `qwen2`, and the
-first text-only `qwen35` pilot without pretending that multi-turn or multimodal
-chat-template parity is already solved.
+first `qwen35` prompt-projection pilot without pretending that multi-turn or
+raw content-part multimodal chat-template parity is already solved.
 
 Embeddings cases also carry an explicit `EmbeddingParityBudget` from
 `psionic-runtime` so vector comparisons use the shared drift-budget policy instead

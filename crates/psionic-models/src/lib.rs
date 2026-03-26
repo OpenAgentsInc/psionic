@@ -3213,6 +3213,82 @@ pub struct GgufDecoderFamilyMetadata {
     pub family_facts: BTreeMap<String, GgufMetadataValue>,
 }
 
+/// Bounded qwen35 multimodal projection config derived from GGUF family facts.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Qwen35MultimodalProjectionConfig {
+    /// Vision encoder block count declared by the artifact.
+    pub vision_block_count: usize,
+    /// Vision embedding width declared by the artifact.
+    pub vision_embedding_length: usize,
+    /// `<|vision_start|>` token id.
+    pub vision_start_token_id: TokenId,
+    /// `<|vision_end|>` token id.
+    pub vision_end_token_id: TokenId,
+    /// `<|image_pad|>` token id.
+    pub image_token_id: TokenId,
+}
+
+impl Qwen35MultimodalProjectionConfig {
+    /// Text marker used by the real qwen35 multimodal template for one image.
+    #[must_use]
+    pub const fn image_marker(&self) -> &'static str {
+        "<|vision_start|><|image_pad|><|vision_end|>"
+    }
+
+    /// Text marker used by the real qwen35 multimodal template for one video.
+    #[must_use]
+    pub const fn video_marker(&self) -> &'static str {
+        "<|vision_start|><|video_pad|><|vision_end|>"
+    }
+}
+
+impl GgufDecoderFamilyMetadata {
+    /// Returns the bounded qwen35 multimodal projection config when the
+    /// artifact declares the required vision facts.
+    #[must_use]
+    pub fn qwen35_multimodal_projection_config(&self) -> Option<Qwen35MultimodalProjectionConfig> {
+        if !matches!(self.family, GgufDecoderFamily::Qwen35) {
+            return None;
+        }
+        Some(Qwen35MultimodalProjectionConfig {
+            vision_block_count: family_fact_usize(&self.family_facts, "qwen35.vision.block_count")?,
+            vision_embedding_length: family_fact_usize(
+                &self.family_facts,
+                "qwen35.vision.embedding_length",
+            )?,
+            vision_start_token_id: TokenId(family_fact_u32(
+                &self.family_facts,
+                "qwen35.vision_start_token_id",
+            )?),
+            vision_end_token_id: TokenId(family_fact_u32(
+                &self.family_facts,
+                "qwen35.vision_end_token_id",
+            )?),
+            image_token_id: TokenId(family_fact_u32(
+                &self.family_facts,
+                "qwen35.image_token_id",
+            )?),
+        })
+    }
+}
+
+fn family_fact_usize(
+    family_facts: &BTreeMap<String, GgufMetadataValue>,
+    key: &str,
+) -> Option<usize> {
+    family_facts
+        .get(key)
+        .and_then(GgufMetadataValue::as_u64)
+        .and_then(|value| usize::try_from(value).ok())
+}
+
+fn family_fact_u32(family_facts: &BTreeMap<String, GgufMetadataValue>, key: &str) -> Option<u32> {
+    family_facts
+        .get(key)
+        .and_then(GgufMetadataValue::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+}
+
 /// Explicit layer kind for one GGUF decoder layer layout.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -7940,21 +8016,22 @@ mod tests {
         ActivationFunction, ByteProjectionEmbedder, ContextOverflowPolicy, ContextWindowError,
         DecoderModelDescriptor, DecoderWeightLoader, FixtureDecoderLoader, FixtureWordTokenizer,
         GgufBlobArtifact, GgufContent, GgufDecoderAdapterLoader, GgufDecoderFamily,
-        GgufDecoderLayerKind, GgufEmbeddingAdapterLoader, GgufEmbeddingFamily,
-        GgufEmbeddingPooling, GgufMetadataValue, GgufPromptTemplateFamily,
+        GgufDecoderFamilyMetadata, GgufDecoderLayerKind, GgufEmbeddingAdapterLoader,
+        GgufEmbeddingFamily, GgufEmbeddingPooling, GgufMetadataValue, GgufPromptTemplateFamily,
         GgufPromptTemplateRenderer, GgufRuntimeTokenizer, GgufTensorType, GgufTokenizerMetadata,
         GgufTokenizerModel, GgufTokenizerPretokenizer, GgufVersion, GgufWeightBundleLoader,
         GptOssHarmonyParseOptions, GptOssHarmonyParseSource, GptOssHarmonyStreamParser,
         LoadedWeightTensor, LocalBlobOpenOptions, LocalWeightBundleLoader, ParsedReasoningResponse,
         PromptMessage, PromptMessageRole, PromptRenderOptions, QuantizedTensorStorage,
-        ReasoningParser, ReasoningResponsePartKind, ReferenceWordDecoder, SafeTensorsDecoderLoader,
-        SafeTensorsWeightBundleLoader, SmokeByteEmbedder, TokenId, TokenSequence,
-        TokenizerBoundary, WeightArtifactBlobKind, WeightArtifactReadPath, WeightFormat,
-        WeightSource, WeightTensorStorage, apply_context_window, apply_special_token_defaults,
-        assert_prompt_template_fixture_matches, assert_prompt_window_case,
-        assert_rendered_prompt_case, assert_tokenizer_fixture_matches, digest_chat_template,
-        golden_prompt_fixture, golden_prompt_fixtures, golden_tokenizer_fixture,
-        golden_tokenizer_fixtures, parse_gpt_oss_harmony_text, parse_gpt_oss_harmony_tokens,
+        Qwen35MultimodalProjectionConfig, ReasoningParser, ReasoningResponsePartKind,
+        ReferenceWordDecoder, SafeTensorsDecoderLoader, SafeTensorsWeightBundleLoader,
+        SmokeByteEmbedder, TokenId, TokenSequence, TokenizerBoundary, WeightArtifactBlobKind,
+        WeightArtifactReadPath, WeightFormat, WeightSource, WeightTensorStorage,
+        apply_context_window, apply_special_token_defaults, assert_prompt_template_fixture_matches,
+        assert_prompt_window_case, assert_rendered_prompt_case, assert_tokenizer_fixture_matches,
+        collect_decoder_family_facts, digest_chat_template, golden_prompt_fixture,
+        golden_prompt_fixtures, golden_tokenizer_fixture, golden_tokenizer_fixtures,
+        parse_gpt_oss_harmony_text, parse_gpt_oss_harmony_tokens,
         parse_reasoning_response_text_for_decoder_family, reasoning_parser_for_decoder_family,
     };
 
@@ -8864,6 +8941,54 @@ mod tests {
     }
 
     #[test]
+    fn gguf_real_qwen35_family_metadata_exposes_multimodal_projection_config()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = golden_tokenizer_fixture("qwen35_0_8b").expect("qwen35 fixture");
+        let path = qwen35_pilot_fixture_path(fixture.source_path);
+        let content = GgufContent::read_path(Path::new(path.as_str()))?;
+        let family_metadata = GgufDecoderFamilyMetadata {
+            family: GgufDecoderFamily::Qwen35,
+            architecture: String::from("qwen35"),
+            display_name: None,
+            rope_theta: 0.0,
+            rope_scaling_factor: None,
+            rope_original_context_length: None,
+            rms_norm_epsilon: 0.0,
+            sliding_window: None,
+            attention_key_length: None,
+            attention_value_length: None,
+            tie_word_embeddings: false,
+            attention_qkv_biases: false,
+            expert_count: None,
+            expert_used_count: None,
+            expert_feed_forward_length: None,
+            family_facts: collect_decoder_family_facts(
+                content.metadata(),
+                &GgufDecoderFamily::Qwen35,
+                "qwen35",
+            ),
+        };
+        let config = family_metadata
+            .qwen35_multimodal_projection_config()
+            .expect("qwen35 multimodal projection config");
+
+        assert_eq!(config.vision_block_count, 12);
+        assert_eq!(config.vision_embedding_length, 768);
+        assert_eq!(config.vision_start_token_id, TokenId(248053));
+        assert_eq!(config.vision_end_token_id, TokenId(248054));
+        assert_eq!(config.image_token_id, TokenId(248056));
+        assert_eq!(
+            config.image_marker(),
+            "<|vision_start|><|image_pad|><|vision_end|>"
+        );
+        assert_eq!(
+            config.video_marker(),
+            "<|vision_start|><|video_pad|><|vision_end|>"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn gguf_prompt_template_renderer_matches_gpt_oss_fixture_render_case()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_prompt_fixture("gpt_oss").expect("gpt-oss fixture");
@@ -9746,6 +9871,18 @@ mod tests {
                         .collect::<Vec<_>>()
                 }),
             Some(vec![0, 0, 0, 1])
+        );
+        assert_eq!(
+            adapter
+                .family_metadata()
+                .qwen35_multimodal_projection_config(),
+            Some(Qwen35MultimodalProjectionConfig {
+                vision_block_count: 2,
+                vision_embedding_length: 6,
+                vision_start_token_id: TokenId(900),
+                vision_end_token_id: TokenId(901),
+                image_token_id: TokenId(902),
+            })
         );
         assert_eq!(adapter.descriptor().config.hidden_size, 8);
         assert_eq!(adapter.descriptor().config.layer_count, 4);
