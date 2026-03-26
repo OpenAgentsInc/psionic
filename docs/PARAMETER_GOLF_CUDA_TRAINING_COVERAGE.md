@@ -132,7 +132,10 @@ same CUDA matmul surface:
 That retires the old "banked storage but split-matrix training execution"
 boundary from the admitted CUDA train lane. It does not prove score closure by
 itself. Fresh H100 or `8xH100` receipts are still required for the wallclock
-claim.
+claim. The first fresh exact public-shape same-node H100 proof attempt after
+the zero-copy bank-slice slice landed did not emit a usable receipt and is
+tracked in
+`docs/audits/2026-03-26-psionic-parameter-golf-single-h100-zero-copy-bank-slice-blocker-audit.md`.
 
 Current `main` now also exposes one explicit same-node H100 attribution seam
 above that runtime surface:
