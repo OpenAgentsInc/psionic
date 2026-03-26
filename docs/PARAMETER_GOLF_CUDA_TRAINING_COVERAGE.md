@@ -236,13 +236,17 @@ Current measured wallclock blockers remain open and are retained in separate
 receipts and issues:
 
 - same-node exact public-shape H100:
-  `matrix_execution_mode=direct_banked` reached `train_runtime_receipt` in
-  `478.511s` in
+  the best retained `matrix_execution_mode=direct_banked` receipt is now
+  `472.430s` in
+  `docs/audits/2026-03-26-psionic-parameter-golf-single-h100-host-fallback-empty-proof.md`;
+  the earlier retained direct-banked baseline was `478.511s` in
   `docs/audits/2026-03-26-psionic-parameter-golf-single-h100-banked-vs-split-audit.md`,
   and the later bank-offset experiment regressed to `504.978s` in
   `docs/audits/2026-03-26-psionic-parameter-golf-single-h100-banked-offset-regression-audit.md`;
-  `#546` remains open because the admitted CUDA forward path is still the
-  dominant catastrophic wallclock source on the exact public shapes
+  the fresh profiler-enabled same-node rerun also retained an empty
+  `host_fallback.jsonl` sink, so `#546` remains open for the narrower reason
+  that the admitted CUDA forward and backward kernels are still catastrophically
+  slow on the exact public shapes
 - real `8xH100` score lane:
   the retained distributed proof still showed step-2 rank-0 timings of about
   `53.3 s` forward, `123.6 s` backward, `7.4 s` gradient sync, and `0.9 s`
