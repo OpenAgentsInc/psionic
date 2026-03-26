@@ -445,6 +445,47 @@ impl CudaBuffer {
         })
     }
 
+    fn contiguous_subbuffer_with_spec(
+        &self,
+        spec: &TensorSpec,
+        byte_offset: usize,
+    ) -> Result<Self, RuntimeError> {
+        if spec.dtype() != self.spec.dtype() || spec.device() != self.spec.device() {
+            return Err(RuntimeError::Backend(format!(
+                "cuda sub-buffer requires identical dtype and device: source={:?} sub_buffer={:?}",
+                self.spec, spec
+            )));
+        }
+        if !spec.layout().is_contiguous() || spec.layout().offset() != 0 {
+            return Err(RuntimeError::Backend(format!(
+                "cuda sub-buffer requires a zero-offset contiguous spec, actual {:?}",
+                spec.layout()
+            )));
+        }
+        let byte_len = spec
+            .storage_size()
+            .checked_mul(size_of_dtype(spec.dtype()))
+            .ok_or_else(|| {
+                RuntimeError::Backend(format!(
+                    "cuda sub-buffer size overflow for tensor storage size {}",
+                    spec.storage_size()
+                ))
+            })?;
+        if byte_offset.saturating_add(byte_len) > self.byte_len {
+            return Err(RuntimeError::Backend(format!(
+                "cuda sub-buffer exceeds allocation: offset={} len={} allocation={}",
+                byte_offset, byte_len, self.byte_len
+            )));
+        }
+        Ok(Self {
+            spec: spec.clone(),
+            byte_len,
+            memory_space: self.memory_space,
+            host_visible: self.host_visible,
+            platform: self.platform.sub_buffer(byte_offset)?,
+        })
+    }
+
     /// Writes raw bytes into the CUDA buffer via an explicit host-to-device transfer.
     pub fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), RuntimeError> {
         if bytes.len() != self.byte_len {
@@ -4257,20 +4298,22 @@ impl AvailableCudaBackend {
             matrix_bank.spec().dtype(),
             matrix_bank.spec().device().clone(),
         );
-        let matrix = self.allocate(&matrix_spec)?;
-        let matrix_byte_len = matrix.byte_len();
+        let matrix_byte_len = matrix_spec
+            .storage_size()
+            .checked_mul(size_of_dtype(matrix_spec.dtype()))
+            .ok_or_else(|| {
+                RuntimeError::Backend(format!(
+                    "cuda parameter_golf_banked_linear bank-slice size overflow for tensor storage size {}",
+                    matrix_spec.storage_size()
+                ))
+            })?;
         let source_byte_offset = bank_index.checked_mul(matrix_byte_len).ok_or_else(|| {
             RuntimeError::Backend(String::from(
                 "cuda parameter_golf_banked_linear source offset overflow",
             ))
         })?;
-        submission.copy_buffer_region(
-            matrix_bank,
-            source_byte_offset,
-            &matrix,
-            0,
-            matrix_byte_len,
-        )?;
+        let matrix =
+            matrix_bank.contiguous_subbuffer_with_spec(&matrix_spec, source_byte_offset)?;
 
         match (input.spec().dtype(), matrix_bank.spec().dtype()) {
             (DType::F32, DType::BF16) => submission
@@ -4401,20 +4444,22 @@ impl AvailableCudaBackend {
             matrix_bank.spec().dtype(),
             matrix_bank.spec().device().clone(),
         );
-        let matrix = self.allocate(&matrix_spec)?;
-        let matrix_byte_len = matrix.byte_len();
+        let matrix_byte_len = matrix_spec
+            .storage_size()
+            .checked_mul(size_of_dtype(matrix_spec.dtype()))
+            .ok_or_else(|| {
+                RuntimeError::Backend(format!(
+                    "cuda parameter_golf_banked_linear_input_backward bank-slice size overflow for tensor storage size {}",
+                    matrix_spec.storage_size()
+                ))
+            })?;
         let source_byte_offset = bank_index.checked_mul(matrix_byte_len).ok_or_else(|| {
             RuntimeError::Backend(String::from(
                 "cuda parameter_golf_banked_linear_input_backward source offset overflow",
             ))
         })?;
-        submission.copy_buffer_region(
-            matrix_bank,
-            source_byte_offset,
-            &matrix,
-            0,
-            matrix_byte_len,
-        )?;
+        let matrix =
+            matrix_bank.contiguous_subbuffer_with_spec(&matrix_spec, source_byte_offset)?;
 
         match matrix_bank.spec().dtype() {
             DType::BF16 => submission.matmul_f32_bf16_strided_batched_to_f32_with_strides(
@@ -4511,11 +4556,33 @@ impl AvailableCudaBackend {
             grad_output.spec().device().clone(),
         ))?;
         submission.permute_rank2_transpose_f32(&grad_flat, &grad_transposed, rows, out_features)?;
-        let gradient_slice = self.allocate(&TensorSpec::new(
+        let gradient_slice_spec = TensorSpec::new(
             Shape::new(vec![out_features, in_features]),
             DType::F32,
             grad_output.spec().device().clone(),
-        ))?;
+        );
+
+        let output = self.allocate(&step.spec)?;
+        submission.fill_buffer(&output, 0)?;
+        let gradient_slice_byte_len = gradient_slice_spec
+            .storage_size()
+            .checked_mul(size_of_dtype(gradient_slice_spec.dtype()))
+            .ok_or_else(|| {
+                RuntimeError::Backend(format!(
+                    "cuda parameter_golf_banked_linear_weight_backward gradient-slice size overflow for tensor storage size {}",
+                    gradient_slice_spec.storage_size()
+                ))
+            })?;
+        let destination_byte_offset =
+            bank_index
+                .checked_mul(gradient_slice_byte_len)
+                .ok_or_else(|| {
+                    RuntimeError::Backend(String::from(
+                    "cuda parameter_golf_banked_linear_weight_backward destination offset overflow",
+                ))
+                })?;
+        let gradient_slice =
+            output.contiguous_subbuffer_with_spec(&gradient_slice_spec, destination_byte_offset)?;
         match input.spec().dtype() {
             DType::F32 => submission.matmul(
                 &grad_transposed,
@@ -4545,23 +4612,6 @@ impl AvailableCudaBackend {
                 )));
             }
         }
-
-        let output = self.allocate(&step.spec)?;
-        submission.fill_buffer(&output, 0)?;
-        let destination_byte_offset = bank_index
-            .checked_mul(gradient_slice.byte_len())
-            .ok_or_else(|| {
-                RuntimeError::Backend(String::from(
-                    "cuda parameter_golf_banked_linear_weight_backward destination offset overflow",
-                ))
-            })?;
-        submission.copy_buffer_region(
-            &gradient_slice,
-            0,
-            &output,
-            destination_byte_offset,
-            gradient_slice.byte_len(),
-        )?;
         Ok(output)
     }
 
@@ -9248,6 +9298,7 @@ mod platform {
     struct PlatformBufferInner {
         runtime: Arc<CudaRuntime>,
         device_ptr: *mut c_void,
+        allocation_owner: Option<Arc<PlatformBufferInner>>,
     }
 
     struct PlatformHostBufferInner {
@@ -9301,6 +9352,7 @@ mod platform {
                 inner: Arc::new(PlatformBufferInner {
                     runtime: Arc::clone(&self.runtime),
                     device_ptr,
+                    allocation_owner: None,
                 }),
             })
         }
@@ -9364,6 +9416,18 @@ mod platform {
     impl PlatformBuffer {
         pub(super) fn allocation_identity(&self) -> usize {
             self.inner.device_ptr as usize
+        }
+
+        pub(super) fn sub_buffer(&self, byte_offset: usize) -> Result<Self, RuntimeError> {
+            self.inner.runtime.set_device()?;
+            Ok(Self {
+                inner: Arc::new(PlatformBufferInner {
+                    runtime: Arc::clone(&self.inner.runtime),
+                    device_ptr: unsafe { self.inner.device_ptr.cast::<u8>().add(byte_offset) }
+                        .cast(),
+                    allocation_owner: Some(Arc::clone(&self.inner)),
+                }),
+            })
         }
 
         pub(super) fn write_bytes(&self, bytes: &[u8]) -> Result<(), RuntimeError> {
@@ -9508,6 +9572,7 @@ mod platform {
                 inner: Arc::new(PlatformBufferInner {
                     runtime: Arc::clone(&self.runtime),
                     device_ptr,
+                    allocation_owner: None,
                 }),
             })
         }
@@ -13244,6 +13309,9 @@ mod platform {
 
     impl Drop for PlatformBufferInner {
         fn drop(&mut self) {
+            if self.allocation_owner.is_some() {
+                return;
+            }
             if !self.device_ptr.is_null() {
                 let _ = self.runtime.set_device();
                 let _ = self.runtime.check(
@@ -13502,6 +13570,12 @@ mod platform {
     impl PlatformBuffer {
         pub(super) fn allocation_identity(&self) -> usize {
             0
+        }
+
+        pub(super) fn sub_buffer(&self, _byte_offset: usize) -> Result<Self, RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda runtime substrate currently requires Linux libcudart",
+            )))
         }
 
         pub(super) fn write_bytes(&self, _bytes: &[u8]) -> Result<(), RuntimeError> {
@@ -17662,6 +17736,46 @@ mod tests {
         assert_close(
             &output.read_f32()?,
             &[1.0, 2.0, 3.0, 4.0, 0.0, 0.0, 16.0, 17.0, 22.0, 23.0],
+            1e-5,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_buffer_contiguous_subbuffer_shares_underlying_bank_storage_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let bank_shape = Shape::new(vec![2, 2, 3]);
+        let mut bank = backend.bf16_buffer(bank_shape.element_count())?;
+        bank.write_bf16_from_f32(&[0.0; 12])?;
+
+        let slice_spec =
+            TensorSpec::new(Shape::new(vec![2, 3]), DType::BF16, selected.device.clone());
+        let slice_byte_len = slice_spec
+            .storage_size()
+            .checked_mul(std::mem::size_of::<bf16>())
+            .ok_or("slice byte length overflow")?;
+        let mut second_bank_slice =
+            bank.contiguous_subbuffer_with_spec(&slice_spec, slice_byte_len)?;
+        second_bank_slice.write_bf16_from_f32(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0])?;
+
+        assert_ne!(
+            second_bank_slice.allocation_identity(),
+            bank.allocation_identity()
+        );
+        assert_close(
+            &bank.read_bf16_to_f32()?,
+            &[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            1e-5,
+        );
+        assert_close(
+            &second_bank_slice.read_bf16_to_f32()?,
+            &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
             1e-5,
         );
         Ok(())

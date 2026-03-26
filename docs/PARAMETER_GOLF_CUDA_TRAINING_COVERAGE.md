@@ -124,6 +124,10 @@ same CUDA matmul surface:
   down to BF16 before those `parameter_golf_banked_linear` sites, so the
   score-lane matrix-input surface no longer stays wide F32 by default when the
   runtime is already on the banked BF16 matmul path
+- the direct banked CUDA path now also binds contiguous zero-copy sub-buffers
+  over the owned bank slice for forward and input-backward GEMMs, and writes
+  banked weight gradients directly into the destination bank slice instead of
+  copying a standalone rank-2 slice in and out around every direct banked op
 
 That retires the old "banked storage but split-matrix training execution"
 boundary from the admitted CUDA train lane. It does not prove score closure by
