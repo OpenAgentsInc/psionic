@@ -2,42 +2,38 @@
 
 ## Intent
 
-This audit answers one concrete repo-planning question:
+This audit now answers the active question:
 
-> after reading `~/code/alpha/psionic/smallmodels.md` and checking the current
-> Psionic tree, what is the best logical next small model type to add as an
-> explicit named row?
+> if Psionic should support `qwen35` GGUFs starting with the small Ollama
+> `qwen3.5:0.8b` row, what exact Psionic changes are required?
 
-The answer should optimize for current Psionic reality.
+This supersedes the earlier "least new substrate work" framing.
 
-It should not optimize for abstract model taste.
-
-It should close the largest remaining validation gap with the least new
-substrate work.
+The active requirement is explicit `Qwen3.5` support.
 
 ## Decision
 
-The next model type to add should be a **SmolLM2 Llama-family instruct row**,
-anchored on **`SmolLM2-360M-Instruct`**.
+Psionic should start `qwen35` support with the Ollama `qwen3.5:0.8b` GGUF.
 
-That is the right next step because:
+That row is the correct first target because:
 
-- it widens Psionic from the already-landed Qwen pilot into the still-unpiloted
-  Llama branch
-- it stays inside the model families Psionic already executes today
-- it fits the small-model health-check use case from `smallmodels.md`
-- it fits the medium-small model band that Psion's own later training plan says
-  matters more than toy-only checkpoints
-- it stays aligned with the repo's anti-code-dominance training posture better
-  than a coder-specialized checkpoint
+- it matches the laptop requirement from `smallmodels.md`
+- it is current Qwen3.5, not an older `qwen2` or `qwen2.5` row
+- it is already available as a public GGUF artifact through the Ollama registry
+- it forces Psionic to add the real `qwen35` substrate instead of hiding behind
+  old `qwen2` assumptions
 
-If the repo wants a two-step ladder instead of one anchor, the correct pairing
-is:
+The exact downloaded artifact used for this audit is:
 
-1. `SmolLM2-135M` for the absolute-minimum smoke path
-2. `SmolLM2-360M-Instruct` for the first real named supported row
-
-The primary recommendation is still `SmolLM2-360M-Instruct`.
+- manifest: `https://registry.ollama.ai/v2/library/qwen3.5/manifests/0.8b`
+- manifest digest: `f3817196d142eaf72ce79dfebe53dcb20bd21da87ce13e138a8f8e10a866b3a4`
+- model blob:
+  `https://registry.ollama.ai/v2/library/qwen3.5/blobs/sha256:afb707b6b8fac6e475acc42bc8380fc0b8d2e0e4190be5a969fbf62fcc897db5`
+- local path:
+  `/home/christopherdavid/models/qwen3.5/qwen3.5-0.8b-q8_0.gguf`
+- local SHA-256:
+  `afb707b6b8fac6e475acc42bc8380fc0b8d2e0e4190be5a969fbf62fcc897db5`
+- on-disk size: about `989M`
 
 ## Sources Reviewed
 
@@ -54,342 +50,494 @@ Canonical Psionic docs:
 - `docs/MLX_MODEL_CATALOG.md`
 - `docs/MLX_TEXT_SERVE.md`
 - `docs/NON_GPT_OSS_QWEN_PILOT.md`
-- `docs/PSION_COMPACT_DECODER.md`
-- `docs/PSION_PRETRAIN_STAGE.md`
-- `docs/PSION_SAMPLING_POLICY.md`
-- `docs/PSION_DECENTRALIZED_CONTRIBUTION.md`
-- `docs/audits/2026-03-22-psion-training-system-full-state-audit.md`
 
-Relevant code paths:
+Relevant Psionic code paths:
 
 - `crates/psionic-models/src/lib.rs`
-- `crates/psionic-models/src/harmony.rs`
+- `crates/psionic-models/src/runtime_tokenizer.rs`
+- `crates/psionic-models/src/fixtures.rs`
 - `crates/psionic-serve/src/gguf.rs`
 - `crates/psionic-serve/src/openai_http.rs`
-- `crates/psionic-mlx-catalog/src/lib.rs`
-- `crates/psionic-mlx-lm/src/lib.rs`
-- `crates/psionic-mlx-serve/src/lib.rs`
+- `crates/psionic-serve/src/conformance.rs`
 
-External model references reviewed after the repo pass:
+Relevant Ollama code paths:
 
-- `https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct`
-- `https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct/blob/main/config.json`
-- `https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF`
-- `https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF`
-- `https://huggingface.co/EleutherAI/pythia-160m`
+- `~/code/ollama/x/create/create.go`
+- `~/code/ollama/server/internal/client/ollama/registry.go`
+- `~/code/ollama/x/models/qwen3_5/qwen3_5.go`
 
-## Current Repo State
+External model references:
 
-The current repo is already past the question "can Psionic execute anything
-except GPT-OSS."
+- `https://ollama.com/library/qwen3.5:0.8b`
+- `https://registry.ollama.ai/v2/library/qwen3.5/manifests/0.8b`
+- `https://huggingface.co/Qwen/Qwen3.5-0.8B`
+- `https://huggingface.co/Qwen/Qwen3.5-0.8B/resolve/main/chat_template.jinja`
+- `https://huggingface.co/docs/transformers/model_doc/qwen3_5`
 
-That part is closed.
+## Why `qwen3.5:0.8b` Is The Right First `qwen35` Row
 
-The important current facts are these:
+`smallmodels.md` names one tester machine directly:
 
-### 1. The generic GGUF runtime already executes three non-GPT-OSS decoder families
+- `8GB` NVIDIA laptop VRAM
+- `32GB` system RAM
 
-`psionic-models` classifies `llama`, `qwen2`, `mistral`, and `gpt-oss` GGUF
-artifacts into concrete decoder families.
+`qwen3.5:0.8b` fits that target.
 
-`psionic-serve/src/gguf.rs` then routes:
+The Ollama blob is about `0.96 GiB` in `Q8_0`. That is small enough to serve as
+the first real `qwen35` bring-up row without turning the effort into a memory
+project before it becomes a model-support project.
 
-- `GgufDecoderFamily::GptOss` into the GPT-OSS-specific service
-- `GgufDecoderFamily::Llama`
-- `GgufDecoderFamily::Qwen`
-- `GgufDecoderFamily::Mistral`
+This is also the right target because it is not just a tiny legacy chat model.
 
-into the shared dense CPU GGUF path.
+It is a real `Qwen3.5` row with the current hybrid architecture, current chat
+template, current tokenizer pretokenizer, current long-context metadata, and
+current multimodal metadata. If Psionic can load and serve this row honestly,
+Psionic has real `qwen35` support instead of a compatibility label built on old
+`qwen2` assumptions.
 
-This means the next model type should not require a new low-level decoder
-family just to become runnable.
+## What The Downloaded GGUF Actually Contains
 
-### 2. Qwen is already the first explicit non-GPT-OSS pilot
+The downloaded GGUF is not a renamed `qwen2` artifact.
 
-`docs/NON_GPT_OSS_QWEN_PILOT.md` and
-`scripts/release/check-psionic-qwen-pilot.sh` already freeze Qwen as the first
-named non-GPT-OSS end-to-end pilot.
+The file carries these direct facts:
 
-That matters because another Qwen row does not widen family coverage very much.
+- `general.architecture = "qwen35"`
+- `tokenizer.ggml.pre = "qwen35"`
+- `qwen35.block_count = 24`
+- `qwen35.context_length = 262144`
+- `qwen35.embedding_length = 1024`
+- `qwen35.feed_forward_length = 3584`
+- `qwen35.full_attention_interval = 4`
+- `qwen35.ssm.conv_kernel = 4`
+- `qwen35.ssm.group_count = 16`
+- `qwen35.ssm.inner_size = 2048`
+- `qwen35.ssm.state_size = 128`
+- `qwen35.ssm.time_step_rank = 16`
+- `qwen35.vision.block_count = 12`
+- `qwen35.vision.embedding_length = 768`
+- `qwen35.vision_start_token_id = 248053`
+- `qwen35.vision_end_token_id = 248054`
+- default chat-template digest:
+  `273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80`
 
-It would mostly deepen a lane Psionic already proved.
+The tensor inventory also shows that the language stack is hybrid.
 
-### 3. The generic server and MLX-facing package surfaces are already real
+The first observed block pattern is:
 
-`crates/psionic-serve/src/openai_http.rs` ships the generic CPU OpenAI server.
+- `blk.0`, `blk.1`, `blk.2`:
+  `attn_qkv.weight`, `attn_gate.weight`, `ffn_*`, and `ssm_*`
+- `blk.3`:
+  `attn_q.weight`, `attn_k.weight`, `attn_v.weight`, `attn_output.weight`,
+  and `ffn_*`
+- then the same `3 hybrid + 1 full-attention` pattern repeats
 
-It already fronts decoder models through:
+That matches `qwen35.full_attention_interval = 4`.
 
-- `/v1/chat/completions`
-- `/v1/responses`
+This matters because Psionic does not currently have a decoder-family contract
+for a mixed SSM plus attention stack.
 
-`crates/psionic-mlx-catalog` and `crates/psionic-mlx-serve` already wrap that
-same serving lane with MLX-style model reference resolution.
+## Where Psionic Fails Today
 
-So the best next model row is one that uses this existing path directly instead
-of demanding a new serving substrate.
+Psionic does not need one change.
 
-### 4. Dense CPU adapter hosting already works for Llama, Qwen, and Mistral
+Psionic needs a stack of coordinated changes.
 
-`crates/psionic-serve/src/gguf.rs` already admits LM-head LoRA hosting on dense
-CPU GGUF families and explicitly allows:
+### 1. The loader rejects `qwen35` immediately
 
-- Llama
-- Qwen
-- Mistral
+`crates/psionic-models/src/lib.rs` only maps these decoder architectures today:
 
-That makes a dense small model more useful than a family that only helps
-metadata or benchmark stories.
+- `llama`
+- `mistral`
+- `mistral3`
+- `qwen2`
+- `gpt-oss`
 
-### 5. The Psion learned lane still wants small serious models, not only toy smoke models
+`qwen35` is rejected before Psionic even reaches prompt or tensor validation.
 
-`docs/audits/2026-03-22-psion-training-system-full-state-audit.md` keeps the
-planned scale bands explicit:
+### 2. The tokenizer layer only knows `qwen2`
 
-- pilot models around `50M` to `150M`
-- later serious internal models around `300M` to `1B`
+`GgufTokenizerPretokenizer` only has `Qwen2`.
 
-That means the best next external small model row is not just "the tiniest file
-possible."
+`runtime_tokenizer.rs` only accepts:
 
-It should also sit near the first serious small-model band.
+- `qwen2`
+- `default`
+- `llama-bpe`
+- `llama`
+- a few other existing strings
 
-### 6. The Psion training policy explicitly resists code-assistant drift
+So even a metadata-only admission patch is incomplete without a `qwen35`
+pretokenizer path.
 
-`docs/PSION_SAMPLING_POLICY.md` caps code-token dominance and rejects coding
-gains that hide reasoning regressions.
+### 3. Prompt rendering only knows the old `qwen2` digest
 
-That makes a coder-specialized checkpoint a weak choice for the first next row.
+Psionic only recognizes the existing `qwen2` prompt-template digest in
+`supported_prompt_template_family`.
 
-The repo does track coding fluency, but it does not want the learned lane to
-drift into a generic coding assistant.
+The real `qwen35` chat template is different:
 
-## Selection Criteria
+- it carries multimodal placeholders
+- it carries tool-call XML formatting branches
+- it carries explicit `<think>` handling
+- it uses the `qwen35` tokenizer family
 
-The right next model type should satisfy six constraints at once:
+The actual default template digest for the downloaded GGUF is:
 
-1. It should use a family Psionic already executes.
-2. It should widen validation coverage beyond the existing Qwen pilot.
-3. It should fit the 8GB-laptop health-check use case from `smallmodels.md`.
-4. It should have low artifact friction and a clean license story.
-5. It should help later adapter-window or small-train experiments.
-6. It should align with Psion's reasoning-heavy and spec-heavy posture.
+- `273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80`
 
-That rules out several otherwise attractive candidates.
+Without a new prompt family, Psionic cannot honestly render a `qwen35` request
+through the generic server.
 
-## Candidate Assessment
+### 4. The current decoder tensor layout cannot represent `qwen35`
 
-### `Qwen2.5-0.5B-Instruct`
+This is the deeper blocker.
 
-This is the cleanest **artifact** candidate.
+`GgufDecoderLayerTensorLayout` currently requires every decoder layer to carry:
 
-The reasons are real:
+- `attention_query_weight`
+- `attention_key_weight`
+- `attention_value_weight`
+- `attention_output_weight`
 
-- official GGUF exists
-- Apache-2.0 is clean
-- the Qwen family is already deeply wired into Psionic's prompt and tokenizer
-  handling
-- the MLX catalog docs already use small Qwen examples
+Those are required `String` fields, not optional fields.
 
-But it is not the best **next row**.
+There is also no place in that struct for:
 
-The repo already spent its first explicit non-GPT-OSS pilot on Qwen. Adding a
-second Qwen row next mostly deepens one already-proved branch instead of
-widening substrate coverage.
+- `attn_gate.weight`
+- `attn_qkv.weight`
+- `ssm_a`
+- `ssm_dt`
+- `ssm_alpha.weight`
+- `ssm_beta.weight`
+- `ssm_conv1d.weight`
+- `ssm_norm.weight`
+- `ssm_out.weight`
 
-`Qwen2.5-0.5B-Instruct` is the right fallback if artifact friction is the only
-priority.
+That means a real `qwen35` hybrid block does not fit the current Psionic layer
+layout contract.
 
-It is not the best next move if the goal is repo sequencing.
+### 5. The current CPU dense runtime is structurally wrong for `qwen35`
 
-### `Qwen2.5-Coder-0.5B-Instruct`
+`crates/psionic-serve/src/gguf.rs` implements one dense non-GPT-OSS path:
 
-This is a useful later variant.
+- RMS norm
+- attention with `Q/K/V`
+- output projection
+- SiLU-GLU feed-forward
 
-It is not the best next default row.
+That is a regular transformer decoder lane.
 
-The conflict is straightforward:
+It has no execution path for:
 
-- it still duplicates the already-proved Qwen family
-- it pulls the next named row toward code-first behavior
-- the Psion lane explicitly tries to avoid code-dominant drift
+- fused gated QKV on hybrid blocks
+- SSM state update
+- SSM convolution
+- alternating `3 hybrid + 1 full-attention` block scheduling
 
-That does not make it a bad model.
+If Psionic simply adds `qwen35` to the loader classifier today, the next hard
+failure is not a small shape tweak.
 
-It makes it the wrong next model for this repo's current sequencing.
+The next hard failure is structural. The current builder would try to load
+`blk.0.attn_q.weight` from a block that actually exposes `blk.0.attn_qkv.weight`
+plus `ssm_*`.
 
-### `Pythia`
+That is an inference from the source and the downloaded tensor inventory.
 
-Pythia is the strongest **research transparency** candidate.
+### 6. The artifact is multimodal, and Psionic must not hide that fact
 
-It has real advantages:
+The downloaded GGUF carries:
 
-- explicit checkpoint ladder
-- scaling-suite value
-- training-dynamics value
-- Apache-2.0
+- `qwen35.vision.*` metadata
+- vision start/end token ids
+- a multimodal chat template
 
-But it is still the wrong next addition.
+Psionic can still choose a text-only first slice.
 
-The reason is structural, not aesthetic.
+Psionic must not pretend that a multimodal artifact is already fully admitted.
 
-Pythia is a `GPTNeoXForCausalLM` family model, and Psionic does not currently
-ship a NeoX-family GGUF decoder path, prompt path, or named server row.
+The first row should be:
 
-Adding Pythia next would force new family work before it delivered the first
-named row.
+- language-model-only execution
+- explicit refusal for image and video inputs
+- explicit refusal for tool-call formatting if Psionic has not implemented it
 
-That is too much new substrate for the current gap.
+That refusal posture needs to be part of the design, not an undocumented
+omission.
 
-Pythia belongs later, after the repo chooses to widen beyond the current
-Llama/Qwen/Mistral/GPT-OSS decoder set.
+## Exact Psionic Changes Needed
 
-### `SmolLM2`
+The clean implementation is a seven-part change.
 
-SmolLM2 is the best fit because it closes the right gap.
+### 1. Add a real `qwen35` family admission path in `psionic-models`
 
-The critical fact is not just that SmolLM2 is small.
+Files:
 
-The critical fact is that `SmolLM2-360M-Instruct` is a **Llama-family**
-checkpoint.
+- `crates/psionic-models/src/lib.rs`
+- `crates/psionic-models/src/runtime_tokenizer.rs`
+- `crates/psionic-models/src/sharding.rs`
 
-The official config declares:
+Required changes:
 
-- `architectures = ["LlamaForCausalLM"]`
-- `model_type = "llama"`
+- Add `qwen35` to GGUF architecture admission.
+- Add a distinct `GgufTokenizerPretokenizer::Qwen35`.
+- Accept `qwen35` in the runtime tokenizer byte-level BPE path.
+- Add a distinct family label instead of silently folding this into old
+  `qwen2` metadata.
 
-The official GGUF row also exists and is marked:
+The correct shape is:
 
-- architecture: `llama`
-- license: `apache-2.0`
+- add `GgufDecoderFamily::Qwen35`
+- keep `GgufDecoderFamily::Qwen` for current `qwen2`
 
-That means SmolLM2 lands directly on a decoder family Psionic already executes,
-while also widening coverage beyond the Qwen pilot.
+That split matters because:
 
-This is the exact combination the repo needs.
+- the architecture string is different
+- the prompt family is different
+- the block layout is different
+- the multimodal metadata is different
 
-## Why `SmolLM2-360M-Instruct` Beats The Other SmolLM2 Sizes
+Trying to overload `Qwen` here would leak ambiguity across serving, runtime
+support, and evidence surfaces.
 
-The size ladder matters.
+### 2. Add a bounded `qwen35` prompt family
 
-The three meaningful options are:
+Files:
 
-- `135M`
-- `360M`
-- `1.7B`
+- `crates/psionic-models/src/lib.rs`
+- `crates/psionic-models/src/fixtures.rs`
+- `crates/psionic-serve/src/openai_http.rs`
 
-### Why not `135M` as the primary row
+Required changes:
 
-`135M` is excellent for smoke tests.
+- Add `GgufPromptTemplateFamily::Qwen35`.
+- Recognize the downloaded template digest
+  `273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80`.
+- Implement a bounded `render_qwen35_text_only` path for:
+  - optional leading `system`
+  - `user`
+  - `assistant`
+  - `add_generation_prompt`
+- Match the current Qwen3.5 text-only template behavior:
+  - `system` stays first
+  - text turns render with `<|im_start|>` / `<|im_end|>`
+  - generation prompt opens the assistant turn
+  - non-thinking mode emits the empty `<think>` scaffold before completion
 
-It is too weak as the first named support row.
+The first slice should explicitly refuse:
 
-The problems are practical:
+- image content
+- video content
+- `tool` messages
+- `tool_calls`
+- assistant reasoning-content replay if Psionic has not implemented it yet
 
-- it is closer to a loader and request-plumbing sentinel than to a meaningful
-  assistant-quality checkpoint
-- it undershoots the repo's own later serious small-model band
-- it is more likely to create false negatives in route, refusal, or structured
-  serving probes because the model is simply too small
+That is enough to make `/v1/chat/completions` honest for text-only requests
+without promising the whole Qwen3.5 prompt surface on day one.
 
-`135M` should exist as a companion smoke artifact, not as the main named row.
+### 3. Replace the current uniform decoder-layer layout with a hybrid block layout
 
-### Why not `1.7B` first
+Files:
 
-`1.7B` is still small enough for a lot of local work.
+- `crates/psionic-models/src/lib.rs`
 
-It is larger than the repo needs for the next step.
+Required changes:
 
-It weakens the main reasons to add a next small model now:
+- Extend `GgufDecoderFamilyMetadata` with `qwen35`-specific execution metadata:
+  - `full_attention_interval`
+  - `ssm_conv_kernel`
+  - `ssm_group_count`
+  - `ssm_inner_size`
+  - `ssm_state_size`
+  - `ssm_time_step_rank`
+  - optional vision metadata fields preserved for refusal/reporting
+- Replace or extend `GgufDecoderLayerTensorLayout` so one layer can be either:
+  - full-attention block
+  - hybrid SSM block
 
-- fastest local validation
-- lowest-friction laptop bring-up
-- easy CI or developer-machine reproduction
+At minimum the hybrid layout needs slots for:
 
-The next row should stay clearly inside the "small and cheap to validate"
-envelope.
+- `attn_gate.weight`
+- `attn_qkv.weight`
+- `attn_qkv.bias` if present
+- `post_attention_norm.weight`
+- `ssm_a`
+- `ssm_dt`
+- `ssm_alpha.weight`
+- `ssm_beta.weight`
+- `ssm_conv1d.weight`
+- `ssm_norm.weight`
+- `ssm_out.weight`
 
-### Why `360M` is the correct center
+The current decoder layout cannot hold those tensors honestly.
 
-`360M` is the correct middle point.
+Do not patch around this by inventing fake `attn_q.weight` names.
 
-It gives Psionic:
+### 4. Add a `qwen35` execution config instead of forcing it into the old dense decoder contract
 
-- a still-small on-device model
-- a real instruct-tuned checkpoint rather than a bare base model
-- a model large enough to matter for structured-serving and route probes
-- a size that sits much closer to the repo's later `300M` to `1B` serious band
+Files:
 
-That is the right tradeoff.
+- `crates/psionic-models/src/lib.rs`
+- `crates/psionic-serve/src/gguf.rs`
+- any shared decoder-config crate types reached through
+  `DecoderModelDescriptor`
 
-## Why This Beats A Second Qwen Row
+Required changes:
 
-The repo already has a Qwen pilot because Qwen was the cleanest first
-non-GPT-OSS family.
+- Add a qwen35-specific execution config or extend the generic decoder config
+  with per-layer block kinds.
+- Record the alternating block schedule instead of pretending all layers are the
+  same transformer block.
 
-That was the correct first decision.
+The real artifact is:
 
-The next decision should optimize for **coverage expansion**, not for repeating
-the same family with a different checkpoint.
+- `24` total layers
+- `full_attention_interval = 4`
+- effectively `6` groups of `3 hybrid blocks + 1 full-attention block`
 
-`SmolLM2-360M-Instruct` does three things a second Qwen row does not:
+Psionic should preserve that truth directly in machine-readable metadata.
 
-1. it validates the Llama branch with a real named row
-2. it uses an official small instruct checkpoint instead of a synthetic tiny
-   fixture alone
-3. it gives the repo one compact open Llama-family anchor for later small-model
-   experiments
+### 5. Add a dedicated `qwen35` CPU runtime instead of routing it through the current dense path
 
-That is a better use of the next slot.
+Files:
 
-## Recommended Repo Framing
+- `crates/psionic-serve/src/gguf.rs`
 
-The repo should add **one named SmolLM2 Llama-family compatibility row**.
+Required changes:
 
-That row should be described as:
+- Add a new runtime kind such as `CpuQwen35GgufTextGenerationService`.
+- Route `GgufDecoderFamily::Qwen35` into that runtime, not into
+  `CpuDenseGgufTextGenerationService`.
+- Implement:
+  - hybrid-block execution
+  - SSM state update
+  - SSM convolution
+  - fused gated-QKV handling on hybrid blocks
+  - full-attention handling on the `interval = 4` blocks
+  - tied-embedding LM head behavior
 
-- first explicit small Llama-family pilot
-- official GGUF-backed
-- on-device health-check capable
-- not a throughput claim
-- not a full multi-backend claim
-- not a broad model-family completion claim
+This should start as:
 
-This should look structurally similar to the Qwen pilot record, but it should
-be honest about what is new:
+- CPU only
+- text only
+- single-family bring-up
 
-- Qwen proved the generic non-GPT-OSS path
-- SmolLM2 should prove the Llama branch with a real small instruct model
+Do not claim:
 
-## Concrete Follow-On Sequence
+- CUDA support
+- Metal support
+- adapter hosting
+- throughput parity
+- multimodal execution
 
-The clean sequence is:
+until those surfaces are actually validated.
 
-1. Add a `SmolLM2-360M-Instruct` pilot record and checker.
-2. Keep the checker on the generic CPU server path first.
-3. Optionally add `SmolLM2-135M` later as the ultra-fast smoke companion.
-4. Defer `Qwen2.5-0.5B-Instruct` to an artifact-depth or throughput-comparison
-   pass, not the next family-expansion slot.
-5. Defer `Pythia` until the repo explicitly chooses to widen decoder-family
-   support beyond the current GGUF set.
+### 6. Add explicit server refusals for the unsupported `qwen35` surfaces
+
+Files:
+
+- `crates/psionic-serve/src/openai_http.rs`
+- `crates/psionic-serve/src/conformance.rs`
+
+Required changes:
+
+- Reject image/video request parts for `qwen35` until a real multimodal encoder
+  path lands.
+- Reject tool-call surfaces until the `qwen35` tool XML format is implemented.
+- Keep model inventory honest:
+  - `psionic_model_family = "qwen35"` is better than collapsing this into
+    `"qwen"`
+  - also surface `general.architecture = "qwen35"`
+  - include the chat-template digest
+  - include the refusal reasons for multimodal and tools in machine-readable
+    form when relevant
+
+That keeps the server truthful while still making the first text path usable.
+
+### 7. Add real qwen35 fixtures, conformance, and release checks
+
+Files:
+
+- `crates/psionic-models/src/fixtures.rs`
+- `crates/psionic-models/src/lib.rs` tests
+- `crates/psionic-serve/src/conformance.rs`
+- `crates/psionic-serve/src/gguf.rs` tests
+- `crates/psionic-serve/src/openai_http.rs` tests
+- `scripts/release/check-psionic-qwen35-pilot.sh`
+- `docs/NON_GPT_OSS_QWEN35_PILOT.md`
+
+Required changes:
+
+- Add a real `qwen35` tokenizer fixture.
+- Add a real `qwen35` prompt-template digest fixture.
+- Add a synthetic tiny `qwen35` GGUF metadata fixture that includes:
+  - `general.architecture = qwen35`
+  - `tokenizer.ggml.pre = qwen35`
+  - the real `qwen35` chat-template digest
+  - one hybrid block and one full-attention block pattern
+- Add loader tests for:
+  - architecture admission
+  - tokenizer admission
+  - prompt rendering
+  - hybrid tensor-layout construction
+- Add runtime tests for:
+  - hybrid block execution on a deterministic tiny fixture
+  - generic server inventory and refusal signals
+- Add a release checker for the real downloaded row:
+  - local GGUF path or Ollama manifest input
+  - machine-checkable text-only request
+  - refusal checks for unsupported multimodal inputs
+
+The first pilot should prove correctness and honesty.
+
+It should not pretend to prove broad Qwen3.5 completion.
+
+## Recommended Implementation Order
+
+The clean order is:
+
+1. Add `qwen35` architecture admission, tokenizer admission, and prompt-family
+   admission.
+2. Add a hybrid decoder metadata/layout contract in `psionic-models`.
+3. Add a dedicated CPU `qwen35` runtime in `psionic-serve`.
+4. Add text-only generic-server support with explicit refusals for multimodal
+   and tools.
+5. Add the `qwen35` pilot checker and docs.
+6. Only after that, consider:
+   - tool-call formatting
+   - multimodal input support
+   - adapters
+   - GPU rows
+
+## What Psionic Should Not Do
+
+Psionic should not:
+
+- map `qwen35` to `qwen2` and call that support
+- advertise a multimodal row while silently serving text only
+- reuse the old Qwen prompt family digest
+- stuff hybrid SSM blocks into the old dense decoder layout with fake tensor
+  names
+- claim throughput or backend portability before there is a real pilot row
 
 ## Final Recommendation
 
-The best logical next model type to add is:
+The right next model row is:
 
-- **`SmolLM2-360M-Instruct` as a named small Llama-family row**
+- **`qwen3.5:0.8b` as the first explicit `qwen35` GGUF target**
 
-The supporting rationale is direct:
+The exact Psionic work required is also clear:
 
-- Psionic already executes the Llama family.
-- Psionic already proved Qwen.
-- Psionic has not yet named a real small Llama-family pilot.
-- SmolLM2 is open, small, instruct-tuned, and officially available in GGUF.
-- `360M` is large enough to matter and still small enough to stay cheap.
+- add a real `qwen35` family and tokenizer path
+- add a bounded `qwen35` prompt renderer for text-only chat
+- add a hybrid SSM plus attention decoder layout contract
+- add a dedicated `qwen35` CPU runtime
+- add explicit refusal posture for multimodal and tool surfaces
+- add fixtures, conformance, and a release checker for the real row
 
-If the repo wants one sentence to guide the next implementation tranche, it
-should be this:
+If Psionic wants one sentence to guide the implementation tranche, it should be
+this:
 
-> Add SmolLM2-360M-Instruct next, because it widens the generic server from the
-> already-proved Qwen branch into a real small Llama-family row without
-> requiring a new decoder substrate.
+> Add `qwen3.5:0.8b` next, and do the real `qwen35` work: new family
+> admission, new prompt digest, hybrid SSM plus attention layer contracts, a
+> dedicated text-only runtime, and explicit refusal on the multimodal surfaces
+> that are not implemented yet.
