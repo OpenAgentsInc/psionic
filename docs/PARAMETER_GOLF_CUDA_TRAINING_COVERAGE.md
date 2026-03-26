@@ -121,6 +121,10 @@ same CUDA matmul surface:
 - the public CUDA backend executes those backward ops directly, so the banked
   training graph can keep the same rank-3 bank tensor surface across forward,
   backward, and resident training-session execution
+- the admitted CUDA banked graph now also casts direct banked-linear inputs
+  down to BF16 before those `parameter_golf_banked_linear` sites, so the
+  score-lane matrix-input surface no longer stays wide F32 by default when the
+  runtime is already on the banked BF16 matmul path
 
 That retires the old "banked storage but split-matrix training execution"
 boundary from the admitted CUDA train lane. It does not prove score closure by

@@ -248,7 +248,10 @@ The command is explicit about what it treats as trainer truth. It binds:
 - BF16 graph inputs for the train-visible token-embedding and linear weight
   surface, with the CUDA path now widening BF16 embedding tables and casting
   F32 activations to BF16 on-device before the existing BF16 matmul lane so
-  the hot-path weight residency is no longer dense `f32` end to end
+  the hot-path weight residency is no longer dense `f32` end to end; the
+  direct banked `q/k/v/out/fc/proj` lane now also casts CUDA banked-linear
+  activations down to BF16 before the banked matmul so the resident score-path
+  matrix inputs no longer stay wide `f32` by default
 - BF16 autodiff admission for that same train-visible weight surface, so the
   single-H100 backward launcher now binds retained BF16 primal values and BF16
   seed or gradient tensors through the graph-declared dtype instead of
@@ -259,7 +262,9 @@ The command is explicit about what it treats as trainer truth. It binds:
   graph-input primals straight from the original input buffers instead of
   retaining that input-bound parameter surface as extra forward outputs; the
   default PGOLF `relu_squared` MLP path now also binds backward against the
-  activation output instead of retaining the pre-activation hidden tensor
+  activation output instead of retaining the pre-activation hidden tensor,
+  while the direct banked matrix lane now keeps those matmul-input activations
+  on the BF16 graph surface on CUDA
 - slice-wise Muon updates over that banked matrix surface, so rank-3 bank
   tensors are now treated as stacks of equal-shaped matrices rather than
   forcing the optimizer path back to the split surface before every update

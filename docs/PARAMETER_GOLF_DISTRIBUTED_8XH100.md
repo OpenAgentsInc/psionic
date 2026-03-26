@@ -102,6 +102,9 @@ Psionic now encodes that exact posture explicitly instead of treating
   longer counts those input-bound parameter tensors as retained forward
   outputs, and now binds the default PGOLF `relu_squared` backward rule
   against the activation output instead of the pre-activation hidden tensor.
+  The direct banked `q/k/v/out/fc/proj` CUDA lane now also casts banked-linear
+  activations down to BF16 before the resident banked matmul surface instead
+  of keeping those train-visible matrix inputs wide `f32` by default.
 - `psionic-train` now also ships retained per-rank distributed validation
   receipts plus one completion receipt bound to the trained runtime-produced
   int8+zlib artifact, so the exported-folder `distributed_8xh100_train` mode
@@ -131,7 +134,9 @@ Psionic now encodes that exact posture explicitly instead of treating
   materializing those rank-3 bank slices through host fallback before the
   matmul; the train lane now also lowers direct banked input-gradient and
   bank-weight-gradient ops instead of bouncing those matrix families back
-  through the older sliced-bank backward posture
+  through the older sliced-bank backward posture, and the admitted CUDA banked
+  path now feeds those direct banked linears from BF16 activations instead of
+  retaining F32 matrix inputs for the same banked surface
 - `psionic-models` plus the lowered PGOLF baseline graph now also admit two
   architecture-pack slices under the shared config surface:
   `rope_rotary_dim` for Partial RoPE,

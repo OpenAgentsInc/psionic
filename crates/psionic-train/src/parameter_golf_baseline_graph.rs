@@ -1459,8 +1459,16 @@ fn parameter_or_banked_linear_3d_graph(
         }
     })?;
     if use_banked_matrix_execution {
+        let lowered_input = if use_bf16_fast_path
+            && bank.spec().dtype() == DType::BF16
+            && input.spec().dtype() == DType::F32
+        {
+            builder.cast(input, DType::BF16)?
+        } else {
+            input.clone()
+        };
         return builder
-            .parameter_golf_banked_linear(input, bank, bank_index)
+            .parameter_golf_banked_linear(&lowered_input, bank, bank_index)
             .map_err(Into::into);
     }
     let weight =
@@ -2721,6 +2729,71 @@ mod tests {
             (split_loss - banked_loss).abs() < 5e-5,
             "banked eval graph loss drift exceeded tolerance: split={split_loss} banked={banked_loss}"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_cuda_banked_graph_feeds_direct_banked_linears_from_bf16_inputs(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = load_baseline_fixture();
+        let model = baseline_model()?;
+        let banked_descriptor = model.banked_descriptor()?;
+        let cuda = Device::new(DeviceKind::Cuda, 0, Some(String::from("cuda:0")));
+        let training_graph = build_parameter_golf_baseline_training_graph(
+            cuda.clone(),
+            &banked_descriptor,
+            fixture.input_ids.len(),
+            fixture.input_ids[0].len(),
+        )?;
+        let eval_graph = build_parameter_golf_baseline_eval_graph(
+            cuda,
+            &banked_descriptor,
+            fixture.input_ids.len(),
+            fixture.input_ids[0].len(),
+        )?;
+
+        let training_banked_linear_input_dtypes = training_graph
+            .graph
+            .graph()
+            .nodes()
+            .iter()
+            .filter_map(|node| match node.op() {
+                OpKind::BackendExtension {
+                    op: BackendExtensionOp::ParameterGolfBankedLinear { .. },
+                } => Some(
+                    node.inputs()
+                        .first()
+                        .and_then(|tensor_id| training_graph.graph.graph().node(*tensor_id))
+                        .map(|input| input.tensor().spec().dtype()),
+                ),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let eval_banked_linear_input_dtypes = eval_graph
+            .graph
+            .nodes()
+            .iter()
+            .filter_map(|node| match node.op() {
+                OpKind::BackendExtension {
+                    op: BackendExtensionOp::ParameterGolfBankedLinear { .. },
+                } => Some(
+                    node.inputs()
+                        .first()
+                        .and_then(|tensor_id| eval_graph.graph.node(*tensor_id))
+                        .map(|input| input.tensor().spec().dtype()),
+                ),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert!(!training_banked_linear_input_dtypes.is_empty());
+        assert!(!eval_banked_linear_input_dtypes.is_empty());
+        assert!(training_banked_linear_input_dtypes
+            .iter()
+            .all(|dtype| *dtype == Some(DType::BF16)));
+        assert!(eval_banked_linear_input_dtypes
+            .iter()
+            .all(|dtype| *dtype == Some(DType::BF16)));
         Ok(())
     }
 
