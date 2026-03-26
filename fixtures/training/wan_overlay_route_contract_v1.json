@@ -1,0 +1,141 @@
+{
+  "schema_version": "psionic.wan_overlay_route_contract.v1",
+  "contract_id": "psionic.wan_overlay_route_contract.v1",
+  "network_id": "psionic.decentralized_training.testnet.v1",
+  "governance_revision_id": "psionic.decentralized_training_governance.v1",
+  "current_epoch_id": "network_epoch_00000123",
+  "decentralized_network_contract_digest": "37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda",
+  "public_network_registry_contract_digest": "ebb5ca08893fe16f1a72c67f2fd99aefe44a95af7670bb31e875b2d77b88b7f4",
+  "elastic_device_mesh_contract_digest": "c28470e11457d28464a6e5ae42543996b7048ec13e228b64e6394e233d1965fc",
+  "nat_postures": [
+    {
+      "registry_record_id": "google_l4_validator_node.registry",
+      "nat_posture": "public_reachable",
+      "advertises_direct_route": true,
+      "detail": "Google exposes the current public relay and checkpoint-authority ingress, so it remains directly reachable for steady-state control traffic."
+    },
+    {
+      "registry_record_id": "runpod_8xh100_dense_node.registry",
+      "nat_posture": "public_reachable",
+      "advertises_direct_route": true,
+      "detail": "RunPod exposes public control and checkpoint mirror endpoints, so checkpoint-authority traffic can remain direct while the path is healthy."
+    },
+    {
+      "registry_record_id": "local_rtx4080_workstation.registry",
+      "nat_posture": "cone_nat",
+      "advertises_direct_route": false,
+      "detail": "The RTX 4080 workstation remains reachable only through relay or overlay assistance on the public internet."
+    },
+    {
+      "registry_record_id": "local_mlx_mac_workstation.registry",
+      "nat_posture": "symmetric_nat",
+      "advertises_direct_route": false,
+      "detail": "The Apple MLX workstation is the worst NAT case in the current mesh, so direct assumptions remain refused."
+    }
+  ],
+  "route_quality_samples": [
+    {
+      "sample_id": "quality.google_runpod.direct",
+      "route_id": "route.checkpoint_authority.google_runpod.direct",
+      "round_trip_latency_ms": 31,
+      "sustained_bandwidth_mbps": 6400,
+      "packet_loss_bps": 2,
+      "egress_cost_basis_points": 14,
+      "route_quality_score_bps": 9440,
+      "detail": "Google-to-RunPod direct transport remains the best checkpoint-authority path while both endpoints stay public-reachable."
+    },
+    {
+      "sample_id": "quality.local_rtx4080_local_mlx.relayed",
+      "route_id": "route.public_miner.local_rtx4080_local_mlx.relayed",
+      "round_trip_latency_ms": 86,
+      "sustained_bandwidth_mbps": 480,
+      "packet_loss_bps": 41,
+      "egress_cost_basis_points": 18,
+      "route_quality_score_bps": 7120,
+      "detail": "The first public-miner path between the two local nodes uses the Google relay because neither endpoint currently advertises direct reachability."
+    },
+    {
+      "sample_id": "quality.local_rtx4080_local_mlx.overlay",
+      "route_id": "route.public_miner.local_rtx4080_local_mlx.overlay_failover",
+      "round_trip_latency_ms": 63,
+      "sustained_bandwidth_mbps": 720,
+      "packet_loss_bps": 18,
+      "egress_cost_basis_points": 16,
+      "route_quality_score_bps": 8040,
+      "detail": "The overlay-tunnel fallback improves latency and loss for the local-node pair once the relay-only path degrades."
+    },
+    {
+      "sample_id": "quality.local_mlx_runpod.overlay",
+      "route_id": "route.checkpoint_authority.local_mlx_runpod.overlay",
+      "round_trip_latency_ms": 58,
+      "sustained_bandwidth_mbps": 910,
+      "packet_loss_bps": 15,
+      "egress_cost_basis_points": 17,
+      "route_quality_score_bps": 7880,
+      "detail": "Apple MLX reaches RunPod through the same relay-assisted overlay control plane for live catch-up and checkpoint serving."
+    }
+  ],
+  "route_records": [
+    {
+      "route_id": "route.checkpoint_authority.google_runpod.direct",
+      "session_kind": "checkpoint_promotion",
+      "src_registry_record_id": "google_l4_validator_node.registry",
+      "dst_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "selected_transport": "direct",
+      "source_selection_id": "checkpoint_promotion_offer_v1",
+      "evidence_sample_id": "quality.google_runpod.direct",
+      "detail": "Checkpoint-authority peers use direct transport while both public endpoints stay healthy, keeping the lowest-latency durable-state lane explicit."
+    },
+    {
+      "route_id": "route.public_miner.local_rtx4080_local_mlx.relayed",
+      "session_kind": "contributor_window",
+      "src_registry_record_id": "local_rtx4080_workstation.registry",
+      "dst_registry_record_id": "local_mlx_mac_workstation.registry",
+      "selected_transport": "relayed",
+      "relay_registry_record_id": "google_l4_validator_node.registry",
+      "source_selection_id": "public_miner_window_offer_v1",
+      "evidence_sample_id": "quality.local_rtx4080_local_mlx.relayed",
+      "detail": "The initial public-miner route between the two local nodes is relay-bound through Google because both peers are still NAT-constrained."
+    },
+    {
+      "route_id": "route.public_miner.local_rtx4080_local_mlx.overlay_failover",
+      "session_kind": "contributor_window",
+      "src_registry_record_id": "local_rtx4080_workstation.registry",
+      "dst_registry_record_id": "local_mlx_mac_workstation.registry",
+      "selected_transport": "overlay_tunnel",
+      "relay_registry_record_id": "google_l4_validator_node.registry",
+      "source_selection_id": "promote_public_miner_standby_after_deathrattle_v1",
+      "evidence_sample_id": "quality.local_rtx4080_local_mlx.overlay",
+      "detail": "The public-miner pair can fail over from a pure relay hop to a relay-assisted overlay tunnel without silently dropping the window."
+    },
+    {
+      "route_id": "route.checkpoint_authority.local_mlx_runpod.overlay",
+      "session_kind": "checkpoint_promotion",
+      "src_registry_record_id": "local_mlx_mac_workstation.registry",
+      "dst_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "selected_transport": "overlay_tunnel",
+      "relay_registry_record_id": "google_l4_validator_node.registry",
+      "source_selection_id": "checkpoint_promotion_offer_v1",
+      "evidence_sample_id": "quality.local_mlx_runpod.overlay",
+      "detail": "Apple MLX reaches the RunPod checkpoint authority through the overlay lane so live catch-up can reuse the same public path truth later."
+    }
+  ],
+  "failover_receipts": [
+    {
+      "receipt_id": "failover.public_miner.local_rtx4080_local_mlx.1",
+      "session_kind": "contributor_window",
+      "previous_route_id": "route.public_miner.local_rtx4080_local_mlx.relayed",
+      "next_route_id": "route.public_miner.local_rtx4080_local_mlx.overlay_failover",
+      "trigger_kind": "packet_loss_overflow",
+      "detail": "The first public-miner transport failover is explicit: packet loss on the relay-only path crossed the allowed threshold, so the mesh promoted the overlay-tunnel fallback for the same peer pair."
+    }
+  ],
+  "authority_paths": {
+    "fixture_path": "fixtures/training/wan_overlay_route_contract_v1.json",
+    "check_script_path": "scripts/check-wan-overlay-route-contract.sh",
+    "reference_doc_path": "docs/WAN_OVERLAY_ROUTE_REFERENCE.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the first internet-native route truth above the elastic device mesh: peer NAT posture, route-quality evidence, direct-vs-relayed-vs-overlay selection, and explicit transport failover receipts. It does not yet claim live checkpoint catch-up, compressed outer sync, or public internet soak closure.",
+  "contract_digest": "3f8ac57a330f37acfed56c582353643cd09072f6b1792472917165db979922e4"
+}

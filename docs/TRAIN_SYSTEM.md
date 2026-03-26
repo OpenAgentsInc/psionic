@@ -243,6 +243,20 @@ live dense remove-without-replacement still refuses and remains explicitly
 bound to the older refused topology and recovery scenarios until later runtime
 and transport issues close.
 
+The repo now also owns the first WAN overlay and relay route contract in
+`crates/psionic-train/src/wan_overlay_route_contract.rs`, the binary
+`wan_overlay_route_contract`, the checker
+`scripts/check-wan-overlay-route-contract.sh`, the focused reference doc
+`docs/WAN_OVERLAY_ROUTE_REFERENCE.md`, and the committed fixture
+`fixtures/training/wan_overlay_route_contract_v1.json`. That surface turns the
+public registry plus elastic mesh into internet-native path truth: one NAT
+posture record per admitted node, retained route-quality samples, typed
+direct-vs-relayed-vs-overlay route selection, and explicit failover receipts
+for the same peer pair. It proves one honest transport move, from a relay-only
+miner path to an overlay tunnel after packet-loss overflow, while still
+refusing to pretend catch-up, outer sync, or public internet soak closure
+already exist.
+
 The repo now also owns the first dense-rank recovery contract in
 `crates/psionic-train/src/dense_rank_recovery_contract.rs`, the binary
 `dense_rank_recovery_contract`, the checker
