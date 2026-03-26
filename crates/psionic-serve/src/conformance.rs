@@ -3102,6 +3102,30 @@ mod tests {
     }
 
     #[test]
+    fn generate_case_builder_uses_real_qwen35_fixture() -> Result<(), Box<dyn std::error::Error>> {
+        let case = GenerateConformanceCase::from_generate_compatible_prompt_fixture(
+            "qwen35-render",
+            "qwen35",
+            "qwen35_0_8b",
+            "qwen35_0_8b.default",
+            "qwen35_0_8b.default_system",
+        )?;
+
+        assert_eq!(case.model, "qwen35");
+        assert_eq!(case.prompt, "Summarize the pilot.");
+        assert_eq!(case.system.as_deref(), Some("Be terse."));
+        assert!(case.debug_render_only);
+        assert!(case.stop_sequences.is_empty());
+        assert_eq!(
+            case.expected_rendered_prompt.as_deref(),
+            Some(
+                "<|im_start|>system\nBe terse.<|im_end|>\n<|im_start|>user\nSummarize the pilot.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
     fn conformance_suite_accepts_matching_prompt_render_candidate()
     -> Result<(), Box<dyn std::error::Error>> {
         let case = GenerateConformanceCase::from_generate_compatible_prompt_fixture(

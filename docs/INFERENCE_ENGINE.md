@@ -35,6 +35,8 @@ than just run tensor math.
   `/v1/responses`.
 - The first `qwen35` lane must fail closed for structured outputs and tool
   calling.
+- The first `qwen35` lane must fail closed for image and video request content
+  until dedicated multimodal support lands.
 
 ## Embeddings Requirements
 

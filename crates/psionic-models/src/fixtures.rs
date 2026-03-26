@@ -237,6 +237,33 @@ const QWEN2_SAMPLES: [GoldenTokenizerSample; 4] = [
     },
 ];
 
+const QWEN35_SAMPLES: [GoldenTokenizerSample; 6] = [
+    GoldenTokenizerSample {
+        token_id: TokenId(0),
+        token: "!",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(1),
+        token: "\"",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(2),
+        token: "#",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(248044),
+        token: "<|endoftext|>",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(248045),
+        token: "<|im_start|>",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(248046),
+        token: "<|im_end|>",
+    },
+];
+
 const GPT_OSS_SAMPLES: [GoldenTokenizerSample; 3] = [
     GoldenTokenizerSample {
         token_id: TokenId(199998),
@@ -253,7 +280,7 @@ const GPT_OSS_SAMPLES: [GoldenTokenizerSample; 3] = [
 ];
 
 /// Golden tokenizer fixtures sourced from local real GGUF artifacts.
-pub const GOLDEN_TOKENIZER_FIXTURES: [GoldenTokenizerFixture; 3] = [
+pub const GOLDEN_TOKENIZER_FIXTURES: [GoldenTokenizerFixture; 4] = [
     GoldenTokenizerFixture {
         id: "llama_spm",
         family: "llama_spm",
@@ -287,6 +314,23 @@ pub const GOLDEN_TOKENIZER_FIXTURES: [GoldenTokenizerFixture; 3] = [
         add_eos: false,
         sample_tokens: &QWEN2_SAMPLES,
         notes: "GPT-style BPE baseline with real qwen2 special-token defaults and prompt family.",
+    },
+    GoldenTokenizerFixture {
+        id: "qwen35_0_8b",
+        family: "qwen35",
+        source_path: "/home/christopherdavid/models/qwen3.5/qwen3.5-0.8b-q8_0.gguf",
+        source_sha256: None,
+        vocabulary_len: 248320,
+        model: GgufTokenizerModel::Gpt2Bpe,
+        pretokenizer: Some("qwen35"),
+        bos_token_id: None,
+        eos_token_ids: &[TokenId(248046)],
+        pad_token_id: Some(TokenId(248044)),
+        unknown_token_id: None,
+        add_bos: true,
+        add_eos: false,
+        sample_tokens: &QWEN35_SAMPLES,
+        notes: "Real qwen3.5:0.8b GGUF tokenizer facts from the downloaded Ollama artifact that Psionic targets for the qwen35 pilot.",
     },
     GoldenTokenizerFixture {
         id: "gpt_oss_20b",
@@ -354,6 +398,36 @@ const QWEN2_MESSAGES_WITH_SYSTEM: [GoldenPromptMessage; 4] = [
     GoldenPromptMessage {
         role: GoldenPromptRole::User,
         content: "Summarize.",
+    },
+];
+
+const QWEN35_MESSAGES_DEFAULT_SYSTEM: [GoldenPromptMessage; 2] = [
+    GoldenPromptMessage {
+        role: GoldenPromptRole::System,
+        content: "Be terse.",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::User,
+        content: "Summarize the pilot.",
+    },
+];
+
+const QWEN35_MESSAGES_WITH_HISTORY: [GoldenPromptMessage; 4] = [
+    GoldenPromptMessage {
+        role: GoldenPromptRole::System,
+        content: "Use one sentence.",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::User,
+        content: "What runs this model?",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::Assistant,
+        content: "A CPU llama.cpp proxy.",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::User,
+        content: "What remains unsupported?",
     },
 ];
 
@@ -452,6 +526,23 @@ const QWEN2_RENDER_CASES: [GoldenPromptRenderCase; 3] = [
     },
 ];
 
+const QWEN35_RENDER_CASES: [GoldenPromptRenderCase; 2] = [
+    GoldenPromptRenderCase {
+        id: "qwen35_0_8b.default_system",
+        messages: &QWEN35_MESSAGES_DEFAULT_SYSTEM,
+        harmony_context: None,
+        add_generation_prompt: true,
+        expected_rendered: "<|im_start|>system\nBe terse.<|im_end|>\n<|im_start|>user\nSummarize the pilot.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    },
+    GoldenPromptRenderCase {
+        id: "qwen35_0_8b.with_history",
+        messages: &QWEN35_MESSAGES_WITH_HISTORY,
+        harmony_context: None,
+        add_generation_prompt: true,
+        expected_rendered: "<|im_start|>system\nUse one sentence.<|im_end|>\n<|im_start|>user\nWhat runs this model?<|im_end|>\n<|im_start|>assistant\nA CPU llama.cpp proxy.<|im_end|>\n<|im_start|>user\nWhat remains unsupported?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    },
+];
+
 const COMMAND_R_RENDER_CASES: [GoldenPromptRenderCase; 2] = [
     GoldenPromptRenderCase {
         id: "command_r.user_only",
@@ -495,8 +586,7 @@ const PHI3_VARIANTS: [GoldenPromptTemplateVariant; 1] = [GoldenPromptTemplateVar
     ollama_stop_source: Some("/home/christopherdavid/code/ollama/template/phi-3.json"),
     template_digest: "268b6082ceb7176dc6ed80557a2f7837f9f0339592fbee677d405a553af15f88",
     raw_template: Some(PHI3_TEMPLATE),
-    template_excerpt:
-        "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') %}...",
+    template_excerpt: "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') %}...",
     stop_sequences: &["<|end|>", "<|system|>", "<|user|>", "<|assistant|>"],
     render_cases: &PHI3_RENDER_CASES,
     notes: "Small redistributable prompt family with real BOS insertion and Ollama stop defaults.",
@@ -513,6 +603,19 @@ const QWEN2_VARIANTS: [GoldenPromptTemplateVariant; 1] = [GoldenPromptTemplateVa
     stop_sequences: &[],
     render_cases: &QWEN2_RENDER_CASES,
     notes: "Real qwen2 chat template with injected default system behavior when the first turn is not system.",
+}];
+
+const QWEN35_VARIANTS: [GoldenPromptTemplateVariant; 1] = [GoldenPromptTemplateVariant {
+    id: "qwen35_0_8b.default",
+    gguf_key: "tokenizer.chat_template",
+    ollama_template_name: None,
+    ollama_stop_source: None,
+    template_digest: "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+    raw_template: None,
+    template_excerpt: "{%- set image_count = namespace(value=0) %}\n{%- set video_count = namespace(value=0) %}\n{%- macro render_content(content, do_vision_count, is_system_content=false) %}...",
+    stop_sequences: &[],
+    render_cases: &QWEN35_RENDER_CASES,
+    notes: "Real qwen3.5 multimodal-aware chat-template digest from the downloaded 0.8B GGUF. The pilot render cases cover the text-only subset Psionic serves today.",
 }];
 
 const COMMAND_R_VARIANTS: [GoldenPromptTemplateVariant; 3] = [
@@ -598,6 +701,27 @@ const QWEN2_WINDOW_CASES: [GoldenPromptWindowCase; 2] = [
     },
 ];
 
+const QWEN35_WINDOW_CASES: [GoldenPromptWindowCase; 2] = [
+    GoldenPromptWindowCase {
+        id: "qwen35_0_8b.default_system_within_medium_window",
+        surface: GoldenPromptSurface::Generate,
+        template_variant_id: "qwen35_0_8b.default",
+        render_case_id: "qwen35_0_8b.default_system",
+        max_rendered_bytes: 160,
+        expected_over_budget: false,
+        note: "Keeps the first text-only qwen35 pilot prompt inside a moderate render budget.",
+    },
+    GoldenPromptWindowCase {
+        id: "qwen35_0_8b.history_over_small_window",
+        surface: GoldenPromptSurface::Generate,
+        template_variant_id: "qwen35_0_8b.default",
+        render_case_id: "qwen35_0_8b.with_history",
+        max_rendered_bytes: 192,
+        expected_over_budget: true,
+        note: "Forces a multi-turn qwen35 prompt over a small render budget while preserving the real template digest.",
+    },
+];
+
 const COMMAND_R_WINDOW_CASES: [GoldenPromptWindowCase; 2] = [
     GoldenPromptWindowCase {
         id: "command_r.user_only_within_medium_window",
@@ -622,7 +746,7 @@ const COMMAND_R_WINDOW_CASES: [GoldenPromptWindowCase; 2] = [
 const GPT_OSS_WINDOW_CASES: [GoldenPromptWindowCase; 0] = [];
 
 /// Golden prompt fixtures sourced from local real GGUF artifacts.
-pub const GOLDEN_PROMPT_FIXTURES: [GoldenPromptFixture; 4] = [
+pub const GOLDEN_PROMPT_FIXTURES: [GoldenPromptFixture; 5] = [
     GoldenPromptFixture {
         id: "phi3",
         family: "phi3",
@@ -640,6 +764,15 @@ pub const GOLDEN_PROMPT_FIXTURES: [GoldenPromptFixture; 4] = [
         template_variants: &QWEN2_VARIANTS,
         window_cases: &QWEN2_WINDOW_CASES,
         notes: "GPT-style prompt family with default-system injection and explicit generation-prompt coverage.",
+    },
+    GoldenPromptFixture {
+        id: "qwen35_0_8b",
+        family: "qwen35",
+        source_path: "/home/christopherdavid/models/qwen3.5/qwen3.5-0.8b-q8_0.gguf",
+        source_sha256: None,
+        template_variants: &QWEN35_VARIANTS,
+        window_cases: &QWEN35_WINDOW_CASES,
+        notes: "Real qwen3.5:0.8b prompt-family anchor. The canonical artifact is multimodal-aware; the current pilot asserts only the text-only render subset Psionic serves.",
     },
     GoldenPromptFixture {
         id: "command_r",

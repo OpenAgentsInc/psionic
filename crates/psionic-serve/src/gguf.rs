@@ -2556,7 +2556,11 @@ mod tests {
     use psionic_core::QuantizationMode;
     use psionic_models::{GgufDecoderFamily, GgufMetadataValue, GgufTensorType};
     use safetensors::{Dtype as SafeTensorsDType, serialize_to_file, tensor::TensorView};
-    use std::{fs, path::Path};
+    use std::{
+        fs,
+        path::Path,
+        sync::{Mutex, OnceLock},
+    };
     use tempfile::tempdir;
 
     #[derive(Clone, Debug)]
@@ -2620,6 +2624,57 @@ mod tests {
             4,
             "hello",
         )
+    }
+
+    #[test]
+    fn cpu_gguf_service_executes_qwen35_proxy_family() -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = qwen35_proxy_test_lock()
+            .lock()
+            .expect("qwen35 proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let (base_url, shutdown_tx) = runtime.block_on(start_qwen35_proxy_test_server())?;
+        let temp = tempdir()?;
+        let path = temp.path().join("tiny_qwen35.gguf");
+        write_test_gguf(
+            &path,
+            qwen35_decoder_metadata("tiny psionic qwen35 proxy").as_slice(),
+            qwen35_decoder_tensors().as_slice(),
+        )?;
+        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
+
+        let mut service = CpuGgufTextGenerationService::from_gguf_path(&path)?;
+        let descriptor = service.model_descriptor().clone();
+        let request = GenerationRequest::new_text(
+            String::from("gguf-qwen35"),
+            descriptor.clone(),
+            None,
+            "hello",
+            GenerationOptions::greedy(2),
+        );
+
+        let response = service.generate(&request)?;
+        let support = service.runtime_support();
+        let loaded = service.loaded_model_views();
+
+        assert_eq!(descriptor.model.family, "qwen35");
+        assert_eq!(response.output.text, "proxy world");
+        assert_eq!(support.family, GgufDecoderFamily::Qwen35);
+        assert_eq!(support.supported_backends, vec![String::from("cpu")]);
+        assert_eq!(
+            support.unsupported_features,
+            vec![
+                String::from("multimodal_inputs"),
+                String::from("video_inputs"),
+                String::from("tool_calling"),
+                String::from("structured_output_fallback"),
+                String::from("adapter_serving"),
+            ]
+        );
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].summary.family.as_deref(), Some("qwen35"));
+
+        let _ = shutdown_tx.send(());
+        Ok(())
     }
 
     #[test]
@@ -2977,6 +3032,123 @@ mod tests {
         metadata
     }
 
+    fn qwen35_chat_template() -> &'static str {
+        include_str!("../../psionic-models/src/testdata/qwen35_chat_template.jinja")
+            .trim_end_matches('\n')
+    }
+
+    fn qwen35_decoder_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = vec![
+            (
+                String::from("general.architecture"),
+                GgufMetadataValue::String(String::from("qwen35")),
+            ),
+            (
+                String::from("general.name"),
+                GgufMetadataValue::String(name.to_string()),
+            ),
+            (
+                String::from("qwen35.context_length"),
+                GgufMetadataValue::U32(256),
+            ),
+            (
+                String::from("qwen35.embedding_length"),
+                GgufMetadataValue::U32(8),
+            ),
+            (
+                String::from("qwen35.feed_forward_length"),
+                GgufMetadataValue::U32(16),
+            ),
+            (
+                String::from("qwen35.block_count"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.attention.head_count"),
+                GgufMetadataValue::U32(2),
+            ),
+            (
+                String::from("qwen35.attention.head_count_kv"),
+                GgufMetadataValue::Array(vec![
+                    GgufMetadataValue::U32(0),
+                    GgufMetadataValue::U32(0),
+                    GgufMetadataValue::U32(0),
+                    GgufMetadataValue::U32(1),
+                ]),
+            ),
+            (
+                String::from("qwen35.attention.key_length"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.attention.value_length"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.attention.layer_norm_rms_epsilon"),
+                GgufMetadataValue::F32(1e-6),
+            ),
+            (
+                String::from("qwen35.rope.dimension_count"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.rope.freq_base"),
+                GgufMetadataValue::F32(10_000_000.0),
+            ),
+            (
+                String::from("qwen35.full_attention_interval"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.ssm.conv_kernel"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.ssm.group_count"),
+                GgufMetadataValue::U32(2),
+            ),
+            (
+                String::from("qwen35.ssm.inner_size"),
+                GgufMetadataValue::U32(8),
+            ),
+            (
+                String::from("qwen35.ssm.state_size"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.ssm.time_step_rank"),
+                GgufMetadataValue::U32(2),
+            ),
+            (
+                String::from("qwen35.vision.block_count"),
+                GgufMetadataValue::U32(2),
+            ),
+            (
+                String::from("qwen35.vision.embedding_length"),
+                GgufMetadataValue::U32(6),
+            ),
+            (
+                String::from("qwen35.vision_start_token_id"),
+                GgufMetadataValue::U32(900),
+            ),
+            (
+                String::from("qwen35.vision_end_token_id"),
+                GgufMetadataValue::U32(901),
+            ),
+            (
+                String::from("qwen35.image_token_id"),
+                GgufMetadataValue::U32(902),
+            ),
+            (
+                String::from("tokenizer.chat_template"),
+                GgufMetadataValue::String(qwen35_chat_template().to_string()),
+            ),
+        ];
+        metadata.extend(qwen35_tokenizer_metadata_entries());
+        metadata
+    }
+
     fn dense_family_header(architecture: &str, name: &str) -> Vec<(String, GgufMetadataValue)> {
         vec![
             (
@@ -3112,6 +3284,57 @@ mod tests {
         ]
     }
 
+    fn qwen35_tokenizer_metadata_entries() -> Vec<(String, GgufMetadataValue)> {
+        vec![
+            (
+                String::from("tokenizer.ggml.model"),
+                GgufMetadataValue::String(String::from("gpt2")),
+            ),
+            (
+                String::from("tokenizer.ggml.pre"),
+                GgufMetadataValue::String(String::from("qwen35")),
+            ),
+            (
+                String::from("tokenizer.ggml.tokens"),
+                GgufMetadataValue::Array(vec![
+                    GgufMetadataValue::String(String::from("<|bos|>")),
+                    GgufMetadataValue::String(String::from("<|eos|>")),
+                    GgufMetadataValue::String(String::from("<|im_start|>")),
+                    GgufMetadataValue::String(String::from("<|im_end|>")),
+                    GgufMetadataValue::String(String::from("<think>")),
+                    GgufMetadataValue::String(String::from("</think>")),
+                    GgufMetadataValue::String(String::from("hello")),
+                    GgufMetadataValue::String(String::from("world")),
+                    GgufMetadataValue::String(String::from("proxy")),
+                    GgufMetadataValue::String(String::from("qwen35")),
+                ]),
+            ),
+            (
+                String::from("tokenizer.ggml.merges"),
+                GgufMetadataValue::Array(vec![
+                    GgufMetadataValue::String(String::from("hello world")),
+                    GgufMetadataValue::String(String::from("proxy qwen35")),
+                ]),
+            ),
+            (
+                String::from("tokenizer.ggml.bos_token_id"),
+                GgufMetadataValue::U32(0),
+            ),
+            (
+                String::from("tokenizer.ggml.eos_token_id"),
+                GgufMetadataValue::U32(1),
+            ),
+            (
+                String::from("tokenizer.ggml.add_bos_token"),
+                GgufMetadataValue::Bool(false),
+            ),
+            (
+                String::from("tokenizer.ggml.add_eos_token"),
+                GgufMetadataValue::Bool(false),
+            ),
+        ]
+    }
+
     fn dense_decoder_tensors(
         include_qkv_bias: bool,
         hello_token_index: usize,
@@ -3147,6 +3370,98 @@ mod tests {
         tensors
     }
 
+    fn qwen35_decoder_tensors() -> Vec<TestGgufTensor> {
+        let mut tensors = vec![
+            dense_f32_tensor("token_embd.weight", vec![10, 8]),
+            dense_f32_tensor("output_norm.weight", vec![8]),
+            dense_f32_tensor("output.weight", vec![10, 8]),
+        ];
+
+        for layer_index in 0..4 {
+            let prefix = format!("blk.{layer_index}");
+            tensors.push(dense_f32_tensor(
+                &format!("{prefix}.attn_norm.weight"),
+                vec![8],
+            ));
+            tensors.push(dense_f32_tensor(
+                &format!("{prefix}.ffn_gate.weight"),
+                vec![16, 8],
+            ));
+            tensors.push(dense_f32_tensor(
+                &format!("{prefix}.ffn_up.weight"),
+                vec![16, 8],
+            ));
+            tensors.push(dense_f32_tensor(
+                &format!("{prefix}.ffn_down.weight"),
+                vec![8, 16],
+            ));
+            tensors.push(dense_f32_tensor(
+                &format!("{prefix}.post_attention_norm.weight"),
+                vec![8],
+            ));
+
+            if layer_index < 3 {
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_qkv.weight"),
+                    vec![24, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_gate.weight"),
+                    vec![8, 8],
+                ));
+                tensors.push(dense_f32_tensor(&format!("{prefix}.ssm_a"), vec![2]));
+                tensors.push(dense_f32_tensor(&format!("{prefix}.ssm_dt"), vec![2]));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.ssm_alpha.weight"),
+                    vec![2, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.ssm_beta.weight"),
+                    vec![2, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.ssm_conv1d.weight"),
+                    vec![24, 4],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.ssm_norm.weight"),
+                    vec![4],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.ssm_out.weight"),
+                    vec![8, 8],
+                ));
+            } else {
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_q.weight"),
+                    vec![8, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_k.weight"),
+                    vec![4, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_v.weight"),
+                    vec![4, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_output.weight"),
+                    vec![8, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_q_norm.weight"),
+                    vec![4],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_k_norm.weight"),
+                    vec![4],
+                ));
+            }
+        }
+
+        tensors
+    }
+
     fn token_embedding_values(hello_token_index: usize) -> Vec<f32> {
         let mut values = vec![0.0; 6 * 4];
         values[hello_token_index.saturating_mul(4)] = 2.0;
@@ -3166,6 +3481,77 @@ mod tests {
             GgufTensorType::F32,
             encode_f32_bytes(values.as_slice()),
         )
+    }
+
+    fn dense_f32_tensor(name: &str, shape: Vec<usize>) -> TestGgufTensor {
+        let element_count = shape.iter().product::<usize>();
+        dense_tensor(name, shape, vec![0.0; element_count])
+    }
+
+    struct ScopedEnvVar {
+        key: &'static str,
+        previous: Option<String>,
+    }
+
+    impl ScopedEnvVar {
+        fn set(key: &'static str, value: &str) -> Self {
+            let previous = std::env::var(key).ok();
+            unsafe {
+                std::env::set_var(key, value);
+            }
+            Self { key, previous }
+        }
+    }
+
+    impl Drop for ScopedEnvVar {
+        fn drop(&mut self) {
+            if let Some(previous) = self.previous.as_deref() {
+                unsafe {
+                    std::env::set_var(self.key, previous);
+                }
+            } else {
+                unsafe {
+                    std::env::remove_var(self.key);
+                }
+            }
+        }
+    }
+
+    fn qwen35_proxy_test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    async fn start_qwen35_proxy_test_server()
+    -> Result<(String, tokio::sync::oneshot::Sender<()>), Box<dyn std::error::Error>> {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let address = listener.local_addr()?;
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+        let router = axum::Router::new()
+            .route(
+                "/health",
+                axum::routing::get(|| async { axum::http::StatusCode::OK }),
+            )
+            .route(
+                "/completion",
+                axum::routing::post(|_body: axum::Json<serde_json::Value>| async move {
+                    axum::Json(serde_json::json!({
+                        "content": "proxy world",
+                        "tokens": [7, 8],
+                        "stop_type": "eos",
+                        "truncated": false,
+                        "tokens_evaluated": 3
+                    }))
+                }),
+            );
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, router)
+                .with_graceful_shutdown(async {
+                    let _ = shutdown_rx.await;
+                })
+                .await;
+        });
+        Ok((format!("http://{address}"), shutdown_tx))
     }
 
     fn write_test_gguf(

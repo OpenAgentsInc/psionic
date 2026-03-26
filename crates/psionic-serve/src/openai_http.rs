@@ -2021,9 +2021,82 @@ struct NamedToolChoiceFunction {
 #[serde(rename_all = "snake_case")]
 struct ChatCompletionMessage {
     role: String,
-    content: String,
+    content: ChatCompletionMessageContent,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     name: Option<String>,
+}
+
+impl ChatCompletionMessage {
+    fn text(role: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            role: role.into(),
+            content: ChatCompletionMessageContent::Text(content.into()),
+            name: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn named_text(
+        role: impl Into<String>,
+        content: impl Into<String>,
+        name: impl Into<String>,
+    ) -> Self {
+        Self {
+            role: role.into(),
+            content: ChatCompletionMessageContent::Text(content.into()),
+            name: Some(name.into()),
+        }
+    }
+
+    #[cfg(test)]
+    fn multimodal(role: impl Into<String>, content: Vec<ChatCompletionContentPart>) -> Self {
+        Self {
+            role: role.into(),
+            content: ChatCompletionMessageContent::Parts(content),
+            name: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(untagged)]
+enum ChatCompletionMessageContent {
+    Text(String),
+    Parts(Vec<ChatCompletionContentPart>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum ChatCompletionContentPart {
+    Text { text: String },
+    ImageUrl { image_url: ChatCompletionMediaUrl },
+    VideoUrl { video_url: ChatCompletionMediaUrl },
+}
+
+impl ChatCompletionContentPart {
+    #[cfg(test)]
+    fn text(text: impl Into<String>) -> Self {
+        Self::Text { text: text.into() }
+    }
+
+    #[cfg(test)]
+    fn image_url(url: impl Into<String>) -> Self {
+        Self::ImageUrl {
+            image_url: ChatCompletionMediaUrl { url: url.into() },
+        }
+    }
+
+    #[cfg(test)]
+    fn video_url(url: impl Into<String>) -> Self {
+        Self::VideoUrl {
+            video_url: ChatCompletionMediaUrl { url: url.into() },
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+struct ChatCompletionMediaUrl {
+    url: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -4760,21 +4833,16 @@ fn response_input_to_prompt_messages_with_options(
 ) -> Result<Vec<PromptMessage>, OpenAiCompatHttpError> {
     let mut messages = Vec::new();
     if include_instructions && let Some(instructions) = request.instructions.as_ref() {
-        messages.push(ChatCompletionMessage {
-            role: String::from("developer"),
-            content: instructions.clone(),
-            name: None,
-        });
+        messages.push(ChatCompletionMessage::text(
+            "developer",
+            instructions.clone(),
+        ));
     }
     match &request.input {
         ResponsesInput::Text(text) => {
             if allow_empty_input && text.is_empty() {
             } else {
-                messages.push(ChatCompletionMessage {
-                    role: String::from("user"),
-                    content: text.clone(),
-                    name: None,
-                });
+                messages.push(ChatCompletionMessage::text("user", text.clone()));
             }
         }
         ResponsesInput::Messages(input_messages) => {
@@ -4835,7 +4903,7 @@ fn chat_messages_to_prompt_messages_for_family(
     if matches!(family, GgufDecoderFamily::GptOss) {
         return chat_messages_to_prompt_messages_gpt_oss(messages);
     }
-    chat_messages_to_prompt_messages_generic(messages)
+    chat_messages_to_prompt_messages_generic(messages, family)
 }
 
 fn chat_messages_to_prompt_messages_gpt_oss(
@@ -4869,7 +4937,10 @@ fn chat_messages_to_prompt_messages_gpt_oss(
             (_, PromptMessageRole::System | PromptMessageRole::Developer) => continue,
             _ => role,
         };
-        let mut prompt = PromptMessage::new(normalized_role, message.content.clone());
+        let mut prompt = PromptMessage::new(
+            normalized_role,
+            chat_message_content_to_text(&message.content, GgufDecoderFamily::GptOss)?,
+        );
         if normalized_role == PromptMessageRole::Tool {
             let Some(name) = message.name.as_ref() else {
                 return Err(OpenAiCompatHttpError::BadRequest(String::from(
@@ -4885,6 +4956,7 @@ fn chat_messages_to_prompt_messages_gpt_oss(
 
 fn chat_messages_to_prompt_messages_generic(
     messages: &[ChatCompletionMessage],
+    family: GgufDecoderFamily,
 ) -> Result<Vec<PromptMessage>, OpenAiCompatHttpError> {
     if messages.is_empty() {
         return Err(OpenAiCompatHttpError::BadRequest(String::from(
@@ -4905,7 +4977,10 @@ fn chat_messages_to_prompt_messages_generic(
                 )));
             }
         };
-        let mut prompt = PromptMessage::new(role, message.content.clone());
+        let mut prompt = PromptMessage::new(
+            role,
+            chat_message_content_to_text(&message.content, family)?,
+        );
         if role == PromptMessageRole::Tool {
             let Some(name) = message.name.as_ref() else {
                 return Err(OpenAiCompatHttpError::BadRequest(String::from(
@@ -4917,6 +4992,43 @@ fn chat_messages_to_prompt_messages_generic(
         prompt_messages.push(prompt);
     }
     Ok(prompt_messages)
+}
+
+fn chat_message_content_to_text(
+    content: &ChatCompletionMessageContent,
+    family: GgufDecoderFamily,
+) -> Result<String, OpenAiCompatHttpError> {
+    match content {
+        ChatCompletionMessageContent::Text(text) => Ok(text.clone()),
+        ChatCompletionMessageContent::Parts(parts) => {
+            let mut text = String::new();
+            for part in parts {
+                match part {
+                    ChatCompletionContentPart::Text { text: part_text } => {
+                        text.push_str(part_text);
+                    }
+                    ChatCompletionContentPart::ImageUrl { .. }
+                    | ChatCompletionContentPart::VideoUrl { .. } => {
+                        return Err(unsupported_multimodal_content_error(family));
+                    }
+                }
+            }
+            Ok(text)
+        }
+    }
+}
+
+fn unsupported_multimodal_content_error(family: GgufDecoderFamily) -> OpenAiCompatHttpError {
+    if matches!(family, GgufDecoderFamily::Qwen35) {
+        OpenAiCompatHttpError::BadRequest(String::from(
+            "multimodal inputs are unavailable on the qwen35 text-only proxy runtime",
+        ))
+    } else {
+        OpenAiCompatHttpError::BadRequest(format!(
+            "multimodal inputs are unavailable on the current `{}` generic prompt-render path",
+            decoder_family_label(family)
+        ))
+    }
 }
 
 fn prompt_message_role_cache_key(role: PromptMessageRole) -> &'static str {
@@ -4988,10 +5100,10 @@ struct OpenAiErrorBody {
 mod tests {
     use super::{
         CPU_SERVER_FALLBACK_POLICY, CPU_SERVER_HYBRID_OFFLOAD_MODE, CPU_SERVER_RESIDENCY_MODE,
-        ChatCompletionJsonSchemaRequest, ChatCompletionMessage, ChatCompletionRequest,
-        ChatCompletionResponseFormatRequest, EmbeddingsInput, EmbeddingsRequest,
-        GptOssMetalExecutionMode, GptOssOpenAiCompatBackend, GptOssOpenAiCompatConfig,
-        HARMONY_CALL_STOP, HARMONY_RETURN_STOP, LOCAL_SERVER_LOAD_STATUS,
+        ChatCompletionContentPart, ChatCompletionJsonSchemaRequest, ChatCompletionMessage,
+        ChatCompletionRequest, ChatCompletionResponseFormatRequest, EmbeddingsInput,
+        EmbeddingsRequest, GptOssMetalExecutionMode, GptOssOpenAiCompatBackend,
+        GptOssOpenAiCompatConfig, HARMONY_CALL_STOP, HARMONY_RETURN_STOP, LOCAL_SERVER_LOAD_STATUS,
         LOCAL_SERVER_MEMORY_PRESSURE_REPORTING, LOCAL_SERVER_UNLOAD_CONTROL,
         LOCAL_SERVER_WARM_CONTROL, LocalServingTruth, NamedToolChoiceFunction,
         NamedToolChoiceRequest, OpenAiCompatConfig, OpenAiCompatServer, PromptTokenCache,
@@ -5040,16 +5152,8 @@ mod tests {
     #[test]
     fn chat_messages_map_to_prompt_messages() {
         let prompt = chat_messages_to_prompt_messages(&[
-            ChatCompletionMessage {
-                role: String::from("system"),
-                content: String::from("sys"),
-                name: None,
-            },
-            ChatCompletionMessage {
-                role: String::from("tool"),
-                content: String::from("{\"ok\":true}"),
-                name: Some(String::from("functions.lookup_weather")),
-            },
+            ChatCompletionMessage::text("system", "sys"),
+            ChatCompletionMessage::named_text("tool", "{\"ok\":true}", "functions.lookup_weather"),
         ])
         .expect("prompt messages");
 
@@ -5064,21 +5168,9 @@ mod tests {
     #[test]
     fn chat_messages_ignore_non_initial_instruction_turns_for_gpt_oss_parity() {
         let prompt = chat_messages_to_prompt_messages(&[
-            ChatCompletionMessage {
-                role: String::from("system"),
-                content: String::from("first instruction"),
-                name: None,
-            },
-            ChatCompletionMessage {
-                role: String::from("developer"),
-                content: String::from("ignored instruction"),
-                name: None,
-            },
-            ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from("hello"),
-                name: None,
-            },
+            ChatCompletionMessage::text("system", "first instruction"),
+            ChatCompletionMessage::text("developer", "ignored instruction"),
+            ChatCompletionMessage::text("user", "hello"),
         ])
         .expect("prompt messages");
 
@@ -5092,25 +5184,18 @@ mod tests {
     #[test]
     fn rendered_prompt_matches_llama_cpp_gpt_oss_openai_contract() {
         let prompt_messages = chat_messages_to_prompt_messages(&[
-            ChatCompletionMessage {
-                role: String::from("system"),
-                content: String::from(
-                    "You are ChatGPT, a large language model trained by OpenAI.\nKnowledge cutoff: 2024-06\nCurrent date: 2026-03-09\n\nReasoning: low\n\n# Valid channels: analysis, final. Channel must be included for every message.",
-                ),
-                name: None,
-            },
-            ChatCompletionMessage {
-                role: String::from("developer"),
-                content: String::from("Be concise. Output exactly one sentence."),
-                name: None,
-            },
-            ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from(
-                    "Reply with exactly this sentence and nothing else: HTTPS protects users by encrypting traffic, preventing tampering, and confirming they are connected to the right website.",
-                ),
-                name: None,
-            },
+            ChatCompletionMessage::text(
+                "system",
+                "You are ChatGPT, a large language model trained by OpenAI.\nKnowledge cutoff: 2024-06\nCurrent date: 2026-03-09\n\nReasoning: low\n\n# Valid channels: analysis, final. Channel must be included for every message.",
+            ),
+            ChatCompletionMessage::text(
+                "developer",
+                "Be concise. Output exactly one sentence.",
+            ),
+            ChatCompletionMessage::text(
+                "user",
+                "Reply with exactly this sentence and nothing else: HTTPS protects users by encrypting traffic, preventing tampering, and confirming they are connected to the right website.",
+            ),
         ])
         .expect("prompt messages");
         let prompt_options = PromptRenderOptions {
@@ -5157,11 +5242,7 @@ mod tests {
     fn generation_options_force_harmony_stop_sequences() {
         let options = generation_options_from_chat_request(&ChatCompletionRequest {
             model: None,
-            messages: vec![ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from("hi"),
-                name: None,
-            }],
+            messages: vec![ChatCompletionMessage::text("user", "hi")],
             temperature: Some(0.0),
             max_tokens: Some(64),
             stop: None,
@@ -5422,34 +5503,14 @@ mod tests {
     #[test]
     fn prompt_request_cache_key_uses_normalized_prompt_messages() {
         let first = chat_messages_to_prompt_messages(&[
-            ChatCompletionMessage {
-                role: String::from("system"),
-                content: String::from("first instruction"),
-                name: None,
-            },
-            ChatCompletionMessage {
-                role: String::from("developer"),
-                content: String::from("ignored instruction"),
-                name: None,
-            },
-            ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from("hello"),
-                name: None,
-            },
+            ChatCompletionMessage::text("system", "first instruction"),
+            ChatCompletionMessage::text("developer", "ignored instruction"),
+            ChatCompletionMessage::text("user", "hello"),
         ])
         .expect("first normalized prompt");
         let second = chat_messages_to_prompt_messages(&[
-            ChatCompletionMessage {
-                role: String::from("system"),
-                content: String::from("first instruction"),
-                name: None,
-            },
-            ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from("hello"),
-                name: None,
-            },
+            ChatCompletionMessage::text("system", "first instruction"),
+            ChatCompletionMessage::text("user", "hello"),
         ])
         .expect("second normalized prompt");
 
@@ -5617,11 +5678,7 @@ mod tests {
 
         let request = ChatCompletionRequest {
             model: Some(String::from("tiny-qwen")),
-            messages: vec![ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from("hello"),
-                name: None,
-            }],
+            messages: vec![ChatCompletionMessage::text("user", "hello")],
             temperature: Some(0.0),
             max_tokens: Some(1),
             stop: None,
@@ -5718,11 +5775,7 @@ mod tests {
                 std::sync::Arc::clone(&server.state),
                 ChatCompletionRequest {
                     model: Some(pilot_model_id.clone()),
-                    messages: vec![ChatCompletionMessage {
-                        role: String::from("user"),
-                        content: String::from("hello"),
-                        name: None,
-                    }],
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
                     temperature: Some(0.0),
                     max_tokens: Some(1),
                     stop: None,
@@ -5867,11 +5920,7 @@ mod tests {
             std::sync::Arc::clone(&server.state),
             ChatCompletionRequest {
                 model: Some(String::from("tiny-qwen35")),
-                messages: vec![ChatCompletionMessage {
-                    role: String::from("user"),
-                    content: String::from("hello"),
-                    name: None,
-                }],
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
                 temperature: Some(0.0),
                 max_tokens: Some(2),
                 stop: None,
@@ -5966,11 +6015,7 @@ mod tests {
             std::sync::Arc::clone(&server.state),
             ChatCompletionRequest {
                 model: Some(String::from("tiny-qwen35")),
-                messages: vec![ChatCompletionMessage {
-                    role: String::from("user"),
-                    content: String::from("hello"),
-                    name: None,
-                }],
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
                 temperature: Some(0.0),
                 max_tokens: Some(2),
                 stop: None,
@@ -6031,11 +6076,7 @@ mod tests {
                 std::sync::Arc::clone(&server.state),
                 ChatCompletionRequest {
                     model: Some(String::from("tiny-qwen35")),
-                    messages: vec![ChatCompletionMessage {
-                        role: String::from("user"),
-                        content: String::from("hello"),
-                        name: None,
-                    }],
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
                     temperature: Some(0.0),
                     max_tokens: Some(2),
                     stop: None,
@@ -6063,11 +6104,7 @@ mod tests {
                 std::sync::Arc::clone(&server.state),
                 ChatCompletionRequest {
                     model: Some(String::from("tiny-qwen35")),
-                    messages: vec![ChatCompletionMessage {
-                        role: String::from("user"),
-                        content: String::from("hello"),
-                        name: None,
-                    }],
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
                     temperature: Some(0.0),
                     max_tokens: Some(2),
                     stop: None,
@@ -6100,6 +6137,102 @@ mod tests {
     }
 
     #[test]
+    fn generic_server_qwen35_refuses_multimodal_inputs_on_text_only_pilot()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = qwen35_proxy_test_lock()
+            .lock()
+            .expect("qwen35 proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let (base_url, shutdown_tx, _) = runtime.block_on(start_qwen35_proxy_test_server())?;
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join("tiny-qwen35.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
+            qwen35_decoder_tensors().as_slice(),
+        )?;
+
+        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
+        drop(_proxy_env);
+
+        let image_error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(String::from("tiny-qwen35")),
+                    messages: vec![ChatCompletionMessage::multimodal(
+                        "user",
+                        vec![
+                            ChatCompletionContentPart::text("hello"),
+                            ChatCompletionContentPart::image_url(
+                                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
+                            ),
+                        ],
+                    )],
+                    temperature: Some(0.0),
+                    max_tokens: Some(2),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    response_format: None,
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                },
+            ))
+            .expect_err("qwen35 image input should fail closed");
+        let image_payload = runtime.block_on(response_json(image_error.into_response()))?;
+        assert_eq!(
+            image_payload["error"]["message"],
+            serde_json::json!(
+                "multimodal inputs are unavailable on the qwen35 text-only proxy runtime"
+            )
+        );
+
+        let video_error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(String::from("tiny-qwen35")),
+                    messages: vec![ChatCompletionMessage::multimodal(
+                        "user",
+                        vec![
+                            ChatCompletionContentPart::text("hello"),
+                            ChatCompletionContentPart::video_url(
+                                "https://example.invalid/pilot.mp4",
+                            ),
+                        ],
+                    )],
+                    temperature: Some(0.0),
+                    max_tokens: Some(2),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    response_format: None,
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                },
+            ))
+            .expect_err("qwen35 video input should fail closed");
+        let video_payload = runtime.block_on(response_json(video_error.into_response()))?;
+        assert_eq!(
+            video_payload["error"]["message"],
+            serde_json::json!(
+                "multimodal inputs are unavailable on the qwen35 text-only proxy runtime"
+            )
+        );
+
+        let _ = shutdown_tx.send(());
+        Ok(())
+    }
+
+    #[test]
     fn generic_server_boots_and_generates_for_gpt_oss() -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let path = temp.path().join("tiny-gpt-oss.gguf");
@@ -6117,11 +6250,7 @@ mod tests {
 
         let request = ChatCompletionRequest {
             model: None,
-            messages: vec![ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from("hello"),
-                name: None,
-            }],
+            messages: vec![ChatCompletionMessage::text("user", "hello")],
             temperature: Some(0.0),
             max_tokens: Some(1),
             stop: None,
@@ -6177,11 +6306,7 @@ mod tests {
                 std::sync::Arc::clone(&server.state),
                 ChatCompletionRequest {
                     model: Some(String::from("tiny-llama")),
-                    messages: vec![ChatCompletionMessage {
-                        role: String::from("user"),
-                        content: String::from("hello"),
-                        name: None,
-                    }],
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
                     temperature: Some(0.0),
                     max_tokens: Some(1),
                     stop: None,
@@ -6792,11 +6917,7 @@ mod tests {
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&path))?;
         let request = ChatCompletionRequest {
             model: Some(String::from("tiny-llama")),
-            messages: vec![ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from("hello"),
-                name: None,
-            }],
+            messages: vec![ChatCompletionMessage::text("user", "hello")],
             temperature: Some(0.0),
             max_tokens: Some(1),
             stop: None,
@@ -6879,11 +7000,7 @@ mod tests {
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&path))?;
         let request = ChatCompletionRequest {
             model: Some(String::from("tiny-json-llama")),
-            messages: vec![ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from("hello"),
-                name: None,
-            }],
+            messages: vec![ChatCompletionMessage::text("user", "hello")],
             temperature: Some(0.0),
             max_tokens: Some(1),
             stop: None,
@@ -6978,11 +7095,7 @@ mod tests {
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&path))?;
         let request = ChatCompletionRequest {
             model: Some(String::from("tiny-choice-llama")),
-            messages: vec![ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from("hello"),
-                name: None,
-            }],
+            messages: vec![ChatCompletionMessage::text("user", "hello")],
             temperature: Some(0.0),
             max_tokens: Some(1),
             stop: None,
@@ -7100,11 +7213,7 @@ mod tests {
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&path))?;
         let request = ChatCompletionRequest {
             model: Some(String::from("tiny-tagged-llama")),
-            messages: vec![ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from("hello"),
-                name: None,
-            }],
+            messages: vec![ChatCompletionMessage::text("user", "hello")],
             temperature: Some(0.0),
             max_tokens: Some(1),
             stop: None,
@@ -7184,11 +7293,7 @@ mod tests {
                 std::sync::Arc::clone(&server.state),
                 ChatCompletionRequest {
                     model: Some(String::from("tiny-tool-none-llama")),
-                    messages: vec![ChatCompletionMessage {
-                        role: String::from("user"),
-                        content: String::from("hello"),
-                        name: None,
-                    }],
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
                     temperature: Some(0.0),
                     max_tokens: Some(1),
                     stop: None,
@@ -7229,11 +7334,7 @@ mod tests {
                 std::sync::Arc::clone(&server.state),
                 ChatCompletionRequest {
                     model: Some(String::from("tiny-tool-auto-llama")),
-                    messages: vec![ChatCompletionMessage {
-                        role: String::from("user"),
-                        content: String::from("hello"),
-                        name: None,
-                    }],
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
                     temperature: Some(0.0),
                     max_tokens: Some(1),
                     stop: None,
@@ -7284,11 +7385,7 @@ mod tests {
                 std::sync::Arc::clone(&server.state),
                 ChatCompletionRequest {
                     model: Some(String::from("tiny-tool-call-llama")),
-                    messages: vec![ChatCompletionMessage {
-                        role: String::from("user"),
-                        content: String::from("hello"),
-                        name: None,
-                    }],
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
                     temperature: Some(0.0),
                     max_tokens: Some(1),
                     stop: None,
@@ -7389,11 +7486,7 @@ mod tests {
             State(std::sync::Arc::clone(&server.state)),
             Json(ChatCompletionRequest {
                 model: Some(String::from("tiny-tool-invalid-llama")),
-                messages: vec![ChatCompletionMessage {
-                    role: String::from("user"),
-                    content: String::from("hello"),
-                    name: None,
-                }],
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
                 temperature: Some(0.0),
                 max_tokens: Some(1),
                 stop: None,
@@ -7437,11 +7530,7 @@ mod tests {
                 std::sync::Arc::clone(&server.state),
                 ChatCompletionRequest {
                     model: Some(String::from("tiny-tool-stream-llama")),
-                    messages: vec![ChatCompletionMessage {
-                        role: String::from("user"),
-                        content: String::from("hello"),
-                        name: None,
-                    }],
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
                     temperature: Some(0.0),
                     max_tokens: Some(1),
                     stop: None,
@@ -7674,11 +7763,7 @@ mod tests {
 
         let build_structured_request = |prompt: &str, tenant_id: &str| ChatCompletionRequest {
             model: Some(String::from("tiny-agent-structured-llama")),
-            messages: vec![ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from(prompt),
-                name: None,
-            }],
+            messages: vec![ChatCompletionMessage::text("user", prompt)],
             temperature: Some(0.0),
             max_tokens: Some(1),
             stop: None,
@@ -7919,11 +8004,7 @@ mod tests {
         let build_request =
             |prompt: &str, prefix_cache: PrefixCacheControl| ChatCompletionRequest {
                 model: Some(String::from("tiny-prefix-llama")),
-                messages: vec![ChatCompletionMessage {
-                    role: String::from("user"),
-                    content: String::from(prompt),
-                    name: None,
-                }],
+                messages: vec![ChatCompletionMessage::text("user", prompt)],
                 temperature: Some(0.0),
                 max_tokens: Some(1),
                 stop: None,
@@ -8022,11 +8103,7 @@ mod tests {
                 std::sync::Arc::clone(&server.state),
                 ChatCompletionRequest {
                     model: Some(String::from("tiny-route-llama")),
-                    messages: vec![ChatCompletionMessage {
-                        role: String::from("user"),
-                        content: String::from("hello"),
-                        name: None,
-                    }],
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
                     temperature: Some(0.0),
                     max_tokens: Some(1),
                     stop: None,
@@ -8077,11 +8154,7 @@ mod tests {
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&path))?;
         let request = ChatCompletionRequest {
             model: Some(String::from("tiny-json-llama")),
-            messages: vec![ChatCompletionMessage {
-                role: String::from("user"),
-                content: String::from("hello"),
-                name: None,
-            }],
+            messages: vec![ChatCompletionMessage::text("user", "hello")],
             temperature: Some(0.0),
             max_tokens: Some(1),
             stop: None,

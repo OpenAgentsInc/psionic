@@ -57,8 +57,9 @@ can map honestly onto `/api/generate`:
 - one `user` turn
 - `add_generation_prompt = true`
 
-That is enough to anchor single-turn families such as `phi3` and `qwen2`
-without pretending that multi-turn chat-template parity is already solved.
+That is enough to anchor single-turn families such as `phi3`, `qwen2`, and the
+first text-only `qwen35` pilot without pretending that multi-turn or multimodal
+chat-template parity is already solved.
 
 Embeddings cases also carry an explicit `EmbeddingParityBudget` from
 `psionic-runtime` so vector comparisons use the shared drift-budget policy instead
@@ -124,6 +125,7 @@ Repeatable CI-stable harness run for a supported model family:
 
 ```bash
 cargo test -p psionic-serve generate_case_builder_uses_real_qwen2_fixture \
+  generate_case_builder_uses_real_qwen35_fixture \
   conformance_suite_records_intentional_candidate_gap \
   ollama_http_subject_normalizes_live_http_responses
 ```
@@ -131,6 +133,7 @@ cargo test -p psionic-serve generate_case_builder_uses_real_qwen2_fixture \
 Those tests cover:
 
 - real `qwen2` prompt-fixture case construction from the golden corpus
+- real `qwen35` prompt-fixture case construction from the golden corpus
 - structured `intentional_difference` reporting for the current Psionic prompt gap
 - live HTTP normalization of Ollama `tags` / `show` / `ps` / `generate(stream)`
   / `embed` semantics via a local test server
