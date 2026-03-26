@@ -1,7 +1,11 @@
 use std::{
     collections::BTreeMap,
+    env,
     path::Path,
+    process::{Child, Command, Stdio},
     sync::{Arc, Mutex},
+    thread,
+    time::Duration,
     time::Instant,
 };
 
@@ -61,6 +65,7 @@ pub struct CpuGgufTextGenerationService {
 enum CpuGgufServiceKind {
     GptOss(CpuGgufGptOssTextGenerationService),
     Dense(CpuDenseGgufTextGenerationService),
+    Qwen35(CpuQwen35ProxyTextGenerationService),
 }
 
 #[derive(Clone, Debug)]
@@ -152,6 +157,9 @@ impl CpuGgufTextGenerationService {
             GgufDecoderFamily::Llama | GgufDecoderFamily::Qwen | GgufDecoderFamily::Mistral => {
                 CpuGgufServiceKind::Dense(CpuDenseGgufTextGenerationService::from_gguf_path(path)?)
             }
+            GgufDecoderFamily::Qwen35 => CpuGgufServiceKind::Qwen35(
+                CpuQwen35ProxyTextGenerationService::from_gguf_path(path)?,
+            ),
         };
         Ok(Self { inner })
     }
@@ -169,6 +177,7 @@ impl CpuGgufTextGenerationService {
         match &self.inner {
             CpuGgufServiceKind::GptOss(service) => service.model_descriptor(),
             CpuGgufServiceKind::Dense(service) => service.model_descriptor(),
+            CpuGgufServiceKind::Qwen35(service) => service.model_descriptor(),
         }
     }
 
@@ -189,6 +198,7 @@ impl CpuGgufTextGenerationService {
                 ),
             ),
             CpuGgufServiceKind::Dense(service) => service.runtime_support(),
+            CpuGgufServiceKind::Qwen35(service) => service.runtime_support(),
         }
     }
 
@@ -197,6 +207,7 @@ impl CpuGgufTextGenerationService {
         match &self.inner {
             CpuGgufServiceKind::GptOss(service) => service.plan_digest(model_id),
             CpuGgufServiceKind::Dense(service) => service.plan_digest(model_id),
+            CpuGgufServiceKind::Qwen35(service) => service.plan_digest(model_id),
         }
     }
 
@@ -207,6 +218,7 @@ impl CpuGgufTextGenerationService {
         match &mut self.inner {
             CpuGgufServiceKind::GptOss(service) => service.create_session(model_id),
             CpuGgufServiceKind::Dense(service) => service.create_session(model_id),
+            CpuGgufServiceKind::Qwen35(service) => service.create_session(model_id),
         }
     }
 
@@ -217,6 +229,7 @@ impl CpuGgufTextGenerationService {
         match &mut self.inner {
             CpuGgufServiceKind::GptOss(service) => service.reset_session(session_id),
             CpuGgufServiceKind::Dense(service) => service.reset_session(session_id),
+            CpuGgufServiceKind::Qwen35(service) => service.reset_session(session_id),
         }
     }
 
@@ -227,6 +240,7 @@ impl CpuGgufTextGenerationService {
         match &mut self.inner {
             CpuGgufServiceKind::GptOss(service) => service.close_session(session_id),
             CpuGgufServiceKind::Dense(service) => service.close_session(session_id),
+            CpuGgufServiceKind::Qwen35(service) => service.close_session(session_id),
         }
     }
 
@@ -235,6 +249,7 @@ impl CpuGgufTextGenerationService {
         match &mut self.inner {
             CpuGgufServiceKind::GptOss(service) => service.loaded_model_views(),
             CpuGgufServiceKind::Dense(service) => service.loaded_model_views(),
+            CpuGgufServiceKind::Qwen35(service) => service.loaded_model_views(),
         }
     }
 
@@ -245,6 +260,7 @@ impl CpuGgufTextGenerationService {
         match &mut self.inner {
             CpuGgufServiceKind::GptOss(service) => service.generate_continuous_batch(requests),
             CpuGgufServiceKind::Dense(service) => service.generate_continuous_batch(requests),
+            CpuGgufServiceKind::Qwen35(service) => service.generate_continuous_batch(requests),
         }
     }
 
@@ -272,6 +288,14 @@ impl CpuGgufTextGenerationService {
                 alpha,
                 residency_mode,
             ),
+            CpuGgufServiceKind::Qwen35(_) => {
+                Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                    binding_id: binding_id.into(),
+                    reason: String::from(
+                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
+                    ),
+                })
+            }
         }
     }
 
@@ -290,6 +314,14 @@ impl CpuGgufTextGenerationService {
             }
             CpuGgufServiceKind::Dense(service) => {
                 service.detach_adapter_binding(served_adapter_digest)
+            }
+            CpuGgufServiceKind::Qwen35(_) => {
+                Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                    binding_id: served_adapter_digest.to_string(),
+                    reason: String::from(
+                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
+                    ),
+                })
             }
         }
     }
@@ -310,6 +342,14 @@ impl CpuGgufTextGenerationService {
             CpuGgufServiceKind::Dense(service) => {
                 service.merge_adapter_binding(served_adapter_digest)
             }
+            CpuGgufServiceKind::Qwen35(_) => {
+                Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                    binding_id: served_adapter_digest.to_string(),
+                    reason: String::from(
+                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
+                    ),
+                })
+            }
         }
     }
 
@@ -329,6 +369,14 @@ impl CpuGgufTextGenerationService {
             CpuGgufServiceKind::Dense(service) => {
                 service.unmerge_adapter_binding(served_adapter_digest)
             }
+            CpuGgufServiceKind::Qwen35(_) => {
+                Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                    binding_id: served_adapter_digest.to_string(),
+                    reason: String::from(
+                        "LM-head LoRA serving is currently supported only on dense CPU GGUF families",
+                    ),
+                })
+            }
         }
     }
 }
@@ -340,6 +388,7 @@ impl TextGenerationExecutor for CpuGgufTextGenerationService {
         match &mut self.inner {
             CpuGgufServiceKind::GptOss(service) => service.generate(request),
             CpuGgufServiceKind::Dense(service) => service.generate(request),
+            CpuGgufServiceKind::Qwen35(service) => service.generate(request),
         }
     }
 }
@@ -354,15 +403,25 @@ impl StreamingTextGenerationExecutor for CpuGgufTextGenerationService {
         match &mut self.inner {
             CpuGgufServiceKind::GptOss(service) => service.generate_stream(request),
             CpuGgufServiceKind::Dense(service) => service.generate_stream(request),
+            CpuGgufServiceKind::Qwen35(service) => service.generate_stream(request),
         }
     }
 }
 
 impl ManagedTextGenerationRuntime for CpuGgufTextGenerationService {
+    fn isolation_policy(&self) -> psionic_runtime::LocalServingIsolationPolicy {
+        match &self.inner {
+            CpuGgufServiceKind::GptOss(service) => service.isolation_policy(),
+            CpuGgufServiceKind::Dense(service) => service.isolation_policy(),
+            CpuGgufServiceKind::Qwen35(service) => service.isolation_policy(),
+        }
+    }
+
     fn loaded_models(&mut self) -> LoadedModelsObservation {
         match &mut self.inner {
             CpuGgufServiceKind::GptOss(service) => service.loaded_models(),
             CpuGgufServiceKind::Dense(service) => service.loaded_models(),
+            CpuGgufServiceKind::Qwen35(service) => service.loaded_models(),
         }
     }
 
@@ -370,6 +429,7 @@ impl ManagedTextGenerationRuntime for CpuGgufTextGenerationService {
         match &mut self.inner {
             CpuGgufServiceKind::GptOss(service) => service.observability(),
             CpuGgufServiceKind::Dense(service) => service.observability(),
+            CpuGgufServiceKind::Qwen35(service) => service.observability(),
         }
     }
 
@@ -381,6 +441,7 @@ impl ManagedTextGenerationRuntime for CpuGgufTextGenerationService {
         match &mut self.inner {
             CpuGgufServiceKind::GptOss(service) => service.warm_model(model_id, keep_alive_millis),
             CpuGgufServiceKind::Dense(service) => service.warm_model(model_id, keep_alive_millis),
+            CpuGgufServiceKind::Qwen35(service) => service.warm_model(model_id, keep_alive_millis),
         }
     }
 
@@ -391,6 +452,7 @@ impl ManagedTextGenerationRuntime for CpuGgufTextGenerationService {
         match &mut self.inner {
             CpuGgufServiceKind::GptOss(service) => service.unload_model(model_id),
             CpuGgufServiceKind::Dense(service) => service.unload_model(model_id),
+            CpuGgufServiceKind::Qwen35(service) => service.unload_model(model_id),
         }
     }
 }
@@ -714,6 +776,526 @@ impl ManagedTextGenerationRuntime for CpuDenseGgufTextGenerationService {
         model_id: &str,
     ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
         Self::unload_model(self, model_id)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CpuQwen35ProxyTextGenerationService {
+    proxy: Arc<Qwen35LlamaCppProxyState>,
+    model_descriptor: DecoderModelDescriptor,
+    runtime_support: GgufDecoderRuntimeSupport,
+    plan_digest: String,
+    load_duration_ns: u64,
+    sessions: InMemoryGenerationSessionStore,
+    backend_health: crate::BackendHealthTracker,
+    residency: psionic_runtime::LoadedModelResidency,
+    memory_plan: psionic_runtime::ModelMemoryPlan,
+    residency_policy: psionic_runtime::ModelResidencyPolicy,
+}
+
+#[derive(Debug)]
+struct Qwen35LlamaCppProxyState {
+    base_url: String,
+    client: reqwest::blocking::Client,
+    child: Mutex<Option<Child>>,
+}
+
+impl Drop for Qwen35LlamaCppProxyState {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.child.lock().ok().and_then(|mut child| child.take()) {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct Qwen35ProxyCompletionResponse {
+    content: String,
+    #[serde(default)]
+    tokens: Vec<u32>,
+    #[serde(default)]
+    stop_type: String,
+    #[serde(default)]
+    truncated: bool,
+    #[serde(default)]
+    tokens_evaluated: usize,
+}
+
+impl CpuQwen35ProxyTextGenerationService {
+    fn from_gguf_path(path: impl AsRef<Path>) -> Result<Self, ReferenceTextGenerationError> {
+        let load_start = Instant::now();
+        let path = path.as_ref();
+        let artifact = GgufBlobArtifact::open_path(path, gguf_local_blob_open_options())?;
+        let adapter = GgufDecoderAdapterLoader.load_blob_artifact(&artifact)?;
+        if !matches!(adapter.family_metadata().family, GgufDecoderFamily::Qwen35) {
+            return Err(ModelLoadError::UnsupportedModel(
+                adapter.descriptor().model.model_id.clone(),
+            )
+            .into());
+        }
+
+        let descriptor = adapter.descriptor().clone();
+        let plan_digest = digest_qwen35_proxy_plan(&descriptor, adapter.family_metadata());
+        let weight_bytes = std::fs::metadata(path)
+            .map(|metadata| metadata.len())
+            .unwrap_or_default();
+        let memory_plan = psionic_runtime::ModelMemoryPlan::host_only(weight_bytes, 0, 0);
+        let residency_policy = psionic_runtime::ModelResidencyPolicy::default();
+        let now_millis = crate::current_time_millis();
+        let residency = psionic_runtime::LoadedModelResidency::ready(
+            now_millis,
+            crate::DEFAULT_MODEL_KEEPALIVE_MILLIS,
+        );
+        let runtime_support = qwen35_proxy_runtime_support(&descriptor);
+        let mut backend_health = crate::BackendHealthTracker::default();
+        backend_health.observe(
+            "cpu",
+            psionic_runtime::RuntimeHealth {
+                status: psionic_runtime::HealthStatus::Ready,
+                message: String::from("qwen35 llama.cpp proxy ready"),
+            },
+            now_millis,
+        );
+        Ok(Self {
+            proxy: Qwen35LlamaCppProxyState::spawn(path, descriptor.config.max_context)?,
+            model_descriptor: descriptor,
+            runtime_support,
+            plan_digest,
+            load_duration_ns: load_start
+                .elapsed()
+                .as_nanos()
+                .try_into()
+                .unwrap_or(u64::MAX),
+            sessions: InMemoryGenerationSessionStore::new(),
+            backend_health,
+            residency,
+            memory_plan,
+            residency_policy,
+        })
+    }
+
+    #[must_use]
+    fn model_descriptor(&self) -> &DecoderModelDescriptor {
+        &self.model_descriptor
+    }
+
+    #[must_use]
+    fn runtime_support(&self) -> GgufDecoderRuntimeSupport {
+        self.runtime_support.clone()
+    }
+
+    #[must_use]
+    fn plan_digest(&self, model_id: &str) -> Option<&str> {
+        (model_id == self.model_descriptor.model.model_id).then_some(self.plan_digest.as_str())
+    }
+
+    fn create_session(
+        &mut self,
+        model_id: &str,
+    ) -> Result<crate::GenerationSession, ReferenceTextGenerationError> {
+        if model_id != self.model_descriptor.model.model_id {
+            return Err(ReferenceTextGenerationError::UnsupportedModel(
+                model_id.to_string(),
+            ));
+        }
+        Ok(self.sessions.create(
+            &self.model_descriptor,
+            crate::served_artifact_identity_for_decoder_backend(&self.model_descriptor, "cpu", &[])
+                .served_artifact_digest,
+        ))
+    }
+
+    fn reset_session(
+        &mut self,
+        session_id: &SessionId,
+    ) -> Result<crate::GenerationSession, ReferenceTextGenerationError> {
+        Ok(self.sessions.reset(session_id)?)
+    }
+
+    fn close_session(
+        &mut self,
+        session_id: &SessionId,
+    ) -> Result<crate::GenerationSession, ReferenceTextGenerationError> {
+        Ok(self.sessions.close(session_id)?)
+    }
+
+    #[must_use]
+    fn loaded_model_views(&mut self) -> Vec<LoadedModelView> {
+        vec![self.loaded_model_view()]
+    }
+
+    #[must_use]
+    fn loaded_models(&mut self) -> LoadedModelsObservation {
+        LoadedModelsObservation::new(vec![self.loaded_model_view().summary])
+    }
+
+    #[must_use]
+    fn observability(&mut self) -> LocalRuntimeObservability {
+        LocalRuntimeObservability {
+            isolation_policy: psionic_runtime::LocalServingIsolationPolicy::subprocess_runtime(),
+            cache_invalidation_policy: crate::cache_invalidation_policy(),
+            execution_profile: continuous_batch_text_generation_execution_profile(),
+            queue_depth: 0,
+            queue_capacity: Some(
+                continuous_batch_text_generation_execution_profile()
+                    .queue_policy
+                    .max_queued_requests,
+            ),
+            active_sessions: self.sessions.len(),
+            active_requests: self.residency.active_requests,
+            memory_footprint: self.residency_snapshot(),
+            backend_health: self.backend_health.snapshot(),
+            recent_transitions: self.backend_health.recent_changes(),
+        }
+    }
+
+    fn warm_model(
+        &mut self,
+        model_id: &str,
+        keep_alive_millis: u64,
+    ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
+        if model_id != self.model_descriptor.model.model_id {
+            return Err(ReferenceTextGenerationError::UnsupportedModel(
+                model_id.to_string(),
+            ));
+        }
+        self.residency
+            .refresh_keep_alive(keep_alive_millis, crate::current_time_millis());
+        Ok(self.loaded_model_view())
+    }
+
+    fn unload_model(
+        &mut self,
+        model_id: &str,
+    ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
+        if model_id != self.model_descriptor.model.model_id {
+            return Err(ReferenceTextGenerationError::UnsupportedModel(
+                model_id.to_string(),
+            ));
+        }
+        self.residency.expire_now(crate::current_time_millis());
+        Ok(self.loaded_model_view())
+    }
+
+    fn generate_continuous_batch(
+        &mut self,
+        requests: Vec<GenerationRequest>,
+    ) -> ContinuousBatchGenerationResult {
+        let responses = requests
+            .iter()
+            .map(|request| self.generate(request))
+            .collect::<Vec<_>>();
+        ContinuousBatchGenerationResult {
+            responses,
+            scheduler_metrics: psionic_runtime::GenerationSchedulerMetrics::default(),
+        }
+    }
+
+    fn generate(
+        &mut self,
+        request: &GenerationRequest,
+    ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        if request.product_id != crate::TEXT_GENERATION_PRODUCT_ID {
+            return Err(ReferenceTextGenerationError::UnsupportedProduct(
+                request.product_id.clone(),
+            ));
+        }
+        if request.model.model.model_id != self.model_descriptor.model.model_id {
+            return Err(ReferenceTextGenerationError::UnsupportedModel(
+                request.model.model.model_id.clone(),
+            ));
+        }
+        if request.adapter_serving.is_some() {
+            return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id: request
+                    .adapter_serving
+                    .as_ref()
+                    .map(|binding| binding.binding_id.clone())
+                    .unwrap_or_else(|| String::from("unknown")),
+                reason: String::from(
+                    "LM-head LoRA serving is currently unsupported on the qwen35 proxy runtime",
+                ),
+            });
+        }
+        if request.session_id.is_some() || request.reset_session {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(String::from(
+                    "qwen35 proxy runtime does not implement session-bound KV reuse",
+                )),
+            ));
+        }
+        if request.options.structured_output.is_some() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::UnsupportedStep(String::from(
+                    "qwen35 proxy runtime does not implement structured-output fallback",
+                )),
+            ));
+        }
+
+        let prompt =
+            qwen35_proxy_prompt_json(&request.prompt, self.model_descriptor.config.vocab_size)?;
+        let response_started = Instant::now();
+        self.residency.begin_request(crate::current_time_millis());
+        let upstream = self
+            .proxy
+            .complete(prompt, &request.options)
+            .and_then(|response| {
+                build_qwen35_proxy_generation_response(
+                    request,
+                    &self.model_descriptor,
+                    &self.plan_digest,
+                    &self.memory_plan,
+                    self.residency_snapshot(),
+                    self.load_duration_ns,
+                    response_started
+                        .elapsed()
+                        .as_nanos()
+                        .try_into()
+                        .unwrap_or(u64::MAX),
+                    response,
+                )
+            });
+        self.residency.finish_request(crate::current_time_millis());
+        upstream
+    }
+}
+
+impl TextGenerationExecutor for CpuQwen35ProxyTextGenerationService {
+    type Error = ReferenceTextGenerationError;
+
+    fn generate(&mut self, request: &GenerationRequest) -> Result<GenerationResponse, Self::Error> {
+        Self::generate(self, request)
+    }
+}
+
+impl StreamingTextGenerationExecutor for CpuQwen35ProxyTextGenerationService {
+    type Stream<'a> = Box<dyn GenerationEventStream + 'a>;
+
+    fn generate_stream<'a>(
+        &'a mut self,
+        request: &GenerationRequest,
+    ) -> Result<Self::Stream<'a>, ReferenceTextGenerationError> {
+        let response = self.generate(request)?;
+        Ok(Box::new(CompletedGenerationStream::new(response)))
+    }
+}
+
+impl ManagedTextGenerationRuntime for CpuQwen35ProxyTextGenerationService {
+    fn isolation_policy(&self) -> psionic_runtime::LocalServingIsolationPolicy {
+        psionic_runtime::LocalServingIsolationPolicy::subprocess_runtime()
+    }
+
+    fn loaded_models(&mut self) -> LoadedModelsObservation {
+        Self::loaded_models(self)
+    }
+
+    fn observability(&mut self) -> LocalRuntimeObservability {
+        Self::observability(self)
+    }
+
+    fn warm_model(
+        &mut self,
+        model_id: &str,
+        keep_alive_millis: u64,
+    ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
+        Self::warm_model(self, model_id, keep_alive_millis)
+    }
+
+    fn unload_model(
+        &mut self,
+        model_id: &str,
+    ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
+        Self::unload_model(self, model_id)
+    }
+}
+
+impl CpuQwen35ProxyTextGenerationService {
+    fn loaded_model_view(&self) -> LoadedModelView {
+        let mut summary = crate::LoadedModelSummary::from_decoder_descriptor(
+            self.model_descriptor.model.model_id.clone(),
+            &self.model_descriptor,
+        );
+        summary.size_bytes = Some(self.memory_plan.weights_bytes);
+        summary.size_vram_bytes = Some(0);
+        summary.backend = Some(String::from("cpu"));
+        summary.fallback_state = Some(String::from("proxy_llama_cpp"));
+        LoadedModelView {
+            summary,
+            residency: self.residency.clone(),
+            memory_plan: self.memory_plan.clone(),
+            residency_policy: self.residency_policy.clone(),
+            residency_snapshot: self.residency_snapshot(),
+        }
+    }
+
+    fn residency_snapshot(&self) -> psionic_runtime::MemoryResidencySnapshot {
+        psionic_runtime::MemoryResidencySnapshot::from_loaded_models(&[
+            psionic_runtime::LoadedModelMemoryState {
+                model_id: self.model_descriptor.model.model_id.clone(),
+                plan: self.memory_plan.clone(),
+                active_requests: self.residency.active_requests,
+                last_used_at_millis: self.residency.last_used_at_millis,
+            },
+        ])
+    }
+}
+
+impl Qwen35LlamaCppProxyState {
+    fn spawn(
+        model_path: &Path,
+        context_length: usize,
+    ) -> Result<Arc<Self>, ReferenceTextGenerationError> {
+        if let Ok(base_url) = env::var("PSIONIC_QWEN35_PROXY_BASE_URL") {
+            let state = Arc::new(Self {
+                base_url,
+                client: reqwest::blocking::Client::builder()
+                    .timeout(Duration::from_secs(600))
+                    .build()
+                    .map_err(qwen35_proxy_runtime_error)?,
+                child: Mutex::new(None),
+            });
+            state.wait_until_ready()?;
+            return Ok(state);
+        }
+
+        let internal_port = reserve_proxy_port()?;
+        let host = "127.0.0.1";
+        let mut command = Command::new(qwen35_llama_server_bin());
+        command
+            .arg("-m")
+            .arg(model_path)
+            .arg("--host")
+            .arg(host)
+            .arg("--port")
+            .arg(internal_port.to_string())
+            .arg("-c")
+            .arg(context_length.to_string())
+            .arg("-ngl")
+            .arg("0")
+            .arg("--no-mmproj")
+            .arg("--no-webui")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        let child = command.spawn().map_err(qwen35_proxy_runtime_error)?;
+        let state = Arc::new(Self {
+            base_url: format!("http://{host}:{internal_port}"),
+            client: reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(600))
+                .build()
+                .map_err(qwen35_proxy_runtime_error)?,
+            child: Mutex::new(Some(child)),
+        });
+        state.wait_until_ready()?;
+        Ok(state)
+    }
+
+    fn wait_until_ready(&self) -> Result<(), ReferenceTextGenerationError> {
+        let health_url = format!("{}/health", self.base_url);
+        let completion_url = format!("{}/completion", self.base_url);
+        let probe = serde_json::json!({
+            "prompt": "hello",
+            "n_predict": 1,
+            "temperature": 0.0,
+            "cache_prompt": false,
+            "return_tokens": true,
+        });
+        let health_client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(1))
+            .build()
+            .map_err(qwen35_proxy_runtime_error)?;
+        let completion_client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .map_err(qwen35_proxy_runtime_error)?;
+        for _ in 0..300 {
+            let health_ready = matches!(
+                health_client.get(health_url.as_str()).send(),
+                Ok(response) if response.status().is_success()
+            );
+            if health_ready {
+                match completion_client
+                    .post(completion_url.as_str())
+                    .json(&probe)
+                    .send()
+                {
+                    Ok(response) if response.status().is_success() => return Ok(()),
+                    Ok(response)
+                        if response.status() != reqwest::StatusCode::SERVICE_UNAVAILABLE =>
+                    {
+                        return Err(ReferenceTextGenerationError::Runtime(
+                            crate::RuntimeError::Backend(format!(
+                                "qwen35 llama.cpp proxy readiness probe failed with status {}",
+                                response.status()
+                            )),
+                        ));
+                    }
+                    Ok(_) | Err(_) => {}
+                }
+            }
+            thread::sleep(Duration::from_millis(200));
+        }
+        Err(ReferenceTextGenerationError::Runtime(
+            crate::RuntimeError::Backend(format!(
+                "qwen35 llama.cpp proxy did not become ready: {completion_url}"
+            )),
+        ))
+    }
+
+    fn complete(
+        &self,
+        prompt: serde_json::Value,
+        options: &crate::GenerationOptions,
+    ) -> Result<Qwen35ProxyCompletionResponse, ReferenceTextGenerationError> {
+        let mut body = serde_json::json!({
+            "prompt": prompt,
+            "n_predict": options.max_output_tokens,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "stream": false,
+        });
+        if matches!(options.decode_strategy, crate::DecodeStrategy::Greedy) {
+            body["temperature"] = serde_json::json!(0.0_f32);
+        } else if let Some(temperature) = options.temperature {
+            body["temperature"] = serde_json::json!(temperature);
+        }
+        if let Some(top_k) = options.top_k {
+            body["top_k"] = serde_json::json!(top_k);
+        }
+        if let Some(top_p) = options.top_p {
+            body["top_p"] = serde_json::json!(top_p);
+        }
+        if let Some(repeat_penalty) = options.repeat_penalty {
+            body["repeat_penalty"] = serde_json::json!(repeat_penalty);
+        }
+        if let Some(presence_penalty) = options.presence_penalty {
+            body["presence_penalty"] = serde_json::json!(presence_penalty);
+        }
+        if let Some(frequency_penalty) = options.frequency_penalty {
+            body["frequency_penalty"] = serde_json::json!(frequency_penalty);
+        }
+        if let Some(seed) = options.seed {
+            body["seed"] = serde_json::json!(seed);
+        }
+        if !options.stop_sequences.is_empty() {
+            body["stop"] = serde_json::json!(options.stop_sequences);
+        }
+        let response = self
+            .client
+            .post(format!("{}/completion", self.base_url))
+            .json(&body)
+            .send()
+            .map_err(qwen35_proxy_runtime_error)?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().unwrap_or_default();
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "qwen35 llama.cpp completion request failed with status {status}: {body}"
+                )),
+            ));
+        }
+        response.json().map_err(qwen35_proxy_runtime_error)
     }
 }
 
@@ -1097,7 +1679,10 @@ impl DenseGgufLayer {
             attention_norm: load_dense_vector(artifact, layout.attention_norm.as_str())?,
             attention_query_weight: ProjectionMatrix::load(
                 artifact,
-                layout.attention_query_weight.as_str(),
+                required_tensor_name(
+                    layout.attention_query_weight.as_deref(),
+                    "attention_query_weight",
+                )?,
             )?,
             attention_query_bias: load_optional_dense_vector(
                 artifact,
@@ -1105,7 +1690,10 @@ impl DenseGgufLayer {
             )?,
             attention_key_weight: ProjectionMatrix::load(
                 artifact,
-                layout.attention_key_weight.as_str(),
+                required_tensor_name(
+                    layout.attention_key_weight.as_deref(),
+                    "attention_key_weight",
+                )?,
             )?,
             attention_key_bias: load_optional_dense_vector(
                 artifact,
@@ -1113,7 +1701,10 @@ impl DenseGgufLayer {
             )?,
             attention_value_weight: ProjectionMatrix::load(
                 artifact,
-                layout.attention_value_weight.as_str(),
+                required_tensor_name(
+                    layout.attention_value_weight.as_deref(),
+                    "attention_value_weight",
+                )?,
             )?,
             attention_value_bias: load_optional_dense_vector(
                 artifact,
@@ -1121,7 +1712,10 @@ impl DenseGgufLayer {
             )?,
             attention_output_weight: ProjectionMatrix::load(
                 artifact,
-                layout.attention_output_weight.as_str(),
+                required_tensor_name(
+                    layout.attention_output_weight.as_deref(),
+                    "attention_output_weight",
+                )?,
             )?,
             attention_output_bias: load_optional_dense_vector(
                 artifact,
@@ -1374,6 +1968,25 @@ fn runtime_support_for_descriptor(
     }
 }
 
+fn qwen35_proxy_runtime_support(descriptor: &DecoderModelDescriptor) -> GgufDecoderRuntimeSupport {
+    GgufDecoderRuntimeSupport {
+        family: GgufDecoderFamily::Qwen35,
+        supported_backends: vec![String::from("cpu")],
+        unsupported_backends: vec![String::from("cuda"), String::from("metal")],
+        unsupported_features: vec![
+            String::from("multimodal_inputs"),
+            String::from("video_inputs"),
+            String::from("tool_calling"),
+            String::from("structured_output_fallback"),
+            String::from("adapter_serving"),
+        ],
+        quantization_modes: descriptor.weights.quantization_modes.clone(),
+        adapter_runtime: unsupported_adapter_runtime_support(
+            "LM-head LoRA serving is currently unsupported on the qwen35 proxy runtime",
+        ),
+    }
+}
+
 fn unsupported_adapter_runtime_support(reason: impl Into<String>) -> DecoderAdapterRuntimeSupport {
     DecoderAdapterRuntimeSupport {
         support_level: String::from("unsupported"),
@@ -1492,6 +2105,159 @@ fn digest_dense_gguf_plan(
     hasher.update(metadata.architecture.as_bytes());
     hasher.update(b"|dense-gguf-cpu|v1");
     hex::encode(hasher.finalize())
+}
+
+fn digest_qwen35_proxy_plan(
+    descriptor: &DecoderModelDescriptor,
+    metadata: &GgufDecoderFamilyMetadata,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(descriptor.model.model_id.as_bytes());
+    hasher.update(b"|");
+    hasher.update(descriptor.model.revision.as_bytes());
+    hasher.update(b"|");
+    hasher.update(descriptor.weights.digest.as_bytes());
+    hasher.update(b"|");
+    hasher.update(descriptor.model.family.as_bytes());
+    hasher.update(b"|");
+    hasher.update(metadata.architecture.as_bytes());
+    hasher.update(b"|qwen35-llama-cpp-proxy-cpu|v1");
+    hex::encode(hasher.finalize())
+}
+
+fn qwen35_proxy_prompt_json(
+    prompt: &GenerationInput,
+    vocab_size: usize,
+) -> Result<serde_json::Value, ReferenceTextGenerationError> {
+    match prompt {
+        GenerationInput::Text(text) => {
+            if text.is_empty() {
+                Err(ReferenceTextGenerationError::EmptyPrompt)
+            } else {
+                Ok(serde_json::Value::String(text.clone()))
+            }
+        }
+        GenerationInput::Tokens(tokens) => {
+            if tokens.as_slice().is_empty() {
+                return Err(ReferenceTextGenerationError::EmptyPrompt);
+            }
+            let mut values = Vec::with_capacity(tokens.as_slice().len());
+            for token in tokens.as_slice() {
+                let raw = token.as_u32();
+                if raw as usize >= vocab_size {
+                    return Err(ReferenceTextGenerationError::InvalidToken {
+                        token: raw,
+                        vocab_size,
+                    });
+                }
+                values.push(serde_json::json!(raw));
+            }
+            Ok(serde_json::Value::Array(values))
+        }
+    }
+}
+
+fn build_qwen35_proxy_generation_response(
+    request: &GenerationRequest,
+    descriptor: &DecoderModelDescriptor,
+    plan_digest: &str,
+    memory_plan: &psionic_runtime::ModelMemoryPlan,
+    residency_snapshot: psionic_runtime::MemoryResidencySnapshot,
+    load_duration_ns: u64,
+    total_duration_ns: u64,
+    upstream: Qwen35ProxyCompletionResponse,
+) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+    let output_tokens =
+        TokenSequence::new(upstream.tokens.into_iter().map(TokenId).collect::<Vec<_>>());
+    let termination = if upstream.truncated {
+        crate::TerminationReason::ContextLimit
+    } else {
+        match upstream.stop_type.as_str() {
+            "limit" => crate::TerminationReason::MaxOutputTokens,
+            "eos" | "word" | "none" | "" => crate::TerminationReason::EndOfSequence,
+            _ => crate::TerminationReason::EndOfSequence,
+        }
+    };
+    let metrics = crate::GenerationMetrics {
+        total_duration_ns: Some(total_duration_ns),
+        load_duration_ns: Some(load_duration_ns),
+        prompt_eval_count: Some(upstream.tokens_evaluated),
+        prompt_eval_duration_ns: None,
+        context_window: None,
+        eval_count: Some(output_tokens.len()),
+        eval_duration_ns: None,
+        time_to_first_token_ns: None,
+        inter_token_latency_ns: None,
+        kv_cache: None,
+        kv_residency: None,
+        kv_cache_encoding: None,
+        prefix_tokens_reused: None,
+        gpt_oss_perf: None,
+    };
+    let provenance = crate::GenerationProvenance {
+        served_artifact: crate::served_artifact_identity_for_decoder_backend(
+            descriptor,
+            "cpu",
+            &[],
+        ),
+        adapter_serving: None,
+        execution_plan_digest: plan_digest.to_string(),
+        cluster_execution: None,
+        load_state: crate::GenerationLoadState::Warm,
+        isolation_policy: psionic_runtime::LocalServingIsolationPolicy::subprocess_runtime(),
+        streaming_policy: None,
+        memory_plan: Some(memory_plan.clone()),
+        residency_policy: Some(psionic_runtime::ModelResidencyPolicy::default()),
+        residency_snapshot: Some(residency_snapshot),
+        kv_cache_policy: None,
+        kv_cache_encoding_policy: None,
+        kv_ownership: None,
+        prefix_cache_control: Some(request.prefix_cache_control.clone()),
+        prefix_cache_state: None,
+        prefix_cache_refusal_reason: None,
+        prefix_cache_policy: None,
+        prefix_cache_identity: None,
+        compile_path: None,
+        delivery_proof: None,
+        cache_observations: Vec::new(),
+        scheduler: None,
+        structured_output: None,
+        psion_served_evidence: None,
+        psion_served_output_claim_posture: None,
+    };
+    Ok(GenerationResponse::new(
+        request,
+        None,
+        output_tokens,
+        upstream.content,
+        metrics.prompt_eval_count.unwrap_or_default(),
+        0,
+        termination,
+    )
+    .with_metrics_and_provenance(metrics, provenance))
+}
+
+fn reserve_proxy_port() -> Result<u16, ReferenceTextGenerationError> {
+    let listener =
+        std::net::TcpListener::bind(("127.0.0.1", 0)).map_err(qwen35_proxy_runtime_error)?;
+    listener
+        .local_addr()
+        .map(|address| address.port())
+        .map_err(qwen35_proxy_runtime_error)
+}
+
+fn qwen35_llama_server_bin() -> String {
+    env::var("PSIONIC_LLAMA_SERVER_BIN").unwrap_or_else(|_| {
+        if cfg!(target_os = "macos") {
+            String::from("/Users/christopherdavid/code/llama.cpp/build/bin/llama-server")
+        } else {
+            String::from("/home/christopherdavid/code/llama.cpp/build/bin/llama-server")
+        }
+    })
+}
+
+fn qwen35_proxy_runtime_error(error: impl std::fmt::Display) -> ReferenceTextGenerationError {
+    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(error.to_string()))
 }
 
 fn load_dense_vector(artifact: &GgufBlobArtifact, name: &str) -> Result<Vec<f32>, ModelLoadError> {
@@ -2105,6 +2871,7 @@ mod tests {
         match family {
             GgufDecoderFamily::Llama => "llama",
             GgufDecoderFamily::Qwen => "qwen",
+            GgufDecoderFamily::Qwen35 => "qwen35",
             GgufDecoderFamily::Mistral => "mistral",
             GgufDecoderFamily::GptOss => "gpt_oss",
         }

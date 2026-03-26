@@ -63,7 +63,7 @@ use crate::{
     MetalGptOssTextGenerationError, ModelEmbeddingsError, PromptRenderError,
     ReferenceTextGenerationError, TerminationReason, TextGenerationExecutor, TokenSequence,
     continuous_batch_text_generation_execution_profile, default_embeddings_execution_profile,
-    default_generation_scheduler_policy,
+    default_generation_scheduler_policy, default_text_generation_execution_profile,
     tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
 };
 
@@ -78,6 +78,9 @@ const CPU_SERVER_RESIDENCY_MODE: &str = "cpu_only";
 const CPU_SERVER_HYBRID_OFFLOAD_MODE: &str = "unsupported";
 const CPU_SERVER_FALLBACK_POLICY: &str = "refuse";
 const CPU_SERVER_PERFORMANCE_CLASS: &str = "portable_cpu_degraded";
+const LLAMA_CPP_PROXY_RESIDENCY_MODE: &str = "llama_cpp_proxy";
+const PROXY_ONLY_FALLBACK_POLICY: &str = "proxy_only";
+const CPU_PROXY_PERFORMANCE_CLASS: &str = "portable_cpu_proxy";
 const LOCAL_SERVER_LOAD_STATUS: &str = "loaded";
 const LOCAL_SERVER_WARM_CONTROL: &str = "not_implemented";
 const LOCAL_SERVER_UNLOAD_CONTROL: &str = "not_implemented";
@@ -109,6 +112,48 @@ impl LocalServingTruth {
             warm_control: LOCAL_SERVER_WARM_CONTROL,
             unload_control: LOCAL_SERVER_UNLOAD_CONTROL,
             memory_pressure_reporting: LOCAL_SERVER_MEMORY_PRESSURE_REPORTING,
+        }
+    }
+
+    const fn cpu_proxy() -> Self {
+        Self {
+            residency_mode: LLAMA_CPP_PROXY_RESIDENCY_MODE,
+            hybrid_offload: CPU_SERVER_HYBRID_OFFLOAD_MODE,
+            hybrid_offload_layers: None,
+            fallback_policy: PROXY_ONLY_FALLBACK_POLICY,
+            performance_class: CPU_PROXY_PERFORMANCE_CLASS,
+            load_status: LOCAL_SERVER_LOAD_STATUS,
+            warm_control: LOCAL_SERVER_WARM_CONTROL,
+            unload_control: LOCAL_SERVER_UNLOAD_CONTROL,
+            memory_pressure_reporting: LOCAL_SERVER_MEMORY_PRESSURE_REPORTING,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct OpenAiCompatServingTruth {
+    backend_label: &'static str,
+    execution_mode_label: &'static str,
+    execution_engine_label: &'static str,
+    local_serving_truth: LocalServingTruth,
+}
+
+impl OpenAiCompatServingTruth {
+    const fn cpu_native() -> Self {
+        Self {
+            backend_label: "cpu",
+            execution_mode_label: "native",
+            execution_engine_label: "psionic",
+            local_serving_truth: LocalServingTruth::cpu_reference(),
+        }
+    }
+
+    const fn cpu_llama_cpp_proxy() -> Self {
+        Self {
+            backend_label: "cpu",
+            execution_mode_label: "proxy",
+            execution_engine_label: "llama.cpp",
+            local_serving_truth: LocalServingTruth::cpu_proxy(),
         }
     }
 }
@@ -711,14 +756,6 @@ pub enum OpenAiCompatBackend {
     Cpu,
 }
 
-impl OpenAiCompatBackend {
-    fn label(self) -> &'static str {
-        match self {
-            Self::Cpu => "cpu",
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct OpenAiCompatConfig {
     pub model_paths: Vec<PathBuf>,
@@ -790,6 +827,7 @@ struct OpenAiCompatLoadedModel {
     model_key: String,
     canonical_name: String,
     supported_endpoints: Vec<RoutingEndpoint>,
+    serving_truth: OpenAiCompatServingTruth,
     kind: OpenAiCompatLoadedModelKind,
 }
 
@@ -806,7 +844,7 @@ struct OpenAiCompatLoadedDecoderModel {
     prompt_renderer: Option<GgufPromptTemplateRenderer>,
     prompt_options: PromptRenderOptions,
     execution_profile: ExecutionCapabilityProfile,
-    scheduler_policy: GenerationSchedulerPolicy,
+    scheduler_policy: Option<GenerationSchedulerPolicy>,
 }
 
 #[derive(Clone)]
@@ -838,39 +876,99 @@ impl OpenAiCompatLoadedModel {
     }
 
     fn scheduler_policy(&self) -> Option<&GenerationSchedulerPolicy> {
-        self.decoder().map(|model| &model.scheduler_policy)
+        self.decoder()
+            .and_then(|model| model.scheduler_policy.as_ref())
+    }
+
+    fn serving_truth(&self) -> OpenAiCompatServingTruth {
+        self.serving_truth
+    }
+
+    fn backend_label(&self) -> &'static str {
+        self.serving_truth.backend_label
+    }
+
+    fn execution_mode_label(&self) -> &'static str {
+        self.serving_truth.execution_mode_label
+    }
+
+    fn execution_engine_label(&self) -> &'static str {
+        self.serving_truth.execution_engine_label
+    }
+
+    fn local_serving_truth(&self) -> LocalServingTruth {
+        self.serving_truth.local_serving_truth
+    }
+
+    fn supports_structured_outputs(&self) -> bool {
+        self.decoder()
+            .is_some_and(|model| !matches!(model.family, GgufDecoderFamily::Qwen35))
+    }
+
+    fn supports_tool_calling(&self) -> bool {
+        self.decoder()
+            .is_some_and(|model| !matches!(model.family, GgufDecoderFamily::Qwen35))
+    }
+
+    fn supports_response_state(&self) -> bool {
+        self.decoder().is_some()
+    }
+
+    fn publishes_kv_cache_policies(&self) -> bool {
+        self.decoder()
+            .is_some_and(|model| !matches!(model.family, GgufDecoderFamily::Qwen35))
     }
 
     fn structured_output_labels(&self) -> Option<Vec<&'static str>> {
-        self.decoder().map(|_| structured_output_parser_labels())
+        self.supports_structured_outputs()
+            .then(structured_output_parser_labels)
     }
 
     fn structured_output_capabilities(&self) -> Vec<StructuredOutputCapability> {
-        if self.decoder().is_some() {
-            local_structured_output_capabilities()
-        } else {
-            unsupported_structured_output_capabilities(
+        match self.decoder() {
+            Some(model) if matches!(model.family, GgufDecoderFamily::Qwen35) => {
+                unsupported_structured_output_capabilities(
+                    "structured outputs are unavailable on the qwen35 llama.cpp text-only proxy runtime",
+                )
+            }
+            Some(_) => local_structured_output_capabilities(),
+            None => unsupported_structured_output_capabilities(
                 "structured outputs are unavailable on embeddings-only models",
-            )
+            ),
         }
     }
 
     fn tool_calling_capability(&self) -> ToolCallingCapability {
-        if self.decoder().is_some() {
-            ToolCallingCapability {
+        match self.decoder() {
+            Some(model) if matches!(model.family, GgufDecoderFamily::Qwen35) => {
+                ToolCallingCapability {
+                    support_level: ToolCallingSupportLevel::Unsupported,
+                    supported_modes: vec!["none"],
+                    parser: "not_available",
+                    argument_validation: "not_available",
+                }
+            }
+            Some(_) => ToolCallingCapability {
                 support_level: ToolCallingSupportLevel::Fallback,
                 supported_modes: vec!["none", "auto", "required", "named"],
                 parser: "tagged_json_schema",
                 argument_validation: "json_schema_subset",
-            }
-        } else {
-            ToolCallingCapability {
+            },
+            None => ToolCallingCapability {
                 support_level: ToolCallingSupportLevel::Unsupported,
                 supported_modes: vec!["none"],
                 parser: "not_available",
                 argument_validation: "not_available",
-            }
+            },
         }
+    }
+
+    fn response_state_capability(
+        &self,
+        state: &OpenAiCompatState,
+    ) -> Option<ResponseStateCapability> {
+        self.supports_response_state()
+            .then(|| state.response_state_capability.clone())
     }
 
     fn family_label(&self) -> &str {
@@ -971,7 +1069,7 @@ impl OpenAiCompatServer {
             routed_models.push(routed_inventory_for_loaded_model(
                 &loaded_model,
                 accepted_names.into_iter().collect(),
-                config.backend.label(),
+                loaded_model.backend_label(),
             ));
             if default_model_key.is_none() {
                 default_model_key = Some(loaded_model.model_key.clone());
@@ -982,15 +1080,19 @@ impl OpenAiCompatServer {
 
         let worker = OpenAiCompatWorker::spawn(load_plans)?;
         let default_model_key = default_model_key.expect("validated non-empty model list");
+        let default_model_truth = models_by_key
+            .get(&default_model_key)
+            .expect("default model should exist")
+            .serving_truth();
         let response_state_capability = response_state.capability();
         let router = FleetRouter::new(
             default_model_key.clone(),
             vec![
                 RoutedWorkerInventory::new(
                     OPENAI_COMPAT_WORKER_ID,
-                    config.backend.label(),
-                    "native",
-                    "psionic",
+                    default_model_truth.backend_label,
+                    default_model_truth.execution_mode_label,
+                    default_model_truth.execution_engine_label,
                 )
                 .with_model_entries(routed_models),
             ],
@@ -1002,9 +1104,9 @@ impl OpenAiCompatServer {
             state: Arc::new(OpenAiCompatState {
                 workers,
                 router,
-                backend_label: config.backend.label(),
-                execution_mode_label: "native",
-                execution_engine_label: "psionic",
+                backend_label: default_model_truth.backend_label,
+                execution_mode_label: default_model_truth.execution_mode_label,
+                execution_engine_label: default_model_truth.execution_engine_label,
                 default_model_key,
                 default_model_name: default_canonical_model_name
                     .expect("validated non-empty model list"),
@@ -1673,6 +1775,10 @@ struct ModelCard {
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_served_backend: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_execution_mode: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_execution_engine: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     psionic_residency_mode: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_hybrid_offload: Option<&'static str>,
@@ -1709,6 +1815,8 @@ async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<
             psionic_supported_endpoints: vec![RoutingEndpoint::ChatCompletions.path()],
             psionic_model_family: state.descriptor.model.family.clone(),
             psionic_served_backend: Some(state.backend_label),
+            psionic_execution_mode: Some(state.execution_mode_label),
+            psionic_execution_engine: Some(state.execution_engine_label),
             psionic_residency_mode: Some(state.local_serving_truth.residency_mode),
             psionic_hybrid_offload: Some(state.local_serving_truth.hybrid_offload),
             psionic_hybrid_offload_layers: state.local_serving_truth.hybrid_offload_layers,
@@ -1768,28 +1876,28 @@ async fn generic_health(
         .expect("default model should exist");
     Json(GenericHealthResponse {
         status: "ok",
-        backend: state.backend_label,
-        execution_mode: state.execution_mode_label,
-        execution_engine: state.execution_engine_label,
+        backend: default_model.backend_label(),
+        execution_mode: default_model.execution_mode_label(),
+        execution_engine: default_model.execution_engine_label(),
         default_model: state.default_model_name.clone(),
         model_count: state.models_by_key.len(),
-        residency_mode: CPU_SERVER_RESIDENCY_MODE,
-        hybrid_offload: CPU_SERVER_HYBRID_OFFLOAD_MODE,
-        hybrid_offload_layers: None,
-        fallback_policy: CPU_SERVER_FALLBACK_POLICY,
-        performance_class: CPU_SERVER_PERFORMANCE_CLASS,
-        load_status: LOCAL_SERVER_LOAD_STATUS,
-        warm_control: LOCAL_SERVER_WARM_CONTROL,
-        unload_control: LOCAL_SERVER_UNLOAD_CONTROL,
-        memory_pressure_reporting: LOCAL_SERVER_MEMORY_PRESSURE_REPORTING,
+        residency_mode: default_model.local_serving_truth().residency_mode,
+        hybrid_offload: default_model.local_serving_truth().hybrid_offload,
+        hybrid_offload_layers: default_model.local_serving_truth().hybrid_offload_layers,
+        fallback_policy: default_model.local_serving_truth().fallback_policy,
+        performance_class: default_model.local_serving_truth().performance_class,
+        load_status: default_model.local_serving_truth().load_status,
+        warm_control: default_model.local_serving_truth().warm_control,
+        unload_control: default_model.local_serving_truth().unload_control,
+        memory_pressure_reporting: default_model
+            .local_serving_truth()
+            .memory_pressure_reporting,
         default_model_supported_endpoints: model_endpoint_paths(default_model),
         supported_endpoints: union_supported_endpoint_paths(state.as_ref()),
         structured_output_fallbacks: default_model.structured_output_labels(),
         structured_output_capabilities: Some(default_model.structured_output_capabilities()),
         tool_calling: Some(default_model.tool_calling_capability()),
-        response_state: default_model
-            .decoder()
-            .map(|_| state.response_state_capability.clone()),
+        response_state: default_model.response_state_capability(state.as_ref()),
         execution_profile: default_model.execution_profile().clone(),
         scheduler_policy: default_model.scheduler_policy().cloned(),
     })
@@ -1806,20 +1914,20 @@ async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Jso
                 owned_by: "psionic",
                 psionic_supported_endpoints: model_endpoint_paths(model),
                 psionic_model_family: model.family_label().to_string(),
-                psionic_served_backend: Some("cpu"),
-                psionic_residency_mode: Some(CPU_SERVER_RESIDENCY_MODE),
-                psionic_hybrid_offload: Some(CPU_SERVER_HYBRID_OFFLOAD_MODE),
-                psionic_hybrid_offload_layers: None,
-                psionic_fallback_policy: Some(CPU_SERVER_FALLBACK_POLICY),
-                psionic_performance_class: Some(CPU_SERVER_PERFORMANCE_CLASS),
+                psionic_served_backend: Some(model.backend_label()),
+                psionic_execution_mode: Some(model.execution_mode_label()),
+                psionic_execution_engine: Some(model.execution_engine_label()),
+                psionic_residency_mode: Some(model.local_serving_truth().residency_mode),
+                psionic_hybrid_offload: Some(model.local_serving_truth().hybrid_offload),
+                psionic_hybrid_offload_layers: model.local_serving_truth().hybrid_offload_layers,
+                psionic_fallback_policy: Some(model.local_serving_truth().fallback_policy),
+                psionic_performance_class: Some(model.local_serving_truth().performance_class),
                 psionic_structured_outputs: model.structured_output_labels(),
                 psionic_structured_output_capabilities: Some(
                     model.structured_output_capabilities(),
                 ),
                 psionic_tool_calling: Some(model.tool_calling_capability()),
-                psionic_response_state: model
-                    .decoder()
-                    .map(|_| state.response_state_capability.clone()),
+                psionic_response_state: model.response_state_capability(state.as_ref()),
                 psionic_execution_profile: Some(model.execution_profile().clone()),
                 psionic_scheduler_policy: model.scheduler_policy().cloned(),
                 psionic_embedding_dimensions: model.embedding_dimensions(),
@@ -2139,6 +2247,7 @@ fn decoder_family_label(family: GgufDecoderFamily) -> &'static str {
     match family {
         GgufDecoderFamily::Llama => "llama",
         GgufDecoderFamily::Qwen => "qwen",
+        GgufDecoderFamily::Qwen35 => "qwen35",
         GgufDecoderFamily::Mistral => "mistral",
         GgufDecoderFamily::GptOss => "gpt_oss",
     }
@@ -2946,7 +3055,7 @@ async fn handle_generic_chat_completions(
         let mut response = Sse::new(iter(events)).into_response();
         insert_generic_execution_headers(
             response.headers_mut(),
-            state.as_ref(),
+            loaded_model,
             &route.selection,
             structured_output_report.as_ref(),
             scheduler_receipt.as_ref(),
@@ -3024,7 +3133,7 @@ async fn handle_generic_chat_completions(
     let mut response = Json(body).into_response();
     insert_generic_execution_headers(
         response.headers_mut(),
-        state.as_ref(),
+        loaded_model,
         &route.selection,
         structured_output_report.as_ref(),
         scheduler_receipt.as_ref(),
@@ -3396,7 +3505,7 @@ async fn handle_generic_responses(
     let mut response = Json(body).into_response();
     insert_generic_execution_headers(
         response.headers_mut(),
-        state.as_ref(),
+        loaded_model,
         &route.selection,
         structured_output_report.as_ref(),
         scheduler_receipt.as_ref(),
@@ -3497,7 +3606,7 @@ async fn handle_generic_embeddings(
     let mut response = Json(body).into_response();
     insert_generic_execution_headers(
         response.headers_mut(),
-        state.as_ref(),
+        loaded_model,
         &route.selection,
         None,
         None,
@@ -3939,7 +4048,7 @@ fn next_generic_request_id(state: &OpenAiCompatState, prefix: &str) -> String {
 
 fn insert_generic_execution_headers(
     headers: &mut HeaderMap,
-    state: &OpenAiCompatState,
+    loaded_model: &OpenAiCompatLoadedModel,
     route_selection: &RouteSelection,
     structured_output: Option<&StructuredOutputExecutionReport>,
     scheduler: Option<&GenerationSchedulerRequestReceipt>,
@@ -3952,17 +4061,17 @@ fn insert_generic_execution_headers(
 ) {
     headers.insert(
         HeaderName::from_static("x-psionic-backend"),
-        HeaderValue::from_static(state.backend_label),
+        HeaderValue::from_static(loaded_model.backend_label()),
     );
     headers.insert(
         HeaderName::from_static("x-psionic-execution-mode"),
-        HeaderValue::from_static(state.execution_mode_label),
+        HeaderValue::from_static(loaded_model.execution_mode_label()),
     );
     headers.insert(
         HeaderName::from_static("x-psionic-execution-engine"),
-        HeaderValue::from_static(state.execution_engine_label),
+        HeaderValue::from_static(loaded_model.execution_engine_label()),
     );
-    insert_local_serving_truth_headers(headers, LocalServingTruth::cpu_reference());
+    insert_local_serving_truth_headers(headers, loaded_model.local_serving_truth());
     headers.insert(
         HeaderName::from_static("x-psionic-route-worker"),
         HeaderValue::from_str(route_selection.worker_id.as_str())
@@ -4007,18 +4116,13 @@ fn insert_generic_execution_headers(
     {
         headers.insert(HeaderName::from_static("x-psionic-route-fallback"), value);
     }
+    headers.insert(
+        HeaderName::from_static("x-psionic-batch-posture"),
+        HeaderValue::from_static(batch_posture_label(
+            route_selection.execution_profile.batch_posture,
+        )),
+    );
     if let Some(scheduler) = scheduler {
-        headers.insert(
-            HeaderName::from_static("x-psionic-batch-posture"),
-            HeaderValue::from_static(match scheduler.batch_posture {
-                psionic_runtime::BatchExecutionPosture::SingleRequestOnly => "single_request_only",
-                psionic_runtime::BatchExecutionPosture::CallerStaticBatch => "caller_static_batch",
-                psionic_runtime::BatchExecutionPosture::SchedulerStaticBatch => {
-                    "scheduler_static_batch"
-                }
-                psionic_runtime::BatchExecutionPosture::ContinuousBatch => "continuous_batch",
-            }),
-        );
         headers.insert(
             HeaderName::from_static("x-psionic-scheduling-class"),
             HeaderValue::from_static(match scheduler.scheduling_class {
@@ -4082,6 +4186,15 @@ fn insert_generic_execution_headers(
         }
     }
     insert_structured_output_headers(headers, structured_output);
+}
+
+fn batch_posture_label(batch_posture: psionic_runtime::BatchExecutionPosture) -> &'static str {
+    match batch_posture {
+        psionic_runtime::BatchExecutionPosture::SingleRequestOnly => "single_request_only",
+        psionic_runtime::BatchExecutionPosture::CallerStaticBatch => "caller_static_batch",
+        psionic_runtime::BatchExecutionPosture::SchedulerStaticBatch => "scheduler_static_batch",
+        psionic_runtime::BatchExecutionPosture::ContinuousBatch => "continuous_batch",
+    }
 }
 
 fn insert_usize_header(headers: &mut HeaderMap, name: &'static str, value: usize) {
@@ -4290,22 +4403,27 @@ fn routed_inventory_for_loaded_model(
         inventory = inventory.with_scheduler_policy(policy.clone());
     }
     inventory = inventory.with_warm_state(RoutedWarmState::Warm);
-    if let Some(decoder) = model.decoder() {
+    if let Some(decoder) = model.decoder()
+        && model.publishes_kv_cache_policies()
+    {
         inventory = inventory.with_kv_cache_encoding_policy(
-            super::default_decoder_kv_cache_encoding_policy(
-                &decoder.descriptor,
-                runtime_backend,
-            ),
+            super::default_decoder_kv_cache_encoding_policy(&decoder.descriptor, runtime_backend),
         );
-        for policy in
-            super::supported_decoder_kv_cache_encoding_policies(&decoder.descriptor, runtime_backend)
-        {
+        for policy in super::supported_decoder_kv_cache_encoding_policies(
+            &decoder.descriptor,
+            runtime_backend,
+        ) {
             inventory = inventory.with_supported_kv_cache_encoding_policy(policy);
         }
-        inventory = inventory
-            .with_structured_outputs()
-            .with_tool_calling()
-            .with_response_state();
+    }
+    if model.supports_structured_outputs() {
+        inventory = inventory.with_structured_outputs();
+    }
+    if model.supports_tool_calling() {
+        inventory = inventory.with_tool_calling();
+    }
+    if model.supports_response_state() {
+        inventory = inventory.with_response_state();
     }
     inventory
 }
@@ -4349,14 +4467,15 @@ fn load_generic_decoder_model(
         model_key: descriptor.model.model_id.clone(),
         canonical_name: default_model_name(model_path, descriptor.model.model_id.as_str()),
         supported_endpoints: vec![RoutingEndpoint::ChatCompletions, RoutingEndpoint::Responses],
+        serving_truth: generic_decoder_serving_truth(family),
         kind: OpenAiCompatLoadedModelKind::Decoder(OpenAiCompatLoadedDecoderModel {
             descriptor: descriptor.clone(),
             family,
             prompt_renderer: (!matches!(family, GgufDecoderFamily::GptOss))
                 .then(|| adapter.prompt_renderer()),
             prompt_options: prompt_options_for_family(family, reasoning_budget),
-            execution_profile: continuous_batch_text_generation_execution_profile(),
-            scheduler_policy: default_generation_scheduler_policy(),
+            execution_profile: generic_decoder_execution_profile(family),
+            scheduler_policy: generic_decoder_scheduler_policy(family),
         }),
     };
     Ok((
@@ -4386,6 +4505,7 @@ fn load_generic_embeddings_model(
         model_key: descriptor.model.model_id.clone(),
         canonical_name: default_model_name(model_path, descriptor.model.model_id.as_str()),
         supported_endpoints: vec![RoutingEndpoint::Embeddings],
+        serving_truth: OpenAiCompatServingTruth::cpu_native(),
         kind: OpenAiCompatLoadedModelKind::Embeddings(OpenAiCompatLoadedEmbeddingsModel {
             descriptor: descriptor.clone(),
             execution_profile: default_embeddings_execution_profile(),
@@ -4399,6 +4519,28 @@ fn load_generic_embeddings_model(
             runtime_kind: OpenAiCompatRuntimeKind::SafetensorsEmbeddings,
         },
     ))
+}
+
+fn generic_decoder_serving_truth(family: GgufDecoderFamily) -> OpenAiCompatServingTruth {
+    if matches!(family, GgufDecoderFamily::Qwen35) {
+        OpenAiCompatServingTruth::cpu_llama_cpp_proxy()
+    } else {
+        OpenAiCompatServingTruth::cpu_native()
+    }
+}
+
+fn generic_decoder_execution_profile(family: GgufDecoderFamily) -> ExecutionCapabilityProfile {
+    if matches!(family, GgufDecoderFamily::Qwen35) {
+        default_text_generation_execution_profile()
+    } else {
+        continuous_batch_text_generation_execution_profile()
+    }
+}
+
+fn generic_decoder_scheduler_policy(
+    family: GgufDecoderFamily,
+) -> Option<GenerationSchedulerPolicy> {
+    (!matches!(family, GgufDecoderFamily::Qwen35)).then(default_generation_scheduler_policy)
 }
 
 fn render_prompt_for_model(
@@ -5614,6 +5756,346 @@ mod tests {
             serde_json::json!("world")
         );
         assert_eq!(payload["usage"]["completion_tokens"], serde_json::json!(1));
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_qwen35_proxy_publication_and_generation_are_honest()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = qwen35_proxy_test_lock()
+            .lock()
+            .expect("qwen35 proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let (base_url, shutdown_tx, observed_requests) =
+            runtime.block_on(start_qwen35_proxy_test_server())?;
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join("tiny-qwen35.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
+            qwen35_decoder_tensors().as_slice(),
+        )?;
+
+        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
+        drop(_proxy_env);
+
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+        assert_eq!(health.0.backend, "cpu");
+        assert_eq!(health.0.execution_mode, "proxy");
+        assert_eq!(health.0.execution_engine, "llama.cpp");
+        assert_eq!(health.0.residency_mode, "llama_cpp_proxy");
+        assert_eq!(health.0.hybrid_offload, "unsupported");
+        assert_eq!(health.0.fallback_policy, "proxy_only");
+        assert_eq!(
+            health.0.execution_profile.batch_posture,
+            BatchExecutionPosture::SingleRequestOnly
+        );
+        assert!(health.0.scheduler_policy.is_none());
+        assert_eq!(health.0.structured_output_fallbacks, None);
+        assert!(
+            health
+                .0
+                .structured_output_capabilities
+                .as_ref()
+                .is_some_and(|capabilities| {
+                    capabilities
+                        .iter()
+                        .all(|capability| capability.support_level.label() == "unsupported")
+                })
+        );
+        assert_eq!(
+            health.0.tool_calling.as_ref().map(|capability| (
+                capability.support_level.label(),
+                capability.supported_modes.clone(),
+                capability.parser,
+                capability.argument_validation,
+            )),
+            Some((
+                "unsupported",
+                vec!["none"],
+                "not_available",
+                "not_available",
+            ))
+        );
+        assert!(health.0.response_state.is_some());
+
+        let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
+            &server.state,
+        ))));
+        let model = models
+            .0
+            .data
+            .iter()
+            .find(|model| model.id == "tiny-qwen35.gguf")
+            .expect("qwen35 proxy model should be listed");
+        assert_eq!(model.psionic_model_family, "qwen35");
+        assert_eq!(model.psionic_served_backend, Some("cpu"));
+        assert_eq!(model.psionic_execution_mode, Some("proxy"));
+        assert_eq!(model.psionic_execution_engine, Some("llama.cpp"));
+        assert_eq!(model.psionic_residency_mode, Some("llama_cpp_proxy"));
+        assert_eq!(model.psionic_hybrid_offload, Some("unsupported"));
+        assert_eq!(model.psionic_fallback_policy, Some("proxy_only"));
+        assert_eq!(model.psionic_structured_outputs, None);
+        assert!(
+            model
+                .psionic_structured_output_capabilities
+                .as_ref()
+                .is_some_and(|capabilities| {
+                    capabilities
+                        .iter()
+                        .all(|capability| capability.support_level.label() == "unsupported")
+                })
+        );
+        assert!(
+            model
+                .psionic_tool_calling
+                .as_ref()
+                .is_some_and(|capability| capability.support_level.label() == "unsupported")
+        );
+        assert_eq!(
+            model
+                .psionic_execution_profile
+                .as_ref()
+                .map(|profile| profile.batch_posture),
+            Some(BatchExecutionPosture::SingleRequestOnly)
+        );
+        assert!(model.psionic_scheduler_policy.is_none());
+        assert!(model.psionic_response_state.is_some());
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-qwen35")),
+                messages: vec![ChatCompletionMessage {
+                    role: String::from("user"),
+                    content: String::from("hello"),
+                    name: None,
+                }],
+                temperature: Some(0.0),
+                max_tokens: Some(2),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+            },
+        ))?;
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-execution-mode"),
+            Some(String::from("proxy"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-execution-engine"),
+            Some(String::from("llama.cpp"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-residency-mode"),
+            Some(String::from("llama_cpp_proxy"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-fallback-policy"),
+            Some(String::from("proxy_only"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-batch-posture"),
+            Some(String::from("single_request_only"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-scheduling-class"),
+            None
+        );
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(
+            payload["choices"][0]["message"]["content"],
+            serde_json::json!("proxy world")
+        );
+        assert_eq!(payload["usage"]["completion_tokens"], serde_json::json!(2));
+
+        let observed_requests = observed_requests
+            .lock()
+            .expect("observed qwen35 proxy requests should be readable");
+        assert!(observed_requests.iter().any(|body| {
+            body.get("n_predict") == Some(&serde_json::json!(2))
+                && body["prompt"]
+                    .as_str()
+                    .is_some_and(|prompt| prompt.contains("hello"))
+        }));
+
+        let _ = shutdown_tx.send(());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_qwen35_headers_remain_model_specific_when_default_model_is_native()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = qwen35_proxy_test_lock()
+            .lock()
+            .expect("qwen35 proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let (base_url, shutdown_tx, _) = runtime.block_on(start_qwen35_proxy_test_server())?;
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-llama.gguf");
+        let qwen35_path = temp.path().join("tiny-qwen35.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny server llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
+            qwen35_decoder_tensors().as_slice(),
+        )?;
+
+        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
+        let mut config = OpenAiCompatConfig::new(&llama_path);
+        config.add_model_path(&qwen35_path);
+        let server = OpenAiCompatServer::from_config(&config)?;
+        drop(_proxy_env);
+
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+        assert_eq!(health.0.execution_mode, "native");
+        assert_eq!(health.0.execution_engine, "psionic");
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-qwen35")),
+                messages: vec![ChatCompletionMessage {
+                    role: String::from("user"),
+                    content: String::from("hello"),
+                    name: None,
+                }],
+                temperature: Some(0.0),
+                max_tokens: Some(2),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+            },
+        ))?;
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-execution-mode"),
+            Some(String::from("proxy"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-execution-engine"),
+            Some(String::from("llama.cpp"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-batch-posture"),
+            Some(String::from("single_request_only"))
+        );
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(
+            payload["choices"][0]["message"]["content"],
+            serde_json::json!("proxy world")
+        );
+
+        let _ = shutdown_tx.send(());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_qwen35_fails_closed_for_tools_and_structured_outputs()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = qwen35_proxy_test_lock()
+            .lock()
+            .expect("qwen35 proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let (base_url, shutdown_tx, _) = runtime.block_on(start_qwen35_proxy_test_server())?;
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join("tiny-qwen35.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
+            qwen35_decoder_tensors().as_slice(),
+        )?;
+
+        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
+        drop(_proxy_env);
+
+        let tool_error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(String::from("tiny-qwen35")),
+                    messages: vec![ChatCompletionMessage {
+                        role: String::from("user"),
+                        content: String::from("hello"),
+                        name: None,
+                    }],
+                    temperature: Some(0.0),
+                    max_tokens: Some(2),
+                    stop: None,
+                    stream: false,
+                    tools: vec![weather_tool_definition()],
+                    tool_choice: None,
+                    response_format: None,
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                },
+            ))
+            .expect_err("qwen35 tool calling should fail closed");
+        let tool_payload = runtime.block_on(response_json(tool_error.into_response()))?;
+        assert!(
+            tool_payload["error"]["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("lacks tool-calling support")
+        );
+
+        let structured_output_error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(String::from("tiny-qwen35")),
+                    messages: vec![ChatCompletionMessage {
+                        role: String::from("user"),
+                        content: String::from("hello"),
+                        name: None,
+                    }],
+                    temperature: Some(0.0),
+                    max_tokens: Some(2),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    response_format: Some(ChatCompletionResponseFormatRequest {
+                        kind: String::from("json_object"),
+                        json_schema: None,
+                        schema: None,
+                    }),
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                },
+            ))
+            .expect_err("qwen35 structured output should fail closed");
+        let structured_output_payload =
+            runtime.block_on(response_json(structured_output_error.into_response()))?;
+        assert!(
+            structured_output_payload["error"]["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("lacks structured-output support")
+        );
+
+        let _ = shutdown_tx.send(());
         Ok(())
     }
 
@@ -7709,6 +8191,88 @@ mod tests {
             .map(String::from)
     }
 
+    struct ScopedEnvVar {
+        key: &'static str,
+        previous: Option<String>,
+    }
+
+    impl ScopedEnvVar {
+        fn set(key: &'static str, value: &str) -> Self {
+            let previous = std::env::var(key).ok();
+            // Safety: qwen35 proxy tests serialize process-wide env mutation behind
+            // `qwen35_proxy_test_lock`, and the value is restored before releasing that lock.
+            unsafe {
+                std::env::set_var(key, value);
+            }
+            Self { key, previous }
+        }
+    }
+
+    impl Drop for ScopedEnvVar {
+        fn drop(&mut self) {
+            if let Some(previous) = self.previous.as_deref() {
+                // Safety: this restores the serialized test-local env override established in `set`.
+                unsafe {
+                    std::env::set_var(self.key, previous);
+                }
+            } else {
+                // Safety: this clears the serialized test-local env override established in `set`.
+                unsafe {
+                    std::env::remove_var(self.key);
+                }
+            }
+        }
+    }
+
+    fn qwen35_proxy_test_lock() -> &'static std::sync::Mutex<()> {
+        static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+        LOCK.get_or_init(|| std::sync::Mutex::new(()))
+    }
+
+    async fn start_qwen35_proxy_test_server() -> Result<
+        (
+            String,
+            tokio::sync::oneshot::Sender<()>,
+            std::sync::Arc<std::sync::Mutex<Vec<serde_json::Value>>>,
+        ),
+        Box<dyn std::error::Error>,
+    > {
+        let observed_requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let address = listener.local_addr()?;
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+        let observed_for_route = std::sync::Arc::clone(&observed_requests);
+        let router = axum::Router::new()
+            .route("/health", axum::routing::get(|| async { StatusCode::OK }))
+            .route(
+                "/completion",
+                axum::routing::post(move |Json(body): Json<serde_json::Value>| {
+                    let observed_requests = std::sync::Arc::clone(&observed_for_route);
+                    async move {
+                        observed_requests
+                            .lock()
+                            .expect("observed qwen35 proxy requests should not be poisoned")
+                            .push(body);
+                        Json(serde_json::json!({
+                            "content": "proxy world",
+                            "tokens": [7, 8],
+                            "stop_type": "eos",
+                            "truncated": false,
+                            "tokens_evaluated": 3
+                        }))
+                    }
+                }),
+            );
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, router)
+                .with_graceful_shutdown(async {
+                    let _ = shutdown_rx.await;
+                })
+                .await;
+        });
+        Ok((format!("http://{address}"), shutdown_tx, observed_requests))
+    }
+
     fn test_generation_response(text: &str) -> GenerationResponse {
         GenerationResponse {
             request_id: String::from("req-test"),
@@ -7854,6 +8418,123 @@ mod tests {
     fn dense_qwen_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
         let mut metadata = dense_family_header("qwen2", name);
         metadata.extend(qwen_tokenizer_metadata_entries());
+        metadata
+    }
+
+    fn qwen35_chat_template() -> &'static str {
+        include_str!("../../psionic-models/src/testdata/qwen35_chat_template.jinja")
+            .trim_end_matches('\n')
+    }
+
+    fn qwen35_decoder_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = vec![
+            (
+                String::from("general.architecture"),
+                GgufMetadataValue::String(String::from("qwen35")),
+            ),
+            (
+                String::from("general.name"),
+                GgufMetadataValue::String(name.to_string()),
+            ),
+            (
+                String::from("qwen35.context_length"),
+                GgufMetadataValue::U32(256),
+            ),
+            (
+                String::from("qwen35.embedding_length"),
+                GgufMetadataValue::U32(8),
+            ),
+            (
+                String::from("qwen35.feed_forward_length"),
+                GgufMetadataValue::U32(16),
+            ),
+            (
+                String::from("qwen35.block_count"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.attention.head_count"),
+                GgufMetadataValue::U32(2),
+            ),
+            (
+                String::from("qwen35.attention.head_count_kv"),
+                GgufMetadataValue::Array(vec![
+                    GgufMetadataValue::U32(0),
+                    GgufMetadataValue::U32(0),
+                    GgufMetadataValue::U32(0),
+                    GgufMetadataValue::U32(1),
+                ]),
+            ),
+            (
+                String::from("qwen35.attention.key_length"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.attention.value_length"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.attention.layer_norm_rms_epsilon"),
+                GgufMetadataValue::F32(1e-6),
+            ),
+            (
+                String::from("qwen35.rope.dimension_count"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.rope.freq_base"),
+                GgufMetadataValue::F32(10_000_000.0),
+            ),
+            (
+                String::from("qwen35.full_attention_interval"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.ssm.conv_kernel"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.ssm.group_count"),
+                GgufMetadataValue::U32(2),
+            ),
+            (
+                String::from("qwen35.ssm.inner_size"),
+                GgufMetadataValue::U32(8),
+            ),
+            (
+                String::from("qwen35.ssm.state_size"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("qwen35.ssm.time_step_rank"),
+                GgufMetadataValue::U32(2),
+            ),
+            (
+                String::from("qwen35.vision.block_count"),
+                GgufMetadataValue::U32(2),
+            ),
+            (
+                String::from("qwen35.vision.embedding_length"),
+                GgufMetadataValue::U32(6),
+            ),
+            (
+                String::from("qwen35.vision_start_token_id"),
+                GgufMetadataValue::U32(900),
+            ),
+            (
+                String::from("qwen35.vision_end_token_id"),
+                GgufMetadataValue::U32(901),
+            ),
+            (
+                String::from("qwen35.image_token_id"),
+                GgufMetadataValue::U32(902),
+            ),
+            (
+                String::from("tokenizer.chat_template"),
+                GgufMetadataValue::String(qwen35_chat_template().to_string()),
+            ),
+        ];
+        metadata.extend(qwen35_tokenizer_metadata_entries());
         metadata
     }
 
@@ -8009,6 +8690,57 @@ mod tests {
         ]
     }
 
+    fn qwen35_tokenizer_metadata_entries() -> Vec<(String, GgufMetadataValue)> {
+        vec![
+            (
+                String::from("tokenizer.ggml.model"),
+                GgufMetadataValue::String(String::from("gpt2")),
+            ),
+            (
+                String::from("tokenizer.ggml.pre"),
+                GgufMetadataValue::String(String::from("qwen35")),
+            ),
+            (
+                String::from("tokenizer.ggml.tokens"),
+                GgufMetadataValue::Array(vec![
+                    GgufMetadataValue::String(String::from("<|bos|>")),
+                    GgufMetadataValue::String(String::from("<|eos|>")),
+                    GgufMetadataValue::String(String::from("<|im_start|>")),
+                    GgufMetadataValue::String(String::from("<|im_end|>")),
+                    GgufMetadataValue::String(String::from("<think>")),
+                    GgufMetadataValue::String(String::from("</think>")),
+                    GgufMetadataValue::String(String::from("hello")),
+                    GgufMetadataValue::String(String::from("world")),
+                    GgufMetadataValue::String(String::from("proxy")),
+                    GgufMetadataValue::String(String::from("qwen35")),
+                ]),
+            ),
+            (
+                String::from("tokenizer.ggml.merges"),
+                GgufMetadataValue::Array(vec![
+                    GgufMetadataValue::String(String::from("hello world")),
+                    GgufMetadataValue::String(String::from("proxy qwen35")),
+                ]),
+            ),
+            (
+                String::from("tokenizer.ggml.bos_token_id"),
+                GgufMetadataValue::U32(0),
+            ),
+            (
+                String::from("tokenizer.ggml.eos_token_id"),
+                GgufMetadataValue::U32(1),
+            ),
+            (
+                String::from("tokenizer.ggml.add_bos_token"),
+                GgufMetadataValue::Bool(false),
+            ),
+            (
+                String::from("tokenizer.ggml.add_eos_token"),
+                GgufMetadataValue::Bool(false),
+            ),
+        ]
+    }
+
     fn dense_decoder_tensors(
         include_qkv_bias: bool,
         hello_token_index: usize,
@@ -8050,6 +8782,97 @@ mod tests {
             tensors.push(dense_tensor("blk.0.attn_k.bias", vec![2], vec![0.0; 2]));
             tensors.push(dense_tensor("blk.0.attn_v.bias", vec![2], vec![0.0; 2]));
         }
+        tensors
+    }
+
+    fn qwen35_decoder_tensors() -> Vec<TestGgufTensor> {
+        let mut tensors = vec![
+            dense_f32_tensor("token_embd.weight", vec![10, 8]),
+            dense_f32_tensor("output_norm.weight", vec![8]),
+        ];
+
+        for layer_index in 0..4 {
+            let prefix = format!("blk.{layer_index}");
+            tensors.push(dense_f32_tensor(
+                &format!("{prefix}.attn_norm.weight"),
+                vec![8],
+            ));
+            tensors.push(dense_f32_tensor(
+                &format!("{prefix}.ffn_gate.weight"),
+                vec![16, 8],
+            ));
+            tensors.push(dense_f32_tensor(
+                &format!("{prefix}.ffn_up.weight"),
+                vec![16, 8],
+            ));
+            tensors.push(dense_f32_tensor(
+                &format!("{prefix}.ffn_down.weight"),
+                vec![8, 16],
+            ));
+            tensors.push(dense_f32_tensor(
+                &format!("{prefix}.post_attention_norm.weight"),
+                vec![8],
+            ));
+
+            if layer_index < 3 {
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_qkv.weight"),
+                    vec![24, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_gate.weight"),
+                    vec![8, 8],
+                ));
+                tensors.push(dense_f32_tensor(&format!("{prefix}.ssm_a"), vec![2]));
+                tensors.push(dense_f32_tensor(&format!("{prefix}.ssm_dt"), vec![2]));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.ssm_alpha.weight"),
+                    vec![2, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.ssm_beta.weight"),
+                    vec![2, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.ssm_conv1d.weight"),
+                    vec![24, 4],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.ssm_norm.weight"),
+                    vec![4],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.ssm_out.weight"),
+                    vec![8, 8],
+                ));
+            } else {
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_q.weight"),
+                    vec![8, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_k.weight"),
+                    vec![4, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_v.weight"),
+                    vec![4, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_output.weight"),
+                    vec![8, 8],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_q_norm.weight"),
+                    vec![4],
+                ));
+                tensors.push(dense_f32_tensor(
+                    &format!("{prefix}.attn_k_norm.weight"),
+                    vec![4],
+                ));
+            }
+        }
+
         tensors
     }
 

@@ -17,6 +17,25 @@ than just run tensor math.
   refusal-required, and unsupported regions explicit together with context and
   latency envelopes
 
+## Current Bounded Lanes
+
+- Generic OpenAI-compatible GGUF serving may expose different runtime truth per
+  loaded model inside the same process. Publication must stay model-specific in
+  `/health`, `/v1/models`, and response headers.
+- `qwen35` is `implemented_early` through a dedicated CPU text-only
+  `llama.cpp` proxy runtime.
+- The `qwen35` lane must publish:
+  - `backend = cpu`
+  - `execution_mode = proxy`
+  - `execution_engine = llama.cpp`
+  - `residency_mode = llama_cpp_proxy`
+  - single-request execution posture
+  - no scheduler policy claim
+- The first `qwen35` lane supports prompt-replay response-state flows on
+  `/v1/responses`.
+- The first `qwen35` lane must fail closed for structured outputs and tool
+  calling.
+
 ## Embeddings Requirements
 
 - explicit embeddings request/response contract

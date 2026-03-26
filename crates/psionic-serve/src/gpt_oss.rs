@@ -28,13 +28,13 @@ use std::{
 };
 
 use psionic_backend_cpu::{
-    decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot, CpuBackend,
+    CpuBackend, decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot,
 };
 use psionic_backend_cuda::{
-    ggml_q8_1_storage_bytes, CudaBackend, CudaBuffer, CudaGraphExec, CudaHostBuffer,
-    CudaQuantizedMatvecResult, CudaQuantizedMatvecStats, CudaSubmission, CudaSubmissionReport,
-    GGML_Q8_1_BLOCK_BYTES, GGML_Q8_1_BLOCK_ELEMENTS,
-    TEXT_GENERATION_SUPPORTED_OPS as CUDA_TEXT_GENERATION_SUPPORTED_OPS,
+    CudaBackend, CudaBuffer, CudaGraphExec, CudaHostBuffer, CudaQuantizedMatvecResult,
+    CudaQuantizedMatvecStats, CudaSubmission, CudaSubmissionReport, GGML_Q8_1_BLOCK_BYTES,
+    GGML_Q8_1_BLOCK_ELEMENTS, TEXT_GENERATION_SUPPORTED_OPS as CUDA_TEXT_GENERATION_SUPPORTED_OPS,
+    ggml_q8_1_storage_bytes,
 };
 use psionic_backend_metal::{
     MetalAttentionGraphReserve, MetalAttentionGraphRuntime, MetalBackend, MetalBuffer,
@@ -47,27 +47,29 @@ use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_core::Shape;
 use psionic_models::{GgufBlobArtifact, GptOssTokenizer, PagedTensorStorage};
 use psionic_runtime::{
-    build_gpt_oss_decode_graph, BackendRuntimeResources, CacheAction, CacheKind, CacheObservation,
-    CompilePathEvidence, CompilePathTemperature, DeviceDiscovery, GptOssDecodeGraph, HealthStatus,
+    BackendRuntimeResources, CacheAction, CacheKind, CacheObservation, CompilePathEvidence,
+    CompilePathTemperature, DeviceDiscovery, GptOssDecodeGraph, HealthStatus,
     KvCacheEncodingAccounting, KvCacheEncodingFamily, KvCacheEncodingObjective,
     KvCacheEncodingPolicy, KvCachePageLayout, KvCachePolicy, PrefixCacheIdentity,
+    build_gpt_oss_decode_graph,
 };
 use sha2::{Digest, Sha256};
 
 use super::{
-    continuous_batch_text_generation_execution_profile, current_time_millis,
-    default_generation_scheduler_policy, default_prefix_cache_policy,
-    generation_runtime_observability, run_continuous_batch_generation_requests,
-    run_generation_request, BackendHealthTracker, CompiledWordGenerationModel,
-    ContinuousBatchGenerationResult, DecodeStrategy, DecoderModelDescriptor, GenerationEventStream,
-    GenerationModelHandle, GenerationOptions, GenerationResponse, GenerationStreamEvent,
-    GenerationStreamStatus, GenerationStreamTerminal, GgufDecoderAdapterLoader, GgufDecoderFamily,
+    BackendHealthTracker, CompiledWordGenerationModel, ContinuousBatchGenerationResult,
+    DecodeStrategy, DecoderModelDescriptor, GenerationEventStream, GenerationModelHandle,
+    GenerationOptions, GenerationResponse, GenerationStreamEvent, GenerationStreamStatus,
+    GenerationStreamTerminal, GgufDecoderAdapterLoader, GgufDecoderFamily,
     GgufDecoderFamilyMetadata, GgufDecoderLayerTensorLayout, GptOssMetalDecodeLogitsMetrics,
     GptOssMetalLogitsOutputMode, GptOssPerformanceMetrics, InMemoryGenerationModelRegistry,
     InMemoryGenerationSessionStore, LoadedModelRegistryError, LoadedModelView,
     LocalRuntimeObservability, ManagedTextGenerationRuntime, ModelLoadError, PrefixCacheMode,
     PrefixCacheRefusalReason, QuantizationMode, ReferenceTextGenerationError, SharedPrefixStore,
     TextGenerationExecutor, TokenId, TokenSequence, TokenizerBoundary,
+    continuous_batch_text_generation_execution_profile, current_time_millis,
+    default_generation_scheduler_policy, default_prefix_cache_policy,
+    generation_runtime_observability, run_continuous_batch_generation_requests,
+    run_generation_request,
 };
 use thiserror::Error;
 
@@ -9252,9 +9254,15 @@ impl GptOssCudaLayer {
             backend,
             artifact,
             &[
-                layout.attention_query_weight.as_str(),
-                layout.attention_key_weight.as_str(),
-                layout.attention_value_weight.as_str(),
+                required_tensor_name(
+                    layout.attention_query_weight.as_ref(),
+                    "attention_query_weight",
+                )?,
+                required_tensor_name(layout.attention_key_weight.as_ref(), "attention_key_weight")?,
+                required_tensor_name(
+                    layout.attention_value_weight.as_ref(),
+                    "attention_value_weight",
+                )?,
             ],
             false,
             f16_mirror_state,
@@ -9264,7 +9272,10 @@ impl GptOssCudaLayer {
         let attention_output_weight = load_cuda_quantized_matrix(
             backend,
             artifact,
-            layout.attention_output_weight.as_str(),
+            required_tensor_name(
+                layout.attention_output_weight.as_ref(),
+                "attention_output_weight",
+            )?,
             false,
             f16_mirror_state,
             placement,
@@ -10819,7 +10830,10 @@ impl GptOssMetalLayer {
             attention_query_weight: load_metal_quantized_matrix(
                 backend,
                 artifact,
-                layout.attention_query_weight.as_str(),
+                required_tensor_name(
+                    layout.attention_query_weight.as_ref(),
+                    "attention_query_weight",
+                )?,
             )?,
             attention_query_bias: load_dense_vector(
                 artifact,
@@ -10828,7 +10842,7 @@ impl GptOssMetalLayer {
             attention_key_weight: load_metal_quantized_matrix(
                 backend,
                 artifact,
-                layout.attention_key_weight.as_str(),
+                required_tensor_name(layout.attention_key_weight.as_ref(), "attention_key_weight")?,
             )?,
             attention_key_bias: load_dense_vector(
                 artifact,
@@ -10837,7 +10851,10 @@ impl GptOssMetalLayer {
             attention_value_weight: load_metal_quantized_matrix(
                 backend,
                 artifact,
-                layout.attention_value_weight.as_str(),
+                required_tensor_name(
+                    layout.attention_value_weight.as_ref(),
+                    "attention_value_weight",
+                )?,
             )?,
             attention_value_bias: load_dense_vector(
                 artifact,
@@ -10846,7 +10863,10 @@ impl GptOssMetalLayer {
             attention_output_weight: load_metal_quantized_matrix(
                 backend,
                 artifact,
-                layout.attention_output_weight.as_str(),
+                required_tensor_name(
+                    layout.attention_output_weight.as_ref(),
+                    "attention_output_weight",
+                )?,
             )?,
             attention_output_bias: layout
                 .attention_output_bias
@@ -11181,7 +11201,10 @@ impl GptOssLayer {
             attention_norm: load_dense_vector(artifact, layout.attention_norm.as_str())?,
             attention_query_weight: load_quantized_matrix(
                 artifact,
-                layout.attention_query_weight.as_str(),
+                required_tensor_name(
+                    layout.attention_query_weight.as_ref(),
+                    "attention_query_weight",
+                )?,
             )?,
             attention_query_bias: load_dense_vector(
                 artifact,
@@ -11189,7 +11212,7 @@ impl GptOssLayer {
             )?,
             attention_key_weight: load_quantized_matrix(
                 artifact,
-                layout.attention_key_weight.as_str(),
+                required_tensor_name(layout.attention_key_weight.as_ref(), "attention_key_weight")?,
             )?,
             attention_key_bias: load_dense_vector(
                 artifact,
@@ -11197,7 +11220,10 @@ impl GptOssLayer {
             )?,
             attention_value_weight: load_quantized_matrix(
                 artifact,
-                layout.attention_value_weight.as_str(),
+                required_tensor_name(
+                    layout.attention_value_weight.as_ref(),
+                    "attention_value_weight",
+                )?,
             )?,
             attention_value_bias: load_dense_vector(
                 artifact,
@@ -11205,7 +11231,10 @@ impl GptOssLayer {
             )?,
             attention_output_weight: load_quantized_matrix(
                 artifact,
-                layout.attention_output_weight.as_str(),
+                required_tensor_name(
+                    layout.attention_output_weight.as_ref(),
+                    "attention_output_weight",
+                )?,
             )?,
             attention_output_bias: layout
                 .attention_output_bias
@@ -14240,12 +14269,11 @@ mod tests {
     #[cfg(target_os = "macos")]
     use super::CpuGgufGptOssTextGenerationService;
     use super::{
-        build_gpt_oss_decode_graph, can_use_q8_1_mmvq,
+        MetalGgufGptOssTextGenerationService, build_gpt_oss_decode_graph, can_use_q8_1_mmvq,
         decode_quantized_matrix_bytes_transposed_f16, decode_quantized_matrix_bytes_transposed_f32,
         decode_quantized_row_into, digest_gpt_oss_cuda_step_plan, f16_bits_to_f32,
         f32_slice_to_f16_bytes, f32_to_f16_bits, pack_quantized_expert_projection_bytes,
         pack_quantized_projection_bytes, split_projection_outputs,
-        MetalGgufGptOssTextGenerationService,
     };
     use crate::QuantizationMode;
     #[cfg(target_os = "macos")]
@@ -14369,12 +14397,14 @@ mod tests {
             KvCacheEncodingFamily::DenseF16Mirror
         );
         assert!(selection.accounting.downgraded);
-        assert!(selection
-            .accounting
-            .refusal_reason
-            .as_deref()
-            .unwrap_or_default()
-            .contains("cache width divisible by 32"));
+        assert!(
+            selection
+                .accounting
+                .refusal_reason
+                .as_deref()
+                .unwrap_or_default()
+                .contains("cache width divisible by 32")
+        );
     }
 
     #[test]
@@ -14385,12 +14415,14 @@ mod tests {
 
         assert_eq!(selection.encoding, super::CudaKvCacheEncoding::DenseF16);
         assert!(selection.accounting.downgraded);
-        assert!(selection
-            .accounting
-            .refusal_reason
-            .as_deref()
-            .unwrap_or_default()
-            .contains("only runs on CUDA"));
+        assert!(
+            selection
+                .accounting
+                .refusal_reason
+                .as_deref()
+                .unwrap_or_default()
+                .contains("only runs on CUDA")
+        );
     }
 
     #[test]
@@ -14418,11 +14450,13 @@ mod tests {
             KvCacheEncodingFamily::DenseF16Mirror
         );
         assert!(selection.downgraded);
-        assert!(selection
-            .refusal_reason
-            .as_deref()
-            .unwrap_or_default()
-            .contains("cache width divisible by 32"));
+        assert!(
+            selection
+                .refusal_reason
+                .as_deref()
+                .unwrap_or_default()
+                .contains("cache width divisible by 32")
+        );
     }
 
     #[test]
@@ -14432,11 +14466,13 @@ mod tests {
         );
 
         assert!(selection.downgraded);
-        assert!(selection
-            .refusal_reason
-            .as_deref()
-            .unwrap_or_default()
-            .contains("only runs on Metal"));
+        assert!(
+            selection
+                .refusal_reason
+                .as_deref()
+                .unwrap_or_default()
+                .contains("only runs on Metal")
+        );
     }
 
     #[test]
@@ -14489,8 +14525,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_matches_cpu_reference_on_synthetic_fixture(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_matches_cpu_reference_on_synthetic_fixture()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny-gpt-oss.gguf");
         write_test_gpt_oss_gguf(&path)?;
@@ -14526,8 +14562,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_reuses_device_prefix_and_reports_graph_metrics(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_reuses_device_prefix_and_reports_graph_metrics()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny-gpt-oss-device-kv.gguf");
         write_test_gpt_oss_gguf(&path)?;
@@ -14558,16 +14594,18 @@ mod tests {
                 .map(|value| value.temperature),
             Some(CompilePathTemperature::WarmReuse | CompilePathTemperature::ColdCompile)
         ));
-        assert!(first
-            .provenance
-            .as_ref()
-            .map(|value| {
-                value.cache_observations.iter().any(|observation| {
-                    observation.kind == CacheKind::KvState
-                        && observation.detail.contains("device-resident kv state")
+        assert!(
+            first
+                .provenance
+                .as_ref()
+                .map(|value| {
+                    value.cache_observations.iter().any(|observation| {
+                        observation.kind == CacheKind::KvState
+                            && observation.detail.contains("device-resident kv state")
+                    })
                 })
-            })
-            .unwrap_or(false));
+                .unwrap_or(false)
+        );
 
         let second = metal.generate(&request)?;
         assert_eq!(
@@ -14593,17 +14631,19 @@ mod tests {
                 .map(|value| value.temperature),
             Some(CompilePathTemperature::WarmReuse)
         );
-        assert!(second
-            .provenance
-            .as_ref()
-            .map(|value| {
-                value.cache_observations.iter().any(|observation| {
-                    observation.kind == CacheKind::KvState
-                        && observation.action == CacheAction::Reuse
-                        && observation.detail == "device-resident kv state was reused"
+        assert!(
+            second
+                .provenance
+                .as_ref()
+                .map(|value| {
+                    value.cache_observations.iter().any(|observation| {
+                        observation.kind == CacheKind::KvState
+                            && observation.action == CacheAction::Reuse
+                            && observation.detail == "device-resident kv state was reused"
+                    })
                 })
-            })
-            .unwrap_or(false));
+                .unwrap_or(false)
+        );
         Ok(())
     }
 
@@ -14633,8 +14673,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_batches_decode_kernels_into_fewer_submissions(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_batches_decode_kernels_into_fewer_submissions()
+    -> Result<(), Box<dyn std::error::Error>> {
         let perf =
             metal_perf_for_options("tiny-gpt-oss-metal-step-plan", GenerationOptions::greedy(1))?;
 
@@ -14661,8 +14701,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_reports_greedy_decode_logits_mode(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_reports_greedy_decode_logits_mode()
+    -> Result<(), Box<dyn std::error::Error>> {
         let metrics = metal_decode_logits_metrics_for_options(
             "tiny-gpt-oss-metal-greedy-logits",
             GenerationOptions::greedy(1),
@@ -14680,8 +14720,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_reports_bounded_top_k_decode_logits_mode(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_reports_bounded_top_k_decode_logits_mode()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut options = GenerationOptions::sample(1);
         options.top_k = Some(2);
         options.seed = Some(7);
@@ -14703,8 +14743,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn metal_gpt_oss_service_reports_raw_decode_logits_mode_when_required(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn metal_gpt_oss_service_reports_raw_decode_logits_mode_when_required()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut options = GenerationOptions::greedy(1);
         options.repeat_penalty = Some(1.1);
         let metrics =
@@ -15173,8 +15213,8 @@ mod tests {
     }
 
     #[test]
-    fn q8_0_transposed_f16_mirror_matches_quantized_projection_for_subnormal_scales_when_available(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn q8_0_transposed_f16_mirror_matches_quantized_projection_for_subnormal_scales_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
