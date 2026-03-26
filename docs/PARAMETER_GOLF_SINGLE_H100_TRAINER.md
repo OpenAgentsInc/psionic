@@ -109,6 +109,23 @@ This selector is only valid when `validation_eval_mode=sliding_window:<stride>`
 uses the same stride value.
 
 The single-H100 trainer now also carries an explicit
+`matrix_execution_mode` contract for the PGOLF matrix families:
+
+- default `matrix_execution_mode=direct_banked`
+- optional comparator `matrix_execution_mode=split_sliced`
+
+The CLI keeps the default `direct_banked` posture unless the caller sets:
+
+```bash
+PSIONIC_PARAMETER_GOLF_MATRIX_EXECUTION_MODE=split_sliced \
+  cargo run -q -p psionic-train --bin parameter_golf_single_h100_train
+```
+
+That comparator exists so same-node H100 receipts can attribute wallclock deltas
+to the direct banked matrix lane instead of conflating them with unrelated
+score-path changes.
+
+The single-H100 trainer now also carries an explicit
 `validation_batch_sequences` contract that is independent from the train batch
 geometry. The default remains the train-geometry batch size for
 `non_overlapping`, but sliding-window evaluation now widens onto the explicit
@@ -237,6 +254,10 @@ The command is explicit about what it treats as trainer truth. It binds:
   matrix surface, so the lowered graph can now bind the same bank vocabulary
   cited by the public top records instead of only the fully split per-layer
   matrix tensor list
+- an explicit `matrix_execution_mode` on that same matrix surface, so the
+  single-H100 lane can run the default direct banked lowering or the explicit
+  split-sliced comparator while preserving machine-readable receipt truth for
+  the chosen posture
 - integer token ids directly into the lowered graph, where token embedding
   lookup now happens on-device rather than through a host-owned embedded-input
   `Vec<f32>` gather before each train or validation batch
@@ -294,7 +315,8 @@ The command is explicit about what it treats as trainer truth. It binds:
   loss surface on device, and records a machine-readable
   validation runtime receipt with the resident parameter buffer count,
   stable-buffer allocation posture, named eval graph surface, token-write
-  cost, byte-accounting cost, and explicit eval mode for each validation pass;
+  cost, byte-accounting cost, explicit eval mode, and explicit
+  `matrix_execution_mode` for each validation pass;
   when legal score-first TTT has already refreshed resident training sessions,
   scored chunk evaluation now reuses those parameter buffers instead of forcing
   a second eager eval-only parameter upload
@@ -305,8 +327,9 @@ The command is explicit about what it treats as trainer truth. It binds:
   inputs every batch, reuses prepacked host `bf16` staging for BF16-visible
   parameter-state refresh instead of repacking those tensors on every step,
   and records one machine-readable training runtime receipt per completed step
-  with resident-buffer counts, named graph surface, resident upload cost,
-  parameter-refresh cost, and mutable token-write cost
+  with resident-buffer counts, named graph surface, explicit
+  `matrix_execution_mode`, resident upload cost, parameter-refresh cost, and
+  mutable token-write cost
 - preserved initial, periodic, and final validation receipts directly from the
   Psionic path, with the pre-export live-model validation retained separately
   whenever that posture is requested
@@ -396,6 +419,12 @@ Today the single-H100 trainer doc does **not** claim:
   the old OOM blocker, but both the live validation sweep and the
   `roundtrip_only` int8-zlib validation sweep are still far too large to serve
   as a quick exact-shape proof surface on one H100
+- fresh same-node H100 banked-vs-split attribution proof now exists; see
+  `docs/audits/2026-03-26-psionic-parameter-golf-single-h100-banked-vs-split-audit.md`.
+  The direct banked matrix path reached `train_runtime_receipt` in `478.511s`,
+  while the explicit `split_sliced` comparator still had no
+  `train_runtime_receipt` after `970s` and was terminated once it crossed `2x`
+  the direct-banked wallclock
 - the pre-fix failure remains retained as historical context in
   `docs/audits/2026-03-26-psionic-parameter-golf-single-h100-current-main-oom-audit.md`
 

@@ -42,6 +42,46 @@ pub struct ParameterGolfBaselineGraphParameterBinding {
     pub gradient_source: ParameterGolfBaselineGradientSource,
 }
 
+/// Explicit PGOLF matrix-execution posture for the banked runtime surface.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfMatrixExecutionMode {
+    /// Lower rank-3 banks through one direct bank-aware backend op.
+    DirectBanked,
+    /// Slice one logical matrix back out of the rank-3 bank and run the older
+    /// split-matrix hot path.
+    SplitSliced,
+}
+
+impl ParameterGolfMatrixExecutionMode {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::DirectBanked => "direct_banked",
+            Self::SplitSliced => "split_sliced",
+        }
+    }
+
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value.trim() {
+            "direct_banked" => Ok(Self::DirectBanked),
+            "split_sliced" => Ok(Self::SplitSliced),
+            other => Err(format!(
+                "unsupported parameter golf matrix execution mode `{other}`; expected `direct_banked` or `split_sliced`"
+            )),
+        }
+    }
+
+    #[must_use]
+    pub const fn uses_direct_banked_execution(self) -> bool {
+        matches!(self, Self::DirectBanked)
+    }
+}
+
+fn default_parameter_golf_matrix_execution_mode() -> ParameterGolfMatrixExecutionMode {
+    ParameterGolfMatrixExecutionMode::DirectBanked
+}
+
 /// Lowered Parameter Golf baseline graph plus machine-readable bindings.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfBaselineGraph {
@@ -211,6 +251,22 @@ pub fn build_parameter_golf_baseline_graph(
     batch_size: usize,
     sequence_length: usize,
 ) -> Result<ParameterGolfBaselineGraph, ParameterGolfBaselineGraphError> {
+    build_parameter_golf_baseline_graph_with_matrix_execution_mode(
+        device,
+        descriptor,
+        batch_size,
+        sequence_length,
+        default_parameter_golf_matrix_execution_mode(),
+    )
+}
+
+pub fn build_parameter_golf_baseline_graph_with_matrix_execution_mode(
+    device: Device,
+    descriptor: &ParameterGolfModelDescriptor,
+    batch_size: usize,
+    sequence_length: usize,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
+) -> Result<ParameterGolfBaselineGraph, ParameterGolfBaselineGraphError> {
     let mut builder = AutodiffGraphBuilder::with_context(device, AutodiffContext::training());
     let state = build_baseline_graph_state(
         &mut builder,
@@ -219,6 +275,7 @@ pub fn build_parameter_golf_baseline_graph(
         sequence_length,
         true,
         false,
+        matrix_execution_mode,
     )?;
     let graph = builder.finish(vec![state.pre_softcap_logits.clone()]);
 
@@ -240,6 +297,22 @@ pub fn build_parameter_golf_baseline_training_graph(
     batch_size: usize,
     sequence_length: usize,
 ) -> Result<ParameterGolfBaselineTrainingGraph, ParameterGolfBaselineGraphError> {
+    build_parameter_golf_baseline_training_graph_with_matrix_execution_mode(
+        device,
+        descriptor,
+        batch_size,
+        sequence_length,
+        default_parameter_golf_matrix_execution_mode(),
+    )
+}
+
+pub fn build_parameter_golf_baseline_training_graph_with_matrix_execution_mode(
+    device: Device,
+    descriptor: &ParameterGolfModelDescriptor,
+    batch_size: usize,
+    sequence_length: usize,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
+) -> Result<ParameterGolfBaselineTrainingGraph, ParameterGolfBaselineGraphError> {
     let use_bf16_fast_path = device.kind() == DeviceKind::Cuda;
     let mut builder = AutodiffGraphBuilder::with_context(device, AutodiffContext::training());
     let state = build_baseline_graph_state(
@@ -249,6 +322,7 @@ pub fn build_parameter_golf_baseline_training_graph(
         sequence_length,
         true,
         use_bf16_fast_path,
+        matrix_execution_mode,
     )?;
     let target_ids = builder.input(
         "target_ids",
@@ -283,6 +357,22 @@ pub fn build_parameter_golf_baseline_eval_graph(
     batch_size: usize,
     sequence_length: usize,
 ) -> Result<ParameterGolfBaselineEvalGraph, ParameterGolfBaselineGraphError> {
+    build_parameter_golf_baseline_eval_graph_with_matrix_execution_mode(
+        device,
+        descriptor,
+        batch_size,
+        sequence_length,
+        default_parameter_golf_matrix_execution_mode(),
+    )
+}
+
+pub fn build_parameter_golf_baseline_eval_graph_with_matrix_execution_mode(
+    device: Device,
+    descriptor: &ParameterGolfModelDescriptor,
+    batch_size: usize,
+    sequence_length: usize,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
+) -> Result<ParameterGolfBaselineEvalGraph, ParameterGolfBaselineGraphError> {
     let use_bf16_fast_path = device.kind() == DeviceKind::Cuda;
     let mut builder = AutodiffGraphBuilder::with_context(device, AutodiffContext::evaluation());
     let state = build_baseline_graph_state(
@@ -292,6 +382,7 @@ pub fn build_parameter_golf_baseline_eval_graph(
         sequence_length,
         false,
         use_bf16_fast_path,
+        matrix_execution_mode,
     )?;
     let target_ids = builder.input(
         "target_ids",
@@ -707,6 +798,7 @@ fn build_baseline_graph_state(
     sequence_length: usize,
     parameter_requires_grad: bool,
     use_bf16_fast_path: bool,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
 ) -> Result<ParameterGolfBaselineGraphBuildState, ParameterGolfBaselineGraphError> {
     let config = &descriptor.config;
     if batch_size == 0 {
@@ -888,7 +980,7 @@ fn build_baseline_graph_state(
         config.effective_rope_rotary_dim()?,
         config.rope_base,
     )?;
-    let use_banked_matrix_execution = true;
+    let use_banked_matrix_execution = matrix_execution_mode.uses_direct_banked_execution();
 
     let mut x = builder.rms_norm(
         &embedded_input,
@@ -2636,6 +2728,121 @@ mod tests {
         assert!(
             (split_loss - banked_loss).abs() < 5e-5,
             "banked graph loss drift exceeded tolerance: split={split_loss} banked={banked_loss}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parameter_golf_banked_training_graph_can_force_split_sliced_matrix_execution(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = load_baseline_fixture();
+        let model = baseline_model()?;
+        let banked_descriptor = model.banked_descriptor()?;
+        let direct_graph = build_parameter_golf_baseline_training_graph_with_matrix_execution_mode(
+            Device::cpu(),
+            &banked_descriptor,
+            fixture.input_ids.len(),
+            fixture.input_ids[0].len(),
+            ParameterGolfMatrixExecutionMode::DirectBanked,
+        )?;
+        let split_sliced_graph =
+            build_parameter_golf_baseline_training_graph_with_matrix_execution_mode(
+                Device::cpu(),
+                &banked_descriptor,
+                fixture.input_ids.len(),
+                fixture.input_ids[0].len(),
+                ParameterGolfMatrixExecutionMode::SplitSliced,
+            )?;
+
+        let bank_tensor_ids = [
+            PARAMETER_GOLF_QO_BANK_NAME,
+            PARAMETER_GOLF_KV_BANK_NAME,
+            PARAMETER_GOLF_MLP_UP_BANK_NAME,
+            PARAMETER_GOLF_MLP_DOWN_BANK_NAME,
+        ]
+        .into_iter()
+        .map(|parameter_id| {
+            split_sliced_graph
+                .parameter_binding(parameter_id)
+                .map(|binding| binding.graph_input_tensor_id)
+                .ok_or("missing bank binding")
+        })
+        .collect::<Result<std::collections::BTreeSet<_>, _>>()?;
+
+        let direct_banked_linear_count = direct_graph
+            .graph
+            .graph()
+            .nodes()
+            .iter()
+            .filter(|node| {
+                matches!(
+                    node.op(),
+                    OpKind::BackendExtension {
+                        op: BackendExtensionOp::ParameterGolfBankedLinear { .. }
+                    }
+                )
+            })
+            .count();
+        let split_sliced_banked_linear_count = split_sliced_graph
+            .graph
+            .graph()
+            .nodes()
+            .iter()
+            .filter(|node| {
+                matches!(
+                    node.op(),
+                    OpKind::BackendExtension {
+                        op: BackendExtensionOp::ParameterGolfBankedLinear { .. }
+                    }
+                )
+            })
+            .count();
+        let split_sliced_bank_slice_count = split_sliced_graph
+            .graph
+            .graph()
+            .nodes()
+            .iter()
+            .filter(|node| {
+                matches!(node.op(), OpKind::Slice { .. } | OpKind::Select { .. })
+                    && node
+                        .inputs()
+                        .iter()
+                        .any(|tensor_id| bank_tensor_ids.contains(tensor_id))
+            })
+            .count();
+
+        assert!(direct_banked_linear_count > 0);
+        assert_eq!(split_sliced_banked_linear_count, 0);
+        assert!(split_sliced_bank_slice_count > 0);
+
+        let direct_inputs = bind_parameter_golf_baseline_training_graph_inputs(
+            &direct_graph,
+            &model,
+            fixture.input_ids.as_slice(),
+            fixture.target_ids.as_slice(),
+        )?;
+        let split_sliced_inputs = bind_parameter_golf_baseline_training_graph_inputs(
+            &split_sliced_graph,
+            &model,
+            fixture.input_ids.as_slice(),
+            fixture.target_ids.as_slice(),
+        )?;
+        let direct_forward = evaluate_graph(direct_graph.graph.graph(), &direct_inputs)?;
+        let split_sliced_forward =
+            evaluate_graph(split_sliced_graph.graph.graph(), &split_sliced_inputs)?;
+        let direct_loss = direct_forward
+            .get(&direct_graph.loss_tensor_id)
+            .ok_or("missing direct loss tensor")?
+            .as_f32_slice()
+            .ok_or("direct loss tensor should be dense f32")?[0];
+        let split_sliced_loss = split_sliced_forward
+            .get(&split_sliced_graph.loss_tensor_id)
+            .ok_or("missing split-sliced loss tensor")?
+            .as_f32_slice()
+            .ok_or("split-sliced loss tensor should be dense f32")?[0];
+        assert!(
+            (direct_loss - split_sliced_loss).abs() < 5e-5,
+            "matrix execution mode loss drift exceeded tolerance: direct={direct_loss} split_sliced={split_sliced_loss}"
         );
         Ok(())
     }

@@ -131,6 +131,28 @@ boundary from the admitted CUDA train lane. It does not prove score closure by
 itself. Fresh H100 or `8xH100` receipts are still required for the wallclock
 claim.
 
+Current `main` now also exposes one explicit same-node H100 attribution seam
+above that runtime surface:
+
+- the single-H100 PGOLF trainer and its runtime receipts now carry an explicit
+  `matrix_execution_mode` with `direct_banked` as the default score-path lane
+  and `split_sliced` as the forced comparator
+- that lets the repo retain exact-shape same-node H100 A/B receipts that
+  isolate the banked matrix-execution effect instead of inferring it from a
+  broader moving target
+
+That attribution seam now has one retained exact-shape H100 proof in
+`docs/audits/2026-03-26-psionic-parameter-golf-single-h100-banked-vs-split-audit.md`:
+
+- `matrix_execution_mode=direct_banked` reached `train_runtime_receipt` in
+  `478.511s`
+- the explicit `matrix_execution_mode=split_sliced` comparator still had no
+  `train_runtime_receipt` after `970s`, had only completed `6/8` micro-steps,
+  and was terminated after crossing `2x` the direct-banked receipt time
+
+That same-node proof is enough to attribute a material train-step wallclock
+reduction to the banked execution path itself.
+
 Current `main` now also moves the admitted BF16 full-sequence PGOLF attention
 forward lane onto that batched scorepath:
 

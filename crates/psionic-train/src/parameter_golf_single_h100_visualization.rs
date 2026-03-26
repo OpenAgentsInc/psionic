@@ -1533,6 +1533,7 @@ mod tests {
             final_validation_mode: crate::ParameterGolfSingleH100ValidationMode::Both,
             validation_eval_mode: ParameterGolfValidationEvalMode::NonOverlapping,
             validation_batch_sequences: 64,
+            matrix_execution_mode: crate::ParameterGolfMatrixExecutionMode::DirectBanked,
             score_first_ttt: None,
             ema: None,
             swa: None,

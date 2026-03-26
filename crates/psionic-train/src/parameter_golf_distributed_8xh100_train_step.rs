@@ -61,7 +61,7 @@ use crate::{
     restore_parameter_golf_banked_weights_from_safetensors,
     restore_parameter_golf_model_from_safetensors, seed_parameter_states, zero_gradients,
     ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph, ParameterGolfBatchGeometry,
-    ParameterGolfDistributed8xH100BringupReport,
+    ParameterGolfDistributed8xH100BringupReport, ParameterGolfMatrixExecutionMode,
     ParameterGolfDistributed8xH100RuntimeBootstrapReceipt,
     ParameterGolfDistributedLiveVisualizationWriter, ParameterGolfDistributedStepObservation,
     ParameterGolfDistributedValidationShardObservation, ParameterGolfDistributedVisualizationError,
@@ -2239,6 +2239,7 @@ impl ParameterGolfDistributed8xH100WorkerRuntime {
                 ParameterGolfSingleH100TrainingRuntimeReceipt {
                     path: String::from("device_resident_cuda_training_graph_v1"),
                     graph_surface: String::from("parameter_golf_baseline_training_graph_v2"),
+                    matrix_execution_mode: ParameterGolfMatrixExecutionMode::DirectBanked,
                     session_count: self.training_session_cache.len(),
                     persistent_parameter_buffer_count: runtime.persistent_parameter_buffer_count,
                     persistent_parameter_value_count: runtime.persistent_parameter_value_count,
@@ -4689,6 +4690,7 @@ pub fn execute_parameter_golf_distributed_8xh100_train_step_child(
             ParameterGolfSingleH100TrainingRuntimeReceipt {
                 path: String::from("device_resident_cuda_training_graph_v1"),
                 graph_surface: String::from("parameter_golf_baseline_training_graph_v2"),
+                matrix_execution_mode: ParameterGolfMatrixExecutionMode::DirectBanked,
                 session_count: 0,
                 persistent_parameter_buffer_count: runtime.persistent_parameter_buffer_count,
                 persistent_parameter_value_count: runtime.persistent_parameter_value_count,

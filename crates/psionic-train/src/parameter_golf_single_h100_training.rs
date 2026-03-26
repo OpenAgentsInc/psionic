@@ -36,21 +36,26 @@ use crate::{
     apply_parameter_golf_cuda_bf16_master_weight_optimizer_step,
     apply_parameter_golf_cuda_muon_step, bind_parameter_golf_baseline_training_graph_inputs,
     bind_parameter_golf_baseline_training_graph_inputs_with_banked_weights,
-    build_parameter_golf_baseline_eval_graph, build_parameter_golf_baseline_training_graph,
+    build_parameter_golf_baseline_eval_graph_with_matrix_execution_mode,
+    build_parameter_golf_baseline_training_graph_with_matrix_execution_mode,
     build_tokenizer_digest, builtin_parameter_golf_cuda_training_capability_report,
     device_matches_single_h100, export_parameter_golf_quantized_model_artifact,
     inspect_local_single_h100_machine, materialize_parameter_golf_baseline_training_gradients,
     parameter_golf_optimizer_plan, parameter_golf_parameter_values_for_bindings,
     restore_parameter_golf_model_from_quantized_artifact, training_batch_from_window_tokens,
-    ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph, ParameterGolfBatchGeometry,
-    ParameterGolfBf16MasterWeightStepReceipt, ParameterGolfFinalArtifactConfig,
-    ParameterGolfOptimizerExecution, ParameterGolfOptimizerGroupKind, ParameterGolfOptimizerPlan,
-    ParameterGolfReferenceTrainingError, ParameterGolfSingleH100BringupError,
+    ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph,
+    ParameterGolfBatchGeometry, ParameterGolfBf16MasterWeightStepReceipt,
+    ParameterGolfFinalArtifactConfig, ParameterGolfMatrixExecutionMode,
+    ParameterGolfOptimizerExecution, ParameterGolfOptimizerGroupKind,
+    ParameterGolfOptimizerPlan, ParameterGolfReferenceTrainingError,
+    ParameterGolfSingleH100BringupError,
     ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100MachineObservation,
     ParameterGolfTrainError, ParameterGolfTrainingHyperparameters, TrainingOptimizerConfig,
     TrainingOptimizerState, TrainingPrecisionMode, PARAMETER_GOLF_SINGLE_H100_DATASET_REF,
     PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION, PARAMETER_GOLF_SINGLE_H100_VARIANT,
 };
+#[cfg(test)]
+use crate::{build_parameter_golf_baseline_eval_graph, build_parameter_golf_baseline_training_graph};
 
 /// Config for the bounded Rust-owned single-H100 Parameter Golf trainer lane.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -86,6 +91,9 @@ pub struct ParameterGolfSingleH100TrainingConfig {
     /// Explicit rank-local evaluation batch geometry, independent from train batching.
     #[serde(default = "default_single_h100_validation_batch_sequences")]
     pub validation_batch_sequences: usize,
+    /// Explicit matrix-execution posture for the banked PGOLF runtime surface.
+    #[serde(default = "default_parameter_golf_single_h100_matrix_execution_mode")]
+    pub matrix_execution_mode: ParameterGolfMatrixExecutionMode,
     /// Optional legal score-first TTT overlay for the final validation passes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub score_first_ttt: Option<ParameterGolfScoreFirstTttConfig>,
@@ -131,6 +139,7 @@ impl ParameterGolfSingleH100TrainingConfig {
                 &ParameterGolfBatchGeometry::challenge_single_device_defaults(),
                 &ParameterGolfValidationEvalMode::NonOverlapping,
             ),
+            matrix_execution_mode: default_parameter_golf_single_h100_matrix_execution_mode(),
             score_first_ttt: None,
             ema: None,
             swa: None,
@@ -523,6 +532,10 @@ fn default_single_h100_validation_batch_sequences() -> usize {
     )
 }
 
+fn default_parameter_golf_single_h100_matrix_execution_mode() -> ParameterGolfMatrixExecutionMode {
+    ParameterGolfMatrixExecutionMode::DirectBanked
+}
+
 /// Explicit legal score-first TTT configuration layered on top of
 /// sliding-window validation.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -890,6 +903,8 @@ pub struct ParameterGolfSingleH100TrainingStepMetrics {
 pub struct ParameterGolfSingleH100TrainingRuntimeReceipt {
     pub path: String,
     pub graph_surface: String,
+    #[serde(default = "default_parameter_golf_single_h100_matrix_execution_mode")]
+    pub matrix_execution_mode: ParameterGolfMatrixExecutionMode,
     pub session_count: usize,
     pub persistent_parameter_buffer_count: usize,
     pub persistent_parameter_value_count: u64,
@@ -923,6 +938,8 @@ pub struct ParameterGolfSingleH100ValidationSummary {
 pub struct ParameterGolfSingleH100ValidationRuntimeReceipt {
     pub path: String,
     pub graph_surface: String,
+    #[serde(default = "default_parameter_golf_single_h100_matrix_execution_mode")]
+    pub matrix_execution_mode: ParameterGolfMatrixExecutionMode,
     #[serde(default)]
     pub eval_mode: ParameterGolfValidationEvalMode,
     #[serde(default = "default_single_h100_validation_batch_sequences")]
@@ -1029,6 +1046,8 @@ pub struct ParameterGolfSingleH100TrainingReport {
     pub validation_eval_mode: ParameterGolfValidationEvalMode,
     #[serde(default = "default_single_h100_validation_batch_sequences")]
     pub validation_batch_sequences: usize,
+    #[serde(default = "default_parameter_golf_single_h100_matrix_execution_mode")]
+    pub matrix_execution_mode: ParameterGolfMatrixExecutionMode,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub score_first_ttt: Option<ParameterGolfScoreFirstTttConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1892,7 +1911,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
     };
 
     emit_progress_line(format!(
-        "single_h100_train_start run_id={} device={} max_steps={} iterations={} warmup_steps={} grad_accum_steps={} val_loss_every={} train_log_every={} final_validation_mode={} validation_eval_mode={} validation_batch_sequences={} local_train_sequences={} local_validation_sequences={} max_wallclock_seconds={}",
+        "single_h100_train_start run_id={} device={} max_steps={} iterations={} warmup_steps={} grad_accum_steps={} val_loss_every={} train_log_every={} final_validation_mode={} validation_eval_mode={} validation_batch_sequences={} matrix_execution_mode={} local_train_sequences={} local_validation_sequences={} max_wallclock_seconds={}",
         config.run_id,
         selected_device.device_name.as_deref().unwrap_or("unknown"),
         config.max_steps,
@@ -1904,6 +1923,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         config.final_validation_mode.as_str(),
         config.validation_eval_mode.as_str(),
         config.validation_batch_sequences,
+        config.matrix_execution_mode.as_str(),
         config.geometry.local_train_batch_sequences(),
         config.validation_batch_sequences,
         config.hyperparameters.max_wallclock_seconds.unwrap_or(0.0),
@@ -1983,6 +2003,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
                 requested_train_tokens,
                 warmup_step + 1,
                 config.warmup_steps,
+                config.matrix_execution_mode,
                 config.hyperparameters.grad_clip_norm,
                 learning_rate_multiplier,
                 muon_momentum,
@@ -2100,7 +2121,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
                 );
             }
             let validation_started = Instant::now();
-            let validation_summary = evaluate_validation_with_optional_score_first_ttt_on_cuda(
+            let validation_summary =
+                evaluate_validation_with_optional_score_first_ttt_on_cuda_and_matrix_execution_mode(
                 &mut cuda_backend,
                 &selected_device.device,
                 current_model.descriptor(),
@@ -2117,6 +2139,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
                 &mut train_graph_cache,
                 &stage_label,
                 live_visualization_writer.as_mut(),
+                config.matrix_execution_mode,
             )?;
             let observed_validation_ms = duration_ms(validation_started);
             if last_step {
@@ -2211,6 +2234,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
             requested_train_tokens,
             step + 1,
             config.max_steps,
+            config.matrix_execution_mode,
             config.hyperparameters.grad_clip_norm,
             learning_rate_multiplier,
             muon_momentum,
@@ -2327,7 +2351,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
             config.final_model_surface.as_str(),
         ));
         let validation_started = Instant::now();
-        let validation_summary = evaluate_validation_with_optional_score_first_ttt_on_cuda(
+        let validation_summary =
+            evaluate_validation_with_optional_score_first_ttt_on_cuda_and_matrix_execution_mode(
             &mut cuda_backend,
             &selected_device.device,
             final_model.descriptor(),
@@ -2342,6 +2367,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
             &mut train_graph_cache,
             &stage_label,
             live_visualization_writer.as_mut(),
+            config.matrix_execution_mode,
         )?;
         let observed_validation_ms = duration_ms(validation_started);
         pre_export_final_validation_observed_ms = Some(observed_validation_ms);
@@ -2386,7 +2412,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
             compressed_model_artifact.bytes.as_slice(),
         )?;
         let roundtrip_validation_started = Instant::now();
-        let roundtrip_validation = evaluate_validation_with_optional_score_first_ttt_on_cuda(
+        let roundtrip_validation =
+            evaluate_validation_with_optional_score_first_ttt_on_cuda_and_matrix_execution_mode(
             &mut cuda_backend,
             &selected_device.device,
             roundtrip_model.descriptor(),
@@ -2401,6 +2428,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
             &mut train_graph_cache,
             final_roundtrip_metric_source,
             live_visualization_writer.as_mut(),
+            config.matrix_execution_mode,
         )?;
         let roundtrip_observed_ms = duration_ms(roundtrip_validation_started);
         emit_progress_line(format!(
@@ -2502,11 +2530,12 @@ fn build_parameter_golf_single_h100_training_report_inner(
         }
     };
     let summary = format!(
-        "The Rust-owned single-H100 trainer executed {} optimizer step(s) with challenge single-device geometry on CUDA, used the widened train_gpt.py-style warmup, validation, and wallclock-stop control loop, ran with final_validation_mode={}, validation_eval_mode={}, validation_batch_sequences={}, and final_model_surface={}, {} before stopping via {:?}.",
+        "The Rust-owned single-H100 trainer executed {} optimizer step(s) with challenge single-device geometry on CUDA, used the widened train_gpt.py-style warmup, validation, and wallclock-stop control loop, ran with final_validation_mode={}, validation_eval_mode={}, validation_batch_sequences={}, matrix_execution_mode={}, and final_model_surface={}, {} before stopping via {:?}.",
         step,
         config.final_validation_mode.as_str(),
         config.validation_eval_mode.as_str(),
         config.validation_batch_sequences,
+        config.matrix_execution_mode.as_str(),
         config.final_model_surface.as_str(),
         final_metric_surface,
         realized_stop_reason
@@ -2536,6 +2565,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         final_validation_mode: config.final_validation_mode,
         validation_eval_mode: config.validation_eval_mode.clone(),
         validation_batch_sequences: config.validation_batch_sequences,
+        matrix_execution_mode: config.matrix_execution_mode,
         score_first_ttt: config.score_first_ttt.clone(),
         ema: config.ema.clone(),
         swa: config.swa.clone(),
@@ -2631,6 +2661,7 @@ fn refusal_report(
         final_validation_mode: config.final_validation_mode,
         validation_eval_mode: config.validation_eval_mode.clone(),
         validation_batch_sequences: config.validation_batch_sequences,
+        matrix_execution_mode: config.matrix_execution_mode,
         score_first_ttt: config.score_first_ttt.clone(),
         ema: config.ema.clone(),
         swa: config.swa.clone(),
@@ -3192,6 +3223,41 @@ pub(crate) fn execute_parameter_golf_training_gradient_batch_from_examples(
     ),
     ParameterGolfSingleH100TrainingError,
 > {
+    execute_parameter_golf_training_gradient_batch_from_examples_with_matrix_execution_mode(
+        cuda_backend,
+        device,
+        current_model,
+        explicit_banked_weights,
+        graph_cache,
+        training_session_cache,
+        sequence_length,
+        input_ids,
+        target_ids,
+        ParameterGolfMatrixExecutionMode::DirectBanked,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn execute_parameter_golf_training_gradient_batch_from_examples_with_matrix_execution_mode(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    current_model: &ParameterGolfReferenceModel,
+    explicit_banked_weights: Option<&ParameterGolfBankedWeights>,
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineTrainingGraph>,
+    training_session_cache: Option<&mut BTreeMap<usize, ParameterGolfCudaTrainingSession>>,
+    sequence_length: usize,
+    input_ids: &[Vec<u32>],
+    target_ids: &[Vec<u32>],
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
+) -> Result<
+    (
+        f32,
+        BTreeMap<String, Vec<f32>>,
+        ParameterGolfSingleH100PhaseTimings,
+        Option<ParameterGolfTrainingBatchRuntime>,
+    ),
+    ParameterGolfSingleH100TrainingError,
+> {
     let batch_size = input_ids.len();
     let mut phase_timings = ParameterGolfSingleH100PhaseTimings::default();
     let (graph, backward_plan, loss, backward_outputs, runtime) =
@@ -3205,6 +3271,7 @@ pub(crate) fn execute_parameter_golf_training_gradient_batch_from_examples(
                 explicit_banked_weights,
                 batch_size,
                 sequence_length,
+                matrix_execution_mode,
             )?;
             let (loss, backward_outputs, runtime) =
                 session.execute_batch(cuda_backend, input_ids, target_ids)?;
@@ -3222,6 +3289,7 @@ pub(crate) fn execute_parameter_golf_training_gradient_batch_from_examples(
                 current_model,
                 batch_size,
                 sequence_length,
+                matrix_execution_mode,
             )?;
             let inputs = bind_parameter_golf_baseline_training_graph_inputs_with_banked_weights(
                 graph,
@@ -3307,6 +3375,33 @@ pub(crate) fn execute_parameter_golf_training_gradient_batch(
     geometry: &ParameterGolfBatchGeometry,
     window: &ParameterGolfTokenStreamWindow,
 ) -> Result<ParameterGolfTrainingGradientBatchResult, ParameterGolfSingleH100TrainingError> {
+    execute_parameter_golf_training_gradient_batch_with_matrix_execution_mode(
+        cuda_backend,
+        device,
+        bundle,
+        current_model,
+        explicit_banked_weights,
+        graph_cache,
+        training_session_cache,
+        geometry,
+        window,
+        ParameterGolfMatrixExecutionMode::DirectBanked,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn execute_parameter_golf_training_gradient_batch_with_matrix_execution_mode(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    bundle: &ParameterGolfDatasetBundle,
+    current_model: &ParameterGolfReferenceModel,
+    explicit_banked_weights: Option<&ParameterGolfBankedWeights>,
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineTrainingGraph>,
+    training_session_cache: Option<&mut BTreeMap<usize, ParameterGolfCudaTrainingSession>>,
+    geometry: &ParameterGolfBatchGeometry,
+    window: &ParameterGolfTokenStreamWindow,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
+) -> Result<ParameterGolfTrainingGradientBatchResult, ParameterGolfSingleH100TrainingError> {
     let mut phase_timings = ParameterGolfSingleH100PhaseTimings::default();
 
     let tokens_started = Instant::now();
@@ -3314,7 +3409,7 @@ pub(crate) fn execute_parameter_golf_training_gradient_batch(
     phase_timings.token_materialization_ms = duration_ms(tokens_started);
     let (input_ids, target_ids) = training_batch_from_window_tokens(tokens.as_slice(), geometry)?;
     let (loss, gradients, batch_phase_timings, runtime) =
-        execute_parameter_golf_training_gradient_batch_from_examples(
+        execute_parameter_golf_training_gradient_batch_from_examples_with_matrix_execution_mode(
             cuda_backend,
             device,
             current_model,
@@ -3324,6 +3419,7 @@ pub(crate) fn execute_parameter_golf_training_gradient_batch(
             geometry.train_sequence_length,
             input_ids.as_slice(),
             target_ids.as_slice(),
+            matrix_execution_mode,
         )?;
     phase_timings.accumulate(&batch_phase_timings);
 
@@ -3352,6 +3448,7 @@ fn execute_training_step(
     requested_train_tokens: u64,
     global_step: u64,
     max_steps: u64,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
     grad_clip_norm: f32,
     learning_rate_multiplier: f32,
     muon_momentum: f32,
@@ -3399,7 +3496,7 @@ fn execute_training_step(
             .window_planning_ms
             .saturating_add(duration_ms(plan_started));
         *cursor = window.end_cursor.clone();
-        let gradient_batch = execute_parameter_golf_training_gradient_batch(
+        let gradient_batch = execute_parameter_golf_training_gradient_batch_with_matrix_execution_mode(
             cuda_backend,
             device,
             bundle,
@@ -3409,6 +3506,7 @@ fn execute_training_step(
             Some(training_session_cache),
             geometry,
             &window,
+            matrix_execution_mode,
         )?;
         window_ids.push(gradient_batch.window_id.clone());
         microbatch_loss_sum += gradient_batch.loss;
@@ -3499,6 +3597,7 @@ fn execute_training_step(
         ParameterGolfSingleH100TrainingRuntimeReceipt {
             path: String::from("device_resident_cuda_training_graph_v1"),
             graph_surface: String::from("parameter_golf_baseline_training_graph_v2"),
+            matrix_execution_mode,
             session_count: training_session_cache.len(),
             persistent_parameter_buffer_count: batch_runtime_totals
                 .persistent_parameter_buffer_count,
@@ -3549,10 +3648,11 @@ fn execute_training_step(
         ));
         if let Some(runtime_receipt) = step_metrics.runtime_receipt.as_ref() {
             emit_progress_line(format!(
-                "train_runtime_receipt step={} path={} graph_surface={} sessions={} stable_parameter_buffers={} stable_parameter_values={} resident_parameter_upload_us={} parameter_refresh_us={} input_token_write_us={} target_token_write_us={} resident_buffers_reused={}",
+                "train_runtime_receipt step={} path={} graph_surface={} matrix_execution_mode={} sessions={} stable_parameter_buffers={} stable_parameter_values={} resident_parameter_upload_us={} parameter_refresh_us={} input_token_write_us={} target_token_write_us={} resident_buffers_reused={}",
                 step_metrics.global_step,
                 runtime_receipt.path,
                 runtime_receipt.graph_surface,
+                runtime_receipt.matrix_execution_mode.as_str(),
                 runtime_receipt.session_count,
                 runtime_receipt.persistent_parameter_buffer_count,
                 runtime_receipt.persistent_parameter_value_count,
@@ -3581,6 +3681,39 @@ pub(crate) fn evaluate_validation_on_cuda(
     stage_label: &str,
     live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
 ) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    evaluate_validation_on_cuda_with_matrix_execution_mode(
+        cuda_backend,
+        device,
+        descriptor,
+        model,
+        validation_tokens,
+        byte_luts,
+        sequence_length,
+        batch_sequences,
+        eval_mode,
+        graph_cache,
+        stage_label,
+        live_visualization_writer,
+        ParameterGolfMatrixExecutionMode::DirectBanked,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn evaluate_validation_on_cuda_with_matrix_execution_mode(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    eval_mode: &ParameterGolfValidationEvalMode,
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
+    stage_label: &str,
+    live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
+) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
     evaluate_validation_on_cuda_with_parameter_buffers(
         cuda_backend,
         device,
@@ -3592,6 +3725,7 @@ pub(crate) fn evaluate_validation_on_cuda(
         sequence_length,
         batch_sequences,
         eval_mode,
+        matrix_execution_mode,
         graph_cache,
         stage_label,
         live_visualization_writer,
@@ -3614,6 +3748,41 @@ pub(crate) fn evaluate_validation_on_cuda_with_resident_training_parameters(
     stage_label: &str,
     live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
 ) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    evaluate_validation_on_cuda_with_resident_training_parameters_and_matrix_execution_mode(
+        cuda_backend,
+        device,
+        descriptor,
+        model,
+        resident_training_sessions,
+        validation_tokens,
+        byte_luts,
+        sequence_length,
+        batch_sequences,
+        eval_mode,
+        graph_cache,
+        stage_label,
+        live_visualization_writer,
+        ParameterGolfMatrixExecutionMode::DirectBanked,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn evaluate_validation_on_cuda_with_resident_training_parameters_and_matrix_execution_mode(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
+    resident_training_sessions: &BTreeMap<usize, ParameterGolfCudaTrainingSession>,
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    eval_mode: &ParameterGolfValidationEvalMode,
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
+    stage_label: &str,
+    live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
+) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
     evaluate_validation_on_cuda_with_parameter_buffers(
         cuda_backend,
         device,
@@ -3625,6 +3794,7 @@ pub(crate) fn evaluate_validation_on_cuda_with_resident_training_parameters(
         sequence_length,
         batch_sequences,
         eval_mode,
+        matrix_execution_mode,
         graph_cache,
         stage_label,
         live_visualization_writer,
@@ -3643,6 +3813,7 @@ fn evaluate_validation_on_cuda_with_parameter_buffers(
     sequence_length: usize,
     batch_sequences: usize,
     eval_mode: &ParameterGolfValidationEvalMode,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
     graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
     stage_label: &str,
     live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
@@ -3673,6 +3844,7 @@ fn evaluate_validation_on_cuda_with_parameter_buffers(
         model,
         sequence_length,
         eval_mode,
+        matrix_execution_mode,
         graph_cache,
         stage_label,
         live_visualization_writer,
@@ -3698,6 +3870,41 @@ pub(crate) fn evaluate_validation_window_starts_on_cuda(
     stage_label: &str,
     live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
 ) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    evaluate_validation_window_starts_on_cuda_with_matrix_execution_mode(
+        cuda_backend,
+        device,
+        descriptor,
+        model,
+        validation_tokens,
+        byte_luts,
+        sequence_length,
+        batch_sequences,
+        stride,
+        window_starts,
+        graph_cache,
+        stage_label,
+        live_visualization_writer,
+        ParameterGolfMatrixExecutionMode::DirectBanked,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn evaluate_validation_window_starts_on_cuda_with_matrix_execution_mode(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    stride: usize,
+    window_starts: &[usize],
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
+    stage_label: &str,
+    live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
+) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
     evaluate_validation_window_starts_on_cuda_with_parameter_buffers(
         cuda_backend,
         device,
@@ -3710,6 +3917,7 @@ pub(crate) fn evaluate_validation_window_starts_on_cuda(
         batch_sequences,
         stride,
         window_starts,
+        matrix_execution_mode,
         graph_cache,
         stage_label,
         live_visualization_writer,
@@ -3733,6 +3941,43 @@ pub(crate) fn evaluate_validation_window_starts_on_cuda_with_resident_training_p
     stage_label: &str,
     live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
 ) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    evaluate_validation_window_starts_on_cuda_with_resident_training_parameters_and_matrix_execution_mode(
+        cuda_backend,
+        device,
+        descriptor,
+        model,
+        resident_training_sessions,
+        validation_tokens,
+        byte_luts,
+        sequence_length,
+        batch_sequences,
+        stride,
+        window_starts,
+        graph_cache,
+        stage_label,
+        live_visualization_writer,
+        ParameterGolfMatrixExecutionMode::DirectBanked,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn evaluate_validation_window_starts_on_cuda_with_resident_training_parameters_and_matrix_execution_mode(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
+    resident_training_sessions: &BTreeMap<usize, ParameterGolfCudaTrainingSession>,
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    stride: usize,
+    window_starts: &[usize],
+    graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
+    stage_label: &str,
+    live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
+) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
     evaluate_validation_window_starts_on_cuda_with_parameter_buffers(
         cuda_backend,
         device,
@@ -3745,6 +3990,7 @@ pub(crate) fn evaluate_validation_window_starts_on_cuda_with_resident_training_p
         batch_sequences,
         stride,
         window_starts,
+        matrix_execution_mode,
         graph_cache,
         stage_label,
         live_visualization_writer,
@@ -3764,6 +4010,7 @@ fn evaluate_validation_window_starts_on_cuda_with_parameter_buffers(
     batch_sequences: usize,
     stride: usize,
     window_starts: &[usize],
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
     graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
     stage_label: &str,
     live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
@@ -3795,6 +4042,7 @@ fn evaluate_validation_window_starts_on_cuda_with_parameter_buffers(
         model,
         sequence_length,
         &eval_mode,
+        matrix_execution_mode,
         graph_cache,
         stage_label,
         live_visualization_writer,
@@ -3822,6 +4070,43 @@ pub(crate) fn evaluate_validation_with_optional_score_first_ttt_on_cuda(
     stage_label: &str,
     live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
 ) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
+    evaluate_validation_with_optional_score_first_ttt_on_cuda_and_matrix_execution_mode(
+        cuda_backend,
+        device,
+        descriptor,
+        model,
+        validation_tokens,
+        byte_luts,
+        sequence_length,
+        batch_sequences,
+        eval_mode,
+        score_first_ttt,
+        eval_graph_cache,
+        train_graph_cache,
+        stage_label,
+        live_visualization_writer,
+        ParameterGolfMatrixExecutionMode::DirectBanked,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn evaluate_validation_with_optional_score_first_ttt_on_cuda_and_matrix_execution_mode(
+    cuda_backend: &mut CudaBackend,
+    device: &psionic_core::Device,
+    descriptor: &psionic_models::ParameterGolfModelDescriptor,
+    model: &ParameterGolfReferenceModel,
+    validation_tokens: &[u16],
+    byte_luts: &ParameterGolfSentencePieceByteLuts,
+    sequence_length: usize,
+    batch_sequences: usize,
+    eval_mode: &ParameterGolfValidationEvalMode,
+    score_first_ttt: Option<&ParameterGolfScoreFirstTttConfig>,
+    eval_graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
+    train_graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineTrainingGraph>,
+    stage_label: &str,
+    live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
+) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
     match score_first_ttt {
         Some(score_first_ttt) => evaluate_score_first_ttt_on_cuda(
             cuda_backend,
@@ -3838,8 +4123,9 @@ pub(crate) fn evaluate_validation_with_optional_score_first_ttt_on_cuda(
             train_graph_cache,
             stage_label,
             live_visualization_writer,
+            matrix_execution_mode,
         ),
-        None => evaluate_validation_on_cuda(
+        None => evaluate_validation_on_cuda_with_matrix_execution_mode(
             cuda_backend,
             device,
             descriptor,
@@ -3852,6 +4138,7 @@ pub(crate) fn evaluate_validation_with_optional_score_first_ttt_on_cuda(
             eval_graph_cache,
             stage_label,
             live_visualization_writer,
+            matrix_execution_mode,
         ),
     }
 }
@@ -3872,6 +4159,7 @@ fn evaluate_score_first_ttt_on_cuda(
     train_graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineTrainingGraph>,
     stage_label: &str,
     live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
 ) -> Result<ParameterGolfSingleH100ValidationSummary, ParameterGolfSingleH100TrainingError> {
     let stride = match eval_mode {
         ParameterGolfValidationEvalMode::SlidingWindow { stride } => *stride,
@@ -3935,7 +4223,7 @@ fn evaluate_score_first_ttt_on_cuda(
 
     for chunk_plan in chunk_plans {
         let score_summary = if training_session_cache.is_empty() {
-            evaluate_validation_window_starts_on_cuda(
+            evaluate_validation_window_starts_on_cuda_with_matrix_execution_mode(
                 cuda_backend,
                 device,
                 descriptor,
@@ -3951,9 +4239,10 @@ fn evaluate_score_first_ttt_on_cuda(
                 live_visualization_writer
                     .as_mut()
                     .map(|writer| &mut **writer),
+                matrix_execution_mode,
             )?
         } else {
-            evaluate_validation_window_starts_on_cuda_with_resident_training_parameters(
+            evaluate_validation_window_starts_on_cuda_with_resident_training_parameters_and_matrix_execution_mode(
                 cuda_backend,
                 device,
                 descriptor,
@@ -3970,6 +4259,7 @@ fn evaluate_score_first_ttt_on_cuda(
                 live_visualization_writer
                     .as_mut()
                     .map(|writer| &mut **writer),
+                matrix_execution_mode,
             )?
         };
         total_loss_sum += score_summary.mean_loss * score_summary.evaluated_token_count as f64;
@@ -4008,7 +4298,7 @@ fn evaluate_score_first_ttt_on_cuda(
                     )?;
                     let step_started = Instant::now();
                     let (_loss, gradients, _, _) =
-                        execute_parameter_golf_training_gradient_batch_from_examples(
+                        execute_parameter_golf_training_gradient_batch_from_examples_with_matrix_execution_mode(
                             cuda_backend,
                             device,
                             &current_model,
@@ -4018,6 +4308,7 @@ fn evaluate_score_first_ttt_on_cuda(
                             sequence_length,
                             input_ids.as_slice(),
                             target_ids.as_slice(),
+                            matrix_execution_mode,
                         )?;
                     let mut trainable_gradients = gradients
                         .into_iter()
@@ -4325,6 +4616,7 @@ fn evaluate_validation_batch_plans_on_cuda(
     model: &ParameterGolfReferenceModel,
     sequence_length: usize,
     eval_mode: &ParameterGolfValidationEvalMode,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
     graph_cache: &mut BTreeMap<usize, ParameterGolfBaselineEvalGraph>,
     stage_label: &str,
     live_visualization_writer: Option<&mut crate::ParameterGolfSingleH100LiveVisualizationWriter>,
@@ -4367,6 +4659,7 @@ fn evaluate_validation_batch_plans_on_cuda(
             resident_training_sessions,
             batch_plan.batch_sequences,
             sequence_length,
+            matrix_execution_mode,
         )?;
         let (batch_token_losses, batch_runtime) =
             session.execute_batch(cuda_backend, batch_plan)?;
@@ -4429,6 +4722,7 @@ fn evaluate_validation_batch_plans_on_cuda(
     let runtime_receipt = ParameterGolfSingleH100ValidationRuntimeReceipt {
         path: String::from("device_resident_cuda_eval_graph_v1"),
         graph_surface: String::from("parameter_golf_baseline_eval_graph_v2"),
+        matrix_execution_mode,
         eval_mode: eval_mode.clone(),
         local_batch_sequences,
         session_count: session_cache.len(),
@@ -4446,11 +4740,12 @@ fn evaluate_validation_batch_plans_on_cuda(
         total_byte_accounting_us,
     };
     emit_progress_line(format!(
-        "validation_runtime_receipt stage={} eval_mode={} path={} graph_surface={} batch_sequences={} sessions={} total_units={} stable_parameter_buffers={} stable_parameter_values={} resident_parameter_upload_us={} input_token_write_us={} target_token_write_us={} byte_accounting_us={}",
+        "validation_runtime_receipt stage={} eval_mode={} path={} graph_surface={} matrix_execution_mode={} batch_sequences={} sessions={} total_units={} stable_parameter_buffers={} stable_parameter_values={} resident_parameter_upload_us={} input_token_write_us={} target_token_write_us={} byte_accounting_us={}",
         stage_label,
         eval_mode.as_str(),
         runtime_receipt.path,
         runtime_receipt.graph_surface,
+        runtime_receipt.matrix_execution_mode.as_str(),
         runtime_receipt.local_batch_sequences,
         runtime_receipt.session_count,
         runtime_receipt.total_units,
@@ -4551,6 +4846,7 @@ fn evaluate_validation_on_cuda_legacy(
             model,
             input_ids.len(),
             sequence_length,
+            ParameterGolfMatrixExecutionMode::DirectBanked,
         )?;
         let inputs = bind_parameter_golf_baseline_training_graph_inputs(
             graph,
@@ -4854,11 +5150,18 @@ fn validation_session_for_batch<'a>(
     resident_training_sessions: Option<&BTreeMap<usize, ParameterGolfCudaTrainingSession>>,
     batch_sequences: usize,
     sequence_length: usize,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
 ) -> Result<&'a mut ParameterGolfCudaValidationSession, ParameterGolfSingleH100TrainingError> {
     if !cache.contains_key(&batch_sequences) {
-        let graph =
-            eval_graph_for_batch(graph_cache, device, model, batch_sequences, sequence_length)?
-                .clone();
+        let graph = eval_graph_for_batch(
+            graph_cache,
+            device,
+            model,
+            batch_sequences,
+            sequence_length,
+            matrix_execution_mode,
+        )?
+        .clone();
         let session = match resident_validation_parameter_source_session(resident_training_sessions)
         {
             Some(training_session) => {
@@ -4904,11 +5207,18 @@ fn training_session_for_batch<'a>(
     explicit_banked_weights: Option<&ParameterGolfBankedWeights>,
     batch_sequences: usize,
     sequence_length: usize,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
 ) -> Result<&'a mut ParameterGolfCudaTrainingSession, ParameterGolfSingleH100TrainingError> {
     if !cache.contains_key(&batch_sequences) {
-        let graph =
-            training_graph_for_batch(graph_cache, device, model, batch_sequences, sequence_length)?
-                .clone();
+        let graph = training_graph_for_batch(
+            graph_cache,
+            device,
+            model,
+            batch_sequences,
+            sequence_length,
+            matrix_execution_mode,
+        )?
+        .clone();
         let session = ParameterGolfCudaTrainingSession::new(
             cuda_backend,
             graph,
@@ -4955,14 +5265,16 @@ fn training_graph_for_batch<'a>(
     model: &ParameterGolfReferenceModel,
     batch_size: usize,
     sequence_length: usize,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
 ) -> Result<&'a ParameterGolfBaselineTrainingGraph, ParameterGolfSingleH100TrainingError> {
     if !cache.contains_key(&batch_size) {
         let descriptor = model.banked_descriptor()?;
-        let graph = build_parameter_golf_baseline_training_graph(
+        let graph = build_parameter_golf_baseline_training_graph_with_matrix_execution_mode(
             device,
             &descriptor,
             batch_size,
             sequence_length,
+            matrix_execution_mode,
         )?;
         cache.insert(batch_size, graph);
     }
@@ -4979,14 +5291,16 @@ fn eval_graph_for_batch<'a>(
     model: &ParameterGolfReferenceModel,
     batch_size: usize,
     sequence_length: usize,
+    matrix_execution_mode: ParameterGolfMatrixExecutionMode,
 ) -> Result<&'a ParameterGolfBaselineEvalGraph, ParameterGolfSingleH100TrainingError> {
     if !cache.contains_key(&batch_size) {
         let descriptor = model.banked_descriptor()?;
-        let graph = build_parameter_golf_baseline_eval_graph(
+        let graph = build_parameter_golf_baseline_eval_graph_with_matrix_execution_mode(
             device,
             &descriptor,
             batch_size,
             sequence_length,
+            matrix_execution_mode,
         )?;
         cache.insert(batch_size, graph);
     }
@@ -7027,6 +7341,7 @@ mod tests {
             Some(&banked_weights),
             1,
             sequence_length,
+            ParameterGolfMatrixExecutionMode::DirectBanked,
         )?;
 
         let byte_luts = ParameterGolfSentencePieceByteLuts {
@@ -7137,6 +7452,7 @@ mod tests {
             &mut train_graph_cache,
             "score_first_ttt_resident_eval_reuse",
             None,
+            ParameterGolfMatrixExecutionMode::DirectBanked,
         )?;
         let receipt = summary
             .score_first_ttt_receipt

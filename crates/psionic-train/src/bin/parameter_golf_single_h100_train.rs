@@ -2,6 +2,7 @@ use std::{env, path::PathBuf};
 
 use psionic_train::{
     parameter_golf_default_validation_batch_sequences,
+    ParameterGolfMatrixExecutionMode,
     write_parameter_golf_single_h100_training_report, ParameterGolfScoreFirstTttConfig,
     ParameterGolfSingleH100TrainingConfig, ParameterGolfSingleH100ValidationMode,
     ParameterGolfValidationEvalMode,
@@ -52,6 +53,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(score_first_ttt) = score_first_ttt {
         config.score_first_ttt = Some(score_first_ttt);
     }
+    if let Some(matrix_execution_mode) = env::var_os("PSIONIC_PARAMETER_GOLF_MATRIX_EXECUTION_MODE")
+    {
+        let raw = matrix_execution_mode.to_string_lossy();
+        config.matrix_execution_mode = ParameterGolfMatrixExecutionMode::parse(raw.as_ref())
+            .map_err(|message| std::io::Error::new(std::io::ErrorKind::InvalidInput, message))?;
+    }
     let report = write_parameter_golf_single_h100_training_report(&output_path, &config)?;
     println!(
         "wrote {} with disposition {:?} executed_steps={} stop_reason={:?}",
@@ -61,7 +68,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         report.stop_reason,
     );
     println!(
-        "warmup_steps={} completed_warmup_steps={} measured_training_time_ms={} validation_checkpoints={} final_validation_mode={} validation_eval_mode={} validation_batch_sequences={}",
+        "warmup_steps={} completed_warmup_steps={} measured_training_time_ms={} validation_checkpoints={} final_validation_mode={} validation_eval_mode={} validation_batch_sequences={} matrix_execution_mode={}",
         report.warmup_steps,
         report.completed_warmup_steps,
         report.observed_training_time_ms,
@@ -69,6 +76,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         report.final_validation_mode.as_str(),
         report.validation_eval_mode.as_str(),
         report.validation_batch_sequences,
+        report.matrix_execution_mode.as_str(),
     );
     if let Some(score_first_ttt) = report.score_first_ttt.as_ref() {
         println!(
